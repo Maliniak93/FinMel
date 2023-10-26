@@ -1,0 +1,103 @@
+[
+  {
+    "Code": "X_09",
+    "Description": "Odsetki od salda dodatniego",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": " ",
+    "Description": "Podatek pobrany",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "B4CC",
+    "Description": "Przelew własny z konta",
+    "IsExpenseIncome": false
+  },
+  {
+    "Code": "EC20",
+    "Description": "Przelew własny na konto",
+    "IsExpenseIncome": false
+  },
+  {
+    "Code": "S152",
+    "Description": "Zamkniecie lokaty",
+    "IsExpenseIncome": false
+  },
+  {
+    "Code": "B8CT",
+    "Description": "Otwarcie lokaty",
+    "IsExpenseIncome": false
+  },
+  {
+    "Code": "EFDC",
+    "Description": "Platnosc karta",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "BRPI",
+    "Description": "Płatność BLIK przez internet",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "B4C9",
+    "Description": "Spłata zadłużenia karty kredytowej",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "EC2F",
+    "Description": "Przelew na telefon",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "S14B",
+    "Description": "Zlecenie stałe",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "EC2G",
+    "Description": "Przelew przychodzący",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "BSCC",
+    "Description": "Pobranie w pieniędzy w celu weryfikacji",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "B4C5",
+    "Description": "Przelew wychodzący",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "S141",
+    "Description": "Rata kredytu",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "BICG",
+    "Description": "Ubezpieczenie kredytu",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "BGCG",
+    "Description": "Przelew na telefon",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "BRPW",
+    "Description": "Wyplata BLIK z bankomatu",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "EFDB",
+    "Description": "Zwrot płatności karta",
+    "IsExpenseIncome": true
+  },
+  {
+    "Code": "0011",
+    "Description": "Wpłata gotówki w oddziale w banku",
+    "IsExpenseIncome": true
+  }
+]
+

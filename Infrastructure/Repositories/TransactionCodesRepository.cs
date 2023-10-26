@@ -17,7 +17,6 @@ public class TransactionCodesRepository : GenericRepository<TransactionCode>, IT
     {
         var query = _context
             .Set<TransactionCode>()
-            .Where(x => x.CreatedBy == userId)
             .Where(i => i.Id == id);
 
         if (asNoTracking)
@@ -31,6 +30,5 @@ public class TransactionCodesRepository : GenericRepository<TransactionCode>, IT
     public async Task<List<TransactionCode>> GetAllAsync(string userId) =>
         await _context
         .Set<TransactionCode>()
-        .Where(u => u.CreatedBy == userId)
         .ToListAsync();
 }

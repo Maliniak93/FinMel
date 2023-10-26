@@ -1,6 +1,8 @@
-﻿using Domain.Entities.Common;
+﻿using Domain.Entities.Bank;
+using Domain.Entities.Common;
 using FinMel.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 
 namespace Infrastructure.Persistence;
 public class ApplicationDbContextInitialiser
@@ -49,6 +51,19 @@ public class ApplicationDbContextInitialiser
                 CurrencyTag = "PLN"
             });
             await _context.SaveChangesAsync();
+        }
+        if (!_context.Set<TransactionCode>().Any())
+        {
+            string filePath = "C:\\Users\\dmalinowski\\source\\repos\\FinMel\\Infrastructure\\Persistence\\TransactionCodes.json";
+            if (File.Exists(filePath))
+            {
+                string jsonData = File.ReadAllText(filePath);
+                List<TransactionCode> codes = JsonConvert.DeserializeObject<List<TransactionCode>>(jsonData);
+
+                _context.Set<TransactionCode>().AddRange(codes);
+
+                await _context.SaveChangesAsync();
+            }
         }
     }
 }

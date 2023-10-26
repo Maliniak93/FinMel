@@ -2,7 +2,7 @@
 
 namespace Domain.Entities.Bank;
 
-public class TransactionCode : BaseAuditableEntity
+public class TransactionCode : BaseEntity
 {
     public TransactionCode(string code,
         string description,

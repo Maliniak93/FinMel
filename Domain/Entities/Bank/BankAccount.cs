@@ -148,18 +148,18 @@ public class BankAccount : BaseAuditableEntity
 
     public decimal AverageMonthlyIncome()
     {
-        decimal totalExpense = 0;
+        decimal totalIncome = 0;
         int month = 0;
 
         foreach (var bankStatement in BankStatements)
         {
-            var monthlyExpense = bankStatement
+            var monthlyIncome = bankStatement
                 .StatementTransactions
                 .Where(i => i.TransactionCode.IsExpenseIncome == true)
                 .Where(v => v.Value > 0)
                 .Select(e => e.Value)
                 .Sum();
-            totalExpense += monthlyExpense;
+            totalIncome += monthlyIncome;
 
             month++;
 
@@ -167,6 +167,6 @@ public class BankAccount : BaseAuditableEntity
                 break;
         }
 
-        return totalExpense / month;
+        return totalIncome / month;
     }
 }
