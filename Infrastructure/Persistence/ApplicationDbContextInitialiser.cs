@@ -45,10 +45,15 @@ public class ApplicationDbContextInitialiser
     {
         if (!_context.Set<Currency>().Any())
         {
-            _context.Set<Currency>().Add(new Currency
+            _context.Set<Currency>().AddRange(new Currency
             {
                 CurrencyName = "Polski Złoty",
                 CurrencyTag = "PLN"
+            },
+            new Currency
+            {
+                CurrencyName = "Euro",
+                CurrencyTag = "EUR"
             });
             await _context.SaveChangesAsync();
         }
