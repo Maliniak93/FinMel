@@ -28,10 +28,9 @@ public class TransactionCodesRepository : GenericRepository<TransactionCode>, IT
         return await query.SingleOrDefaultAsync();
     }
 
-    public async Task<IEnumerable<TransactionCode>> GetAllAsync(string userId) =>
+    public async Task<List<TransactionCode>> GetAllAsync(string userId) =>
         await _context
         .Set<TransactionCode>()
-        .AsNoTracking()
         .Where(u => u.CreatedBy == userId)
         .ToListAsync();
 }

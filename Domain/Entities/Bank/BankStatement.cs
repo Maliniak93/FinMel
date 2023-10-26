@@ -6,7 +6,11 @@ namespace Domain.Entities.Bank;
 public class BankStatement : BaseAuditableEntity
 {
     private readonly List<StatementTransaction> _statementTransactions = new();
-    public BankStatement(int statementFileId,
+    public BankStatement()
+    {
+
+    }
+    public BankStatement(StatementFile statementFile,
         string statementNumber,
         DateTime statementFrom,
         decimal beginValue,
@@ -14,7 +18,7 @@ public class BankStatement : BaseAuditableEntity
         decimal endValue,
         int bankAccountId)
     {
-        StatementFileId = statementFileId;
+        StatementFile = statementFile;
         StatementNumber = statementNumber;
         StatementFrom = statementFrom;
         BeginValue = beginValue;

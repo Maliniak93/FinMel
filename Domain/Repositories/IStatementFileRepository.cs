@@ -1,6 +1,9 @@
-﻿namespace Domain;
+﻿using Domain.Entities.Files;
+using Domain.Repositories;
 
-public interface IStatementFileRepository
+namespace Domain;
+
+public interface IStatementFileRepository : IGenericRepository<StatementFile>
 {
     Task<bool> IsStatementFileUniqueAsync(string fileName, string userId);
 }

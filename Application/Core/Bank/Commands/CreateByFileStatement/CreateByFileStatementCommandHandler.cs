@@ -79,7 +79,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
 
         var bankAccount = await _bankAccountRepository.GetByAccountNumberAsync(bankStatementDto.BankAccountNumber,
             _user.Id,
-            true);
+            false);
 
         if (bankAccount is null)
         {
@@ -87,7 +87,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
         }
 
         var bankStatement = new BankStatement(
-            statementFile.Id,
+            statementFile,
             bankStatementDto.StatementNumber,
             bankStatementDto.StatementFrom,
             bankStatementDto.BeginValue,
@@ -104,7 +104,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
             if (!codes.Select(x => x.Code).Contains(statementTransactionDto.TransactionCode))
             {
                 var newCode = new TransactionCode(statementTransactionDto.TransactionCode, statementTransactionDto.DescriptionBase);
-                _transactionCodeRepository.Insert(newCode);
+                codes.Add(newCode);
 
                 statementTransaction.AddTransactionCode(newCode);
             }
