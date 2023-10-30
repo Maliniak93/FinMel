@@ -23,8 +23,9 @@ public class StatementTransaction : BaseAuditableEntity
         TransactionCode = transactionCode;
     }
 
-    public void SetTransactionCode(int transactionCodeId)
+    public void SetTransactionCode(int transactionCodeId, TransactionCode transactionCode)
     {
         TransactionCodeId = transactionCodeId;
+        TransactionCode = transactionCode;
     }
 }

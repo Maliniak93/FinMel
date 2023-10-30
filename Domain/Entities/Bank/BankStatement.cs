@@ -44,4 +44,9 @@ public class BankStatement : BaseAuditableEntity
     {
         _statementTransactions.Add(statementTransaction);
     }
+
+    public void AddStatementTransactions(List<StatementTransaction> statementTransactions)
+    {
+        _statementTransactions.AddRange(statementTransactions);
+    }
 }

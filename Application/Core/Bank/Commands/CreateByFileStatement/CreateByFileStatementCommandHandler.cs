@@ -68,11 +68,11 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
 
         var xmlSantanderStatement = new XmlSantanderStatement();
 
-        using (var stream = request.File.OpenReadStream())
+        var xmlSantanderStatementResult = xmlSantanderStatement.XmlSantanderStatementCreate(request.File);
+
+        if (xmlSantanderStatementResult.IsFailure)
         {
-            var xmlSantanderStatementDeserialization = xmlSantanderStatement.DeserializeFile(stream);
-            if (xmlSantanderStatementDeserialization.IsFailure)
-                return xmlSantanderStatementDeserialization;
+            return xmlSantanderStatementResult;
         }
 
         var bankStatementDto = _mapper.Map<CreateByFileStatementCommandDto>(xmlSantanderStatement.Statement);
@@ -97,24 +97,9 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
 
         var codes = await _transactionCodeRepository.GetAllAsync(_user.Id);
 
-        foreach (var statementTransactionDto in bankStatementDto.StatementTransactions)
-        {
-            var statementTransaction = _mapper.Map<StatementTransaction>(statementTransactionDto);
+        var statementTransactionList = _mapper.Map<List<StatementTransaction>>(bankStatementDto.StatementTransactions, opt => opt.Items["codes"] = codes);
 
-            if (!codes.Select(x => x.Code).Contains(statementTransactionDto.TransactionCode))
-            {
-                var newCode = new TransactionCode(statementTransactionDto.TransactionCode, statementTransactionDto.DescriptionBase);
-                codes.Add(newCode);
-
-                statementTransaction.AddTransactionCode(newCode);
-            }
-            else
-            {
-                var code = codes.Where(x => x.Code == statementTransactionDto.TransactionCode).SingleOrDefault();
-                statementTransaction.AddTransactionCode(code);
-            }
-            bankStatement.AddStatementTransaction(statementTransaction);
-        }
+        bankStatement.AddStatementTransactions(statementTransactionList);
 
         bankAccount.AddBankHistory(new History(bankStatement.StatementTo, bankStatement.EndValue, bankAccount.Id));
 

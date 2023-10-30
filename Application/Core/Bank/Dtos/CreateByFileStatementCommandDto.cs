@@ -51,7 +51,21 @@ public class CreateByFileStatementCommandDto
                 .ForMember(d => d.TransactionCode, o => o.MapFrom(s => s.TransactionCode));
 
             CreateMap<StatementTransactionsCreateByFileDto, StatementTransaction>()
-                .ForMember(d => d.TransactionCode, o => o.Ignore());
+                .ForMember(d => d.TransactionCode, o => o.MapFrom((src, dest, destMember, context) =>
+                {
+                    var codesList = (List<TransactionCode>)context.Items["codes"];
+                    var code = codesList.FirstOrDefault(x => x.Code == src.TransactionCode);
+                    if (code != null)
+                    {
+                        return code;
+                    }
+                    else
+                    {
+                        TransactionCode newCode = new TransactionCode(src.TransactionCode, src.DescriptionBase, false);
+                        codesList.Add(newCode);
+                        return newCode;
+                    }
+                }));
         }
 
         private decimal ParseDecimal(string inputDecimal)
