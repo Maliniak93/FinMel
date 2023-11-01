@@ -1,4 +1,5 @@
-﻿using Application.Abstractions.Messaging;
+﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Messaging;
 using Domain.Common;
 using Domain.Entities.Identity;
 using Domain.Errors;
@@ -10,10 +11,16 @@ public record RegisterCommand(string Email, string Password, string DisplayName)
 public class RegisterCommandHandler : ICommandHandler<RegisterCommand, RegisterDto>
 {
     private readonly UserManager<AppUser> _userManager;
+    private readonly SignInManager<AppUser> _signInManager;
+    private readonly IToken _token;
 
-    public RegisterCommandHandler(UserManager<AppUser> userManager)
+    public RegisterCommandHandler(UserManager<AppUser> userManager,
+        SignInManager<AppUser> signInManager,
+        IToken token)
     {
         _userManager = userManager;
+        _signInManager = signInManager;
+        _token = token;
     }
     public async Task<Result<RegisterDto>> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
@@ -28,6 +35,6 @@ public class RegisterCommandHandler : ICommandHandler<RegisterCommand, RegisterD
             result.Errors.FirstOrDefault().Description));
         }
 
-        return Result.Success(new RegisterDto(user.Email, user.DisplayName));
+        return Result.Success(new RegisterDto(user.Email, _token.CreateToken(user), user.DisplayName));
     }
 }

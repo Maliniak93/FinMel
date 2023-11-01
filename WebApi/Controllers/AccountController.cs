@@ -22,7 +22,7 @@ public class AccountController : ApiController
     {
         var response = await _mediator.Send(registerCommand, cancellationToken);
 
-        return response.IsSuccess ? Ok() : HandleFailure(response);
+        return response.IsSuccess ? Ok(response.Value) : HandleFailure(response);
     }
 
     [HttpPost("login")]
