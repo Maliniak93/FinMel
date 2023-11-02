@@ -3,6 +3,7 @@ using Application.Common;
 using Infrastructure;
 using Infrastructure.Persistence;
 using Serilog;
+using WebApi.Middleware;
 using WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,6 +34,8 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
