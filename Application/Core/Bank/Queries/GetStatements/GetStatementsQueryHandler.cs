@@ -8,9 +8,7 @@ using Domain.Specifications.StatementSpecification;
 
 namespace Application.Core.Bank.Queries.GetStatements;
 
-public record GetStatementsQuery(BankStatementsSpecificationParameters SpecParameters,
-    int PageNumber = 1,
-    int PageSize = 10) : IQuery<PagedList<GetStatementDto>>;
+public record GetStatementsQuery(BankStatementsSpecificationParameters SpecParameters) : IQuery<PagedList<GetStatementDto>>;
 public class GetStatementsQueryHandler : IQueryHandler<GetStatementsQuery, PagedList<GetStatementDto>>
 {
     private readonly IBankStatementRepository _repository;
@@ -33,15 +31,15 @@ public class GetStatementsQueryHandler : IQueryHandler<GetStatementsQuery, Paged
         var totalCount = bankStatementsQuery.Count();
 
         var bankStatements = bankStatementsQuery
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize);
+            .Skip((request.SpecParameters.PageNumber - 1) * request.SpecParameters.PageSize)
+            .Take(request.SpecParameters.PageSize);
 
         var bankStatementsDto = _mapper.Map<List<GetStatementDto>>(bankStatements);
 
         var result = new PagedList<GetStatementDto>(bankStatementsDto,
             totalCount,
-            request.PageNumber,
-            request.PageSize);
+            request.SpecParameters.PageNumber,
+            request.SpecParameters.PageSize);
 
         return result;
     }

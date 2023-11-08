@@ -9,8 +9,15 @@ public class BankStatementsSpecification : BaseSpecification<BankStatement>
     {
         if (!string.IsNullOrEmpty(parameters.Sort))
         {
-            AddOrderBy(d => d.StatementTo);
+            switch (parameters.Sort)
+            {
+                case "asc":
+                    AddOrderBy(x => x.StatementTo);
+                    break;
+                case "desc":
+                    AddOrderByDesc(x => x.StatementTo);
+                    break;
+            }
         }
-        AddOrderByDesc(d => d.StatementTo);
     }
 }

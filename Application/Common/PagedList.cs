@@ -11,6 +11,7 @@ public class PagedList<T>
     {
         Items = items;
         TotalCount = totalCount;
+        TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
         Page = page;
         PageSize = pageSize;
     }
@@ -20,6 +21,7 @@ public class PagedList<T>
     public IReadOnlyCollection<T> Items { get; }
 
     public int TotalCount { get; }
+    public int TotalPages { get; }
 
     public int Page { get; }
 

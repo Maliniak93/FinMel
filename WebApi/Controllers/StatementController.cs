@@ -1,9 +1,12 @@
-﻿using Application.Core.Bank.Commands.CreateByFileStatement;
+﻿using Application.Common;
+using Application.Core.Bank.Commands.CreateByFileStatement;
 using Application.Core.Bank.Commands.UpdateTransactionCode;
 using Application.Core.Bank.Queries.GetStatementById;
 using Application.Core.Bank.Queries.GetStatements;
 using Application.Core.Bank.Queries.GetStatementTransaction;
 using Application.Core.Bank.Queries.GetTransactionCodes;
+using Application.Extensions;
+using Domain.Specifications.StatementSpecification;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Abstractions;
@@ -43,11 +46,18 @@ public class StatementController : ApiController
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetStatements([FromBody] GetStatementsQuery query, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetStatements([FromQuery] BankStatementsSpecificationParameters query, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(query, cancellationToken);
+        var request = new GetStatementsQuery(query);
 
-        return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
+        var response = await _mediator.Send(request, cancellationToken);
+
+        Response.AddPaginationheader(new PaginationHeader(response.Value.Page,
+            response.Value.PageSize,
+            response.Value.TotalCount,
+            response.Value.TotalPages));
+
+        return response.IsSuccess ? Ok(response.Value.Items) : HandleFailureNoContent(response);
     }
 
     [HttpGet("transactions")]
