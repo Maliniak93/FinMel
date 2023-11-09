@@ -34,13 +34,21 @@ public class StatementController : ApiController
     [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetStatementById(int id, [FromBody] GetStatementByIdRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetStatementById(int id, [FromQuery] GetStatementByIdRequest request, CancellationToken cancellationToken)
     {
         var query = new GetStatementByIdQuery(id, request.PageNumber, request.PageSize);
 
         var response = await _mediator.Send(query, cancellationToken);
 
-        return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
+        if (response.Value.Item2 != null)
+        {
+            Response.AddPaginationheader(new PaginationHeader(response.Value.Item2.Page,
+                response.Value.Item2.PageSize,
+                response.Value.Item2.TotalCount,
+                response.Value.Item2.TotalPages));
+        }
+
+        return response.IsSuccess ? Ok(response.Value.Item1) : HandleFailureNoContent(response);
     }
 
     [HttpGet]

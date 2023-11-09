@@ -1,5 +1,4 @@
-﻿using Application.Common;
-using AutoMapper;
+﻿using AutoMapper;
 using Domain.Entities.Bank;
 
 namespace Application.Core.Bank.Dtos;
@@ -11,7 +10,7 @@ public class GetStatementByIdDto
     public decimal BeginValue { get; set; }
     public DateTime StatementTo { get; set; }
     public decimal EndValue { get; set; }
-    public PagedList<StatementTransactionDto> statementTransactionDtos { get; set; }
+    public IReadOnlyCollection<StatementTransactionDto> statementTransactionDtos { get; set; }
     public int BankAccountId { get; set; }
 
     private class Mapping : Profile

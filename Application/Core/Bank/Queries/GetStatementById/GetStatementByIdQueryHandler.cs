@@ -10,9 +10,9 @@ namespace Application.Core.Bank.Queries.GetStatementById;
 
 public record GetStatementByIdQuery(int Id,
     int PageNumber = 1,
-    int PageSize = 10) : IQuery<GetStatementByIdDto>;
+    int PageSize = 10) : IQuery<Tuple<GetStatementByIdDto, PagedList<StatementTransactionDto>>>;
 
-public class GetStatementByIdQueryHandler : IQueryHandler<GetStatementByIdQuery, GetStatementByIdDto>
+public class GetStatementByIdQueryHandler : IQueryHandler<GetStatementByIdQuery, Tuple<GetStatementByIdDto, PagedList<StatementTransactionDto>>>
 {
     private readonly IBankStatementRepository _repository;
     private readonly IUser _user;
@@ -27,7 +27,7 @@ public class GetStatementByIdQueryHandler : IQueryHandler<GetStatementByIdQuery,
         _mapper = mapper;
     }
 
-    public async Task<Result<GetStatementByIdDto>> Handle(GetStatementByIdQuery request, CancellationToken cancellationToken)
+    public async Task<Result<Tuple<GetStatementByIdDto, PagedList<StatementTransactionDto>>>> Handle(GetStatementByIdQuery request, CancellationToken cancellationToken)
     {
         var bankStatement = await _repository.GetByIdAsync(request.Id,
             _user.Id,
@@ -35,11 +35,12 @@ public class GetStatementByIdQueryHandler : IQueryHandler<GetStatementByIdQuery,
 
         if (bankStatement is null)
         {
-            return Result.Failure<GetStatementByIdDto>(DomainErrors.BankStatement.BankStatementWithIdIsNotExist(request.Id));
+            return Result.Failure<Tuple<GetStatementByIdDto, PagedList<StatementTransactionDto>>>(DomainErrors.BankStatement.BankStatementWithIdIsNotExist(request.Id));
         }
 
         var totalCount = bankStatement.StatementTransactions.Count;
         var bankStatementDto = _mapper.Map<GetStatementByIdDto>(bankStatement);
+        PagedList<StatementTransactionDto> pagedStatementTransactions = null;
 
         if (totalCount > 0)
         {
@@ -49,14 +50,14 @@ public class GetStatementByIdQueryHandler : IQueryHandler<GetStatementByIdQuery,
 
             var statementTransactionDto = _mapper.Map<List<StatementTransactionDto>>(statementSkippedTransactions);
 
-            var pagedStatementTransactions = new PagedList<StatementTransactionDto>(statementTransactionDto,
+            pagedStatementTransactions = new PagedList<StatementTransactionDto>(statementTransactionDto,
                 totalCount,
                 request.PageNumber,
                 request.PageSize);
 
-            bankStatementDto.statementTransactionDtos = pagedStatementTransactions;
+            bankStatementDto.statementTransactionDtos = pagedStatementTransactions.Items;
         }
 
-        return bankStatementDto;
+        return new Tuple<GetStatementByIdDto, PagedList<StatementTransactionDto>>(bankStatementDto, pagedStatementTransactions);
     }
 }
