@@ -18,10 +18,11 @@ public class GetBankAccountByIdQueryDto
 
     public class GetBankAccountByIdQueryDtoStatement
     {
+        public int Id { get; set; }
         public string StatementNumber { get; set; }
-        public string StatementFrom { get; set; }
+        public DateTime StatementFrom { get; set; }
         public decimal BeginValue { get; set; }
-        public string StatementTo { get; set; }
+        public DateTime StatementTo { get; set; }
         public decimal EndValue { get; set; }
         public int BankAccountId { get; set; }
     }
@@ -39,9 +40,7 @@ public class GetBankAccountByIdQueryDto
 
             CreateMap<BankStatement, GetBankAccountByIdQueryDtoStatement>()
                 .ForMember(d => d.BeginValue, o => o.MapFrom(s => Math.Round(s.BeginValue, 2)))
-                .ForMember(d => d.EndValue, o => o.MapFrom(s => Math.Round(s.EndValue, 2)))
-                .ForMember(d => d.StatementFrom, o => o.MapFrom(s => s.StatementFrom.ToShortDateString()))
-                .ForMember(d => d.StatementTo, o => o.MapFrom(s => s.StatementTo.ToShortDateString()));
+                .ForMember(d => d.EndValue, o => o.MapFrom(s => Math.Round(s.EndValue, 2)));
         }
 
     }

@@ -9,12 +9,14 @@ public class GetStatementDto
     public DateTime StatementFrom { get; set; }
     public DateTime StatementTo { get; set; }
     public int BankAccountId { get; set; }
+    public string BankAccountName { get; set; }
 
     private class Mapping : Profile
     {
         public Mapping()
         {
-            CreateMap<BankStatement, GetStatementDto>();
+            CreateMap<BankStatement, GetStatementDto>()
+                .ForMember(d => d.BankAccountName, o => o.MapFrom(s => s.BankAccount.AccountName));
         }
     }
 }

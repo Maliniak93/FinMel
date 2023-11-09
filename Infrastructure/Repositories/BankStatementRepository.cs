@@ -33,6 +33,7 @@ public class BankStatementRepository : GenericRepository<BankStatement>, IBankSt
         await _context
             .GetEntityWithSpec<BankStatement>(spec)
             .AsNoTracking()
+            .Include(b => b.BankAccount)
             .Where(u => u.CreatedBy == userId)
             .ToListAsync();
 }
