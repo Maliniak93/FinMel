@@ -7,6 +7,7 @@ using Application.Core.Bank.Queries.GetStatementTransaction;
 using Application.Core.Bank.Queries.GetTransactionCodes;
 using Application.Extensions;
 using Domain.Specifications.StatementSpecification;
+using Domain.Specifications.TransactionSpecification;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Abstractions;
@@ -34,21 +35,13 @@ public class StatementController : ApiController
     [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetStatementById(int id, [FromQuery] GetStatementByIdRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetStatementById(int id, CancellationToken cancellationToken)
     {
-        var query = new GetStatementByIdQuery(id, request.PageNumber, request.PageSize);
+        var query = new GetStatementByIdQuery(id);
 
         var response = await _mediator.Send(query, cancellationToken);
 
-        if (response.Value.Item2 != null)
-        {
-            Response.AddPaginationheader(new PaginationHeader(response.Value.Item2.Page,
-                response.Value.Item2.PageSize,
-                response.Value.Item2.TotalCount,
-                response.Value.Item2.TotalPages));
-        }
-
-        return response.IsSuccess ? Ok(response.Value.Item1) : HandleFailureNoContent(response);
+        return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
     }
 
     [HttpGet]
@@ -68,14 +61,21 @@ public class StatementController : ApiController
         return response.IsSuccess ? Ok(response.Value.Items) : HandleFailureNoContent(response);
     }
 
-    [HttpGet("transactions")]
+    [HttpGet("{id}/transactions")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetStatementTransactions([FromBody] GetStatementTransactionQuery query, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetStatementTransactions(int id, [FromQuery] BankStatementsTransactionsSpecificationParameters request, CancellationToken cancellationToken)
     {
+        var query = new GetStatementTransactionQuery(id, request);
+
         var response = await _mediator.Send(query, cancellationToken);
 
-        return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
+        Response.AddPaginationheader(new PaginationHeader(response.Value.Page,
+            response.Value.PageSize,
+            response.Value.TotalCount,
+            response.Value.TotalPages));
+
+        return response.IsSuccess ? Ok(response.Value.Items) : HandleFailureNoContent(response);
     }
 
     [HttpGet("transactions/codes")]

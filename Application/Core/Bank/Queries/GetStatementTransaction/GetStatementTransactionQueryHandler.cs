@@ -8,9 +8,9 @@ using Domain.Specifications.TransactionSpecification;
 
 namespace Application.Core.Bank.Queries.GetStatementTransaction;
 
-public record GetStatementTransactionQuery(BankStatementsTransactionsSpecificationParameters SpecParameters,
-    int PageNumber = 1,
-    int PageSize = 10) : IQuery<PagedList<GetStatementsTransactionsDto>>;
+public record GetStatementTransactionQuery(int Id,
+    BankStatementsTransactionsSpecificationParameters SpecParameters
+    ) : IQuery<PagedList<GetStatementsTransactionsDto>>;
 public class GetStatementTransactionQueryHandler : IQueryHandler<GetStatementTransactionQuery, PagedList<GetStatementsTransactionsDto>>
 {
     private readonly IStatementTransactionRepository _repository;
@@ -30,20 +30,20 @@ public class GetStatementTransactionQueryHandler : IQueryHandler<GetStatementTra
     {
         var spec = new BankStatementsTransactionsSpecification(request.SpecParameters);
 
-        var statementTransactiontsQuery = await _repository.GetAllStatementTransactionsWithSpec(_user.Id, spec);
+        var statementTransactiontsQuery = await _repository.GetStatementByIdTransactionsWithSpec(request.Id, _user.Id, spec);
 
-        var totalCount = statementTransactiontsQuery.Count();
+        var totalCount = statementTransactiontsQuery.Count;
 
         var statementTransactionts = statementTransactiontsQuery
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize);
+            .Skip((request.SpecParameters.PageNumber - 1) * request.SpecParameters.PageSize)
+            .Take(request.SpecParameters.PageSize);
 
         var statementTransactionsDto = _mapper.Map<List<GetStatementsTransactionsDto>>(statementTransactionts);
 
         var result = new PagedList<GetStatementsTransactionsDto>(statementTransactionsDto,
             totalCount,
-            request.PageNumber,
-            request.PageSize);
+            request.SpecParameters.PageNumber,
+            request.SpecParameters.PageSize);
 
         return result;
     }

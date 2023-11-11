@@ -17,7 +17,6 @@ public class BankStatementRepository : GenericRepository<BankStatement>, IBankSt
     {
         var query = _context
             .Set<BankStatement>()
-            .Include(t => t.StatementTransactions)
             .Where(u => u.CreatedBy == userId)
             .Where(i => i.Id == id);
 

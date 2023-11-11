@@ -10,7 +10,6 @@ public class GetStatementByIdDto
     public decimal BeginValue { get; set; }
     public DateTime StatementTo { get; set; }
     public decimal EndValue { get; set; }
-    public IReadOnlyCollection<StatementTransactionDto> statementTransactionDtos { get; set; }
     public int BankAccountId { get; set; }
 
     private class Mapping : Profile
