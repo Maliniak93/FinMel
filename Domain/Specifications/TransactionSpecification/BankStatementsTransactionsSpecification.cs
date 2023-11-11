@@ -4,9 +4,9 @@ using Domain.Entities.Bank;
 namespace Domain.Specifications.TransactionSpecification;
 public class BankStatementsTransactionsSpecification : BaseSpecification<StatementTransaction>
 {
-    public BankStatementsTransactionsSpecification(BankStatementsTransactionsSpecificationParameters parameters) : base(/*x =>*/
-        //(string.IsNullOrEmpty(parameters.Search) || x.DescriptionBase.ToLower().Contains(parameters.Search) || x.DescriptionOptional.ToLower().Contains(parameters.Search) &&
-        /*x.TransactionDate.Year == parameters.SearchYear*/)
+    public BankStatementsTransactionsSpecification(BankStatementsTransactionsSpecificationParameters parameters) : base(x =>
+        (string.IsNullOrEmpty(parameters.Search) || x.DescriptionBase.ToLower().Contains(parameters.Search) || x.DescriptionOptional.ToLower().Contains(parameters.Search) /*&&*/
+        /*x.TransactionDate.Year == parameters.SearchYear*/))
     {
         if (!string.IsNullOrEmpty(parameters.Sort))
         {
@@ -17,6 +17,12 @@ public class BankStatementsTransactionsSpecification : BaseSpecification<Stateme
                     break;
                 case "desc":
                     AddOrderByDesc(x => x.TransactionDate);
+                    break;
+                case "low":
+                    AddOrderBy(x => x.Value);
+                    break;
+                case "high":
+                    AddOrderByDesc(x => x.Value);
                     break;
             }
         }
