@@ -1,5 +1,9 @@
 ﻿using Application.Common;
 using Domain.Common;
+using Domain.Entities.Bank;
+using Domain.Entities.Common;
+using Domain.Entities.Dashboard;
+using Domain.Entities.Files;
 using Domain.Interfaces;
 using Infrastructure;
 using Infrastructure.Persistence;
@@ -22,6 +26,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         _auditableEntitySaveChangesInterceptor = auditableEntitySaveChangesInterceptor;
     }
 
+    public virtual DbSet<BankAccount> BankAccounts { get; set; }
+    public virtual DbSet<BankStatement> BankStatements { get; set; }
+    public virtual DbSet<StatementTransaction> StatementTransactions { get; set; }
+    public virtual DbSet<TransactionCode> TransactionCodes { get; set; }
+    public virtual DbSet<Currency> CurrencyCodes { get; set; }
+    public virtual DbSet<History> Histories { get; set; }
+    public virtual DbSet<MainDashboard> MainDashboard { get; set; }
+    public virtual DbSet<StatementFile> StatementFiles { get; set; }
 
     public new DbSet<TEntity> Set<TEntity>()
         where TEntity : BaseEntity =>
@@ -65,7 +77,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         return await base.SaveChangesAsync(cancellationToken);
     }
-
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

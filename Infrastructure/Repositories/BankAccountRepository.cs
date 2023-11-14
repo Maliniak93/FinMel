@@ -25,6 +25,10 @@ public class BankAccountRepository : GenericRepository<BankAccount>, IBankAccoun
         .Set<Currency>()
         .AnyAsync(c => c.Id == currencyId);
 
+    public async Task<bool> IsFirstBankAccount(string id) =>
+        !await _context.Set<BankAccount>().AnyAsync(u => u.CreatedBy == id);
+
+
     public async Task<BankAccount> GetByIdAsync(int id, string userId, bool asNoTracking = false)
     {
         var query = _context

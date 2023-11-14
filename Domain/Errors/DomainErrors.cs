@@ -25,6 +25,10 @@ public static class DomainErrors
                 "BankAccount.NotFound",
                 $"The BankAccount with account number {accountNumber} was not found");
 
+        public static Error MainDashboardError => new(
+                "BankAccount.MainDashboardError",
+                $"Main Dashboard is null");
+
         //public static Func<int, Error> CountPersonalWealthHistoryIsNull = id => new(
         //        "BankAccount.CountPersonalWealth",
         //        $"BankAccount with id {id} History is null");

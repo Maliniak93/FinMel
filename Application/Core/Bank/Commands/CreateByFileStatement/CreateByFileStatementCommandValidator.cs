@@ -8,7 +8,7 @@ public class CreateByFileStatementCommandValidator : AbstractValidator<CreateByF
         RuleFor(x => x.File.Length).NotNull().LessThanOrEqualTo(200000)
                 .WithMessage("File size is larger than allowed");
 
-        RuleFor(x => x.File.ContentType).NotNull().Must(x => x.Equals("application/xml"))
+        RuleFor(x => x.File.ContentType).NotNull().Must(x => x.Equals("text/xml"))
                         .WithMessage("File type is not xml");
     }
 }

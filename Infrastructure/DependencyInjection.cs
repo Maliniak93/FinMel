@@ -22,7 +22,11 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"),
-                    builder => builder.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+                  builder => builder.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+
+        services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
+
+        services.AddScoped<ApplicationDbContextInitialiser>();
 
         services.AddDbContext<AppIdentityDbContext>(options =>
         {
@@ -61,10 +65,6 @@ public static class DependencyInjection
 
 
         services.AddAuthorization();
-
-        services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
-
-        services.AddScoped<ApplicationDbContextInitialiser>();
 
         services.AddScoped<IToken, Token>();
 

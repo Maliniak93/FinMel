@@ -1,5 +1,6 @@
 ﻿using Domain.Common;
 using Domain.Entities.Common;
+using Domain.Entities.Dashboard;
 using Domain.Enums;
 
 namespace Domain.Entities.Bank;
@@ -14,7 +15,8 @@ public class BankAccount : BaseAuditableEntity
         string accountName,
         int currencyId,
         double intrestRate,
-        AccountType accountType)
+        AccountType accountType
+        )
     {
         AccountNumber = accountNumber;
         ClientNumber = clientNumber;
@@ -34,15 +36,17 @@ public class BankAccount : BaseAuditableEntity
     public AccountType AccountType { get; set; }
     public IReadOnlyCollection<BankStatement> BankStatements => _bankStatements;
     public IReadOnlyCollection<History> History => _histories;
+    public MainDashboard MainDashboard { get; private set; }
+    public int MainDashboardId { get; private set; }
 
-    public void InitializeBankHistory()
-    {
-        History history = new History(DateTime.Now,
-            0,
-            this.Id);
+    //public void InitializeBankHistory()
+    //{
+    //    History history = new History(DateTime.Now,
+    //        0,
+    //        this.Id);
 
-        _histories.Add(history);
-    }
+    //    _histories.Add(history);
+    //}
 
     public void AddBankStatement(BankStatement bankStatement)
     {
@@ -52,6 +56,16 @@ public class BankAccount : BaseAuditableEntity
     public void AddBankHistory(History history)
     {
         _histories.Add(history);
+    }
+
+    public void AddNewMainDashboard(MainDashboard mainDashboard)
+    {
+        MainDashboard = mainDashboard;
+    }
+
+    public void AddExistingDashboard(int id)
+    {
+        MainDashboardId = id;
     }
 
     public void UpdateBankAccount(string clientName,
