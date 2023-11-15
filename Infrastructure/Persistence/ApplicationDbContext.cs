@@ -34,6 +34,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public virtual DbSet<History> Histories { get; set; }
     public virtual DbSet<MainDashboard> MainDashboard { get; set; }
     public virtual DbSet<StatementFile> StatementFiles { get; set; }
+    public virtual DbSet<Investment> Investments { get; set; }
 
     public new DbSet<TEntity> Set<TEntity>()
         where TEntity : BaseEntity =>
