@@ -8,6 +8,7 @@ using Domain.Common;
 using Domain.Entities.Bank;
 using Domain.Entities.Common;
 using Domain.Entities.Files;
+using Domain.Enums;
 using Domain.Errors;
 using Domain.Repositories;
 using Microsoft.AspNetCore.Http;
@@ -23,6 +24,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
     private readonly IBankStatementRepository _statementRepository;
     private readonly IStatementFileRepository _statementFileRepository;
     private readonly IBankAccountRepository _bankAccountRepository;
+    private readonly IInvestmentRepository _investmentRepository;
     private readonly ITransactionCodeRepository _transactionCodeRepository;
     private readonly IUser _user;
     private readonly IMapper _mapper;
@@ -33,6 +35,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
     public CreateByFileStatementCommandHandler(IBankStatementRepository statementRepository,
         IStatementFileRepository statementFileRepository,
         IBankAccountRepository bankAccountRepository,
+        IInvestmentRepository investmentRepository,
         ITransactionCodeRepository transactionCodeRepository,
         IUser user,
         IMapper mapper,
@@ -43,6 +46,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
         _statementRepository = statementRepository;
         _statementFileRepository = statementFileRepository;
         _bankAccountRepository = bankAccountRepository;
+        _investmentRepository = investmentRepository;
         _transactionCodeRepository = transactionCodeRepository;
         _user = user;
         _mapper = mapper;
@@ -102,6 +106,17 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
         bankStatement.AddStatementTransactions(statementTransactionList);
 
         bankAccount.AddBankHistory(new History(bankStatement.StatementTo, bankStatement.EndValue, bankAccount.Id));
+
+        var investments = bankStatement.StatementTransactions.Where(x => x.TransactionCode.Type == TransactionTypes.Investments);
+
+        if (investments.Any())
+        {
+            foreach (var investment in investments)
+            {
+                var newInwestment = new Investment(investment.Value, bankAccount.CurrencyId, investment.ExecutionDate);
+                _investmentRepository.Insert(newInwestment);
+            }
+        }
 
         _statementRepository.Insert(bankStatement);
 

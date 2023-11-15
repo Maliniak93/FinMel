@@ -8,7 +8,7 @@ public class Investment : BaseAuditableEntity
         int currencyId,
         DateTime startInvestment)
     {
-        Amount = amount;
+        Amount = Math.Abs(amount);
         CurrencyId = currencyId;
         StartInvestment = startInvestment;
     }
@@ -17,9 +17,9 @@ public class Investment : BaseAuditableEntity
     public int CurrencyId { get; private set; }
     public DateTime StartInvestment { get; private set; }
     public bool IsFinished { get; private set; } = false;
-    public DateTime StopInvestment { get; private set; }
-    public decimal FinalAmount { get; private set; }
-    public double ReturnOfInvestment { get; private set; }
+    public DateTime? StopInvestment { get; private set; } = null;
+    public decimal? FinalAmount { get; private set; } = null;
+    public double? ReturnOfInvestment { get; private set; } = null;
 
     public void FinishInvestment(DateTime stopInvestment, decimal finalAmount, decimal returnOfInvestment)
     {
