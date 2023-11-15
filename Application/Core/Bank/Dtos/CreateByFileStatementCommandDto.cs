@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Domain.Entities.Bank;
 using Domain.Entities.Files;
+using Domain.Enums;
 using System.Globalization;
 
 namespace Application.Core.Bank.Dtos;
@@ -61,7 +62,7 @@ public class CreateByFileStatementCommandDto
                     }
                     else
                     {
-                        TransactionCode newCode = new TransactionCode(src.TransactionCode, src.DescriptionBase, false);
+                        TransactionCode newCode = new TransactionCode(src.TransactionCode, src.DescriptionBase, TransactionTypes.Other);
                         codesList.Add(newCode);
                         return newCode;
                     }

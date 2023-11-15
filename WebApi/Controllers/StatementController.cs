@@ -93,7 +93,7 @@ public class StatementController : ApiController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateStatementTransactions(int id, [FromBody] UpdateTransactionCodeRequest request, CancellationToken cancellationToken)
     {
-        var query = new UpdateTransactionCodeCommand(id, request.Code, request.Description, request.IsExpensionIncome);
+        var query = new UpdateTransactionCodeCommand(id, request.Code, request.Description, request.Type);
 
         var response = await _mediator.Send(query, cancellationToken);
 

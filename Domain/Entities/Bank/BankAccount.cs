@@ -99,7 +99,7 @@ public class BankAccount : BaseAuditableEntity
         .OrderByDescending(d => d.StatementTo)
         .FirstOrDefault()
         .StatementTransactions
-        .Where(i => i.TransactionCode.IsExpenseIncome == true)
+        .Where(i => i.TransactionCode.Type == TransactionTypes.Expenses)
         .Where(v => v.Value < 0)
         .Select(e => e.Value)
         .Sum();
@@ -110,7 +110,7 @@ public class BankAccount : BaseAuditableEntity
         .Skip(1)
         .FirstOrDefault()
         .StatementTransactions
-        .Where(i => i.TransactionCode.IsExpenseIncome == true)
+        .Where(i => i.TransactionCode.Type == TransactionTypes.Expenses)
         .Where(v => v.Value < 0)
         .Select(e => e.Value)
         .Sum();
@@ -124,7 +124,7 @@ public class BankAccount : BaseAuditableEntity
         {
             var monthlyExpense = bankStatement
                 .StatementTransactions
-                .Where(i => i.TransactionCode.IsExpenseIncome == true)
+                .Where(i => i.TransactionCode.Type == TransactionTypes.Expenses)
                 .Where(v => v.Value < 0)
                 .Select(e => e.Value)
                 .Sum();
@@ -144,7 +144,7 @@ public class BankAccount : BaseAuditableEntity
         .OrderByDescending(d => d.StatementTo)
         .FirstOrDefault()
         .StatementTransactions
-        .Where(i => i.TransactionCode.IsExpenseIncome == true)
+        .Where(i => i.TransactionCode.Type == TransactionTypes.Income)
         .Where(v => v.Value > 0)
         .Select(e => e.Value)
         .Sum();
@@ -155,7 +155,7 @@ public class BankAccount : BaseAuditableEntity
         .Skip(1)
         .FirstOrDefault()
         .StatementTransactions
-        .Where(i => i.TransactionCode.IsExpenseIncome == true)
+        .Where(i => i.TransactionCode.Type == TransactionTypes.Income)
         .Where(v => v.Value > 0)
         .Select(e => e.Value)
         .Sum();
@@ -169,7 +169,7 @@ public class BankAccount : BaseAuditableEntity
         {
             var monthlyIncome = bankStatement
                 .StatementTransactions
-                .Where(i => i.TransactionCode.IsExpenseIncome == true)
+                .Where(i => i.TransactionCode.Type == TransactionTypes.Income)
                 .Where(v => v.Value > 0)
                 .Select(e => e.Value)
                 .Sum();

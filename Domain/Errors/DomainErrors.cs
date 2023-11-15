@@ -64,6 +64,13 @@ public static class DomainErrors
                 $"The Transaction Code with Id {id} was not found");
     }
 
+    public static class Dashboard
+    {
+        public static Error MainDashboardNotExist => new(
+                "MainDashboard.NotFound",
+                $"Main Dashboard was not found");
+    }
+
     public static class Authentication
     {
         public static Error InvalidEmailOrPassword => new Error(

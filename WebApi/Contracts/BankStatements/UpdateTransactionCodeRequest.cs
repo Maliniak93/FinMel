@@ -1,5 +1,7 @@
-﻿namespace WebApi.Contracts.BankStatements;
+﻿using Domain.Enums;
+
+namespace WebApi.Contracts.BankStatements;
 
 public record UpdateTransactionCodeRequest(string Code,
     string Description,
-    bool IsExpensionIncome);
+    TransactionTypes Type);

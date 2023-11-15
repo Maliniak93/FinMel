@@ -1,4 +1,5 @@
 ﻿using Domain.Common;
+using Domain.Enums;
 
 namespace Domain.Entities.Bank;
 
@@ -6,22 +7,22 @@ public class TransactionCode : BaseEntity
 {
     public TransactionCode(string code,
         string description,
-        bool isExpenseIncome = default)
+        TransactionTypes type)
     {
         Code = code;
         Description = description;
-        IsExpenseIncome = isExpenseIncome;
+        Type = type;
     }
     public string Code { get; private set; }
     public string Description { get; private set; }
-    public bool IsExpenseIncome { get; private set; }
+    public TransactionTypes Type { get; private set; }
 
     public void UpdateTransactionCode(string code,
         string description,
-        bool isExpenseIncome)
+        TransactionTypes type)
     {
         Code = code;
         Description = description;
-        IsExpenseIncome = isExpenseIncome;
+        Type = type;
     }
 }

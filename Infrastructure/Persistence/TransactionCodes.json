@@ -2,102 +2,102 @@
   {
     "Code": "X_09",
     "Description": "Odsetki od salda dodatniego",
-    "IsExpenseIncome": true
+    "Type": 1
   },
   {
     "Code": " ",
     "Description": "Podatek pobrany",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "B4CC",
     "Description": "Przelew własny z konta",
-    "IsExpenseIncome": false
+    "Type": 4
   },
   {
     "Code": "EC20",
     "Description": "Przelew własny na konto",
-    "IsExpenseIncome": false
+    "Type": 4
   },
   {
     "Code": "S152",
     "Description": "Zamkniecie lokaty",
-    "IsExpenseIncome": false
+    "Type": 3
   },
   {
     "Code": "B8CT",
     "Description": "Otwarcie lokaty",
-    "IsExpenseIncome": false
+    "Type": 2
   },
   {
     "Code": "EFDC",
     "Description": "Platnosc karta",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "BRPI",
     "Description": "Płatność BLIK przez internet",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "B4C9",
     "Description": "Spłata zadłużenia karty kredytowej",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "EC2F",
     "Description": "Przelew na telefon",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "S14B",
     "Description": "Zlecenie stałe",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "EC2G",
     "Description": "Przelew przychodzący",
-    "IsExpenseIncome": true
+    "Type": 1
   },
   {
     "Code": "BSCC",
     "Description": "Pobranie w pieniędzy w celu weryfikacji",
-    "IsExpenseIncome": true
+    "Type": 3
   },
   {
     "Code": "B4C5",
     "Description": "Przelew wychodzący",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "S141",
     "Description": "Rata kredytu",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "BICG",
     "Description": "Ubezpieczenie kredytu",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "BGCG",
     "Description": "Przelew na telefon",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "BRPW",
     "Description": "Wyplata BLIK z bankomatu",
-    "IsExpenseIncome": true
+    "Type": 0
   },
   {
     "Code": "EFDB",
     "Description": "Zwrot płatności karta",
-    "IsExpenseIncome": true
+    "Type": 3
   },
   {
     "Code": "0011",
     "Description": "Wpłata gotówki w oddziale w banku",
-    "IsExpenseIncome": true
+    "Type": 3
   }
 ]
 

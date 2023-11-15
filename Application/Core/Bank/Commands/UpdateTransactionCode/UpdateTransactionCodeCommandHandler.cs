@@ -1,6 +1,7 @@
 ﻿using Application.Abstractions.Messaging;
 using Application.Common;
 using Domain.Common;
+using Domain.Enums;
 using Domain.Errors;
 using Domain.Repositories;
 
@@ -9,7 +10,7 @@ namespace Application.Core.Bank.Commands.UpdateTransactionCode;
 public record UpdateTransactionCodeCommand(int Id,
     string Code,
     string Description,
-    bool IsExpensionIncome) : ICommand;
+    TransactionTypes Type) : ICommand;
 public class UpdateTransactionCodeCommandHandler : ICommandHandler<UpdateTransactionCodeCommand>
 {
     private readonly ITransactionCodeRepository _repository;
@@ -34,7 +35,7 @@ public class UpdateTransactionCodeCommandHandler : ICommandHandler<UpdateTransac
 
         code.UpdateTransactionCode(request.Code,
             request.Description,
-            request.IsExpensionIncome);
+            request.Type);
 
         _repository.Update(code);
 
