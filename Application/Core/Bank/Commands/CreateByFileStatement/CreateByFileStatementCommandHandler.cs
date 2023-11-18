@@ -113,7 +113,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
         {
             foreach (var investment in investments)
             {
-                var newInwestment = new Investment(investment.Value, bankAccount.CurrencyId, investment.ExecutionDate);
+                var newInwestment = new Investment(investment.Value, bankAccount.CurrencyId, investment.TransactionDate);
                 _investmentRepository.Insert(newInwestment);
             }
         }

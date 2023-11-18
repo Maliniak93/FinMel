@@ -69,6 +69,10 @@ public static class DomainErrors
         public static Error MainDashboardNotExist => new(
                 "MainDashboard.NotFound",
                 $"Main Dashboard was not found");
+
+        public static Func<DateTime, DateTime, Error> MainDashboardForTimeRangeAlreadyExist = (firstDayOfMonth, lastDayOfMonth) => new(
+            "MainDashboard.Exist",
+            $"Main Dashboard with {firstDayOfMonth.ToShortDateString()} - {lastDayOfMonth.ToShortDateString()} time range exist");
     }
 
     public static class Authentication

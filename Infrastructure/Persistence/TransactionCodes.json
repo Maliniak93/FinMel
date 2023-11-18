@@ -47,7 +47,7 @@
   {
     "Code": "EC2F",
     "Description": "Przelew na telefon",
-    "Type": 0
+    "Type": 1
   },
   {
     "Code": "S14B",

@@ -13,6 +13,14 @@ public class DashboardRepository : GenericRepository<MainDashboard>, IDashboardR
         _context = context;
     }
 
+    public async Task<List<MainDashboard>> GetAllAsync(string userId) =>
+        await _context
+        .Set<MainDashboard>()
+        .AsNoTracking()
+        .Where(u => u.CreatedBy == userId)
+        .ToListAsync();
+
+
     public async Task<MainDashboard> GetUserDashboard(string userId) =>
         await _context
         .Set<MainDashboard>()

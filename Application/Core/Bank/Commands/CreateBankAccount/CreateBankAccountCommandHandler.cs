@@ -61,7 +61,7 @@ public class CreateBankAccountCommandHandler : ICommandHandler<CreateBankAccount
 
         if (await _bankAccountRepository.IsFirstBankAccount(_user.Id))
         {
-            var dashboard = new MainDashboard(0, 0, 0, 0, 0);
+            var dashboard = new MainDashboard(0, 0, 0, 0, 0, default, default);
             _dashboardRepository.Insert(dashboard);
             bankAccount.AddNewMainDashboard(dashboard);
         }

@@ -1,4 +1,5 @@
-﻿using Application.Core.Dashboard.Queries.MainDashboard;
+﻿using Application.Core.Dashboard.Commands.CreateMainDashboard;
+using Application.Core.Dashboard.Queries.MainDashboard;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Abstractions;
@@ -9,6 +10,16 @@ public class DashboardController : ApiController
 {
     public DashboardController(IMediator mediator) : base(mediator)
     {
+    }
+
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create([FromQuery] CreateMainDashboardCommand request, CancellationToken cancellationToken)
+    {
+        var response = await _mediator.Send(request, cancellationToken);
+
+        return response.IsSuccess ? Ok() : HandleFailure(response);
     }
 
     [HttpGet]

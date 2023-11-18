@@ -25,6 +25,22 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
         return await query.ToListAsync();
     }
 
+    public async Task<IReadOnlyCollection<StatementTransaction>> GetStatementsTransactionsInTimeRange(string userId, DateTime from, DateTime to, int bankAccountId)
+    {
+        var query = _context
+            .Set<StatementTransaction>()
+            .AsNoTracking()
+            .Include(s => s.BankStatement)
+            .Include(c => c.TransactionCode)
+            .Where(u => u.CreatedBy == userId)
+            .Where(f => f.TransactionDate >= from && f.TransactionDate <= to)
+            .Where(a => a.BankStatement.BankAccountId == bankAccountId)
+            .OrderByDescending(d => d.TransactionDate)
+            .ThenByDescending(i => i.Id);
+
+        return await query.ToListAsync();
+    }
+
     public async Task<IReadOnlyCollection<StatementTransaction>> GetAllStatementTransactionsWithSpec(string userId, BankStatementsTransactionsSpecification spec)
     {
         var query = _context
@@ -34,4 +50,5 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
 
         return await query.ToListAsync();
     }
+
 }
