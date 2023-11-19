@@ -27,4 +27,10 @@ public class DashboardRepository : GenericRepository<MainDashboard>, IDashboardR
         .AsNoTracking()
         .Where(u => u.CreatedBy == userId)
         .FirstOrDefaultAsync();
+
+    public async Task<MainDashboard> GetByIdAsync(string userId, int id) =>
+        await _context
+        .Set<MainDashboard>()
+        .Where(u => u.CreatedBy == userId && u.Id == id)
+        .SingleOrDefaultAsync();
 }

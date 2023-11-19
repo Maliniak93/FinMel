@@ -5,13 +5,13 @@ public class CreateMainDashboardCommandValidator : AbstractValidator<CreateMainD
 {
     public CreateMainDashboardCommandValidator()
     {
-        RuleFor(command => command.year)
+        RuleFor(command => command.Year)
             .GreaterThanOrEqualTo(2020).WithMessage("Year must be equal to or greater than 2020.");
 
-        RuleFor(command => command.month)
+        RuleFor(command => command.Month)
             .InclusiveBetween(1, 12).WithMessage("Month should be int from 1 to 12");
 
-        RuleFor(command => new DateTime(command.year, command.month, 1))
+        RuleFor(command => new DateTime(command.Year, command.Month, 1))
             .LessThan(DateTime.Now.AddMonths(-1)).WithMessage("Date cannot be never than previous month");
     }
 }

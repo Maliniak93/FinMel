@@ -2,7 +2,6 @@
 using Application.Common;
 using Domain.Common;
 using Domain.Entities.Bank;
-using Domain.Entities.Dashboard;
 using Domain.Enums;
 using Domain.Errors;
 using Domain.Repositories;
@@ -58,24 +57,6 @@ public class CreateBankAccountCommandHandler : ICommandHandler<CreateBankAccount
             request.IntrestRate,
             request.AccountType
             );
-
-        if (await _bankAccountRepository.IsFirstBankAccount(_user.Id))
-        {
-            var dashboard = new MainDashboard(0, 0, 0, 0, 0, default, default);
-            _dashboardRepository.Insert(dashboard);
-            bankAccount.AddNewMainDashboard(dashboard);
-        }
-        else
-        {
-            var dashboard = await _dashboardRepository.GetUserDashboard(_user.Id);
-
-            if (dashboard == null)
-            {
-                return Result.Failure(DomainErrors.BankAccount.MainDashboardError);
-            }
-
-            bankAccount.AddExistingDashboard(dashboard.Id);
-        }
 
         _bankAccountRepository.Insert(bankAccount);
 

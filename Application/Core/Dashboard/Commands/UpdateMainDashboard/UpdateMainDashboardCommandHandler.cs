@@ -2,17 +2,15 @@
 using Application.Common;
 using Domain;
 using Domain.Common;
-using Domain.Entities.Dashboard;
 using Domain.Enums;
 using Domain.Errors;
 using Domain.Repositories;
 
-namespace Application.Core.Dashboard.Commands.CreateMainDashboard;
+namespace Application.Core.Dashboard.Commands.UpdateMainDashboard;
 
-public record CreateMainDashboardCommand(
-    int Year,
-    int Month) : ICommand;
-public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashboardCommand>
+public record UpdateMainDashboardCommand(
+    int mainDashboardId) : ICommand;
+public class UpdateMainDashboardCommandHandler : ICommandHandler<UpdateMainDashboardCommand>
 {
     private readonly IDashboardRepository _dashboardRepository;
     private readonly IInvestmentRepository _investmentRepository;
@@ -21,7 +19,7 @@ public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashb
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUser _user;
 
-    public CreateMainDashboardCommandHandler(IDashboardRepository dashboardRepository,
+    public UpdateMainDashboardCommandHandler(IDashboardRepository dashboardRepository,
         IInvestmentRepository investmentRepository,
         IStatementTransactionRepository statementTransactionRepository,
         IBankAccountRepository bankAccountRepository,
@@ -35,20 +33,19 @@ public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashb
         _unitOfWork = unitOfWork;
         _user = user;
     }
-    public async Task<Result> Handle(CreateMainDashboardCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(UpdateMainDashboardCommand request, CancellationToken cancellationToken)
     {
-        var firstDayOfMonth = new DateTime(request.Year, request.Month, 1);
-        var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
-
-        var mainDashboards = await _dashboardRepository.GetAllAsync(_user.Id);
-        if (mainDashboards.Any(m => m.From == firstDayOfMonth && m.To == lastDayOfMonth))
+        var mainDashboard = await _dashboardRepository.GetByIdAsync(_user.Id, request.mainDashboardId);
+        if (mainDashboard is null)
         {
-            return Result.Failure(DomainErrors.Dashboard.MainDashboardForTimeRangeAlreadyExist(firstDayOfMonth, lastDayOfMonth));
+            return Result.Failure(DomainErrors.Dashboard.MainDashboardWithIdNotExist(request.mainDashboardId));
         }
 
-        MainDashboard mainDashboard = new(0, 0, 0, 0, 0, firstDayOfMonth, lastDayOfMonth);
+        mainDashboard.ResetMainDashboard();
 
-        var investments = await _investmentRepository.GetAllInTimeRange(_user.Id, firstDayOfMonth, lastDayOfMonth);
+        var mainDashboards = await _dashboardRepository.GetAllAsync(_user.Id);
+
+        var investments = await _investmentRepository.GetAllInTimeRange(_user.Id, mainDashboard.From, mainDashboard.To);
         if (investments.Any())
         {
             mainDashboard.AddToPersonalWealth(investments.Select(a => a.Amount).Sum());
@@ -59,7 +56,7 @@ public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashb
         {
             foreach (var bankAccount in bankAccounts)
             {
-                var transactions = await _statementTransactionRepository.GetStatementsTransactionsInTimeRange(_user.Id, firstDayOfMonth, lastDayOfMonth, bankAccount.Id);
+                var transactions = await _statementTransactionRepository.GetStatementsTransactionsInTimeRange(_user.Id, mainDashboard.From, mainDashboard.To, bankAccount.Id);
                 if (transactions.Any())
                 {
                     mainDashboard.AddToPersonalWealth(transactions.FirstOrDefault().AccountValue);
@@ -75,7 +72,7 @@ public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashb
 
         mainDashboard.CountAverageMonthlyExpenseAndIncome(mainDashboards);
 
-        _dashboardRepository.Insert(mainDashboard);
+        _dashboardRepository.Update(mainDashboard);
         await _unitOfWork.SaveChangesAsync();
 
         return Result.Success();

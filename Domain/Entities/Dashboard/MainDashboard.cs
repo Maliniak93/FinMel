@@ -46,16 +46,28 @@ public class MainDashboard : BaseAuditableEntity
 
     public void CountAverageMonthlyExpenseAndIncome(List<MainDashboard> mainDashboards)
     {
-        if (mainDashboards.Any())
+        var oldMainDashboards = mainDashboards.Where(x => x.From < From);
+
+        if (oldMainDashboards.Any())
         {
-            var months = mainDashboards.Count();
-            AverageMonthlyExpense = (MonthlyExpenses + mainDashboards.Select(x => x.MonthlyExpenses).Sum()) / months;
-            AverageMonthlyIncome = (MonthlyIncome + mainDashboards.Select(x => x.MonthlyIncome).Sum()) / months;
+
+            var months = oldMainDashboards.Count() + 1;
+            AverageMonthlyExpense = (MonthlyExpenses + oldMainDashboards.Select(x => x.MonthlyExpenses).Sum()) / months;
+            AverageMonthlyIncome = (MonthlyIncome + oldMainDashboards.Select(x => x.MonthlyIncome).Sum()) / months;
         }
         else
         {
             AverageMonthlyExpense = MonthlyExpenses;
             AverageMonthlyIncome = MonthlyIncome;
         }
+    }
+
+    public void ResetMainDashboard()
+    {
+        PersonalWealth = 0;
+        MonthlyExpenses = 0;
+        MonthlyIncome = 0;
+        AverageMonthlyExpense = 0;
+        AverageMonthlyIncome = 0;
     }
 }

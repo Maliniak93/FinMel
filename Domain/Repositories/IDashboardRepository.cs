@@ -5,4 +5,5 @@ public interface IDashboardRepository : IGenericRepository<MainDashboard>
 {
     Task<List<MainDashboard>> GetAllAsync(string userId);
     Task<MainDashboard> GetUserDashboard(string userId);
+    Task<MainDashboard> GetByIdAsync(string userId, int id);
 }
