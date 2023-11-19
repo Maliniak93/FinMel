@@ -10,13 +10,18 @@ public class GetStatementsTransactionsDto
     public decimal Value { get; set; }
     public decimal RealValue { get; set; }
     public string Description { get; set; }
+    public string Type { get; set; }
+    public string TransactionCode { get; set; }
 
     private class Mapping : Profile
     {
         public Mapping()
         {
             CreateMap<StatementTransaction, GetStatementsTransactionsDto>()
-                .ForMember(d => d.Description, o => o.MapFrom(s => s.DescriptionBase + s.DescriptionOptional));
+                .ForMember(d => d.Description, o => o.MapFrom(s => s.DescriptionBase + s.DescriptionOptional))
+                .ForMember(d => d.Type, o => o.MapFrom(s => s.TransactionCode.Type))
+                .ForMember(d => d.TransactionCode, o => o.MapFrom(s => s.TransactionCode.Code));
+
         }
     }
 }

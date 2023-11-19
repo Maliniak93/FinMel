@@ -6,9 +6,8 @@ using Domain.Repositories;
 
 namespace Application.Core.Bank.Queries.GetTransactionCodes;
 
-public record GetTransactionCodesQuery(int PageNumber = 1,
-    int PageSize = 10) : IQuery<PagedList<GetTransactionCodesQueryDto>>;
-public class GetTransactionCodesQueryHandler : IQueryHandler<GetTransactionCodesQuery, PagedList<GetTransactionCodesQueryDto>>
+public record GetTransactionCodesQuery() : IQuery<List<GetTransactionCodesQueryDto>>;
+public class GetTransactionCodesQueryHandler : IQueryHandler<GetTransactionCodesQuery, List<GetTransactionCodesQueryDto>>
 {
     private readonly ITransactionCodeRepository _repository;
     private readonly IUser _user;
@@ -22,22 +21,11 @@ public class GetTransactionCodesQueryHandler : IQueryHandler<GetTransactionCodes
         _user = user;
         _mapper = mapper;
     }
-    public async Task<Result<PagedList<GetTransactionCodesQueryDto>>> Handle(GetTransactionCodesQuery request, CancellationToken cancellationToken)
+    public async Task<Result<List<GetTransactionCodesQueryDto>>> Handle(GetTransactionCodesQuery request, CancellationToken cancellationToken)
     {
-        var codesQuery = await _repository.GetAllAsync(_user.Id);
+        var codes = await _repository.GetAllAsync(_user.Id);
 
-        var codes = codesQuery
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize);
-
-        var totalCount = codesQuery.Count();
-
-        var codesDto = _mapper.Map<List<GetTransactionCodesQueryDto>>(codes);
-
-        var result = new PagedList<GetTransactionCodesQueryDto>(codesDto,
-            totalCount,
-            request.PageNumber,
-            request.PageSize);
+        var result = _mapper.Map<List<GetTransactionCodesQueryDto>>(codes);
 
         return result;
     }

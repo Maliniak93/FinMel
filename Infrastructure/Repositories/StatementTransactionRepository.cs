@@ -19,6 +19,7 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
         var query = _context
             .GetEntityWithSpec<StatementTransaction>(spec)
             .AsNoTracking()
+            .Include(x => x.TransactionCode)
             .Where(u => u.CreatedBy == userId)
             .Where(i => i.BankStatementId == id);
 

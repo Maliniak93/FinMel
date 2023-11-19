@@ -53,10 +53,13 @@ public class StatementController : ApiController
 
         var response = await _mediator.Send(request, cancellationToken);
 
-        Response.AddPaginationheader(new PaginationHeader(response.Value.Page,
-            response.Value.PageSize,
-            response.Value.TotalCount,
-            response.Value.TotalPages));
+        if (response.IsSuccess)
+        {
+            Response.AddPaginationheader(new PaginationHeader(response.Value.Page,
+                response.Value.PageSize,
+                response.Value.TotalCount,
+                response.Value.TotalPages));
+        }
 
         return response.IsSuccess ? Ok(response.Value.Items) : HandleFailureNoContent(response);
     }
@@ -70,10 +73,13 @@ public class StatementController : ApiController
 
         var response = await _mediator.Send(query, cancellationToken);
 
-        Response.AddPaginationheader(new PaginationHeader(response.Value.Page,
-            response.Value.PageSize,
-            response.Value.TotalCount,
-            response.Value.TotalPages));
+        if (response.IsSuccess)
+        {
+            Response.AddPaginationheader(new PaginationHeader(response.Value.Page,
+                response.Value.PageSize,
+                response.Value.TotalCount,
+                response.Value.TotalPages));
+        }
 
         return response.IsSuccess ? Ok(response.Value.Items) : HandleFailureNoContent(response);
     }
@@ -81,8 +87,10 @@ public class StatementController : ApiController
     [HttpGet("transactions/codes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetTransactionCodes([FromBody] GetTransactionCodesQuery query, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTransactionCodes(CancellationToken cancellationToken)
     {
+        var query = new GetTransactionCodesQuery();
+
         var response = await _mediator.Send(query, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);

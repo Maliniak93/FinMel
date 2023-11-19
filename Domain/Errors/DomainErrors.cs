@@ -55,6 +55,10 @@ public static class DomainErrors
         public static Func<int, Error> BankStatementWithIdIsNotExist = id => new(
                 "BankStatement.NotFound",
                 $"The BankStatement with Id {id} was not found.");
+
+        public static Func<int, Error> StatementWithIdTransactionIsNotFound = id => new(
+            "BankStatement.NotFound",
+            $"The Bank Statement with Id {id} Transactions was not found.");
     }
 
     public static class TransactionCode
