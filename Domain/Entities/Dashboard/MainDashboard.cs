@@ -1,5 +1,6 @@
 ﻿using Domain.Common;
 using Domain.Entities.Bank;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Domain.Entities.Dashboard;
 public class MainDashboard : BaseAuditableEntity
@@ -27,7 +28,9 @@ public class MainDashboard : BaseAuditableEntity
     public decimal AverageMonthlyExpense { get; private set; }
     public decimal MonthlyIncome { get; private set; }
     public decimal AverageMonthlyIncome { get; private set; }
+    [Column(TypeName = "Date")]
     public DateTime From { get; private set; }
+    [Column(TypeName = "Date")]
     public DateTime To { get; private set; }
     public IReadOnlyCollection<BankAccount> BankAccounts => _bankAccounts;
 

@@ -34,7 +34,7 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
             .Include(s => s.BankStatement)
             .Include(c => c.TransactionCode)
             .Where(u => u.CreatedBy == userId)
-            .Where(f => f.TransactionDate >= from && f.TransactionDate <= to)
+            .Where(f => f.DashboardDate >= from && f.DashboardDate <= to)
             .Where(a => a.BankStatement.BankAccountId == bankAccountId)
             .OrderByDescending(d => d.TransactionDate)
             .ThenByDescending(i => i.Id);

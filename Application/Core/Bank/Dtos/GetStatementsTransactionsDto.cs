@@ -7,6 +7,7 @@ public class GetStatementsTransactionsDto
     public int Id { get; set; }
     public int BankStatementId { get; set; }
     public DateTime ExecutionDate { get; set; }
+    public DateTime DashboardDate { get; set; }
     public decimal Value { get; set; }
     public decimal RealValue { get; set; }
     public string Description { get; set; }

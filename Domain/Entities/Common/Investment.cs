@@ -1,4 +1,5 @@
 ﻿using Domain.Common;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Domain.Entities.Common;
 public class Investment : BaseAuditableEntity
@@ -15,8 +16,10 @@ public class Investment : BaseAuditableEntity
     public decimal Amount { get; private set; }
     public Currency Currency { get; private set; }
     public int CurrencyId { get; private set; }
+    [Column(TypeName = "Date")]
     public DateTime StartInvestment { get; private set; }
     public bool IsFinished { get; private set; } = false;
+    [Column(TypeName = "Date")]
     public DateTime? StopInvestment { get; private set; } = null;
     public decimal? FinalAmount { get; private set; } = null;
     public double? ReturnOfInvestment { get; private set; } = null;

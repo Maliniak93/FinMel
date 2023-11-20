@@ -10,6 +10,8 @@ public class StatementTransaction : BaseAuditableEntity
     public DateTime ExecutionDate { get; private set; }
     [Column(TypeName = "Date")]
     public DateTime TransactionDate { get; private set; }
+    [Column(TypeName = "Date")]
+    public DateTime DashboardDate { get; set; }
     public decimal Value { get; private set; }
     public decimal AccountValue { get; private set; }
     public decimal RealValue { get; private set; }
