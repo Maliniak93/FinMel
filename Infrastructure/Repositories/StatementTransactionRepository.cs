@@ -14,6 +14,12 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
         _context = context;
     }
 
+    public async Task<StatementTransaction> GetTransactionById(int id, string userId) =>
+        await _context.Set<StatementTransaction>()
+            .Where(x => x.CreatedBy == userId)
+            .Where(x => x.Id == id)
+            .SingleOrDefaultAsync();
+
     public async Task<IReadOnlyCollection<StatementTransaction>> GetStatementByIdTransactionsWithSpec(int id, string userId, BankStatementsTransactionsSpecification spec)
     {
         var query = _context
@@ -51,5 +57,6 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
 
         return await query.ToListAsync();
     }
+
 
 }
