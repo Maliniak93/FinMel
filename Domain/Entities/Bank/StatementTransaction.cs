@@ -30,4 +30,29 @@ public class StatementTransaction : BaseAuditableEntity
         TransactionCodeId = transactionCodeId;
         TransactionCode = transactionCode;
     }
+
+    public void UpdateTransactionType(string newType, List<TransactionCode> codes)
+    {
+        switch (newType)
+        {
+            case "Expenses":
+                TransactionCode = codes.SingleOrDefault(x => x.Code == "Def E");
+                break;
+            case "Income":
+                TransactionCode = codes.SingleOrDefault(x => x.Code == "Def I");
+                break;
+            case "Investments":
+                TransactionCode = codes.SingleOrDefault(x => x.Code == "Inv");
+                break;
+            case "Other":
+                TransactionCode = codes.SingleOrDefault(x => x.Code == "Othe");
+                break;
+            case "Ignore":
+                TransactionCode = codes.SingleOrDefault(x => x.Code == "Igno");
+                break;
+            default:
+                TransactionCode = codes.SingleOrDefault(x => x.Code == "Igno");
+                break;
+        }
+    }
 }

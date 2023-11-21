@@ -10,5 +10,9 @@ public class UpdateTransactionCodeCommandValidator : AbstractValidator<UpdateTra
         RuleFor(x => x.Code).NotEmpty().MaximumLength(255).WithMessage("Code field cannot exceed 255 characters.");
 
         RuleFor(x => x.Description).MaximumLength(255).WithMessage("Description field cannot exceed 255 characters.");
+
+        RuleFor(command => command.Type)
+                .IsInEnum()
+                .WithMessage("Incorrect Type");
     }
 }

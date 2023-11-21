@@ -98,6 +98,31 @@
     "Code": "0011",
     "Description": "Wpłata gotówki w oddziale w banku",
     "Type": 3
+  },
+  {
+    "Code": "Def E",
+    "Description": "Default Expense",
+    "Type": 0
+  },
+  {
+    "Code": "Def I",
+    "Description": "Default Income",
+    "Type": 1
+  },
+  {
+    "Code": "Inv",
+    "Description": "Default Investment",
+    "Type": 2
+  },
+  {
+    "Code": "Othe",
+    "Description": "Default Other",
+    "Type": 3
+  },
+  {
+    "Code": "Igno",
+    "Description": "Default Ignore",
+    "Type": 4
   }
 ]
 

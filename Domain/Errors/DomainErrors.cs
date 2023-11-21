@@ -71,8 +71,12 @@ public static class DomainErrors
     public static class TransactionCode
     {
         public static Func<int, Error> TransactionCodeWithIdIsNotExist = id => new(
-                "BankStatement.NotFound",
+                "TransactionCode.NotFound",
                 $"The Transaction Code with Id {id} was not found");
+
+        public static Error TransactionCodesIsNotExist => new(
+                "TransactionCodes.NotFound",
+                $"The Transaction Codes was not found");
     }
 
     public static class Dashboard

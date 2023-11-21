@@ -16,6 +16,7 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
 
     public async Task<StatementTransaction> GetTransactionById(int id, string userId) =>
         await _context.Set<StatementTransaction>()
+            .Include(x => x.TransactionCode)
             .Where(x => x.CreatedBy == userId)
             .Where(x => x.Id == id)
             .SingleOrDefaultAsync();

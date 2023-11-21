@@ -2,6 +2,7 @@
 using Application.Core.Bank.Commands.CreateByFileStatement;
 using Application.Core.Bank.Commands.UpdateTransactionCode;
 using Application.Core.Bank.Commands.UpdateTransactionDashboardDate;
+using Application.Core.Bank.Commands.UpdateTransactionType;
 using Application.Core.Bank.Queries.GetStatementById;
 using Application.Core.Bank.Queries.GetStatements;
 using Application.Core.Bank.Queries.GetStatementTransaction;
@@ -120,6 +121,16 @@ public class StatementController : ApiController
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }
+    [HttpPut("transactions/type/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateTransactionType(int id, [FromBody] UpdateTransactionTypeRequest request, CancellationToken cancellationToken)
+    {
+        var command = new UpdateTransactionTypeCommand(id, request.Type);
 
+        var response = await _mediator.Send(command, cancellationToken);
+
+        return response.IsSuccess ? Ok() : HandleFailure(response);
+    }
 
 }
