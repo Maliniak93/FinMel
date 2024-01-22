@@ -1,6 +1,5 @@
 ﻿using Domain.Entities.Bank;
 using Domain.Entities.Common;
-using FinMel.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
@@ -16,29 +15,15 @@ public class ApplicationDbContextInitialiser
 
     public async Task InitialiseAsync()
     {
-        try
+        if (_context.Database.IsSqlServer())
         {
-            if (_context.Database.IsSqlServer())
-            {
-                await _context.Database.MigrateAsync();
-            }
-        }
-        catch (Exception)
-        {
-            throw;
+            await _context.Database.MigrateAsync();
         }
     }
 
     public async Task SeedAsync()
     {
-        try
-        {
-            await TrySeedAsync();
-        }
-        catch (Exception)
-        {
-            throw;
-        }
+        await TrySeedAsync();
     }
 
     public async Task TrySeedAsync()
@@ -59,7 +44,7 @@ public class ApplicationDbContextInitialiser
         }
         if (!_context.Set<TransactionCode>().Any())
         {
-            string filePath = "C:\\Users\\dmalinowski\\source\\repos\\FinMel\\Infrastructure\\Persistence\\TransactionCodes.json";
+            string filePath = Path.Combine("..", "Infrastructure", "Persistence", "TransactionCodes.json");
             if (File.Exists(filePath))
             {
                 string jsonData = File.ReadAllText(filePath);

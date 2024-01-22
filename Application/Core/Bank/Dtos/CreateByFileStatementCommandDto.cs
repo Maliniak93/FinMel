@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
 using Domain.Entities.Bank;
-using Domain.Entities.Files;
 using Domain.Enums;
 using System.Globalization;
+using Domain.Entities.File;
+
+// ReSharper disable All
 
 namespace Application.Core.Bank.Dtos;
 public class CreateByFileStatementCommandDto

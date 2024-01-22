@@ -2,12 +2,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.Abstractions;
+// ReSharper disable All
 
 namespace WebApi.Controllers;
 
 public class BuggyController : ApiController
 {
-    public BuggyController(IMediator _mediator) : base(_mediator)
+    public BuggyController(IMediator mediator) : base(mediator)
     {
     }
 

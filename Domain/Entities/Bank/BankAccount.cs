@@ -5,9 +5,12 @@ using Domain.Enums;
 namespace Domain.Entities.Bank;
 public class BankAccount : BaseAuditableEntity
 {
+    // ReSharper disable once CollectionNeverUpdated.Local
     private readonly List<BankStatement> _bankStatements = new();
     private readonly List<History> _histories = new();
-    public BankAccount(
+
+    // ReSharper disable once NotNullOrRequiredMemberIsNotInitialized
+    private BankAccount(
         string accountNumber,
         string clientNumber,
         string clientName,
@@ -25,30 +28,23 @@ public class BankAccount : BaseAuditableEntity
         IntrestRate = intrestRate;
         AccountType = accountType;
     }
+
+    public static BankAccount CreateInstance(string accountNumber, string clientNumber, string clientName, string accountName, int currencyId, double intrestRate, AccountType accountType)
+    {
+        return new BankAccount(accountNumber, clientNumber, clientName, accountName, currencyId, intrestRate, accountType);
+    }
+
     public string AccountNumber { get; private set; }
     public string ClientNumber { get; private set; }
     public string ClientName { get; private set; }
     public string AccountName { get; private set; }
-    public Currency Currency { get; private set; }
+    // ReSharper disable once UnassignedGetOnlyAutoProperty
+    public Currency Currency { get;}
     public int CurrencyId { get; private set; }
     public double IntrestRate { get; private set; }
     public AccountType AccountType { get; set; }
     public IReadOnlyCollection<BankStatement> BankStatements => _bankStatements;
     public IReadOnlyCollection<History> History => _histories;
-
-    //public void InitializeBankHistory()
-    //{
-    //    History history = new History(DateTime.Now,
-    //        0,
-    //        this.Id);
-
-    //    _histories.Add(history);
-    //}
-
-    public void AddBankStatement(BankStatement bankStatement)
-    {
-        _bankStatements.Add(bankStatement);
-    }
 
     public void AddBankHistory(History history)
     {
@@ -66,108 +62,5 @@ public class BankAccount : BaseAuditableEntity
             AccountName = accountName;
 
         IntrestRate = intrestRate;
-    }
-
-    public decimal CountPersonalWealth() =>
-        History
-        .OrderByDescending(d => d.Date)
-        .Select(b => b.Balance)
-        .FirstOrDefault();
-
-    public decimal CountPersonalWealthLastMonth() =>
-        History
-        .OrderByDescending(d => d.Date)
-        .Select(b => b.Balance)
-        .Skip(1)
-        .FirstOrDefault();
-
-    public decimal CountMonthlyExpenses() =>
-        BankStatements
-        .OrderByDescending(d => d.StatementTo)
-        .FirstOrDefault()
-        .StatementTransactions
-        .Where(i => i.TransactionCode.Type == TransactionTypes.Expenses)
-        .Where(v => v.Value < 0)
-        .Select(e => e.Value)
-        .Sum();
-
-    public decimal CountMonthlyExpensesLastMonth() =>
-        BankStatements
-        .OrderByDescending(d => d.StatementTo)
-        .Skip(1)
-        .FirstOrDefault()
-        .StatementTransactions
-        .Where(i => i.TransactionCode.Type == TransactionTypes.Expenses)
-        .Where(v => v.Value < 0)
-        .Select(e => e.Value)
-        .Sum();
-
-    public decimal AverageMonthlyExpense()
-    {
-        decimal totalExpense = 0;
-        int month = 0;
-
-        foreach (var bankStatement in BankStatements)
-        {
-            var monthlyExpense = bankStatement
-                .StatementTransactions
-                .Where(i => i.TransactionCode.Type == TransactionTypes.Expenses)
-                .Where(v => v.Value < 0)
-                .Select(e => e.Value)
-                .Sum();
-            totalExpense += monthlyExpense;
-
-            month++;
-
-            if (month == 12)
-                break;
-        }
-
-        return totalExpense / month;
-    }
-
-    public decimal CountMonthlyIncome() =>
-        BankStatements
-        .OrderByDescending(d => d.StatementTo)
-        .FirstOrDefault()
-        .StatementTransactions
-        .Where(i => i.TransactionCode.Type == TransactionTypes.Income)
-        .Where(v => v.Value > 0)
-        .Select(e => e.Value)
-        .Sum();
-
-    public decimal CountMonthlyIncomeLastMonth() =>
-        BankStatements
-        .OrderByDescending(d => d.StatementTo)
-        .Skip(1)
-        .FirstOrDefault()
-        .StatementTransactions
-        .Where(i => i.TransactionCode.Type == TransactionTypes.Income)
-        .Where(v => v.Value > 0)
-        .Select(e => e.Value)
-        .Sum();
-
-    public decimal AverageMonthlyIncome()
-    {
-        decimal totalIncome = 0;
-        int month = 0;
-
-        foreach (var bankStatement in BankStatements)
-        {
-            var monthlyIncome = bankStatement
-                .StatementTransactions
-                .Where(i => i.TransactionCode.Type == TransactionTypes.Income)
-                .Where(v => v.Value > 0)
-                .Select(e => e.Value)
-                .Sum();
-            totalIncome += monthlyIncome;
-
-            month++;
-
-            if (month == 12)
-                break;
-        }
-
-        return totalIncome / month;
     }
 }

@@ -1,6 +1,6 @@
-﻿using Domain;
-using Domain.Entities.Files;
-using FinMel.Infrastructure.Persistence;
+﻿using Domain.Entities.File;
+using Domain.Repositories;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;

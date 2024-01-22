@@ -15,7 +15,7 @@ public class ValidationPipelineBehavior<TRequest, TResponse>
         _validators = validators;
     }
 
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    public async Task<TResponse?> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         if (!_validators.Any())
         {
@@ -40,7 +40,7 @@ public class ValidationPipelineBehavior<TRequest, TResponse>
         return await next();
     }
 
-    private static TResult CreateValidationResult<TResult>(Error[] errors)
+    private static TResult? CreateValidationResult<TResult>(Error[] errors)
         where TResult : Result
     {
         if (typeof(TResult) == typeof(Result))
@@ -52,7 +52,7 @@ public class ValidationPipelineBehavior<TRequest, TResponse>
             .GetGenericTypeDefinition()
             .MakeGenericType(typeof(TResult).GenericTypeArguments[0])
             .GetMethod(nameof(ValidationResult.WithErrors))
-            .Invoke(null, new object?[] { errors })!;
+            ?.Invoke(null, new object?[] { errors })!;
 
         return (TResult)validationResult;
     }

@@ -1,4 +1,5 @@
-﻿namespace Domain.Common;
+﻿// ReSharper disable All
+namespace Domain.Common;
 public abstract class BaseAuditableEntity : BaseEntity
 {
     public DateTime Created { get; set; }

@@ -1,8 +1,9 @@
 ﻿using Domain.Common;
 
-namespace Domain.Entities.Files;
+namespace Domain.Entities.File;
 public class StatementFile : BaseAuditableEntity
 {
+    // ReSharper disable once NotNullOrRequiredMemberIsNotInitialized
     public StatementFile()
     {
 

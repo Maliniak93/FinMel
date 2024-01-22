@@ -1,11 +1,11 @@
 ﻿using Application.Abstractions.Messaging;
 using Application.Common;
-using Domain;
 using Domain.Common;
 using Domain.Entities.Dashboard;
 using Domain.Enums;
 using Domain.Errors;
 using Domain.Repositories;
+// ReSharper disable All
 
 namespace Application.Core.Dashboard.Commands.CreateMainDashboard;
 
@@ -39,7 +39,7 @@ public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashb
     {
         var firstDayOfMonth = new DateTime(request.Year, request.Month, 1);
         var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
-
+        
         var mainDashboards = await _dashboardRepository.GetAllAsync(_user.Id);
         if (mainDashboards.Any(m => m.From == firstDayOfMonth && m.To == lastDayOfMonth))
         {
@@ -60,16 +60,14 @@ public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashb
             foreach (var bankAccount in bankAccounts)
             {
                 var transactions = await _statementTransactionRepository.GetStatementsTransactionsInTimeRange(_user.Id, firstDayOfMonth, lastDayOfMonth, bankAccount.Id);
-                if (transactions.Any())
-                {
-                    mainDashboard.AddToPersonalWealth(transactions.FirstOrDefault().AccountValue);
+                if (!transactions.Any()) continue;
+                mainDashboard.AddToPersonalWealth(transactions.FirstOrDefault()!.AccountValue);
 
-                    var expenses = transactions.Where(x => x.TransactionCode.Type == TransactionTypes.Expenses).Select(x => x.Value).Sum();
-                    mainDashboard.CountTotalExpenses(expenses);
+                var expenses = transactions.Where(x => x.TransactionCode.Type == TransactionTypes.Expenses).Select(x => x.Value).Sum();
+                mainDashboard.CountTotalExpenses(expenses);
 
-                    var incomes = transactions.Where(x => x.TransactionCode.Type == TransactionTypes.Income).Select(x => x.Value).Sum();
-                    mainDashboard.CountTotalIncomes(incomes);
-                }
+                var incomes = transactions.Where(x => x.TransactionCode.Type == TransactionTypes.Income).Select(x => x.Value).Sum();
+                mainDashboard.CountTotalIncomes(incomes);
             }
         }
 

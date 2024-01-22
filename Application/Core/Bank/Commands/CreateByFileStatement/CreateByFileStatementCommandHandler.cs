@@ -3,11 +3,10 @@ using Application.Common;
 using Application.Core.Bank.Dtos;
 using Application.Services;
 using AutoMapper;
-using Domain;
 using Domain.Common;
 using Domain.Entities.Bank;
 using Domain.Entities.Common;
-using Domain.Entities.Files;
+using Domain.Entities.File;
 using Domain.Enums;
 using Domain.Errors;
 using Domain.Repositories;
@@ -58,7 +57,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
     public async Task<Result> Handle(CreateByFileStatementCommand request,
         CancellationToken cancellationToken)
     {
-        if (!await _statementFileRepository.IsStatementFileUniqueAsync(request.FileName, _user.Id))
+        if (_user.Id != null && !await _statementFileRepository.IsStatementFileUniqueAsync(request.FileName, _user.Id))
             return Result.Failure(DomainErrors.StatementFile.StatementFileIsNotUnique(request.FileName));
 
         _unitOfWork.BeginTransaction();
@@ -82,13 +81,8 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
         var bankStatementDto = _mapper.Map<CreateByFileStatementCommandDto>(xmlSantanderStatement.Statement);
 
         var bankAccount = await _bankAccountRepository.GetByAccountNumberAsync(bankStatementDto.BankAccountNumber,
-            _user.Id,
+            _user.Id!,
             false);
-
-        if (bankAccount is null)
-        {
-            return Result.Failure(DomainErrors.BankAccount.BankAccountWithAccountNumberIsNotExist(bankStatementDto.BankAccountNumber));
-        }
 
         var bankStatement = new BankStatement(
             statementFile,
@@ -107,7 +101,7 @@ internal class CreateByFileStatementCommandHandler : ICommandHandler<CreateByFil
 
         bankAccount.AddBankHistory(new History(bankStatement.StatementTo, bankStatement.EndValue, bankAccount.Id));
 
-        var investments = bankStatement.StatementTransactions.Where(x => x.TransactionCode.Type == TransactionTypes.Investments);
+        var investments = bankStatement.StatementTransactions.Where(x => x.TransactionCode.Type == TransactionTypes.Investments).ToList();
 
         if (investments.Any())
         {

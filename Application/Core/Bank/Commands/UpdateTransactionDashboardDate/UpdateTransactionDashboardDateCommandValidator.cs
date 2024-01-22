@@ -5,7 +5,7 @@ public class UpdateTransactionDashboardDateCommandValidator : AbstractValidator<
 {
     public UpdateTransactionDashboardDateCommandValidator()
     {
-        RuleFor(x => x.newDate)
+        RuleFor(x => x.NewDate)
             .GreaterThan(new DateTime(2020, 1, 1))
             .WithMessage("The new date must be after 2020-01-01.");
     }

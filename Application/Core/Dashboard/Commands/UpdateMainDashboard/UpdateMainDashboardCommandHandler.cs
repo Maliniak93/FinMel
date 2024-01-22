@@ -1,6 +1,5 @@
 ﻿using Application.Abstractions.Messaging;
 using Application.Common;
-using Domain;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Errors;
@@ -9,7 +8,7 @@ using Domain.Repositories;
 namespace Application.Core.Dashboard.Commands.UpdateMainDashboard;
 
 public record UpdateMainDashboardCommand(
-    int mainDashboardId) : ICommand;
+    int MainDashboardId) : ICommand;
 public class UpdateMainDashboardCommandHandler : ICommandHandler<UpdateMainDashboardCommand>
 {
     private readonly IDashboardRepository _dashboardRepository;
@@ -35,10 +34,11 @@ public class UpdateMainDashboardCommandHandler : ICommandHandler<UpdateMainDashb
     }
     public async Task<Result> Handle(UpdateMainDashboardCommand request, CancellationToken cancellationToken)
     {
-        var mainDashboard = await _dashboardRepository.GetByIdAsync(_user.Id, request.mainDashboardId);
+        // ReSharper disable once AssignNullToNotNullAttribute
+        var mainDashboard = await _dashboardRepository.GetByIdAsync(_user.Id, request.MainDashboardId);
         if (mainDashboard is null)
         {
-            return Result.Failure(DomainErrors.Dashboard.MainDashboardWithIdNotExist(request.mainDashboardId));
+            return Result.Failure(DomainErrors.Dashboard.MainDashboardWithIdNotExist(request.MainDashboardId));
         }
 
         mainDashboard.ResetMainDashboard();
@@ -59,7 +59,7 @@ public class UpdateMainDashboardCommandHandler : ICommandHandler<UpdateMainDashb
                 var transactions = await _statementTransactionRepository.GetStatementsTransactionsInTimeRange(_user.Id, mainDashboard.From, mainDashboard.To, bankAccount.Id);
                 if (transactions.Any())
                 {
-                    mainDashboard.AddToPersonalWealth(transactions.FirstOrDefault().AccountValue);
+                    mainDashboard.AddToPersonalWealth(transactions.FirstOrDefault()!.AccountValue);
 
                     var expenses = transactions.Where(x => x.TransactionCode.Type == TransactionTypes.Expenses).Select(x => x.Value).Sum();
                     mainDashboard.CountTotalExpenses(expenses);

@@ -1,17 +1,15 @@
-﻿using Application.Common;
+﻿using System.Reflection;
+using Application.Common;
 using Domain.Common;
 using Domain.Entities.Bank;
 using Domain.Entities.Common;
 using Domain.Entities.Dashboard;
-using Domain.Entities.Files;
+using Domain.Entities.File;
 using Domain.Interfaces;
-using Infrastructure;
-using Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using System.Reflection;
 
-namespace FinMel.Infrastructure.Persistence;
+namespace Infrastructure.Persistence;
 public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     private readonly IMediator _mediator;

@@ -1,5 +1,4 @@
 ﻿using Application.Abstractions.Messaging;
-using Application.Common;
 using Domain.Common;
 using Domain.Entities.Bank;
 using Domain.Enums;
@@ -18,22 +17,16 @@ public record CreateBankAccountCommand(string AccountNumber,
     AccountType AccountType
     ) : ICommand;
 
-public class CreateBankAccountCommandHandler : ICommandHandler<CreateBankAccountCommand>
+public class  CreateBankAccountCommandHandler : ICommandHandler<CreateBankAccountCommand>
 {
     private readonly IBankAccountRepository _bankAccountRepository;
-    private readonly IDashboardRepository _dashboardRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IUser _user;
 
     public CreateBankAccountCommandHandler(IBankAccountRepository bankAccountRepository,
-        IDashboardRepository dashboardRepository,
-        IUnitOfWork unitOfWork,
-        IUser user)
+        IUnitOfWork unitOfWork)
     {
         _bankAccountRepository = bankAccountRepository;
-        _dashboardRepository = dashboardRepository;
         _unitOfWork = unitOfWork;
-        _user = user;
     }
 
     public async Task<Result> Handle(CreateBankAccountCommand request, CancellationToken cancellationToken)
@@ -48,15 +41,13 @@ public class CreateBankAccountCommandHandler : ICommandHandler<CreateBankAccount
             return Result.Failure(DomainErrors.BankAccount.BankAccountCurrencyIsNotExist);
         }
 
-        var bankAccount = new BankAccount(
-            request.AccountNumber,
+        var bankAccount = BankAccount.CreateInstance(request.AccountNumber,
             request.ClientNumber,
             request.ClientName,
             request.AccountName,
             request.CurrencyId,
             request.IntrestRate,
-            request.AccountType
-            );
+            request.AccountType);
 
         _bankAccountRepository.Insert(bankAccount);
 

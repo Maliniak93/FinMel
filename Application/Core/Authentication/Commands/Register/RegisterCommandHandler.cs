@@ -11,15 +11,12 @@ public record RegisterCommand(string Email, string Password, string DisplayName)
 public class RegisterCommandHandler : ICommandHandler<RegisterCommand, RegisterDto>
 {
     private readonly UserManager<AppUser> _userManager;
-    private readonly SignInManager<AppUser> _signInManager;
     private readonly IToken _token;
 
     public RegisterCommandHandler(UserManager<AppUser> userManager,
-        SignInManager<AppUser> signInManager,
         IToken token)
     {
         _userManager = userManager;
-        _signInManager = signInManager;
         _token = token;
     }
     public async Task<Result<RegisterDto>> Handle(RegisterCommand request, CancellationToken cancellationToken)

@@ -1,11 +1,9 @@
 ﻿using Domain.Common;
-using Domain.Entities.Bank;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Domain.Entities.Dashboard;
 public class MainDashboard : BaseAuditableEntity
 {
-    private readonly List<BankAccount> _bankAccounts = new();
     public MainDashboard(
         decimal personalWealth,
         decimal monthlyExpenses,
@@ -32,7 +30,7 @@ public class MainDashboard : BaseAuditableEntity
     public DateTime From { get; private set; }
     [Column(TypeName = "Date")]
     public DateTime To { get; private set; }
-    public IReadOnlyCollection<BankAccount> BankAccounts => _bankAccounts;
+
 
     public void AddToPersonalWealth(decimal value)
     {
@@ -47,14 +45,14 @@ public class MainDashboard : BaseAuditableEntity
         MonthlyIncome += value;
     }
 
-    public void CountAverageMonthlyExpenseAndIncome(List<MainDashboard> mainDashboards)
+    public void CountAverageMonthlyExpenseAndIncome(IEnumerable<MainDashboard> mainDashboards)
     {
-        var oldMainDashboards = mainDashboards.Where(x => x.From < From);
+        var oldMainDashboards = mainDashboards.Where(x => x.From < From).ToList();
 
         if (oldMainDashboards.Any())
         {
 
-            var months = oldMainDashboards.Count() + 1;
+            var months = oldMainDashboards.Count + 1;
             AverageMonthlyExpense = (MonthlyExpenses + oldMainDashboards.Select(x => x.MonthlyExpenses).Sum()) / months;
             AverageMonthlyIncome = (MonthlyIncome + oldMainDashboards.Select(x => x.MonthlyIncome).Sum()) / months;
         }

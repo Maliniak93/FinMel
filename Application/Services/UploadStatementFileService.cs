@@ -9,11 +9,9 @@ public class UploadStatementFileService : IUploadStatementFileService
     {
         if (!File.Exists(filePath))
         {
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-                return Result.Success();
-            }
+            await using var stream = new FileStream(filePath, FileMode.Create);
+            await file.CopyToAsync(stream);
+            return Result.Success();
         }
         else
         {

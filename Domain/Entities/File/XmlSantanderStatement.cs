@@ -1,9 +1,10 @@
-﻿using Domain.Common;
+﻿using System.Xml.Serialization;
+using Domain.Common;
 using Domain.Errors;
 using Microsoft.AspNetCore.Http;
-using System.Xml.Serialization;
+// ReSharper disable All
 
-namespace Domain.Entities.Files;
+namespace Domain.Entities.File;
 
 public class XmlSantanderStatement
 {

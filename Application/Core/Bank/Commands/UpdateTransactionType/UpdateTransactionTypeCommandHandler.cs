@@ -1,6 +1,5 @@
 ﻿using Application.Abstractions.Messaging;
 using Application.Common;
-using Domain;
 using Domain.Common;
 using Domain.Errors;
 using Domain.Repositories;
@@ -28,6 +27,7 @@ public class UpdateTransactionTypeCommandHandler : ICommandHandler<UpdateTransac
     }
     public async Task<Result> Handle(UpdateTransactionTypeCommand request, CancellationToken cancellationToken)
     {
+        // ReSharper disable once AssignNullToNotNullAttribute
         var transaction = await _statementTransactionRepository.GetTransactionById(request.Id, _user.Id);
 
         if (transaction is null)

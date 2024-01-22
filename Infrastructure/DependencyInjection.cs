@@ -1,7 +1,6 @@
 ﻿using Application.Abstractions.Authentication;
 using Application.Common;
 using Domain.Entities.Identity;
-using FinMel.Infrastructure.Persistence;
 using Infrastructure.Authentication;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -36,17 +35,17 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
 
         services.AddIdentityCore<AppUser>(opt =>
-        {
-            opt.User.RequireUniqueEmail = true;
-            opt.Password.RequireDigit = true;
-            opt.Password.RequireNonAlphanumeric = true;
-            opt.Password.RequireLowercase = true;
-            opt.Password.RequireUppercase = true;
-            opt.Password.RequiredLength = 8;
+            {
+                opt.User.RequireUniqueEmail = true;
+                opt.Password.RequireDigit = true;
+                opt.Password.RequireNonAlphanumeric = true;
+                opt.Password.RequireLowercase = true;
+                opt.Password.RequireUppercase = true;
+                opt.Password.RequiredLength = 8;
 
-            opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
-            opt.Lockout.MaxFailedAccessAttempts = 5;
-        })
+                opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
+                opt.Lockout.MaxFailedAccessAttempts = 5;
+            })
             .AddEntityFrameworkStores<AppIdentityDbContext>()
             .AddSignInManager<SignInManager<AppUser>>();
 

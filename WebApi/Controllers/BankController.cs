@@ -14,7 +14,7 @@ namespace WebApi.Controllers;
 public class BankController : ApiController
 {
 
-    public BankController(IMediator _mediator) : base(_mediator)
+    public BankController(IMediator mediator) : base(mediator)
     {
     }
 
@@ -35,7 +35,7 @@ public class BankController : ApiController
             request.AccountType
             );
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await Mediator.Send(command, cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }
@@ -47,7 +47,7 @@ public class BankController : ApiController
     {
         var query = new GetBankAccountByIdQuery(id);
 
-        var response = await _mediator.Send(query, cancellationToken);
+        var response = await Mediator.Send(query, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
     }
@@ -59,7 +59,7 @@ public class BankController : ApiController
     {
         var query = new GetBankAccountsQuery();
 
-        var response = await _mediator.Send(query, cancellationToken);
+        var response = await Mediator.Send(query, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
     }
@@ -75,7 +75,7 @@ public class BankController : ApiController
             request.IntrestRate,
             request.Balance);
 
-        var response = await _mediator.Send(updateBankAccountCommand, cancellationToken);
+        var response = await Mediator.Send(updateBankAccountCommand, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
     }
@@ -87,7 +87,7 @@ public class BankController : ApiController
     {
         var deleteBankAccountCommand = new DeleteBankAccountCommand(id);
 
-        var response = await _mediator.Send(deleteBankAccountCommand, cancellationToken);
+        var response = await Mediator.Send(deleteBankAccountCommand, cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailureNoContent(response);
     }

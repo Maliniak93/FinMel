@@ -1,8 +1,7 @@
 ﻿using Domain.Entities.Bank;
-using Domain.Repositories;
 using Domain.Specifications.StatementSpecification;
 
-namespace Domain;
+namespace Domain.Repositories;
 
 public interface IBankStatementRepository : IGenericRepository<BankStatement>
 {

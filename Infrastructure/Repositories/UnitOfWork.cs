@@ -1,5 +1,5 @@
 ﻿using Domain.Repositories;
-using FinMel.Infrastructure.Persistence;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Infrastructure.Repositories;

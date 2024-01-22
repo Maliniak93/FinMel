@@ -7,7 +7,7 @@ using Domain.Repositories;
 
 namespace Application.Core.Bank.Queries.GetBankAccounts;
 
-public record GetBankAccountsQuery() : IQuery<IEnumerable<GetBankAccountsQueryDto>>;
+public record GetBankAccountsQuery : IQuery<IEnumerable<GetBankAccountsQueryDto>>;
 
 public class GetBankAccountsQueryHandlers : IQueryHandler<GetBankAccountsQuery, IEnumerable<GetBankAccountsQueryDto>>
 {
@@ -25,6 +25,7 @@ public class GetBankAccountsQueryHandlers : IQueryHandler<GetBankAccountsQuery, 
 
     public async Task<Result<IEnumerable<GetBankAccountsQueryDto>>> Handle(GetBankAccountsQuery request, CancellationToken cancellationToken)
     {
+        // ReSharper disable once AssignNullToNotNullAttribute
         var bankAccounts = await _repository.GetAllAsync(_user.Id);
 
         if (!bankAccounts.Any())

@@ -2,9 +2,9 @@
 using Application.Common;
 using Application.Core.Bank.Dtos;
 using AutoMapper;
-using Domain;
 using Domain.Common;
 using Domain.Errors;
+using Domain.Repositories;
 using Domain.Specifications.TransactionSpecification;
 
 namespace Application.Core.Bank.Queries.GetStatementTransaction;
@@ -31,6 +31,7 @@ public class GetStatementTransactionQueryHandler : IQueryHandler<GetStatementTra
     {
         var spec = new BankStatementsTransactionsSpecification(request.SpecParameters);
 
+        // ReSharper disable once AssignNullToNotNullAttribute
         var statementTransactiontsQuery = await _repository.GetStatementByIdTransactionsWithSpec(request.Id, _user.Id, spec);
 
         if (!statementTransactiontsQuery.Any())

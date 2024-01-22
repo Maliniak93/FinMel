@@ -1,7 +1,6 @@
-﻿using Domain.Entities.Files;
-using Domain.Repositories;
+﻿using Domain.Entities.File;
 
-namespace Domain;
+namespace Domain.Repositories;
 
 public interface IStatementFileRepository : IGenericRepository<StatementFile>
 {

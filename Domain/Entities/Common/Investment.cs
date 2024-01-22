@@ -1,5 +1,6 @@
 ﻿using Domain.Common;
 using System.ComponentModel.DataAnnotations.Schema;
+// ReSharper disable All
 
 namespace Domain.Entities.Common;
 public class Investment : BaseAuditableEntity

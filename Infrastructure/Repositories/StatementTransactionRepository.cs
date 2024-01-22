@@ -1,7 +1,7 @@
-﻿using Domain;
-using Domain.Entities.Bank;
+﻿using Domain.Entities.Bank;
+using Domain.Repositories;
 using Domain.Specifications.TransactionSpecification;
-using FinMel.Infrastructure.Persistence;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
@@ -24,7 +24,7 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
     public async Task<IReadOnlyCollection<StatementTransaction>> GetStatementByIdTransactionsWithSpec(int id, string userId, BankStatementsTransactionsSpecification spec)
     {
         var query = _context
-            .GetEntityWithSpec<StatementTransaction>(spec)
+            .GetEntityWithSpec(spec)
             .AsNoTracking()
             .Include(x => x.TransactionCode)
             .Where(u => u.CreatedBy == userId)
@@ -52,7 +52,7 @@ public class StatementTransactionRepository : GenericRepository<StatementTransac
     public async Task<IReadOnlyCollection<StatementTransaction>> GetAllStatementTransactionsWithSpec(string userId, BankStatementsTransactionsSpecification spec)
     {
         var query = _context
-            .GetEntityWithSpec<StatementTransaction>(spec)
+            .GetEntityWithSpec(spec)
             .AsNoTracking()
             .Where(u => u.CreatedBy == userId);
 

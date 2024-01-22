@@ -1,3 +1,3 @@
 ﻿namespace WebApi.Contracts.BankStatements;
 
-public record UpdateTransactionDashboardDateRequest(DateTime newDate);
+public record UpdateTransactionDashboardDateRequest(DateTime NewDate);

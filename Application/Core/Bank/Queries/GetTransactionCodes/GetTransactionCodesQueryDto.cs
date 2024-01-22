@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Domain.Entities.Bank;
+// ReSharper disable All
 
 namespace Application.Core.Bank.Queries.GetTransactionCodes;
 

@@ -2,8 +2,8 @@
 using Application.Common;
 using Application.Core.Bank.Dtos;
 using AutoMapper;
-using Domain;
 using Domain.Common;
+using Domain.Repositories;
 using Domain.Specifications.StatementSpecification;
 
 namespace Application.Core.Bank.Queries.GetStatements;
@@ -26,6 +26,7 @@ public class GetStatementsQueryHandler : IQueryHandler<GetStatementsQuery, Paged
     {
         var spec = new BankStatementsSpecification(request.SpecParameters);
 
+        // ReSharper disable once AssignNullToNotNullAttribute
         var bankStatementsQuery = await _repository.GetAllStatementsWithSpec(_user.Id, spec);
 
         var totalCount = bankStatementsQuery.Count();

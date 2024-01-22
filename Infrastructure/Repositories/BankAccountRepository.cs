@@ -1,7 +1,7 @@
 ﻿using Domain.Entities.Bank;
 using Domain.Entities.Common;
 using Domain.Repositories;
-using FinMel.Infrastructure.Persistence;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
@@ -47,7 +47,7 @@ public class BankAccountRepository : GenericRepository<BankAccount>, IBankAccoun
         return await query.SingleOrDefaultAsync();
     }
 
-    public async Task<IEnumerable<BankAccount>> GetAllAsync(string userId) =>
+    public async Task<List<BankAccount>> GetAllAsync(string userId) =>
         await _context.Set<BankAccount>()
            .AsNoTracking()
            .Include(x => x.Currency)

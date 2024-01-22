@@ -9,9 +9,4 @@ public class AppIdentityDbContext : IdentityDbContext<AppUser>
     {
 
     }
-
-    protected override void OnModelCreating(ModelBuilder builder)
-    {
-        base.OnModelCreating(builder);
-    }
 }

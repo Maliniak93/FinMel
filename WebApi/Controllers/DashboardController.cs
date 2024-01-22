@@ -18,7 +18,7 @@ public class DashboardController : ApiController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromQuery] CreateMainDashboardCommand request, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(request, cancellationToken);
+        var response = await Mediator.Send(request, cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }
@@ -28,7 +28,7 @@ public class DashboardController : ApiController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update([FromQuery] UpdateMainDashboardCommand request, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(request, cancellationToken);
+        var response = await Mediator.Send(request, cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }
@@ -40,7 +40,7 @@ public class DashboardController : ApiController
     {
         var query = new GetMainDashboardQuery();
 
-        var response = await _mediator.Send(query, cancellationToken);
+        var response = await Mediator.Send(query, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
     }

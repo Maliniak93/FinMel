@@ -1,6 +1,7 @@
 ﻿using Domain.Common;
 using Domain.Entities.Bank;
 using System.ComponentModel.DataAnnotations.Schema;
+// ReSharper disable All
 
 namespace Domain.Entities.Common;
 public class History : BaseEntity

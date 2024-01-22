@@ -2,9 +2,9 @@
 using Application.Common;
 using Application.Core.Bank.Dtos;
 using AutoMapper;
-using Domain;
 using Domain.Common;
 using Domain.Errors;
+using Domain.Repositories;
 
 namespace Application.Core.Bank.Queries.GetStatementById;
 
@@ -14,17 +14,14 @@ public record GetStatementByIdQuery(int Id
 public class GetStatementByIdQueryHandler : IQueryHandler<GetStatementByIdQuery, GetStatementByIdDto>
 {
     private readonly IBankStatementRepository _repository;
-    private readonly IStatementTransactionRepository _transactionRepository;
     private readonly IUser _user;
     private readonly IMapper _mapper;
 
     public GetStatementByIdQueryHandler(IBankStatementRepository repository,
-        IStatementTransactionRepository transactionRepository,
         IUser user,
         IMapper mapper)
     {
         _repository = repository;
-        _transactionRepository = transactionRepository;
         _user = user;
         _mapper = mapper;
     }
@@ -32,6 +29,7 @@ public class GetStatementByIdQueryHandler : IQueryHandler<GetStatementByIdQuery,
     public async Task<Result<GetStatementByIdDto>> Handle(GetStatementByIdQuery request, CancellationToken cancellationToken)
     {
         var bankStatement = await _repository.GetByIdAsync(request.Id,
+            // ReSharper disable once AssignNullToNotNullAttribute
             _user.Id,
             true);
 

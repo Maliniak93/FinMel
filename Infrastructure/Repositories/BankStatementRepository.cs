@@ -1,7 +1,7 @@
-﻿using Domain;
-using Domain.Entities.Bank;
+﻿using Domain.Entities.Bank;
+using Domain.Repositories;
 using Domain.Specifications.StatementSpecification;
-using FinMel.Infrastructure.Persistence;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
@@ -30,7 +30,7 @@ public class BankStatementRepository : GenericRepository<BankStatement>, IBankSt
 
     public async Task<IReadOnlyCollection<BankStatement>> GetAllStatementsWithSpec(string userId, BankStatementsSpecification spec) =>
         await _context
-            .GetEntityWithSpec<BankStatement>(spec)
+            .GetEntityWithSpec(spec)
             .AsNoTracking()
             .Include(b => b.BankAccount)
             .Where(u => u.CreatedBy == userId)

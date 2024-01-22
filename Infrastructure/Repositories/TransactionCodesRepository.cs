@@ -1,6 +1,6 @@
 ﻿using Domain.Entities.Bank;
 using Domain.Repositories;
-using FinMel.Infrastructure.Persistence;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;

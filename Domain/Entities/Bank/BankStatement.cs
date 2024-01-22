@@ -1,15 +1,17 @@
 ﻿using Domain.Common;
-using Domain.Entities.Files;
 using System.ComponentModel.DataAnnotations.Schema;
+using Domain.Entities.File;
 
 namespace Domain.Entities.Bank;
 public class BankStatement : BaseAuditableEntity
 {
     private readonly List<StatementTransaction> _statementTransactions = new();
+    // ReSharper disable once NotNullOrRequiredMemberIsNotInitialized
     public BankStatement()
     {
 
     }
+    // ReSharper disable once NotNullOrRequiredMemberIsNotInitialized
     public BankStatement(StatementFile statementFile,
         string statementNumber,
         DateTime statementFrom,
@@ -28,6 +30,7 @@ public class BankStatement : BaseAuditableEntity
     }
 
     public StatementFile StatementFile { get; private set; }
+    // ReSharper disable once UnusedAutoPropertyAccessor.Local
     public int StatementFileId { get; private set; }
     public string StatementNumber { get; private set; }
     [Column(TypeName = "Date")]
@@ -38,6 +41,7 @@ public class BankStatement : BaseAuditableEntity
     public decimal EndValue { get; private set; }
     public IReadOnlyCollection<StatementTransaction> StatementTransactions => _statementTransactions;
     public int BankAccountId { get; private set; }
+    // ReSharper disable once UnusedAutoPropertyAccessor.Local
     public BankAccount BankAccount { get; private set; }
 
     public void AddStatementTransaction(StatementTransaction statementTransaction)

@@ -19,7 +19,7 @@ namespace WebApi.Controllers;
 
 public class StatementController : ApiController
 {
-    public StatementController(IMediator _mediator) : base(_mediator)
+    public StatementController(IMediator mediator) : base(mediator)
     {
     }
 
@@ -29,7 +29,7 @@ public class StatementController : ApiController
     public async Task<IActionResult> CreateByFile([FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new CreateByFileStatementCommand(file.FileName, file), cancellationToken);
+        var response = await Mediator.Send(new CreateByFileStatementCommand(file.FileName, file), cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }
@@ -41,7 +41,7 @@ public class StatementController : ApiController
     {
         var query = new GetStatementByIdQuery(id);
 
-        var response = await _mediator.Send(query, cancellationToken);
+        var response = await Mediator.Send(query, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
     }
@@ -53,7 +53,7 @@ public class StatementController : ApiController
     {
         var request = new GetStatementsQuery(query);
 
-        var response = await _mediator.Send(request, cancellationToken);
+        var response = await Mediator.Send(request, cancellationToken);
 
         if (response.IsSuccess)
         {
@@ -73,7 +73,7 @@ public class StatementController : ApiController
     {
         var query = new GetStatementTransactionQuery(id, request);
 
-        var response = await _mediator.Send(query, cancellationToken);
+        var response = await Mediator.Send(query, cancellationToken);
 
         if (response.IsSuccess)
         {
@@ -93,7 +93,7 @@ public class StatementController : ApiController
     {
         var query = new GetTransactionCodesQuery();
 
-        var response = await _mediator.Send(query, cancellationToken);
+        var response = await Mediator.Send(query, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureNoContent(response);
     }
@@ -103,9 +103,9 @@ public class StatementController : ApiController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateTransactionDashboardDate(int id, [FromBody] UpdateTransactionDashboardDateRequest request, CancellationToken cancellationToken)
     {
-        var command = new UpdateTransactionDashboardDateCommand(id, request.newDate);
+        var command = new UpdateTransactionDashboardDateCommand(id, request.NewDate);
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await Mediator.Send(command, cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }
@@ -117,7 +117,7 @@ public class StatementController : ApiController
     {
         var command = new UpdateTransactionCodeCommand(id, request.Code, request.Description, request.Type);
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await Mediator.Send(command, cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }
@@ -128,7 +128,7 @@ public class StatementController : ApiController
     {
         var command = new UpdateTransactionTypeCommand(id, request.Type);
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await Mediator.Send(command, cancellationToken);
 
         return response.IsSuccess ? Ok() : HandleFailure(response);
     }

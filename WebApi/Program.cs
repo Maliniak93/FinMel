@@ -1,7 +1,9 @@
 using Application;
 using Application.Common;
+using Domain.Entities.Identity;
 using Infrastructure;
 using Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Serilog;
 using WebApi.Middleware;
 using WebApi.Services;
@@ -41,12 +43,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    using (var scope = app.Services.CreateScope())
-    {
-        var initialiser = scope.ServiceProvider.GetRequiredService<ApplicationDbContextInitialiser>();
-        await initialiser.InitialiseAsync();
-        await initialiser.SeedAsync();
-    }
+    using var scope = app.Services.CreateScope();
+    var initializer = scope.ServiceProvider.GetRequiredService<ApplicationDbContextInitialiser>();
+    await initializer.InitialiseAsync();
+    await initializer.SeedAsync();
 }
 
 app.UseSerilogRequestLogging();

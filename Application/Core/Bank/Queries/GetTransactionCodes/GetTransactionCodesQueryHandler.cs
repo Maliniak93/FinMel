@@ -3,10 +3,11 @@ using Application.Common;
 using AutoMapper;
 using Domain.Common;
 using Domain.Repositories;
+// ReSharper disable All
 
 namespace Application.Core.Bank.Queries.GetTransactionCodes;
 
-public record GetTransactionCodesQuery() : IQuery<List<GetTransactionCodesQueryDto>>;
+public record GetTransactionCodesQuery : IQuery<List<GetTransactionCodesQueryDto>>;
 public class GetTransactionCodesQueryHandler : IQueryHandler<GetTransactionCodesQuery, List<GetTransactionCodesQueryDto>>
 {
     private readonly ITransactionCodeRepository _repository;

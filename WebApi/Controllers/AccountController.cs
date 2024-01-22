@@ -10,7 +10,7 @@ namespace WebApi.Controllers;
 public class AccountController : ApiController
 {
 
-    public AccountController(IMediator _mediator) : base(_mediator)
+    public AccountController(IMediator mediator) : base(mediator)
     {
 
     }
@@ -20,7 +20,7 @@ public class AccountController : ApiController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterCommand registerCommand, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(registerCommand, cancellationToken);
+        var response = await Mediator.Send(registerCommand, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailure(response);
     }
@@ -31,7 +31,7 @@ public class AccountController : ApiController
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginCommand loginCommand, CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(loginCommand, cancellationToken);
+        var response = await Mediator.Send(loginCommand, cancellationToken);
 
         return response.IsSuccess ? Ok(response.Value) : HandleFailureUnauthorized(response);
     }
