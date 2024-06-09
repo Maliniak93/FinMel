@@ -16,9 +16,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MediatR" Version="12.2.0" />
+    <PackageReference Include="MediatR" Version="12.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="6.0.0-preview.4.21253.5" />
-    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="9.0.0-preview.4.24267.6" />
   </ItemGroup>
 
 </Project>
