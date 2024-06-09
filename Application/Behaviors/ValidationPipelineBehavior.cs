@@ -54,6 +54,6 @@ public class ValidationPipelineBehavior<TRequest, TResponse>
             .GetMethod(nameof(ValidationResult.WithErrors))
             ?.Invoke(null, new object?[] { errors })!;
 
-        return (TResult)validationResult;
+        return (TResult) validationResult;
     }
 }

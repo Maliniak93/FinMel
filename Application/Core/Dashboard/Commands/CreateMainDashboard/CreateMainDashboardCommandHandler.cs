@@ -39,7 +39,7 @@ public class CreateMainDashboardCommandHandler : ICommandHandler<CreateMainDashb
     {
         var firstDayOfMonth = new DateTime(request.Year, request.Month, 1);
         var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
-        
+
         var mainDashboards = await _dashboardRepository.GetAllAsync(_user.Id);
         if (mainDashboards.Any(m => m.From == firstDayOfMonth && m.To == lastDayOfMonth))
         {

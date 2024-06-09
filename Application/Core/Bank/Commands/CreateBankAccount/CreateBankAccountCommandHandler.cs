@@ -17,7 +17,7 @@ public record CreateBankAccountCommand(string AccountNumber,
     AccountType AccountType
     ) : ICommand;
 
-public class  CreateBankAccountCommandHandler : ICommandHandler<CreateBankAccountCommand>
+public class CreateBankAccountCommandHandler : ICommandHandler<CreateBankAccountCommand>
 {
     private readonly IBankAccountRepository _bankAccountRepository;
     private readonly IUnitOfWork _unitOfWork;

@@ -26,7 +26,7 @@ public class StatementController : ApiController
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateByFile([FromForm] IFormFile file,
+    public async Task<IActionResult> CreateByFile(IFormFile file,
         CancellationToken cancellationToken)
     {
         var response = await Mediator.Send(new CreateByFileStatementCommand(file.FileName, file), cancellationToken);

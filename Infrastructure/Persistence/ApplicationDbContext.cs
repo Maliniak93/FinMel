@@ -5,20 +5,22 @@ using Domain.Entities.Bank;
 using Domain.Entities.Common;
 using Domain.Entities.Dashboard;
 using Domain.Entities.File;
+using Domain.Entities.Identity;
 using Domain.Interfaces;
 using MediatR;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence;
-public class ApplicationDbContext : DbContext, IApplicationDbContext
+public class ApplicationDbContext : IdentityDbContext<AppUser>, IApplicationDbContext
 {
     private readonly IMediator _mediator;
     private readonly AuditableEntitySaveChangesInterceptor _auditableEntitySaveChangesInterceptor;
 
     public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
         IMediator mediator,
-        AuditableEntitySaveChangesInterceptor auditableEntitySaveChangesInterceptor,
-        DbContextOptions<ApplicationDbContext> options) : base(options)
+        AuditableEntitySaveChangesInterceptor auditableEntitySaveChangesInterceptor) : base(options)
     {
         _mediator = mediator;
         _auditableEntitySaveChangesInterceptor = auditableEntitySaveChangesInterceptor;

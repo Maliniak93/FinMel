@@ -27,7 +27,7 @@ internal class GetMainDashboardQueryHandler : IQueryHandler<GetMainDashboardQuer
         {
             return Result.Failure<GetMainDashboardQueryDto>(DomainErrors.Dashboard.MainDashboardNotExist);
         }
-        
+
         var mainDashboardQueryDto = new GetMainDashboardQueryDto();
 
         return Result.Success(mainDashboardQueryDto);

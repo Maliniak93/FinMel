@@ -20,17 +20,12 @@ public static class DependencyInjection
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
         services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"),
+                options.UseSqlite(configuration.GetConnectionString("DefaultConnection"),
                   builder => builder.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
 
         services.AddScoped<ApplicationDbContextInitialiser>();
-
-        services.AddDbContext<AppIdentityDbContext>(options =>
-        {
-            options.UseSqlServer(configuration.GetConnectionString("IdentityConnection"));
-        });
 
         services.AddHttpContextAccessor();
 
@@ -46,7 +41,7 @@ public static class DependencyInjection
                 opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
                 opt.Lockout.MaxFailedAccessAttempts = 5;
             })
-            .AddEntityFrameworkStores<AppIdentityDbContext>()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddSignInManager<SignInManager<AppUser>>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

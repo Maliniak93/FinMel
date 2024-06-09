@@ -57,7 +57,7 @@ public class CreateByFileStatementCommandDto
                 .ForMember(d => d.DashboardDate, o => o.MapFrom(s => s.TransactionDate))
                 .ForMember(d => d.TransactionCode, o => o.MapFrom((src, dest, destMember, context) =>
                 {
-                    var codesList = (List<TransactionCode>)context.Items["codes"];
+                    var codesList = (List<TransactionCode>) context.Items["codes"];
                     var code = codesList.FirstOrDefault(x => x.Code == src.TransactionCode);
                     if (code != null)
                     {

@@ -27,7 +27,7 @@ public abstract class ValueObject : IEquatable<ValueObject>
             return false;
         }
 
-        var other = (ValueObject)obj;
+        var other = (ValueObject) obj;
         return GetEqualityComponents().SequenceEqual(other.GetEqualityComponents());
     }
 

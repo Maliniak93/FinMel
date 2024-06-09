@@ -9,6 +9,6 @@ public sealed class AppUser : IdentityUser
         Email = email;
         UserName = email;
     }
-    
+
     public string DisplayName { get; set; }
 }

@@ -1,9 +1,7 @@
 using Application;
 using Application.Common;
-using Domain.Entities.Identity;
 using Infrastructure;
 using Infrastructure.Persistence;
-using Microsoft.AspNetCore.Identity;
 using Serilog;
 using WebApi.Middleware;
 using WebApi.Services;

@@ -36,6 +36,6 @@ public class Investment : BaseAuditableEntity
 
     private void CountReturnOfInvestment(decimal returnOfInvestment)
     {
-        ReturnOfInvestment = (double)((returnOfInvestment - Amount) / Amount) * 100;
+        ReturnOfInvestment = (double) ((returnOfInvestment - Amount) / Amount) * 100;
     }
 }

@@ -24,7 +24,7 @@ public class XmlSantanderStatement
         XmlSerializer serializer = new XmlSerializer(typeof(Statement));
         try
         {
-            Statement = (Statement)serializer.Deserialize(xmlStream);
+            Statement = (Statement) serializer.Deserialize(xmlStream);
             return Result.Success();
         }
         catch (Exception ex)

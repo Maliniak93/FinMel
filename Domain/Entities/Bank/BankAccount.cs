@@ -39,7 +39,7 @@ public class BankAccount : BaseAuditableEntity
     public string ClientName { get; private set; }
     public string AccountName { get; private set; }
     // ReSharper disable once UnassignedGetOnlyAutoProperty
-    public Currency Currency { get;}
+    public Currency Currency { get; }
     public int CurrencyId { get; private set; }
     public double IntrestRate { get; private set; }
     public AccountType AccountType { get; set; }
