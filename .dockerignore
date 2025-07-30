@@ -1,0 +1,17 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.DotSettings.user
+publish/
+*.log
+.DS_Store
+node_modules/
+dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

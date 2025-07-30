@@ -1,0 +1,25 @@
+{
+  "dotnet.defaultSolution": "FinMel.sln",
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true
+  },
+  "omnisharp.enableEditorConfigSupport": true,
+  "omnisharp.enableRoslynAnalyzers": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "csharp.format.enable": true,
+  "csharp.semanticHighlighting.enabled": true,
+  "explorer.excludeGitIgnore": true,
+  "files.associations": {
+    "*.cs": "csharp"
+  },
+  "search.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "**/node_modules": true
+  }
+}

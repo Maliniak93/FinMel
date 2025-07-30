@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["build"],
+      "group": "build",
+      "presentation": {
+        "reveal": "silent"
+      },
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Build Solution",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["build"],
+      "group": "build",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Run Web API",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["run", "--project", "src/FinMel.Web"],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Run with Aspire",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["run", "--project", "src/FinMel.AppHost"],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["test"],
+      "group": "test",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["clean"],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

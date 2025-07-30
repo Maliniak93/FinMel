@@ -1,0 +1,6 @@
+@FinMel.Web_HostAddress = http://localhost:5181
+
+GET {{FinMel.Web_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
