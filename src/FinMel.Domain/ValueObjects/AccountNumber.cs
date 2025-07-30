@@ -1,4 +1,3 @@
-using System;
 using System.Text.RegularExpressions;
 
 namespace FinMel.Domain.ValueObjects
@@ -7,16 +6,9 @@ namespace FinMel.Domain.ValueObjects
     /// Represents a bank account number as a value object.
     /// Immutable and validated on creation.
     /// </summary>
-    public sealed partial class AccountNumber : IEquatable<AccountNumber>
+    public sealed partial record AccountNumber(string Value)
     {
         private static readonly Regex AccountNumberRegex = MyRegex();
-
-        public string Value { get; }
-
-        private AccountNumber(string value)
-        {
-            Value = value;
-        }
 
         public static AccountNumber Create(string value)
         {
@@ -28,23 +20,8 @@ namespace FinMel.Domain.ValueObjects
             if (!AccountNumberRegex.IsMatch(normalized))
                 throw new ArgumentException("Account number must be 16-34 digits.", nameof(value));
 
-
             return new AccountNumber(normalized);
         }
-
-
-        public override bool Equals(object? obj) => Equals(obj as AccountNumber);
-
-        public bool Equals(AccountNumber? other) =>
-            other is not null && string.Equals(Value, other.Value, StringComparison.Ordinal);
-
-        public override int GetHashCode() => Value.GetHashCode();
-
-        public static bool operator ==(AccountNumber left, AccountNumber right) =>
-            Equals(left, right);
-
-        public static bool operator !=(AccountNumber left, AccountNumber right) =>
-            !Equals(left, right);
 
         public override string ToString() => Value;
 
