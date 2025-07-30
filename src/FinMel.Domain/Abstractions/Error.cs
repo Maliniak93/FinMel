@@ -1,5 +1,8 @@
 namespace FinMel.Domain.Abstractions;
 
+/// <summary>
+/// Represents an error that can occur during operations.
+/// </summary>
 public abstract class Error : IEquatable<Error>
 {
     public static readonly Error None = new NoneError();

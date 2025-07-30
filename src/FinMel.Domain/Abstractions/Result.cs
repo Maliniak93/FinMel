@@ -2,6 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace FinMel.Domain.Abstractions;
 
+/// <summary>
+/// Represents the result of an operation, encapsulating success or failure.
+/// </summary>
 public class Result
 {
     protected internal Result(bool isSuccess, Error error)
@@ -38,6 +41,10 @@ public class Result
         value is not null ? Success(value) : Failure<TValue>(Error.NullValue);
 }
 
+/// <summary>
+/// Represents the result of an operation that returns a value, encapsulating success or failure.
+/// </summary>
+/// <typeparam name="TValue"></typeparam>
 public class Result<TValue> : Result
 {
     private readonly TValue? _value;
@@ -48,6 +55,9 @@ public class Result<TValue> : Result
         _value = value;
     }
 
+    /// <summary>
+    /// Represents the result of an operation that returns a value, encapsulating success or failure.
+    /// </summary>
     [NotNull]
     public TValue Value => IsSuccess
         ? _value!
