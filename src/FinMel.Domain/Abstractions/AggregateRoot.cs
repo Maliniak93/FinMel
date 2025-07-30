@@ -1,5 +1,3 @@
-using FinMel.Domain.Abstractions;
-
 namespace FinMel.Domain.Abstractions;
 
 /// <summary>

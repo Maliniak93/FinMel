@@ -1,4 +1,3 @@
-using System;
 using FinMel.Domain.Entities;
 
 namespace FinMel.Domain.ValueObjects

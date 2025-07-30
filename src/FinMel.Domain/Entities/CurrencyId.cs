@@ -1,5 +1,3 @@
-using System;
-
 namespace FinMel.Domain.Entities
 {
     /// <summary>
