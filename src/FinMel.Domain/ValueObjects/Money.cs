@@ -1,4 +1,4 @@
-using FinMel.Domain.Entities;
+using FinMel.Domain.Entities.Currency;
 
 namespace FinMel.Domain.ValueObjects
 {

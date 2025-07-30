@@ -1,4 +1,4 @@
-namespace FinMel.Domain.Entities
+namespace FinMel.Domain.Entities.Currency
 {
     /// <summary>
     /// Strongly-typed identifier for Currency entity.

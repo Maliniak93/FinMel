@@ -1,8 +1,7 @@
-using System;
 using System.Text.RegularExpressions;
 using FinMel.Domain.Abstractions;
 
-namespace FinMel.Domain.Entities;
+namespace FinMel.Domain.Entities.Currency;
 
 /// <summary>
 /// Represents a currency entity with a strongly-typed identifier.
