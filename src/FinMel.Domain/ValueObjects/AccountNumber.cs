@@ -8,7 +8,7 @@ namespace FinMel.Domain.ValueObjects
     /// </summary>
     public sealed partial record AccountNumber(string Value)
     {
-        private static readonly Regex AccountNumberRegex = MyRegex();
+        private static readonly Regex AccountNumberRegex = AccountRegex();
 
         public static AccountNumber Create(string value)
         {
@@ -31,6 +31,6 @@ namespace FinMel.Domain.ValueObjects
         /// </summary>
         /// <returns></returns>
         [GeneratedRegex(@"^\d{16,34}$", RegexOptions.Compiled)]
-        private static partial Regex MyRegex();
+        private static partial Regex AccountRegex();
     }
 }
