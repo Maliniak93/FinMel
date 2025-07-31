@@ -10,18 +10,19 @@ public sealed partial class Currency : Entity<CurrencyId>
 {
     private static readonly Regex IsoCodeRegex = CurrencyRegex();
 
-    private string _name = string.Empty;
-    public required string Name
+    private string _code = string.Empty;
+    public required string Code
     {
-        get => _name;
+        get => _code;
         init
         {
             if (!IsoCodeRegex.IsMatch(value))
-                throw new ArgumentException("Currency code must be a 3-letter uppercase ISO code.", nameof(Name));
-            _name = value;
+                throw new ArgumentException("Currency code must be a 3-letter uppercase ISO code.", nameof(Code));
+            _code = value;
         }
     }
 
+    public required string Name { get; init; }
     public required string Symbol { get; init; }
 
     [GeneratedRegex(@"^[A-Z]{3}$", RegexOptions.Compiled)]
