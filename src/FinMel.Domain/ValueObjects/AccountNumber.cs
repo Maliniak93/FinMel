@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using FinMel.Domain.Abstractions;
 
 namespace FinMel.Domain.ValueObjects
 {
@@ -6,7 +7,7 @@ namespace FinMel.Domain.ValueObjects
     /// Represents a bank account number as a value object.
     /// Immutable and validated on creation.
     /// </summary>
-    public sealed partial record AccountNumber(string Value)
+    public sealed partial record AccountNumber(string Value) : ValueObject
     {
         private static readonly Regex AccountNumberRegex = AccountRegex();
 

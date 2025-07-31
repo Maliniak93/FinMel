@@ -1,4 +1,5 @@
 using System;
+using FinMel.Domain.Abstractions;
 
 namespace FinMel.Domain.ValueObjects
 {
@@ -11,5 +12,5 @@ namespace FinMel.Domain.ValueObjects
         DateTime ImportedAt,
         string Source,
         string FileHash
-    );
+    ) : ValueObject;
 }

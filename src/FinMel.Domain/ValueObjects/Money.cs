@@ -1,3 +1,4 @@
+using FinMel.Domain.Abstractions;
 using FinMel.Domain.Entities.Currency;
 
 namespace FinMel.Domain.ValueObjects
@@ -5,7 +6,7 @@ namespace FinMel.Domain.ValueObjects
     /// <summary>
     /// Represents a monetary value with currency support.
     /// </summary>
-    public sealed record Money(decimal Value, CurrencyId CurrencyId)
+    public sealed record Money(decimal Value, CurrencyId CurrencyId) : ValueObject
     {
         public static Money operator +(Money a, Money b)
         {

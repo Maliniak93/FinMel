@@ -1,3 +1,5 @@
+using FinMel.Domain.Abstractions;
+
 namespace FinMel.Domain.ValueObjects
 {
     /// <summary>
@@ -10,5 +12,5 @@ namespace FinMel.Domain.ValueObjects
         string State,
         string PostalCode,
         string Country
-    );
+    ) : ValueObject;
 }
