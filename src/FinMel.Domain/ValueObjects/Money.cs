@@ -1,5 +1,4 @@
 using FinMel.Domain.Abstractions;
-using FinMel.Domain.Entities.Currency;
 
 namespace FinMel.Domain.ValueObjects
 {

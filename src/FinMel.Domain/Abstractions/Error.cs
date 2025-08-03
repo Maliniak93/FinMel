@@ -1,66 +1,35 @@
 namespace FinMel.Domain.Abstractions;
 
-/// <summary>
-/// Represents an error that can occur during operations.
-/// </summary>
-public abstract class Error : IEquatable<Error>
+public record Error
 {
-    public static readonly Error None = new NoneError();
-    public static readonly Error NullValue = new NullValueError();
+    public static readonly Error None = new(string.Empty, string.Empty, ErrorType.Failure);
+    public static readonly Error NullValue = new(
+        "General.Null",
+        "Null value was provided",
+        ErrorType.Failure);
 
-    protected Error(string code, string name, string description)
+    public Error(string code, string description, ErrorType type)
     {
         Code = code;
-        Name = name;
         Description = description;
+        Type = type;
     }
 
     public string Code { get; }
-    public string Name { get; }
+
     public string Description { get; }
 
-    public static implicit operator Result(Error error) => Result.Failure(error);
+    public ErrorType Type { get; }
 
-    public static bool operator ==(Error? a, Error? b)
-    {
-        if (a is null && b is null)
-        {
-            return true;
-        }
+    public static Error Failure(string code, string description) =>
+        new(code, description, ErrorType.Failure);
 
-        if (a is null || b is null)
-        {
-            return false;
-        }
+    public static Error NotFound(string code, string description) =>
+        new(code, description, ErrorType.NotFound);
 
-        return a.Equals(b);
-    }
+    public static Error Problem(string code, string description) =>
+        new(code, description, ErrorType.Problem);
 
-    public static bool operator !=(Error? a, Error? b) => !(a == b);
-
-    public virtual bool Equals(Error? other)
-    {
-        if (other is null)
-        {
-            return false;
-        }
-
-        return Code == other.Code && Name == other.Name && Description == other.Description;
-    }
-
-    public override bool Equals(object? obj) => obj is Error error && Equals(error);
-
-    public override int GetHashCode() => HashCode.Combine(Code, Name, Description);
-
-    public override string ToString() => $"{Name}: {Description}";
-
-    private sealed class NoneError : Error
-    {
-        public NoneError() : base(string.Empty, string.Empty, string.Empty) { }
-    }
-
-    private sealed class NullValueError : Error
-    {
-        public NullValueError() : base("Error.NullValue", "Null value", "Null value was provided") { }
-    }
+    public static Error Conflict(string code, string description) =>
+        new(code, description, ErrorType.Conflict);
 }

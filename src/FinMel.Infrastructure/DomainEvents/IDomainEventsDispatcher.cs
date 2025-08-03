@@ -1,8 +1,8 @@
 using FinMel.Domain.Abstractions;
 
-namespace FinMel.Application.Abstractions.Services;
+namespace FinMel.Infrastructure.DomainEvents;
 
-public interface IDomainEventDispatcher
+public interface IDomainEventsDispatcher
 {
     Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken = default);
 }
