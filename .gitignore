@@ -1,0 +1,30 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+artifacts/
+TestResults/
+*.binlog
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+
+# Environment / secrets — never commit
+.env
+.env.*
+appsettings.Production.json
+
+# Claude Code (personal, not shared)
+CLAUDE.local.md
+.claude/settings.local.json
+
+# OS / editors
+Thumbs.db
+.DS_Store
+
+# private files
+skarbiec-plan
