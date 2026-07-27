@@ -97,6 +97,13 @@ docker volume rm skarbiec.apphost-<hash>-postgres-data skarbiec.apphost-<hash>-r
 ```
 (find the exact names with `docker volume ls`).
 
+### EF Core migrations (T0.5)
+
+Each service applies its own pending EF Core migrations at startup (`Database.MigrateAsync()`),
+but only when `ASPNETCORE_ENVIRONMENT=Development` — convenient for local Aspire runs, but running
+schema changes on every container start is not something production should do implicitly. In
+production (T0.18), migrations are an explicit step in the deploy script instead.
+
 ## Production: docker compose on a VPS (T0.18)
 
 Not built yet — see `skarbiec-plan/zadania/phase-0-platform.md` T0.18.

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\contracts\Skarbiec.Contracts\Skarbiec.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Skarbiec.ServiceDefaults\Skarbiec.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

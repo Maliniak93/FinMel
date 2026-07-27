@@ -3,6 +3,9 @@
     <Project Path="contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj" />
     <Project Path="contracts/Skarbiec.Contracts/Skarbiec.Contracts.csproj" />
   </Folder>
+  <Folder Name="/services/Identity/">
+    <Project Path="services/Identity/Skarbiec.Identity/Skarbiec.Identity.csproj" />
+  </Folder>
   <Project Path="Skarbiec.AppHost/Skarbiec.AppHost.csproj" />
   <Project Path="Skarbiec.ServiceDefaults/Skarbiec.ServiceDefaults.csproj" />
   <Project Path="Skarbiec.ServiceDefaults.Sample/Skarbiec.ServiceDefaults.Sample.csproj" />
