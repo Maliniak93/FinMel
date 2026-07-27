@@ -1,2 +1,6 @@
 <Solution>
+  <Folder Name="/contracts/">
+    <Project Path="contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj" />
+    <Project Path="contracts/Skarbiec.Contracts/Skarbiec.Contracts.csproj" />
+  </Folder>
 </Solution>

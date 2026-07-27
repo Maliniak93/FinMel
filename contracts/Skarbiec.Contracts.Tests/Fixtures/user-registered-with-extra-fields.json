@@ -1,0 +1,8 @@
+{
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "email": "ada@example.com",
+  "displayName": "Ada",
+  "occurredAtUtc": "2026-01-15T10:30:00+00:00",
+  "correlationId": "9c858901-8a57-4791-81fe-4c455b099bc9",
+  "schemaHint": "this field does not exist yet and must not break deserialization"
+}
