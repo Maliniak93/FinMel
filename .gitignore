@@ -21,6 +21,7 @@ appsettings.Production.json
 # Claude Code (personal, not shared)
 CLAUDE.local.md
 .claude/settings.local.json
+.claude/skills/zadanie/
 
 # OS / editors
 Thumbs.db
