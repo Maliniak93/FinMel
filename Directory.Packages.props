@@ -1,0 +1,11 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Package versions are added here as services start referencing packages. -->
+  </ItemGroup>
+
+</Project>
