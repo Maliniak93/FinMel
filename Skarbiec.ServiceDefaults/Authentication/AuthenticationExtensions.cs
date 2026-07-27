@@ -22,6 +22,8 @@ public static class AuthenticationExtensions
             ?? throw new InvalidOperationException(
                 $"Missing '{JwtOptions.SectionName}' configuration section (Issuer/Audience/SigningKey).");
 
+        builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
