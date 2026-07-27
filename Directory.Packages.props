@@ -30,6 +30,9 @@
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.6" />
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+
+    <!-- Skarbiec.Identity.Tests (T0.6) -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
   </ItemGroup>
 
 </Project>

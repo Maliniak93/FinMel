@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/services/Identity/">
     <Project Path="services/Identity/Skarbiec.Identity/Skarbiec.Identity.csproj" />
+    <Project Path="services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj" />
   </Folder>
   <Project Path="Skarbiec.AppHost/Skarbiec.AppHost.csproj" />
   <Project Path="Skarbiec.ServiceDefaults/Skarbiec.ServiceDefaults.csproj" />
