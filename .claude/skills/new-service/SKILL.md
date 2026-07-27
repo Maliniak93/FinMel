@@ -11,7 +11,7 @@ If `Skarbiec.sln` does not exist yet, stop: implementation has not started — p
 
 ## Checklist
 
-1. Project under `services/<Name>/` referencing `Skarbiec.ServiceDefaults` (OpenTelemetry, health checks `/health/live` + `/health/ready`, JWT auth, HTTP resilience).
+1. Project under `services/<Name>/` referencing `Skarbiec.ServiceDefaults` (OpenTelemetry, health checks `/health/live` + `/health/ready`, JWT auth, HTTP resilience, `Result`→ProblemDetails mapping helper).
 2. Own database `<name>_db` with a dedicated DB user that has no access to other databases. No cross-DB joins, ever.
 3. EF Core: DbContext, migrations, global query filter on `UserId` + save interceptor.
 4. Register the service and its database in the Aspire AppHost.

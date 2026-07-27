@@ -28,12 +28,13 @@ Items marked *(default — confirm in Phase 0)* are opinionated choices not back
 - Endpoints grouped with `MapGroup("/api/<service>/<feature>")`; one endpoint file per slice registering itself via an extension method.
 - Return `TypedResults` with `Results<T1, T2, ...>` unions — never bare `IResult`.
 - Validation: .NET 10 built-in Minimal API validation — `builder.Services.AddValidation()` + DataAnnotations on request records; invalid input short-circuits to 400 ProblemDetails. Complex/cross-field rules: `IValidatableObject` or a validator class in the slice. *(default — confirm in Phase 0; fallback: FluentValidation)*
-- All errors as ProblemDetails (`AddProblemDetails()` + exception handler in ServiceDefaults); correlation/trace id included in the response.
+- Errors as ProblemDetails end-to-end: request validation → 400 automatically (previous bullet); handler-level expected failures (not found, conflict, business-rule violation) → the handler returns `Result`/`Result<T>`, the endpoint maps the failure to `TypedResults`/ProblemDetails via a shared helper in ServiceDefaults (ADR-017); genuinely unexpected failures → exception, caught by the global `AddProblemDetails()` handler in ServiceDefaults. Correlation/trace id included in every response.
 - OpenAPI: built-in `Microsoft.AspNetCore.OpenApi` (`AddOpenApi()`/`MapOpenApi()`) — no Swashbuckle. The generated doc feeds the Angular TS client.
 
 ## Slices (ADR-002, ADR-004)
 
 - `Features/<FeatureName>/` = endpoint + handler + validator (+ request/response records). Handler is a plain class resolved from DI — no MediatR, no Service/Repository layers.
+- Handler methods return `Result`/`Result<T>` (railway-oriented; the `Result`/`Result<T>`/`Error` types live in `Skarbiec.Contracts`) — never throw for expected failures. The endpoint calls the handler and maps the result to `TypedResults` via the ProblemDetails-mapping helper in ServiceDefaults (ADR-017). Exceptions stay reserved for genuinely unexpected failures.
 - Extract shared code only on the third use.
 - `UserId` always from JWT claims (`ClaimsPrincipal`), never from the request body or route (ADR-006).
 

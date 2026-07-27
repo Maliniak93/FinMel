@@ -18,7 +18,13 @@
     "deny": [
       "Read(./**/.env*)",
       "Edit(./**/.env*)",
-      "Read(./**/appsettings.Production.json)"
+      "Read(./**/appsettings.Production.json)",
+      "PowerShell"
+    ],
+    "ask": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
