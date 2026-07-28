@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Login;
+using Skarbiec.Identity.Features.Logout;
+using Skarbiec.Identity.Features.Refresh;
 using Skarbiec.Identity.Features.Register;
 using Skarbiec.Identity.Security;
 using Skarbiec.ServiceDefaults.Authentication;
@@ -21,6 +23,8 @@ builder.Services
 
 builder.Services.AddScoped<RegisterHandler>();
 builder.Services.AddScoped<LoginHandler>();
+builder.Services.AddScoped<RefreshHandler>();
+builder.Services.AddScoped<LogoutHandler>();
 builder.Services.AddSingleton<AccessTokenGenerator>();
 
 var app = builder.Build();
@@ -30,6 +34,8 @@ app.MapDefaultEndpoints();
 
 app.MapRegisterEndpoint();
 app.MapLoginEndpoint();
+app.MapRefreshEndpoint();
+app.MapLogoutEndpoint();
 
 // Diagnostic endpoint proving an access token minted by /login round-trips through JWT
 // bearer validation (ServiceDefaults) end to end — mirrors Skarbiec.ServiceDefaults.Sample's /secure.
