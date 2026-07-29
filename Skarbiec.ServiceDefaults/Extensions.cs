@@ -58,11 +58,18 @@ public static class Extensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    // MassTransit's own meter (T0.10) — harmless to register even for services
+                    // that don't use messaging yet.
+                    .AddMeter("MassTransit");
             })
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
+                    // MassTransit's send/receive/consume/outbox activities (T0.10, ADR-012) —
+                    // without this, publish/consume spans never reach the exporter and a
+                    // register request's trace stops at the HTTP+DB spans.
+                    .AddSource("MassTransit")
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>

@@ -5,14 +5,21 @@ using Skarbiec.Identity.Features.Login;
 using Skarbiec.Identity.Features.Logout;
 using Skarbiec.Identity.Features.Refresh;
 using Skarbiec.Identity.Features.Register;
+using Skarbiec.Identity.Messaging;
 using Skarbiec.Identity.Security;
 using Skarbiec.ServiceDefaults.Authentication;
+using Skarbiec.ServiceDefaults.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
 builder.AddNpgsqlDbContext<IdentityDbContext>("identity-db");
+
+// UserRegisteredLoggingConsumer is temporary (T0.10 AC: one trace HTTP -> outbox publish ->
+// consume) — remove once another service reacts to registration for real (T0.13+/T0.12).
+builder.AddRabbitMqMessaging<WebApplicationBuilder, IdentityDbContext>(
+    configureConsumers: x => x.AddConsumer<UserRegisteredLoggingConsumer>());
 
 builder.Services.AddValidation();
 

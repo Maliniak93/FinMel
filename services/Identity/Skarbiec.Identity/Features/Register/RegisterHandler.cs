@@ -1,10 +1,16 @@
+using MassTransit;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Identity.Data;
 
 namespace Skarbiec.Identity.Features.Register;
 
-public sealed class RegisterHandler(UserManager<ApplicationUser> userManager)
+public sealed class RegisterHandler(
+    UserManager<ApplicationUser> userManager,
+    IdentityDbContext dbContext,
+    IPublishEndpoint publishEndpoint)
 {
     // UserManager<TUser> predates CancellationToken support and has no overload to forward it to.
     public async Task<Result<RegisterResponse>> HandleAsync(RegisterRequest request, CancellationToken cancellationToken)
@@ -16,19 +22,41 @@ public sealed class RegisterHandler(UserManager<ApplicationUser> userManager)
             DisplayName = request.DisplayName
         };
 
-        var identityResult = await userManager.CreateAsync(user, request.Password);
+        // Npgsql's retry-on-failure execution strategy forbids a bare BeginTransactionAsync — it
+        // can't replay a user-initiated transaction, only a whole delegate it controls. Running
+        // both CreateAsync's own SaveChanges and our outbox SaveChanges inside this delegate is
+        // also what lets them share one transaction, committing atomically (ADR-012).
+        var strategy = dbContext.Database.CreateExecutionStrategy();
 
-        if (!identityResult.Succeeded)
+        return await strategy.ExecuteAsync<Result<RegisterResponse>>(async attemptCancellationToken =>
         {
-            return MapError(identityResult);
-        }
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(attemptCancellationToken);
 
-        return new RegisterResponse
-        {
-            UserId = user.Id,
-            Email = user.Email!,
-            DisplayName = user.DisplayName
-        };
+            var identityResult = await userManager.CreateAsync(user, request.Password);
+
+            if (!identityResult.Succeeded)
+            {
+                return MapError(identityResult);
+            }
+
+            await publishEndpoint.Publish(new UserRegistered
+            {
+                UserId = user.Id,
+                Email = user.Email!,
+                DisplayName = user.DisplayName,
+                OccurredAtUtc = DateTimeOffset.UtcNow
+            }, attemptCancellationToken);
+
+            await dbContext.SaveChangesAsync(attemptCancellationToken);
+            await transaction.CommitAsync(attemptCancellationToken);
+
+            return new RegisterResponse
+            {
+                UserId = user.Id,
+                Email = user.Email!,
+                DisplayName = user.DisplayName
+            };
+        }, cancellationToken);
     }
 
     private static Error MapError(IdentityResult identityResult)

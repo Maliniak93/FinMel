@@ -28,6 +28,8 @@ var reportingDb = await AddServiceDatabase("reporting", "reporting_db");
 builder.AddProject<Projects.Skarbiec_Identity>("identity-service")
     .WithReference(identityDb.ConnectionString)
     .WaitFor(identityDb.Database)
+    .WithReference(rabbitmq)
+    .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
 builder.Build().Run();

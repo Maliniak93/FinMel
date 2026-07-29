@@ -42,6 +42,12 @@
     <PackageVersion Include="Testcontainers.RabbitMq" Version="4.13.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <PackageVersion Include="Npgsql" Version="10.0.2" />
+
+    <!-- Messaging: MassTransit v8 + EF Outbox (T0.10, ADR-012 — pinned to v8, no v9 upgrade) -->
+    <PackageVersion Include="MassTransit" Version="8.5.10" />
+    <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.10" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.5.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
   </ItemGroup>
 
 </Project>
