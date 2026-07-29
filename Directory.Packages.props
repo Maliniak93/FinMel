@@ -8,6 +8,7 @@
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
 
     <!-- Skarbiec.ServiceDefaults (T0.3) -->
@@ -36,6 +37,11 @@
 
     <!-- Skarbiec.Identity (T0.7) -->
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
+
+    <!-- Skarbiec.Testing (T0.9) -->
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.13.0" />
+    <PackageVersion Include="Respawn" Version="7.0.0" />
+    <PackageVersion Include="Npgsql" Version="10.0.2" />
   </ItemGroup>
 
 </Project>

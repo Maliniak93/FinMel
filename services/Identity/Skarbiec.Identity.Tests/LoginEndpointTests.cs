@@ -4,20 +4,29 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Skarbiec.Identity.Features.Login;
 using Skarbiec.Identity.Features.Register;
+using Skarbiec.Testing;
+using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
-public sealed class LoginEndpointTests(IdentityApiFactory factory) : IClassFixture<IdentityApiFactory>
+[Collection(TestingDefaults.CollectionName)]
+public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
     private const string RegisterUri = "/api/identity/register";
     private const string LoginUri = "/api/identity/login";
     private const string MeUri = "/api/identity/me";
     private const string Password = "Str0ng!Passw0rd";
 
+    private readonly IdentityApiFactory _factory = new(containers);
+
+    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
+
+    public ValueTask DisposeAsync() => _factory.DisposeAsync();
+
     [Fact]
     public async Task Login_WithValidCredentials_ReturnsAccessTokenAndSetsRefreshCookie()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var email = await RegisterUserAsync(client);
 
         var response = await client.PostAsJsonAsync(
@@ -38,7 +47,7 @@ public sealed class LoginEndpointTests(IdentityApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Login_WithValidCredentials_AccessTokenAuthorizesProtectedEndpoint()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var email = await RegisterUserAsync(client);
 
         var loginResponse = await client.PostAsJsonAsync(
@@ -56,7 +65,7 @@ public sealed class LoginEndpointTests(IdentityApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Login_AccessToken_HasFifteenMinuteLifetime()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var email = await RegisterUserAsync(client);
 
         var response = await client.PostAsJsonAsync(
@@ -72,7 +81,7 @@ public sealed class LoginEndpointTests(IdentityApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Login_WithWrongPassword_ReturnsUnauthorized()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var email = await RegisterUserAsync(client);
 
         var response = await client.PostAsJsonAsync(
@@ -84,7 +93,7 @@ public sealed class LoginEndpointTests(IdentityApiFactory factory) : IClassFixtu
     [Fact]
     public async Task Login_WithUnknownEmail_ReturnsUnauthorized()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             LoginUri,

@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Skarbiec.ServiceDefaults.Sample\Skarbiec.ServiceDefaults.Sample.csproj" />
+    <ProjectReference Include="..\Skarbiec.Testing\Skarbiec.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

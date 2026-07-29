@@ -3,12 +3,15 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Skarbiec.Identity.Features.Login;
 using Skarbiec.Identity.Features.Register;
+using Skarbiec.Testing;
+using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
 // HandleCookies is disabled so each request's refresh cookie is exactly what the test attaches,
 // never one implicitly carried over by the client's own cookie jar from a previous call.
-public sealed class LogoutEndpointTests(IdentityApiFactory factory) : IClassFixture<IdentityApiFactory>
+[Collection(TestingDefaults.CollectionName)]
+public sealed class LogoutEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
     private const string RegisterUri = "/api/identity/register";
     private const string LoginUri = "/api/identity/login";
@@ -16,10 +19,16 @@ public sealed class LogoutEndpointTests(IdentityApiFactory factory) : IClassFixt
     private const string RefreshUri = "/api/identity/refresh";
     private const string Password = "Str0ng!Passw0rd";
 
+    private readonly IdentityApiFactory _factory = new(containers);
+
+    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
+
+    public ValueTask DisposeAsync() => _factory.DisposeAsync();
+
     [Fact]
     public async Task Logout_WithValidCookie_ReturnsNoContentAndClearsCookie()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         var refreshToken = await RegisterAndLoginAsync(client);
 
         var response = await SendLogoutWithCookieAsync(client, refreshToken);
@@ -33,7 +42,7 @@ public sealed class LogoutEndpointTests(IdentityApiFactory factory) : IClassFixt
     [Fact]
     public async Task Logout_ThenRefresh_ReturnsUnauthorized()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         var refreshToken = await RegisterAndLoginAsync(client);
 
         var logoutResponse = await SendLogoutWithCookieAsync(client, refreshToken);
@@ -49,7 +58,7 @@ public sealed class LogoutEndpointTests(IdentityApiFactory factory) : IClassFixt
     [Fact]
     public async Task Logout_WithoutCookie_ReturnsNoContent()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
 
         using var request = new HttpRequestMessage(HttpMethod.Post, LogoutUri);
         var response = await client.SendAsync(request, TestContext.Current.CancellationToken);

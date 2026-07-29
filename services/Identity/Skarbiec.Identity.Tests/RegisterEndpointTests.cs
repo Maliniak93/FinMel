@@ -4,17 +4,26 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Register;
+using Skarbiec.Testing;
+using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
-public sealed class RegisterEndpointTests(IdentityApiFactory factory) : IClassFixture<IdentityApiFactory>
+[Collection(TestingDefaults.CollectionName)]
+public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
     private const string RegisterUri = "/api/identity/register";
+
+    private readonly IdentityApiFactory _factory = new(containers);
+
+    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
+
+    public ValueTask DisposeAsync() => _factory.DisposeAsync();
 
     [Fact]
     public async Task Register_WithValidRequest_ReturnsCreatedAndStoresHashedPassword()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",
@@ -26,7 +35,7 @@ public sealed class RegisterEndpointTests(IdentityApiFactory factory) : IClassFi
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        using var scope = factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByEmailAsync(request.Email);
 
@@ -38,7 +47,7 @@ public sealed class RegisterEndpointTests(IdentityApiFactory factory) : IClassFi
     [Fact]
     public async Task Register_WithWeakPassword_ReturnsBadRequest()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",
@@ -54,7 +63,7 @@ public sealed class RegisterEndpointTests(IdentityApiFactory factory) : IClassFi
     [Fact]
     public async Task Register_WithMalformedEmail_ReturnsBadRequest()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = "not-an-email",
@@ -70,7 +79,7 @@ public sealed class RegisterEndpointTests(IdentityApiFactory factory) : IClassFi
     [Fact]
     public async Task Register_WithDuplicateEmail_ReturnsConflict()
     {
-        using var client = factory.CreateClient();
+        using var client = _factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",

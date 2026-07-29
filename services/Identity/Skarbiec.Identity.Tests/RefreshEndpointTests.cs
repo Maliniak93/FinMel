@@ -4,22 +4,31 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Skarbiec.Identity.Features.Login;
 using Skarbiec.Identity.Features.Refresh;
 using Skarbiec.Identity.Features.Register;
+using Skarbiec.Testing;
+using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
 // HandleCookies is disabled so each request's refresh cookie is exactly what the test attaches,
 // never one implicitly carried over by the client's own cookie jar from a previous call.
-public sealed class RefreshEndpointTests(IdentityApiFactory factory) : IClassFixture<IdentityApiFactory>
+[Collection(TestingDefaults.CollectionName)]
+public sealed class RefreshEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
     private const string RegisterUri = "/api/identity/register";
     private const string LoginUri = "/api/identity/login";
     private const string RefreshUri = "/api/identity/refresh";
     private const string Password = "Str0ng!Passw0rd";
 
+    private readonly IdentityApiFactory _factory = new(containers);
+
+    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
+
+    public ValueTask DisposeAsync() => _factory.DisposeAsync();
+
     [Fact]
     public async Task Refresh_WithValidCookie_ReturnsNewAccessTokenAndInvalidatesOldRefreshToken()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         var originalRefreshToken = await RegisterAndLoginAsync(client);
 
         var refreshResponse = await SendRefreshWithCookieAsync(client, originalRefreshToken);
@@ -39,7 +48,7 @@ public sealed class RefreshEndpointTests(IdentityApiFactory factory) : IClassFix
     [Fact]
     public async Task Refresh_ReusingRotatedToken_RevokesWholeChain()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         var originalRefreshToken = await RegisterAndLoginAsync(client);
 
         var firstRefresh = await SendRefreshWithCookieAsync(client, originalRefreshToken);
@@ -58,7 +67,7 @@ public sealed class RefreshEndpointTests(IdentityApiFactory factory) : IClassFix
     [Fact]
     public async Task Refresh_WithoutCookie_ReturnsUnauthorized()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
 
         using var request = new HttpRequestMessage(HttpMethod.Post, RefreshUri);
         var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
@@ -69,7 +78,7 @@ public sealed class RefreshEndpointTests(IdentityApiFactory factory) : IClassFix
     [Fact]
     public async Task Refresh_WithGarbageCookie_ReturnsUnauthorized()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
 
         var response = await SendRefreshWithCookieAsync(client, "not-a-real-token");
 
