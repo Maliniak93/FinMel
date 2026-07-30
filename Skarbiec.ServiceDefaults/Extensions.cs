@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -125,7 +126,17 @@ public static class Extensions
     /// <summary>Middleware-side wiring — call right after <c>builder.Build()</c>, before other middleware.</summary>
     public static WebApplication UseServiceDefaults(this WebApplication app)
     {
-        app.UseExceptionHandler();
+        // StatusCodeSelector (.NET 9+) is what makes UseExceptionHandler() honor
+        // BadHttpRequestException.StatusCode instead of flattening every exception to 500 — see
+        // BadHttpRequestExceptionHandler's old XML doc / T1.1 for why this exception occurs
+        // (Minimal API body binding throws it, with the correct status code already attached, only
+        // in Development — which is every Skarbiec test host and local `dotnet run`).
+        app.UseExceptionHandler(new ExceptionHandlerOptions
+        {
+            StatusCodeSelector = exception => exception is BadHttpRequestException badHttpRequestException
+                ? badHttpRequestException.StatusCode
+                : StatusCodes.Status500InternalServerError
+        });
 
         return app;
     }
