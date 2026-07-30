@@ -25,7 +25,7 @@ var strategyDb = await AddServiceDatabase("strategy", "strategy_db");
 var reportingDb = await AddServiceDatabase("reporting", "reporting_db");
 
 // First real service (T0.5); the rest land in T0.13.
-builder.AddProject<Projects.Skarbiec_Identity>("identity-service")
+var identityService = builder.AddProject<Projects.Skarbiec_Identity>("identity-service")
     .WithReference(identityDb.ConnectionString)
     .WaitFor(identityDb.Database)
     .WithReference(rabbitmq)
@@ -34,24 +34,40 @@ builder.AddProject<Projects.Skarbiec_Identity>("identity-service")
 
 // T0.13: skeletons only — health checks, OTel, EF + tenancy plumbing. No messaging yet, so no
 // RabbitMQ reference (that lands alongside each service's first published/consumed event).
-builder.AddProject<Projects.Skarbiec_Portfolio>("portfolio-service")
+var portfolioService = builder.AddProject<Projects.Skarbiec_Portfolio>("portfolio-service")
     .WithReference(portfolioDb.ConnectionString)
     .WaitFor(portfolioDb.Database)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-builder.AddProject<Projects.Skarbiec_MarketData>("marketdata-service")
+var marketDataService = builder.AddProject<Projects.Skarbiec_MarketData>("marketdata-service")
     .WithReference(marketDataDb.ConnectionString)
     .WaitFor(marketDataDb.Database)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-builder.AddProject<Projects.Skarbiec_Strategy>("strategy-service")
+var strategyService = builder.AddProject<Projects.Skarbiec_Strategy>("strategy-service")
     .WithReference(strategyDb.ConnectionString)
     .WaitFor(strategyDb.Database)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-builder.AddProject<Projects.Skarbiec_Reporting>("reporting-service")
+var reportingService = builder.AddProject<Projects.Skarbiec_Reporting>("reporting-service")
     .WithReference(reportingDb.ConnectionString)
     .WaitFor(reportingDb.Database)
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
+
+// T0.15: single entry point for Angular (ADR-013) — routes per prefix, JWT validated at the
+// gateway, downstream addresses resolved via Aspire service discovery (WithReference below injects
+// the "Services:<name>:..." config YARP's AddServiceDiscoveryDestinationResolver reads).
+builder.AddProject<Projects.Skarbiec_Gateway>("gateway")
+    .WithReference(identityService)
+    .WaitFor(identityService)
+    .WithReference(portfolioService)
+    .WaitFor(portfolioService)
+    .WithReference(marketDataService)
+    .WaitFor(marketDataService)
+    .WithReference(strategyService)
+    .WaitFor(strategyService)
+    .WithReference(reportingService)
+    .WaitFor(reportingService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
 builder.Build().Run();

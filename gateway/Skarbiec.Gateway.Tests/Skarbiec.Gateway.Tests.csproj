@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Aliased: Skarbiec.Identity and Skarbiec.Portfolio each compile a top-level `Program` class
+         into the global namespace, which collides with Skarbiec.Gateway's own `Program` and with
+         each other. Only their `Program` type is needed here (as WebApplicationFactory<TProgram>),
+         accessed through the extern alias in Infrastructure/*TestHost.cs. -->
+    <ProjectReference Include="..\..\services\Identity\Skarbiec.Identity\Skarbiec.Identity.csproj" Aliases="IdentityAssembly" />
+    <ProjectReference Include="..\..\services\Portfolio\Skarbiec.Portfolio\Skarbiec.Portfolio.csproj" Aliases="PortfolioAssembly" />
+    <ProjectReference Include="..\Skarbiec.Gateway\Skarbiec.Gateway.csproj" />
+    <ProjectReference Include="..\..\Skarbiec.Testing\Skarbiec.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

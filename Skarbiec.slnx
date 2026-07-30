@@ -23,6 +23,10 @@
     <Project Path="services/Reporting/Skarbiec.Reporting/Skarbiec.Reporting.csproj" />
     <Project Path="services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj" />
   </Folder>
+  <Folder Name="/gateway/">
+    <Project Path="gateway/Skarbiec.Gateway/Skarbiec.Gateway.csproj" />
+    <Project Path="gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj" />
+  </Folder>
   <Project Path="Skarbiec.AppHost/Skarbiec.AppHost.csproj" />
   <Project Path="Skarbiec.ServiceDefaults/Skarbiec.ServiceDefaults.csproj" />
   <Project Path="Skarbiec.ServiceDefaults.Sample/Skarbiec.ServiceDefaults.Sample.csproj" />

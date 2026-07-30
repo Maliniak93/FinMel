@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.ServiceDefaults.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,11 @@ var app = builder.Build();
 
 app.UseServiceDefaults();
 app.MapDefaultEndpoints();
+
+// Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton
+// service (T0.15 AC) — mirrors Skarbiec.Identity's /api/identity/me.
+app.MapGet("/api/portfolio/me", (ICurrentUser currentUser) => TypedResults.Ok(currentUser.UserId))
+    .RequireAuthorization();
 
 // Production applies migrations as an explicit deploy step instead (see deploy/README.md).
 if (app.Environment.IsDevelopment())
