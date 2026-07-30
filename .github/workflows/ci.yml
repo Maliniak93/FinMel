@@ -100,9 +100,10 @@ jobs:
               - 'web/**'
 
   # One job per microservice + the gateway: restore -> build (warnings-as-errors, via
-  # Directory.Build.props) -> test (Testcontainers needs the Docker daemon the runner already has)
-  # -> build the image locally to validate the Dockerfile. Never pushed anywhere — no registry
-  # is wired up yet; that's a decision left for T0.18 (deploy).
+  # Directory.Build.props) -> test (Testcontainers needs the Docker daemon the runner already has).
+  # No Dockerfile build here — with no registry wired up yet, a `docker build` step only
+  # duplicated the restore/publish work above (no BuildKit cache) for a rarely-tripped safety net.
+  # Dockerfile validation + push arrives with the registry in T0.18 (deploy).
   #
   # These are separate named jobs, not a strategy.matrix, on purpose: a job-level `if:` cannot
   # reference the `matrix` context (only `needs`/`github`/`vars`/`inputs` are available there —
@@ -132,15 +133,6 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj --configuration Release --no-build
 
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build image (validates the Dockerfile — never published)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/Identity/Skarbiec.Identity/Dockerfile
-          push: false
-
   portfolio:
     name: portfolio
     needs: changes
@@ -161,15 +153,6 @@ jobs:
 
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj --configuration Release --no-build
-
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build image (validates the Dockerfile — never published)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/Portfolio/Skarbiec.Portfolio/Dockerfile
-          push: false
 
   marketdata:
     name: marketdata
@@ -192,15 +175,6 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj --configuration Release --no-build
 
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build image (validates the Dockerfile — never published)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/MarketData/Skarbiec.MarketData/Dockerfile
-          push: false
-
   strategy:
     name: strategy
     needs: changes
@@ -221,15 +195,6 @@ jobs:
 
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj --configuration Release --no-build
-
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build image (validates the Dockerfile — never published)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/Strategy/Skarbiec.Strategy/Dockerfile
-          push: false
 
   reporting:
     name: reporting
@@ -252,15 +217,6 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj --configuration Release --no-build
 
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build image (validates the Dockerfile — never published)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/Reporting/Skarbiec.Reporting/Dockerfile
-          push: false
-
   gateway:
     name: gateway
     needs: changes
@@ -281,15 +237,6 @@ jobs:
 
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj --configuration Release --no-build
-
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build image (validates the Dockerfile — never published)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: gateway/Skarbiec.Gateway/Dockerfile
-          push: false
 
   # Skarbiec.Contracts / Skarbiec.ServiceDefaults / Skarbiec.Testing are libraries, not deployable
   # services — no image, just their own test suite when they (or root build config) change.
