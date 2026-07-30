@@ -28,4 +28,6 @@
   <Project Path="Skarbiec.ServiceDefaults.Sample/Skarbiec.ServiceDefaults.Sample.csproj" />
   <Project Path="Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj" />
   <Project Path="Skarbiec.Testing/Skarbiec.Testing.csproj" />
+  <Project Path="Skarbiec.Testing.Sample/Skarbiec.Testing.Sample.csproj" />
+  <Project Path="Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj" />
 </Solution>

@@ -11,14 +11,13 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="NetArchTest.Rules" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Skarbiec.Identity\Skarbiec.Identity.csproj" />
-    <ProjectReference Include="..\..\..\Skarbiec.Testing\Skarbiec.Testing.csproj" />
+    <ProjectReference Include="..\Skarbiec.Testing.Sample\Skarbiec.Testing.Sample.csproj" />
+    <ProjectReference Include="..\Skarbiec.Testing\Skarbiec.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>
