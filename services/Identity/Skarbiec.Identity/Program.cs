@@ -17,7 +17,11 @@ builder.AddServiceDefaults();
 builder.AddNpgsqlDbContext<IdentityDbContext>("identity-db");
 
 // UserRegisteredLoggingConsumer is temporary (T0.10 AC: one trace HTTP -> outbox publish ->
-// consume) — remove once another service reacts to registration for real (T0.13+/T0.12).
+// consume) — remove once another service reacts to registration for real (T0.13+). Deliberately
+// plain (no IdempotentConsumerDefinition, see Messaging/README.md): every register/login/refresh
+// slice test boots this consumer via IdentityApiFactory, and EF-outbox-wrapping its consume adds a
+// DB transaction that isn't always fully drained by WebApplicationFactory.DisposeAsync's shutdown
+// window, bleeding into later tests sharing the same Postgres container.
 builder.AddRabbitMqMessaging<WebApplicationBuilder, IdentityDbContext>(
     configureConsumers: x => x.AddConsumer<UserRegisteredLoggingConsumer>());
 
