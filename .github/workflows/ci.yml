@@ -12,13 +12,11 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 env:
   DOTNET_VERSION: "10.0.x"
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
-  REGISTRY: ghcr.io
 
 jobs:
   # Decides which services actually need to build/test/publish for this change. Every service
@@ -103,8 +101,8 @@ jobs:
 
   # One job per microservice + the gateway: restore -> build (warnings-as-errors, via
   # Directory.Build.props) -> test (Testcontainers needs the Docker daemon the runner already has)
-  # -> build the image -> push to GHCR tagged by commit SHA (push only on merge to main, never
-  # from a pull_request, so PRs validate the Dockerfile without publishing anything).
+  # -> build the image locally to validate the Dockerfile. Never pushed anywhere — no registry
+  # is wired up yet; that's a decision left for T0.18 (deploy).
   #
   # These are separate named jobs, not a strategy.matrix, on purpose: a job-level `if:` cannot
   # reference the `matrix` context (only `needs`/`github`/`vars`/`inputs` are available there —
@@ -134,27 +132,14 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj --configuration Release --no-build
 
-      - name: Lowercase image owner
-        id: owner
-        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
       - uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image (push only on merge to main)
+      - name: Build image (validates the Dockerfile — never published)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: services/Identity/Skarbiec.Identity/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-identity:${{ github.sha }}
+          push: false
 
   portfolio:
     name: portfolio
@@ -177,27 +162,14 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj --configuration Release --no-build
 
-      - name: Lowercase image owner
-        id: owner
-        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
       - uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image (push only on merge to main)
+      - name: Build image (validates the Dockerfile — never published)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: services/Portfolio/Skarbiec.Portfolio/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-portfolio:${{ github.sha }}
+          push: false
 
   marketdata:
     name: marketdata
@@ -220,27 +192,14 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj --configuration Release --no-build
 
-      - name: Lowercase image owner
-        id: owner
-        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
       - uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image (push only on merge to main)
+      - name: Build image (validates the Dockerfile — never published)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: services/MarketData/Skarbiec.MarketData/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-marketdata:${{ github.sha }}
+          push: false
 
   strategy:
     name: strategy
@@ -263,27 +222,14 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj --configuration Release --no-build
 
-      - name: Lowercase image owner
-        id: owner
-        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
       - uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image (push only on merge to main)
+      - name: Build image (validates the Dockerfile — never published)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: services/Strategy/Skarbiec.Strategy/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-strategy:${{ github.sha }}
+          push: false
 
   reporting:
     name: reporting
@@ -306,27 +252,14 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj --configuration Release --no-build
 
-      - name: Lowercase image owner
-        id: owner
-        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
       - uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image (push only on merge to main)
+      - name: Build image (validates the Dockerfile — never published)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: services/Reporting/Skarbiec.Reporting/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-reporting:${{ github.sha }}
+          push: false
 
   gateway:
     name: gateway
@@ -349,27 +282,14 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj --configuration Release --no-build
 
-      - name: Lowercase image owner
-        id: owner
-        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
       - uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build image (push only on merge to main)
+      - name: Build image (validates the Dockerfile — never published)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: gateway/Skarbiec.Gateway/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-gateway:${{ github.sha }}
+          push: false
 
   # Skarbiec.Contracts / Skarbiec.ServiceDefaults / Skarbiec.Testing are libraries, not deployable
   # services — no image, just their own test suite when they (or root build config) change.
