@@ -16,6 +16,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\services\Identity\Skarbiec.Identity\Skarbiec.Identity.csproj" />
+    <ProjectReference Include="..\services\Portfolio\Skarbiec.Portfolio\Skarbiec.Portfolio.csproj" />
+    <ProjectReference Include="..\services\MarketData\Skarbiec.MarketData\Skarbiec.MarketData.csproj" />
+    <ProjectReference Include="..\services\Strategy\Skarbiec.Strategy\Skarbiec.Strategy.csproj" />
+    <ProjectReference Include="..\services\Reporting\Skarbiec.Reporting\Skarbiec.Reporting.csproj" />
   </ItemGroup>
 
 </Project>

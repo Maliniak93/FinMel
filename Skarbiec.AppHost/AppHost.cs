@@ -32,6 +32,28 @@ builder.AddProject<Projects.Skarbiec_Identity>("identity-service")
     .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
+// T0.13: skeletons only — health checks, OTel, EF + tenancy plumbing. No messaging yet, so no
+// RabbitMQ reference (that lands alongside each service's first published/consumed event).
+builder.AddProject<Projects.Skarbiec_Portfolio>("portfolio-service")
+    .WithReference(portfolioDb.ConnectionString)
+    .WaitFor(portfolioDb.Database)
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
+
+builder.AddProject<Projects.Skarbiec_MarketData>("marketdata-service")
+    .WithReference(marketDataDb.ConnectionString)
+    .WaitFor(marketDataDb.Database)
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
+
+builder.AddProject<Projects.Skarbiec_Strategy>("strategy-service")
+    .WithReference(strategyDb.ConnectionString)
+    .WaitFor(strategyDb.Database)
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
+
+builder.AddProject<Projects.Skarbiec_Reporting>("reporting-service")
+    .WithReference(reportingDb.ConnectionString)
+    .WaitFor(reportingDb.Database)
+    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
+
 builder.Build().Run();
 
 // Provisions a dedicated Postgres role per service, scoped to only its own database (ADR-003):

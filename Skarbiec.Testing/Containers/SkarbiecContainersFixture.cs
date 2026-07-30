@@ -45,6 +45,23 @@ public sealed class SkarbiecContainersFixture : IAsyncLifetime
         await using var connection = new NpgsqlConnection(PostgresConnectionString);
         await connection.OpenAsync();
 
+        // A service whose migrations create no business tables (T0.13 skeletons) still gets
+        // __EFMigrationsHistory from Migrate() — nothing left to reset once that's ignored.
+        // Respawner.CreateAsync throws on zero non-ignored tables, so skip it rather than treat an
+        // empty schema as a configuration error.
+        await using (var countCommand = connection.CreateCommand())
+        {
+            countCommand.CommandText = """
+                SELECT count(*) FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name <> '__EFMigrationsHistory'
+                """;
+
+            if ((long)(await countCommand.ExecuteScalarAsync())! == 0)
+            {
+                return;
+            }
+        }
+
         var respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,

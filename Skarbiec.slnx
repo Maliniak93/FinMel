@@ -7,6 +7,22 @@
     <Project Path="services/Identity/Skarbiec.Identity/Skarbiec.Identity.csproj" />
     <Project Path="services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj" />
   </Folder>
+  <Folder Name="/services/Portfolio/">
+    <Project Path="services/Portfolio/Skarbiec.Portfolio/Skarbiec.Portfolio.csproj" />
+    <Project Path="services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj" />
+  </Folder>
+  <Folder Name="/services/MarketData/">
+    <Project Path="services/MarketData/Skarbiec.MarketData/Skarbiec.MarketData.csproj" />
+    <Project Path="services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj" />
+  </Folder>
+  <Folder Name="/services/Strategy/">
+    <Project Path="services/Strategy/Skarbiec.Strategy/Skarbiec.Strategy.csproj" />
+    <Project Path="services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj" />
+  </Folder>
+  <Folder Name="/services/Reporting/">
+    <Project Path="services/Reporting/Skarbiec.Reporting/Skarbiec.Reporting.csproj" />
+    <Project Path="services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj" />
+  </Folder>
   <Project Path="Skarbiec.AppHost/Skarbiec.AppHost.csproj" />
   <Project Path="Skarbiec.ServiceDefaults/Skarbiec.ServiceDefaults.csproj" />
   <Project Path="Skarbiec.ServiceDefaults.Sample/Skarbiec.ServiceDefaults.Sample.csproj" />

@@ -48,6 +48,17 @@
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.10" />
     <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.5.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+
+    <!-- Portfolio/MarketData/Strategy/Reporting skeletons (T0.13) — pinned explicitly because
+         Aspire.Npgsql.EntityFrameworkCore.PostgreSQL's own transitive floor for this package
+         (10.0.8) otherwise conflicts with the 10.0.10 family pinned above. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+
+    <!-- Portfolio/Strategy/Reporting (T0.13): registered via plain AddDbContext, not Aspire's
+         AddNpgsqlDbContext — that helper hardcodes DbContext pooling, which is incompatible with
+         constructor-injecting the request-scoped ICurrentUser these three contexts need for
+         tenancy (ADR-006). MarketData has no such dependency and keeps the Aspire helper. -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

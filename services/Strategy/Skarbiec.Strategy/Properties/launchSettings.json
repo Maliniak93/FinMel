@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Skarbiec.Strategy": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:60589;http://localhost:60590"
+    }
+  }
+}
