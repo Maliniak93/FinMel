@@ -1,0 +1,24 @@
+# .NET build output (nested patterns need the ** prefix — a bare "bin/" only matches at the
+# context root, not per-project folders, and stale local obj/ output bakes host-specific NuGet
+# paths into project.assets.json that break restore/publish inside the container).
+**/bin/
+**/obj/
+**/artifacts/
+**/TestResults/
+**/*.user
+
+# Aspire / IDE
+**/.vs/
+**/.vscode/
+**/.idea/
+
+# Node / Angular
+web/node_modules/
+web/dist/
+web/.angular/
+
+# VCS / tooling
+.git/
+.github/
+.claude/
+skarbiec-plan/

@@ -1,0 +1,247 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  REGISTRY: ghcr.io
+
+jobs:
+  # Decides which services actually need to build/test/publish for this change. Every service
+  # filter also matches contracts/**, Skarbiec.ServiceDefaults/** (+ its Sample project),
+  # Skarbiec.Testing/** (+ its Sample project) and root build config, because every service
+  # project-references those — a change there can break every service, not just the one whose
+  # folder changed (ADR-002/003 keep services independent; these four are the exception).
+  changes:
+    name: Detect changed paths
+    runs-on: self-hosted
+    outputs:
+      identity: ${{ steps.filter.outputs.identity }}
+      portfolio: ${{ steps.filter.outputs.portfolio }}
+      marketdata: ${{ steps.filter.outputs.marketdata }}
+      strategy: ${{ steps.filter.outputs.strategy }}
+      reporting: ${{ steps.filter.outputs.reporting }}
+      gateway: ${{ steps.filter.outputs.gateway }}
+      web: ${{ steps.filter.outputs.web }}
+      contracts: ${{ steps.filter.outputs.contracts }}
+      servicedefaults: ${{ steps.filter.outputs.servicedefaults }}
+      testinglib: ${{ steps.filter.outputs.testinglib }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            shared: &shared
+              - 'Directory.Build.props'
+              - 'Directory.Packages.props'
+              - 'Skarbiec.slnx'
+              - '.github/workflows/ci.yml'
+            contracts:
+              - *shared
+              - 'contracts/**'
+            servicedefaults:
+              - *shared
+              - 'Skarbiec.ServiceDefaults/**'
+              - 'Skarbiec.ServiceDefaults.Sample/**'
+            testinglib:
+              - *shared
+              - 'Skarbiec.Testing/**'
+              - 'Skarbiec.Testing.Sample/**'
+            identity:
+              - *shared
+              - 'contracts/**'
+              - 'Skarbiec.ServiceDefaults/**'
+              - 'Skarbiec.Testing/**'
+              - 'services/Identity/**'
+            portfolio:
+              - *shared
+              - 'contracts/**'
+              - 'Skarbiec.ServiceDefaults/**'
+              - 'Skarbiec.Testing/**'
+              - 'services/Portfolio/**'
+            marketdata:
+              - *shared
+              - 'contracts/**'
+              - 'Skarbiec.ServiceDefaults/**'
+              - 'Skarbiec.Testing/**'
+              - 'services/MarketData/**'
+            strategy:
+              - *shared
+              - 'contracts/**'
+              - 'Skarbiec.ServiceDefaults/**'
+              - 'Skarbiec.Testing/**'
+              - 'services/Strategy/**'
+            reporting:
+              - *shared
+              - 'contracts/**'
+              - 'Skarbiec.ServiceDefaults/**'
+              - 'Skarbiec.Testing/**'
+              - 'services/Reporting/**'
+            gateway:
+              - *shared
+              - 'Skarbiec.ServiceDefaults/**'
+              - 'Skarbiec.Testing/**'
+              - 'gateway/**'
+            web:
+              - 'web/**'
+
+  # One job per microservice + the gateway: restore -> build (warnings-as-errors, via
+  # Directory.Build.props) -> test (Testcontainers needs the Docker daemon the runner already has)
+  # -> build the image -> push to GHCR tagged by commit SHA (push only on merge to main, never
+  # from a pull_request, so PRs validate the Dockerfile without publishing anything).
+  build-test:
+    name: ${{ matrix.service }}
+    needs: changes
+    if: needs.changes.outputs[matrix.service] == 'true'
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: identity
+            test_project: services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj
+            dockerfile: services/Identity/Skarbiec.Identity/Dockerfile
+            image: skarbiec-identity
+          - service: portfolio
+            test_project: services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj
+            dockerfile: services/Portfolio/Skarbiec.Portfolio/Dockerfile
+            image: skarbiec-portfolio
+          - service: marketdata
+            test_project: services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj
+            dockerfile: services/MarketData/Skarbiec.MarketData/Dockerfile
+            image: skarbiec-marketdata
+          - service: strategy
+            test_project: services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj
+            dockerfile: services/Strategy/Skarbiec.Strategy/Dockerfile
+            image: skarbiec-strategy
+          - service: reporting
+            test_project: services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj
+            dockerfile: services/Reporting/Skarbiec.Reporting/Dockerfile
+            image: skarbiec-reporting
+          - service: gateway
+            test_project: gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj
+            dockerfile: gateway/Skarbiec.Gateway/Dockerfile
+            image: skarbiec-gateway
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ matrix.test_project }}
+
+      - name: Build (warnings as errors)
+        run: dotnet build ${{ matrix.test_project }} --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test ${{ matrix.test_project }} --configuration Release --no-build
+
+      - name: Lowercase image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (push only on merge to main)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/${{ matrix.image }}:${{ github.sha }}
+
+  # Skarbiec.Contracts / Skarbiec.ServiceDefaults / Skarbiec.Testing are libraries, not deployable
+  # services — no image, just their own test suite when they (or root build config) change.
+  libraries:
+    name: ${{ matrix.lib }}
+    needs: changes
+    if: needs.changes.outputs[matrix.lib] == 'true'
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lib: contracts
+            test_project: contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj
+          - lib: servicedefaults
+            test_project: Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj
+          - lib: testinglib
+            test_project: Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ matrix.test_project }}
+
+      - name: Build (warnings as errors)
+        run: dotnet build ${{ matrix.test_project }} --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test ${{ matrix.test_project }} --configuration Release --no-build
+
+  # Angular app lands in Phase 1 (T1.x) — web/ only holds a placeholder today. The job is wired
+  # up now so path filtering already works; it no-ops until web/package.json exists.
+  web:
+    name: web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check frontend project exists
+        id: probe
+        run: |
+          if [ -f web/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::web/package.json not present yet (Angular app lands in Phase 1) — skipping frontend build/test."
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.probe.outputs.exists == 'true'
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        if: steps.probe.outputs.exists == 'true'
+        working-directory: web
+        run: npm ci
+
+      - name: Test
+        if: steps.probe.outputs.exists == 'true'
+        working-directory: web
+        run: npm test
