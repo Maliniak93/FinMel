@@ -14,4 +14,12 @@
     <ProjectReference Include="..\..\..\Skarbiec.ServiceDefaults\Skarbiec.ServiceDefaults.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The Portfolio entity's simple name collides with this project's own root namespace
+         segment (Skarbiec.Portfolio) — referencing "Portfolio" unqualified from any namespace
+         that isn't Skarbiec.Portfolio.Data itself resolves to the namespace, not the type
+         (CS0118). Project-wide alias avoids repeating a per-file "using" in every slice. -->
+    <Using Include="Skarbiec.Portfolio.Data.Portfolio" Alias="PortfolioEntity" />
+  </ItemGroup>
+
 </Project>
