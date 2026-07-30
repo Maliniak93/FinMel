@@ -105,39 +105,19 @@ jobs:
   # Directory.Build.props) -> test (Testcontainers needs the Docker daemon the runner already has)
   # -> build the image -> push to GHCR tagged by commit SHA (push only on merge to main, never
   # from a pull_request, so PRs validate the Dockerfile without publishing anything).
-  build-test:
-    name: ${{ matrix.service }}
+  #
+  # These are separate named jobs, not a strategy.matrix, on purpose: a job-level `if:` cannot
+  # reference the `matrix` context (only `needs`/`github`/`vars`/`inputs` are available there —
+  # `matrix` only exists inside step-level `if:`), so `needs.changes.outputs[matrix.service]`
+  # is invalid and GitHub rejects the whole workflow file. Separate jobs with a literal
+  # `needs.changes.outputs.<name>` condition are the construct that actually makes an unaffected
+  # service's job absent from the run, rather than merely no-op its steps.
+
+  identity:
+    name: identity
     needs: changes
-    if: needs.changes.outputs[matrix.service] == 'true'
+    if: needs.changes.outputs.identity == 'true'
     runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: identity
-            test_project: services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj
-            dockerfile: services/Identity/Skarbiec.Identity/Dockerfile
-            image: skarbiec-identity
-          - service: portfolio
-            test_project: services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj
-            dockerfile: services/Portfolio/Skarbiec.Portfolio/Dockerfile
-            image: skarbiec-portfolio
-          - service: marketdata
-            test_project: services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj
-            dockerfile: services/MarketData/Skarbiec.MarketData/Dockerfile
-            image: skarbiec-marketdata
-          - service: strategy
-            test_project: services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj
-            dockerfile: services/Strategy/Skarbiec.Strategy/Dockerfile
-            image: skarbiec-strategy
-          - service: reporting
-            test_project: services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj
-            dockerfile: services/Reporting/Skarbiec.Reporting/Dockerfile
-            image: skarbiec-reporting
-          - service: gateway
-            test_project: gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj
-            dockerfile: gateway/Skarbiec.Gateway/Dockerfile
-            image: skarbiec-gateway
     steps:
       - uses: actions/checkout@v7
 
@@ -146,13 +126,13 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore ${{ matrix.test_project }}
+        run: dotnet restore services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj
 
       - name: Build (warnings as errors)
-        run: dotnet build ${{ matrix.test_project }} --configuration Release --no-restore
+        run: dotnet build services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj --configuration Release --no-restore
 
       - name: Test (Testcontainers — requires Docker)
-        run: dotnet test ${{ matrix.test_project }} --configuration Release --no-build
+        run: dotnet test services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj --configuration Release --no-build
 
       - name: Lowercase image owner
         id: owner
@@ -172,27 +152,15 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: services/Identity/Skarbiec.Identity/Dockerfile
           push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/${{ matrix.image }}:${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-identity:${{ github.sha }}
 
-  # Skarbiec.Contracts / Skarbiec.ServiceDefaults / Skarbiec.Testing are libraries, not deployable
-  # services — no image, just their own test suite when they (or root build config) change.
-  libraries:
-    name: ${{ matrix.lib }}
+  portfolio:
+    name: portfolio
     needs: changes
-    if: needs.changes.outputs[matrix.lib] == 'true'
+    if: needs.changes.outputs.portfolio == 'true'
     runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - lib: contracts
-            test_project: contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj
-          - lib: servicedefaults
-            test_project: Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj
-          - lib: testinglib
-            test_project: Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj
     steps:
       - uses: actions/checkout@v7
 
@@ -201,13 +169,274 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore ${{ matrix.test_project }}
+        run: dotnet restore services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj
 
       - name: Build (warnings as errors)
-        run: dotnet build ${{ matrix.test_project }} --configuration Release --no-restore
+        run: dotnet build services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj --configuration Release --no-restore
 
       - name: Test (Testcontainers — requires Docker)
-        run: dotnet test ${{ matrix.test_project }} --configuration Release --no-build
+        run: dotnet test services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj --configuration Release --no-build
+
+      - name: Lowercase image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (push only on merge to main)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/Portfolio/Skarbiec.Portfolio/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-portfolio:${{ github.sha }}
+
+  marketdata:
+    name: marketdata
+    needs: changes
+    if: needs.changes.outputs.marketdata == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: dotnet build services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj --configuration Release --no-build
+
+      - name: Lowercase image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (push only on merge to main)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/MarketData/Skarbiec.MarketData/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-marketdata:${{ github.sha }}
+
+  strategy:
+    name: strategy
+    needs: changes
+    if: needs.changes.outputs.strategy == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: dotnet build services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj --configuration Release --no-build
+
+      - name: Lowercase image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (push only on merge to main)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/Strategy/Skarbiec.Strategy/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-strategy:${{ github.sha }}
+
+  reporting:
+    name: reporting
+    needs: changes
+    if: needs.changes.outputs.reporting == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: dotnet build services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj --configuration Release --no-build
+
+      - name: Lowercase image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (push only on merge to main)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/Reporting/Skarbiec.Reporting/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-reporting:${{ github.sha }}
+
+  gateway:
+    name: gateway
+    needs: changes
+    if: needs.changes.outputs.gateway == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: dotnet build gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj --configuration Release --no-build
+
+      - name: Lowercase image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (push only on merge to main)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: gateway/Skarbiec.Gateway/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/skarbiec-gateway:${{ github.sha }}
+
+  # Skarbiec.Contracts / Skarbiec.ServiceDefaults / Skarbiec.Testing are libraries, not deployable
+  # services — no image, just their own test suite when they (or root build config) change.
+  # Same reasoning as above for splitting into separate jobs instead of a strategy.matrix.
+
+  contracts:
+    name: contracts
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: dotnet build contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj --configuration Release --no-build
+
+  servicedefaults:
+    name: servicedefaults
+    needs: changes
+    if: needs.changes.outputs.servicedefaults == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: dotnet build Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj --configuration Release --no-build
+
+  testinglib:
+    name: testinglib
+    needs: changes
+    if: needs.changes.outputs.testinglib == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: dotnet build Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj --configuration Release --no-restore
+
+      - name: Test (Testcontainers — requires Docker)
+        run: dotnet test Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj --configuration Release --no-build
 
   # Angular app lands in Phase 1 (T1.x) — web/ only holds a placeholder today. The job is wired
   # up now so path filtering already works; it no-ops until web/package.json exists.
