@@ -11,6 +11,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
     public DbSet<PortfolioEntity> Portfolios => Set<PortfolioEntity>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<Transaction> Transactions => Set<Transaction>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -41,6 +42,16 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             // AssetCount denormalization decision on Portfolio, T1.1), but still worth indexing
             // since every asset query in this service filters by PortfolioId.
             asset.HasIndex(a => a.PortfolioId);
+        });
+
+        modelBuilder.Entity<Transaction>(transaction =>
+        {
+            transaction.Property(t => t.Quantity).HasPrecision(18, 8);
+            transaction.Property(t => t.UnitPriceAmount).HasPrecision(18, 2);
+            transaction.Property(t => t.FeeAmount).HasPrecision(18, 2);
+
+            // No navigation/FK to Asset (ADR-003) — every transaction query filters by AssetId.
+            transaction.HasIndex(t => t.AssetId);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).
