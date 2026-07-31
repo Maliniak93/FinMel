@@ -1,10 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.ArchivePortfolio;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.DeletePortfolio;
+using Skarbiec.Portfolio.Features.GetAsset;
 using Skarbiec.Portfolio.Features.GetPortfolio;
+using Skarbiec.Portfolio.Features.ListAssets;
 using Skarbiec.Portfolio.Features.ListPortfolios;
+using Skarbiec.Portfolio.Features.RemoveAsset;
+using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
 using Skarbiec.ServiceDefaults.Authentication;
 
@@ -27,6 +32,11 @@ builder.Services.AddScoped<ListPortfoliosHandler>();
 builder.Services.AddScoped<GetPortfolioHandler>();
 builder.Services.AddScoped<DeletePortfolioHandler>();
 builder.Services.AddScoped<ArchivePortfolioHandler>();
+builder.Services.AddScoped<AddAssetHandler>();
+builder.Services.AddScoped<UpdateAssetHandler>();
+builder.Services.AddScoped<ListAssetsHandler>();
+builder.Services.AddScoped<GetAssetHandler>();
+builder.Services.AddScoped<RemoveAssetHandler>();
 
 var app = builder.Build();
 
@@ -39,6 +49,11 @@ app.MapListPortfoliosEndpoint();
 app.MapGetPortfolioEndpoint();
 app.MapDeletePortfolioEndpoint();
 app.MapArchivePortfolioEndpoint();
+app.MapAddAssetEndpoint();
+app.MapUpdateAssetEndpoint();
+app.MapListAssetsEndpoint();
+app.MapGetAssetEndpoint();
+app.MapRemoveAssetEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton
 // service (T0.15 AC) — mirrors Skarbiec.Identity's /api/identity/me.
