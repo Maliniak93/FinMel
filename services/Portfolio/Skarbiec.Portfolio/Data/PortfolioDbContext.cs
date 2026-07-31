@@ -42,6 +42,18 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             // AssetCount denormalization decision on Portfolio, T1.1), but still worth indexing
             // since every asset query in this service filters by PortfolioId.
             asset.HasIndex(a => a.PortfolioId);
+
+            // Optimistic concurrency (T1.4 scope: two racing edits to the same asset's
+            // transactions must not silently lose one's Quantity recompute). Maps to Postgres's
+            // own xmin system column instead of an app-managed token — Postgres bumps it on every
+            // UPDATE regardless of which handler runs, so RecordTransaction (T1.3) is covered too
+            // without touching it. Shadow property: xmin already exists on every row, nothing to
+            // migrate.
+            asset.Property<uint>("Version")
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         modelBuilder.Entity<Transaction>(transaction =>
@@ -52,6 +64,14 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             // No navigation/FK to Asset (ADR-003) — every transaction query filters by AssetId.
             transaction.HasIndex(t => t.AssetId);
+
+            // Same xmin concurrency token as Asset (see above) — protects a transaction row
+            // itself against two concurrent edits/deletes of that exact transaction.
+            transaction.Property<uint>("Version")
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).

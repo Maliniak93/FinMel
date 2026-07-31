@@ -13,8 +13,16 @@ namespace Skarbiec.Portfolio.Features;
 /// </summary>
 public static class TransactionQuantityCalculator
 {
-    public static Result<decimal> Recompute(IEnumerable<Transaction> transactions)
+    /// <summary>
+    /// <paramref name="oversellError"/> lets callers pick the right <see cref="Error"/>/HTTP status
+    /// for the same invariant break: RecordTransaction (T1.3, the default) treats it as 400
+    /// validation on new input; UpdateTransaction/DeleteTransaction (T1.4) pass
+    /// <see cref="TransactionErrors.MutationBreaksHistory"/> instead, since there it's a conflict
+    /// with already-recorded history (409).
+    /// </summary>
+    public static Result<decimal> Recompute(IEnumerable<Transaction> transactions, Func<TransactionType, Error>? oversellError = null)
     {
+        oversellError ??= TransactionErrors.OversellsPosition;
         var quantity = 0m;
 
         // Same-day ties break on Id — arbitrary but deterministic; the domain doesn't track
@@ -25,7 +33,7 @@ public static class TransactionQuantityCalculator
 
             if (quantity < 0)
             {
-                return TransactionErrors.OversellsPosition(transaction.Type);
+                return oversellError(transaction.Type);
             }
         }
 
