@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Tenancy;
 using Testcontainers.PostgreSql;
@@ -77,11 +78,4 @@ internal sealed class TenancyProbeDbContext(DbContextOptions<TenancyProbeDbConte
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyUserOwnedQueryFilters(this);
     }
-}
-
-internal sealed class StubCurrentUser(Guid userId) : ICurrentUser
-{
-    public bool IsAuthenticated => true;
-
-    public Guid UserId => userId;
 }

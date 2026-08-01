@@ -1,62 +1,48 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Portfolio.Features;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
+using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
+using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 [Collection(TestingDefaults.CollectionName)]
-public sealed class ListPortfoliosEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class ListPortfoliosEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    private const string PortfoliosUri = "/api/portfolio/portfolios";
-
-    private readonly PortfolioApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task List_ByDefault_ExcludesArchivedPortfolios()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var active = await CreateAsync(client, "Active", cancellationToken);
-        var archived = await CreateAsync(client, "Archived", cancellationToken);
-        await client.PostAsync($"{PortfoliosUri}/{archived.Id}/archive", content: null, cancellationToken);
+        var activeId = await client.CreatePortfolioAsync(cancellationToken, name: "Active");
+        var archivedId = await client.CreatePortfolioAsync(cancellationToken, name: "Archived");
+        await client.PostAsync($"{PortfolioUri(archivedId)}/archive", content: null, cancellationToken);
 
         var response = await client.GetAsync(PortfoliosUri, cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<List<PortfolioResponse>>(cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Single(body!);
-        Assert.Equal(active.Id, body![0].Id);
+        Assert.Equal(activeId, body![0].Id);
     }
 
     [Fact]
     public async Task List_WithIncludeArchivedTrue_IncludesArchivedPortfolios()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        await CreateAsync(client, "Active", cancellationToken);
-        var archived = await CreateAsync(client, "Archived", cancellationToken);
-        await client.PostAsync($"{PortfoliosUri}/{archived.Id}/archive", content: null, cancellationToken);
+        await client.CreatePortfolioAsync(cancellationToken, name: "Active");
+        var archivedId = await client.CreatePortfolioAsync(cancellationToken, name: "Archived");
+        await client.PostAsync($"{PortfolioUri(archivedId)}/archive", content: null, cancellationToken);
 
         var response = await client.GetAsync($"{PortfoliosUri}?includeArchived=true", cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<List<PortfolioResponse>>(cancellationToken);
 
         Assert.Equal(2, body!.Count);
-    }
-
-    private static async Task<PortfolioResponse> CreateAsync(HttpClient client, string name, CancellationToken cancellationToken)
-    {
-        var response = await client.PostAsJsonAsync(
-            PortfoliosUri, new CreatePortfolioRequest { Name = name, Currency = "PLN" }, cancellationToken);
-
-        return (await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken))!;
     }
 }

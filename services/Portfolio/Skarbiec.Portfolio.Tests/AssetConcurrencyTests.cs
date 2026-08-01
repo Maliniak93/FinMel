@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
@@ -10,20 +11,13 @@ namespace Skarbiec.Portfolio.Tests;
 /// Proves the xmin concurrency token configured on Asset/Transaction (T1.4 scope: "note on
 /// optimistic concurrency ... implement the simple safe option") actually detects a race, instead
 /// of two racing SaveChangesAsync calls silently overwriting each other's Asset.Quantity. Drives
-/// PortfolioDbContext directly — a genuine race (read, THEN a concurrent write, THEN save) can't
-/// be forced through the black-box HTTP client, since each request loads and saves within a single
-/// handler call. Uses PortfolioApiFactory only to get the schema migrated (mirrors
-/// RemoveAssetEndpointTests.BumpTransactionCountAsync's direct-DbContext technique).
+/// PortfolioDbContext directly via <see cref="PortfolioEndpointTests.CreateDbContext"/> — a genuine
+/// race (read, THEN a concurrent write, THEN save) can't be forced through the black-box HTTP
+/// client, since each request loads and saves within a single handler call.
 /// </summary>
 [Collection(TestingDefaults.CollectionName)]
-public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    private readonly PortfolioApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task TwoContextsEditingTheSameAsset_SecondSaveThrowsConcurrencyException()
     {
@@ -31,7 +25,7 @@ public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) 
         var ownerId = Guid.NewGuid();
         var (portfolioId, assetId) = (Guid.NewGuid(), Guid.NewGuid());
 
-        await using (var seedContext = CreateContext(ownerId))
+        await using (var seedContext = CreateDbContext(ownerId))
         {
             seedContext.Portfolios.Add(new PortfolioEntity { Id = portfolioId, Name = "Retirement", Currency = "PLN" });
             seedContext.Assets.Add(new Asset
@@ -46,8 +40,8 @@ public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) 
             await seedContext.SaveChangesAsync(cancellationToken);
         }
 
-        await using var contextA = CreateContext(ownerId);
-        await using var contextB = CreateContext(ownerId);
+        await using var contextA = CreateDbContext(ownerId);
+        await using var contextB = CreateDbContext(ownerId);
         var assetInA = await contextA.Assets.SingleAsync(a => a.Id == assetId, cancellationToken);
         var assetInB = await contextB.Assets.SingleAsync(a => a.Id == assetId, cancellationToken);
 
@@ -58,14 +52,5 @@ public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) 
         // A still holds the pre-race xmin as its "original" value.
         assetInA.Quantity = 10m;
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => contextA.SaveChangesAsync(cancellationToken));
-    }
-
-    private PortfolioDbContext CreateContext(Guid userId)
-    {
-        var options = new DbContextOptionsBuilder<PortfolioDbContext>()
-            .UseNpgsql(containers.PostgresConnectionString)
-            .Options;
-
-        return new PortfolioDbContext(options, new StubCurrentUser(userId));
     }
 }

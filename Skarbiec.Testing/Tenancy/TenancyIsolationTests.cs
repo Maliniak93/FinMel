@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 
@@ -13,10 +12,8 @@ namespace Skarbiec.Testing.Tenancy;
 /// and only supplies how to create/locate/list that one resource; the four isolation facts below
 /// are proven identically every time.
 /// </summary>
-public abstract class TenancyIsolationTests<TProgram> : IAsyncLifetime where TProgram : class
+public abstract class TenancyIsolationTests<TProgram> : ServiceEndpointTests<TProgram> where TProgram : class
 {
-    protected abstract SkarbiecApiFactory<TProgram> Factory { get; }
-
     /// <summary>Creates the resource as <paramref name="ownerClient"/> and returns its GET/PUT/DELETE URL.</summary>
     protected abstract Task<Uri> CreateResourceAsync(HttpClient ownerClient, CancellationToken cancellationToken);
 
@@ -29,17 +26,13 @@ public abstract class TenancyIsolationTests<TProgram> : IAsyncLifetime where TPr
     /// <summary>Asserts the resource created by <see cref="CreateResourceAsync"/> is absent from a stranger's listing response.</summary>
     protected abstract Task AssertResourceAbsentFromListAsync(HttpResponseMessage listResponse, CancellationToken cancellationToken);
 
-    public virtual ValueTask InitializeAsync() => new(Factory.ResetDatabaseAsync());
-
-    public virtual ValueTask DisposeAsync() => Factory.DisposeAsync();
-
     [Fact]
     public async Task Get_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var resourceUrl = await CreateResourceAsOwnerAsync(cancellationToken);
 
-        using var stranger = CreateAuthenticatedClient(Guid.NewGuid());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.GetAsync(resourceUrl, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -51,7 +44,7 @@ public abstract class TenancyIsolationTests<TProgram> : IAsyncLifetime where TPr
         var cancellationToken = TestContext.Current.CancellationToken;
         var resourceUrl = await CreateResourceAsOwnerAsync(cancellationToken);
 
-        using var stranger = CreateAuthenticatedClient(Guid.NewGuid());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.PutAsync(resourceUrl, CreateUpdatePayload(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -63,7 +56,7 @@ public abstract class TenancyIsolationTests<TProgram> : IAsyncLifetime where TPr
         var cancellationToken = TestContext.Current.CancellationToken;
         var resourceUrl = await CreateResourceAsOwnerAsync(cancellationToken);
 
-        using var stranger = CreateAuthenticatedClient(Guid.NewGuid());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.DeleteAsync(resourceUrl, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -75,7 +68,7 @@ public abstract class TenancyIsolationTests<TProgram> : IAsyncLifetime where TPr
         var cancellationToken = TestContext.Current.CancellationToken;
         await CreateResourceAsOwnerAsync(cancellationToken);
 
-        using var stranger = CreateAuthenticatedClient(Guid.NewGuid());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.GetAsync(ListUrl, cancellationToken);
 
         await AssertResourceAbsentFromListAsync(response, cancellationToken);
@@ -83,14 +76,7 @@ public abstract class TenancyIsolationTests<TProgram> : IAsyncLifetime where TPr
 
     private async Task<Uri> CreateResourceAsOwnerAsync(CancellationToken cancellationToken)
     {
-        using var owner = CreateAuthenticatedClient(Guid.NewGuid());
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         return await CreateResourceAsync(owner, cancellationToken);
-    }
-
-    private HttpClient CreateAuthenticatedClient(Guid userId)
-    {
-        var client = Factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Factory.IssueAccessToken(userId));
-        return client;
     }
 }

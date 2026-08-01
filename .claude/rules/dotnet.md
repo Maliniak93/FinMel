@@ -66,6 +66,20 @@ Items marked *(default — confirm in Phase 0)* are opinionated choices not back
 - NetArchTest: every user-owned entity has `UserId`; no references between service projects.
 - Contract tests: previously serialized event payloads still deserialize.
 
+### Test helpers live in exactly one place
+
+**Never copy a test helper between test classes.** Unlike production code (where the rule is "extract on the third use"), a duplicated arrange helper gets extracted on the *second* — it's plumbing, not a domain decision, and copies drift silently. Two layers own it:
+
+| Layer | Where | Holds |
+| --- | --- | --- |
+| Cross-service infrastructure | `Skarbiec.Testing` | `SkarbiecContainersFixture` (shared PG + RabbitMQ), `SkarbiecApiFactory<TProgram>`, `ServiceEndpointTests<TProgram>` (factory lifetime + per-test DB reset), `TestJwtIssuer` / `CreateAuthenticatedClient`, `TenancyIsolationTests<TProgram>` |
+| Per-service domain | `<Service>.Tests/Fixtures/` | `<Service>EndpointTests` base binding the factory, `<Service>Api` (route builders + arrange calls), `<Service>Assertions` (invariants asserted from more than one slice), direct-DbContext access for facts HTTP can't express |
+
+- A test class is `[Collection(TestingDefaults.CollectionName)]` + `: <Service>EndpointTests(containers)` + facts. It must **not** declare its own `_factory`, `InitializeAsync`/`DisposeAsync`, or route constants — the base and `<Service>Api` own those. (A service with only one host-backed test class may derive from `ServiceEndpointTests<Program>` directly and extract the per-service base when the second one arrives.)
+- Fixture helpers are **arrange only** and `EnsureSuccessStatusCode`. A test asserting on endpoint X calls X directly and inspects the raw `HttpResponseMessage` — routing it through the helper would turn the failure under test into an exception. Say so in a comment at the top of such a class.
+- Give helpers optional parameters with sane defaults (`name`, `assetClass`, `quantity`) so a call site states only what the fact depends on.
+- Before adding a helper to a test class, check `Fixtures/` first — and when a fact needs a variant, add a parameter there instead of a private copy.
+
 ## Observability
 
 - Everything through `Skarbiec.ServiceDefaults`: OTel traces/logs/metrics, `/health/live` + `/health/ready`. Never configure these per-service by hand.
