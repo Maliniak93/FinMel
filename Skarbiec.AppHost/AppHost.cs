@@ -32,11 +32,13 @@ var identityService = builder.AddProject<Projects.Skarbiec_Identity>("identity-s
     .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-// T0.13: skeletons only — health checks, OTel, EF + tenancy plumbing. No messaging yet, so no
-// RabbitMQ reference (that lands alongside each service's first published/consumed event).
+// T1.5: publishes AssetChanged/TransactionRecorded through the outbox — RabbitMQ reference lands
+// alongside this, its first published event.
 var portfolioService = builder.AddProject<Projects.Skarbiec_Portfolio>("portfolio-service")
     .WithReference(portfolioDb.ConnectionString)
     .WaitFor(portfolioDb.Database)
+    .WithReference(rabbitmq)
+    .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
 var marketDataService = builder.AddProject<Projects.Skarbiec_MarketData>("marketdata-service")

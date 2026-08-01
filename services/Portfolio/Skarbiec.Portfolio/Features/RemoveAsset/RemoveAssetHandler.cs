@@ -1,10 +1,12 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.RemoveAsset;
 
-public sealed class RemoveAssetHandler(PortfolioDbContext dbContext)
+public sealed class RemoveAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint)
 {
     public async Task<Result> HandleAsync(Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -25,6 +27,15 @@ public sealed class RemoveAssetHandler(PortfolioDbContext dbContext)
         portfolio.AssetCount--;
 
         dbContext.Assets.Remove(asset);
+
+        await publishEndpoint.Publish(new AssetChanged
+        {
+            AssetId = asset.Id,
+            PortfolioId = portfolioId,
+            UserId = dbContext.CurrentUserId,
+            Kind = AssetChangeKind.Removed
+        }, cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

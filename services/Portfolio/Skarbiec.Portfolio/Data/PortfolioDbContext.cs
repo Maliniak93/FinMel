@@ -1,3 +1,4 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Tenancy;
@@ -76,5 +77,16 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).
         modelBuilder.ApplyUserOwnedQueryFilters(this);
+
+        // MassTransit EF Outbox (T1.5, ADR-012), same pattern as Identity (T0.10): the bus outbox
+        // writes here in the same SaveChanges call as the business entities above, so both commit
+        // atomically. Table names prefixed with "Portfolio" — MassTransit's defaults ("InboxState"
+        // etc.) collide with Identity's own outbox tables of the same name once both DbContexts'
+        // migrations run against the single shared Postgres database Gateway.Tests uses to host
+        // every service's test host side by side (Skarbiec.Testing's Testcontainer, not a
+        // per-service database — ADR-003 db-per-service only holds for real deployments).
+        modelBuilder.AddInboxStateEntity(x => x.ToTable("PortfolioInboxState"));
+        modelBuilder.AddOutboxMessageEntity(x => x.ToTable("PortfolioOutboxMessage"));
+        modelBuilder.AddOutboxStateEntity(x => x.ToTable("PortfolioOutboxState"));
     }
 }
