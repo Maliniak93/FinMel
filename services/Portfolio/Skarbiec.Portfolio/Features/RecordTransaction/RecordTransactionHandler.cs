@@ -1,10 +1,12 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.RecordTransaction;
 
-public sealed class RecordTransactionHandler(PortfolioDbContext dbContext)
+public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint)
 {
     public async Task<Result<TransactionResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, RecordTransactionRequest request, CancellationToken cancellationToken)
@@ -56,6 +58,16 @@ public sealed class RecordTransactionHandler(PortfolioDbContext dbContext)
         asset.Quantity = recomputed.Value;
         asset.TransactionCount++;
         dbContext.Transactions.Add(transaction);
+
+        await publishEndpoint.Publish(new TransactionRecorded
+        {
+            TransactionId = transaction.Id,
+            AssetId = assetId,
+            UserId = dbContext.CurrentUserId,
+            Type = transaction.Type,
+            Quantity = transaction.Quantity,
+            Date = transaction.Date
+        }, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

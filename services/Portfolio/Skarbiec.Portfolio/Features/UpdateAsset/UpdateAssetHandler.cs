@@ -1,10 +1,12 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.UpdateAsset;
 
-public sealed class UpdateAssetHandler(PortfolioDbContext dbContext)
+public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint)
 {
     public async Task<Result<AssetResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, UpdateAssetRequest request, CancellationToken cancellationToken)
@@ -29,6 +31,14 @@ public sealed class UpdateAssetHandler(PortfolioDbContext dbContext)
         asset.Quantity = request.Quantity;
         asset.ManualValueAmount = manualValue.Value.Amount;
         asset.ManualValueDate = request.ManualValueDate;
+
+        await publishEndpoint.Publish(new AssetChanged
+        {
+            AssetId = asset.Id,
+            PortfolioId = portfolioId,
+            UserId = dbContext.CurrentUserId,
+            Kind = AssetChangeKind.Updated
+        }, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

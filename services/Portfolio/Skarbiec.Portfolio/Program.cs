@@ -16,6 +16,7 @@ using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.ServiceDefaults.Authentication;
+using Skarbiec.ServiceDefaults.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,10 @@ builder.AddServiceDefaults();
 var portfolioConnectionString = builder.Configuration.GetConnectionString("portfolio-db")
     ?? throw new InvalidOperationException("Missing connection string 'portfolio-db'.");
 builder.Services.AddDbContext<PortfolioDbContext>(options => options.UseNpgsql(portfolioConnectionString));
+
+// No consumers yet (T1.5) — Portfolio only publishes AssetChanged/TransactionRecorded through the
+// outbox; Reporting subscribes in Phase 2.
+builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
 
 builder.Services.AddValidation();
 

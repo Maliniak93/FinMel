@@ -10,6 +10,7 @@ using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Register;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Identity.Tests;
 
@@ -128,41 +129,15 @@ public sealed class UserRegisteredOutboxDurabilityTests(SkarbiecContainersFixtur
     private ServiceProvider BuildProvider(
         Action<IServiceCollection>? configureServices = null,
         Action<IBusRegistrationConfigurator>? configureConsumers = null)
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-
-        services.AddDbContext<IdentityDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
-
-        services
-            .AddIdentityCore<ApplicationUser>(options => options.User.RequireUniqueEmail = true)
-            .AddEntityFrameworkStores<IdentityDbContext>();
-
-        services.AddMassTransit(x =>
+        => HostlessOutboxProvider.Build<IdentityDbContext>(containers, services =>
         {
-            x.SetKebabCaseEndpointNameFormatter();
+            services
+                .AddIdentityCore<ApplicationUser>(options => options.User.RequireUniqueEmail = true)
+                .AddEntityFrameworkStores<IdentityDbContext>();
 
-            x.AddEntityFrameworkOutbox<IdentityDbContext>(o =>
-            {
-                o.UsePostgres();
-                o.UseBusOutbox();
-            });
-
-            configureConsumers?.Invoke(x);
-
-            x.UsingRabbitMq((context, cfg) =>
-            {
-                cfg.Host(new Uri(containers.RabbitMqConnectionString));
-
-                cfg.ConfigureEndpoints(context);
-            });
-        });
-
-        services.AddScoped<RegisterHandler>();
-        configureServices?.Invoke(services);
-
-        return services.BuildServiceProvider();
-    }
+            services.AddScoped<RegisterHandler>();
+            configureServices?.Invoke(services);
+        }, configureConsumers);
 
     private sealed class DurabilityTestConsumer(TaskCompletionSource<UserRegistered> received) : IConsumer<UserRegistered>
     {

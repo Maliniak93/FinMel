@@ -1,4 +1,3 @@
-using MassTransit;
 using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +7,7 @@ using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Register;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Identity.Tests;
 
@@ -25,36 +25,14 @@ public sealed class UserRegisteredOutboxTests(SkarbiecContainersFixture containe
 
     public async ValueTask InitializeAsync()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-
-        services.AddDbContext<IdentityDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
-
-        services
-            .AddIdentityCore<ApplicationUser>(options => options.User.RequireUniqueEmail = true)
-            .AddEntityFrameworkStores<IdentityDbContext>();
-
-        services.AddMassTransit(x =>
+        _provider = HostlessOutboxProvider.Build<IdentityDbContext>(containers, services =>
         {
-            x.SetKebabCaseEndpointNameFormatter();
+            services
+                .AddIdentityCore<ApplicationUser>(options => options.User.RequireUniqueEmail = true)
+                .AddEntityFrameworkStores<IdentityDbContext>();
 
-            x.AddEntityFrameworkOutbox<IdentityDbContext>(o =>
-            {
-                o.UsePostgres();
-                o.UseBusOutbox();
-            });
-
-            x.UsingRabbitMq((context, cfg) =>
-            {
-                cfg.Host(new Uri(containers.RabbitMqConnectionString));
-
-                cfg.ConfigureEndpoints(context);
-            });
+            services.AddScoped<RegisterHandler>();
         });
-
-        services.AddScoped<RegisterHandler>();
-
-        _provider = services.BuildServiceProvider();
 
         await using (var scope = _provider.CreateAsyncScope())
         {
