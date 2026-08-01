@@ -3,38 +3,29 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Skarbiec.Identity.Features.Login;
-using Skarbiec.Identity.Features.Register;
+using Skarbiec.Identity.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
 [Collection(TestingDefaults.CollectionName)]
-public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
-    private const string RegisterUri = "/api/identity/register";
-    private const string LoginUri = "/api/identity/login";
-    private const string MeUri = "/api/identity/me";
-    private const string Password = "Str0ng!Passw0rd";
-
-    private readonly IdentityApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task Login_WithValidCredentials_ReturnsAccessTokenAndSetsRefreshCookie()
     {
-        using var client = _factory.CreateClient();
-        var email = await RegisterUserAsync(client);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateClient();
+        var email = await client.RegisterAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            LoginUri, new LoginRequest { Email = email, Password = Password }, TestContext.Current.CancellationToken);
+            LoginUri, new LoginRequest { Email = email, Password = Password }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<LoginResponse>(TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.False(string.IsNullOrWhiteSpace(body.AccessToken));
 
@@ -47,17 +38,18 @@ public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : I
     [Fact]
     public async Task Login_WithValidCredentials_AccessTokenAuthorizesProtectedEndpoint()
     {
-        using var client = _factory.CreateClient();
-        var email = await RegisterUserAsync(client);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateClient();
+        var email = await client.RegisterAsync(cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(
-            LoginUri, new LoginRequest { Email = email, Password = Password }, TestContext.Current.CancellationToken);
-        var body = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(TestContext.Current.CancellationToken);
+            LoginUri, new LoginRequest { Email = email, Password = Password }, cancellationToken);
+        var body = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken);
 
         using var meRequest = new HttpRequestMessage(HttpMethod.Get, MeUri);
         meRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
 
-        var meResponse = await client.SendAsync(meRequest, TestContext.Current.CancellationToken);
+        var meResponse = await client.SendAsync(meRequest, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
     }
@@ -65,12 +57,13 @@ public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : I
     [Fact]
     public async Task Login_AccessToken_HasFifteenMinuteLifetime()
     {
-        using var client = _factory.CreateClient();
-        var email = await RegisterUserAsync(client);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateClient();
+        var email = await client.RegisterAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            LoginUri, new LoginRequest { Email = email, Password = Password }, TestContext.Current.CancellationToken);
-        var body = await response.Content.ReadFromJsonAsync<LoginResponse>(TestContext.Current.CancellationToken);
+            LoginUri, new LoginRequest { Email = email, Password = Password }, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken);
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(body!.AccessToken);
         var lifetimeMinutes = (jwt.ValidTo - jwt.ValidFrom).TotalMinutes;
@@ -81,11 +74,12 @@ public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : I
     [Fact]
     public async Task Login_WithWrongPassword_ReturnsUnauthorized()
     {
-        using var client = _factory.CreateClient();
-        var email = await RegisterUserAsync(client);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateClient();
+        var email = await client.RegisterAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            LoginUri, new LoginRequest { Email = email, Password = "WrongPassword!1" }, TestContext.Current.CancellationToken);
+            LoginUri, new LoginRequest { Email = email, Password = "WrongPassword!1" }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -93,7 +87,7 @@ public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : I
     [Fact]
     public async Task Login_WithUnknownEmail_ReturnsUnauthorized()
     {
-        using var client = _factory.CreateClient();
+        using var client = Factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             LoginUri,
@@ -101,16 +95,5 @@ public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : I
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    private static async Task<string> RegisterUserAsync(HttpClient client)
-    {
-        var email = $"{Guid.NewGuid()}@example.com";
-        var request = new RegisterRequest { Email = email, Password = Password, DisplayName = "Ada Lovelace" };
-
-        var response = await client.PostAsJsonAsync(RegisterUri, request, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        return email;
     }
 }

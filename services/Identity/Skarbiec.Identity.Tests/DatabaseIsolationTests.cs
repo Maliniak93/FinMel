@@ -1,6 +1,4 @@
-using System.Net;
-using System.Net.Http.Json;
-using Skarbiec.Identity.Features.Register;
+using Skarbiec.Identity.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
@@ -11,16 +9,9 @@ namespace Skarbiec.Identity.Tests;
 // tests didn't work, the second fact to run would see a leftover row from the first and get 409
 // Conflict instead of 201 Created (T0.9 AC: "two tests writing the same entity do not interfere").
 [Collection(TestingDefaults.CollectionName)]
-public sealed class DatabaseIsolationTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class DatabaseIsolationTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
-    private const string RegisterUri = "/api/identity/register";
     private const string FixedEmail = "isolation-check@example.com";
-
-    private readonly IdentityApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
 
     [Fact]
     public Task First_RegistrationOfFixedEmail_Succeeds() => RegisterFixedEmailAsync();
@@ -30,16 +21,9 @@ public sealed class DatabaseIsolationTests(SkarbiecContainersFixture containers)
 
     private async Task RegisterFixedEmailAsync()
     {
-        using var client = _factory.CreateClient();
-        var request = new RegisterRequest
-        {
-            Email = FixedEmail,
-            Password = "Str0ng!Passw0rd",
-            DisplayName = "Ada Lovelace"
-        };
+        using var client = Factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync(RegisterUri, request, TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        // RegisterAsync asserts 201 — the Conflict a broken reset would produce fails right here.
+        await client.RegisterAsync(TestContext.Current.CancellationToken, FixedEmail);
     }
 }

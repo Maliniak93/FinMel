@@ -1,35 +1,27 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Portfolio.Features;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
+using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
+using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 [Collection(TestingDefaults.CollectionName)]
-public sealed class UpdatePortfolioEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class UpdatePortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    private const string PortfoliosUri = "/api/portfolio/portfolios";
-
-    private readonly PortfolioApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task Update_WithValidRequest_ChangesFields()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var created = await client.PostAsJsonAsync(
-            PortfoliosUri, new CreatePortfolioRequest { Name = "Retirement", Currency = "PLN" }, cancellationToken);
-        var portfolio = await created.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
         var response = await client.PutAsJsonAsync(
-            $"{PortfoliosUri}/{portfolio!.Id}",
+            PortfolioUri(portfolioId),
             new UpdatePortfolioRequest { Name = "Retirement (renamed)", Description = "Updated", Currency = "USD" },
             cancellationToken);
 
@@ -43,13 +35,12 @@ public sealed class UpdatePortfolioEndpointTests(SkarbiecContainersFixture conta
     public async Task Update_ToNameTakenByAnotherOwnPortfolio_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.PostAsJsonAsync(PortfoliosUri, new CreatePortfolioRequest { Name = "Taken", Currency = "PLN" }, cancellationToken);
-        var created = await client.PostAsJsonAsync(PortfoliosUri, new CreatePortfolioRequest { Name = "Free", Currency = "PLN" }, cancellationToken);
-        var portfolio = await created.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await client.CreatePortfolioAsync(cancellationToken, name: "Taken");
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Free");
 
         var response = await client.PutAsJsonAsync(
-            $"{PortfoliosUri}/{portfolio!.Id}", new UpdatePortfolioRequest { Name = "Taken", Currency = "PLN" }, cancellationToken);
+            PortfolioUri(portfolioId), new UpdatePortfolioRequest { Name = "Taken", Currency = "PLN" }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -57,10 +48,10 @@ public sealed class UpdatePortfolioEndpointTests(SkarbiecContainersFixture conta
     [Fact]
     public async Task Update_NonExistentPortfolio_ReturnsNotFound()
     {
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
         var response = await client.PutAsJsonAsync(
-            $"{PortfoliosUri}/{Guid.NewGuid()}",
+            PortfolioUri(Guid.NewGuid()),
             new UpdatePortfolioRequest { Name = "Anything", Currency = "PLN" },
             TestContext.Current.CancellationToken);
 

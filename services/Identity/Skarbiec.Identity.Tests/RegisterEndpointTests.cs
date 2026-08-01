@@ -4,38 +4,36 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Register;
+using Skarbiec.Identity.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
+// Registration is the endpoint under test here, so these facts post to RegisterUri directly
+// instead of going through IdentityApi.RegisterAsync — that helper asserts 201 Created, which is
+// exactly what the weak-password, malformed-email and duplicate cases below need to observe.
 [Collection(TestingDefaults.CollectionName)]
-public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
-    private const string RegisterUri = "/api/identity/register";
-
-    private readonly IdentityApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task Register_WithValidRequest_ReturnsCreatedAndStoresHashedPassword()
     {
-        using var client = _factory.CreateClient();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",
-            Password = "Str0ng!Passw0rd",
-            DisplayName = "Ada Lovelace"
+            Password = Password,
+            DisplayName = DisplayName
         };
 
-        var response = await client.PostAsJsonAsync(RegisterUri, request, TestContext.Current.CancellationToken);
+        var response = await client.PostAsJsonAsync(RegisterUri, request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = Factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByEmailAsync(request.Email);
 
@@ -47,12 +45,12 @@ public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) 
     [Fact]
     public async Task Register_WithWeakPassword_ReturnsBadRequest()
     {
-        using var client = _factory.CreateClient();
+        using var client = Factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",
             Password = "weak",
-            DisplayName = "Ada Lovelace"
+            DisplayName = DisplayName
         };
 
         var response = await client.PostAsJsonAsync(RegisterUri, request, TestContext.Current.CancellationToken);
@@ -63,12 +61,12 @@ public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) 
     [Fact]
     public async Task Register_WithMalformedEmail_ReturnsBadRequest()
     {
-        using var client = _factory.CreateClient();
+        using var client = Factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = "not-an-email",
-            Password = "Str0ng!Passw0rd",
-            DisplayName = "Ada Lovelace"
+            Password = Password,
+            DisplayName = DisplayName
         };
 
         var response = await client.PostAsJsonAsync(RegisterUri, request, TestContext.Current.CancellationToken);
@@ -79,18 +77,19 @@ public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) 
     [Fact]
     public async Task Register_WithDuplicateEmail_ReturnsConflict()
     {
-        using var client = _factory.CreateClient();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateClient();
         var request = new RegisterRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",
-            Password = "Str0ng!Passw0rd",
-            DisplayName = "Ada Lovelace"
+            Password = Password,
+            DisplayName = DisplayName
         };
 
-        var first = await client.PostAsJsonAsync(RegisterUri, request, TestContext.Current.CancellationToken);
+        var first = await client.PostAsJsonAsync(RegisterUri, request, cancellationToken);
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-        var second = await client.PostAsJsonAsync(RegisterUri, request, TestContext.Current.CancellationToken);
+        var second = await client.PostAsJsonAsync(RegisterUri, request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
     }

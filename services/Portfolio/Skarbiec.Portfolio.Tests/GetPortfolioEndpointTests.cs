@@ -1,45 +1,37 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Portfolio.Features;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
+using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
+using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 [Collection(TestingDefaults.CollectionName)]
-public sealed class GetPortfolioEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class GetPortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    private const string PortfoliosUri = "/api/portfolio/portfolios";
-
-    private readonly PortfolioApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task Get_ExistingPortfolio_ReturnsIt()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var created = await client.PostAsJsonAsync(
-            PortfoliosUri, new CreatePortfolioRequest { Name = "Retirement", Currency = "PLN" }, cancellationToken);
-        var portfolio = await created.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
-        var response = await client.GetAsync($"{PortfoliosUri}/{portfolio!.Id}", cancellationToken);
+        var response = await client.GetAsync(PortfolioUri(portfolioId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
-        Assert.Equal(portfolio.Id, body!.Id);
+        Assert.Equal(portfolioId, body!.Id);
     }
 
     [Fact]
     public async Task Get_NonExistentPortfolio_ReturnsNotFound()
     {
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var response = await client.GetAsync($"{PortfoliosUri}/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
+        var response = await client.GetAsync(PortfolioUri(Guid.NewGuid()), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

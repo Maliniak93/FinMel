@@ -18,9 +18,13 @@ If `Skarbiec.sln` does not exist yet, stop: implementation has not started — p
    - `<FeatureName>Validator.cs` — request validation
 3. Tenancy: read `UserId` from JWT claims only; rely on the EF global query filter. Never accept `UserId` from the request body.
 4. Tests in the service's test project:
+   - read `<Service>.Tests/Fixtures/` **first** — `<Service>Api` already has the route builders and arrange calls (create a portfolio, add an asset, …), and `<Service>EndpointTests` already owns the factory lifetime and per-test DB reset
+   - the test class is `[Collection(TestingDefaults.CollectionName)]` + `: <Service>EndpointTests(containers)` + facts — no local `_factory`, no `InitializeAsync`/`DisposeAsync`, no route constants
+   - the slice's own endpoint is called directly (raw `HttpResponseMessage`), never through a fixture helper — those assert success
+   - anything the new slice needs that `Fixtures/` lacks goes **into** `Fixtures/` (new helper, or a new optional parameter on an existing one) — never a private copy in the test class
    - integration test on Testcontainers (PostgreSQL; RabbitMQ if the slice publishes events)
    - tenancy isolation test: user B gets 404 on user A's resource
-5. Use an existing slice in the same service as the pattern reference. Extract shared code only on the third use.
+5. Use an existing slice in the same service as the pattern reference. Extract shared production code only on the third use — test helpers, by contrast, are extracted on the second (see `.claude/rules/dotnet.md`).
 
 ## Rules
 

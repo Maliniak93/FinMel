@@ -1,22 +1,17 @@
 using System.Net;
+using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
 [Collection(TestingDefaults.CollectionName)]
-public sealed class HealthCheckTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class HealthCheckTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    private readonly PortfolioApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task Ready_ReturnsHealthy()
     {
-        using var client = _factory.CreateClient();
+        using var client = Factory.CreateClient();
 
         var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
 

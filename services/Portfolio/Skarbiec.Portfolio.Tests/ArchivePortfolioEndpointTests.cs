@@ -1,33 +1,25 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Portfolio.Features;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
+using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
+using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 [Collection(TestingDefaults.CollectionName)]
-public sealed class ArchivePortfolioEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class ArchivePortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    private const string PortfoliosUri = "/api/portfolio/portfolios";
-
-    private readonly PortfolioApiFactory _factory = new(containers);
-
-    public ValueTask InitializeAsync() => new(_factory.ResetDatabaseAsync());
-
-    public ValueTask DisposeAsync() => _factory.DisposeAsync();
-
     [Fact]
     public async Task Archive_ExistingPortfolio_SetsIsArchivedTrue()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var created = await client.PostAsJsonAsync(
-            PortfoliosUri, new CreatePortfolioRequest { Name = "Retirement", Currency = "PLN" }, cancellationToken);
-        var portfolio = await created.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
-        var response = await client.PostAsync($"{PortfoliosUri}/{portfolio!.Id}/archive", content: null, cancellationToken);
+        var response = await client.PostAsync($"{PortfolioUri(portfolioId)}/archive", content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
@@ -37,9 +29,10 @@ public sealed class ArchivePortfolioEndpointTests(SkarbiecContainersFixture cont
     [Fact]
     public async Task Archive_NonExistentPortfolio_ReturnsNotFound()
     {
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var response = await client.PostAsync($"{PortfoliosUri}/{Guid.NewGuid()}/archive", content: null, TestContext.Current.CancellationToken);
+        var response = await client.PostAsync(
+            $"{PortfolioUri(Guid.NewGuid())}/archive", content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -48,13 +41,11 @@ public sealed class ArchivePortfolioEndpointTests(SkarbiecContainersFixture cont
     public async Task Archive_AlreadyArchivedPortfolio_IsIdempotent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = _factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var created = await client.PostAsJsonAsync(
-            PortfoliosUri, new CreatePortfolioRequest { Name = "Retirement", Currency = "PLN" }, cancellationToken);
-        var portfolio = await created.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
-        await client.PostAsync($"{PortfoliosUri}/{portfolio!.Id}/archive", content: null, cancellationToken);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        await client.PostAsync($"{PortfolioUri(portfolioId)}/archive", content: null, cancellationToken);
 
-        var response = await client.PostAsync($"{PortfoliosUri}/{portfolio.Id}/archive", content: null, cancellationToken);
+        var response = await client.PostAsync($"{PortfolioUri(portfolioId)}/archive", content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
