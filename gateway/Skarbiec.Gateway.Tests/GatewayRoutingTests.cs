@@ -89,6 +89,16 @@ public sealed class GatewayRoutingTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task OpenApiDocument_ThroughGateway_ReachableWithoutToken()
+    {
+        using var client = _gateway.CreateClient();
+
+        var response = await client.GetAsync("/api/portfolio/openapi/v1.json", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Login_BurstBeyondRateLimit_Returns429()
     {
         using var client = _gateway.CreateClient();

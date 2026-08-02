@@ -13,6 +13,7 @@ using Skarbiec.ServiceDefaults.Messaging;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddServiceOpenApi();
 
 builder.AddNpgsqlDbContext<IdentityDbContext>("identity-db");
 
@@ -42,6 +43,7 @@ var app = builder.Build();
 
 app.UseServiceDefaults();
 app.MapDefaultEndpoints();
+app.MapServiceOpenApi("identity");
 
 app.MapRegisterEndpoint();
 app.MapLoginEndpoint();
