@@ -358,8 +358,8 @@ jobs:
       - name: Test (Testcontainers — requires Docker)
         run: dotnet test Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj --configuration Release --no-build
 
-  # Angular app lands in Phase 1 (T1.x) — web/ only holds a placeholder today. The job is wired
-  # up now so path filtering already works; it no-ops until web/package.json exists.
+  # web/package.json exists since T1.7 (OpenAPI client-gen tooling), but the Angular app itself
+  # (with real Vitest unit tests) lands in T1.8+. Until then, "test" aliases to typecheck.
   web:
     name: web
     needs: changes

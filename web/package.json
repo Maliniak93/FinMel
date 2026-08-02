@@ -5,6 +5,7 @@
   "scripts": {
     "gen:api": "openapi-ts",
     "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck",
     "smoke:api": "tsx scripts/smoke-api.ts"
   },
   "devDependencies": {
