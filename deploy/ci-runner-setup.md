@@ -114,7 +114,7 @@ window needed.
 
 ## 6. One repo setting this depends on
 
-GHCR image push only runs on `push` to `main` (never on `pull_request`), using the workflow's own
+GHCR image push only runs on `push` to `master` (never on `pull_request`), using the workflow's own
 `permissions: packages: write`. For that push step to actually succeed, check
 `https://github.com/Maliniak93/FinMel/settings/actions` → **Workflow permissions** is set to
 "Read and write permissions" — the per-workflow `permissions:` block can only narrow that
