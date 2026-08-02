@@ -1,0 +1,39 @@
+// Shared by login/register (features/auth/*) — the same centered-card layout for both.
+@mixin auth-page {
+  :host {
+    display: block;
+    height: 100%;
+  }
+
+  .auth-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 24px;
+  }
+
+  .auth-page__card {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .auth-page__field {
+    display: block;
+    width: 100%;
+  }
+
+  .auth-page__error {
+    color: var(--mat-sys-error);
+    margin: 0 0 16px;
+  }
+
+  .auth-page__submit {
+    width: 100%;
+  }
+
+  .auth-page__switch {
+    margin-top: 16px;
+    text-align: center;
+  }
+}
