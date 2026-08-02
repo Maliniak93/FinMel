@@ -30,6 +30,7 @@ public sealed class CreatePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.NotNull(body);
         Assert.Equal(request.Name, body.Name);
         Assert.False(body.IsArchived);
+        Assert.Equal(0, body.AssetCount);
         Assert.Equal(PortfolioUri(body.Id), response.Headers.Location?.OriginalString);
     }
 

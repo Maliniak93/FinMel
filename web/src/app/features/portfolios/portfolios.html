@@ -1,2 +1,108 @@
-<h1>Portfolios</h1>
-<p>Coming in T1.10.</p>
+<div class="portfolios-page">
+  <div class="portfolios-page__header">
+    <h1>Portfolios</h1>
+    <div class="portfolios-page__header-actions">
+      <mat-slide-toggle
+        [checked]="includeArchived()"
+        (change)="includeArchived.set($event.checked)"
+      >
+        Show archived
+      </mat-slide-toggle>
+      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+        <mat-icon>add</mat-icon>
+        New portfolio
+      </button>
+    </div>
+  </div>
+
+  @if (portfoliosResource.error(); as loadError) {
+    <div class="portfolios-page__state" role="alert">
+      <p>{{ loadError.message }}</p>
+      <button mat-button type="button" (click)="portfoliosResource.reload()">Retry</button>
+    </div>
+  } @else if (portfoliosResource.isLoading() && !portfoliosResource.hasValue()) {
+    <div class="portfolios-page__state">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (portfoliosResource.hasValue() && portfoliosResource.value().length === 0) {
+    <div class="portfolios-page__state">
+      <p>You don't have any portfolios yet.</p>
+      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+        Create your first portfolio
+      </button>
+    </div>
+  } @else if (portfoliosResource.hasValue()) {
+    <table mat-table [dataSource]="portfoliosResource.value()" class="portfolios-page__table">
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <td mat-cell *matCellDef="let portfolio">{{ portfolio.name }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="currency">
+        <th mat-header-cell *matHeaderCellDef>Currency</th>
+        <td mat-cell *matCellDef="let portfolio">{{ portfolio.currency }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="assetCount">
+        <th mat-header-cell *matHeaderCellDef>Assets</th>
+        <td mat-cell *matCellDef="let portfolio">{{ portfolio.assetCount }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let portfolio">
+          @if (portfolio.isArchived) {
+            <mat-chip-set>
+              <mat-chip>Archived</mat-chip>
+            </mat-chip-set>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let portfolio">
+          <button
+            mat-icon-button
+            type="button"
+            [matMenuTriggerFor]="menu"
+            [attr.aria-label]="'Actions for ' + portfolio.name"
+          >
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item type="button" (click)="openEditDialog(portfolio)">
+              <mat-icon>edit</mat-icon>
+              <span>Edit</span>
+            </button>
+            @if (!portfolio.isArchived) {
+              <button mat-menu-item type="button" (click)="archive(portfolio)">
+                <mat-icon>archive</mat-icon>
+                <span>Archive</span>
+              </button>
+            }
+            @if (portfolio.assetCount === 0) {
+              <button mat-menu-item type="button" (click)="remove(portfolio)">
+                <mat-icon>delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            } @else {
+              <button
+                mat-menu-item
+                type="button"
+                disabled
+                matTooltip="Portfolios with assets can't be deleted — archive it instead."
+              >
+                <mat-icon>delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            }
+          </mat-menu>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  }
+</div>

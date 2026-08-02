@@ -46,6 +46,7 @@ export type PortfolioResponse = {
     description?: null | string;
     currency: string;
     isArchived: boolean;
+    assetCount: number | string;
 };
 
 export type RecordTransactionRequest = {
