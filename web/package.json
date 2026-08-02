@@ -1,18 +1,49 @@
 {
   "name": "skarbiec-web",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.12.1",
   "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
     "gen:api": "openapi-ts",
-    "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck",
-    "smoke:api": "tsx scripts/smoke-api.ts"
+    "typecheck": "tsc --noEmit -p tsconfig.tools.json",
+    "smoke:api": "tsx scripts/smoke-api.ts",
+    "lint": "ng lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@angular/cdk": "^22.1.0",
+    "@angular/common": "^22.1.0",
+    "@angular/compiler": "^22.1.0",
+    "@angular/core": "^22.1.0",
+    "@angular/forms": "^22.1.0",
+    "@angular/material": "^22.1.0",
+    "@angular/platform-browser": "^22.1.0",
+    "@angular/router": "^22.1.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
+    "@angular/build": "^22.1.2",
+    "@angular/cli": "^22.1.2",
+    "@angular/compiler-cli": "^22.1.0",
+    "@eslint/js": "^10.0.1",
     "@hey-api/openapi-ts": "0.99.0",
     "@types/node": "26.1.2",
+    "angular-eslint": "22.1.0",
+    "eslint": "^10.6.0",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
     "tsx": "4.23.2",
-    "typescript": "6.0.3"
+    "typescript": "~6.0.2",
+    "typescript-eslint": "8.62.1",
+    "vitest": "^4.0.8"
   },
   "overrides": {
     "js-yaml": "4.3.1"

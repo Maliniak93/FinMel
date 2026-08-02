@@ -34,7 +34,9 @@ async function main(): Promise<void> {
     throw new Error(`listPortfolios failed: ${JSON.stringify(list.error)}`);
   }
 
-  console.log(`smoke OK — listPortfolios through the Gateway returned ${list.data?.length ?? 0} portfolio(s)`);
+  console.log(
+    `smoke OK — listPortfolios through the Gateway returned ${list.data?.length ?? 0} portfolio(s)`,
+  );
 }
 
 main().catch((error: unknown) => {

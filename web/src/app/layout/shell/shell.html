@@ -1,0 +1,30 @@
+<mat-sidenav-container class="shell">
+  <mat-sidenav #drawer mode="side" opened class="shell__nav">
+    <mat-nav-list>
+      @for (link of navLinks; track link.path) {
+        <a mat-list-item [routerLink]="link.path" routerLinkActive="shell__nav-link--active">
+          <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
+          <span matListItemTitle>{{ link.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="shell__content-area">
+    <mat-toolbar color="primary" class="shell__toolbar">
+      <button
+        mat-icon-button
+        type="button"
+        (click)="drawer.toggle()"
+        aria-label="Toggle navigation"
+      >
+        <mat-icon>menu</mat-icon>
+      </button>
+      <span>Skarbiec</span>
+    </mat-toolbar>
+
+    <main class="shell__content">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>
