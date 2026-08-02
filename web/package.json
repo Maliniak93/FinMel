@@ -1,0 +1,20 @@
+{
+  "name": "skarbiec-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen:api": "openapi-ts",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck",
+    "smoke:api": "tsx scripts/smoke-api.ts"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "@types/node": "26.1.2",
+    "tsx": "4.23.2",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "js-yaml": "4.3.1"
+  }
+}

@@ -21,6 +21,7 @@ using Skarbiec.ServiceDefaults.Messaging;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddServiceOpenApi();
 
 // Plain scoped AddDbContext, not Aspire's AddNpgsqlDbContext — that helper always pools
 // (AddDbContextPool), which can't take the constructor-injected, request-scoped ICurrentUser
@@ -55,6 +56,7 @@ var app = builder.Build();
 
 app.UseServiceDefaults();
 app.MapDefaultEndpoints();
+app.MapServiceOpenApi("portfolio");
 
 app.MapCreatePortfolioEndpoint();
 app.MapUpdatePortfolioEndpoint();

@@ -4,6 +4,7 @@ using Skarbiec.MarketData.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddServiceOpenApi();
 
 builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
 
@@ -11,6 +12,7 @@ var app = builder.Build();
 
 app.UseServiceDefaults();
 app.MapDefaultEndpoints();
+app.MapServiceOpenApi("marketdata");
 
 // Production applies migrations as an explicit deploy step instead (see deploy/README.md).
 if (app.Environment.IsDevelopment())
