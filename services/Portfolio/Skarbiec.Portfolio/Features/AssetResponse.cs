@@ -14,6 +14,7 @@ public sealed record AssetResponse
     public required decimal ManualValue { get; init; }
     public required DateOnly ManualValueDate { get; init; }
     public Guid? InstrumentId { get; init; }
+    public required int TransactionCount { get; init; }
 }
 
 public static class AssetMappingExtensions
@@ -28,6 +29,7 @@ public static class AssetMappingExtensions
         Quantity = asset.Quantity,
         ManualValue = asset.ManualValueAmount,
         ManualValueDate = asset.ManualValueDate,
-        InstrumentId = asset.InstrumentId
+        InstrumentId = asset.InstrumentId,
+        TransactionCount = asset.TransactionCount
     };
 }

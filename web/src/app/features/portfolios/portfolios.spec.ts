@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
@@ -48,6 +49,7 @@ describe('Portfolios', () => {
     await TestBed.configureTestingModule({
       imports: [Portfolios],
       providers: [
+        provideRouter([]),
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: snackBar },
       ],

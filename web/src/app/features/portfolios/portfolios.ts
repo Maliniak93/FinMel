@@ -9,6 +9,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -36,6 +37,7 @@ import { PortfolioFormDialog } from './portfolio-form-dialog/portfolio-form-dial
     MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
+    RouterLink,
   ],
   templateUrl: './portfolios.html',
   styleUrl: './portfolios.scss',

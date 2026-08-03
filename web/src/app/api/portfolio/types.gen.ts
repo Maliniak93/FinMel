@@ -25,6 +25,7 @@ export type AssetResponse = {
     manualValue: number | string;
     manualValueDate: string;
     instrumentId?: null | string;
+    transactionCount: number | string;
 };
 
 export type CreatePortfolioRequest = {
