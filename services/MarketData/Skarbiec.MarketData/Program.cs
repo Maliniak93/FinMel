@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
 using Skarbiec.MarketData.Data;
+using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
 using Skarbiec.MarketData.Sources.Stooq;
@@ -13,6 +16,8 @@ builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
 builder.AddNbpSources();
 builder.AddStooqSource();
 builder.AddCoinGeckoSource();
+builder.AddPriceSyncJob();
+builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddSource(PriceSyncJob.ActivitySourceName));
 
 var app = builder.Build();
 

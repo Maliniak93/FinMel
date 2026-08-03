@@ -73,6 +73,15 @@
     <!-- Skarbiec.Gateway (T0.15): YARP + Aspire service discovery destination resolver -->
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.6.0" />
+
+    <!-- MarketData PriceSyncJob (T2.6): Postgres-backed persistent store so schedule/state survive
+         restarts, clustered so two live instances never run the same fire concurrently (ADR-007). -->
+    <PackageVersion Include="Quartz" Version="3.19.1" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.19.1" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.19.1" />
+    <!-- Generates Quartz's ADO job-store schema as a normal EF Core migration in marketdata_db,
+         instead of hand-running Quartz's own tables_postgres.sql as a separate deploy step. -->
+    <PackageVersion Include="AppAny.Quartz.EntityFrameworkCore.Migrations.PostgreSQL" Version="0.6.0" />
   </ItemGroup>
 
 </Project>

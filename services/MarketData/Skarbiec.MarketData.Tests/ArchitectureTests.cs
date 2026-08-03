@@ -31,4 +31,23 @@ public sealed class ArchitectureTests
         Assert.All(requestTypes, t => Assert.Null(
             t.GetProperty("UserId")));
     }
+
+    /// <summary>
+    /// External price APIs are called only from <see cref="Skarbiec.MarketData.Sources.PriceSyncJob"/>
+    /// (ADR-007) — everything that depends on <c>IPriceSource</c>/<c>IFxRateSource</c> (the sole
+    /// gateway to those APIs, per T2.2) lives in the <c>Sources</c> namespace alongside the job, never
+    /// in a request-path <c>Features/*</c> handler.
+    /// </summary>
+    [Fact]
+    public void OnlySourcesNamespace_DependsOn_PriceSourceAbstractions()
+    {
+        var result = Types.InAssembly(typeof(Program).Assembly)
+            .That()
+            .HaveDependencyOnAny("Skarbiec.MarketData.Sources.IPriceSource", "Skarbiec.MarketData.Sources.IFxRateSource")
+            .Should()
+            .ResideInNamespaceStartingWith("Skarbiec.MarketData.Sources")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }

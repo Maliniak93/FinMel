@@ -1,3 +1,5 @@
+using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations.PostgreSQL;
 using Microsoft.EntityFrameworkCore;
 
 namespace Skarbiec.MarketData.Data;
@@ -9,10 +11,17 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
     public DbSet<Instrument> Instruments => Set<Instrument>();
     public DbSet<PriceQuote> PriceQuotes => Set<PriceQuote>();
     public DbSet<FxRate> FxRates => Set<FxRate>();
+    public DbSet<SyncRun> SyncRuns => Set<SyncRun>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Quartz's ADO job-store schema (T2.6), created via this DbContext's own migrations instead
+        // of hand-running Quartz's tables_postgres.sql as a separate deploy step — schema "quartz",
+        // table prefix "qrtz_" (AppAny package defaults). PriceSyncJobExtensions' UsePersistentStore
+        // must use the matching schema-qualified prefix "quartz.qrtz_".
+        modelBuilder.AddQuartz(quartz => quartz.UsePostgreSql());
 
         modelBuilder.Entity<Instrument>(instrument =>
         {
@@ -41,6 +50,11 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
 
             // Upsert-friendly: PriceSyncJob (T2.6) writes one row per pair per day.
             rate.HasIndex(r => new { r.Pair, r.Date }).IsUnique();
+        });
+
+        modelBuilder.Entity<SyncRun>(run =>
+        {
+            run.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
         });
     }
 }
