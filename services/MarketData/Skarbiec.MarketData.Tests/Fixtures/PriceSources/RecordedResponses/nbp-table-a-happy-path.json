@@ -1,0 +1,13 @@
+[
+  {
+    "table": "A",
+    "no": "148/A/NBP/2026",
+    "effectiveDate": "2026-08-03",
+    "rates": [
+      { "currency": "dolar amerykański", "code": "USD", "mid": 3.7330 },
+      { "currency": "euro", "code": "EUR", "mid": 4.3013 },
+      { "currency": "funt szterling", "code": "GBP", "mid": 5.0222 },
+      { "currency": "frank szwajcarski", "code": "CHF", "mid": 4.6141 }
+    ]
+  }
+]

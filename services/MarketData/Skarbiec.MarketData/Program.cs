@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.MarketData.Data;
+using Skarbiec.MarketData.Sources.Nbp;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,7 @@ builder.AddServiceDefaults();
 builder.AddServiceOpenApi();
 
 builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
+builder.AddNbpSources();
 
 var app = builder.Build();
 
