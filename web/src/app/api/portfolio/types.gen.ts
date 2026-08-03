@@ -15,6 +15,12 @@ export type AddAssetRequest = {
 
 export type AssetClass = number;
 
+export type AssetClassBreakdown = {
+    assetClass: AssetClass;
+    value: number | string;
+    percentage: number | string;
+};
+
 export type AssetResponse = {
     id: string;
     portfolioId: string;
@@ -39,6 +45,12 @@ export type PagedResponseOfTransactionResponse = {
     page: number | string;
     pageSize: number | string;
     totalCount: number | string;
+};
+
+export type PortfolioBreakdown = {
+    portfolioId: string;
+    name: string;
+    value: number | string;
 };
 
 export type PortfolioResponse = {
@@ -91,6 +103,14 @@ export type UpdateTransactionRequest = {
     unitPrice: number | string;
     fee?: number | string;
     date: string;
+};
+
+export type WealthSummaryResponse = {
+    totalNetWorth: number | string;
+    baseCurrency: string;
+    fxConversionIsNaive: boolean;
+    byAssetClass: Array<AssetClassBreakdown>;
+    byPortfolio: Array<PortfolioBreakdown>;
 };
 
 export type GetApiPortfolioMeData = {
@@ -388,3 +408,19 @@ export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByI
 };
 
 export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses];
+
+export type GetApiPortfolioWealthSummaryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/wealth-summary';
+};
+
+export type GetApiPortfolioWealthSummaryResponses = {
+    /**
+     * OK
+     */
+    200: WealthSummaryResponse;
+};
+
+export type GetApiPortfolioWealthSummaryResponse = GetApiPortfolioWealthSummaryResponses[keyof GetApiPortfolioWealthSummaryResponses];

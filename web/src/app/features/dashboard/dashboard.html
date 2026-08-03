@@ -1,2 +1,60 @@
-<h1>Dashboard</h1>
-<p>Coming in T1.13.</p>
+<div class="dashboard-page">
+  <h1>Dashboard</h1>
+
+  @if (summaryResource.error(); as loadError) {
+    <div class="dashboard-page__state" role="alert">
+      <p>{{ loadError.message }}</p>
+      <button mat-button type="button" (click)="summaryResource.reload()">Retry</button>
+    </div>
+  } @else if (summaryResource.isLoading() && !summaryResource.hasValue()) {
+    <div class="dashboard-page__state">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (summaryResource.hasValue()) {
+    @let summary = summaryResource.value();
+
+    @if (isZero(summary.totalNetWorth)) {
+      <div class="dashboard-page__state">
+        <p>You haven't entered any wealth yet.</p>
+        <a mat-flat-button color="primary" routerLink="/portfolios">Go to portfolios</a>
+      </div>
+    } @else {
+      <p class="dashboard-page__net-worth">{{ formatMoney(summary.totalNetWorth) }}</p>
+
+      @if (summary.fxConversionIsNaive) {
+        <p class="dashboard-page__fx-caveat">
+          Amounts in a currency other than PLN are added as-is, without a real exchange rate — no FX
+          conversion yet (real rates come in Phase 2). Treat this total as an approximation.
+        </p>
+      }
+
+      <div class="dashboard-page__breakdown">
+        <app-pie-chart [segments]="pieSegments()" class="dashboard-page__chart" />
+
+        <ul class="dashboard-page__legend">
+          @for (entry of summary.byAssetClass; track entry.assetClass) {
+            <li>
+              <span
+                class="dashboard-page__swatch"
+                [style.background]="assetClassColor(entry.assetClass)"
+              ></span>
+              {{ assetClassLabel(entry.assetClass) }} — {{ formatMoney(entry.value) }} ({{
+                entry.percentage
+              }}%)
+            </li>
+          }
+        </ul>
+      </div>
+
+      <h2>By portfolio</h2>
+      <ul class="dashboard-page__portfolios">
+        @for (entry of summary.byPortfolio; track entry.portfolioId) {
+          <li>
+            <a [routerLink]="['/portfolios', entry.portfolioId, 'assets']">{{ entry.name }}</a>
+            <span>{{ formatMoney(entry.value) }}</span>
+          </li>
+        }
+      </ul>
+    }
+  }
+</div>

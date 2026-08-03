@@ -7,6 +7,7 @@ using Skarbiec.Portfolio.Features.DeletePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.GetAsset;
 using Skarbiec.Portfolio.Features.GetPortfolio;
+using Skarbiec.Portfolio.Features.GetWealthSummary;
 using Skarbiec.Portfolio.Features.ListAssets;
 using Skarbiec.Portfolio.Features.ListPortfolios;
 using Skarbiec.Portfolio.Features.ListTransactions;
@@ -51,6 +52,7 @@ builder.Services.AddScoped<RecordTransactionHandler>();
 builder.Services.AddScoped<ListTransactionsHandler>();
 builder.Services.AddScoped<UpdateTransactionHandler>();
 builder.Services.AddScoped<DeleteTransactionHandler>();
+builder.Services.AddScoped<GetWealthSummaryHandler>();
 
 var app = builder.Build();
 
@@ -73,6 +75,7 @@ app.MapRecordTransactionEndpoint();
 app.MapListTransactionsEndpoint();
 app.MapUpdateTransactionEndpoint();
 app.MapDeleteTransactionEndpoint();
+app.MapGetWealthSummaryEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton
 // service (T0.15 AC) — mirrors Skarbiec.Identity's /api/identity/me.
