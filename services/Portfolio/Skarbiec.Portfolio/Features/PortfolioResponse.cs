@@ -7,6 +7,7 @@ public sealed record PortfolioResponse
     public string? Description { get; init; }
     public required string Currency { get; init; }
     public required bool IsArchived { get; init; }
+    public required int AssetCount { get; init; }
 }
 
 public static class PortfolioMappingExtensions
@@ -17,6 +18,7 @@ public static class PortfolioMappingExtensions
         Name = portfolio.Name,
         Description = portfolio.Description,
         Currency = portfolio.Currency,
-        IsArchived = portfolio.IsArchived
+        IsArchived = portfolio.IsArchived,
+        AssetCount = portfolio.AssetCount
     };
 }
