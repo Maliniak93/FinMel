@@ -1,0 +1,14 @@
+.asset-form-dialog__field {
+  display: block;
+  width: 100%;
+}
+
+.asset-form-dialog__mode {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.asset-form-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}
