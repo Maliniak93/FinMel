@@ -17,7 +17,9 @@ public static class MarketDataSeeder
 
     private static readonly (string Ticker, string Name, PriceSource Source, string QuoteCurrency, AssetClass AssetClass)[] SeedInstruments =
     [
-        ("XAU", "Gold (troy ounce)", PriceSource.Nbp, "PLN", AssetClass.PreciousMetal),
+        // NBP's cenyzlota endpoint (T2.3) prices 1 gram, not a troy ounce, despite the "XAU" ticker
+        // convention — the name documents the actual quoted unit so it's not misread at valuation time.
+        ("XAU", "Gold (1 gram, NBP)", PriceSource.Nbp, "PLN", AssetClass.PreciousMetal),
         ("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", AssetClass.Stock),
         ("CDR.PL", "CD Projekt", PriceSource.Stooq, "PLN", AssetClass.Stock),
         ("bitcoin", "Bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
