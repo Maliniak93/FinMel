@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.MarketData.Data;
+using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
 using Skarbiec.MarketData.Sources.Stooq;
 
@@ -11,6 +12,7 @@ builder.AddServiceOpenApi();
 builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
 builder.AddNbpSources();
 builder.AddStooqSource();
+builder.AddCoinGeckoSource();
 
 var app = builder.Build();
 
