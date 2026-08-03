@@ -33,6 +33,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/assets/assets').then((m) => m.Assets),
       },
       {
+        path: 'portfolios/:portfolioId/assets/:assetId/transactions',
+        loadComponent: () =>
+          import('./features/transactions/transactions').then((m) => m.Transactions),
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
       },
