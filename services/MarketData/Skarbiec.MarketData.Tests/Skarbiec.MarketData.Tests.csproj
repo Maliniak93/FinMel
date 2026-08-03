@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <None Include="Fixtures\PriceSources\RecordedResponses\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\PriceSources\RecordedResponses\*.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
