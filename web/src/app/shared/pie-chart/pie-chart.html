@@ -1,0 +1,25 @@
+@if (rendered().length > 0) {
+  <svg
+    viewBox="0 0 36 36"
+    class="pie-chart"
+    role="img"
+    aria-label="Net worth breakdown by asset class"
+  >
+    <g transform="rotate(-90 18 18)">
+      @for (segment of rendered(); track segment.label) {
+        <circle
+          cx="18"
+          cy="18"
+          [attr.r]="radius"
+          fill="transparent"
+          [attr.stroke]="segment.color"
+          stroke-width="4"
+          [attr.stroke-dasharray]="segment.dashArray"
+          [attr.stroke-dashoffset]="segment.dashOffset"
+        />
+      }
+    </g>
+  </svg>
+} @else {
+  <p class="pie-chart__empty">No data to chart yet.</p>
+}

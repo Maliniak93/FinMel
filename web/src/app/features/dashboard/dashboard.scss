@@ -1,0 +1,67 @@
+.dashboard-page__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.dashboard-page__net-worth {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin: 8px 0 0;
+}
+
+.dashboard-page__fx-caveat {
+  margin: 4px 0 24px;
+  font-size: 0.875rem;
+  opacity: 0.7;
+}
+
+.dashboard-page__breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.dashboard-page__chart {
+  width: 200px;
+  flex: none;
+}
+
+.dashboard-page__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-page__swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.dashboard-page__portfolios {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-page__portfolios li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 480px;
+}

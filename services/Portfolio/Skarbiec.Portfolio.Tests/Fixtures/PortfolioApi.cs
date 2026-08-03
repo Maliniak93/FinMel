@@ -20,6 +20,7 @@ namespace Skarbiec.Portfolio.Tests.Fixtures;
 internal static class PortfolioApi
 {
     public const string PortfoliosUri = "/api/portfolio/portfolios";
+    public const string WealthSummaryUri = "/api/portfolio/wealth-summary";
 
     public static string PortfolioUri(Guid portfolioId) =>
         $"{PortfoliosUri}/{portfolioId}";
