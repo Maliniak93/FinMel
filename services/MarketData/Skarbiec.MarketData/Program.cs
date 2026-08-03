@@ -14,11 +14,14 @@ app.UseServiceDefaults();
 app.MapDefaultEndpoints();
 app.MapServiceOpenApi("marketdata");
 
-// Production applies migrations as an explicit deploy step instead (see deploy/README.md).
+// Production applies migrations (and the seed below) as an explicit deploy step instead (see
+// deploy/README.md).
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
-    await scope.ServiceProvider.GetRequiredService<MarketDataDbContext>().Database.MigrateAsync();
+    var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+    await db.Database.MigrateAsync();
+    await MarketDataSeeder.SeedAsync(db);
 }
 
 app.Run();
