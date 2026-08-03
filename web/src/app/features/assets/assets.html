@@ -1,0 +1,128 @@
+<div class="assets-page">
+  <div class="assets-page__header">
+    <div>
+      <a routerLink="/portfolios" class="assets-page__back">
+        <mat-icon>arrow_back</mat-icon>
+        Portfolios
+      </a>
+      <h1>
+        @if (portfolioResource.hasValue()) {
+          Assets — {{ portfolioResource.value().name }}
+        } @else {
+          Assets
+        }
+      </h1>
+    </div>
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+      New asset
+    </button>
+  </div>
+
+  @if (portfolioResource.error(); as portfolioError) {
+    <div class="assets-page__state" role="alert">
+      <p>{{ portfolioError.message }}</p>
+      <button mat-button type="button" (click)="portfolioResource.reload()">Retry</button>
+    </div>
+  } @else if (assetsResource.error(); as loadError) {
+    <div class="assets-page__state" role="alert">
+      <p>{{ loadError.message }}</p>
+      <button mat-button type="button" (click)="assetsResource.reload()">Retry</button>
+    </div>
+  } @else if (assetsResource.isLoading() && !assetsResource.hasValue()) {
+    <div class="assets-page__state">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (assetsResource.hasValue() && assetsResource.value().length === 0) {
+    <div class="assets-page__state">
+      <p>This portfolio doesn't have any assets yet.</p>
+      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+        Add your first asset
+      </button>
+    </div>
+  } @else if (assetsResource.hasValue()) {
+    <table mat-table [dataSource]="assetsResource.value()" class="assets-page__table">
+      <ng-container matColumnDef="assetClass">
+        <th mat-header-cell *matHeaderCellDef>Class</th>
+        <td mat-cell *matCellDef="let asset">{{ assetClassLabel(asset.assetClass) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <td mat-cell *matCellDef="let asset">{{ asset.name }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="quantity">
+        <th mat-header-cell *matHeaderCellDef>Quantity</th>
+        <td mat-cell *matCellDef="let asset">{{ formatQuantity(asset.quantity) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="currency">
+        <th mat-header-cell *matHeaderCellDef>Currency</th>
+        <td mat-cell *matCellDef="let asset">{{ asset.currency }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="value">
+        <th mat-header-cell *matHeaderCellDef>Value</th>
+        <td mat-cell *matCellDef="let asset">
+          {{ formatMoney(asset.manualValue, asset.currency) }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="manualValueDate">
+        <th mat-header-cell *matHeaderCellDef>Valued on</th>
+        <td mat-cell *matCellDef="let asset">
+          {{ asset.manualValueDate | date: 'mediumDate' }}
+          @if (isStale(asset.manualValueDate)) {
+            <mat-chip-set>
+              <mat-chip
+                matTooltip="This valuation is more than 6 months old — consider refreshing it."
+              >
+                Stale — refresh me
+              </mat-chip>
+            </mat-chip-set>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let asset">
+          <button
+            mat-icon-button
+            type="button"
+            [matMenuTriggerFor]="menu"
+            [attr.aria-label]="'Actions for ' + asset.name"
+          >
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item type="button" (click)="openEditDialog(asset)">
+              <mat-icon>edit</mat-icon>
+              <span>Edit</span>
+            </button>
+            @if (asset.transactionCount === 0) {
+              <button mat-menu-item type="button" (click)="remove(asset)">
+                <mat-icon>delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            } @else {
+              <button
+                mat-menu-item
+                type="button"
+                disabled
+                matTooltip="Assets with transactions can't be deleted."
+              >
+                <mat-icon>delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            }
+          </mat-menu>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  }
+</div>

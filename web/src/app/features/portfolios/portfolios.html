@@ -35,7 +35,9 @@
     <table mat-table [dataSource]="portfoliosResource.value()" class="portfolios-page__table">
       <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef>Name</th>
-        <td mat-cell *matCellDef="let portfolio">{{ portfolio.name }}</td>
+        <td mat-cell *matCellDef="let portfolio">
+          <a [routerLink]="['/portfolios', portfolio.id, 'assets']">{{ portfolio.name }}</a>
+        </td>
       </ng-container>
 
       <ng-container matColumnDef="currency">
