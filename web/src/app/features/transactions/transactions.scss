@@ -1,0 +1,37 @@
+.transactions-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.transactions-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 0.875rem;
+}
+
+.transactions-page__summary {
+  opacity: 0.7;
+  margin: 0;
+}
+
+.transactions-page__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.transactions-page__table {
+  width: 100%;
+}

@@ -1,0 +1,136 @@
+<div class="transactions-page">
+  <div class="transactions-page__header">
+    <div>
+      <a [routerLink]="['/portfolios', portfolioId(), 'assets']" class="transactions-page__back">
+        <mat-icon>arrow_back</mat-icon>
+        Assets
+      </a>
+      @if (assetResource.hasValue()) {
+        @let asset = assetResource.value();
+        <h1>Transactions — {{ asset.name }}</h1>
+        <p class="transactions-page__summary">
+          {{ assetClassLabel(asset.assetClass) }} · Quantity {{ formatQuantity(asset.quantity) }} ·
+          {{ formatMoney(asset.manualValue, asset.currency) }}
+        </p>
+      } @else {
+        <h1>Transactions</h1>
+      }
+    </div>
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+      New transaction
+    </button>
+  </div>
+
+  @if (assetResource.error(); as assetError) {
+    <div class="transactions-page__state" role="alert">
+      <p>{{ assetError.message }}</p>
+      <button mat-button type="button" (click)="assetResource.reload()">Retry</button>
+    </div>
+  } @else if (transactionsResource.error(); as loadError) {
+    <div class="transactions-page__state" role="alert">
+      <p>{{ loadError.message }}</p>
+      <button mat-button type="button" (click)="transactionsResource.reload()">Retry</button>
+    </div>
+  } @else if (transactionsResource.isLoading() && !transactionsResource.hasValue()) {
+    <div class="transactions-page__state">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (transactionsResource.value(); as page) {
+    @if (page.items.length === 0) {
+      <div class="transactions-page__state">
+        <p>No transactions recorded for this asset yet.</p>
+        <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+          Record your first transaction
+        </button>
+      </div>
+    } @else {
+      <table mat-table [dataSource]="page.items" class="transactions-page__table">
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let transaction">
+            {{ transaction.date | date: 'mediumDate' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let transaction">
+            {{ transactionTypeLabel(transaction.type) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="quantity">
+          <th mat-header-cell *matHeaderCellDef>Quantity</th>
+          <td mat-cell *matCellDef="let transaction">
+            {{ formatQuantity(transaction.quantity) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="unitPrice">
+          <th mat-header-cell *matHeaderCellDef>Unit price</th>
+          <td mat-cell *matCellDef="let transaction">
+            @if (assetResource.value(); as asset) {
+              {{ formatMoney(transaction.unitPrice, asset.currency) }}
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="fee">
+          <th mat-header-cell *matHeaderCellDef>Fee</th>
+          <td mat-cell *matCellDef="let transaction">
+            @if (assetResource.value(); as asset) {
+              {{ formatMoney(transaction.fee, asset.currency) }}
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="value">
+          <th mat-header-cell *matHeaderCellDef>Value</th>
+          <td mat-cell *matCellDef="let transaction">
+            @if (assetResource.value(); as asset) {
+              {{ formatMoney(transactionValue(transaction), asset.currency) }}
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let transaction">
+            <button
+              mat-icon-button
+              type="button"
+              [matMenuTriggerFor]="menu"
+              [attr.aria-label]="
+                'Actions for ' + transactionTypeLabel(transaction.type) + ' on ' + transaction.date
+              "
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #menu="matMenu">
+              <button mat-menu-item type="button" (click)="openEditDialog(transaction)">
+                <mat-icon>edit</mat-icon>
+                <span>Edit</span>
+              </button>
+              <button mat-menu-item type="button" (click)="remove(transaction)">
+                <mat-icon>delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+
+      <mat-paginator
+        [length]="asNumber(page.totalCount)"
+        [pageIndex]="pageIndex()"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="[10, 20, 50, 100]"
+        (page)="onPage($event)"
+      ></mat-paginator>
+    }
+  }
+</div>
