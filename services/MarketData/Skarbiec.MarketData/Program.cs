@@ -17,7 +17,10 @@ builder.AddNbpSources();
 builder.AddStooqSource();
 builder.AddCoinGeckoSource();
 builder.AddPriceSyncJob();
-builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddSource(PriceSyncJob.ActivitySourceName));
+builder.AddHistoryBackfillJob();
+builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
+    .AddSource(PriceSyncJob.ActivitySourceName)
+    .AddSource(HistoryBackfillJob.ActivitySourceName));
 
 var app = builder.Build();
 

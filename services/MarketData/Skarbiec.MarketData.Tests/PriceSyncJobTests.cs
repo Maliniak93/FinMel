@@ -4,6 +4,7 @@ using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
+using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
@@ -106,34 +107,4 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         QuoteCurrency = quoteCurrency,
         AssetClass = assetClass,
     };
-
-    /// <summary>Canned <see cref="IPriceSource"/> — one scripted result per source, matching the
-    /// "swap the fetch, exercise real job logic" pattern <c>FixturePriceSource</c> (T2.2) established,
-    /// but scripted with a full <see cref="PriceFetchResult{TValue}"/> instead of a raw payload since
-    /// this proves the job's handling of the outcome, not a vendor parser.</summary>
-    private sealed class ScriptedPriceSource(PriceSource source, PriceFetchResult<InstrumentQuote> result) : IPriceSource
-    {
-        public PriceSource Source { get; } = source;
-
-        public TimeSpan RequestDelay => TimeSpan.Zero;
-
-        public Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
-            IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken) => Task.FromResult(result);
-
-        public Task<PriceFetchResult<InstrumentQuote>> FetchHistoryAsync(
-            Instrument instrument, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
-            throw new NotSupportedException("Not exercised by PriceSyncJob (T2.6) — backfill is T2.7.");
-    }
-
-    private sealed class ScriptedFxRateSource(PriceFetchResult<FxRateQuote> result) : IFxRateSource
-    {
-        public TimeSpan RequestDelay => TimeSpan.Zero;
-
-        public Task<PriceFetchResult<FxRateQuote>> FetchLatestAsync(
-            IReadOnlyCollection<string> currencyCodes, CancellationToken cancellationToken) => Task.FromResult(result);
-
-        public Task<PriceFetchResult<FxRateQuote>> FetchHistoryAsync(
-            string currencyCode, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
-            throw new NotSupportedException("Not exercised by PriceSyncJob (T2.6) — backfill is T2.7.");
-    }
 }

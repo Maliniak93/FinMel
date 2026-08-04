@@ -72,14 +72,14 @@ public sealed class PriceSyncJob(
                 continue;
             }
 
-            var result = await FetchSafelyAsync(
+            var result = await SafeFetch.RunAsync(
                 () => source.FetchLatestAsync(groupInstruments, cancellationToken),
                 ex => $"{group.Key} fetch threw unexpectedly: {ex.Message}");
 
             switch (result.Outcome)
             {
                 case PriceFetchOutcome.Success:
-                    var returnedIds = await UpsertInstrumentQuotesAsync(result.Values, cancellationToken);
+                    var returnedIds = await QuoteUpsert.UpsertInstrumentQuotesAsync(db, result.Values, cancellationToken);
                     synced += returnedIds.Count;
                     failed += groupInstruments.Count(i => !returnedIds.Contains(i.Id));
                     break;
@@ -106,14 +106,14 @@ public sealed class PriceSyncJob(
 
         if (currencies.Count > 0)
         {
-            var fxResult = await FetchSafelyAsync(
+            var fxResult = await SafeFetch.RunAsync(
                 () => fxRateSource.FetchLatestAsync(currencies, cancellationToken),
                 ex => $"FX fetch threw unexpectedly: {ex.Message}");
 
             switch (fxResult.Outcome)
             {
                 case PriceFetchOutcome.Success:
-                    var syncedPairs = await UpsertFxRatesAsync(fxResult.Values, cancellationToken);
+                    var syncedPairs = await QuoteUpsert.UpsertFxRatesAsync(db, fxResult.Values, cancellationToken);
                     var syncedCurrencies = currencies.Count(c => syncedPairs.Contains(c.ToUpperInvariant() + BaseCurrency));
                     synced += syncedCurrencies;
                     failed += currencies.Count - syncedCurrencies;
@@ -155,89 +155,4 @@ public sealed class PriceSyncJob(
 
     private Task<List<Instrument>> GetInstrumentsToSyncAsync(CancellationToken cancellationToken) =>
         db.Instruments.AsNoTracking().ToListAsync(cancellationToken);
-
-    private static async Task<PriceFetchResult<TValue>> FetchSafelyAsync<TValue>(
-        Func<Task<PriceFetchResult<TValue>>> fetch, Func<Exception, string> describeError)
-    {
-        try
-        {
-            return await fetch();
-        }
-        catch (Exception ex)
-        {
-            return PriceFetchResult<TValue>.Error(describeError(ex));
-        }
-    }
-
-    private async Task<HashSet<Guid>> UpsertInstrumentQuotesAsync(
-        IReadOnlyList<InstrumentQuote> quotes, CancellationToken cancellationToken)
-    {
-        if (quotes.Count == 0)
-        {
-            return [];
-        }
-
-        var instrumentIds = quotes.Select(q => q.InstrumentId).ToHashSet();
-        var dates = quotes.Select(q => q.Date).ToHashSet();
-        var existing = await db.PriceQuotes
-            .Where(q => instrumentIds.Contains(q.InstrumentId) && dates.Contains(q.Date))
-            .ToDictionaryAsync(q => (q.InstrumentId, q.Date), cancellationToken);
-
-        foreach (var quote in quotes)
-        {
-            if (existing.TryGetValue((quote.InstrumentId, quote.Date), out var row))
-            {
-                row.Close = quote.Close;
-            }
-            else
-            {
-                db.PriceQuotes.Add(new PriceQuote
-                {
-                    Id = Guid.NewGuid(),
-                    InstrumentId = quote.InstrumentId,
-                    Date = quote.Date,
-                    Close = quote.Close,
-                });
-            }
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        return instrumentIds;
-    }
-
-    private async Task<HashSet<string>> UpsertFxRatesAsync(
-        IReadOnlyList<FxRateQuote> rates, CancellationToken cancellationToken)
-    {
-        if (rates.Count == 0)
-        {
-            return [];
-        }
-
-        var pairs = rates.Select(r => r.Pair).ToHashSet();
-        var dates = rates.Select(r => r.Date).ToHashSet();
-        var existing = await db.FxRates
-            .Where(r => pairs.Contains(r.Pair) && dates.Contains(r.Date))
-            .ToDictionaryAsync(r => (r.Pair, r.Date), cancellationToken);
-
-        foreach (var rate in rates)
-        {
-            if (existing.TryGetValue((rate.Pair, rate.Date), out var row))
-            {
-                row.Rate = rate.Rate;
-            }
-            else
-            {
-                db.FxRates.Add(new FxRate
-                {
-                    Id = Guid.NewGuid(),
-                    Pair = rate.Pair,
-                    Date = rate.Date,
-                    Rate = rate.Rate,
-                });
-            }
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        return pairs;
-    }
 }
