@@ -44,6 +44,10 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             // since every asset query in this service filters by PortfolioId.
             asset.HasIndex(a => a.PortfolioId);
 
+            // No FK to MarketData either (ADR-003) — indexed anyway now that AddAsset/UpdateAsset
+            // actually populate it (T2.9), same rationale as PortfolioId above.
+            asset.HasIndex(a => a.InstrumentId);
+
             // Optimistic concurrency (T1.4 scope: two racing edits to the same asset's
             // transactions must not silently lose one's Quantity recompute). Maps to Postgres's
             // own xmin system column instead of an app-managed token — Postgres bumps it on every

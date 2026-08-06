@@ -7,6 +7,7 @@ using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.RecordTransaction;
+using Skarbiec.Portfolio.MarketData;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.Testing;
@@ -34,6 +35,7 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         _provider = HostlessOutboxProvider.Build<PortfolioDbContext>(containers, services =>
         {
             services.AddSingleton<ICurrentUser>(new StubCurrentUser(UserId));
+            services.AddSingleton<IInstrumentLookupClient>(new FakeInstrumentLookupClient());
             services.AddScoped<CreatePortfolioHandler>();
             services.AddScoped<AddAssetHandler>();
             services.AddScoped<RecordTransactionHandler>();

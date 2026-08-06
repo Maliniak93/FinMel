@@ -12,10 +12,20 @@ public sealed class Asset : IUserOwned
     public required string Name { get; set; }
     public required string Currency { get; set; }
     public decimal Quantity { get; set; }
-    public decimal ManualValueAmount { get; set; }
-    public required DateOnly ManualValueDate { get; set; }
 
-    /// <summary>Guid from the MarketData database, no FK (ADR-003). Unused until Phase 2.</summary>
+    /// <summary>
+    /// Manual and market are mutually exclusive (T2.9): exactly one of
+    /// (<see cref="ManualValueAmount"/> + <see cref="ManualValueDate"/>) or <see cref="InstrumentId"/>
+    /// is set. Enforced by <c>AddAssetRequest</c>/<c>UpdateAssetRequest</c>'s
+    /// <c>IValidatableObject</c> rule, not a DB constraint — Postgres has no cheap "exactly one of
+    /// these column groups is null" check across a nullable decimal + nullable Guid without a
+    /// trigger, and the handler is already the single writer of both.
+    /// </summary>
+    public decimal? ManualValueAmount { get; set; }
+
+    public DateOnly? ManualValueDate { get; set; }
+
+    /// <summary>Guid from the MarketData database, no FK (ADR-003). Validated via internal REST on write (T2.9).</summary>
     public Guid? InstrumentId { get; set; }
 
     /// <summary>

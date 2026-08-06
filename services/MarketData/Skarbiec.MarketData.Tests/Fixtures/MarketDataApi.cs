@@ -20,6 +20,8 @@ internal static class MarketDataApi
     public const string InstrumentsUri = "/api/marketdata/instruments";
     public const string SearchInstrumentsBaseUri = "/api/marketdata/instruments/search";
 
+    public static string InstrumentUri(Guid id) => $"{InstrumentsUri}/{id}";
+
     public static string SearchInstrumentsUri(string? q = null, int? limit = null)
     {
         var parameters = new List<string>();
@@ -58,5 +60,37 @@ internal static class MarketDataApi
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<CustomInstrumentResponse>(cancellationToken))!;
+    }
+
+    /// <summary>Seeds an instrument directly (no fetch involved) and returns its id.</summary>
+    public static async Task<Guid> SeedInstrumentAsync(
+        this MarketDataDbContext db,
+        string ticker,
+        string name,
+        PriceSource source,
+        string quoteCurrency,
+        CancellationToken cancellationToken,
+        AssetClass assetClass = AssetClass.Stock)
+    {
+        var instrument = new Instrument
+        {
+            Id = Guid.NewGuid(),
+            Ticker = ticker,
+            Name = name,
+            Source = source,
+            QuoteCurrency = quoteCurrency,
+            AssetClass = assetClass,
+        };
+        db.Instruments.Add(instrument);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return instrument.Id;
+    }
+
+    public static async Task SeedQuoteAsync(
+        this MarketDataDbContext db, Guid instrumentId, DateOnly date, decimal close, CancellationToken cancellationToken)
+    {
+        db.PriceQuotes.Add(new PriceQuote { Id = Guid.NewGuid(), InstrumentId = instrumentId, Date = date, Close = close });
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

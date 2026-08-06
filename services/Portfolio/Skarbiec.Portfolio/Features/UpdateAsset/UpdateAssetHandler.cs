@@ -3,10 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateAsset;
 
-public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint)
+public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, IInstrumentLookupClient instrumentLookupClient)
 {
     public async Task<Result<AssetResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, UpdateAssetRequest request, CancellationToken cancellationToken)
@@ -19,18 +20,42 @@ public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEnd
             return AssetErrors.NotFound(assetId);
         }
 
-        var manualValue = Money.Create(request.ManualValue, request.Currency);
-        if (manualValue.IsFailure)
+        // Switching modes is allowed (T2.9) — transactions are untouched either way (this handler
+        // never writes to the Transaction table), only the valuation fields below move.
+        if (request.InstrumentId is { } instrumentId)
         {
-            return manualValue.Error;
+            var lookupStatus = await instrumentLookupClient.CheckAsync(instrumentId, cancellationToken);
+            if (lookupStatus == InstrumentLookupStatus.NotFound)
+            {
+                return AssetErrors.InstrumentNotFound(instrumentId);
+            }
+
+            if (lookupStatus == InstrumentLookupStatus.Unavailable)
+            {
+                return AssetErrors.MarketDataUnavailable;
+            }
+
+            asset.InstrumentId = instrumentId;
+            asset.ManualValueAmount = null;
+            asset.ManualValueDate = null;
+        }
+        else
+        {
+            var manualValue = Money.Create(request.ManualValue!.Value, request.Currency);
+            if (manualValue.IsFailure)
+            {
+                return manualValue.Error;
+            }
+
+            asset.ManualValueAmount = manualValue.Value.Amount;
+            asset.ManualValueDate = request.ManualValueDate;
+            asset.InstrumentId = null;
         }
 
         asset.AssetClass = request.AssetClass;
         asset.Name = request.Name;
         asset.Currency = request.Currency;
         asset.Quantity = request.Quantity;
-        asset.ManualValueAmount = manualValue.Value.Amount;
-        asset.ManualValueDate = request.ManualValueDate;
 
         await publishEndpoint.Publish(new AssetChanged
         {

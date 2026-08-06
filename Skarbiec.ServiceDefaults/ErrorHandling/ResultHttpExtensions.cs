@@ -44,6 +44,7 @@ public static class ResultHttpExtensions
             "Validation" => (StatusCodes.Status400BadRequest, "Validation Failed"),
             "Unauthorized" => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             "Forbidden" => (StatusCodes.Status403Forbidden, "Forbidden"),
+            "ServiceUnavailable" => (StatusCodes.Status503ServiceUnavailable, "Service Unavailable"),
             _ => (StatusCodes.Status400BadRequest, "Bad Request")
         };
     }

@@ -3,10 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.AddAsset;
 
-public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint)
+public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, IInstrumentLookupClient instrumentLookupClient)
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, AddAssetRequest request, CancellationToken cancellationToken)
     {
@@ -14,12 +15,6 @@ public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoi
         if (portfolio is null)
         {
             return PortfolioErrors.NotFound(portfolioId);
-        }
-
-        var manualValue = Money.Create(request.ManualValue, request.Currency);
-        if (manualValue.IsFailure)
-        {
-            return manualValue.Error;
         }
 
         var asset = new Asset
@@ -30,9 +25,34 @@ public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoi
             Name = request.Name,
             Currency = request.Currency,
             Quantity = request.Quantity,
-            ManualValueAmount = manualValue.Value.Amount,
-            ManualValueDate = request.ManualValueDate
         };
+
+        if (request.InstrumentId is { } instrumentId)
+        {
+            var lookupStatus = await instrumentLookupClient.CheckAsync(instrumentId, cancellationToken);
+            if (lookupStatus == InstrumentLookupStatus.NotFound)
+            {
+                return AssetErrors.InstrumentNotFound(instrumentId);
+            }
+
+            if (lookupStatus == InstrumentLookupStatus.Unavailable)
+            {
+                return AssetErrors.MarketDataUnavailable;
+            }
+
+            asset.InstrumentId = instrumentId;
+        }
+        else
+        {
+            var manualValue = Money.Create(request.ManualValue!.Value, request.Currency);
+            if (manualValue.IsFailure)
+            {
+                return manualValue.Error;
+            }
+
+            asset.ManualValueAmount = manualValue.Value.Amount;
+            asset.ManualValueDate = request.ManualValueDate;
+        }
 
         dbContext.Assets.Add(asset);
         portfolio.AssetCount++;
