@@ -151,6 +151,96 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
+    public async Task Add_WithValidInstrument_ReturnsCreatedAsMarketAsset()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var instrumentId = Guid.NewGuid();
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "Apple",
+            Currency = "USD",
+            Quantity = 10m,
+            InstrumentId = instrumentId
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(instrumentId, body.InstrumentId);
+        Assert.Null(body.ManualValue);
+        Assert.Null(body.ManualValueDate);
+    }
+
+    [Fact]
+    public async Task Add_WithNonExistentInstrument_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var instrumentId = Guid.NewGuid();
+        Factory.InstrumentLookupClient.WithNotFound(instrumentId);
+        var request = new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Ghost", Currency = "USD", InstrumentId = instrumentId };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Add_WhenMarketDataUnavailable_ReturnsServiceUnavailable()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var instrumentId = Guid.NewGuid();
+        Factory.InstrumentLookupClient.WithUnavailable(instrumentId);
+        var request = new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Down", Currency = "USD", InstrumentId = instrumentId };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Add_WithBothInstrumentIdAndManualValue_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "Ambiguous",
+            Currency = "USD",
+            InstrumentId = Guid.NewGuid(),
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Add_WithNeitherInstrumentIdNorManualValue_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Neither", Currency = "USD" };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Add_AssetToPortfolio_MakesPortfolioDeleteConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -3,6 +3,7 @@ using OpenTelemetry;
 using OpenTelemetry.Trace;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.AddCustomInstrument;
+using Skarbiec.MarketData.Features.GetInstrument;
 using Skarbiec.MarketData.Features.SearchInstruments;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
@@ -28,6 +29,7 @@ builder.Services.AddValidation();
 
 builder.Services.AddScoped<SearchInstrumentsHandler>();
 builder.Services.AddScoped<AddCustomInstrumentHandler>();
+builder.Services.AddScoped<GetInstrumentHandler>();
 
 var app = builder.Build();
 
@@ -37,6 +39,7 @@ app.MapServiceOpenApi("marketdata");
 
 app.MapSearchInstrumentsEndpoint();
 app.MapAddCustomInstrumentEndpoint();
+app.MapGetInstrumentEndpoint();
 
 // Production applies migrations (and the seed below) as an explicit deploy step instead (see
 // deploy/README.md).

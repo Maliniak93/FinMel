@@ -24,15 +24,18 @@ public sealed class GetWealthSummaryHandler(PortfolioDbContext dbContext)
             .Where(a => portfolioIds.Contains(a.PortfolioId))
             .ToListAsync(cancellationToken);
 
-        var totalNetWorth = assets.Sum(a => a.ManualValueAmount);
+        // Market assets (T2.9) contribute 0 here — this handler only ever summed manual values, and
+        // still doesn't price anything (that stays Reporting's job, T2.11); a market asset's real
+        // value shows up once Reporting replaces this whole endpoint (T2.12/T2.13).
+        var totalNetWorth = assets.Sum(a => a.ManualValueAmount ?? 0m);
 
         var byAssetClass = assets
             .GroupBy(a => a.AssetClass)
             .Select(g => new AssetClassBreakdown
             {
                 AssetClass = g.Key,
-                Value = g.Sum(a => a.ManualValueAmount),
-                Percentage = totalNetWorth == 0m ? 0m : Math.Round(g.Sum(a => a.ManualValueAmount) / totalNetWorth * 100m, 2),
+                Value = g.Sum(a => a.ManualValueAmount ?? 0m),
+                Percentage = totalNetWorth == 0m ? 0m : Math.Round(g.Sum(a => a.ManualValueAmount ?? 0m) / totalNetWorth * 100m, 2),
             })
             .OrderByDescending(b => b.Value)
             .ToList();
@@ -45,7 +48,7 @@ public sealed class GetWealthSummaryHandler(PortfolioDbContext dbContext)
                 {
                     PortfolioId = p.Id,
                     Name = p.Name,
-                    Value = portfolioAssets.Sum(a => a.ManualValueAmount),
+                    Value = portfolioAssets.Sum(a => a.ManualValueAmount ?? 0m),
                 };
             })
             .OrderByDescending(b => b.Value)

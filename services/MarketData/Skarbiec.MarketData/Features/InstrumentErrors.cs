@@ -12,4 +12,7 @@ internal static class InstrumentErrors
 
     public static Error AlreadyExists(PriceSource source, string ticker) =>
         new("Conflict.InstrumentAlreadyExists", $"An instrument with source '{source}' and ticker '{ticker}' already exists.");
+
+    public static Error NotFound(Guid id) =>
+        new("NotFound.Instrument", $"Instrument '{id}' was not found.");
 }
