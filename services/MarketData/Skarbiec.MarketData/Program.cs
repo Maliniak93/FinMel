@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using OpenTelemetry;
 using OpenTelemetry.Trace;
 using Skarbiec.MarketData.Data;
+using Skarbiec.MarketData.Features.AddCustomInstrument;
+using Skarbiec.MarketData.Features.SearchInstruments;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
@@ -22,11 +24,19 @@ builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
     .AddSource(PriceSyncJob.ActivitySourceName)
     .AddSource(HistoryBackfillJob.ActivitySourceName));
 
+builder.Services.AddValidation();
+
+builder.Services.AddScoped<SearchInstrumentsHandler>();
+builder.Services.AddScoped<AddCustomInstrumentHandler>();
+
 var app = builder.Build();
 
 app.UseServiceDefaults();
 app.MapDefaultEndpoints();
 app.MapServiceOpenApi("marketdata");
+
+app.MapSearchInstrumentsEndpoint();
+app.MapAddCustomInstrumentEndpoint();
 
 // Production applies migrations (and the seed below) as an explicit deploy step instead (see
 // deploy/README.md).
