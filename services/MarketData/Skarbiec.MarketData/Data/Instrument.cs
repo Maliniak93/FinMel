@@ -12,4 +12,9 @@ public sealed class Instrument
     public required PriceSource Source { get; set; }
     public required string QuoteCurrency { get; set; }
     public required AssetClass AssetClass { get; set; }
+
+    // Defaults to Verified so every pre-T2.8 call site (seeder, T2.6/T2.7 test fixtures) keeps
+    // compiling without stating it; only AddCustomInstrument (T2.8) explicitly starts an instrument
+    // as Unverified, pending the one-off HistoryBackfillJob run that resolves it one way or the other.
+    public InstrumentVerificationStatus VerificationStatus { get; set; } = InstrumentVerificationStatus.Verified;
 }

@@ -52,6 +52,7 @@ public static class MarketDataSeeder
                     Source = seed.Source,
                     QuoteCurrency = seed.QuoteCurrency,
                     AssetClass = seed.AssetClass,
+                    VerificationStatus = InstrumentVerificationStatus.Verified,
                 });
             }
         }

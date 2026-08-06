@@ -29,6 +29,13 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
             instrument.Property(i => i.Name).HasMaxLength(200);
             instrument.Property(i => i.QuoteCurrency).HasMaxLength(3);
 
+            // HasDefaultValue backfills every pre-existing row to Verified when the migration runs
+            // (T2.8) — the dictionary predates verification tracking and was curated by hand.
+            instrument.Property(i => i.VerificationStatus)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(InstrumentVerificationStatus.Verified);
+
             // Natural key of the dictionary — same ticker can recur under a different source, so
             // the pair is what must stay unique. Also what keeps the seeder's idempotency check
             // (MarketDataSeeder) cheap and DB-enforced, not just application-level.

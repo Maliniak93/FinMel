@@ -20,6 +20,10 @@ public static class HistoryBackfillJobExtensions
     {
         if (builder.Configuration.GetValue<bool>(DisableBackgroundJobsConfigKey))
         {
+            // Features/AddCustomInstrument (T2.8) still needs IHistoryBackfillTrigger resolvable
+            // under SkarbiecApiFactory-based HTTP slice tests, even with no live Quartz scheduler to
+            // enqueue onto — see NoOpHistoryBackfillTrigger.
+            builder.Services.AddSingleton<IHistoryBackfillTrigger, NoOpHistoryBackfillTrigger>();
             return builder;
         }
 

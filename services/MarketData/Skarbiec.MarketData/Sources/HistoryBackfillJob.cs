@@ -71,12 +71,27 @@ public sealed class HistoryBackfillJob(
             return;
         }
 
-        var quoteCount = await BackfillInstrumentAsync(source, instrument, from, to, cancellationToken);
+        var (outcome, quoteCount) = await BackfillInstrumentAsync(source, instrument, from, to, cancellationToken);
 
         var fxCount = 0;
         if (!string.Equals(instrument.QuoteCurrency, BaseCurrency, StringComparison.OrdinalIgnoreCase))
         {
             fxCount = await BackfillFxAsync(instrument.QuoteCurrency, from, to, cancellationToken);
+        }
+
+        // Only a custom instrument (Features/AddCustomInstrument, T2.8) is ever Unverified going in —
+        // this is the one-off check that resolves it, based on its own ticker's fetch outcome alone
+        // (a currency's separate FX backfill failing doesn't say anything about the ticker's validity).
+        if (instrument.VerificationStatus == InstrumentVerificationStatus.Unverified)
+        {
+            var verified = outcome == PriceFetchOutcome.Success && quoteCount > 0;
+            await db.Instruments
+                .Where(i => i.Id == instrumentId)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        i => i.VerificationStatus,
+                        verified ? InstrumentVerificationStatus.Verified : InstrumentVerificationStatus.Failed),
+                    cancellationToken);
         }
 
         activity?.SetTag("skarbiec.backfill.quotes", quoteCount);
@@ -86,7 +101,7 @@ public sealed class HistoryBackfillJob(
             instrumentId, quoteCount, fxCount, from, to);
     }
 
-    private async Task<int> BackfillInstrumentAsync(
+    private async Task<(PriceFetchOutcome Outcome, int Count)> BackfillInstrumentAsync(
         IPriceSource source, Instrument instrument, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         var result = await SafeFetch.RunAsync(
@@ -98,16 +113,16 @@ public sealed class HistoryBackfillJob(
             logger.LogWarning(
                 "HistoryBackfillJob: {Source} history fetch for instrument {InstrumentId} failed: {Reason}",
                 instrument.Source, instrument.Id, result.ErrorReason);
-            return 0;
+            return (result.Outcome, 0);
         }
 
         if (result.Outcome == PriceFetchOutcome.NoData)
         {
-            return 0;
+            return (result.Outcome, 0);
         }
 
         await QuoteUpsert.UpsertInstrumentQuotesAsync(db, result.Values, cancellationToken);
-        return result.Values.Count;
+        return (result.Outcome, result.Values.Count);
     }
 
     private async Task<int> BackfillFxAsync(
