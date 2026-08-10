@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Skarbiec.Reporting.Data;
+using Skarbiec.Reporting.Features.GetDashboard;
+using Skarbiec.Reporting.Features.GetNetWorthHistory;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Portfolio;
@@ -17,6 +20,14 @@ builder.AddServiceOpenApi();
 var reportingConnectionString = builder.Configuration.GetConnectionString("reporting-db")
     ?? throw new InvalidOperationException("Missing connection string 'reporting-db'.");
 builder.Services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(reportingConnectionString));
+
+// T2.12: GetNetWorthHistory resolves the 1M/1Y/YTD range boundaries against "today" — same
+// TimeProvider.System registration MarketData's Quartz jobs use, so tests can inject a fake later
+// without touching production wiring.
+builder.Services.TryAddSingleton(TimeProvider.System);
+
+builder.Services.AddScoped<GetDashboardHandler>();
+builder.Services.AddScoped<GetNetWorthHistoryHandler>();
 
 // T2.11: consumes DailyPricesSynced (published by MarketData, T2.10) through the T0.12 idempotent
 // inbox template.
@@ -41,6 +52,9 @@ var app = builder.Build();
 app.UseServiceDefaults();
 app.MapDefaultEndpoints();
 app.MapServiceOpenApi("reporting");
+
+app.MapGetDashboardEndpoint();
+app.MapGetNetWorthHistoryEndpoint();
 
 // Production applies migrations as an explicit deploy step instead (see deploy/README.md).
 if (app.Environment.IsDevelopment())

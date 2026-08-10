@@ -31,6 +31,12 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
             // DailyPricesSynced consumer (T2.11) writes one row per portfolio per day, and a
             // redelivered event overwrites the same row instead of duplicating it.
             snapshot.HasIndex(s => new { s.PortfolioId, s.Date }).IsUnique();
+
+            // T2.12: GetDashboard (latest per portfolio for the current user) and
+            // GetNetWorthHistory (date-range scan for the current user) both filter/order on
+            // exactly this pair — the P95 <1s AC's seeded-year scale needs this to stay an index
+            // scan instead of a sequential one.
+            snapshot.HasIndex(s => new { s.UserId, s.Date });
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).
