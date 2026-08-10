@@ -51,6 +51,10 @@ public static class Extensions
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddTransient<JwtForwardingHandler>();
 
+        // T2.11: mints a SystemCaller JWT for typed clients used from background jobs/consumers
+        // that have no inbound request to forward a token from.
+        builder.Services.AddTransient<SystemTokenHandler>();
+
         return builder;
     }
 

@@ -42,7 +42,13 @@ public static class AuthenticationExtensions
                 };
             });
 
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(options =>
+        {
+            // T2.11: bulk/cross-user internal endpoints (e.g. Portfolio's positions-for-valuation)
+            // require this instead of a bare RequireAuthorization() — see SystemCaller.
+            options.AddPolicy(SystemCaller.PolicyName, policy =>
+                policy.RequireClaim(SystemCaller.ClaimType, SystemCaller.ClaimValue));
+        });
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 

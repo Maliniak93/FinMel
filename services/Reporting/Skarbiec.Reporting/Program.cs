@@ -1,5 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Reporting.Data;
+using Skarbiec.Reporting.MarketData;
+using Skarbiec.Reporting.Messaging;
+using Skarbiec.Reporting.Portfolio;
+using Skarbiec.ServiceDefaults.Http;
+using Skarbiec.ServiceDefaults.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +17,24 @@ builder.AddServiceOpenApi();
 var reportingConnectionString = builder.Configuration.GetConnectionString("reporting-db")
     ?? throw new InvalidOperationException("Missing connection string 'reporting-db'.");
 builder.Services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(reportingConnectionString));
+
+// T2.11: consumes DailyPricesSynced (published by MarketData, T2.10) through the T0.12 idempotent
+// inbox template.
+builder.AddRabbitMqMessaging<WebApplicationBuilder, ReportingDbContext>(
+    configureConsumers: x => x.AddConsumer<DailyPricesSyncedConsumer>(typeof(DailyPricesSyncedConsumerDefinition)));
+
+// The consumer has no caller JWT to forward (it's triggered by a message, not a request) and needs
+// every user's data, not one — SystemTokenHandler mints a SystemCaller token instead of
+// JwtForwardingHandler's token passthrough.
+builder.Services.AddHttpClient<IPositionsClient, PortfolioPositionsClient>(client =>
+{
+    client.BaseAddress = new Uri("https+http://portfolio-service");
+}).AddSystemTokenHandler();
+
+builder.Services.AddHttpClient<IPriceQuoteClient, MarketDataPriceClient>(client =>
+{
+    client.BaseAddress = new Uri("https+http://marketdata-service");
+}).AddSystemTokenHandler();
 
 var app = builder.Build();
 
