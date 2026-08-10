@@ -82,6 +82,19 @@ export type LatestPricesBatchResponse = {
 
 export type PriceSource = number;
 
+export type SyncRunStatus = number;
+
+export type SyncStatusResponse = {
+    hasRun: boolean;
+    runId?: null | string;
+    status?: null | SyncRunStatus;
+    startedAt?: null | string;
+    finishedAt?: null | string;
+    syncedCount?: null | number | string;
+    noDataCount?: null | number | string;
+    failedCount?: null | number | string;
+};
+
 export type GetApiMarketdataInstrumentsSearchData = {
     body?: never;
     path?: never;
@@ -166,3 +179,35 @@ export type PostApiMarketdataFxLatestBatchResponses = {
 };
 
 export type PostApiMarketdataFxLatestBatchResponse = PostApiMarketdataFxLatestBatchResponses[keyof PostApiMarketdataFxLatestBatchResponses];
+
+export type PostApiMarketdataSyncTriggerData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/marketdata/sync/trigger';
+};
+
+export type PostApiMarketdataSyncTriggerResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiMarketdataSyncTriggerResponse = PostApiMarketdataSyncTriggerResponses[keyof PostApiMarketdataSyncTriggerResponses];
+
+export type GetApiMarketdataSyncStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/marketdata/sync/status';
+};
+
+export type GetApiMarketdataSyncStatusResponses = {
+    /**
+     * OK
+     */
+    200: SyncStatusResponse;
+};
+
+export type GetApiMarketdataSyncStatusResponse = GetApiMarketdataSyncStatusResponses[keyof GetApiMarketdataSyncStatusResponses];

@@ -6,7 +6,9 @@ using Skarbiec.MarketData.Features.AddCustomInstrument;
 using Skarbiec.MarketData.Features.GetFxRatesBatch;
 using Skarbiec.MarketData.Features.GetInstrument;
 using Skarbiec.MarketData.Features.GetLatestPricesBatch;
+using Skarbiec.MarketData.Features.GetSyncStatus;
 using Skarbiec.MarketData.Features.SearchInstruments;
+using Skarbiec.MarketData.Features.TriggerSync;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
@@ -40,6 +42,8 @@ builder.Services.AddScoped<AddCustomInstrumentHandler>();
 builder.Services.AddScoped<GetInstrumentHandler>();
 builder.Services.AddScoped<GetLatestPricesBatchHandler>();
 builder.Services.AddScoped<GetFxRatesBatchHandler>();
+builder.Services.AddScoped<TriggerSyncHandler>();
+builder.Services.AddScoped<GetSyncStatusHandler>();
 
 var app = builder.Build();
 
@@ -52,6 +56,8 @@ app.MapAddCustomInstrumentEndpoint();
 app.MapGetInstrumentEndpoint();
 app.MapGetLatestPricesBatchEndpoint();
 app.MapGetFxRatesBatchEndpoint();
+app.MapTriggerSyncEndpoint();
+app.MapGetSyncStatusEndpoint();
 
 // Production applies migrations (and the seed below) as an explicit deploy step instead (see
 // deploy/README.md).

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
 import { client } from './client.gen.js';
-import type { GetApiMarketdataInstrumentsByIdData, GetApiMarketdataInstrumentsByIdResponses, GetApiMarketdataInstrumentsSearchData, GetApiMarketdataInstrumentsSearchResponses, PostApiMarketdataFxLatestBatchData, PostApiMarketdataFxLatestBatchResponses, PostApiMarketdataInstrumentsData, PostApiMarketdataInstrumentsResponses, PostApiMarketdataPricesLatestBatchData, PostApiMarketdataPricesLatestBatchResponses } from './types.gen.js';
+import type { GetApiMarketdataInstrumentsByIdData, GetApiMarketdataInstrumentsByIdResponses, GetApiMarketdataInstrumentsSearchData, GetApiMarketdataInstrumentsSearchResponses, GetApiMarketdataSyncStatusData, GetApiMarketdataSyncStatusResponses, PostApiMarketdataFxLatestBatchData, PostApiMarketdataFxLatestBatchResponses, PostApiMarketdataInstrumentsData, PostApiMarketdataInstrumentsResponses, PostApiMarketdataPricesLatestBatchData, PostApiMarketdataPricesLatestBatchResponses, PostApiMarketdataSyncTriggerData, PostApiMarketdataSyncTriggerResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -48,3 +48,7 @@ export const postApiMarketdataFxLatestBatch = <ThrowOnError extends boolean = fa
         ...options.headers
     }
 });
+
+export const postApiMarketdataSyncTrigger = <ThrowOnError extends boolean = false>(options?: Options<PostApiMarketdataSyncTriggerData, ThrowOnError>): RequestResult<PostApiMarketdataSyncTriggerResponses, unknown, ThrowOnError> => (options?.client ?? client).post<PostApiMarketdataSyncTriggerResponses, unknown, ThrowOnError>({ url: '/api/marketdata/sync/trigger', ...options });
+
+export const getApiMarketdataSyncStatus = <ThrowOnError extends boolean = false>(options?: Options<GetApiMarketdataSyncStatusData, ThrowOnError>): RequestResult<GetApiMarketdataSyncStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiMarketdataSyncStatusResponses, unknown, ThrowOnError>({ url: '/api/marketdata/sync/status', ...options });
