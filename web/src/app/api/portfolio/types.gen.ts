@@ -9,17 +9,12 @@ export type AddAssetRequest = {
     name: string;
     currency?: string;
     quantity?: number | string;
-    manualValue: number | string;
-    manualValueDate: string;
+    instrumentId?: null | string;
+    manualValue?: null | number | string;
+    manualValueDate?: null | string;
 };
 
 export type AssetClass = number;
-
-export type AssetClassBreakdown = {
-    assetClass: AssetClass;
-    value: number | string;
-    percentage: number | string;
-};
 
 export type AssetResponse = {
     id: string;
@@ -28,8 +23,8 @@ export type AssetResponse = {
     name: string;
     currency: string;
     quantity: number | string;
-    manualValue: number | string;
-    manualValueDate: string;
+    manualValue?: null | number | string;
+    manualValueDate?: null | string;
     instrumentId?: null | string;
     transactionCount: number | string;
 };
@@ -47,12 +42,6 @@ export type PagedResponseOfTransactionResponse = {
     totalCount: number | string;
 };
 
-export type PortfolioBreakdown = {
-    portfolioId: string;
-    name: string;
-    value: number | string;
-};
-
 export type PortfolioResponse = {
     id: string;
     name: string;
@@ -60,6 +49,23 @@ export type PortfolioResponse = {
     currency: string;
     isArchived: boolean;
     assetCount: number | string;
+};
+
+export type PositionForValuationResponse = {
+    userId: string;
+    portfolioId: string;
+    assetId: string;
+    assetClass: AssetClass;
+    currency: string;
+    quantity: number | string;
+    instrumentId?: null | string;
+    manualValueAmount?: null | number | string;
+    manualValueDate?: null | string;
+};
+
+export type PositionsForValuationPage = {
+    items: Array<PositionForValuationResponse>;
+    hasMore: boolean;
 };
 
 export type RecordTransactionRequest = {
@@ -87,8 +93,9 @@ export type UpdateAssetRequest = {
     name: string;
     currency: string;
     quantity?: number | string;
-    manualValue: number | string;
-    manualValueDate: string;
+    instrumentId?: null | string;
+    manualValue?: null | number | string;
+    manualValueDate?: null | string;
 };
 
 export type UpdatePortfolioRequest = {
@@ -103,14 +110,6 @@ export type UpdateTransactionRequest = {
     unitPrice: number | string;
     fee?: number | string;
     date: string;
-};
-
-export type WealthSummaryResponse = {
-    totalNetWorth: number | string;
-    baseCurrency: string;
-    fxConversionIsNaive: boolean;
-    byAssetClass: Array<AssetClassBreakdown>;
-    byPortfolio: Array<PortfolioBreakdown>;
 };
 
 export type GetApiPortfolioMeData = {
@@ -409,18 +408,21 @@ export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByI
 
 export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses];
 
-export type GetApiPortfolioWealthSummaryData = {
+export type GetApiPortfolioPositionsForValuationData = {
     body?: never;
     path?: never;
-    query?: never;
-    url: '/api/portfolio/wealth-summary';
+    query?: {
+        page?: number | string;
+        pageSize?: number | string;
+    };
+    url: '/api/portfolio/positions-for-valuation';
 };
 
-export type GetApiPortfolioWealthSummaryResponses = {
+export type GetApiPortfolioPositionsForValuationResponses = {
     /**
      * OK
      */
-    200: WealthSummaryResponse;
+    200: PositionsForValuationPage;
 };
 
-export type GetApiPortfolioWealthSummaryResponse = GetApiPortfolioWealthSummaryResponses[keyof GetApiPortfolioWealthSummaryResponses];
+export type GetApiPortfolioPositionsForValuationResponse = GetApiPortfolioPositionsForValuationResponses[keyof GetApiPortfolioPositionsForValuationResponses];

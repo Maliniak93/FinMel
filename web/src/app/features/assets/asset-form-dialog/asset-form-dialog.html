@@ -13,18 +13,133 @@
 
     <mat-button-toggle-group
       class="asset-form-dialog__mode"
-      value="manual"
+      [value]="mode()"
+      (change)="setMode($event.value)"
       aria-label="Valuation mode"
     >
       <mat-button-toggle value="manual">Manual valuation</mat-button-toggle>
-      <mat-button-toggle
-        value="market"
-        disabled
-        matTooltip="Picking a market instrument arrives in Phase 2."
-      >
-        Market instrument
-      </mat-button-toggle>
+      <mat-button-toggle value="market">Market instrument</mat-button-toggle>
     </mat-button-toggle-group>
+
+    @if (mode() === 'market') {
+      <mat-form-field appearance="outline" class="asset-form-dialog__field">
+        <mat-label>Instrument</mat-label>
+        <input
+          matInput
+          type="text"
+          [formControl]="instrumentControl"
+          [matAutocomplete]="instrumentAuto"
+          placeholder="Search by ticker or name"
+        />
+        <mat-autocomplete
+          #instrumentAuto="matAutocomplete"
+          [displayWith]="displayInstrument"
+          (optionSelected)="onInstrumentOptionSelected($event)"
+        >
+          @for (result of searchResource.value(); track result.id) {
+            <mat-option [value]="result">
+              {{ result.ticker }} — {{ result.name }}
+              @if (result.lastPrice !== null) {
+                ({{ formatMoney(result.lastPrice, result.quoteCurrency) }})
+              }
+            </mat-option>
+          }
+        </mat-autocomplete>
+        @if (searchResource.isLoading()) {
+          <mat-spinner matSuffix diameter="16" />
+        }
+      </mat-form-field>
+
+      @if (selectedInstrument(); as instrument) {
+        <p class="asset-form-dialog__selected-instrument">
+          Selected: {{ instrument.ticker }} — {{ instrument.name }} ({{ instrument.quoteCurrency }})
+        </p>
+      }
+
+      <button
+        mat-button
+        type="button"
+        class="asset-form-dialog__custom-instrument-link"
+        (click)="toggleCustomInstrumentForm()"
+      >
+        {{ showCustomInstrumentForm() ? 'Cancel' : "Can't find it? Add it" }}
+      </button>
+
+      @if (showCustomInstrumentForm()) {
+        <div class="asset-form-dialog__custom-instrument" [formGroup]="customInstrumentForm">
+          <mat-form-field appearance="outline" class="asset-form-dialog__field">
+            <mat-label>Source</mat-label>
+            <mat-select formControlName="source">
+              @for (source of customInstrumentSources; track source.value) {
+                <mat-option [value]="source.value">{{ source.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="asset-form-dialog__field">
+            <mat-label>Ticker / id</mat-label>
+            <input matInput type="text" formControlName="ticker" autocomplete="off" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="asset-form-dialog__field">
+            <mat-label>Name</mat-label>
+            <input matInput type="text" formControlName="name" autocomplete="off" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="asset-form-dialog__field">
+            <mat-label>Quote currency</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="quoteCurrency"
+              maxlength="3"
+              autocomplete="off"
+            />
+            <mat-hint>3-letter code, e.g. USD</mat-hint>
+          </mat-form-field>
+
+          @if (customInstrumentError()) {
+            <p class="asset-form-dialog__error" role="alert">{{ customInstrumentError() }}</p>
+          }
+
+          <button
+            mat-flat-button
+            type="button"
+            color="primary"
+            [disabled]="customInstrumentSubmitting()"
+            (click)="submitCustomInstrument()"
+          >
+            @if (customInstrumentSubmitting()) {
+              <mat-spinner diameter="20" />
+            } @else {
+              Add instrument
+            }
+          </button>
+        </div>
+      }
+    } @else {
+      <mat-form-field appearance="outline" class="asset-form-dialog__field">
+        <mat-label>Value</mat-label>
+        <input matInput type="number" step="0.01" formControlName="manualValue" />
+        @if (form.controls.manualValue.hasError('required')) {
+          <mat-error>Value is required.</mat-error>
+        } @else if (form.controls.manualValue.hasError('min')) {
+          <mat-error>Value must not be negative.</mat-error>
+        } @else if (form.controls.manualValue.hasError('server')) {
+          <mat-error>{{ form.controls.manualValue.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="asset-form-dialog__field">
+        <mat-label>Valued on</mat-label>
+        <input matInput [matDatepicker]="valuedOnPicker" formControlName="manualValueDate" />
+        <mat-datepicker-toggle matIconSuffix [for]="valuedOnPicker"></mat-datepicker-toggle>
+        <mat-datepicker #valuedOnPicker></mat-datepicker>
+        @if (form.controls.manualValueDate.hasError('required')) {
+          <mat-error>Valuation date is required.</mat-error>
+        }
+      </mat-form-field>
+    }
 
     <mat-form-field appearance="outline" class="asset-form-dialog__field">
       <mat-label>Name</mat-label>
@@ -54,28 +169,6 @@
       <input matInput type="number" step="any" formControlName="quantity" />
       @if (form.controls.quantity.hasError('min')) {
         <mat-error>Quantity must not be negative.</mat-error>
-      }
-    </mat-form-field>
-
-    <mat-form-field appearance="outline" class="asset-form-dialog__field">
-      <mat-label>Value</mat-label>
-      <input matInput type="number" step="0.01" formControlName="manualValue" />
-      @if (form.controls.manualValue.hasError('required')) {
-        <mat-error>Value is required.</mat-error>
-      } @else if (form.controls.manualValue.hasError('min')) {
-        <mat-error>Value must not be negative.</mat-error>
-      } @else if (form.controls.manualValue.hasError('server')) {
-        <mat-error>{{ form.controls.manualValue.getError('server') }}</mat-error>
-      }
-    </mat-form-field>
-
-    <mat-form-field appearance="outline" class="asset-form-dialog__field">
-      <mat-label>Valued on</mat-label>
-      <input matInput [matDatepicker]="valuedOnPicker" formControlName="manualValueDate" />
-      <mat-datepicker-toggle matIconSuffix [for]="valuedOnPicker"></mat-datepicker-toggle>
-      <mat-datepicker #valuedOnPicker></mat-datepicker>
-      @if (form.controls.manualValueDate.hasError('required')) {
-        <mat-error>Valuation date is required.</mat-error>
       }
     </mat-form-field>
 

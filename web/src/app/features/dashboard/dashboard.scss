@@ -8,13 +8,20 @@
   text-align: center;
 }
 
+.dashboard-page__net-worth-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
 .dashboard-page__net-worth {
   font-size: 2.5rem;
   font-weight: 600;
-  margin: 8px 0 0;
+  margin: 0;
 }
 
-.dashboard-page__fx-caveat {
+.dashboard-page__as-of {
   margin: 4px 0 24px;
   font-size: 0.875rem;
   opacity: 0.7;
@@ -48,20 +55,4 @@
   height: 12px;
   border-radius: 50%;
   margin-right: 8px;
-}
-
-.dashboard-page__portfolios {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.dashboard-page__portfolios li {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  max-width: 480px;
 }

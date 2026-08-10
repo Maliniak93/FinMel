@@ -1,44 +1,49 @@
 <div class="dashboard-page">
   <h1>Dashboard</h1>
 
-  @if (summaryResource.error(); as loadError) {
+  @if (dashboardResource.error(); as loadError) {
     <div class="dashboard-page__state" role="alert">
       <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="summaryResource.reload()">Retry</button>
+      <button mat-button type="button" (click)="dashboardResource.reload()">Retry</button>
     </div>
-  } @else if (summaryResource.isLoading() && !summaryResource.hasValue()) {
+  } @else if (dashboardResource.isLoading() && !dashboardResource.hasValue()) {
     <div class="dashboard-page__state">
       <mat-spinner diameter="32" />
     </div>
-  } @else if (summaryResource.hasValue()) {
-    @let summary = summaryResource.value();
+  } @else if (dashboardResource.hasValue()) {
+    @let dashboard = dashboardResource.value();
 
-    @if (isZero(summary.totalNetWorth)) {
+    @if (dashboard.asOf === null) {
       <div class="dashboard-page__state">
         <p>You haven't entered any wealth yet.</p>
         <a mat-flat-button color="primary" routerLink="/portfolios">Go to portfolios</a>
       </div>
     } @else {
-      <p class="dashboard-page__net-worth">{{ formatMoney(summary.totalNetWorth) }}</p>
-
-      @if (summary.fxConversionIsNaive) {
-        <p class="dashboard-page__fx-caveat">
-          Amounts in a currency other than PLN are added as-is, without a real exchange rate — no FX
-          conversion yet (real rates come in Phase 2). Treat this total as an approximation.
-        </p>
-      }
+      <div class="dashboard-page__net-worth-row">
+        <p class="dashboard-page__net-worth">{{ formatMoney(dashboard.netWorthPln) }}</p>
+        @if (dashboard.isStale) {
+          <mat-chip-set>
+            <mat-chip
+              matTooltip="At least one portfolio's valuation hasn't refreshed in a while — this total may be out of date."
+            >
+              Stale
+            </mat-chip>
+          </mat-chip-set>
+        }
+      </div>
+      <p class="dashboard-page__as-of">As of {{ dashboard.asOf | date: 'mediumDate' }}</p>
 
       <div class="dashboard-page__breakdown">
         <app-pie-chart [segments]="pieSegments()" class="dashboard-page__chart" />
 
         <ul class="dashboard-page__legend">
-          @for (entry of summary.byAssetClass; track entry.assetClass) {
+          @for (entry of dashboard.byAssetClass; track entry.assetClass) {
             <li>
               <span
                 class="dashboard-page__swatch"
                 [style.background]="assetClassColor(entry.assetClass)"
               ></span>
-              {{ assetClassLabel(entry.assetClass) }} — {{ formatMoney(entry.value) }} ({{
+              {{ assetClassLabel(entry.assetClass) }} — {{ formatMoney(entry.valuePln) }} ({{
                 entry.percentage
               }}%)
             </li>
@@ -46,15 +51,8 @@
         </ul>
       </div>
 
-      <h2>By portfolio</h2>
-      <ul class="dashboard-page__portfolios">
-        @for (entry of summary.byPortfolio; track entry.portfolioId) {
-          <li>
-            <a [routerLink]="['/portfolios', entry.portfolioId, 'assets']">{{ entry.name }}</a>
-            <span>{{ formatMoney(entry.value) }}</span>
-          </li>
-        }
-      </ul>
+      <h2>Net worth history</h2>
+      <app-net-worth-chart />
     }
   }
 </div>

@@ -10,16 +10,20 @@ public sealed record InstrumentDetailsResponse(
     AssetClass AssetClass,
     string QuoteCurrency,
     PriceSource Source,
-    InstrumentVerificationStatus VerificationStatus);
+    InstrumentVerificationStatus VerificationStatus,
+    decimal? LastPrice,
+    DateOnly? LastPriceDate);
 
 public static class InstrumentDetailsMappingExtensions
 {
-    public static InstrumentDetailsResponse ToDetailsResponse(this Instrument instrument) => new(
+    public static InstrumentDetailsResponse ToDetailsResponse(this Instrument instrument, PriceQuote? latestQuote) => new(
         instrument.Id,
         instrument.Ticker,
         instrument.Name,
         instrument.AssetClass,
         instrument.QuoteCurrency,
         instrument.Source,
-        instrument.VerificationStatus);
+        instrument.VerificationStatus,
+        latestQuote?.Close,
+        latestQuote?.Date);
 }
