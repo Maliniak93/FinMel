@@ -1,2 +1,47 @@
 <h1>Settings</h1>
-<p>Coming later.</p>
+
+<section class="settings-page__section">
+  <h2>Price sync</h2>
+
+  <div class="settings-page__sync-row">
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      [disabled]="triggering()"
+      (click)="triggerSync()"
+    >
+      @if (triggering()) {
+        <mat-spinner diameter="18" />
+      } @else {
+        Sync now
+      }
+    </button>
+
+    @if (statusResource.isLoading() && !statusResource.hasValue()) {
+      <mat-spinner diameter="18" />
+    } @else if (statusResource.hasValue()) {
+      @let status = statusResource.value();
+
+      @if (!status.hasRun) {
+        <span class="settings-page__status-text">No sync has run yet.</span>
+      } @else {
+        <mat-chip-set>
+          <mat-chip>{{ syncRunStatusLabel(status.status) }}</mat-chip>
+        </mat-chip-set>
+        <span class="settings-page__status-text">
+          Started {{ status.startedAt | date: 'medium' }}
+          @if (status.finishedAt) {
+            · finished {{ status.finishedAt | date: 'medium' }}
+          }
+          · synced {{ status.syncedCount }}, no data {{ status.noDataCount }}, failed
+          {{ status.failedCount }}
+        </span>
+      }
+    }
+  </div>
+
+  @if (triggerError(); as error) {
+    <p class="settings-page__error" role="alert">{{ error }}</p>
+  }
+</section>

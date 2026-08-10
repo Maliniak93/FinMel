@@ -32,6 +32,10 @@ public static class PriceSyncJobExtensions
     {
         if (builder.Configuration.GetValue<bool>(DisableBackgroundJobsConfigKey))
         {
+            // Features/TriggerSync (T2.14) still needs ISyncTrigger resolvable under
+            // SkarbiecApiFactory-based HTTP slice tests, even with no live Quartz scheduler here to
+            // enqueue onto — see NoOpSyncTrigger.
+            builder.Services.AddSingleton<ISyncTrigger, NoOpSyncTrigger>();
             return builder;
         }
 
@@ -64,6 +68,7 @@ public static class PriceSyncJobExtensions
         });
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        builder.Services.AddSingleton<ISyncTrigger, QuartzSyncTrigger>();
 
         return builder;
     }

@@ -7,6 +7,7 @@ using Quartz;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
+using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
@@ -181,19 +182,6 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
             .BuildScheduler();
 
         return scheduler;
-    }
-
-    private sealed class NoOpFxRateSource : IFxRateSource
-    {
-        public TimeSpan RequestDelay => TimeSpan.Zero;
-
-        public Task<PriceFetchResult<FxRateQuote>> FetchLatestAsync(
-            IReadOnlyCollection<string> currencyCodes, CancellationToken cancellationToken) =>
-            Task.FromResult(PriceFetchResult<FxRateQuote>.NoData());
-
-        public Task<PriceFetchResult<FxRateQuote>> FetchHistoryAsync(
-            string currencyCode, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
-            Task.FromResult(PriceFetchResult<FxRateQuote>.NoData());
     }
 }
 
