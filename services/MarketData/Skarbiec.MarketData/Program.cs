@@ -9,6 +9,7 @@ using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
 using Skarbiec.MarketData.Sources.Stooq;
+using Skarbiec.ServiceDefaults.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,11 @@ builder.AddServiceDefaults();
 builder.AddServiceOpenApi();
 
 builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
+
+// No consumers yet (T2.10) — MarketData only publishes DailyPricesSynced through the outbox;
+// Reporting subscribes in T2.11.
+builder.AddRabbitMqMessaging<WebApplicationBuilder, MarketDataDbContext>();
+
 builder.AddNbpSources();
 builder.AddStooqSource();
 builder.AddCoinGeckoSource();

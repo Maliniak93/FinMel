@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
+using Skarbiec.Contracts.Events;
 using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
@@ -22,6 +24,7 @@ public sealed class PriceSyncJob(
     MarketDataDbContext db,
     IEnumerable<IPriceSource> priceSources,
     IFxRateSource fxRateSource,
+    IPublishEndpoint publishEndpoint,
     TimeProvider timeProvider,
     ILogger<PriceSyncJob> logger) : IJob
 {
@@ -133,6 +136,25 @@ public sealed class PriceSyncJob(
         run.NoDataCount = noData;
         run.FailedCount = failed;
         run.Status = DetermineStatus(synced, noData, failed);
+
+        // Partial runs still publish (T2.10 scope): Reporting's snapshots fall back to last-known
+        // prices anyway (domain valuation algorithm), so a partially-failed run is still useful
+        // signal. Only a wholesale Failed run (nothing synced, nothing even came back empty) is
+        // skipped — there's nothing new for Reporting to react to. IPublishEndpoint.Publish enrolls
+        // the outbox row on this same db context, so the SaveChangesAsync below commits the SyncRun
+        // completion write and the DailyPricesSynced outbox message in one transaction (ADR-012).
+        if (run.Status is SyncRunStatus.Completed or SyncRunStatus.Partial)
+        {
+            await publishEndpoint.Publish(new DailyPricesSynced
+            {
+                RunId = run.Id,
+                SyncDate = DateOnly.FromDateTime(run.StartedAt.UtcDateTime),
+                SyncedCount = synced,
+                FailedCount = failed,
+                NoDataCount = noData,
+            }, cancellationToken);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         activity?.SetTag("skarbiec.sync_run.id", run.Id);

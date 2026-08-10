@@ -1,5 +1,6 @@
 using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.PostgreSQL;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Skarbiec.MarketData.Data;
@@ -63,5 +64,15 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
         {
             run.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
         });
+
+        // MassTransit EF Outbox (T2.10, ADR-012), same pattern as Identity (T0.10) and Portfolio
+        // (T1.5): PriceSyncJob's completion write and the DailyPricesSynced outbox row commit
+        // atomically. Table names prefixed "MarketData" — MassTransit's defaults ("InboxState" etc.)
+        // would otherwise collide with the other services' own outbox tables once every DbContext's
+        // migrations run against the single shared Postgres database Gateway.Tests uses to host every
+        // service's test host side by side.
+        modelBuilder.AddInboxStateEntity(x => x.ToTable("MarketDataInboxState"));
+        modelBuilder.AddOutboxMessageEntity(x => x.ToTable("MarketDataOutboxMessage"));
+        modelBuilder.AddOutboxStateEntity(x => x.ToTable("MarketDataOutboxState"));
     }
 }
