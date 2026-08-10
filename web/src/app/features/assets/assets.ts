@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
+import { getApiMarketdataInstrumentsById, type InstrumentDetailsResponse } from '../../api/marketdata';
 import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
   getApiPortfolioPortfoliosById,
@@ -19,18 +20,33 @@ import {
   type AssetResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { formatMoney } from '../../shared/format-money';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form-dialog/asset-form-dialog';
+import { priceSourceLabel } from './price-source';
 
 // A manual valuation older than this is flagged as stale, prompting a refresh (no ADR/backlog
 // number given — domain-model.md just says "every N months").
 const STALE_MANUAL_VALUE_MONTHS = 6;
 
+// Market prices older than this are stale (domain.md, E4 [S]) — a separate, much tighter, rule
+// than manual valuations above since a synced price is expected daily, not entered by hand.
+const STALE_PRICE_DAYS = 7;
+
 function isStale(manualValueDate: string): boolean {
   const threshold = new Date();
   threshold.setMonth(threshold.getMonth() - STALE_MANUAL_VALUE_MONTHS);
   return new Date(manualValueDate) < threshold;
+}
+
+function isPriceStale(lastPriceDate: string | null | undefined): boolean {
+  if (!lastPriceDate) {
+    return true;
+  }
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - STALE_PRICE_DAYS);
+  return new Date(lastPriceDate) < threshold;
 }
 
 // MatDialog/MatSnackBar are injected as services only (never referenced as template directives),
@@ -96,15 +112,49 @@ export class Assets {
     },
   });
 
+  // AssetResponse only carries InstrumentId (ADR-003, no FK) — one lookup per distinct instrument
+  // used by this portfolio's market assets fills in ticker/last price/date/source for display.
+  protected readonly instrumentDetailsResource = resource({
+    params: () => {
+      const instrumentIds = [
+        ...new Set(
+          (this.assetsResource.value() ?? [])
+            .map((asset) => asset.instrumentId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      return instrumentIds.length > 0 ? { instrumentIds } : undefined;
+    },
+    loader: async ({ params, abortSignal }) => {
+      const details = await Promise.all(
+        params.instrumentIds.map(async (id) => {
+          const result = await getApiMarketdataInstrumentsById({ path: { id }, signal: abortSignal });
+          return result.error ? null : (result.data ?? null);
+        }),
+      );
+      return new Map(
+        details
+          .filter((detail): detail is InstrumentDetailsResponse => detail !== null)
+          .map((detail) => [detail.id, detail]),
+      );
+    },
+  });
+
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly isStale = isStale;
+  protected readonly isPriceStale = isPriceStale;
+  protected readonly priceSourceLabel = priceSourceLabel;
+  protected readonly formatMoney = formatMoney;
 
-  protected formatMoney(amount: number | string, currency: string): string {
-    try {
-      return new Intl.NumberFormat('pl-PL', { style: 'currency', currency }).format(Number(amount));
-    } catch {
-      return `${amount} ${currency}`;
-    }
+  protected instrumentFor(asset: AssetResponse): InstrumentDetailsResponse | undefined {
+    return asset.instrumentId
+      ? this.instrumentDetailsResource.value()?.get(asset.instrumentId)
+      : undefined;
+  }
+
+  // Only called once the template has confirmed instrument.lastPrice != null.
+  protected marketValue(asset: AssetResponse, instrument: InstrumentDetailsResponse): number {
+    return Number(asset.quantity) * Number(instrument.lastPrice);
   }
 
   protected formatQuantity(quantity: number | string): string {

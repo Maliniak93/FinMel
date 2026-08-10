@@ -67,22 +67,52 @@
       <ng-container matColumnDef="value">
         <th mat-header-cell *matHeaderCellDef>Value</th>
         <td mat-cell *matCellDef="let asset">
-          {{ formatMoney(asset.manualValue, asset.currency) }}
+          @if (asset.instrumentId) {
+            @if (instrumentFor(asset); as instrument) {
+              @if (instrument.lastPrice !== null) {
+                {{ formatMoney(marketValue(asset, instrument), instrument.quoteCurrency) }}
+              } @else {
+                No price yet
+              }
+            } @else {
+              <mat-spinner diameter="16" />
+            }
+          } @else {
+            {{ formatMoney(asset.manualValue, asset.currency) }}
+          }
         </td>
       </ng-container>
 
       <ng-container matColumnDef="manualValueDate">
         <th mat-header-cell *matHeaderCellDef>Valued on</th>
         <td mat-cell *matCellDef="let asset">
-          {{ asset.manualValueDate | date: 'mediumDate' }}
-          @if (isStale(asset.manualValueDate)) {
-            <mat-chip-set>
-              <mat-chip
-                matTooltip="This valuation is more than 6 months old — consider refreshing it."
-              >
-                Stale — refresh me
-              </mat-chip>
-            </mat-chip-set>
+          @if (asset.instrumentId) {
+            @if (instrumentFor(asset); as instrument) {
+              @if (instrument.lastPriceDate) {
+                {{ instrument.lastPriceDate | date: 'mediumDate' }} ·
+                {{ priceSourceLabel(instrument.source) }}
+              } @else {
+                No price yet
+              }
+              @if (isPriceStale(instrument.lastPriceDate)) {
+                <mat-chip-set>
+                  <mat-chip matTooltip="This instrument's price is more than 7 days old.">
+                    Stale
+                  </mat-chip>
+                </mat-chip-set>
+              }
+            }
+          } @else {
+            {{ asset.manualValueDate | date: 'mediumDate' }}
+            @if (isStale(asset.manualValueDate)) {
+              <mat-chip-set>
+                <mat-chip
+                  matTooltip="This valuation is more than 6 months old — consider refreshing it."
+                >
+                  Stale — refresh me
+                </mat-chip>
+              </mat-chip-set>
+            }
           }
         </td>
       </ng-container>

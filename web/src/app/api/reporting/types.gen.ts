@@ -3,3 +3,73 @@
 export type ClientOptions = {
     baseUrl: 'https://localhost:60591/' | (string & {});
 };
+
+export type AssetClass = number;
+
+export type DashboardAssetClassValue = {
+    assetClass: AssetClass;
+    valuePln: number | string;
+    percentage: number | string;
+};
+
+export type DashboardPortfolioValue = {
+    portfolioId: string;
+    valuePln: number | string;
+    snapshotDate: string;
+    isStale: boolean;
+};
+
+export type DashboardResponse = {
+    netWorthPln: number | string;
+    asOf: null | string;
+    isStale: boolean;
+    byAssetClass: Array<DashboardAssetClassValue>;
+    byPortfolio: Array<DashboardPortfolioValue>;
+};
+
+export type NetWorthHistoryPoint = {
+    date: string;
+    netWorthPln: number | string;
+};
+
+export type NetWorthHistoryResponse = {
+    range: string;
+    points: Array<NetWorthHistoryPoint>;
+};
+
+export type GetApiReportingDashboardData = {
+    body?: never;
+    path?: never;
+    query?: {
+        portfolioId?: string;
+    };
+    url: '/api/reporting/dashboard';
+};
+
+export type GetApiReportingDashboardResponses = {
+    /**
+     * OK
+     */
+    200: DashboardResponse;
+};
+
+export type GetApiReportingDashboardResponse = GetApiReportingDashboardResponses[keyof GetApiReportingDashboardResponses];
+
+export type GetApiReportingNetWorthHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        range?: string;
+        portfolioId?: string;
+    };
+    url: '/api/reporting/net-worth-history';
+};
+
+export type GetApiReportingNetWorthHistoryResponses = {
+    /**
+     * OK
+     */
+    200: NetWorthHistoryResponse;
+};
+
+export type GetApiReportingNetWorthHistoryResponse = GetApiReportingNetWorthHistoryResponses[keyof GetApiReportingNetWorthHistoryResponses];

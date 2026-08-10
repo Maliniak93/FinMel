@@ -17,8 +17,20 @@ public sealed class GetInstrumentHandler(MarketDataDbContext dbContext)
         var instrument = await dbContext.Instruments.AsNoTracking()
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
 
-        return instrument is null
-            ? InstrumentErrors.NotFound(id)
-            : instrument.ToDetailsResponse();
+        if (instrument is null)
+        {
+            return InstrumentErrors.NotFound(id);
+        }
+
+        // Same "latest row per instrument" lookup as SearchInstrumentsHandler, single-instrument
+        // case — lets Portfolio's asset list (T2.13) show last price/date/source per market asset
+        // without a second, batch-only endpoint (GetLatestPricesBatch is SystemCaller-only, T2.11).
+        var latestQuote = await dbContext.PriceQuotes
+            .AsNoTracking()
+            .Where(q => q.InstrumentId == id)
+            .OrderByDescending(q => q.Date)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return instrument.ToDetailsResponse(latestQuote);
     }
 }

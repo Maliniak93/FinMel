@@ -4,6 +4,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import { client as marketDataClient } from '../../api/marketdata/client.gen';
+import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetResponse, PortfolioResponse } from '../../api/portfolio';
 import { Assets } from './assets';
@@ -18,6 +20,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 const portfolioId = '22222222-2222-2222-2222-222222222222';
+const instrumentId = '33333333-3333-3333-3333-333333333333';
 
 const portfolio: PortfolioResponse = {
   id: portfolioId,
@@ -40,6 +43,17 @@ const asset: AssetResponse = {
   transactionCount: 0,
 };
 
+const marketAsset: AssetResponse = {
+  id: '44444444-4444-4444-4444-444444444444',
+  portfolioId,
+  assetClass: 2,
+  name: 'Apple',
+  currency: 'USD',
+  quantity: 10,
+  instrumentId,
+  transactionCount: 0,
+};
+
 function requestUrl(input: unknown): string {
   return typeof input === 'string' ? input : (input as Request).url;
 }
@@ -53,6 +67,7 @@ describe('Assets', () => {
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+    marketDataClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
   afterEach(() => {
@@ -62,9 +77,13 @@ describe('Assets', () => {
   async function setup(
     assetsResponse: Response,
     portfolioResponse = jsonResponse(portfolio),
+    instrumentResponse?: Response,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
+      if (url.includes('/instruments/')) {
+        return instrumentResponse ?? jsonResponse({ detail: 'Not found.' }, 404);
+      }
       return url.includes('/assets') ? assetsResponse : portfolioResponse;
     });
     dialog = { open: vi.fn() };
@@ -182,5 +201,66 @@ describe('Assets', () => {
       'Asset has transactions and cannot be removed.',
       'Dismiss',
     );
+  });
+
+  it('shows a market asset\'s last price, date, and source', async () => {
+    const instrument: InstrumentDetailsResponse = {
+      id: instrumentId,
+      ticker: 'AAPL.US',
+      name: 'Apple Inc.',
+      assetClass: 2,
+      quoteCurrency: 'USD',
+      source: 1,
+      verificationStatus: 0,
+      lastPrice: 212,
+      lastPriceDate: new Date().toISOString().slice(0, 10),
+    };
+    await setup(jsonResponse([marketAsset]), undefined, jsonResponse(instrument));
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'USD' }).format(2120));
+    expect(text).toContain('Stooq');
+    expect(text).not.toContain('Stale');
+  });
+
+  it('flags a market asset as stale when its last price is older than 7 days', async () => {
+    const staleDate = new Date();
+    staleDate.setDate(staleDate.getDate() - 10);
+    const instrument: InstrumentDetailsResponse = {
+      id: instrumentId,
+      ticker: 'AAPL.US',
+      name: 'Apple Inc.',
+      assetClass: 2,
+      quoteCurrency: 'USD',
+      source: 1,
+      verificationStatus: 0,
+      lastPrice: 212,
+      lastPriceDate: staleDate.toISOString().slice(0, 10),
+    };
+    await setup(jsonResponse([marketAsset]), undefined, jsonResponse(instrument));
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Stale');
+  });
+
+  it("shows 'No price yet' for a market asset with no quotes", async () => {
+    const instrument: InstrumentDetailsResponse = {
+      id: instrumentId,
+      ticker: 'NEW.US',
+      name: 'Brand New Co.',
+      assetClass: 2,
+      quoteCurrency: 'USD',
+      source: 1,
+      verificationStatus: 1,
+      lastPrice: null,
+      lastPriceDate: null,
+    };
+    await setup(jsonResponse([marketAsset]), undefined, jsonResponse(instrument));
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('No price yet');
   });
 });

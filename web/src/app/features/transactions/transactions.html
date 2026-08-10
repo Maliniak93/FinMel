@@ -9,8 +9,10 @@
         @let asset = assetResource.value();
         <h1>Transactions — {{ asset.name }}</h1>
         <p class="transactions-page__summary">
-          {{ assetClassLabel(asset.assetClass) }} · Quantity {{ formatQuantity(asset.quantity) }} ·
-          {{ formatMoney(asset.manualValue, asset.currency) }}
+          {{ assetClassLabel(asset.assetClass) }} · Quantity {{ formatQuantity(asset.quantity) }}
+          @if (asset.manualValue !== null && asset.manualValue !== undefined) {
+            · {{ formatMoney(asset.manualValue, asset.currency) }}
+          }
         </p>
       } @else {
         <h1>Transactions</h1>
