@@ -32,9 +32,12 @@ var identityService = builder.AddProject<Projects.Skarbiec_Identity>("identity-s
     .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
+// T2.10: publishes DailyPricesSynced through the outbox once PriceSyncJob's daily run completes.
 var marketDataService = builder.AddProject<Projects.Skarbiec_MarketData>("marketdata-service")
     .WithReference(marketDataDb.ConnectionString)
     .WaitFor(marketDataDb.Database)
+    .WithReference(rabbitmq)
+    .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
 // T1.5: publishes AssetChanged/TransactionRecorded through the outbox — RabbitMQ reference lands

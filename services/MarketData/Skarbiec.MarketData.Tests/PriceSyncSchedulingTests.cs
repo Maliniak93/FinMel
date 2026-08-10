@@ -7,6 +7,7 @@ using Quartz;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
+using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
@@ -44,9 +45,13 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
 
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration["ConnectionStrings:marketdata-db"] = _containers.PostgresConnectionString;
+        builder.Configuration["ConnectionStrings:rabbitmq"] = _containers.RabbitMqConnectionString;
         builder.Configuration["PriceSync:Cron"] = "0/2 * * * * ?"; // every 2s — proves "runs on schedule" fast.
         builder.Services.AddDbContext<MarketDataDbContext>(o => o.UseNpgsql(_containers.PostgresConnectionString));
         builder.Services.AddSingleton<IFxRateSource>(new NoOpFxRateSource());
+        // PriceSyncJob resolves IPublishEndpoint (T2.10) — the real job fires on this host's own
+        // schedule, so it needs the same outbox wiring Program.cs gives it in production.
+        builder.AddRabbitMqMessaging<HostApplicationBuilder, MarketDataDbContext>();
         builder.AddPriceSyncJob();
 
         // Deliberately not disposed: Quartz.Logging.LogProvider caches this host's ILoggerFactory

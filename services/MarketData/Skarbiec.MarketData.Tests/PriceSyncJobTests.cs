@@ -1,4 +1,6 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
@@ -7,6 +9,7 @@ using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.MarketData.Tests;
 
@@ -14,18 +17,29 @@ namespace Skarbiec.MarketData.Tests;
 /// PriceSyncJob's business logic (T2.6 AC: per-source isolation, partial-run recording, upsert
 /// idempotency) exercised via <see cref="PriceSyncJob.RunAsync"/> directly — no Quartz scheduler
 /// involved. Scheduling mechanics (cron firing, restart/cluster safety) are covered separately in
-/// <see cref="PriceSyncSchedulingTests"/>.
+/// <see cref="PriceSyncSchedulingTests"/>. Outbox atomicity (T2.10 AC) is covered in
+/// <see cref="MarketDataOutboxTests"/>; the job still needs a real, outbox-aware
+/// <see cref="IPublishEndpoint"/> here (a hand-rolled no-op fake would have to match the whole
+/// interface), so each fact builds one via <see cref="HostlessOutboxProvider"/> — same helper, same
+/// scope, same DbContext instance the job runs against.
 /// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
+    // Explicit field: the primary constructor parameter is also passed to the base constructor
+    // above, so referencing it directly elsewhere in this class would trigger CS9107.
+    private readonly SkarbiecContainersFixture _containers = containers;
+
     private static readonly DateOnly Today = new(2026, 8, 3);
 
     [Fact]
     public async Task RunAsync_MiddleSourceFails_OtherTwoSynced_RunRecordedAsPartial()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var nbpInstrument = NewInstrument("XAU", PriceSource.Nbp, "PLN", AssetClass.PreciousMetal);
         var stooqInstrument = NewInstrument("AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
@@ -45,7 +59,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var fxSource = new ScriptedFxRateSource(PriceFetchResult<FxRateQuote>.Success(
             [new FxRateQuote("USDPLN", Today, 3.65m)]));
 
-        var job = new PriceSyncJob(db, sources, fxSource, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        var job = new PriceSyncJob(db, sources, fxSource, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await job.RunAsync(cancellationToken);
 
         var run = await db.SyncRuns.SingleAsync(cancellationToken);
@@ -70,7 +84,10 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
     public async Task RunAsync_CalledTwiceForSameDay_UpsertsInsteadOfDuplicating()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
         db.Instruments.Add(instrument);
@@ -81,12 +98,12 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
 
         var firstRunSource = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, Today, 100m)]));
-        var firstJob = new PriceSyncJob(db, [firstRunSource], noFx, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        var firstJob = new PriceSyncJob(db, [firstRunSource], noFx, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await firstJob.RunAsync(cancellationToken);
 
         var secondRunSource = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, Today, 105m)]));
-        var secondJob = new PriceSyncJob(db, [secondRunSource], noFx, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        var secondJob = new PriceSyncJob(db, [secondRunSource], noFx, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await secondJob.RunAsync(cancellationToken);
 
         var quote = await db.PriceQuotes.SingleAsync(q => q.InstrumentId == instrument.Id && q.Date == Today, cancellationToken);
