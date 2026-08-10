@@ -59,9 +59,18 @@ var strategyService = builder.AddProject<Projects.Skarbiec_Strategy>("strategy-s
     .WaitFor(strategyDb.Database)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
+// T2.11: DailyPricesSynced consumer calls Portfolio's positions-for-valuation and MarketData's
+// price/FX batch endpoints directly (not through the Gateway) — same WithReference rationale as
+// Portfolio's own MarketData reference above.
 var reportingService = builder.AddProject<Projects.Skarbiec_Reporting>("reporting-service")
     .WithReference(reportingDb.ConnectionString)
     .WaitFor(reportingDb.Database)
+    .WithReference(rabbitmq)
+    .WaitFor(rabbitmq)
+    .WithReference(portfolioService)
+    .WaitFor(portfolioService)
+    .WithReference(marketDataService)
+    .WaitFor(marketDataService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
 // T0.15: single entry point for Angular (ADR-013) — routes per prefix, JWT validated at the

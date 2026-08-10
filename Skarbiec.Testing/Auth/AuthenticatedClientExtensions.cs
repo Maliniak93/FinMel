@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.Security.Claims;
+using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Testing.Auth;
@@ -19,6 +21,21 @@ public static class AuthenticatedClientExtensions
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", factory.IssueAccessToken(userId));
+
+        return client;
+    }
+
+    /// <summary>
+    /// A client carrying a <see cref="SystemCaller"/> token (T2.11) — for exercising bulk/cross-user
+    /// internal endpoints (e.g. Portfolio's positions-for-valuation) the way Reporting's consumer
+    /// calls them, rather than as any particular user.
+    /// </summary>
+    public static HttpClient CreateSystemAuthenticatedClient<TProgram>(this SkarbiecApiFactory<TProgram> factory)
+        where TProgram : class
+    {
+        var client = factory.CreateClient();
+        var token = factory.IssueAccessToken(Guid.NewGuid(), [new Claim(SystemCaller.ClaimType, SystemCaller.ClaimValue)]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         return client;
     }

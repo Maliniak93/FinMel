@@ -93,4 +93,11 @@ internal static class MarketDataApi
         db.PriceQuotes.Add(new PriceQuote { Id = Guid.NewGuid(), InstrumentId = instrumentId, Date = date, Close = close });
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public static async Task SeedFxRateAsync(
+        this MarketDataDbContext db, string pair, DateOnly date, decimal rate, CancellationToken cancellationToken)
+    {
+        db.FxRates.Add(new FxRate { Id = Guid.NewGuid(), Pair = pair, Date = date, Rate = rate });
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
