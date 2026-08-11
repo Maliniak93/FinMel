@@ -16,6 +16,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
+import { DEFAULT_CURRENCY } from '../../../shared/currencies';
 
 export interface PortfolioFormDialogData {
   portfolio?: PortfolioResponse;
@@ -47,7 +48,7 @@ export class PortfolioFormDialog {
     name: [this.data.portfolio?.name ?? '', [Validators.required, Validators.maxLength(200)]],
     description: [this.data.portfolio?.description ?? '', [Validators.maxLength(1000)]],
     currency: [
-      this.data.portfolio?.currency ?? 'PLN',
+      this.data.portfolio?.currency ?? DEFAULT_CURRENCY,
       [Validators.required, Validators.pattern(/^[A-Z]{3}$/)],
     ],
   });

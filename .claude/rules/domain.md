@@ -21,6 +21,7 @@ paths:
 - Sell cannot take asset quantity below 0.
 - Amounts and quantities ≥ 0; fees ≥ 0.
 - One PriceQuote per (instrument, date); one FxRate per (pair, date) — unique indexes.
+- User-chosen currency (Portfolio, Asset) comes from `SupportedCurrencies` in `Skarbiec.Contracts` — PLN/EUR/USD, default PLN, uppercase, one definition (frontend mirror: `web/src/app/shared/currencies.ts`). MarketData's own currencies (`Instrument.QuoteCurrency`, `FxRate.Pair`) are **not** restricted.
 - Every user-owned entity has `UserId` — enforced by a NetArchTest architecture test.
 
 ## Data ownership

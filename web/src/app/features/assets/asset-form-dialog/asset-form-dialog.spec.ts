@@ -197,6 +197,36 @@ describe('AssetFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
+  it('REPRO: clicking the Market instrument toggle switches mode', async () => {
+    await setup({ portfolioId });
+
+    const toggles = Array.from(
+      fixture.nativeElement.querySelectorAll('mat-button-toggle'),
+    ) as HTMLElement[];
+    console.log(
+      'toggles before click:',
+      toggles.map((t) => ({ text: t.textContent?.trim(), classes: t.className })),
+    );
+
+    const marketButton = toggles
+      .find((t) => t.textContent?.includes('Market instrument'))
+      ?.querySelector('button') as HTMLButtonElement;
+    marketButton.click();
+    await fixture.whenStable();
+
+    console.log(
+      'toggles after click:',
+      toggles.map((t) => ({ text: t.textContent?.trim(), classes: t.className })),
+    );
+    console.log('mode signal after click:', component['mode']());
+
+    expect(component['mode']()).toBe('market');
+    const marketToggle = toggles.find((t) => t.textContent?.includes('Market instrument'))!;
+    const manualToggle = toggles.find((t) => t.textContent?.includes('Manual valuation'))!;
+    expect(marketToggle.className).toContain('mat-button-toggle-checked');
+    expect(manualToggle.className).not.toContain('mat-button-toggle-checked');
+  });
+
   it('pre-fills market mode and the instrument picker when editing a market asset', async () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
       requestUrl(input).includes('/instruments/') ? jsonResponse(instrumentDetails) : jsonResponse(marketAsset),
