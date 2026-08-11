@@ -30,6 +30,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
+import { DEFAULT_CURRENCY } from '../../../shared/currencies';
 import { formatMoney } from '../../../shared/format-money';
 import { ASSET_CLASSES } from '../asset-class';
 import { CUSTOM_INSTRUMENT_SOURCES } from '../price-source';
@@ -92,7 +93,7 @@ export class AssetFormDialog {
     assetClass: [this.data.asset?.assetClass ?? 0, [Validators.required]],
     name: [this.data.asset?.name ?? '', [Validators.required, Validators.maxLength(200)]],
     currency: [
-      this.data.asset?.currency ?? 'PLN',
+      this.data.asset?.currency ?? DEFAULT_CURRENCY,
       [Validators.required, Validators.pattern(/^[A-Z]{3}$/)],
     ],
     quantity: [Number(this.data.asset?.quantity ?? 0), [Validators.min(0)]],

@@ -22,6 +22,8 @@ appsettings.Production.json
 CLAUDE.local.md
 .claude/settings.local.json
 .claude/skills/zadanie/
+.claude/skills/poprawki/
+.claude/skills/modyfikacje/
 
 # OS / editors
 Thumbs.db

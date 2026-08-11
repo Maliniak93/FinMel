@@ -53,7 +53,7 @@ skarbiec-plan/            # planning docs — local only (gitignored)
 - Events published only through MassTransit EF Outbox; consumers idempotent (inbox/dedup by MessageId) (ADR-012).
 - Every user-owned entity has `UserId` from JWT claims — never from the request body. EF global query filter per service; tenancy isolation tests are part of DoD (ADR-006).
 - Money: `decimal` + `Money` value object; base currency PLN (ADR-008).
-- External price APIs (NBP, Stooq, CoinGecko) called only from Quartz jobs in MarketData — never in a request path (ADR-007).
+- External price APIs (NBP, Stooq, CoinGecko) called only from Quartz jobs in MarketData — never in a request path (ADR-007). One narrow exception (ADR-018): verifying that a user-supplied ticker exists at its provider, before the instrument is created — via `ITickerVerifier` only, never for valuation, never persisting a quote.
 - Transactions are the source of truth for asset quantity (ADR-009).
 - Angular talks only to the Gateway (ADR-013).
 
