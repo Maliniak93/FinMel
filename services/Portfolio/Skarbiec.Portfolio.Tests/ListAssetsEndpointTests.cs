@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
@@ -52,5 +54,38 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         var response = await client.GetAsync(AssetsUri(Guid.NewGuid()), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    /// <summary>M1.3: an out-of-set currency row must not break the list either — reads keep working.</summary>
+    [Fact]
+    public async Task List_IncludesAssetWithOutOfSetCurrency()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerId = Guid.NewGuid();
+        var (portfolioId, assetId) = (Guid.NewGuid(), Guid.NewGuid());
+
+        await using (var seedContext = CreateDbContext(ownerId))
+        {
+            seedContext.Portfolios.Add(new PortfolioEntity { Id = portfolioId, Name = "Legacy account", Currency = "PLN" });
+            seedContext.Assets.Add(new Asset
+            {
+                Id = assetId,
+                PortfolioId = portfolioId,
+                AssetClass = AssetClass.Cash,
+                Name = "Legacy GBP cash",
+                Currency = "GBP",
+                ManualValueAmount = 100m,
+                ManualValueDate = new DateOnly(2026, 1, 1)
+            });
+            await seedContext.SaveChangesAsync(cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(ownerId);
+        var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
+        var assets = await response.Content.ReadFromJsonAsync<List<AssetResponse>>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var asset = Assert.Single(assets!);
+        Assert.Equal("GBP", asset.Currency);
     }
 }

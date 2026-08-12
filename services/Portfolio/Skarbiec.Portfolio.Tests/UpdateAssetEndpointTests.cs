@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.UpdateAsset;
@@ -40,6 +41,57 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(3m, body.Quantity);
         Assert.Equal(42.42m, body.ManualValue);
         Assert.Equal(new DateOnly(2026, 6, 15), body.ManualValueDate);
+    }
+
+    [Theory]
+    [InlineData("PLN")]
+    [InlineData("EUR")]
+    [InlineData("USD")]
+    public async Task Update_WithSupportedCurrency_ReturnsOk(string currency)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = $"Cash in {currency}",
+            Currency = currency,
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.Equal(currency, body!.Currency);
+    }
+
+    [Fact]
+    public async Task Update_WithUnsupportedCurrency_ReturnsBadRequestNamingAcceptedSet()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Swiss cash",
+            Currency = "CHF",
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.Contains(problem.Errors, e => e.Key.Equals(nameof(UpdateAssetRequest.Currency), StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            problem.Errors.Values.SelectMany(messages => messages),
+            message => message.Contains(SupportedCurrencies.Accepted, StringComparison.Ordinal));
     }
 
     [Fact]
