@@ -80,6 +80,81 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         Assert.Equal(3.65m, fxRate.Rate);
     }
 
+    /// <summary>M1.4 AC: even with no EUR-quoted instrument in the dictionary, the daily run still
+    /// writes a current EURPLN row — before this, <c>PriceSyncJob</c> only requested FX for currencies
+    /// an instrument happened to quote in, so EUR (nothing quotes in it) never synced at all and a
+    /// currency-valued EUR asset (M1.4's third mode) would have valued off <c>MarketDataSeeder</c>'s
+    /// 2020 bootstrap rate forever.</summary>
+    [Fact]
+    public async Task RunAsync_NoEurQuotedInstrument_StillWritesCurrentEurPlnRow()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var instrument = NewInstrument("AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
+        db.Instruments.Add(instrument);
+        await db.SaveChangesAsync(cancellationToken);
+
+        IPriceSource[] sources =
+        [
+            new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
+                [new InstrumentQuote(instrument.Id, Today, 190m)])),
+        ];
+        // NBP table A returns every published currency in one call regardless of what's asked for
+        // (M1.4) — USD (instrument-backed) and EUR (supported-set-only, no instrument here) both come back.
+        var fxSource = new ScriptedFxRateSource(PriceFetchResult<FxRateQuote>.Success(
+            [new FxRateQuote("USDPLN", Today, 3.65m), new FxRateQuote("EURPLN", Today, 4.30m)]));
+
+        var job = new PriceSyncJob(db, sources, fxSource, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken);
+
+        var eurRate = await db.FxRates.SingleAsync(r => r.Pair == "EURPLN" && r.Date == Today, cancellationToken);
+        Assert.Equal(4.30m, eurRate.Rate);
+
+        var run = await db.SyncRuns.SingleAsync(cancellationToken);
+        Assert.Equal(SyncRunStatus.Completed, run.Status);
+        Assert.Equal(0, run.FailedCount);
+    }
+
+    /// <summary>M1.4's FailedCount decision: a supported-set currency nobody currently holds an
+    /// instrument in (EUR here) isn't penalized just because it's missing from NBP's response — but a
+    /// currency an instrument actually depends on (USD here) still is, exactly as before M1.4.</summary>
+    [Fact]
+    public async Task RunAsync_FxResponseMissingSupportedOnlyCurrency_NotFailed_ButMissingInstrumentBackedCurrencyIs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var instrument = NewInstrument("AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
+        db.Instruments.Add(instrument);
+        await db.SaveChangesAsync(cancellationToken);
+
+        IPriceSource[] sources =
+        [
+            new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
+                [new InstrumentQuote(instrument.Id, Today, 190m)])),
+        ];
+        // USD (instrument-backed) is missing from the response; EUR (supported-set-only) is present.
+        var fxSource = new ScriptedFxRateSource(PriceFetchResult<FxRateQuote>.Success(
+            [new FxRateQuote("EURPLN", Today, 4.30m)]));
+
+        var job = new PriceSyncJob(db, sources, fxSource, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken);
+
+        var run = await db.SyncRuns.SingleAsync(cancellationToken);
+        // 1 instrument quote + 1 EUR rate synced; 1 failure — the missing USDPLN (instrument-backed).
+        // EUR being requested-but-quoted-by-nobody never enters the failure count at all.
+        Assert.Equal(2, run.SyncedCount);
+        Assert.Equal(1, run.FailedCount);
+        Assert.Equal(SyncRunStatus.Partial, run.Status);
+    }
+
     [Fact]
     public async Task RunAsync_CalledTwiceForSameDay_UpsertsInsteadOfDuplicating()
     {

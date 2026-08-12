@@ -114,8 +114,8 @@ public sealed class ValuationAlgorithmTests
         var stockInstrumentId = Guid.NewGuid();
         var positions = new ValuationPosition[]
         {
-            new() { AssetClass = AssetClass.Stock, Currency = "PLN", Quantity = 2, InstrumentId = stockInstrumentId },
-            new() { AssetClass = AssetClass.RealEstate, Currency = "PLN", Quantity = 0, ManualValueAmount = 300_000m },
+            new() { AssetClass = AssetClass.Stock, ValuationMode = AssetValuationMode.Market, Currency = "PLN", Quantity = 2, InstrumentId = stockInstrumentId },
+            new() { AssetClass = AssetClass.RealEstate, ValuationMode = AssetValuationMode.Manual, Currency = "PLN", Quantity = 0, ManualValueAmount = 300_000m },
         };
         var prices = Prices((stockInstrumentId, "PLN", SnapshotDate, 150m));
 
@@ -127,9 +127,65 @@ public sealed class ValuationAlgorithmTests
         Assert.Contains(result.Breakdown, e => e.AssetClass == AssetClass.RealEstate && e.ValuePln == 300_000m);
     }
 
+    // --- M1.4: currency-valued mode (value = Quantity × FxRate(currency→PLN), no instrument, no manual amount). ---
+
+    [Fact]
+    public void Calculate_CurrencyValuedAssetInBaseCurrency_SkipsFxLookup()
+    {
+        var positions = new[] { CurrencyValuedPosition(AssetClass.Cash, quantity: 1_500m, currency: "PLN") };
+
+        var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), FxRates(), SnapshotDate);
+
+        Assert.Equal(1_500m, result.TotalPln);
+        Assert.False(result.IsStale);
+    }
+
+    [Fact]
+    public void Calculate_CurrencyValuedAssetInForeignCurrency_ConvertsThroughFxRate()
+    {
+        var positions = new[] { CurrencyValuedPosition(AssetClass.Cash, quantity: 1_000m, currency: "EUR") };
+        var fx = FxRates(("EURPLN", SnapshotDate, 4.30m));
+
+        var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
+
+        // 1000 EUR x 4.30 PLN/EUR = 4300 PLN.
+        Assert.Equal(4_300m, result.TotalPln);
+        Assert.False(result.IsStale);
+    }
+
+    [Fact]
+    public void Calculate_CurrencyValuedAssetWithStaleRate_ValuesButMarksStale()
+    {
+        var positions = new[] { CurrencyValuedPosition(AssetClass.Deposit, quantity: 500m, currency: "USD") };
+        var fx = FxRates(("USDPLN", SnapshotDate.AddDays(-10), 3.65m));
+
+        var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
+
+        // Last known rate still values the position — staleness is a flag, not an exclusion (same
+        // contract as market/manual).
+        Assert.Equal(1_825m, result.TotalPln);
+        Assert.True(result.IsStale);
+    }
+
+    [Fact]
+    public void Calculate_CurrencyValuedAssetWithNoRateAtAll_ContributesNothingAndMarksStale_NeverZeroByAccident()
+    {
+        var positions = new[] { CurrencyValuedPosition(AssetClass.Cash, quantity: 1_000m, currency: "EUR") };
+        var fx = FxRates(); // no EURPLN row at all.
+
+        var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
+
+        // Missing rate: excluded from the total/breakdown entirely (not silently valued at 0 PLN and
+        // included) — the same "no quote at all" contract ValueMarketAsset already has.
+        Assert.Equal(0m, result.TotalPln);
+        Assert.True(result.IsStale);
+        Assert.Empty(result.Breakdown);
+    }
+
     private static ValuationPosition MarketPosition(AssetClass assetClass, decimal quantity) => new()
     {
         AssetClass = assetClass,
+        ValuationMode = AssetValuationMode.Market,
         Currency = "PLN", // irrelevant for market assets — the instrument's own quote currency governs FX.
         Quantity = quantity,
         InstrumentId = InstrumentId,
@@ -138,9 +194,18 @@ public sealed class ValuationAlgorithmTests
     private static ValuationPosition ManualPosition(AssetClass assetClass, decimal manualValue, string currency) => new()
     {
         AssetClass = assetClass,
+        ValuationMode = AssetValuationMode.Manual,
         Currency = currency,
         Quantity = 0,
         ManualValueAmount = manualValue,
+    };
+
+    private static ValuationPosition CurrencyValuedPosition(AssetClass assetClass, decimal quantity, string currency) => new()
+    {
+        AssetClass = assetClass,
+        ValuationMode = AssetValuationMode.CurrencyValued,
+        Currency = currency,
+        Quantity = quantity,
     };
 
     private static Dictionary<Guid, InstrumentPriceLookup> Prices(params (Guid InstrumentId, string Currency, DateOnly Date, decimal Close)[] entries) =>

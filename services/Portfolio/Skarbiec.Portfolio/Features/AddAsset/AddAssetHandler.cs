@@ -25,6 +25,10 @@ public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoi
             Name = request.Name,
             Currency = request.Currency,
             Quantity = request.Quantity,
+            // Currency-valued (M1.4) is the fallthrough: neither branch below applies when the
+            // request supplies neither InstrumentId nor ManualValue — AddAssetRequest.Validate already
+            // confirmed that combination is only accepted for classes that support it.
+            ValuationMode = AssetValuationMode.CurrencyValued,
         };
 
         if (request.InstrumentId is { } instrumentId)
@@ -41,10 +45,11 @@ public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoi
             }
 
             asset.InstrumentId = instrumentId;
+            asset.ValuationMode = AssetValuationMode.Market;
         }
-        else
+        else if (request.ManualValue is { } manualAmount)
         {
-            var manualValue = Money.Create(request.ManualValue!.Value, request.Currency);
+            var manualValue = Money.Create(manualAmount, request.Currency);
             if (manualValue.IsFailure)
             {
                 return manualValue.Error;
@@ -52,6 +57,7 @@ public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoi
 
             asset.ManualValueAmount = manualValue.Value.Amount;
             asset.ManualValueDate = request.ManualValueDate;
+            asset.ValuationMode = AssetValuationMode.Manual;
         }
 
         dbContext.Assets.Add(asset);

@@ -72,6 +72,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
                 Id = assetId,
                 PortfolioId = portfolioId,
                 AssetClass = AssetClass.Cash,
+                ValuationMode = AssetValuationMode.Manual,
                 Name = "Legacy GBP cash",
                 Currency = "GBP",
                 ManualValueAmount = 100m,

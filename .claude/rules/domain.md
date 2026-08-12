@@ -11,9 +11,9 @@ paths:
 ## Domain
 
 - `AssetClass` enum (SharedKernel): Cash, Deposit, Stock, Etf, Bond, Crypto, PreciousMetal, RealEstate, Other.
-- Transaction types: Buy, Sell, Deposit, Withdraw, Dividend, Interest, Fee. Asset quantity is derived from transactions (recomputed, never stored as truth). Manual-valuation assets may exist without transactions.
-- Two valuation modes: market (`Quantity × last PriceQuote × FxRate`, same date) and manual (`ManualValue × FxRate` at snapshot date).
-- Missing price for a date → use last known (weekends/holidays); mark `stale` when older than 7 days.
+- Transaction types: Buy, Sell, Deposit, Withdraw, Dividend, Interest, Fee. Asset quantity is derived from transactions (recomputed, never stored as truth). Manual-valuation and currency-valued assets may exist without transactions.
+- Three valuation modes (M1.4), explicit on `Asset.ValuationMode` (`AssetValuationMode` in `Skarbiec.Contracts`): market (`Quantity × last PriceQuote × FxRate`, same date), manual (`ManualValue × FxRate` at snapshot date), and currency-valued (`Quantity × FxRate` at snapshot date — no instrument, no manual amount; natural members are Cash/Deposit, per `AssetValuationModes.Default`, but every class may still use market/manual as before).
+- Missing price/FX rate for a date → use last known (weekends/holidays); mark `stale` when older than 7 days. MarketData's `PriceSyncJob` syncs FX for every `SupportedCurrencies` code daily (not only currencies an `Instrument` happens to quote), so a currency-valued asset's rate stays current.
 
 ## Invariants (validate and test)
 
