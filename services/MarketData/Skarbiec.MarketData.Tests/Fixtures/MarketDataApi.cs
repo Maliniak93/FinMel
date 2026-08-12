@@ -41,19 +41,19 @@ internal static class MarketDataApi
     public static async Task<CustomInstrumentResponse> AddCustomInstrumentAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
-        PriceSource source = PriceSource.Stooq,
         string ticker = "MSFT.US",
         string name = "Microsoft Corp.",
         string quoteCurrency = "USD",
-        AssetClass assetClass = AssetClass.Stock)
+        AssetClass assetClass = AssetClass.Stock,
+        bool allowUnverified = false)
     {
         var request = new AddCustomInstrumentRequest
         {
-            Source = source,
             Ticker = ticker,
             Name = name,
             QuoteCurrency = quoteCurrency,
             AssetClass = assetClass,
+            AllowUnverified = allowUnverified,
         };
 
         var response = await client.PostAsJsonAsync(InstrumentsUri, request, cancellationToken);
