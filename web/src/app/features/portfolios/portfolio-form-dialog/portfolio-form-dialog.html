@@ -24,12 +24,26 @@
 
     <mat-form-field appearance="outline" class="portfolio-form-dialog__field">
       <mat-label>Currency</mat-label>
-      <input matInput type="text" formControlName="currency" maxlength="3" autocomplete="off" />
-      <mat-hint>3-letter code, e.g. PLN</mat-hint>
+      <mat-select formControlName="currency">
+        @if (legacyCurrency) {
+          <mat-option [value]="legacyCurrency">
+            {{ legacyCurrency }} — outside the supported set, kept until you choose one below
+          </mat-option>
+        }
+        @for (currency of currencies; track currency.code) {
+          <mat-option [value]="currency.code">{{ currency.label }}</mat-option>
+        }
+      </mat-select>
+      @if (legacyCurrency) {
+        <mat-hint
+          >This portfolio's currency isn't PLN, EUR or USD. Saving without changing it will be
+          rejected — pick a supported currency to update it.</mat-hint
+        >
+      }
       @if (form.controls.currency.hasError('required')) {
         <mat-error>Currency is required.</mat-error>
-      } @else if (form.controls.currency.hasError('pattern')) {
-        <mat-error>Enter a 3-letter uppercase currency code.</mat-error>
+      } @else if (form.controls.currency.hasError('server')) {
+        <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
       }
     </mat-form-field>
 
