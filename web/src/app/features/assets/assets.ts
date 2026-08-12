@@ -12,7 +12,12 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { getApiMarketdataInstrumentsById, type InstrumentDetailsResponse } from '../../api/marketdata';
+import {
+  getApiMarketdataInstrumentsById,
+  postApiMarketdataFxLatestBatch,
+  type FxRateResult,
+  type InstrumentDetailsResponse,
+} from '../../api/marketdata';
 import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
   getApiPortfolioPortfoliosById,
@@ -24,14 +29,24 @@ import { formatMoney } from '../../shared/format-money';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form-dialog/asset-form-dialog';
+import { VALUATION_MODE } from './asset-valuation-mode';
 
 // A manual valuation older than this is flagged as stale, prompting a refresh (no ADR/backlog
 // number given — domain-model.md just says "every N months").
 const STALE_MANUAL_VALUE_MONTHS = 6;
 
-// Market prices older than this are stale (domain.md, E4 [S]) — a separate, much tighter, rule
-// than manual valuations above since a synced price is expected daily, not entered by hand.
+// Market prices — and, since M1.4, FX rates behind a currency-valued asset — older than this are
+// stale (domain.md, E4 [S]): both are synced daily, a separate, much tighter rule than manual
+// valuations above, which are entered by hand.
 const STALE_PRICE_DAYS = 7;
+
+// PLN is the base currency (ADR-008): a currency-valued asset already denominated in PLN needs no
+// FX lookup at all — its value is exactly its quantity, and there's no rate/date to report. Mirrors
+// the backend's own short-circuit (ValuationAlgorithm.ResolveFxRate) and the repeated
+// `BaseCurrency = "PLN"; // ADR-008` literal on that side. Deliberately not DEFAULT_CURRENCY from
+// shared/currencies.ts — that constant is "what a new asset defaults to", a different concept (see
+// M1.2's decisions block).
+const BASE_CURRENCY = 'PLN';
 
 function isStale(manualValueDate: string): boolean {
   const threshold = new Date();
@@ -139,6 +154,36 @@ export class Assets {
     },
   });
 
+  // FX rates for every distinct non-PLN currency behind a currency-valued asset (M1.4's third
+  // valuation mode) — batched once per load into one request, the same way instrumentDetailsResource
+  // above batches instrument lookups, never fetched per row. PLN never appears in the request:
+  // fxRateFor short-circuits it below, exactly like the backend's ResolveFxRate does.
+  protected readonly fxRatesResource = resource({
+    params: () => {
+      const currencies = [
+        ...new Set(
+          (this.assetsResource.value() ?? [])
+            .filter((asset) => Number(asset.valuationMode) === VALUATION_MODE.CurrencyValued)
+            .map((asset) => asset.currency)
+            .filter((currency) => currency !== BASE_CURRENCY),
+        ),
+      ];
+      return currencies.length > 0
+        ? { pairs: currencies.map((currency) => `${currency}${BASE_CURRENCY}`) }
+        : undefined;
+    },
+    loader: async ({ params, abortSignal }) => {
+      const result = await postApiMarketdataFxLatestBatch({
+        body: { pairs: params.pairs, asOfDate: new Date().toISOString().slice(0, 10) },
+        signal: abortSignal,
+      });
+      if (result.error) {
+        return new Map<string, FxRateResult>();
+      }
+      return new Map((result.data?.rates ?? []).map((rate) => [rate.pair, rate]));
+    },
+  });
+
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly isStale = isStale;
   protected readonly isPriceStale = isPriceStale;
@@ -150,9 +195,43 @@ export class Assets {
       : undefined;
   }
 
+  protected isCurrencyValued(asset: AssetResponse): boolean {
+    return Number(asset.valuationMode) === VALUATION_MODE.CurrencyValued;
+  }
+
+  // Undefined while a non-PLN rate lookup is still in flight (renders a spinner, same convention as
+  // instrumentFor above). Once fxRatesResource has resolved: `rate: null` when no FxRate row exists
+  // yet for that pair at all — nothing has ever synced it — which the template renders as "No price
+  // yet" plus the Stale marker, mirroring the market branch's own precedent for that case. PLN
+  // short-circuits before any of this: rate is always exactly 1, there's no date, and it's never
+  // stale (ADR-008; matches ValuationAlgorithm.ResolveFxRate on the backend).
+  protected fxRateFor(
+    asset: AssetResponse,
+  ): { rate: number | null; date: string | null; isBaseCurrency: boolean } | undefined {
+    if (asset.currency === BASE_CURRENCY) {
+      return { rate: 1, date: null, isBaseCurrency: true };
+    }
+    if (!this.fxRatesResource.hasValue()) {
+      return undefined;
+    }
+    const found = this.fxRatesResource.value().get(`${asset.currency}${BASE_CURRENCY}`);
+    return found
+      ? { rate: Number(found.rate), date: found.date, isBaseCurrency: false }
+      : { rate: null, date: null, isBaseCurrency: false };
+  }
+
   // Only called once the template has confirmed instrument.lastPrice != null.
   protected marketValue(asset: AssetResponse, instrument: InstrumentDetailsResponse): number {
     return Number(asset.quantity) * Number(instrument.lastPrice);
+  }
+
+  // Value for a currency-valued asset is Quantity × FxRate(currency → PLN) — the third mode M1.4
+  // added, valued straight off the asset's own currency rather than an instrument or a hand-typed
+  // amount. Only called once the template has confirmed fxRateFor(asset).rate != null; `rate` still
+  // accepts null here so the template doesn't need to narrow it, matching marketValue's own style
+  // above (Number(null) is never actually reached because the caller already branched on it).
+  protected currencyValuedValue(asset: AssetResponse, rate: number | null): number {
+    return Number(asset.quantity) * Number(rate);
   }
 
   protected formatQuantity(quantity: number | string): string {

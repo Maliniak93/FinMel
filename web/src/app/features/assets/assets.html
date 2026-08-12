@@ -77,6 +77,16 @@
             } @else {
               <mat-spinner diameter="16" />
             }
+          } @else if (isCurrencyValued(asset)) {
+            @if (fxRateFor(asset); as fxRate) {
+              @if (fxRate.rate !== null) {
+                {{ formatMoney(currencyValuedValue(asset, fxRate.rate)) }}
+              } @else {
+                No price yet
+              }
+            } @else {
+              <mat-spinner diameter="16" />
+            }
           } @else {
             {{ formatMoney(asset.manualValue, asset.currency) }}
           }
@@ -96,6 +106,23 @@
               @if (isPriceStale(instrument.lastPriceDate)) {
                 <mat-chip-set>
                   <mat-chip matTooltip="This instrument's price is more than 7 days old.">
+                    Stale
+                  </mat-chip>
+                </mat-chip-set>
+              }
+            }
+          } @else if (isCurrencyValued(asset)) {
+            @if (fxRateFor(asset); as fxRate) {
+              @if (fxRate.isBaseCurrency) {
+                No conversion needed
+              } @else if (fxRate.date) {
+                {{ fxRate.date | date: 'mediumDate' }}
+              } @else {
+                No price yet
+              }
+              @if (!fxRate.isBaseCurrency && isPriceStale(fxRate.date)) {
+                <mat-chip-set>
+                  <mat-chip matTooltip="This exchange rate is more than 7 days old.">
                     Stale
                   </mat-chip>
                 </mat-chip-set>

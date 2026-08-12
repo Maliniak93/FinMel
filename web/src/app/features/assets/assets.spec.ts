@@ -56,6 +56,31 @@ const marketAsset: AssetResponse = {
   transactionCount: 0,
 };
 
+// M1.4's third mode: no instrumentId, no manualValue — matches the live shape a Cash asset actually
+// comes back as (see M1.11's task brief), which is exactly what M1.7's @else branch got wrong before
+// this step (rendered `0,00 €` with a false "Stale — refresh me" chip).
+const currencyValuedAsset: AssetResponse = {
+  id: '55555555-5555-5555-5555-555555555555',
+  portfolioId,
+  assetClass: 0, // Cash
+  valuationMode: 2, // CurrencyValued
+  name: 'Euro Cash',
+  currency: 'EUR',
+  quantity: 500,
+  transactionCount: 1,
+};
+
+const plnCashAsset: AssetResponse = {
+  id: '66666666-6666-6666-6666-666666666666',
+  portfolioId,
+  assetClass: 0, // Cash
+  valuationMode: 2, // CurrencyValued
+  name: 'PLN Cash',
+  currency: 'PLN',
+  quantity: 500,
+  transactionCount: 1,
+};
+
 function requestUrl(input: unknown): string {
   return typeof input === 'string' ? input : (input as Request).url;
 }
@@ -80,11 +105,15 @@ describe('Assets', () => {
     assetsResponse: Response,
     portfolioResponse = jsonResponse(portfolio),
     instrumentResponse?: Response,
+    fxResponse?: Response,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
       if (url.includes('/instruments/')) {
         return instrumentResponse ?? jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (url.includes('/fx/latest-batch')) {
+        return fxResponse ?? jsonResponse({ rates: [] });
       }
       return url.includes('/assets') ? assetsResponse : portfolioResponse;
     });
@@ -263,5 +292,95 @@ describe('Assets', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('No price yet');
+  });
+
+  it("shows a currency-valued asset's real value, converted through its FX rate, agreeing with quantity × rate — the case that rendered 0,00 before this step", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await setup(
+      jsonResponse([currencyValuedAsset]),
+      undefined,
+      undefined,
+      jsonResponse({ rates: [{ pair: 'EURPLN', date: today, rate: 4.3 }] }),
+    );
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(
+      new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(2150),
+    );
+    expect(text).not.toContain('Stale — refresh me');
+    expect(text).not.toContain(
+      new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'EUR' }).format(0),
+    );
+  });
+
+  it('flags a currency-valued asset as stale when its FX rate is older than 7 days, showing the price-staleness marker instead of the manual one', async () => {
+    const staleDate = new Date();
+    staleDate.setDate(staleDate.getDate() - 10);
+    await setup(
+      jsonResponse([currencyValuedAsset]),
+      undefined,
+      undefined,
+      jsonResponse({
+        rates: [{ pair: 'EURPLN', date: staleDate.toISOString().slice(0, 10), rate: 4.3 }],
+      }),
+    );
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Stale');
+    expect(text).not.toContain('Stale — refresh me');
+    expect(text).not.toContain('more than 6 months old');
+  });
+
+  it("shows 'No price yet' — never a bogus zero — for a currency-valued asset with no FX rate synced yet", async () => {
+    await setup(
+      jsonResponse([currencyValuedAsset]),
+      undefined,
+      undefined,
+      jsonResponse({ rates: [] }),
+    );
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('No price yet');
+    expect(text).not.toContain(
+      new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'EUR' }).format(0),
+    );
+  });
+
+  it('values a PLN currency-valued asset at its quantity with no FX lookup at all, and never flags it stale', async () => {
+    await setup(jsonResponse([plnCashAsset]));
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(
+      new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(500),
+    );
+    expect(text).not.toContain('Stale');
+    expect(
+      fetchSpy.mock.calls.some((call: unknown[]) => requestUrl(call[0]).includes('/fx/latest-batch')),
+    ).toBe(false);
+  });
+
+  it('batches the FX lookup once for multiple currency-valued assets sharing a currency, not per row', async () => {
+    const secondEuroCash: AssetResponse = {
+      ...currencyValuedAsset,
+      id: '77777777-7777-7777-7777-777777777777',
+      name: 'Second Euro Cash',
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    await setup(
+      jsonResponse([currencyValuedAsset, secondEuroCash]),
+      undefined,
+      undefined,
+      jsonResponse({ rates: [{ pair: 'EURPLN', date: today, rate: 4.3 }] }),
+    );
+    await fixture.whenStable();
+
+    const fxCalls = fetchSpy.mock.calls.filter((call: unknown[]) =>
+      requestUrl(call[0]).includes('/fx/latest-batch'),
+    );
+    expect(fxCalls.length).toBe(1);
   });
 });
