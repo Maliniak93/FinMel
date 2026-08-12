@@ -41,6 +41,7 @@ Items marked *(default — confirm in Phase 0)* are opinionated choices not back
 ## EF Core 10
 
 - One DbContext per service; migrations live in the service; no lazy loading, no `Include` chains crossing aggregate boundaries.
+- Migrations carry no legacy burden (ADR-019): dropping a column/table or changing a type needs no data backfill, and when the history gets in the way a service's migrations may be deleted and regenerated as one `InitialCreate` (local databases get dropped and recreated by Aspire).
 - Reads: `AsNoTracking()`; projections with `Select` into response records.
 - Global query filter on `UserId` + save interceptor stamping `UserId` (ADR-006).
 - Money: `decimal` with explicit precision (e.g. `HasPrecision(18, 8)` for quantity/prices, `(18, 2)` for PLN amounts) — never `double`/`float`.
@@ -50,7 +51,7 @@ Items marked *(default — confirm in Phase 0)* are opinionated choices not back
 ## Messaging (ADR-012)
 
 - Publish only via MassTransit EF Outbox — never `IPublishEndpoint` outside the outbox transaction.
-- Consumers idempotent: inbox/dedup by `MessageId`. Contracts in `Skarbiec.Contracts`, additive versioning (breaking = new `V2` type).
+- Consumers idempotent: inbox/dedup by `MessageId`. Contracts in `Skarbiec.Contracts`, edited in place — no `V2` types, no deprecation window; every publisher and consumer of a changed record is updated in the same change (ADR-019).
 - Trace context propagates automatically (MassTransit + OTel) — no manual correlation IDs.
 - Details and tests: follow `/new-event`.
 
@@ -64,7 +65,7 @@ Items marked *(default — confirm in Phase 0)* are opinionated choices not back
 - xUnit v3 *(default — confirm in Phase 0)* + Testcontainers (PostgreSQL, RabbitMQ) for slice integration tests.
 - Per service DoD: tenancy isolation test (user B gets 404 on user A's resource), health-check smoke test.
 - NetArchTest: every user-owned entity has `UserId`; no references between service projects.
-- Contract tests: previously serialized event payloads still deserialize.
+- Contract tests: an event payload carrying *unknown extra fields* still deserializes (forward compatibility — the one wire rule ADR-019 keeps).
 
 ### Test helpers live in exactly one place
 
