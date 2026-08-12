@@ -5,6 +5,24 @@
     <title>Skarbiec</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Applies the stored theme choice to <html> synchronously, before first paint, so a hard
+      // reload never flashes the previous theme while Angular's JS is still loading. Mirrors
+      // ThemeService (web/src/app/core/theme/theme.ts) — kept as plain JS here since Angular
+      // hasn't bootstrapped yet. Sets `color-scheme` on the inline `style` (not just the
+      // `data-theme` attribute) because production builds inline only a "critical" CSS subset
+      // into <head> and load the rest async — an inline style wins the cascade regardless of
+      // that timing, a same-specificity stylesheet rule would not. No stored value (or "system")
+      // leaves both unset, so styles.scss's `color-scheme: light dark` on <html> follows the OS
+      // preference on its own.
+      (function () {
+        var theme = localStorage.getItem('skarbiec-theme');
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', theme);
+          document.documentElement.style.setProperty('color-scheme', theme);
+        }
+      })();
+    </script>
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
