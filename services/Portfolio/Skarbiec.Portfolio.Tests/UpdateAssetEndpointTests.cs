@@ -190,6 +190,48 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(250m, body.ManualValue);
     }
 
+    /// <summary>M1.4: switching an existing (manual) asset to currency-valued clears the manual fields
+    /// and InstrumentId, and stores the explicit mode.</summary>
+    [Fact]
+    public async Task Update_SwitchManualCashToCurrencyValued_ClearsManualValueAndSetsMode()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken); // default: manual, AssetClass.Stock.
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Now currency-valued",
+            Currency = "EUR",
+            Quantity = 500m,
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.Equal(AssetValuationMode.CurrencyValued, body!.ValuationMode);
+        Assert.Null(body.ManualValue);
+        Assert.Null(body.ManualValueDate);
+        Assert.Null(body.InstrumentId);
+        Assert.Equal(500m, body.Quantity);
+    }
+
+    /// <summary>Mirrors <see cref="AddAssetEndpointTests.Add_WithNeitherInstrumentIdNorManualValue_ReturnsBadRequest"/>
+    /// on the update path: "neither" stays a 400 outside the currency-valued classes.</summary>
+    [Fact]
+    public async Task Update_NonCurrencyValuedClassWithNeitherInstrumentIdNorManualValue_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Neither", Currency = "USD" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Update_WithNonExistentInstrument_ReturnsBadRequest()
     {

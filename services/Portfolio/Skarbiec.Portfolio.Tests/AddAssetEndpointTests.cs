@@ -291,6 +291,80 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    /// <summary>M1.4: the third valuation mode — neither InstrumentId nor ManualValue — is only
+    /// accepted for classes <c>AssetValuationModes.SupportsCurrencyValued</c> (Cash, Deposit); for
+    /// every other class "neither" stays a 400 (see <see cref="Add_WithNeitherInstrumentIdNorManualValue_ReturnsBadRequest"/>,
+    /// unmodified by this change).</summary>
+    [Theory]
+    [InlineData(AssetClass.Cash)]
+    [InlineData(AssetClass.Deposit)]
+    public async Task Add_CurrencyValuedClassWithNeitherInstrumentNorManualValue_ReturnsCreatedAsCurrencyValued(AssetClass assetClass)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = assetClass,
+            Name = "Plain cash",
+            Currency = "EUR",
+            Quantity = 1_000m,
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(AssetValuationMode.CurrencyValued, body.ValuationMode);
+        Assert.Equal(1_000m, body.Quantity);
+        Assert.Null(body.InstrumentId);
+        Assert.Null(body.ManualValue);
+        Assert.Null(body.ManualValueDate);
+    }
+
+    [Fact]
+    public async Task Add_WithValidInstrument_ReturnsCreatedWithMarketValuationMode()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "Apple",
+            Currency = "USD",
+            Quantity = 10m,
+            InstrumentId = Guid.NewGuid(),
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.Equal(AssetValuationMode.Market, body!.ValuationMode);
+    }
+
+    [Fact]
+    public async Task Add_EveryAssetClassWithManualValue_ReturnsManualValuationMode()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Cash, // manual stays available even for a currency-valued class (M1.4 decision).
+            Name = "Manual cash",
+            Currency = "PLN",
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1),
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.Equal(AssetValuationMode.Manual, body!.ValuationMode);
+    }
+
     [Fact]
     public async Task Add_AssetToPortfolio_MakesPortfolioDeleteConflict()
     {

@@ -94,6 +94,7 @@ public sealed class DailyPricesSyncedConsumer(
             .Select(p => new ValuationPosition
             {
                 AssetClass = p.AssetClass,
+                ValuationMode = p.ValuationMode,
                 Currency = p.Currency,
                 Quantity = p.Quantity,
                 InstrumentId = p.InstrumentId,
@@ -147,7 +148,8 @@ public sealed class DailyPricesSyncedConsumer(
     {
         // Every non-PLN currency actually in play: a market asset's own quote currency (not its
         // Asset.Currency — the price is denominated in whatever the instrument quotes in), or a
-        // manual asset's own Currency.
+        // manual/currency-valued asset's own Currency (M1.4: both non-market modes key off Currency,
+        // so filtering on InstrumentId is null already covers the new mode with no change here).
         var currencies = pricesByInstrument.Values.Select(p => p.QuoteCurrency)
             .Concat(positions.Where(p => p.InstrumentId is null).Select(p => p.Currency))
             .Where(c => !string.Equals(c, BaseCurrency, StringComparison.OrdinalIgnoreCase))

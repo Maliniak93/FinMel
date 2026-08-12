@@ -23,21 +23,55 @@ public sealed record AddAssetRequest : IValidatableObject
 
     public DateOnly? ManualValueDate { get; init; }
 
-    /// <summary>Manual and market are mutually exclusive — see the same rule on <c>Asset</c>.</summary>
+    /// <summary>
+    /// Exactly one of three modes (M1.4) — market (<see cref="InstrumentId"/>), manual
+    /// (<see cref="ManualValue"/> + <see cref="ManualValueDate"/>), or currency-valued (neither) — see
+    /// the same rule on <c>Asset.ValuationMode</c>. The currency-valued combination is only accepted
+    /// for classes <c>AssetValuationModes.SupportsCurrencyValued</c> (Cash, Deposit): for every other
+    /// class "neither" was always a validation error before M1.4 and stays one, so no pre-existing
+    /// behaviour changes. Market and Manual stay available to every class exactly as before.
+    /// </summary>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (InstrumentId is not null && (ManualValue is not null || ManualValueDate is not null))
+        var hasInstrument = InstrumentId is not null;
+        var hasAnyManual = ManualValue is not null || ManualValueDate is not null;
+        var hasFullManual = ManualValue is not null && ManualValueDate is not null;
+
+        if (hasInstrument && hasAnyManual)
         {
-            yield return new ValidationResult(
-                "An asset is either market (InstrumentId) or manual (ManualValue + ManualValueDate), not both.",
-                [nameof(InstrumentId), nameof(ManualValue), nameof(ManualValueDate)]);
+            return
+            [
+                new ValidationResult(
+                    "An asset is exactly one of market (InstrumentId), manual (ManualValue + ManualValueDate), or currency-valued (neither) — never more than one.",
+                    [nameof(InstrumentId), nameof(ManualValue), nameof(ManualValueDate)])
+            ];
         }
 
-        if (InstrumentId is null && (ManualValue is null || ManualValueDate is null))
+        if (hasInstrument)
         {
-            yield return new ValidationResult(
-                "A manual asset requires both ManualValue and ManualValueDate.",
-                [nameof(ManualValue), nameof(ManualValueDate)]);
+            return [];
         }
+
+        if (hasAnyManual && !hasFullManual)
+        {
+            return
+            [
+                new ValidationResult(
+                    "A manual asset requires both ManualValue and ManualValueDate.",
+                    [nameof(ManualValue), nameof(ManualValueDate)])
+            ];
+        }
+
+        if (hasFullManual || AssetValuationModes.SupportsCurrencyValued(AssetClass))
+        {
+            return [];
+        }
+
+        return
+        [
+            new ValidationResult(
+                $"AssetClass '{AssetClass}' needs either InstrumentId (market) or ManualValue + ManualValueDate (manual) — only {string.Join(", ", AssetValuationModes.CurrencyValuedClasses)} may be created with neither (currency-valued).",
+                [nameof(InstrumentId), nameof(ManualValue), nameof(ManualValueDate)])
+        ];
     }
 }

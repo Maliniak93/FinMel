@@ -60,9 +60,12 @@ public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers)
 
         var source = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, new DateOnly(2026, 8, 6), 100m)]));
-        var noFx = new ScriptedFxRateSource();
+        // M1.4: the FX branch always runs now (SupportedCurrencies.All), but this instrument is
+        // PLN-quoted, so an empty Success response is enough — this test only cares about trace
+        // propagation on the price-quote publish, not FX outcomes.
+        var fx = new ScriptedFxRateSource(PriceFetchResult<FxRateQuote>.Success([]));
 
-        var job = new PriceSyncJob(db, [source], noFx, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        var job = new PriceSyncJob(db, [source], fx, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await job.RunAsync(cancellationToken);
 
         var jobActivity = Assert.Single(activities, a => a.OperationName == "PriceSyncJob.Run");

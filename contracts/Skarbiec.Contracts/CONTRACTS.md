@@ -14,8 +14,8 @@ deserialization contract test in `Skarbiec.Contracts.Tests`.
 ## Rules
 
 These wire-versioning rules govern the **event/DTO records** (e.g. `UserRegistered`), not the
-shared primitives (`Money`, `AssetClass`, `SupportedCurrencies`, `Result`/`Result<T>`/`Error`) —
-those never go on the wire and version like any other C# type.
+shared primitives (`Money`, `AssetClass`, `AssetValuationMode`, `SupportedCurrencies`,
+`Result`/`Result<T>`/`Error`) — those never go on the wire and version like any other C# type.
 
 1. **Additive only.** A new field is always optional with a sensible default. Existing
    consumers that don't know about it must keep deserializing without error.
