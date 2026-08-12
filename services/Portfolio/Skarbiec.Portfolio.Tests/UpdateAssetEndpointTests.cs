@@ -15,18 +15,25 @@ namespace Skarbiec.Portfolio.Tests;
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    /// <summary>
+    /// M1.5: <c>UpdateAssetRequest</c> has no directly-settable <c>Quantity</c> (see its
+    /// <c>&lt;remarks&gt;</c>) — a prior Buy transaction gives the asset a real, non-zero quantity, and
+    /// the update (which touches every other field) must leave it exactly as the transaction produced
+    /// it, proving Quantity moves only through <c>TransactionQuantityCalculator</c> (ADR-009), never
+    /// through this endpoint.
+    /// </summary>
     [Fact]
-    public async Task Update_ExistingAsset_ReturnsOkWithUpdatedFields()
+    public async Task Update_ExistingAsset_ReturnsOkWithUpdatedFieldsAndQuantityUntouched()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Crypto,
             Name = "Renamed",
             Currency = "USD",
-            Quantity = 3m,
             ManualValue = 42.42m,
             ManualValueDate = new DateOnly(2026, 6, 15)
         };
@@ -147,7 +154,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
             AssetClass = AssetClass.Stock,
             Name = "Now market",
             Currency = "USD",
-            Quantity = 5m,
             InstrumentId = instrumentId
         };
 
@@ -158,6 +164,9 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(instrumentId, body!.InstrumentId);
         Assert.Null(body.ManualValue);
         Assert.Null(body.ManualValueDate);
+        // M1.5: no Quantity field on the request — the switch to Market must not disturb the
+        // quantity the earlier Buy transaction already produced.
+        Assert.Equal(5m, body.Quantity);
 
         var transactions = await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken);
         Assert.Single(transactions.Items);
@@ -191,19 +200,25 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     /// <summary>M1.4: switching an existing (manual) asset to currency-valued clears the manual fields
-    /// and InstrumentId, and stores the explicit mode.</summary>
+    /// and InstrumentId, and stores the explicit mode.
+    /// <para>
+    /// M1.5: <c>UpdateAssetRequest</c> has no directly-settable <c>Quantity</c>. A currency-valued
+    /// asset's quantity (value = <c>Quantity × FxRate</c>) still has to come from somewhere, and the
+    /// answer is the same as every other asset class: recorded transactions (ADR-009) — here a Deposit
+    /// of 500 before the mode switch, which the switch must leave untouched.
+    /// </para></summary>
     [Fact]
-    public async Task Update_SwitchManualCashToCurrencyValued_ClearsManualValueAndSetsMode()
+    public async Task Update_SwitchManualCashToCurrencyValued_ClearsManualValueAndSetsModeQuantityFromTransaction()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken); // default: manual, AssetClass.Stock.
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 500m, new DateOnly(2026, 1, 1), cancellationToken);
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Cash,
             Name = "Now currency-valued",
             Currency = "EUR",
-            Quantity = 500m,
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);

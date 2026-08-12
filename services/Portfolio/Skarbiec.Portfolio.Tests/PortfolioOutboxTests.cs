@@ -83,6 +83,56 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         Assert.Contains(outboxMessages, m => m.MessageType.Contains(nameof(AssetChanged)));
     }
 
+    /// <summary>
+    /// M1.5 AC: "Both events land in the outbox in the same transaction as the writes" — the combined
+    /// path where <c>AddAsset</c> is given an <c>InitialTransaction</c> and must write the Asset row,
+    /// the Transaction row, the <see cref="AssetChanged"/> outbox message, and the
+    /// <see cref="TransactionRecorded"/> outbox message all inside <c>AddAssetHandler</c>'s single
+    /// <c>SaveChangesAsync</c> call. Same no-hosted-services technique as the two single-event facts
+    /// above: nothing can deliver/remove an outbox row before this assertion runs.
+    /// </summary>
+    [Fact]
+    public async Task AddAsset_WithInitialTransaction_WritesBothOutboxMessagesInSameTransactionAsBothRows()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = _provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+
+        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        Assert.True(portfolioResult.IsSuccess);
+
+        var handler = scope.ServiceProvider.GetRequiredService<AddAssetHandler>();
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "Outbox test asset with initial transaction",
+            Currency = "PLN",
+            InstrumentId = Guid.NewGuid(),
+            InitialTransaction = new RecordTransactionRequest
+            {
+                Type = TransactionType.Buy,
+                Quantity = 5m,
+                UnitPrice = 10m,
+                Date = new DateOnly(2026, 1, 1)
+            }
+        };
+
+        var result = await handler.HandleAsync(portfolioResult.Value.Id, request, cancellationToken);
+        Assert.True(result.IsSuccess);
+
+        var asset = await dbContext.Assets.SingleOrDefaultAsync(a => a.Id == result.Value.Id, cancellationToken);
+        Assert.NotNull(asset);
+
+        var transaction = await dbContext.Transactions.SingleOrDefaultAsync(t => t.AssetId == asset.Id, cancellationToken);
+        Assert.NotNull(transaction);
+
+        var outboxMessages = await dbContext.Set<OutboxMessage>().ToListAsync(cancellationToken);
+        Assert.Contains(outboxMessages, m => m.MessageType.Contains(nameof(AssetChanged)));
+        Assert.Contains(outboxMessages, m => m.MessageType.Contains(nameof(TransactionRecorded)));
+    }
+
     [Fact]
     public async Task RecordTransaction_WritesTransactionRecordedOutboxMessageInSameTransactionAsTransactionRow()
     {

@@ -68,7 +68,10 @@ public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEnd
         asset.AssetClass = request.AssetClass;
         asset.Name = request.Name;
         asset.Currency = request.Currency;
-        asset.Quantity = request.Quantity;
+        // M1.5: no Asset.Quantity write here, deliberately — UpdateAssetRequest has no Quantity field
+        // (see its <remarks>). Quantity only ever moves through TransactionQuantityCalculator.Recompute
+        // (ADR-009), driven by RecordTransaction/UpdateTransaction/DeleteTransaction and AddAsset's own
+        // optional initial transaction — never a second, parallel path here.
 
         await publishEndpoint.Publish(new AssetChanged
         {
