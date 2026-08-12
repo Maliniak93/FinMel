@@ -35,4 +35,31 @@ public sealed class GetPortfolioEndpointTests(SkarbiecContainersFixture containe
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    /// <summary>
+    /// M1.3: the currency restriction applies to writes only (T1.11's live session already created a
+    /// USD portfolio before USD was even in the set) — a row holding an out-of-set currency must keep
+    /// reading back unchanged, never rewritten and never a validation error, since GET has no request
+    /// body for [SupportedCurrency] to inspect.
+    /// </summary>
+    [Fact]
+    public async Task Get_PortfolioWithOutOfSetCurrency_ReadsBackUnchanged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+
+        await using (var seedContext = CreateDbContext(ownerId))
+        {
+            seedContext.Portfolios.Add(new PortfolioEntity { Id = portfolioId, Name = "Legacy GBP account", Currency = "GBP" });
+            await seedContext.SaveChangesAsync(cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(ownerId);
+        var response = await client.GetAsync(PortfolioUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        Assert.Equal("GBP", body!.Currency);
+    }
 }

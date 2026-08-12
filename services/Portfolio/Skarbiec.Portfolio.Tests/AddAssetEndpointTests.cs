@@ -69,6 +69,57 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal("PLN", body.Currency);
     }
 
+    [Theory]
+    [InlineData("PLN")]
+    [InlineData("EUR")]
+    [InlineData("USD")]
+    public async Task Add_WithSupportedCurrency_ReturnsCreated(string currency)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = $"Cash in {currency}",
+            Currency = currency,
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.Equal(currency, body!.Currency);
+    }
+
+    [Fact]
+    public async Task Add_WithUnsupportedCurrency_ReturnsBadRequestNamingAcceptedSet()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Swiss cash",
+            Currency = "CHF",
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.Contains(problem.Errors, e => e.Key.Equals(nameof(AddAssetRequest.Currency), StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            problem.Errors.Values.SelectMany(messages => messages),
+            message => message.Contains(SupportedCurrencies.Accepted, StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Add_WithNegativeManualValue_ReturnsBadRequest()
     {
