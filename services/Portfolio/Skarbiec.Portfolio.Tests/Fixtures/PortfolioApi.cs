@@ -48,8 +48,9 @@ internal static class PortfolioApi
     }
 
     /// <summary>
-    /// Adds an asset to <paramref name="portfolioId"/> and returns its id. Quantity is left unset,
-    /// so the asset starts at 0 and its quantity is driven purely by transactions (ADR-009).
+    /// Adds an asset to <paramref name="portfolioId"/> and returns its id. No InitialTransaction is
+    /// sent (M1.5), so the asset starts at quantity 0 with zero transactions — quantity is driven
+    /// purely by transactions (ADR-009), never a directly-settable request field.
     /// </summary>
     public static async Task<Guid> AddAssetAsync(
         this HttpClient client,

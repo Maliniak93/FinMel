@@ -13,9 +13,6 @@ public sealed record UpdateAssetRequest : IValidatableObject
     [Required, SupportedCurrency]
     public required string Currency { get; init; }
 
-    [Range(typeof(decimal), "0", "79228162514264337593543950335")]
-    public decimal Quantity { get; init; }
-
     /// <summary>Market mode (T2.9): points at a MarketData instrument instead of a manual value. Switching modes is allowed; existing transactions are kept either way.</summary>
     public Guid? InstrumentId { get; init; }
 
@@ -31,6 +28,20 @@ public sealed record UpdateAssetRequest : IValidatableObject
     /// class "neither" was always a validation error before M1.4 and stays one, so no pre-existing
     /// behaviour changes. Market and Manual stay available to every class exactly as before.
     /// </summary>
+    /// <remarks>
+    /// M1.5: there is deliberately no <c>Quantity</c> property here anymore. ADR-009 makes
+    /// transactions the only source of truth for an asset's quantity, and <c>AddAssetRequest</c>
+    /// already dropped its own directly-settable <c>Quantity</c> in favour of an optional initial
+    /// transaction (recomputed via <see cref="Skarbiec.Portfolio.Features.TransactionQuantityCalculator"/>).
+    /// Keeping a writable <c>Quantity</c> here — even for currency-valued Cash/Deposit assets, whose
+    /// value is <c>Quantity × FxRate</c> — would have reopened a second, parallel way to set the same
+    /// number that <c>UpdateAssetHandler</c> could apply without going through the calculator at all.
+    /// A currency-valued asset with no transactions values at 0, exactly like a market/manual asset
+    /// with no transactions; its quantity only moves via <c>RecordTransaction</c>/<c>UpdateTransaction</c>/
+    /// <c>DeleteTransaction</c> (typically <see cref="TransactionType.Deposit"/>/<see cref="TransactionType.Withdraw"/>
+    /// for cash-like classes) or <c>AddAsset</c>'s own optional initial transaction — never a direct
+    /// field on this request.
+    /// </remarks>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         var hasInstrument = InstrumentId is not null;

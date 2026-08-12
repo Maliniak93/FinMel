@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Features.RecordTransaction;
 
 namespace Skarbiec.Portfolio.Features.AddAsset;
 
@@ -13,15 +14,24 @@ public sealed record AddAssetRequest : IValidatableObject
     [SupportedCurrency]
     public string Currency { get; init; } = Money.BaseCurrency;
 
-    [Range(typeof(decimal), "0", "79228162514264337593543950335")]
-    public decimal Quantity { get; init; }
-
     /// <summary>Market mode (T2.9): points at a MarketData instrument instead of a manual value.</summary>
     public Guid? InstrumentId { get; init; }
 
     public decimal? ManualValue { get; init; }
 
     public DateOnly? ManualValueDate { get; init; }
+
+    /// <summary>
+    /// Optional opening transaction (M1.5, S5's "add first transaction" checkbox). Omitted → the
+    /// asset is created with zero transactions and <c>Quantity == 0</c>, exactly as an asset with a
+    /// checkbox left unchecked. Reuses <see cref="RecordTransactionRequest"/> — the shape of "one
+    /// transaction" input — rather than inventing a second one; it is validated the same way (its own
+    /// <c>[Range]</c>/<c>[Required]</c> attributes, recursed into automatically by .NET 10's Minimal
+    /// API validation for nested complex properties) and turned into quantity by the same
+    /// <see cref="TransactionQuantityCalculator"/> path <c>RecordTransaction</c> uses (ADR-009) — never
+    /// a second, parallel way to arrive at a quantity.
+    /// </summary>
+    public RecordTransactionRequest? InitialTransaction { get; init; }
 
     /// <summary>
     /// Exactly one of three modes (M1.4) — market (<see cref="InstrumentId"/>), manual
