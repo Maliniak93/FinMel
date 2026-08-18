@@ -6,28 +6,28 @@
 
   <ItemGroup>
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.v3.assert" Version="3.2.2" />
     <PackageVersion Include="xunit.v3.extensibility.core" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
 
     <!-- Skarbiec.ServiceDefaults (T0.3) -->
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
     <!-- Skarbiec.ServiceDefaults (T1.7): built-in OpenAPI generation, no Swashbuckle -->
-    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <!-- Pinned above the 2.0.0 Microsoft.AspNetCore.OpenApi 10.0.10 pulls in transitively — NU1903
          (audit-as-error) flags it for GHSA-v5pm-xwqc-g5wc (stack-overflow DoS parsing a circular
          schema reference), patched from 2.7.5 onward. -->
-    <PackageVersion Include="Microsoft.OpenApi" Version="2.11.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
-    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.9.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
 
     <!-- Skarbiec.AppHost (T0.4) -->
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.6" />
@@ -36,43 +36,43 @@
 
     <!-- Skarbiec.Identity (T0.5) -->
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.6" />
-    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
 
     <!-- Skarbiec.Identity.Tests (T0.6) -->
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
 
     <!-- Skarbiec.Identity (T0.7) -->
-    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
 
     <!-- Skarbiec.Testing (T0.9) -->
-    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.14.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
-    <PackageVersion Include="Npgsql" Version="10.0.2" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
 
     <!-- Messaging: MassTransit v8 + EF Outbox (T0.10, ADR-012 — pinned to v8, no v9 upgrade) -->
     <PackageVersion Include="MassTransit" Version="8.5.10" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.10" />
     <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.5.10" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
 
     <!-- Portfolio/MarketData/Strategy/Reporting skeletons (T0.13) — pinned explicitly because
          Aspire.Npgsql.EntityFrameworkCore.PostgreSQL's own transitive floor for this package
          (10.0.8) otherwise conflicts with the 10.0.10 family pinned above. -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
 
     <!-- Portfolio/Strategy/Reporting (T0.13): registered via plain AddDbContext, not Aspire's
          AddNpgsqlDbContext — that helper hardcodes DbContext pooling, which is incompatible with
          constructor-injecting the request-scoped ICurrentUser these three contexts need for
          tenancy (ADR-006). MarketData has no such dependency and keeps the Aspire helper. -->
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
 
     <!-- Architecture tests (T0.14) -->
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
 
     <!-- Skarbiec.Gateway (T0.15): YARP + Aspire service discovery destination resolver -->
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
-    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.6.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.9.0" />
 
     <!-- MarketData PriceSyncJob (T2.6): Postgres-backed persistent store so schedule/state survive
          restarts, clustered so two live instances never run the same fire concurrently (ADR-007). -->
