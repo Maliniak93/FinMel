@@ -1,0 +1,64 @@
+### Login
+# @name login
+POST {{baseUrl}}/api/identity/login
+Content-Type: application/json
+
+{
+  "email": "test@skarbiec.local",
+  "password": "P@ssw0rd!123"
+}
+
+@authToken = {{login.response.body.accessToken}}
+
+### Search instruments
+GET {{baseUrl}}/api/marketdata/instruments/search?q=AAPL&limit=20
+Authorization: Bearer {{authToken}}
+
+### Add a custom instrument
+# @name addCustomInstrument
+POST {{baseUrl}}/api/marketdata/instruments
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "source": "Stooq",
+  "ticker": "AAPL.US",
+  "name": "Apple Inc.",
+  "quoteCurrency": "USD",
+  "assetClass": "Stock"
+}
+
+### Get instrument details
+GET {{baseUrl}}/api/marketdata/instruments/{{addCustomInstrument.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+### Trigger a price sync
+POST {{baseUrl}}/api/marketdata/sync/trigger
+Authorization: Bearer {{authToken}}
+
+### Get sync status
+GET {{baseUrl}}/api/marketdata/sync/status
+Authorization: Bearer {{authToken}}
+
+
+### --- Internal / system-caller only (SystemCaller policy) ---
+
+### Latest prices batch
+POST {{baseUrl}}/api/marketdata/prices/latest-batch
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "instrumentIds": ["{{addCustomInstrument.response.body.id}}"],
+  "asOfDate": "2026-08-18"
+}
+
+### Latest FX rates batch
+POST {{baseUrl}}/api/marketdata/fx/latest-batch
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "pairs": ["USDPLN", "EURPLN"],
+  "asOfDate": "2026-08-18"
+}

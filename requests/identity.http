@@ -1,0 +1,32 @@
+### Register a new user
+# @name register
+POST {{baseUrl}}/api/identity/register
+Content-Type: application/json
+
+{
+  "email": "test@skarbiec.local",
+  "password": "P@ssw0rd!123",
+  "displayName": "Test User"
+}
+
+### Login
+# @name login
+POST {{baseUrl}}/api/identity/login
+Content-Type: application/json
+
+{
+  "email": "test@skarbiec.local",
+  "password": "P@ssw0rd!123"
+}
+
+### Refresh
+# @name refresh
+POST {{baseUrl}}/api/identity/refresh
+
+### Me
+GET {{baseUrl}}/api/identity/me
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Logout
+POST {{baseUrl}}/api/identity/logout
+Authorization: Bearer {{login.response.body.accessToken}}

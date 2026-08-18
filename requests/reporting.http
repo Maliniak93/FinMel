@@ -1,0 +1,27 @@
+### Login
+# @name login
+POST {{baseUrl}}/api/identity/login
+Content-Type: application/json
+
+{
+  "email": "test@skarbiec.local",
+  "password": "P@ssw0rd!123"
+}
+
+@authToken = {{login.response.body.accessToken}}
+
+### Dashboard — all portfolios
+GET {{baseUrl}}/api/reporting/dashboard
+Authorization: Bearer {{authToken}}
+
+### Dashboard — one portfolio
+GET {{baseUrl}}/api/reporting/dashboard?portfolioId={{createPortfolio.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+### Net worth history — range: 1M | 1Y | YTD (default 1Y), all portfolios
+GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y
+Authorization: Bearer {{authToken}}
+
+### Net worth history — one portfolio
+GET {{baseUrl}}/api/reporting/net-worth-history?range=1M&portfolioId={{createPortfolio.response.body.id}}
+Authorization: Bearer {{authToken}}
