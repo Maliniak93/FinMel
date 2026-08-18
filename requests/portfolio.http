@@ -1,0 +1,155 @@
+### Login
+# @name login
+POST {{baseUrl}}/api/identity/login
+Content-Type: application/json
+
+{
+  "email": "test@skarbiec.local",
+  "password": "P@ssw0rd!123"
+}
+
+@authToken = {{login.response.body.accessToken}}
+
+### --- Portfolios ---
+
+### Create a portfolio
+# @name createPortfolio
+POST {{baseUrl}}/api/portfolio/portfolios
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Main portfolio",
+  "description": "Test portfolio created via REST Client",
+  "currency": "PLN"
+}
+
+### List portfolios
+GET {{baseUrl}}/api/portfolio/portfolios?includeArchived=false
+Authorization: Bearer {{authToken}}
+
+### Get a portfolio
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+### Update a portfolio
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Main portfolio (renamed)",
+  "description": "Updated via REST Client",
+  "currency": "PLN"
+}
+
+### Archive a portfolio
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/archive
+Authorization: Bearer {{authToken}}
+
+### Delete a portfolio
+DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+
+### --- Assets ---
+
+### Add a manual-valuation asset
+# @name addAsset
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Cash",
+  "name": "Savings account",
+  "currency": "PLN",
+  "quantity": 1,
+  "manualValue": 5000,
+  "manualValueDate": "2026-08-18"
+}
+
+### Add a market-valuation asset
+# @name addMarketAsset
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Stock",
+  "name": "Example stock",
+  "currency": "USD",
+  "quantity": 10,
+  "instrumentId": "{{addCustomInstrument.response.body.id}}"
+}
+
+### List assets
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+Authorization: Bearer {{authToken}}
+
+### Get an asset
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+### Update an asset
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Cash",
+  "name": "Savings account (renamed)",
+  "currency": "PLN",
+  "quantity": 1,
+  "manualValue": 5200,
+  "manualValueDate": "2026-08-18"
+}
+
+### Remove an asset
+DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+
+### --- Transactions ---
+
+### Record a transaction
+# @name recordTransaction
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 1,
+  "unitPrice": 5000,
+  "fee": 0,
+  "date": "2026-08-18"
+}
+
+### List transactions (paged)
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions?page=1&pageSize=20
+Authorization: Bearer {{authToken}}
+
+### Update a transaction
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 1,
+  "unitPrice": 5200,
+  "fee": 0,
+  "date": "2026-08-18"
+}
+
+### Delete a transaction
+DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+
+### --- Internal / system-caller only (ADR/SystemCaller policy) ---
+
+### Positions for valuation
+GET {{baseUrl}}/api/portfolio/positions-for-valuation?page=1
+Authorization: Bearer {{authToken}}

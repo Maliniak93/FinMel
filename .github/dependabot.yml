@@ -1,0 +1,47 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      nuget-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/gateway/Skarbiec.Gateway"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/services/Identity/Skarbiec.Identity"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/services/MarketData/Skarbiec.MarketData"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/services/Portfolio/Skarbiec.Portfolio"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/services/Reporting/Skarbiec.Reporting"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/services/Strategy/Skarbiec.Strategy"
+    schedule:
+      interval: "weekly"
