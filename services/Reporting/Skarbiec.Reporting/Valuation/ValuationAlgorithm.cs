@@ -23,9 +23,12 @@ public static class ValuationAlgorithm
 
         foreach (var position in positions)
         {
-            var (valuePln, positionIsStale) = position.InstrumentId is { } instrumentId
-                ? ValueMarketAsset(position, instrumentId, pricesByInstrument, fxRatesByPair, snapshotDate)
-                : ValueManualAsset(position, fxRatesByPair, snapshotDate);
+            var (valuePln, positionIsStale) = position.ValuationMode switch
+            {
+                AssetValuationMode.Market => ValueMarketAsset(position, pricesByInstrument, fxRatesByPair, snapshotDate),
+                AssetValuationMode.CurrencyValued => ValueCurrencyValuedAsset(position, fxRatesByPair, snapshotDate),
+                _ => ValueManualAsset(position, fxRatesByPair, snapshotDate),
+            };
 
             isStale |= positionIsStale;
 
@@ -51,12 +54,14 @@ public static class ValuationAlgorithm
 
     private static (decimal? ValuePln, bool IsStale) ValueMarketAsset(
         ValuationPosition position,
-        Guid instrumentId,
         IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument,
         IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
         DateOnly snapshotDate)
     {
-        if (!pricesByInstrument.TryGetValue(instrumentId, out var price))
+        // Defensive, not expected: Portfolio is the sole writer of ValuationMode and InstrumentId
+        // together, so Market without an InstrumentId shouldn't happen — stale-and-unvalued beats
+        // throwing if it ever does.
+        if (position.InstrumentId is not { } instrumentId || !pricesByInstrument.TryGetValue(instrumentId, out var price))
         {
             // No quote at all (not even an old one) — nothing to value, but flag it.
             return (null, true);
@@ -84,6 +89,23 @@ public static class ValuationAlgorithm
         }
 
         return ((position.ManualValueAmount ?? 0m) * rate.Value, fxIsStale);
+    }
+
+    /// <summary>M1.4's third mode: no instrument, no manual amount — <see cref="ValuationPosition.Quantity"/>
+    /// itself is the amount held in <see cref="ValuationPosition.Currency"/> (e.g. plain cash, a term
+    /// deposit), converted through the same <see cref="ResolveFxRate"/> the other two modes use.</summary>
+    private static (decimal? ValuePln, bool IsStale) ValueCurrencyValuedAsset(
+        ValuationPosition position,
+        IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
+        DateOnly snapshotDate)
+    {
+        var (rate, fxIsStale) = ResolveFxRate(position.Currency, fxRatesByPair, snapshotDate);
+        if (rate is null)
+        {
+            return (null, true);
+        }
+
+        return (position.Quantity * rate.Value, fxIsStale);
     }
 
     private static (decimal? Rate, bool IsStale) ResolveFxRate(

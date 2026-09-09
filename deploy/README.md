@@ -104,6 +104,10 @@ but only when `ASPNETCORE_ENVIRONMENT=Development` — convenient for local Aspi
 schema changes on every container start is not something production should do implicitly. In
 production (T0.18), migrations are an explicit step in the deploy script instead.
 
+While ADR-019 (greenfield mode) holds, migrations carry no data: dropping a database and letting it
+be recreated from scratch is an acceptable upgrade path, and a service's migration history may be
+squashed to a single `InitialCreate`. Production migration discipline arrives with T0.18.
+
 ## Production: docker compose on a VPS (T0.18)
 
 Not built yet — see `skarbiec-plan/zadania/phase-0-platform.md` T0.18.

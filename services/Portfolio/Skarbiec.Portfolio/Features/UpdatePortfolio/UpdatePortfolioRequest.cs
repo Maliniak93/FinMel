@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Skarbiec.Contracts;
 
 namespace Skarbiec.Portfolio.Features.UpdatePortfolio;
 
@@ -10,6 +11,6 @@ public sealed record UpdatePortfolioRequest
     [MaxLength(1000)]
     public string? Description { get; init; }
 
-    [Required, StringLength(3, MinimumLength = 3)]
+    [Required, SupportedCurrency]
     public required string Currency { get; init; }
 }

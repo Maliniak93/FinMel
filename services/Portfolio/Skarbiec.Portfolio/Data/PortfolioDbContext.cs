@@ -39,6 +39,9 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             asset.Property(a => a.Quantity).HasPrecision(18, 8);
             asset.Property(a => a.ManualValueAmount).HasPrecision(18, 2);
 
+            // ValuationMode (M1.4) needs no explicit config here — stored as its int ordinal by
+            // convention, same as AssetClass above it.
+
             // No navigation/FK to Portfolio — cross-aggregate reference by plain Guid (see the
             // AssetCount denormalization decision on Portfolio, T1.1), but still worth indexing
             // since every asset query in this service filters by PortfolioId.

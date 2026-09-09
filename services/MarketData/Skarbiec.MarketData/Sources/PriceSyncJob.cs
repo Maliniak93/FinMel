@@ -2,6 +2,7 @@ using System.Diagnostics;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
+using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.MarketData.Data;
 
@@ -101,34 +102,59 @@ public sealed class PriceSyncJob(
             }
         }
 
-        var currencies = instruments
-            .Select(i => i.QuoteCurrency)
+        // M1.4: union with every user-selectable currency (Skarbiec.Contracts.SupportedCurrencies),
+        // not just the currencies today's instruments happen to quote in. Before this, a currency
+        // with no instrument behind it (EUR: nothing quotes in it; the seeded USD coverage was
+        // incidental to three instruments) never got a daily rate at all — a currency-valued asset
+        // (M1.4's third valuation mode) in that currency would value off MarketDataSeeder's 2020
+        // bootstrap rate forever, flagged stale but never corrected. NBP table A returns every
+        // published currency in one call regardless of what's asked for (NbpFxRateSource's own doc
+        // comment), so this costs no extra HTTP request — it only changes which rows land.
+        var instrumentCurrencies = new HashSet<string>(
+            instruments.Select(i => i.QuoteCurrency).Where(c => !string.Equals(c, BaseCurrency, StringComparison.OrdinalIgnoreCase)),
+            StringComparer.OrdinalIgnoreCase);
+
+        var currencies = instrumentCurrencies
+            .Concat(SupportedCurrencies.All)
             .Where(c => !string.Equals(c, BaseCurrency, StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (currencies.Count > 0)
-        {
-            var fxResult = await SafeFetch.RunAsync(
-                () => fxRateSource.FetchLatestAsync(currencies, cancellationToken),
-                ex => $"FX fetch threw unexpectedly: {ex.Message}");
+        // currencies is never empty now (SupportedCurrencies.All always has EUR/USD beyond PLN), so
+        // the FX branch always runs — it's no longer conditional on instrument coverage.
+        var fxResult = await SafeFetch.RunAsync(
+            () => fxRateSource.FetchLatestAsync(currencies, cancellationToken),
+            ex => $"FX fetch threw unexpectedly: {ex.Message}");
 
-            switch (fxResult.Outcome)
-            {
-                case PriceFetchOutcome.Success:
-                    var syncedPairs = await QuoteUpsert.UpsertFxRatesAsync(db, fxResult.Values, cancellationToken);
-                    var syncedCurrencies = currencies.Count(c => syncedPairs.Contains(c.ToUpperInvariant() + BaseCurrency));
-                    synced += syncedCurrencies;
-                    failed += currencies.Count - syncedCurrencies;
-                    break;
-                case PriceFetchOutcome.NoData:
-                    noData += currencies.Count;
-                    break;
-                case PriceFetchOutcome.Error:
-                    logger.LogWarning("PriceSyncJob: FX fetch failed: {Reason}", fxResult.ErrorReason);
-                    failed += currencies.Count;
-                    break;
-            }
+        switch (fxResult.Outcome)
+        {
+            case PriceFetchOutcome.Success:
+                var syncedPairs = await QuoteUpsert.UpsertFxRatesAsync(db, fxResult.Values, cancellationToken);
+                var syncedCurrencies = currencies.Count(c => syncedPairs.Contains(c.ToUpperInvariant() + BaseCurrency));
+                synced += syncedCurrencies;
+
+                // FailedCount decision (M1.4): a supported-set currency nobody currently holds an
+                // instrument in (e.g. EUR before any EUR instrument/asset exists) doesn't count as a
+                // failure just because NBP's response didn't happen to include it — MarketData can't
+                // see Portfolio's assets (ADR-003, no cross-DB joins) to know if it's actually "in
+                // use" beyond instrument coverage, and failing closed on a currency nobody's
+                // valuation depends on today is noise that would make a routine run look Partial. A
+                // currency an instrument actually quotes in still counts exactly as before — that one
+                // *is* a real signal something's wrong.
+                var missingInstrumentBacked = currencies
+                    .Where(c => !syncedPairs.Contains(c.ToUpperInvariant() + BaseCurrency))
+                    .Count(instrumentCurrencies.Contains);
+                failed += missingInstrumentBacked;
+                break;
+            case PriceFetchOutcome.NoData:
+                noData += currencies.Count;
+                break;
+            case PriceFetchOutcome.Error:
+                logger.LogWarning("PriceSyncJob: FX fetch failed: {Reason}", fxResult.ErrorReason);
+                // Same instrument-backed scoping as the Success branch above — a total FX outage is
+                // still only a *failure* for currencies something actually depends on today.
+                failed += currencies.Count(instrumentCurrencies.Contains);
+                break;
         }
 
         run.FinishedAt = timeProvider.GetUtcNow();

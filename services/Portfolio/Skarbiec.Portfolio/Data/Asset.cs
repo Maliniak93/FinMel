@@ -14,18 +14,24 @@ public sealed class Asset : IUserOwned
     public decimal Quantity { get; set; }
 
     /// <summary>
-    /// Manual and market are mutually exclusive (T2.9): exactly one of
-    /// (<see cref="ManualValueAmount"/> + <see cref="ManualValueDate"/>) or <see cref="InstrumentId"/>
-    /// is set. Enforced by <c>AddAssetRequest</c>/<c>UpdateAssetRequest</c>'s
-    /// <c>IValidatableObject</c> rule, not a DB constraint — Postgres has no cheap "exactly one of
-    /// these column groups is null" check across a nullable decimal + nullable Guid without a
-    /// trigger, and the handler is already the single writer of both.
+    /// Which of the three valuation modes (M1.4, <c>Skarbiec.Contracts.AssetValuationMode</c>) this
+    /// asset uses — the explicit source of truth for which of the fields below are populated:
+    /// <see cref="InstrumentId"/> (Market), <see cref="ManualValueAmount"/> +
+    /// <see cref="ManualValueDate"/> (Manual), or neither (CurrencyValued — value comes from
+    /// <see cref="Quantity"/> × the FX rate for <see cref="Currency"/>, no extra field needed).
+    /// Exactly one shape applies at a time. Enforced by <c>AddAssetRequest</c>/
+    /// <c>UpdateAssetRequest</c>'s <c>IValidatableObject</c> rule, not a DB constraint — Postgres has
+    /// no cheap "exactly one of these column groups is null" check across a nullable decimal +
+    /// nullable Guid without a trigger, and the handler is already the single writer of all three.
     /// </summary>
+    public required AssetValuationMode ValuationMode { get; set; }
+
+    /// <summary>Manual mode only — set together with <see cref="ManualValueDate"/>, null otherwise.</summary>
     public decimal? ManualValueAmount { get; set; }
 
     public DateOnly? ManualValueDate { get; set; }
 
-    /// <summary>Guid from the MarketData database, no FK (ADR-003). Validated via internal REST on write (T2.9).</summary>
+    /// <summary>Market mode only. Guid from the MarketData database, no FK (ADR-003). Validated via internal REST on write (T2.9).</summary>
     public Guid? InstrumentId { get; set; }
 
     /// <summary>

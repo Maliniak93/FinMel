@@ -7,6 +7,18 @@
 
 html {
   height: 100%;
+
+  // Default: follow the OS preference, live, with no JS involved — `light-dark()` (used inside
+  // every `--mat-sys-*` variable below) re-evaluates automatically as `prefers-color-scheme`
+  // changes. `ThemeService` (`web/src/app/core/theme/theme.ts`) lets the user pin an explicit
+  // choice instead, by writing `color-scheme` directly onto this element's inline `style` (not a
+  // stylesheet rule here) — an inline style wins the cascade unconditionally, which matters
+  // because production builds inline only a "critical" subset of this stylesheet into <head> and
+  // load the rest async; a same-specificity override rule living in that async-loaded remainder
+  // would apply a beat after first paint and flash. `index.html`'s bootstrap script does the same
+  // synchronously before Angular loads, for the same reason.
+  color-scheme: light dark;
+
   @include mat.theme(
     (
       color: (
@@ -20,10 +32,10 @@ html {
 }
 
 body {
-  // Default the application to a light color theme. This can be changed to
-  // `dark` to enable the dark color theme, or to `light dark` to defer to the
-  // user's system settings.
-  color-scheme: light;
+  // No `color-scheme` here on purpose — it must inherit from <html> above. Redeclaring it here
+  // (even to the same-looking value) would pin it for the whole app regardless of the user's
+  // choice, silently breaking the toggle, since `color-scheme` is what every `light-dark()` in
+  // `--mat-sys-*` resolves against.
 
   // Set a default background, font and text colors for the application using
   // Angular Material's system-level CSS variables. Learn more about these
