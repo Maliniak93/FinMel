@@ -26,30 +26,30 @@
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.9.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
 
     <!-- Skarbiec.AppHost (T0.4) -->
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.5.3" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.3" />
+    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.5.3" />
 
     <!-- Skarbiec.Identity (T0.5) -->
-    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.5.3" />
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
 
     <!-- Skarbiec.Identity.Tests (T0.6) -->
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
 
     <!-- Skarbiec.Identity (T0.7) -->
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
 
     <!-- Skarbiec.Testing (T0.9) -->
-    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.15.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
 
@@ -79,9 +79,9 @@
 
     <!-- MarketData PriceSyncJob (T2.6): Postgres-backed persistent store so schedule/state survive
          restarts, clustered so two live instances never run the same fire concurrently (ADR-007). -->
-    <PackageVersion Include="Quartz" Version="3.19.1" />
-    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.19.1" />
-    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.19.1" />
+    <PackageVersion Include="Quartz" Version="3.21.0" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.21.0" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.21.0" />
     <!-- Generates Quartz's ADO job-store schema as a normal EF Core migration in marketdata_db,
          instead of hand-running Quartz's own tables_postgres.sql as a separate deploy step. -->
     <PackageVersion Include="AppAny.Quartz.EntityFrameworkCore.Migrations.PostgreSQL" Version="0.6.0" />
