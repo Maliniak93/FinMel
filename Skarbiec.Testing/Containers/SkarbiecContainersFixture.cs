@@ -72,9 +72,8 @@ public sealed class SkarbiecContainersFixture : IAsyncLifetime
         // Retried on deadlock (Postgres 40P01): once a service has an EF outbox (T1.5), its
         // WebApplicationFactory host runs a live MassTransit bus + outbox delivery poller as a
         // background hosted service, which isn't always fully drained by the *previous* test
-        // class's WebApplicationFactory.DisposeAsync shutdown window (see
-        // Skarbiec.Identity's UserRegisteredLoggingConsumer for the same caveat) — so this DELETE
-        // batch can occasionally lock-clash with a still-shutting-down poller touching
+        // class's WebApplicationFactory.DisposeAsync shutdown window — so this DELETE batch can
+        // occasionally lock-clash with a still-shutting-down poller touching
         // OutboxMessage/OutboxState. Postgres's own recommendation for 40P01 is exactly this: retry
         // the losing transaction.
         const int maxAttempts = 3;

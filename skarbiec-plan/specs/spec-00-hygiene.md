@@ -1,6 +1,6 @@
 ---
 title: Build hygiene — drop the logging consumer, build-time OpenAPI, gen:api from files
-status: draft
+status: done
 tier: 1
 branch: feat/hygiene
 created: 2026-09-06
@@ -48,7 +48,7 @@ Strategy service wiring (spec-01 deletes it outright). Event/consumer redesign, 
 
 ## Design decisions
 
-1. **Zero test files change.** Grepped `services/Identity` for `UserRegisteredLoggingConsumer`: only `Program.cs` and the class's own file reference it — no test does. Read all five `UserRegistered*` test classes: `UserRegisteredOutboxTests`/`UserRegisteredOutboxDurabilityTests`/`UserRegisteredIdempotentConsumerTests`/`UserRegisteredPoisonMessageTests` each build their own throwaway consumer via `HostlessOutboxProvider.Build`/a hand-rolled `ServiceCollection` (never touch Identity's real bus registration); `UserRegisteredDeliveryTests` uses the fully independent `Messaging/TestConsumerHost` + `UserRegisteredTestConsumer` pair, which opens its own bus against the shared RabbitMQ container. None depends on `UserRegisteredLoggingConsumer`.
+1. **Zero test files change.** Grepped `services/Identity` for `UserRegisteredLoggingConsumer`: only `Program.cs` and the class's own file reference it — no test does. Read all five `UserRegistered*` test classes: `UserRegisteredOutboxTests`/`UserRegisteredOutboxDurabilityTests`/`UserRegisteredIdempotentConsumerTests`/`UserRegisteredPoisonMessageTests` each build their own throwaway consumer via `HostlessOutboxProvider.Build`/a hand-rolled `ServiceCollection` (never touch Identity's real bus registration); `UserRegisteredDeliveryTests` uses the fully independent `Messaging/TestConsumerHost` + `UserRegisteredTestConsumer` pair, which opens its own bus against the shared RabbitMQ container. None depends on `UserRegisteredLoggingConsumer`. (Correction, post-review: this claim was wrong in one respect — deleting the consumer emptied the `Skarbiec.Identity.Messaging` namespace, so the now-dangling `using` had to be removed from `UserRegisteredIdempotentConsumerTests.cs` and `UserRegisteredPoisonMessageTests.cs` to fix CS0234.)
 2. **Per-service guard table** (skip when `OpenApiBuildTime.IsActive`; endpoints/handlers always stay mapped since the doc generator only introspects routes, and a handler is merely resolved from DI per request):
 
    | Service | Skipped when build-time | Always runs |
@@ -102,4 +102,4 @@ _(none — required empty before `status: approved`)_
 
 ## Result
 
-<!-- Filled in by ops after Ship. -->
+PR: https://github.com/Maliniak93/FinMel/pull/76

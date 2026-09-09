@@ -17,6 +17,11 @@ const BUY = 0;
 const SELL = 1;
 const FEE = 6;
 
+// Exported for callers that need to set/compare a specific transaction type by name rather than by
+// index into TRANSACTION_TYPES (asset-form-dialog's initial-transaction default, T1.11).
+export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
+export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
+
 export function transactionTypeLabel(value: TransactionType): string {
   return TRANSACTION_TYPES.find((t) => t.value === Number(value))?.label ?? 'Unknown';
 }

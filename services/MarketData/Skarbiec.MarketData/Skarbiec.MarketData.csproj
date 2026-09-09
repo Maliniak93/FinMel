@@ -12,11 +12,20 @@
     <PackageReference Include="Quartz.Extensions.Hosting" />
     <PackageReference Include="Quartz.Serialization.SystemTextJson" />
     <PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.PostgreSQL" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\contracts\Skarbiec.Contracts\Skarbiec.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Skarbiec.ServiceDefaults\Skarbiec.ServiceDefaults.csproj" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildThisFileDirectory)../../../web/openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name marketdata</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
 
 </Project>
