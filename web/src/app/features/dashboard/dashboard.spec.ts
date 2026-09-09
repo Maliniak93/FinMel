@@ -22,7 +22,12 @@ const dashboard: DashboardResponse = {
     { assetClass: 2, valuePln: 10000, percentage: 66.67 },
   ],
   byPortfolio: [
-    { portfolioId: '11111111-1111-1111-1111-111111111111', valuePln: 15000, snapshotDate: '2026-08-09', isStale: false },
+    {
+      portfolioId: '11111111-1111-1111-1111-111111111111',
+      valuePln: 15000,
+      snapshotDate: '2026-08-09',
+      isStale: false,
+    },
   ],
 };
 

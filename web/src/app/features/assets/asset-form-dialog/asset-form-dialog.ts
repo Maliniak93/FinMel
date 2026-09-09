@@ -1,7 +1,10 @@
 import { Component, effect, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatAutocompleteModule, type MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
+import {
+  MatAutocompleteModule,
+  type MatAutocompleteSelectedEvent,
+} from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -41,7 +44,8 @@ export interface AssetFormDialogData {
 }
 
 type Mode = 'manual' | 'market';
-type InstrumentOption = InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;
+type InstrumentOption =
+  InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;
 
 function toDateOnly(date: Date): string {
   const year = date.getFullYear();

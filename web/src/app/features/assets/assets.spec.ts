@@ -203,7 +203,7 @@ describe('Assets', () => {
     );
   });
 
-  it('shows a market asset\'s last price, date, and source', async () => {
+  it("shows a market asset's last price, date, and source", async () => {
     const instrument: InstrumentDetailsResponse = {
       id: instrumentId,
       ticker: 'AAPL.US',
@@ -219,7 +219,9 @@ describe('Assets', () => {
     await fixture.whenStable();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain(new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'USD' }).format(2120));
+    expect(text).toContain(
+      new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'USD' }).format(2120),
+    );
     expect(text).toContain('Stooq');
     expect(text).not.toContain('Stale');
   });

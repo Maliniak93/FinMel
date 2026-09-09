@@ -1,0 +1,25 @@
+flowchart LR
+    U["User<br/>(browser)"]
+
+    subgraph SKARBIEC["Skarbiec system (microservices)"]
+        SPA["Angular 22 SPA"]
+        GW["API Gateway<br/>(YARP, JWT validation)"]
+        SVC[".NET 10 services:<br/>Identity, Portfolio, MarketData,<br/>Strategy, Reporting"]
+        MQ["RabbitMQ"]
+        DB[("PostgreSQL<br/>database per service")]
+    end
+
+    NBP["NBP API<br/>FX rates, gold price"]
+    STOOQ["Stooq<br/>GPW, ETFs, precious metals (CSV)"]
+    CG["CoinGecko<br/>crypto"]
+    SMTP["SMTP server<br/>notifications (Phase 4)"]
+
+    U -->|HTTPS| SPA
+    SPA -->|"REST/JSON + JWT"| GW
+    GW --> SVC
+    SVC <-->|events| MQ
+    SVC --> DB
+    SVC -->|"jobs, once a day"| NBP
+    SVC -->|"jobs, once a day"| STOOQ
+    SVC -->|"jobs, once a day"| CG
+    SVC -.->|e-mail| SMTP

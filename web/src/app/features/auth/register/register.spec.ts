@@ -68,7 +68,10 @@ describe('Register', () => {
   it('maps a weak-password validation failure onto the password field', async () => {
     authService.register.mockResolvedValue({
       success: false,
-      problem: { errorCode: 'Validation.Register', detail: 'Passwords must be at least 6 characters.' },
+      problem: {
+        errorCode: 'Validation.Register',
+        detail: 'Passwords must be at least 6 characters.',
+      },
     });
     component['form'].setValue({ email: 'a@b.com', displayName: 'Ada', password: 'secretpw' });
 

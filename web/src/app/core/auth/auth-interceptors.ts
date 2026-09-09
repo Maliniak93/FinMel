@@ -15,7 +15,9 @@ interface ResolvedRequestOptions {
 interface InterceptableClient {
   interceptors: {
     request: {
-      use(fn: (request: Request, options: ResolvedRequestOptions) => Request | Promise<Request>): unknown;
+      use(
+        fn: (request: Request, options: ResolvedRequestOptions) => Request | Promise<Request>,
+      ): unknown;
     };
     response: {
       use(

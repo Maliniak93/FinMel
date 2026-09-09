@@ -19,16 +19,13 @@ npm-debug.log*
 appsettings.Production.json
 
 # Claude Code (personal, not shared)
-CLAUDE.local.md
-.claude/settings.local.json
-.claude/skills/zadanie/
-.claude/skills/poprawki/
-.claude/skills/modyfikacje/
-.claude/skills/praca/
+
 
 # OS / editors
 Thumbs.db
 .DS_Store
 
 # private files
-skarbiec-plan
+
+# hey-api generator error dumps
+web/openapi-ts-error-*.log

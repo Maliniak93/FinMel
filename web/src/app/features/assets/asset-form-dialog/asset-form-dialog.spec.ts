@@ -4,7 +4,11 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNativeDateAdapter } from '@angular/material/core';
 
 import { client as marketDataClient } from '../../../api/marketdata/client.gen';
-import type { CustomInstrumentResponse, InstrumentDetailsResponse, InstrumentSearchResult } from '../../../api/marketdata';
+import type {
+  CustomInstrumentResponse,
+  InstrumentDetailsResponse,
+  InstrumentSearchResult,
+} from '../../../api/marketdata';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { AssetResponse } from '../../../api/portfolio';
 import { AssetFormDialog, type AssetFormDialogData } from './asset-form-dialog';
@@ -228,15 +232,22 @@ describe('AssetFormDialog', () => {
   });
 
   it('pre-fills market mode and the instrument picker when editing a market asset', async () => {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
-      requestUrl(input).includes('/instruments/') ? jsonResponse(instrumentDetails) : jsonResponse(marketAsset),
-    );
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) =>
+        requestUrl(input).includes('/instruments/')
+          ? jsonResponse(instrumentDetails)
+          : jsonResponse(marketAsset),
+      );
 
     await TestBed.configureTestingModule({
       imports: [AssetFormDialog],
       providers: [
         provideNativeDateAdapter(),
-        { provide: MAT_DIALOG_DATA, useValue: { portfolioId, asset: marketAsset } satisfies AssetFormDialogData },
+        {
+          provide: MAT_DIALOG_DATA,
+          useValue: { portfolioId, asset: marketAsset } satisfies AssetFormDialogData,
+        },
         { provide: MatDialogRef, useValue: (dialogRef = { close: vi.fn() }) },
       ],
     }).compileComponents();
@@ -251,7 +262,9 @@ describe('AssetFormDialog', () => {
 
   it('creates a market asset from an autocomplete selection', async () => {
     await setup({ portfolioId });
-    fetchSpy.mockResolvedValue(jsonResponse({ ...marketAsset, id: '55555555-5555-5555-5555-555555555555' }, 201));
+    fetchSpy.mockResolvedValue(
+      jsonResponse({ ...marketAsset, id: '55555555-5555-5555-5555-555555555555' }, 201),
+    );
 
     component['setMode']('market');
     component['onInstrumentOptionSelected']({

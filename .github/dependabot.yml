@@ -4,14 +4,20 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
       nuget-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # ADR-012 pins MassTransit v8
+      - dependency-name: "MassTransit*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]

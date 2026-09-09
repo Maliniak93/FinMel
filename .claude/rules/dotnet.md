@@ -8,78 +8,65 @@ paths:
 
 # .NET conventions (C# 14 / .NET 10)
 
-Items marked *(default — confirm in Phase 0)* are opinionated choices not backed by an ADR yet; use them, but flag when the user touches the area for the first time.
+Messaging lives in `messaging.md`, tests in `testing.md`, domain rules in `domain.md`.
 
 ## Language
 
 - `<Nullable>enable</Nullable>`, implicit usings, file-scoped namespaces everywhere.
-- `record` for DTOs, requests/responses, event contracts; `required` members over constructor telescoping.
-- Classes `sealed` by default; primary constructors for DI; pattern matching over type checks/casts.
-- No `async void`; `CancellationToken` accepted and passed through in every handler and EF/HTTP call.
+- `record` for DTOs, requests/responses and event contracts; `required` members over constructor telescoping.
+- Classes `sealed` by default; primary constructors for DI; pattern matching over type checks and casts.
+- No `async void`. Accept a `CancellationToken` in every handler, consumer and job, and pass it through every EF and HTTP call.
 
-## Solution hygiene *(default — confirm in Phase 0)*
+## Solution hygiene
 
-- `Directory.Build.props` at repo root: `LangVersion` latest, `TreatWarningsAsErrors`, `AnalysisLevel` latest, `ImplicitUsings`, `Nullable`.
-- Central Package Management: versions only in `Directory.Packages.props`.
-- `dotnet format` clean before commit.
+- `Directory.Build.props` at the repo root owns `LangVersion`, `TreatWarningsAsErrors`, `AnalysisLevel`, `ImplicitUsings`, `Nullable` — never set them per project.
+- Central Package Management: package versions live only in `Directory.Packages.props`.
+- Add every new project to `Skarbiec.slnx`; build with `dotnet build Skarbiec.slnx`.
+- Warnings are errors. Run `dotnet format` before handing work off.
 
 ## Minimal APIs
 
-- Endpoints grouped with `MapGroup("/api/<service>/<feature>")`; one endpoint file per slice registering itself via an extension method.
-- Return `TypedResults` with `Results<T1, T2, ...>` unions — never bare `IResult`.
-- Validation: .NET 10 built-in Minimal API validation — `builder.Services.AddValidation()` + DataAnnotations on request records; invalid input short-circuits to 400 ProblemDetails. Complex/cross-field rules: `IValidatableObject` or a validator class in the slice. *(default — confirm in Phase 0; fallback: FluentValidation)*
-- Errors as ProblemDetails end-to-end: request validation → 400 automatically (previous bullet); handler-level expected failures (not found, conflict, business-rule violation) → the handler returns `Result`/`Result<T>`, the endpoint maps the failure to `TypedResults`/ProblemDetails via a shared helper in ServiceDefaults (ADR-017); genuinely unexpected failures → exception, caught by the global `AddProblemDetails()` handler in ServiceDefaults. Correlation/trace id included in every response.
-- OpenAPI: built-in `Microsoft.AspNetCore.OpenApi` (`AddOpenApi()`/`MapOpenApi()`) — no Swashbuckle. The generated doc feeds the Angular TS client.
+- Group endpoints with `MapGroup("/api/<service>/<feature>")`; one endpoint file per slice, registering itself through a `Map<Feature>Endpoint()` extension method called from `Program.cs`.
+- Return `TypedResults` inside a `Results<T1, T2, ...>` union — never a bare `IResult`.
+- Validation: `builder.Services.AddValidation()` plus DataAnnotations on the request record; .NET 10's built-in Minimal API validation short-circuits invalid input to a 400 ProblemDetails. Cross-field rules go in `IValidatableObject` on the same record, or a validator class in the slice.
+- Errors are ProblemDetails end to end: bad input → 400 automatically; an expected failure (not found, conflict, business rule) → the handler's failed `Result` mapped by `ResultHttpExtensions` in ServiceDefaults (ADR-017); a genuinely unexpected failure → an exception caught by ServiceDefaults' `AddProblemDetailsWithTraceId()`. Every response carries the trace id.
+- OpenAPI through ServiceDefaults only: `builder.AddServiceOpenApi()` + `app.MapServiceOpenApi("<service>")`, which puts the document under the service's own `/api/<service>/openapi/...` prefix so it flows through the existing Gateway route. Never add Swashbuckle.
 
 ## Slices (ADR-002, ADR-004)
 
-- `Features/<FeatureName>/` = endpoint + handler + validator (+ request/response records). Handler is a plain class resolved from DI — no MediatR, no Service/Repository layers.
-- Handler methods return `Result`/`Result<T>` (railway-oriented; the `Result`/`Result<T>`/`Error` types live in `Skarbiec.Contracts`) — never throw for expected failures. The endpoint calls the handler and maps the result to `TypedResults` via the ProblemDetails-mapping helper in ServiceDefaults (ADR-017). Exceptions stay reserved for genuinely unexpected failures.
+- `Features/<FeatureName>/` = endpoint + handler + validator (+ request/response records). The handler is a plain class resolved from DI — no MediatR, no Service or Repository layer.
+- Handler methods return `Result`/`Result<T>` (the `Result`, `Result<T>` and `Error` types live in `Skarbiec.Contracts`). Never throw for an expected failure; exceptions stay reserved for the genuinely unexpected.
+- **Register every handler**: `builder.Services.AddScoped<XHandler>();` in `Program.cs`, next to the others. Forgetting it still builds green — the host then fails at startup because Minimal API parameter binding tries to infer the unregistered handler as `[FromBody]` and reports two body parameters.
 - Extract shared code only on the third use.
-- `UserId` always from JWT claims (`ClaimsPrincipal`), never from the request body or route (ADR-006).
+- `UserId` always comes from the JWT via `ICurrentUser` — never from the request body, query or route (ADR-006).
 
 ## EF Core 10
 
-- One DbContext per service; migrations live in the service; no lazy loading, no `Include` chains crossing aggregate boundaries.
-- Reads: `AsNoTracking()`; projections with `Select` into response records.
-- Global query filter on `UserId` + save interceptor stamping `UserId` (ADR-006).
-- Money: `decimal` with explicit precision (e.g. `HasPrecision(18, 8)` for quantity/prices, `(18, 2)` for PLN amounts) — never `double`/`float`.
-- Time: `DateTimeOffset`/UTC (`timestamptz`); `DateOnly` for `PriceQuote`/`FxRate` dates. Unique indexes: (instrument, date), (pair, date).
-- Cross-service references are plain `Guid` columns — no FK, no navigation (ADR-003).
-
-## Messaging (ADR-012)
-
-- Publish only via MassTransit EF Outbox — never `IPublishEndpoint` outside the outbox transaction.
-- Consumers idempotent: inbox/dedup by `MessageId`. Contracts in `Skarbiec.Contracts`, additive versioning (breaking = new `V2` type).
-- Trace context propagates automatically (MassTransit + OTel) — no manual correlation IDs.
-- Details and tests: follow `/new-event`.
+- One `DbContext` per service; its migrations live in the service project. No lazy loading, no `Include` chain crossing an aggregate boundary.
+- Reads use `AsNoTracking()` and project with `Select` straight into the response record.
+- Tenancy: a global query filter on `UserId` plus the save interceptor that stamps it (ADR-006).
+- `decimal` with explicit precision — `HasPrecision(18, 8)` for quantities and prices, `(18, 2)` for money amounts. Never `double`/`float`.
+- Time: `DateTimeOffset` in UTC (`timestamptz`); `DateOnly` for quote and rate dates. Unique indexes as listed in `domain.md`.
+- Concurrency: an `xmin` shadow property as the concurrency token. A migration must never create, drop or alter it — if a generated migration touches `xmin`, delete those lines by hand.
+- Enums are stored as ints, so with `HasDefaultValue` the CLR default 0 is what an existing row gets: the member that means "not set" (or the intended default) must be the one with value 0. Ordering enum members carelessly silently rewrites history.
+- Run `dotnet format` right after `dotnet ef migrations add` — generated migration files are not formatted.
+- Migrations may be destructive and may be squashed to a single `InitialCreate` (ADR-019). No backfill scripts, no compatibility shims; drop the local database instead.
+- Cross-service references are plain `Guid` columns — no FK, no navigation property (ADR-003).
 
 ## HTTP between services
 
-- Named/typed `HttpClient` + `Microsoft.Extensions.Http.Resilience` (retry with jitter, circuit breaker, timeout) — configured once in ServiceDefaults.
-- Forward the caller's JWT (token passthrough); downstream service filters by its own `UserId` claim.
+- One typed `HttpClient` per dependency, based at `https+http://<service>-service` (Aspire service discovery). Resilience comes from ServiceDefaults' `ConfigureHttpClientDefaults` — do not add retry or circuit-breaker policies per client.
+- `.AddJwtForwardingHandler()` when the call happens inside a user's request and the downstream service must see that user (Portfolio → MarketData instrument lookup).
+- `.AddSystemTokenHandler()` only for the daily Reporting → MarketData price/FX batch endpoints, which are the only endpoints behind the `SystemCaller` policy. Jobs and consumers have no inbound token to forward, which is the whole reason it exists.
+- `IgnoreQueryFilters()` is allowed only in those `SystemCaller` endpoints and in consumers that legitimately write for many users. Every such call needs a comment saying why.
+- A transport failure is an expected failure: return a `ServiceUnavailable`-prefixed `Error` so the endpoint maps it to 503 (see `Features/AssetErrors.cs` in Portfolio) — never let the `HttpRequestException` escape.
 
-## Testing
+## Quartz jobs (MarketData only)
 
-- xUnit v3 *(default — confirm in Phase 0)* + Testcontainers (PostgreSQL, RabbitMQ) for slice integration tests.
-- Per service DoD: tenancy isolation test (user B gets 404 on user A's resource), health-check smoke test.
-- NetArchTest: every user-owned entity has `UserId`; no references between service projects.
-- Contract tests: previously serialized event payloads still deserialize.
-
-### Test helpers live in exactly one place
-
-**Never copy a test helper between test classes.** Unlike production code (where the rule is "extract on the third use"), a duplicated arrange helper gets extracted on the *second* — it's plumbing, not a domain decision, and copies drift silently. Two layers own it:
-
-| Layer | Where | Holds |
-| --- | --- | --- |
-| Cross-service infrastructure | `Skarbiec.Testing` | `SkarbiecContainersFixture` (shared PG + RabbitMQ), `SkarbiecApiFactory<TProgram>`, `ServiceEndpointTests<TProgram>` (factory lifetime + per-test DB reset), `TestJwtIssuer` / `CreateAuthenticatedClient`, `TenancyIsolationTests<TProgram>` |
-| Per-service domain | `<Service>.Tests/Fixtures/` | `<Service>EndpointTests` base binding the factory, `<Service>Api` (route builders + arrange calls), `<Service>Assertions` (invariants asserted from more than one slice), direct-DbContext access for facts HTTP can't express |
-
-- A test class is `[Collection(TestingDefaults.CollectionName)]` + `: <Service>EndpointTests(containers)` + facts. It must **not** declare its own `_factory`, `InitializeAsync`/`DisposeAsync`, or route constants — the base and `<Service>Api` own those. (A service with only one host-backed test class may derive from `ServiceEndpointTests<Program>` directly and extract the per-service base when the second one arrives.)
-- Fixture helpers are **arrange only** and `EnsureSuccessStatusCode`. A test asserting on endpoint X calls X directly and inspects the raw `HttpResponseMessage` — routing it through the helper would turn the failure under test into an exception. Say so in a comment at the top of such a class.
-- Give helpers optional parameters with sane defaults (`name`, `assetClass`, `quantity`) so a call site states only what the fact depends on.
-- Before adding a helper to a test class, check `Fixtures/` first — and when a fact needs a variant, add a parameter there instead of a private copy.
+- Register the schedule behind `Testing:DisableBackgroundJobs`; when it is set, register the NoOp trigger implementation instead (`NoOpSyncTrigger`, `NoOpHistoryBackfillTrigger`) so slice tests never race a job.
+- Each job owns an `ActivitySource` exposed as `public const string ActivitySourceName`, registered in the service's `AddSource(...)` call in `Program.cs`, and starts an activity named `<Job>.Run`.
+- Jobs are the only place that talks to NBP, Stooq or CoinGecko (ADR-007) — never a request path, with `ITickerVerifier` as the single exception (ADR-018).
 
 ## Observability
 
-- Everything through `Skarbiec.ServiceDefaults`: OTel traces/logs/metrics, `/health/live` + `/health/ready`. Never configure these per-service by hand.
+Everything through `Skarbiec.ServiceDefaults`: OTel traces/logs/metrics, `/health/live`, `/health/ready`, JWT auth, ProblemDetails. Never configure any of these per service by hand.

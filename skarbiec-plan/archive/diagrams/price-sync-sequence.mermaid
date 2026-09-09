@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    participant Q as Quartz in MarketData (business days 18:30)
+    participant MD as MarketData Service
+    participant EXT as NBP / Stooq / CoinGecko
+    participant MDB as marketdata_db
+    participant MQ as RabbitMQ
+    participant RP as Reporting Service
+    participant PF as Portfolio Service
+    participant RDB as reporting_db
+
+    Q->>MD: trigger PriceSyncJob
+    MD->>MDB: load active instruments and currencies
+    MD->>EXT: fetch FX rates, gold, quotes, crypto
+    EXT-->>MD: responses (JSON/CSV)
+    Note over MD: retry with backoff (Polly)<br/>one failing source doesn't stop the rest
+    MD->>MDB: UPSERT fx_rate, price_quote<br/>+ event written to OUTBOX (same transaction!)
+    MDB-->>MD: commit
+    MD->>MQ: publish DailyPricesSynced (from the outbox, after commit)
+
+    MQ->>RP: deliver DailyPricesSynced
+    RP->>RDB: check inbox (MessageId already processed?)
+    alt new event
+        RP->>PF: GET asset positions (internal REST)
+        PF-->>RP: assets per portfolio
+        RP->>MD: GET prices and rates for the day (REST)
+        MD-->>RP: prices, rates
+        RP->>RDB: INSERT valuation_snapshot + write to inbox
+        Note over RP: no price for today → last known one,<br/>stale flag when > 7 days
+    else duplicate
+        RP->>RP: ignore (idempotency)
+    end
