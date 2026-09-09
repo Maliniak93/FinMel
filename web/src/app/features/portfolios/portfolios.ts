@@ -1,4 +1,4 @@
-import { Component, inject, resource, signal } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
@@ -18,7 +18,9 @@ import {
   postApiPortfolioPortfoliosByIdArchive,
   type PortfolioResponse,
 } from '../../api/portfolio';
+import { getApiReportingDashboard, type DashboardPortfolioValue } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { formatMoney } from '../../shared/format-money';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { PortfolioFormDialog } from './portfolio-form-dialog/portfolio-form-dialog';
 
@@ -47,7 +49,14 @@ export class Portfolios {
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly includeArchived = signal(false);
-  protected readonly displayedColumns = ['name', 'currency', 'assetCount', 'status', 'actions'];
+
+  // Status only makes sense once archived portfolios are actually in view (S3) — the column list
+  // itself reacts to the same toggle that filters the rows.
+  protected readonly displayedColumns = computed(() =>
+    this.includeArchived()
+      ? ['name', 'currency', 'totalValue', 'status', 'actions']
+      : ['name', 'currency', 'totalValue', 'actions'],
+  );
 
   protected readonly portfoliosResource = resource({
     params: () => ({ includeArchived: this.includeArchived() }),
@@ -62,6 +71,40 @@ export class Portfolios {
       return result.data ?? [];
     },
   });
+
+  // Total value per portfolio is Reporting's existing dashboard read model (ByPortfolio), joined
+  // client-side on portfolioId — no new backend endpoint (S3). Loaded once, independent of the
+  // "Show archived" toggle: a portfolio absent from the payload (no snapshot yet, or an archived
+  // portfolio the read model doesn't carry) simply has no map entry, and the template renders an
+  // explicit placeholder rather than treating "missing" as "zero". If Reporting itself is
+  // unreachable, every row degrades to that same placeholder instead of blocking the whole list.
+  protected readonly dashboardResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiReportingDashboard({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? 'Failed to load portfolio values.',
+        );
+      }
+      return result.data;
+    },
+  });
+
+  protected readonly portfolioValues = computed(() => {
+    const map = new Map<string, DashboardPortfolioValue>();
+    if (this.dashboardResource.hasValue()) {
+      for (const entry of this.dashboardResource.value().byPortfolio) {
+        map.set(entry.portfolioId, entry);
+      }
+    }
+    return map;
+  });
+
+  protected readonly formatMoney = formatMoney;
+
+  protected valueEntryFor(portfolioId: string): DashboardPortfolioValue | undefined {
+    return this.portfolioValues().get(portfolioId);
+  }
 
   protected openCreateDialog(): void {
     const ref = this.dialog.open(PortfolioFormDialog, { width: '480px', data: {} });

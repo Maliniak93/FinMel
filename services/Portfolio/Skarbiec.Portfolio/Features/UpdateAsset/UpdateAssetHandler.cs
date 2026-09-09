@@ -20,8 +20,9 @@ public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEnd
             return AssetErrors.NotFound(assetId);
         }
 
-        // Switching modes is allowed (T2.9) — transactions are untouched either way (this handler
-        // never writes to the Transaction table), only the valuation fields below move.
+        // Switching modes is allowed (T2.9, extended to three modes by M1.4) — transactions are
+        // untouched either way (this handler never writes to the Transaction table), only the
+        // valuation fields below move.
         if (request.InstrumentId is { } instrumentId)
         {
             var lookupStatus = await instrumentLookupClient.CheckAsync(instrumentId, cancellationToken);
@@ -38,10 +39,11 @@ public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEnd
             asset.InstrumentId = instrumentId;
             asset.ManualValueAmount = null;
             asset.ManualValueDate = null;
+            asset.ValuationMode = AssetValuationMode.Market;
         }
-        else
+        else if (request.ManualValue is { } manualAmount)
         {
-            var manualValue = Money.Create(request.ManualValue!.Value, request.Currency);
+            var manualValue = Money.Create(manualAmount, request.Currency);
             if (manualValue.IsFailure)
             {
                 return manualValue.Error;
@@ -50,12 +52,26 @@ public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEnd
             asset.ManualValueAmount = manualValue.Value.Amount;
             asset.ManualValueDate = request.ManualValueDate;
             asset.InstrumentId = null;
+            asset.ValuationMode = AssetValuationMode.Manual;
+        }
+        else
+        {
+            // Currency-valued (M1.4): neither field — UpdateAssetRequest.Validate already confirmed
+            // this class supports it. Clear both other modes' fields so switching into this mode from
+            // Market/Manual doesn't leave stale data behind.
+            asset.InstrumentId = null;
+            asset.ManualValueAmount = null;
+            asset.ManualValueDate = null;
+            asset.ValuationMode = AssetValuationMode.CurrencyValued;
         }
 
         asset.AssetClass = request.AssetClass;
         asset.Name = request.Name;
         asset.Currency = request.Currency;
-        asset.Quantity = request.Quantity;
+        // M1.5: no Asset.Quantity write here, deliberately — UpdateAssetRequest has no Quantity field
+        // (see its <remarks>). Quantity only ever moves through TransactionQuantityCalculator.Recompute
+        // (ADR-009), driven by RecordTransaction/UpdateTransaction/DeleteTransaction and AddAsset's own
+        // optional initial transaction — never a second, parallel path here.
 
         await publishEndpoint.Publish(new AssetChanged
         {

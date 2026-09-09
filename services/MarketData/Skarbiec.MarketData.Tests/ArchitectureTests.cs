@@ -50,4 +50,31 @@ public sealed class ArchitectureTests
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    /// <summary>
+    /// ADR-018's other guard rail (M1.6). <c>ITickerVerifier</c> lives in a <c>Sources.*</c> namespace
+    /// (<c>Sources.Verification</c>), so it already satisfies
+    /// <see cref="OnlySourcesNamespace_DependsOn_PriceSourceAbstractions"/> above — but nothing about
+    /// that test stops an unrelated <c>Features/*</c> handler from also injecting it and using
+    /// MarketData's one request-path provider exception for something other than "verify a ticker
+    /// before creating an instrument" (ADR-018: "never for valuation, never to persist a quote"). This
+    /// test is the actual containment: only the verification slice itself (<c>Sources.Verification</c>)
+    /// and the one feature that legitimately consumes it (<c>Features.AddCustomInstrument</c>) may
+    /// depend on <c>ITickerVerifier</c> at all — widening that allow-list is a deliberate, visible
+    /// change to this test, not something a new handler can do by accident.
+    /// </summary>
+    [Fact]
+    public void OnlyVerificationSlice_DependsOn_TickerVerifier()
+    {
+        var result = Types.InAssembly(typeof(Program).Assembly)
+            .That()
+            .HaveDependencyOn("Skarbiec.MarketData.Sources.Verification.ITickerVerifier")
+            .Should()
+            .ResideInNamespaceStartingWith("Skarbiec.MarketData.Sources.Verification")
+            .Or()
+            .ResideInNamespaceStartingWith("Skarbiec.MarketData.Features.AddCustomInstrument")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }

@@ -5,11 +5,11 @@ export type ClientOptions = {
 };
 
 export type AddCustomInstrumentRequest = {
-    source: PriceSource;
     ticker: string;
     name: string;
     quoteCurrency: string;
     assetClass: AssetClass;
+    allowUnverified?: boolean;
 };
 
 export type AssetClass = number;

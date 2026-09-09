@@ -11,6 +11,6 @@ public sealed record CreatePortfolioRequest
     [MaxLength(1000)]
     public string? Description { get; init; }
 
-    [StringLength(3, MinimumLength = 3)]
+    [SupportedCurrency]
     public string Currency { get; init; } = Money.BaseCurrency;
 }

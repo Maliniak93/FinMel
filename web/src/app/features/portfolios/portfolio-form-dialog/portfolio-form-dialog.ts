@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 
 import {
   postApiPortfolioPortfolios,
@@ -16,7 +17,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
-import { DEFAULT_CURRENCY } from '../../../shared/currencies';
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
 
 export interface PortfolioFormDialogData {
   portfolio?: PortfolioResponse;
@@ -31,6 +32,7 @@ export interface PortfolioFormDialogData {
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
   ],
   templateUrl: './portfolio-form-dialog.html',
   styleUrl: './portfolio-form-dialog.scss',
@@ -43,14 +45,27 @@ export class PortfolioFormDialog {
   protected readonly isEdit = !!this.data.portfolio;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
+  protected readonly currencies = SUPPORTED_CURRENCIES;
+
+  // M1.3 already rejects a write outside PLN/EUR/USD server-side; this dropdown just makes the
+  // restriction the only reachable UI path. A portfolio stored before M1.3 (or seeded directly,
+  // e.g. T1.11's live-session USD row, or the GBP fixtures M1.3's own tests write straight through
+  // PortfolioDbContext) can still hold a currency outside that set — the value must survive into
+  // the form unchanged (never silently swapped for DEFAULT_CURRENCY) and stay visible, not render
+  // as a blank mat-select. See `legacyCurrency` and the template's extra <mat-option> for it.
+  protected readonly legacyCurrency: string | null =
+    this.data.portfolio &&
+    !SUPPORTED_CURRENCIES.some((c) => c.code === this.data.portfolio!.currency)
+      ? this.data.portfolio.currency
+      : null;
 
   protected readonly form = this.formBuilder.nonNullable.group({
     name: [this.data.portfolio?.name ?? '', [Validators.required, Validators.maxLength(200)]],
     description: [this.data.portfolio?.description ?? '', [Validators.maxLength(1000)]],
-    currency: [
-      this.data.portfolio?.currency ?? DEFAULT_CURRENCY,
-      [Validators.required, Validators.pattern(/^[A-Z]{3}$/)],
-    ],
+    // No pattern validator: a mat-select bound to `currencies` (plus, when editing, the one extra
+    // legacy option above) can only ever emit one of those exact values — the format is enforced
+    // by construction, same precedent as asset-form-dialog's Currency control (M1.7).
+    currency: [this.data.portfolio?.currency ?? DEFAULT_CURRENCY, [Validators.required]],
   });
 
   protected async onSubmit(): Promise<void> {

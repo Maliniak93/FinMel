@@ -43,7 +43,7 @@
     "tsx": "4.23.13",
     "typescript": "~6.0.2",
     "typescript-eslint": "8.69.0",
-    "vitest": "^4.0.8"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "js-yaml": "4.3.1"

@@ -28,6 +28,7 @@ const asset: AssetResponse = {
   id: assetId,
   portfolioId,
   assetClass: 2,
+  valuationMode: 1, // Manual
   name: 'Apple',
   currency: 'USD',
   quantity: 10,

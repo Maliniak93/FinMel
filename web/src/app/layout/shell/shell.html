@@ -22,6 +22,15 @@
       </button>
       <span>Skarbiec</span>
       <span class="shell__spacer"></span>
+      <button
+        mat-icon-button
+        type="button"
+        (click)="cycleTheme()"
+        [matTooltip]="themeLabel()"
+        [attr.aria-label]="themeLabel()"
+      >
+        <mat-icon>{{ themeIcon() }}</mat-icon>
+      </button>
       <button mat-icon-button type="button" (click)="logout()" aria-label="Log out">
         <mat-icon>logout</mat-icon>
       </button>
