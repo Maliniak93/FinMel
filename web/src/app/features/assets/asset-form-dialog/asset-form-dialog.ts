@@ -53,15 +53,9 @@ export interface AssetFormDialogData {
   asset?: AssetResponse;
 }
 
+type Mode = 'manual' | 'market';
 type InstrumentOption =
   InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;
-
-// Outcomes ITickerVerifier/AddCustomInstrumentHandler distinguish (ADR-018, M1.6), reflected here as
-// distinct, human-renderable UI states instead of a single boolean success/failure.
-type CustomInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'conflict' | 'error';
-
-const TRANSACTION_TYPE_BUY = 0;
-const TRANSACTION_TYPE_DEPOSIT = 2;
 
 function toDateOnly(date: Date): string {
   const year = date.getFullYear();

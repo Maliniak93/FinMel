@@ -1,0 +1,46 @@
+flowchart TB
+    SPA["Angular SPA"]
+    GW["Gateway (YARP)<br/>routing, JWT, rate limit, CORS"]
+
+    subgraph SERVICES["Services (.NET 10, each: vertical slices + ServiceDefaults)"]
+        ID["Identity<br/>registration, JWT"]
+        PF["Portfolio<br/>portfolios, assets, transactions"]
+        MD["MarketData<br/>instruments, prices, FX rates<br/>Quartz: PriceSyncJob"]
+        STR["Strategy<br/>allocation, rebalancing,<br/>emergency fund, goals"]
+        RP["Reporting<br/>read model, snapshots,<br/>history (CQRS)"]
+    end
+
+    MQ["RabbitMQ<br/>MassTransit v8, outbox + inbox"]
+
+    IDB[("identity_db")]
+    PDB[("portfolio_db")]
+    MDB[("marketdata_db")]
+    SDB[("strategy_db")]
+    RDB[("reporting_db")]
+
+    EXT["NBP / Stooq / CoinGecko"]
+
+    SPA -->|"/api/* + JWT"| GW
+    GW --> ID
+    GW --> PF
+    GW --> MD
+    GW --> STR
+    GW --> RP
+
+    STR -->|"REST (gRPC in Phase 3)"| PF
+    STR -->|REST| MD
+    RP -->|REST| PF
+    RP -->|REST| MD
+
+    ID -->|UserRegistered| MQ
+    PF -->|AssetChanged, TransactionRecorded| MQ
+    MD -->|DailyPricesSynced| MQ
+    MQ -->|consumes| RP
+
+    ID --> IDB
+    PF --> PDB
+    MD --> MDB
+    STR --> SDB
+    RP --> RDB
+
+    MD -->|HTTP, jobs| EXT

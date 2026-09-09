@@ -1,20 +1,38 @@
 #!/usr/bin/env node
-// PreToolUse(Bash) guard: restricts mutating git/gh commands to the /praca lane.
+// PreToolUse(Bash) guard: restricts mutating git/gh commands to a working lane.
 //
 // This hook only ever *narrows* permissions. It emits "ask" or "deny" and never "allow" — when a
-// command is inside the lane it prints nothing at all, which leaves the normal `permissions` rules
+// command is inside a lane it prints nothing at all, which leaves the normal `permissions` rules
 // in settings.json fully in charge. It cannot grant anything those rules do not already grant.
 //
-// Why it exists: /praca needs git add|commit|push and gh pr on the `allow` list so a run does not
-// stop on a prompt every task. That allowance is repo-wide, so on its own it would also cover a
-// silent commit straight onto master in any session. This hook puts those cases back on `ask`.
+// Why it exists: automated workflows need git add|commit|push and gh pr on the `allow` list so a
+// run does not stop on a prompt every step. That allowance is repo-wide, so on its own it would
+// also cover a silent commit straight onto master in any session. This hook puts those cases back
+// on `ask` (or `deny` for a force-push to trunk), no matter which lane produced them.
+//
+// Lanes — branches where commit / push / PR-to-trunk proceed without a prompt:
+//   - `feat/*`, `chore/*`, `fix/*` — the current model. `/build`'s `ops` agent commits, pushes and
+//     opens a PR to master from `feat/<slug>` for every spec it ships; the user still merges (see
+//     below).
+//   - `praca_YYYY-MM-DD` and `[MT]<n>.<n>-...` — legacy branches from the earlier /praca workflow,
+//     kept so old branches and open PRs keep behaving the way they always did.
+//
+// Merging is never silent: `gh pr merge` always asks, regardless of branch or base — that decision
+// stays with the user. Pushing straight to master/main always asks; force-pushing it is denied
+// outright. Commit/push/PR activity outside every lane above falls back to asking, same as anything
+// else this hook doesn't specifically recognize.
 
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const LANE_BASE = /^praca_\d{4}-\d{2}-\d{2}$/; // integration branch created by /praca
-const LANE_TASK = /^[MT]\d+\.\d+-/; // per-task branch, e.g. M1.3-Portfolio--constrain-currency…
+const LANE_CONVENTIONAL = /^(feat|chore|fix)\//; // current model; /build's ops agent lives here
+const LANE_PRACA = /^praca_\d{4}-\d{2}-\d{2}$/; // legacy: integration branch created by /praca
+const LANE_TASK = /^[MT]\d+\.\d+-/; // legacy: per-task branch, e.g. M1.3-Portfolio--constrain-currency…
 const TRUNK = /^(master|main)$/;
+
+function isLane(branch) {
+  return !!branch && (LANE_CONVENTIONAL.test(branch) || LANE_PRACA.test(branch) || LANE_TASK.test(branch));
+}
 
 const ASK = "ask";
 const DENY = "deny";
@@ -133,7 +151,7 @@ function judgeGit(args, cwd, segment) {
           }
         : {
             decision: ASK,
-            reason: "Pushing to master/main is a human decision, not a /praca step.",
+            reason: "Pushing to master/main is a human decision, not an automated step.",
           };
     }
     return outsideLane(cwd, "`git push`");
@@ -148,47 +166,41 @@ function judgeGh(args, cwd, segment) {
   if (args[1] === "create") {
     const i = args.indexOf("--base");
     const base = i === -1 ? null : args[i + 1];
-    if (base && LANE_BASE.test(base)) return null;
+    const branch = currentBranch(cwd);
+
+    if (!base) {
+      return {
+        decision: ASK,
+        reason: "PR has no explicit --base; it would default to the repository's default branch.",
+      };
+    }
+    if (TRUNK.test(base) && isLane(branch)) return null; // lane -> master/main is the expected flow
+
     return {
       decision: ASK,
-      reason: base
-        ? `PR would target \`${base}\`, outside the /praca lane.`
-        : "PR has no explicit --base; it would default to the repository's default branch.",
+      reason: TRUNK.test(base)
+        ? `\`gh pr create --base ${base}\` from \`${branch ?? "an indeterminate branch"}\`, which is not a lane branch (feat/*, chore/*, fix/*).`
+        : `PR would target \`${base}\`, not master/main.`,
     };
   }
 
   if (args[1] === "merge") {
-    const base = resolvePrBase(args.slice(2), cwd);
-    if (base && LANE_BASE.test(base)) return null;
-    return {
-      decision: ASK,
-      reason: base
-        ? `PR merges into \`${base}\`, outside the /praca lane.`
-        : `Could not determine the PR's base branch for: ${segment}`,
-    };
+    // Always a human decision, regardless of branch, base, or how the PR was opened.
+    return { decision: ASK, reason: "Merging is the user's decision" };
   }
 
   return null;
-}
-
-function resolvePrBase(mergeArgs, cwd) {
-  const selector = mergeArgs.find((a) => !a.startsWith("-"));
-  const args = ["pr", "view"];
-  if (selector) args.push(selector);
-  args.push("--json", "baseRefName", "-q", ".baseRefName");
-
-  return run("gh", args, cwd);
 }
 
 function outsideLane(cwd, what) {
   const branch = currentBranch(cwd);
 
   if (!branch) return { decision: ASK, reason: `Could not determine the current branch for ${what}.` };
-  if (LANE_BASE.test(branch) || LANE_TASK.test(branch)) return null; // in lane — no opinion
+  if (isLane(branch)) return null; // in lane — no opinion
 
   return {
     decision: ASK,
-    reason: `${what} on \`${branch}\`, outside the /praca lane (praca_<date> or a task branch).`,
+    reason: `${what} on \`${branch}\`, outside every working lane (feat/*, chore/*, fix/*, praca_<date>, or a task branch).`,
   };
 }
 

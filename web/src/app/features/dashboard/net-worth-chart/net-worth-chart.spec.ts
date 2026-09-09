@@ -79,7 +79,9 @@ describe('NetWorthChart', () => {
   });
 
   it('shows a not-enough-data message with fewer than two points', async () => {
-    await setup(jsonResponse({ range: '1Y', points: [{ date: '2026-08-01', netWorthPln: 10000 }] }));
+    await setup(
+      jsonResponse({ range: '1Y', points: [{ date: '2026-08-01', netWorthPln: 10000 }] }),
+    );
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Not enough history to chart yet.');

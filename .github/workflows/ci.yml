@@ -99,6 +99,23 @@ jobs:
             web:
               - 'web/**'
 
+  # Solution-wide formatting gate: only needs to run once, not once per service, and only when a
+  # .NET project actually changed (a web-only PR gets nothing from re-running `dotnet format`).
+  format:
+    name: format
+    needs: changes
+    if: needs.changes.outputs.identity == 'true' || needs.changes.outputs.portfolio == 'true' || needs.changes.outputs.marketdata == 'true' || needs.changes.outputs.strategy == 'true' || needs.changes.outputs.reporting == 'true' || needs.changes.outputs.gateway == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.servicedefaults == 'true' || needs.changes.outputs.testinglib == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Format check
+        run: dotnet format Skarbiec.slnx --verify-no-changes
+
   # One job per microservice + the gateway: restore -> build (warnings-as-errors, via
   # Directory.Build.props) -> test (Testcontainers needs the Docker daemon the runner already has).
   # No Dockerfile build here — with no registry wired up yet, a `docker build` step only
@@ -260,7 +277,7 @@ jobs:
       - name: Build (warnings as errors)
         run: dotnet build contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj --configuration Release --no-restore
 
-      - name: Test (Testcontainers — requires Docker)
+      - name: Test
         run: dotnet test contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj --configuration Release --no-build
 
   servicedefaults:
@@ -281,7 +298,7 @@ jobs:
       - name: Build (warnings as errors)
         run: dotnet build Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj --configuration Release --no-restore
 
-      - name: Test (Testcontainers — requires Docker)
+      - name: Test
         run: dotnet test Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj --configuration Release --no-build
 
   testinglib:
@@ -302,11 +319,9 @@ jobs:
       - name: Build (warnings as errors)
         run: dotnet build Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj --configuration Release --no-restore
 
-      - name: Test (Testcontainers — requires Docker)
+      - name: Test
         run: dotnet test Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj --configuration Release --no-build
 
-  # web/package.json exists since T1.7 (OpenAPI client-gen tooling), but the Angular app itself
-  # (with real Vitest unit tests) lands in T1.8+. Until then, "test" aliases to typecheck.
   web:
     name: web
     needs: changes
@@ -315,29 +330,32 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check frontend project exists
-        id: probe
-        run: |
-          if [ -f web/package.json ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::web/package.json not present yet (Angular app lands in Phase 1) — skipping frontend build/test."
-          fi
-
       - uses: actions/setup-node@v7
-        if: steps.probe.outputs.exists == 'true'
         with:
-          node-version: "22"
+          node-version-file: web/.nvmrc
           cache: "npm"
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
-        if: steps.probe.outputs.exists == 'true'
         working-directory: web
         run: npm ci
 
-      - name: Test
-        if: steps.probe.outputs.exists == 'true'
+      - name: Typecheck
         working-directory: web
-        run: npm test
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+
+      - name: Format check
+        working-directory: web
+        run: npm run format:check
+
+      - name: Build
+        working-directory: web
+        run: npm run build
+
+      - name: Test
+        working-directory: web
+        run: npm test -- --watch=false
