@@ -116,6 +116,45 @@ jobs:
       - name: Format check
         run: dotnet format Skarbiec.slnx --verify-no-changes
 
+  # Enforces the build-time OpenAPI documents (web/openapi/<service>.json, written by
+  # Microsoft.Extensions.ApiDescription.Server on `dotnet build`) and the generated TS client
+  # (web/src/app/api/) stay in sync with the backend — a schema change that lands without
+  # regenerating the client fails here instead of surfacing as a runtime mismatch (spec-00-hygiene).
+  openapi-client:
+    name: openapi-client
+    needs: changes
+    if: needs.changes.outputs.identity == 'true' || needs.changes.outputs.portfolio == 'true' || needs.changes.outputs.marketdata == 'true' || needs.changes.outputs.strategy == 'true' || needs.changes.outputs.reporting == 'true' || needs.changes.outputs.gateway == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.servicedefaults == 'true' || needs.changes.outputs.testinglib == 'true' || needs.changes.outputs.web == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build (writes web/openapi/<service>.json)
+        run: dotnet build Skarbiec.slnx
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Regenerate the API client
+        working-directory: web
+        run: npm run gen:api
+
+      - name: Track any newly emitted OpenAPI documents
+        run: git add --intent-to-add -- web/openapi
+
+      - name: Diff check
+        run: git diff --exit-code -- web/src/app/api web/openapi
+
   # One job per microservice + the gateway: restore -> build (warnings-as-errors, via
   # Directory.Build.props) -> test (Testcontainers needs the Docker daemon the runner already has).
   # No Dockerfile build here — with no registry wired up yet, a `docker build` step only

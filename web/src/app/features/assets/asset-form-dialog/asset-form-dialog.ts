@@ -39,6 +39,8 @@ import {
   isPricedTransactionType,
   quantityFieldLabel,
   showsFeeField,
+  TRANSACTION_TYPE_BUY,
+  TRANSACTION_TYPE_DEPOSIT,
   TRANSACTION_TYPES,
 } from '../../transactions/transaction-type';
 import { ASSET_CLASSES } from '../asset-class';
@@ -53,9 +55,12 @@ export interface AssetFormDialogData {
   asset?: AssetResponse;
 }
 
-type Mode = 'manual' | 'market';
 type InstrumentOption =
   InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;
+
+// ITickerVerifier's three outcomes (ADR-018) plus 'conflict' (409 already-in-dictionary) and a
+// generic 'error' fallback — mirrored in asset-form-dialog.html's @if/@else-if chain (lines 147-165).
+type CustomInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'conflict' | 'error';
 
 function toDateOnly(date: Date): string {
   const year = date.getFullYear();

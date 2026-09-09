@@ -26,6 +26,8 @@ Thumbs.db
 .DS_Store
 
 # private files
+skarbiec-plan/archive/
+skarbiec-plan/specs/
 
 # hey-api generator error dumps
 web/openapi-ts-error-*.log

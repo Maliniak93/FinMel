@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Identity.Data;
-using Skarbiec.Identity.Messaging;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;

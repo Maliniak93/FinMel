@@ -8,6 +8,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
   </ItemGroup>
 
@@ -15,5 +18,11 @@
     <ProjectReference Include="..\..\..\contracts\Skarbiec.Contracts\Skarbiec.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Skarbiec.ServiceDefaults\Skarbiec.ServiceDefaults.csproj" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildThisFileDirectory)../../../web/openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name identity</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
 
 </Project>

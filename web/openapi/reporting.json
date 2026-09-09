@@ -1,0 +1,230 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Skarbiec.Reporting | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/reporting/dashboard": {
+      "get": {
+        "tags": [
+          "GetDashboardEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reporting/net-worth-history": {
+      "get": {
+        "tags": [
+          "GetNetWorthHistoryEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "1Y"
+            }
+          },
+          {
+            "name": "portfolioId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetWorthHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssetClass": {
+        "type": "integer"
+      },
+      "DashboardAssetClassValue": {
+        "required": [
+          "assetClass",
+          "valuePln",
+          "percentage"
+        ],
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "percentage": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "DashboardPortfolioValue": {
+        "required": [
+          "portfolioId",
+          "valuePln",
+          "snapshotDate",
+          "isStale"
+        ],
+        "type": "object",
+        "properties": {
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "snapshotDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "isStale": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DashboardResponse": {
+        "required": [
+          "netWorthPln",
+          "asOf",
+          "isStale",
+          "byAssetClass",
+          "byPortfolio"
+        ],
+        "type": "object",
+        "properties": {
+          "netWorthPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "asOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "isStale": {
+            "type": "boolean"
+          },
+          "byAssetClass": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardAssetClassValue"
+            }
+          },
+          "byPortfolio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardPortfolioValue"
+            }
+          }
+        }
+      },
+      "NetWorthHistoryPoint": {
+        "required": [
+          "date",
+          "netWorthPln"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "netWorthPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "NetWorthHistoryResponse": {
+        "required": [
+          "range",
+          "points"
+        ],
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NetWorthHistoryPoint"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "GetDashboardEndpoint"
+    },
+    {
+      "name": "GetNetWorthHistoryEndpoint"
+    }
+  ]
+}
