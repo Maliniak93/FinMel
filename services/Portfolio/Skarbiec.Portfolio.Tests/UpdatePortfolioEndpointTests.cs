@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -56,5 +58,46 @@ public sealed class UpdatePortfolioEndpointTests(SkarbiecContainersFixture conta
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("PLN")]
+    [InlineData("EUR")]
+    [InlineData("USD")]
+    public async Task Update_WithSupportedCurrency_ReturnsOk(string currency)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+
+        var response = await client.PutAsJsonAsync(
+            PortfolioUri(portfolioId),
+            new UpdatePortfolioRequest { Name = "Renamed", Currency = currency },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        Assert.Equal(currency, body!.Currency);
+    }
+
+    [Fact]
+    public async Task Update_WithUnsupportedCurrency_ReturnsBadRequestNamingAcceptedSet()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+
+        var response = await client.PutAsJsonAsync(
+            PortfolioUri(portfolioId),
+            new UpdatePortfolioRequest { Name = "Renamed", Currency = "GBP" },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.Contains(problem.Errors, e => e.Key.Equals(nameof(UpdatePortfolioRequest.Currency), StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            problem.Errors.Values.SelectMany(messages => messages),
+            message => message.Contains(SupportedCurrencies.Accepted, StringComparison.Ordinal));
     }
 }

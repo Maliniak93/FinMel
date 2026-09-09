@@ -45,4 +45,27 @@ public sealed class ListPortfoliosEndpointTests(SkarbiecContainersFixture contai
 
         Assert.Equal(2, body!.Count);
     }
+
+    /// <summary>M1.3: an out-of-set currency row must not break the list either — reads keep working.</summary>
+    [Fact]
+    public async Task List_IncludesPortfolioWithOutOfSetCurrency()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+
+        await using (var seedContext = CreateDbContext(ownerId))
+        {
+            seedContext.Portfolios.Add(new PortfolioEntity { Id = portfolioId, Name = "Legacy GBP account", Currency = "GBP" });
+            await seedContext.SaveChangesAsync(cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(ownerId);
+        var response = await client.GetAsync(PortfoliosUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<List<PortfolioResponse>>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var portfolio = Assert.Single(body!);
+        Assert.Equal("GBP", portfolio.Currency);
+    }
 }

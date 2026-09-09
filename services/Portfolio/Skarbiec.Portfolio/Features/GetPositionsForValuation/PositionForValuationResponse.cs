@@ -10,6 +10,7 @@ public sealed record PositionForValuationResponse
     public required Guid PortfolioId { get; init; }
     public required Guid AssetId { get; init; }
     public required AssetClass AssetClass { get; init; }
+    public required AssetValuationMode ValuationMode { get; init; }
     public required string Currency { get; init; }
     public required decimal Quantity { get; init; }
     public Guid? InstrumentId { get; init; }
@@ -25,6 +26,7 @@ public static class PositionForValuationResponseExtensions
         PortfolioId = asset.PortfolioId,
         AssetId = asset.Id,
         AssetClass = asset.AssetClass,
+        ValuationMode = asset.ValuationMode,
         Currency = asset.Currency,
         Quantity = asset.Quantity,
         InstrumentId = asset.InstrumentId,

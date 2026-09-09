@@ -3,6 +3,17 @@
 Personal wealth-management web app and a deliberate microservices learning project.
 Stack: .NET 10 (5 services + YARP gateway) · Angular 22 · PostgreSQL (db-per-service) · RabbitMQ + MassTransit v8 (outbox/inbox) · .NET Aspire locally.
 
+## Project state: greenfield — there is no legacy to protect (ADR-019)
+
+One user (the author), **zero real data**, local-only. Implement every change **as if the feature were being written from scratch** — never spend work on backward compatibility:
+
+- Contracts: edit event/DTO records in place (rename, retype, remove fields) — no `V2` types, no deprecation window; update every publisher/consumer in the same change.
+- Database: migrations may be destructive with no data backfill; squashing a service's migrations to a single `InitialCreate` and dropping the local databases is allowed.
+- API: routes, request/response shapes and enum members change freely — regenerate the TS client (`npm run gen:api`).
+- Replaced code, tests and docs get **deleted, not deprecated**. A rewrite is a valid answer when it yields a better design than an incremental patch.
+
+Everything that isn't about compatibility over time still applies in full: tenancy isolation, outbox + idempotent consumers, `Result` pattern, and the definition of done below. Holds until the user explicitly revokes it.
+
 ## Commands
 
 Run from the repo root (`Skarbiec.sln`).
@@ -26,7 +37,7 @@ Skarbiec.AppHost/         # Aspire orchestration — the local F5 entry point
 Skarbiec.ServiceDefaults/ # OTel, health checks, JWT auth, HTTP resilience — referenced by every service
 services/                 # 5 microservices; vertical slices inside (Features/<Name>/)
 gateway/                  # YARP
-contracts/                # Skarbiec.Contracts — event/DTO records, additive versioning
+contracts/                # Skarbiec.Contracts — event/DTO records, edited in place (ADR-019)
 web/                      # Angular 22 frontend
 deploy/                   # docker compose (VPS); k3s in Phase 5
 skarbiec-plan/            # planning docs — local only (gitignored)

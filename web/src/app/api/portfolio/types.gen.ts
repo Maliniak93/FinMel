@@ -8,10 +8,10 @@ export type AddAssetRequest = {
     assetClass: AssetClass;
     name: string;
     currency?: string;
-    quantity?: number | string;
     instrumentId?: null | string;
     manualValue?: null | number | string;
     manualValueDate?: null | string;
+    initialTransaction?: null | RecordTransactionRequest;
 };
 
 export type AssetClass = number;
@@ -20,6 +20,7 @@ export type AssetResponse = {
     id: string;
     portfolioId: string;
     assetClass: AssetClass;
+    valuationMode: AssetValuationMode;
     name: string;
     currency: string;
     quantity: number | string;
@@ -28,6 +29,8 @@ export type AssetResponse = {
     instrumentId?: null | string;
     transactionCount: number | string;
 };
+
+export type AssetValuationMode = number;
 
 export type CreatePortfolioRequest = {
     name: string;
@@ -56,6 +59,7 @@ export type PositionForValuationResponse = {
     portfolioId: string;
     assetId: string;
     assetClass: AssetClass;
+    valuationMode: AssetValuationMode;
     currency: string;
     quantity: number | string;
     instrumentId?: null | string;
@@ -92,7 +96,6 @@ export type UpdateAssetRequest = {
     assetClass: AssetClass;
     name: string;
     currency: string;
-    quantity?: number | string;
     instrumentId?: null | string;
     manualValue?: null | number | string;
     manualValueDate?: null | string;

@@ -13,6 +13,7 @@ using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
 using Skarbiec.MarketData.Sources.Stooq;
+using Skarbiec.MarketData.Sources.Verification;
 using Skarbiec.ServiceDefaults.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +30,7 @@ builder.AddRabbitMqMessaging<WebApplicationBuilder, MarketDataDbContext>();
 builder.AddNbpSources();
 builder.AddStooqSource();
 builder.AddCoinGeckoSource();
+builder.AddTickerVerification();
 builder.AddPriceSyncJob();
 builder.AddHistoryBackfillJob();
 builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing

@@ -35,6 +35,7 @@ const asset: AssetResponse = {
   id: '11111111-1111-1111-1111-111111111111',
   portfolioId,
   assetClass: 2,
+  valuationMode: 1, // Manual
   name: 'Apple',
   currency: 'USD',
   quantity: 10,
@@ -47,6 +48,7 @@ const marketAsset: AssetResponse = {
   id: '44444444-4444-4444-4444-444444444444',
   portfolioId,
   assetClass: 2,
+  valuationMode: 0, // Market
   name: 'Apple',
   currency: 'USD',
   quantity: 10,
@@ -203,7 +205,7 @@ describe('Assets', () => {
     );
   });
 
-  it('shows a market asset\'s last price, date, and source', async () => {
+  it("shows a market asset's last price and date", async () => {
     const instrument: InstrumentDetailsResponse = {
       id: instrumentId,
       ticker: 'AAPL.US',
@@ -220,7 +222,6 @@ describe('Assets', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain(new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'USD' }).format(2120));
-    expect(text).toContain('Stooq');
     expect(text).not.toContain('Stale');
   });
 
