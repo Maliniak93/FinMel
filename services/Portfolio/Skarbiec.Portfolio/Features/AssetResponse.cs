@@ -8,6 +8,7 @@ public sealed record AssetResponse
     public required Guid Id { get; init; }
     public required Guid PortfolioId { get; init; }
     public required AssetClass AssetClass { get; init; }
+    public required AssetValuationMode ValuationMode { get; init; }
     public required string Name { get; init; }
     public required string Currency { get; init; }
     public required decimal Quantity { get; init; }
@@ -24,6 +25,7 @@ public static class AssetMappingExtensions
         Id = asset.Id,
         PortfolioId = asset.PortfolioId,
         AssetClass = asset.AssetClass,
+        ValuationMode = asset.ValuationMode,
         Name = asset.Name,
         Currency = asset.Currency,
         Quantity = asset.Quantity,

@@ -20,30 +20,34 @@ using Skarbiec.Portfolio.MarketData;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Http;
 using Skarbiec.ServiceDefaults.Messaging;
+using Skarbiec.ServiceDefaults.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddServiceOpenApi();
 
-// Plain scoped AddDbContext, not Aspire's AddNpgsqlDbContext — that helper always pools
-// (AddDbContextPool), which can't take the constructor-injected, request-scoped ICurrentUser
-// PortfolioDbContext needs for tenancy (ADR-006).
-var portfolioConnectionString = builder.Configuration.GetConnectionString("portfolio-db")
-    ?? throw new InvalidOperationException("Missing connection string 'portfolio-db'.");
-builder.Services.AddDbContext<PortfolioDbContext>(options => options.UseNpgsql(portfolioConnectionString));
-
-// No consumers yet (T1.5) — Portfolio only publishes AssetChanged/TransactionRecorded through the
-// outbox; Reporting subscribes in Phase 2.
-builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
-
-// AddAsset/UpdateAsset validate a market asset's InstrumentId against MarketData (T2.9) — resilience
-// and service discovery come from ServiceDefaults' ConfigureHttpClientDefaults; the JWT-forwarding
-// handler passes the caller's own token through (dotnet.md token passthrough).
-builder.Services.AddHttpClient<IInstrumentLookupClient, MarketDataInstrumentLookupClient>(client =>
+if (!OpenApiBuildTime.IsActive)
 {
-    client.BaseAddress = new Uri("https+http://marketdata-service");
-}).AddJwtForwardingHandler();
+    // Plain scoped AddDbContext, not Aspire's AddNpgsqlDbContext — that helper always pools
+    // (AddDbContextPool), which can't take the constructor-injected, request-scoped ICurrentUser
+    // PortfolioDbContext needs for tenancy (ADR-006).
+    var portfolioConnectionString = builder.Configuration.GetConnectionString("portfolio-db")
+        ?? throw new InvalidOperationException("Missing connection string 'portfolio-db'.");
+    builder.Services.AddDbContext<PortfolioDbContext>(options => options.UseNpgsql(portfolioConnectionString));
+
+    // No consumers yet (T1.5) — Portfolio only publishes AssetChanged/TransactionRecorded through the
+    // outbox; Reporting subscribes in Phase 2.
+    builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
+
+    // AddAsset/UpdateAsset validate a market asset's InstrumentId against MarketData (T2.9) — resilience
+    // and service discovery come from ServiceDefaults' ConfigureHttpClientDefaults; the JWT-forwarding
+    // handler passes the caller's own token through (dotnet.md token passthrough).
+    builder.Services.AddHttpClient<IInstrumentLookupClient, MarketDataInstrumentLookupClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://marketdata-service");
+    }).AddJwtForwardingHandler();
+}
 
 builder.Services.AddValidation();
 
@@ -93,7 +97,7 @@ app.MapGet("/api/portfolio/me", (ICurrentUser currentUser) => TypedResults.Ok(cu
     .RequireAuthorization();
 
 // Production applies migrations as an explicit deploy step instead (see deploy/README.md).
-if (app.Environment.IsDevelopment())
+if (!OpenApiBuildTime.IsActive && app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>().Database.MigrateAsync();

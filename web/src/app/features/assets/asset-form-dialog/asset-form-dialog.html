@@ -11,113 +11,40 @@
       </mat-select>
     </mat-form-field>
 
-    <mat-button-toggle-group
-      class="asset-form-dialog__mode"
-      [value]="mode()"
-      (change)="setMode($event.value)"
-      aria-label="Valuation mode"
-    >
-      <mat-button-toggle value="manual">Manual valuation</mat-button-toggle>
-      <mat-button-toggle value="market">Market instrument</mat-button-toggle>
-    </mat-button-toggle-group>
+    <mat-form-field appearance="outline" class="asset-form-dialog__field">
+      <mat-label>Name</mat-label>
+      <input matInput type="text" formControlName="name" autocomplete="off" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>Name is required.</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>Name is too long.</mat-error>
+      } @else if (form.controls.name.hasError('server')) {
+        <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
 
-    @if (mode() === 'market') {
-      <mat-form-field appearance="outline" class="asset-form-dialog__field">
-        <mat-label>Instrument</mat-label>
-        <input
-          matInput
-          type="text"
-          [formControl]="instrumentControl"
-          [matAutocomplete]="instrumentAuto"
-          placeholder="Search by ticker or name"
-        />
-        <mat-autocomplete
-          #instrumentAuto="matAutocomplete"
-          [displayWith]="displayInstrument"
-          (optionSelected)="onInstrumentOptionSelected($event)"
-        >
-          @for (result of searchResource.value(); track result.id) {
-            <mat-option [value]="result">
-              {{ result.ticker }} — {{ result.name }}
-              @if (result.lastPrice !== null) {
-                ({{ formatMoney(result.lastPrice, result.quoteCurrency) }})
-              }
-            </mat-option>
-          }
-        </mat-autocomplete>
-        @if (searchResource.isLoading()) {
-          <mat-spinner matSuffix diameter="16" />
+    <mat-form-field appearance="outline" class="asset-form-dialog__field">
+      <mat-label>Currency</mat-label>
+      <mat-select formControlName="currency">
+        @for (currency of currencies; track currency.code) {
+          <mat-option [value]="currency.code">{{ currency.label }}</mat-option>
         }
-      </mat-form-field>
-
-      @if (selectedInstrument(); as instrument) {
-        <p class="asset-form-dialog__selected-instrument">
-          Selected: {{ instrument.ticker }} — {{ instrument.name }} ({{ instrument.quoteCurrency }})
-        </p>
+      </mat-select>
+      @if (form.controls.currency.hasError('required')) {
+        <mat-error>Currency is required.</mat-error>
+      } @else if (form.controls.currency.hasError('server')) {
+        <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
       }
+    </mat-form-field>
 
-      <button
-        mat-button
-        type="button"
-        class="asset-form-dialog__custom-instrument-link"
-        (click)="toggleCustomInstrumentForm()"
-      >
-        {{ showCustomInstrumentForm() ? 'Cancel' : "Can't find it? Add it" }}
-      </button>
+    @if (isCurrencyValued()) {
+      <p class="asset-form-dialog__hint">
+        Valued automatically from {{ form.controls.currency.value }}'s exchange rate — nothing else
+        to fill in. Use "Add first transaction" below to deposit an opening amount.
+      </p>
+    }
 
-      @if (showCustomInstrumentForm()) {
-        <div class="asset-form-dialog__custom-instrument" [formGroup]="customInstrumentForm">
-          <mat-form-field appearance="outline" class="asset-form-dialog__field">
-            <mat-label>Source</mat-label>
-            <mat-select formControlName="source">
-              @for (source of customInstrumentSources; track source.value) {
-                <mat-option [value]="source.value">{{ source.label }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="asset-form-dialog__field">
-            <mat-label>Ticker / id</mat-label>
-            <input matInput type="text" formControlName="ticker" autocomplete="off" />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="asset-form-dialog__field">
-            <mat-label>Name</mat-label>
-            <input matInput type="text" formControlName="name" autocomplete="off" />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="asset-form-dialog__field">
-            <mat-label>Quote currency</mat-label>
-            <input
-              matInput
-              type="text"
-              formControlName="quoteCurrency"
-              maxlength="3"
-              autocomplete="off"
-            />
-            <mat-hint>3-letter code, e.g. USD</mat-hint>
-          </mat-form-field>
-
-          @if (customInstrumentError()) {
-            <p class="asset-form-dialog__error" role="alert">{{ customInstrumentError() }}</p>
-          }
-
-          <button
-            mat-flat-button
-            type="button"
-            color="primary"
-            [disabled]="customInstrumentSubmitting()"
-            (click)="submitCustomInstrument()"
-          >
-            @if (customInstrumentSubmitting()) {
-              <mat-spinner diameter="20" />
-            } @else {
-              Add instrument
-            }
-          </button>
-        </div>
-      }
-    } @else {
+    @if (isManual()) {
       <mat-form-field appearance="outline" class="asset-form-dialog__field">
         <mat-label>Value</mat-label>
         <input matInput type="number" step="0.01" formControlName="manualValue" />
@@ -141,36 +68,196 @@
       </mat-form-field>
     }
 
-    <mat-form-field appearance="outline" class="asset-form-dialog__field">
-      <mat-label>Name</mat-label>
-      <input matInput type="text" formControlName="name" autocomplete="off" />
-      @if (form.controls.name.hasError('required')) {
-        <mat-error>Name is required.</mat-error>
-      } @else if (form.controls.name.hasError('maxlength')) {
-        <mat-error>Name is too long.</mat-error>
-      } @else if (form.controls.name.hasError('server')) {
-        <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
-      }
-    </mat-form-field>
+    @if (isMarket()) {
+      <mat-form-field appearance="outline" class="asset-form-dialog__field">
+        <mat-label>Instrument</mat-label>
+        <input
+          matInput
+          type="text"
+          [formControl]="instrumentControl"
+          [matAutocomplete]="instrumentAuto"
+          placeholder="Search by ticker or name"
+        />
+        <mat-autocomplete
+          #instrumentAuto="matAutocomplete"
+          [displayWith]="displayInstrument"
+          (optionSelected)="onInstrumentOptionSelected($event)"
+        >
+          @if (searchResource.hasValue()) {
+            @for (result of searchResource.value(); track result.id) {
+              <mat-option [value]="result">
+                {{ result.ticker }} — {{ result.name }}
+                @if (result.lastPrice !== null) {
+                  ({{ formatMoney(result.lastPrice, result.quoteCurrency) }})
+                }
+              </mat-option>
+            }
+          }
+        </mat-autocomplete>
+        @if (searchResource.isLoading()) {
+          <mat-spinner matSuffix diameter="16" />
+        }
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="asset-form-dialog__field">
-      <mat-label>Currency</mat-label>
-      <input matInput type="text" formControlName="currency" maxlength="3" autocomplete="off" />
-      <mat-hint>3-letter code, e.g. PLN</mat-hint>
-      @if (form.controls.currency.hasError('required')) {
-        <mat-error>Currency is required.</mat-error>
-      } @else if (form.controls.currency.hasError('pattern')) {
-        <mat-error>Enter a 3-letter uppercase currency code.</mat-error>
+      @if (selectedInstrument(); as instrument) {
+        <p class="asset-form-dialog__selected-instrument">
+          Verified: {{ instrument.ticker }} — {{ instrument.name }} ({{ instrument.quoteCurrency }})
+        </p>
+      } @else {
+        <p class="asset-form-dialog__hint">
+          Pick an existing instrument above, or verify a new ticker below — creation is blocked
+          until one is selected.
+        </p>
       }
-    </mat-form-field>
 
-    <mat-form-field appearance="outline" class="asset-form-dialog__field">
-      <mat-label>Quantity</mat-label>
-      <input matInput type="number" step="any" formControlName="quantity" />
-      @if (form.controls.quantity.hasError('min')) {
-        <mat-error>Quantity must not be negative.</mat-error>
+      @if (customInstrumentAvailable()) {
+        <button
+          mat-button
+          type="button"
+          class="asset-form-dialog__custom-instrument-link"
+          (click)="toggleCustomInstrumentForm()"
+        >
+          {{ showCustomInstrumentForm() ? 'Cancel' : "Can't find it? Verify a new ticker" }}
+        </button>
+
+        @if (showCustomInstrumentForm()) {
+          <div class="asset-form-dialog__custom-instrument" [formGroup]="customInstrumentForm">
+            <mat-form-field appearance="outline" class="asset-form-dialog__field">
+              <mat-label>Ticker / id</mat-label>
+              <input matInput type="text" formControlName="ticker" autocomplete="off" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="asset-form-dialog__field">
+              <mat-label>Name</mat-label>
+              <input matInput type="text" formControlName="name" autocomplete="off" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="asset-form-dialog__field">
+              <mat-label>Quote currency</mat-label>
+              <input
+                matInput
+                type="text"
+                formControlName="quoteCurrency"
+                maxlength="3"
+                autocomplete="off"
+              />
+              <mat-hint>3-letter code, e.g. USD</mat-hint>
+            </mat-form-field>
+
+            @if (customInstrumentOutcome() === 'notFound') {
+              <p class="asset-form-dialog__error" role="alert">{{ customInstrumentMessage() }}</p>
+            } @else if (customInstrumentOutcome() === 'unreachable') {
+              <div class="asset-form-dialog__warning" role="alert">
+                <p>{{ customInstrumentMessage() }}</p>
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [disabled]="customInstrumentSubmitting()"
+                  (click)="addInstrumentAnyway()"
+                >
+                  Add anyway
+                </button>
+              </div>
+            } @else if (customInstrumentOutcome() === 'conflict') {
+              <p class="asset-form-dialog__error" role="alert">
+                {{ customInstrumentMessage() }} Try searching for it above instead.
+              </p>
+            } @else if (customInstrumentOutcome() === 'error') {
+              <p class="asset-form-dialog__error" role="alert">{{ customInstrumentMessage() }}</p>
+            }
+
+            <button
+              mat-flat-button
+              type="button"
+              color="primary"
+              [disabled]="customInstrumentSubmitting()"
+              (click)="submitCustomInstrument()"
+            >
+              @if (customInstrumentSubmitting()) {
+                <mat-spinner diameter="20" />
+              } @else {
+                Verify and add
+              }
+            </button>
+          </div>
+        }
+      } @else {
+        <p class="asset-form-dialog__hint">
+          Precious metal has no custom-ticker lookup — the seeded gold instrument is already in the
+          dictionary above.
+        </p>
       }
-    </mat-form-field>
+    }
+
+    @if (!isEdit) {
+      <mat-checkbox
+        class="asset-form-dialog__add-transaction-toggle"
+        [checked]="addFirstTransaction()"
+        (change)="toggleAddFirstTransaction()"
+      >
+        Add first transaction
+      </mat-checkbox>
+
+      @if (addFirstTransaction()) {
+        <div class="asset-form-dialog__initial-transaction" [formGroup]="transactionForm">
+          <mat-form-field appearance="outline" class="asset-form-dialog__field">
+            <mat-label>Type</mat-label>
+            <mat-select formControlName="type">
+              @for (type of transactionTypes; track type.value) {
+                <mat-option [value]="type.value">{{ type.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="asset-form-dialog__field">
+            <mat-label>{{ transactionQuantityLabel() }}</mat-label>
+            <input matInput type="number" step="any" formControlName="quantity" />
+            @if (transactionForm.controls.quantity.hasError('min')) {
+              <mat-error>{{ transactionQuantityLabel() }} must not be negative.</mat-error>
+            } @else if (transactionForm.controls.quantity.hasError('server')) {
+              <mat-error>{{ transactionForm.controls.quantity.getError('server') }}</mat-error>
+            }
+          </mat-form-field>
+
+          @if (transactionIsPriced()) {
+            <mat-form-field appearance="outline" class="asset-form-dialog__field">
+              <mat-label>Unit price</mat-label>
+              <input matInput type="number" step="0.01" formControlName="unitPrice" />
+              @if (transactionForm.controls.unitPrice.hasError('min')) {
+                <mat-error>Unit price must not be negative.</mat-error>
+              } @else if (transactionForm.controls.unitPrice.hasError('server')) {
+                <mat-error>{{ transactionForm.controls.unitPrice.getError('server') }}</mat-error>
+              }
+            </mat-form-field>
+          }
+
+          @if (transactionShowsFee()) {
+            <mat-form-field appearance="outline" class="asset-form-dialog__field">
+              <mat-label>Fee</mat-label>
+              <input matInput type="number" step="0.01" formControlName="fee" />
+              @if (transactionForm.controls.fee.hasError('min')) {
+                <mat-error>Fee must not be negative.</mat-error>
+              } @else if (transactionForm.controls.fee.hasError('server')) {
+                <mat-error>{{ transactionForm.controls.fee.getError('server') }}</mat-error>
+              }
+            </mat-form-field>
+          }
+
+          <mat-form-field appearance="outline" class="asset-form-dialog__field">
+            <mat-label>Date</mat-label>
+            <input matInput [matDatepicker]="transactionDatePicker" formControlName="date" />
+            <mat-datepicker-toggle
+              matIconSuffix
+              [for]="transactionDatePicker"
+            ></mat-datepicker-toggle>
+            <mat-datepicker #transactionDatePicker></mat-datepicker>
+            @if (transactionForm.controls.date.hasError('required')) {
+              <mat-error>Date is required.</mat-error>
+            }
+          </mat-form-field>
+        </div>
+      }
+    }
 
     @if (formError()) {
       <p class="asset-form-dialog__error" role="alert">{{ formError() }}</p>

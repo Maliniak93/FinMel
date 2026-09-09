@@ -1,0 +1,605 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Skarbiec.MarketData | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/marketdata/instruments/search": {
+      "get": {
+        "tags": [
+          "SearchInstrumentsEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstrumentSearchResult"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketdata/instruments": {
+      "post": {
+        "tags": [
+          "AddCustomInstrumentEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCustomInstrumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomInstrumentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketdata/instruments/{id}": {
+      "get": {
+        "tags": [
+          "GetInstrumentEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentDetailsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketdata/prices/latest-batch": {
+      "post": {
+        "tags": [
+          "GetLatestPricesBatchEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LatestPricesBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestPricesBatchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketdata/fx/latest-batch": {
+      "post": {
+        "tags": [
+          "GetFxRatesBatchEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FxRatesBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxRatesBatchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketdata/sync/trigger": {
+      "post": {
+        "tags": [
+          "TriggerSyncEndpoint"
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/marketdata/sync/status": {
+      "get": {
+        "tags": [
+          "GetSyncStatusEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddCustomInstrumentRequest": {
+        "required": [
+          "ticker",
+          "name",
+          "quoteCurrency",
+          "assetClass"
+        ],
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "quoteCurrency": {
+            "maxLength": 3,
+            "minLength": 3,
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "allowUnverified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AssetClass": {
+        "type": "integer"
+      },
+      "CustomInstrumentResponse": {
+        "required": [
+          "id",
+          "ticker",
+          "name",
+          "source",
+          "quoteCurrency",
+          "assetClass",
+          "verificationStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ticker": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PriceSource"
+          },
+          "quoteCurrency": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "verificationStatus": {
+            "$ref": "#/components/schemas/InstrumentVerificationStatus"
+          }
+        }
+      },
+      "FxRateResult": {
+        "required": [
+          "pair",
+          "date",
+          "rate"
+        ],
+        "type": "object",
+        "properties": {
+          "pair": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "rate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "FxRatesBatchRequest": {
+        "required": [
+          "pairs",
+          "asOfDate"
+        ],
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "asOfDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "FxRatesBatchResponse": {
+        "required": [
+          "rates"
+        ],
+        "type": "object",
+        "properties": {
+          "rates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FxRateResult"
+            }
+          }
+        }
+      },
+      "InstrumentDetailsResponse": {
+        "required": [
+          "id",
+          "ticker",
+          "name",
+          "assetClass",
+          "quoteCurrency",
+          "source",
+          "verificationStatus",
+          "lastPrice",
+          "lastPriceDate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ticker": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "quoteCurrency": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PriceSource"
+          },
+          "verificationStatus": {
+            "$ref": "#/components/schemas/InstrumentVerificationStatus"
+          },
+          "lastPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastPriceDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        }
+      },
+      "InstrumentQuoteResult": {
+        "required": [
+          "instrumentId",
+          "quoteCurrency",
+          "date",
+          "close"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quoteCurrency": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "close": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "InstrumentSearchResult": {
+        "required": [
+          "id",
+          "ticker",
+          "name",
+          "assetClass",
+          "quoteCurrency",
+          "verificationStatus",
+          "lastPrice",
+          "lastPriceDate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ticker": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "quoteCurrency": {
+            "type": "string"
+          },
+          "verificationStatus": {
+            "$ref": "#/components/schemas/InstrumentVerificationStatus"
+          },
+          "lastPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastPriceDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        }
+      },
+      "InstrumentVerificationStatus": {
+        "type": "integer"
+      },
+      "LatestPricesBatchRequest": {
+        "required": [
+          "instrumentIds",
+          "asOfDate"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentIds": {
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "asOfDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "LatestPricesBatchResponse": {
+        "required": [
+          "quotes"
+        ],
+        "type": "object",
+        "properties": {
+          "quotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstrumentQuoteResult"
+            }
+          }
+        }
+      },
+      "PriceSource": {
+        "type": "integer"
+      },
+      "SyncRunStatus": {
+        "type": "integer"
+      },
+      "SyncStatusResponse": {
+        "required": [
+          "hasRun"
+        ],
+        "type": "object",
+        "properties": {
+          "hasRun": {
+            "type": "boolean"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SyncRunStatus"
+              }
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "syncedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "noDataCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "SearchInstrumentsEndpoint"
+    },
+    {
+      "name": "AddCustomInstrumentEndpoint"
+    },
+    {
+      "name": "GetInstrumentEndpoint"
+    },
+    {
+      "name": "GetLatestPricesBatchEndpoint"
+    },
+    {
+      "name": "GetFxRatesBatchEndpoint"
+    },
+    {
+      "name": "TriggerSyncEndpoint"
+    },
+    {
+      "name": "GetSyncStatusEndpoint"
+    }
+  ]
+}

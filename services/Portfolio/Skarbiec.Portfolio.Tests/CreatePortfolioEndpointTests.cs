@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -43,6 +44,39 @@ public sealed class CreatePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PortfolioResponse>(TestContext.Current.CancellationToken);
         Assert.Equal("PLN", body!.Currency);
+    }
+
+    [Theory]
+    [InlineData("PLN")]
+    [InlineData("EUR")]
+    [InlineData("USD")]
+    public async Task Create_WithSupportedCurrency_ReturnsCreated(string currency)
+    {
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var request = new CreatePortfolioRequest { Name = $"Portfolio in {currency}", Currency = currency };
+
+        var response = await client.PostAsJsonAsync(PortfoliosUri, request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PortfolioResponse>(TestContext.Current.CancellationToken);
+        Assert.Equal(currency, body!.Currency);
+    }
+
+    [Fact]
+    public async Task Create_WithUnsupportedCurrency_ReturnsBadRequestNamingAcceptedSet()
+    {
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var request = new CreatePortfolioRequest { Name = "Swiss account", Currency = "CHF" };
+
+        var response = await client.PostAsJsonAsync(PortfoliosUri, request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(TestContext.Current.CancellationToken);
+        Assert.NotNull(problem);
+        Assert.Contains(problem.Errors, e => e.Key.Equals(nameof(CreatePortfolioRequest.Currency), StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            problem.Errors.Values.SelectMany(messages => messages),
+            message => message.Contains(SupportedCurrencies.Accepted, StringComparison.Ordinal));
     }
 
     [Fact]

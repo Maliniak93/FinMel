@@ -13,27 +13,34 @@ using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
 using Skarbiec.MarketData.Sources.Stooq;
+using Skarbiec.MarketData.Sources.Verification;
 using Skarbiec.ServiceDefaults.Messaging;
+using Skarbiec.ServiceDefaults.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddServiceOpenApi();
 
-builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
+builder.AddTickerVerification();
 
-// No consumers yet (T2.10) — MarketData only publishes DailyPricesSynced through the outbox;
-// Reporting subscribes in T2.11.
-builder.AddRabbitMqMessaging<WebApplicationBuilder, MarketDataDbContext>();
+if (!OpenApiBuildTime.IsActive)
+{
+    builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
 
-builder.AddNbpSources();
-builder.AddStooqSource();
-builder.AddCoinGeckoSource();
-builder.AddPriceSyncJob();
-builder.AddHistoryBackfillJob();
-builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
-    .AddSource(PriceSyncJob.ActivitySourceName)
-    .AddSource(HistoryBackfillJob.ActivitySourceName));
+    // No consumers yet (T2.10) — MarketData only publishes DailyPricesSynced through the outbox;
+    // Reporting subscribes in T2.11.
+    builder.AddRabbitMqMessaging<WebApplicationBuilder, MarketDataDbContext>();
+
+    builder.AddNbpSources();
+    builder.AddStooqSource();
+    builder.AddCoinGeckoSource();
+    builder.AddPriceSyncJob();
+    builder.AddHistoryBackfillJob();
+    builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
+        .AddSource(PriceSyncJob.ActivitySourceName)
+        .AddSource(HistoryBackfillJob.ActivitySourceName));
+}
 
 builder.Services.AddValidation();
 
@@ -61,7 +68,7 @@ app.MapGetSyncStatusEndpoint();
 
 // Production applies migrations (and the seed below) as an explicit deploy step instead (see
 // deploy/README.md).
-if (app.Environment.IsDevelopment())
+if (!OpenApiBuildTime.IsActive && app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();

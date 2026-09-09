@@ -1,4 +1,4 @@
-import { Component, effect, inject, resource, signal } from '@angular/core';
+import { Component, computed, effect, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
@@ -6,7 +6,7 @@ import {
   type MatAutocompleteSelectedEvent,
 } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -33,19 +33,34 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
-import { DEFAULT_CURRENCY } from '../../../shared/currencies';
+import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from '../../../shared/currencies';
 import { formatMoney } from '../../../shared/format-money';
+import {
+  isPricedTransactionType,
+  quantityFieldLabel,
+  showsFeeField,
+  TRANSACTION_TYPE_BUY,
+  TRANSACTION_TYPE_DEPOSIT,
+  TRANSACTION_TYPES,
+} from '../../transactions/transaction-type';
 import { ASSET_CLASSES } from '../asset-class';
-import { CUSTOM_INSTRUMENT_SOURCES } from '../price-source';
+import {
+  canAddCustomInstrument,
+  defaultValuationMode,
+  VALUATION_MODE,
+} from '../asset-valuation-mode';
 
 export interface AssetFormDialogData {
   portfolioId: string;
   asset?: AssetResponse;
 }
 
-type Mode = 'manual' | 'market';
 type InstrumentOption =
   InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;
+
+// ITickerVerifier's three outcomes (ADR-018) plus 'conflict' (409 already-in-dictionary) and a
+// generic 'error' fallback — mirrored in asset-form-dialog.html's @if/@else-if chain (lines 147-165).
+type CustomInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'conflict' | 'error';
 
 function toDateOnly(date: Date): string {
   const year = date.getFullYear();
@@ -68,7 +83,7 @@ function fromDateOnly(dateOnly: string): Date {
     ReactiveFormsModule,
     MatAutocompleteModule,
     MatButtonModule,
-    MatButtonToggleModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -88,19 +103,13 @@ export class AssetFormDialog {
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
   protected readonly assetClasses = ASSET_CLASSES;
+  protected readonly currencies = SUPPORTED_CURRENCIES;
   protected readonly formatMoney = formatMoney;
-
-  protected readonly mode = signal<Mode>(this.data.asset?.instrumentId ? 'market' : 'manual');
-  protected readonly selectedInstrument = signal<InstrumentOption | null>(null);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     assetClass: [this.data.asset?.assetClass ?? 0, [Validators.required]],
     name: [this.data.asset?.name ?? '', [Validators.required, Validators.maxLength(200)]],
-    currency: [
-      this.data.asset?.currency ?? DEFAULT_CURRENCY,
-      [Validators.required, Validators.pattern(/^[A-Z]{3}$/)],
-    ],
-    quantity: [Number(this.data.asset?.quantity ?? 0), [Validators.min(0)]],
+    currency: [this.data.asset?.currency ?? DEFAULT_CURRENCY, [Validators.required]],
     manualValue: [Number(this.data.asset?.manualValue ?? 0), [Validators.min(0)]],
     manualValueDate: [
       this.data.asset?.manualValueDate ? fromDateOnly(this.data.asset.manualValueDate) : new Date(),
@@ -108,16 +117,47 @@ export class AssetFormDialog {
     ],
   });
 
-  // Manual valuation fields are only required in manual mode — a market asset submits an
-  // InstrumentId instead (AddAssetRequest/UpdateAssetRequest's mutually-exclusive rule).
+  // The asset class is what drives the whole form (Scope: "each choice adapts the form to add the
+  // given asset") — the old manual/market button-toggle the user picked by hand is gone; the class's
+  // AssetValuationModes.Default mirror (asset-valuation-mode.ts) decides instead.
+  private readonly assetClassValue = toSignal(this.form.controls.assetClass.valueChanges, {
+    initialValue: this.form.controls.assetClass.value,
+  });
+  protected readonly valuationMode = computed(() => defaultValuationMode(this.assetClassValue()));
+  protected readonly isMarket = computed(() => this.valuationMode() === VALUATION_MODE.Market);
+  protected readonly isManual = computed(() => this.valuationMode() === VALUATION_MODE.Manual);
+  protected readonly isCurrencyValued = computed(
+    () => this.valuationMode() === VALUATION_MODE.CurrencyValued,
+  );
+  protected readonly customInstrumentAvailable = computed(() =>
+    canAddCustomInstrument(this.assetClassValue()),
+  );
+
+  protected readonly selectedInstrument = signal<InstrumentOption | null>(null);
+
+  // Manual valuation fields are only required in manual mode; a market asset submits an
+  // InstrumentId instead, and a currency-valued asset submits neither (AddAssetRequest/
+  // UpdateAssetRequest's three-way mutually-exclusive rule, M1.4).
   private readonly modeValidatorEffect = effect(() => {
-    const manualRequired = this.mode() === 'manual';
+    const manualRequired = this.isManual();
     this.form.controls.manualValue.setValidators(
       manualRequired ? [Validators.required, Validators.min(0)] : [Validators.min(0)],
     );
     this.form.controls.manualValueDate.setValidators(manualRequired ? [Validators.required] : []);
     this.form.controls.manualValue.updateValueAndValidity({ emitEvent: false });
     this.form.controls.manualValueDate.updateValueAndValidity({ emitEvent: false });
+  });
+
+  // Leaving market mode drops whatever instrument was selected/verified — submitting it against a
+  // now-manual or now-currency-valued class would be meaningless, and AddAssetRequest.Validate would
+  // reject the combination anyway. Depends only on isMarket() (not on selectedInstrument() itself),
+  // so this never reads the signal it writes — signal.set() is a no-op once it's already null.
+  private readonly clearInstrumentOnModeChangeEffect = effect(() => {
+    if (this.isMarket()) {
+      return;
+    }
+    this.selectedInstrument.set(null);
+    this.instrumentControl.setValue(null, { emitEvent: false });
   });
 
   protected readonly instrumentControl = new FormControl<InstrumentOption | string | null>(null);
@@ -159,28 +199,77 @@ export class AssetFormDialog {
     },
   });
 
+  // resource().value() throws while the resource is in its error state — gated on hasValue() rather
+  // than trusting the loader's own try/catch (a network exception, not just an API error, can still
+  // land the resource there). Also re-checks isMarket(): guards the race where the user flips the
+  // asset class away from Market before this async fetch resolves (clearInstrumentOnModeChangeEffect
+  // would otherwise have already run and this could reintroduce a stale instrument behind its back).
   private readonly prefillExistingInstrumentEffect = effect(() => {
+    if (!this.existingInstrumentResource.hasValue()) {
+      return;
+    }
     const details = this.existingInstrumentResource.value();
-    if (details) {
+    if (details && this.isMarket()) {
       this.selectInstrument(details);
     }
   });
 
   protected readonly showCustomInstrumentForm = signal(false);
   protected readonly customInstrumentSubmitting = signal(false);
-  protected readonly customInstrumentError = signal<string | null>(null);
-  protected readonly customInstrumentSources = CUSTOM_INSTRUMENT_SOURCES;
+  protected readonly customInstrumentOutcome = signal<CustomInstrumentOutcome>('idle');
+  protected readonly customInstrumentMessage = signal<string | null>(null);
 
+  // No Source field: AddCustomInstrumentRequest derives the provider from AssetClass (M1.6) — the
+  // user never picks Stooq vs CoinGecko by hand anymore.
   protected readonly customInstrumentForm = this.formBuilder.nonNullable.group({
-    source: [1, [Validators.required]],
     ticker: ['', [Validators.required, Validators.maxLength(30)]],
     name: ['', [Validators.required, Validators.maxLength(200)]],
     quoteCurrency: ['', [Validators.required, Validators.pattern(/^[A-Z]{3}$/)]],
-    assetClass: [this.data.asset?.assetClass ?? 0, [Validators.required]],
   });
 
-  protected setMode(mode: Mode): void {
-    this.mode.set(mode);
+  // "Add first transaction" (M1.5) only exists on create — AddAssetRequest.InitialTransaction has no
+  // Update-side counterpart, so quantity on an existing asset only ever moves through the
+  // transactions view.
+  protected readonly addFirstTransaction = signal(false);
+  protected readonly transactionTypes = TRANSACTION_TYPES;
+
+  protected readonly transactionForm = this.formBuilder.nonNullable.group({
+    type: [
+      defaultValuationMode(this.data.asset?.assetClass ?? 0) === VALUATION_MODE.CurrencyValued
+        ? TRANSACTION_TYPE_DEPOSIT
+        : TRANSACTION_TYPE_BUY,
+      [Validators.required],
+    ],
+    quantity: [0, [Validators.min(0)]],
+    unitPrice: [1, [Validators.min(0)]],
+    fee: [0, [Validators.min(0)]],
+    date: [new Date(), [Validators.required]],
+  });
+
+  private readonly transactionType = toSignal(this.transactionForm.controls.type.valueChanges, {
+    initialValue: this.transactionForm.controls.type.value,
+  });
+  protected readonly transactionIsPriced = computed(() =>
+    isPricedTransactionType(this.transactionType()),
+  );
+  protected readonly transactionShowsFee = computed(() => showsFeeField(this.transactionType()));
+  protected readonly transactionQuantityLabel = computed(() =>
+    quantityFieldLabel(this.transactionType()),
+  );
+
+  protected toggleAddFirstTransaction(): void {
+    const enabling = !this.addFirstTransaction();
+    this.addFirstTransaction.set(enabling);
+
+    // Prefill a sensible default only the first time the box is checked (pristine) — an already
+    //-edited sub-form is left alone so unchecking/rechecking never clobbers what the user typed.
+    if (enabling && this.transactionForm.pristine) {
+      const isCash = this.isCurrencyValued();
+      this.transactionForm.patchValue({
+        type: isCash ? TRANSACTION_TYPE_DEPOSIT : TRANSACTION_TYPE_BUY,
+        unitPrice: isCash ? 1 : 0,
+      });
+    }
   }
 
   protected displayInstrument(value: InstrumentOption | string | null): string {
@@ -194,10 +283,14 @@ export class AssetFormDialog {
     this.selectInstrument(event.option.value as InstrumentOption);
   }
 
+  // Deliberately does NOT copy instrument.quoteCurrency into the Currency control (T1.11 did).
+  // ValuationAlgorithm.ValueMarketAsset resolves FX off the *instrument's* quote currency
+  // (price.QuoteCurrency), never off Asset.Currency — so for a market asset, Currency is just the
+  // user's own PLN/EUR/USD denomination choice (SupportedCurrency, M1.3), unrelated to what the
+  // instrument itself quotes in and never read by market valuation.
   private selectInstrument(instrument: InstrumentOption): void {
     this.selectedInstrument.set(instrument);
     this.instrumentControl.setValue(instrument, { emitEvent: false });
-    this.form.controls.currency.setValue(instrument.quoteCurrency);
     if (!this.form.controls.name.value) {
       this.form.controls.name.setValue(instrument.name);
     }
@@ -205,44 +298,71 @@ export class AssetFormDialog {
 
   protected toggleCustomInstrumentForm(): void {
     this.showCustomInstrumentForm.update((shown) => !shown);
-    this.customInstrumentError.set(null);
+    this.customInstrumentOutcome.set('idle');
+    this.customInstrumentMessage.set(null);
   }
 
-  protected async submitCustomInstrument(): Promise<void> {
+  protected async submitCustomInstrument(allowUnverified = false): Promise<void> {
     if (this.customInstrumentSubmitting()) {
       return;
     }
 
-    if (this.customInstrumentForm.invalid) {
+    if (!allowUnverified && this.customInstrumentForm.invalid) {
       this.customInstrumentForm.markAllAsTouched();
       return;
     }
 
     this.customInstrumentSubmitting.set(true);
-    this.customInstrumentError.set(null);
+    this.customInstrumentOutcome.set('idle');
+    this.customInstrumentMessage.set(null);
 
+    const values = this.customInstrumentForm.getRawValue();
     const result = await postApiMarketdataInstruments({
-      body: this.customInstrumentForm.getRawValue(),
+      body: {
+        ticker: values.ticker,
+        name: values.name,
+        quoteCurrency: values.quoteCurrency,
+        assetClass: this.form.controls.assetClass.value,
+        allowUnverified,
+      },
     });
 
     this.customInstrumentSubmitting.set(false);
 
     if (result.error) {
-      this.customInstrumentError.set(
-        readProblemDetails(result.error).detail ?? 'Failed to add instrument.',
-      );
+      const problem = readProblemDetails(result.error);
+      this.customInstrumentMessage.set(problem.detail ?? 'Failed to add instrument.');
+      this.customInstrumentOutcome.set(this.classifyCustomInstrumentError(problem));
       return;
     }
 
+    this.customInstrumentOutcome.set('idle');
+    this.customInstrumentMessage.set(null);
     this.selectInstrument(result.data!);
     this.showCustomInstrumentForm.set(false);
-    this.customInstrumentForm.reset({
-      source: 1,
-      ticker: '',
-      name: '',
-      quoteCurrency: '',
-      assetClass: this.customInstrumentForm.controls.assetClass.value,
-    });
+    this.customInstrumentForm.reset({ ticker: '', name: '', quoteCurrency: '' });
+  }
+
+  // Renders ITickerVerifier's three outcomes (ADR-018) as three distinct states, plus a fallback for
+  // anything else (409 already-in-dictionary, or a genuinely unexpected error).
+  private classifyCustomInstrumentError(problem: ApiProblemDetails): CustomInstrumentOutcome {
+    switch (problem.errorCode) {
+      case 'Validation.TickerNotFound':
+        return 'notFound';
+      case 'ServiceUnavailable.TickerVerificationUnreachable':
+        return 'unreachable';
+      case 'Conflict.InstrumentAlreadyExists':
+        return 'conflict';
+      default:
+        return 'error';
+    }
+  }
+
+  // The documented ADR-018 opt-in: when the provider couldn't be reached, create the instrument
+  // Unverified anyway (HistoryBackfillJob resolves it later, off the request path) instead of
+  // leaving the user stuck.
+  protected addInstrumentAnyway(): void {
+    void this.submitCustomInstrument(true);
   }
 
   protected async onSubmit(): Promise<void> {
@@ -250,8 +370,8 @@ export class AssetFormDialog {
       return;
     }
 
-    if (this.mode() === 'market' && !this.selectedInstrument()) {
-      this.formError.set('Pick an instrument, or add a custom one, before saving.');
+    if (this.isMarket() && !this.selectedInstrument()) {
+      this.formError.set('Verify a ticker, or pick one from search, before creating this asset.');
       return;
     }
 
@@ -260,37 +380,37 @@ export class AssetFormDialog {
       return;
     }
 
+    const recordingInitialTransaction = !this.isEdit && this.addFirstTransaction();
+    if (recordingInitialTransaction && this.transactionForm.invalid) {
+      this.transactionForm.markAllAsTouched();
+      return;
+    }
+
     this.submitting.set(true);
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const instrument = this.selectedInstrument();
-    const body =
-      this.mode() === 'market' && instrument
-        ? {
-            assetClass: values.assetClass,
-            name: values.name,
-            currency: values.currency,
-            quantity: values.quantity,
-            instrumentId: instrument.id,
-          }
-        : {
-            assetClass: values.assetClass,
-            name: values.name,
-            currency: values.currency,
-            quantity: values.quantity,
-            manualValue: values.manualValue,
-            manualValueDate: toDateOnly(values.manualValueDate),
-          };
+    const modeFields = this.buildModeFields();
 
     const result = this.data.asset
       ? await putApiPortfolioPortfoliosByPortfolioIdAssetsById({
           path: { portfolioId: this.data.portfolioId, id: this.data.asset.id },
-          body,
+          body: {
+            assetClass: values.assetClass,
+            name: values.name,
+            currency: values.currency,
+            ...modeFields,
+          },
         })
       : await postApiPortfolioPortfoliosByPortfolioIdAssets({
           path: { portfolioId: this.data.portfolioId },
-          body,
+          body: {
+            assetClass: values.assetClass,
+            name: values.name,
+            currency: values.currency,
+            ...modeFields,
+            initialTransaction: recordingInitialTransaction ? this.buildInitialTransaction() : null,
+          },
         });
 
     this.submitting.set(false);
@@ -303,15 +423,79 @@ export class AssetFormDialog {
     this.dialogRef.close(true);
   }
 
+  private buildModeFields():
+    | { instrumentId: string }
+    | { manualValue: number; manualValueDate: string }
+    | Record<string, never> {
+    const mode = this.valuationMode();
+
+    if (mode === VALUATION_MODE.Market) {
+      // Guarded in onSubmit — selectedInstrument() is always set by the time this runs.
+      return { instrumentId: this.selectedInstrument()!.id };
+    }
+
+    if (mode === VALUATION_MODE.Manual) {
+      const values = this.form.getRawValue();
+      return {
+        manualValue: values.manualValue,
+        manualValueDate: toDateOnly(values.manualValueDate),
+      };
+    }
+
+    return {};
+  }
+
+  private buildInitialTransaction() {
+    const values = this.transactionForm.getRawValue();
+    return {
+      type: values.type,
+      quantity: values.quantity,
+      // Unit price/fee are hidden (and meaningless) for non-trade types — same rule as
+      // TransactionFormDialog: 1/0 keeps `quantity * unitPrice` a single Value formula end to end.
+      unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
+      fee: showsFeeField(values.type) ? values.fee : 0,
+      date: toDateOnly(values.date),
+    };
+  }
+
   protected cancel(): void {
     this.dialogRef.close(false);
   }
 
   private applyServerErrors(problem: ApiProblemDetails): void {
-    if (applyFieldErrors(this.form, problem)) {
+    const mainFieldMatched = applyFieldErrors(this.form, problem);
+    const transactionFieldMatched = this.applyInitialTransactionFieldErrors(problem);
+
+    if (mainFieldMatched || transactionFieldMatched) {
       return;
     }
 
     this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+  }
+
+  // AddAssetRequest.InitialTransaction is a nested complex property — .NET 10's validation recurses
+  // into it and reports keys like "InitialTransaction.Quantity", which applyFieldErrors (matching
+  // top-level `form` control names only) can't route on its own; this matches the suffix against
+  // transactionForm's own controls instead.
+  private applyInitialTransactionFieldErrors(problem: ApiProblemDetails): boolean {
+    if (!problem.errors) {
+      return false;
+    }
+
+    let matched = false;
+    for (const [field, messages] of Object.entries(problem.errors)) {
+      if (!field.toLowerCase().includes('initialtransaction')) {
+        continue;
+      }
+      const suffix = field.split('.').pop() ?? field;
+      const controlName = Object.keys(this.transactionForm.controls).find(
+        (name) => name.toLowerCase() === suffix.toLowerCase(),
+      );
+      if (controlName) {
+        this.transactionForm.get(controlName)?.setErrors({ server: messages.join(' ') });
+        matched = true;
+      }
+    }
+    return matched;
   }
 }

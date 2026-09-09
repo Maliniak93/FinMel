@@ -59,6 +59,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
                 UserId = userAId,
                 PortfolioId = portfolioAId,
                 AssetClass = AssetClass.Stock,
+                ValuationMode = AssetValuationMode.Market,
                 Currency = "PLN",
                 Quantity = 10,
                 InstrumentId = stockInstrumentId,
@@ -68,6 +69,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
                 UserId = userBId,
                 PortfolioId = portfolioBId,
                 AssetClass = AssetClass.RealEstate,
+                ValuationMode = AssetValuationMode.Manual,
                 Currency = "PLN",
                 Quantity = 0,
                 ManualValueAmount = 300_000m,
@@ -100,6 +102,53 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
+    /// <summary>M1.4 AC: a currency-valued asset (no instrument, no manual amount) flows
+    /// event → snapshot with the correct PLN value — the case that valued at 0 before this mode
+    /// existed as an explicit branch in <see cref="Skarbiec.Reporting.Valuation.ValuationAlgorithm"/>.</summary>
+    [Fact]
+    public async Task Consume_DailyPricesSynced_CurrencyValuedAssetValuesThroughFxRate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 12);
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+
+        var positionsClient = new FakePositionsClient()
+            .WithPosition(new PositionForValuation
+            {
+                UserId = userId,
+                PortfolioId = portfolioId,
+                AssetClass = AssetClass.Cash,
+                ValuationMode = AssetValuationMode.CurrencyValued,
+                Currency = "EUR",
+                Quantity = 1_000m, // 1000 EUR cash — no instrument, no manual value.
+            });
+
+        var priceQuoteClient = new FakePriceQuoteClient()
+            .WithFxRate("EURPLN", new FxRateLookup(snapshotDate, 4.30m));
+
+        await RunConsumerAsync(positionsClient, priceQuoteClient, async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new DailyPricesSynced
+            {
+                RunId = Guid.NewGuid(),
+                SyncDate = snapshotDate,
+                SyncedCount = 1,
+                FailedCount = 0,
+                NoDataCount = 0,
+            }, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+
+            // 1000 EUR x 4.30 PLN/EUR = 4300 PLN — not 0, which is what pre-M1.4 code would have
+            // produced (it treated "no InstrumentId" as manual, and ManualValueAmount is null here).
+            Assert.Equal(userId, snapshot.UserId);
+            Assert.Equal(4_300m, snapshot.TotalPln);
+            Assert.False(snapshot.IsStale);
+        }, cancellationToken);
+    }
+
     [Fact]
     public async Task Consume_SameMessageIdDeliveredTwice_SnapshotComputedOnlyOnce()
     {
@@ -114,6 +163,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
                 UserId = userId,
                 PortfolioId = portfolioId,
                 AssetClass = AssetClass.Cash,
+                ValuationMode = AssetValuationMode.Manual,
                 Currency = "PLN",
                 Quantity = 0,
                 ManualValueAmount = 42m,

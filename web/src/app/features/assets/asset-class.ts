@@ -15,6 +15,20 @@ export const ASSET_CLASSES: readonly { value: AssetClass; label: string }[] = [
   { value: 8, label: 'Other' },
 ];
 
+// Named constants for the same values, so asset-valuation-mode.ts (M1.7) and callers that branch on
+// a specific class read as intent ("PreciousMetal") rather than a bare int repeated at each call site.
+export const ASSET_CLASS = {
+  Cash: 0,
+  Deposit: 1,
+  Stock: 2,
+  Etf: 3,
+  Bond: 4,
+  Crypto: 5,
+  PreciousMetal: 6,
+  RealEstate: 7,
+  Other: 8,
+} as const satisfies Record<string, AssetClass>;
+
 export function assetClassLabel(value: AssetClass): string {
   return ASSET_CLASSES.find((c) => c.value === Number(value))?.label ?? 'Unknown';
 }

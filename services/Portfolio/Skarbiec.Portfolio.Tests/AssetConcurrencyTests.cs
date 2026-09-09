@@ -33,6 +33,7 @@ public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) 
                 Id = assetId,
                 PortfolioId = portfolioId,
                 AssetClass = AssetClass.Stock,
+                ValuationMode = AssetValuationMode.Manual,
                 Name = "Test stock",
                 Currency = "PLN",
                 ManualValueDate = new DateOnly(2026, 1, 1)
