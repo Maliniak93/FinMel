@@ -23,7 +23,21 @@
       "Bash(dotnet restore:*)",
       "Bash(dotnet format:*)",
       "Bash(npm test:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(node scripts/verify.mjs:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run gen:api:*)",
+      "Bash(npm run format:check:*)",
+      "Bash(npm run smoke:api:*)",
+      "Bash(npm ci:*)",
+      "Bash(dotnet ef:*)",
+      "Bash(git worktree:*)",
+      "Bash(gh api:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run view:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)"
     ],
     "deny": [
       "Read(./**/.env*)",
@@ -40,6 +54,18 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-guard.mjs\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/format-on-edit.mjs\"",
+            "timeout": 30
           }
         ]
       }

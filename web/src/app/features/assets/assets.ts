@@ -12,7 +12,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { getApiMarketdataInstrumentsById, type InstrumentDetailsResponse } from '../../api/marketdata';
+import {
+  getApiMarketdataInstrumentsById,
+  type InstrumentDetailsResponse,
+} from '../../api/marketdata';
 import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
   getApiPortfolioPortfoliosById,
@@ -128,7 +131,10 @@ export class Assets {
     loader: async ({ params, abortSignal }) => {
       const details = await Promise.all(
         params.instrumentIds.map(async (id) => {
-          const result = await getApiMarketdataInstrumentsById({ path: { id }, signal: abortSignal });
+          const result = await getApiMarketdataInstrumentsById({
+            path: { id },
+            signal: abortSignal,
+          });
           return result.error ? null : (result.data ?? null);
         }),
       );
