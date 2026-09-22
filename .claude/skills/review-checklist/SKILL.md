@@ -11,7 +11,7 @@ agent's report at face value.
 
 ## Gather your own evidence
 1. Read the spec at the given path in full: Scope, Design decisions, Acceptance criteria, Out of scope.
-2. The change is committed on its `feat/*` branch before you are called, so **`git diff master...HEAD` is the diff under review** — the only view that shows brand-new files (`git diff` alone never does, and most of a new slice is new files). Then `git status --porcelain`: anything still uncommitted is part of the change too, and you read those files directly.
+2. The change is staged — never committed — on its `feat/*` branch before you are called, so **`git diff --cached` is the diff under review**: the index shows brand-new files (a bare `git diff` does not, and most of a new slice is new files). `master...HEAD` is empty here; don't reach for it. Then `git status --porcelain`: anything still unstaged is part of the change too, and you read those files directly.
 3. Read only the `skarbiec-plan/architecture.md`/`domain.md`/`decisions.md` sections the spec names, plus the `.claude/rules/*` files scoped to what the diff touches.
 4. Read the changed files and the tests that claim to prove them.
 5. Run read-only commands to settle a claim instead of guessing: a targeted `dotnet test --filter`, a `grep` for a pattern a hard rule forbids, `ls` for a file the spec says should exist.

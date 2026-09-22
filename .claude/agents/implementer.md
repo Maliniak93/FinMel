@@ -30,6 +30,8 @@ The delegation message carries some of these, as paths and JSON — never as fil
   the spec declared `skip: [tests]`** — that spec adds no behaviour, so nothing is red to start with:
   implement its Scope, run the command every acceptance criterion names as its proof, report those in
   `commandsRun`, and leave every existing suite green. Writing a test there is scope creep, not zeal.
+  An acceptance criterion whose named proof is `scripts/verify.mjs` or a full suite is already proven
+  by the verifier that runs after you — note it in `commandsRun` as deferred, do not run it twice.
 - `failures` — `[{ step, summary, file }]` from the verifier. Fix round: fix exactly these.
 - `findings` — blocking review findings `[{ file, line, claim, evidence, suggestedFix }]`. Fix round.
 
@@ -62,26 +64,49 @@ instead, and say in `notes` that you could not verify the API.
 
 ## Work
 
-1. Run the given tests and see them red first:
+1. Run the given tests and see them red first, **filtered to those tests only**:
    `dotnet test services/<Service>/Skarbiec.<Service>.Tests --filter "FullyQualifiedName~<Name>"`.
    Already green means the spec or the tests are wrong — stop and report it as an open question.
    (No tests delivered → skip this step and start from the spec's Scope.)
 2. Implement the smallest change that turns them green, following the loaded playbooks and
    `.claude/rules/*`. Copy the nearest existing pattern instead of inventing one.
-3. Re-run those tests, then the whole affected test project(s).
+3. Re-run the same filtered tests. Stop there — the verifier runs the full suites right after you.
+
+## Run only your own tests — the verifier owns the rest
+
+A `verifier` agent runs `node scripts/verify.mjs` immediately after every turn of yours, and that
+script already does `dotnet format --verify-no-changes`, `dotnet build`, `dotnet test` per affected
+project, and `web/`'s `typecheck`, `lint`, `format:check`, `build` and `test`. Running any of those
+yourself repeats a check that is about to run anyway — minutes of wall clock and tokens for an answer
+you get for free.
+
+**Never run** (the verifier does, once): `node scripts/verify.mjs` · a solution-wide `dotnet format`
+as a habit · `dotnet build` on the solution · an unfiltered `dotnet test` · `npm run typecheck` /
+`lint` / `format:check` / `build` · `npm test`.
+
+**Do run**: `dotnet test <project> --filter "FullyQualifiedName~<Name>"` for the tests you are
+driving green, `dotnet ef migrations add` when the model changed, and `dotnet format` **once** right
+after that (generated migration files come out unformatted). A build error surfacing inside a
+filtered `dotnet test` run is yours to fix — you do not need a separate `dotnet build` to find it.
+
+The one exception is the generated client (below): `npm run gen:api` has to run here, because the
+verifier only checks that its output is already in the tree.
 
 ## Definition of done (all of it, before you finish)
 
-- Tests green, including tenancy isolation for any new user-owned resource.
-- Zero warnings (warnings are errors) and `dotnet format` clean.
-- API surface changed → `cd web && npm run gen:api`, then `npm run typecheck`; diff the generated
-  client and keep only the real schema delta (the generator can strip `.js` extensions repo-wide —
-  hand-revert anything that is not your change).
+- The tests you were given are green, and you have not weakened one to get there.
+- API surface changed → `cd web && npm run gen:api`, then `npm run typecheck` **once** (the one web
+  command you own: a client that does not compile otherwise costs a whole fix round), then
+  `git diff -- web/src/app/api` and keep only the real schema delta — the generator can strip `.js`
+  extensions repo-wide, so hand-revert anything that is not your change.
 - New or changed endpoint → `requests/<service>.http` updated with a working request.
 - Convention changed → the matching `.claude/rules/*.md` updated. Hard rule changed → an ADR entry
   appended to `skarbiec-plan/decisions.md`, referenced from the spec. Neither happens silently.
 - Migration added → it is reviewed for destructiveness and named after the change, and the runbook
   note in the spec's Verification section still holds.
+
+Zero warnings and a formatted tree are still part of done; the `Stop` hook and the verifier are how
+that gets checked, not a suite you run yourself.
 
 ## Hard constraints
 

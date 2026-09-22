@@ -11,9 +11,9 @@
 // on `ask` (or `deny` for a force-push to trunk), no matter which lane produced them.
 //
 // Lanes — branches where commit / push / PR-to-trunk proceed without a prompt:
-//   - `feat/*`, `chore/*`, `fix/*` — the current model. `/build`'s `ops` agent commits, pushes and
-//     opens a PR to master from `feat/<slug>` for every spec it ships; the user still merges (see
-//     below).
+//   - `feat/*`, `chore/*`, `fix/*` — the current model. Note that `/build` no longer reaches this
+//     hook at all: its `ops` agent stops at `git add -A`, and the commit, push and PR are the
+//     user's own. The lane is what keeps an explicit `/ops <task>` chore from prompting per step.
 //   - `praca_YYYY-MM-DD` and `[MT]<n>.<n>-...` — legacy branches from the earlier /praca workflow,
 //     kept so old branches and open PRs keep behaving the way they always did.
 //

@@ -62,8 +62,11 @@ in `notes` — never invent an API.
 
 ## Confirm red
 
-Run them: `dotnet test services/<Service>/Skarbiec.<Service>.Tests --filter "FullyQualifiedName~<Name>"`
-(or `cd web && npm test` for frontend specs). Every new test must fail for the right reason.
+Run them **filtered to the tests you just wrote**:
+`dotnet test services/<Service>/Skarbiec.<Service>.Tests --filter "FullyQualifiedName~<Name>"`
+(frontend: `cd web && npm test -- --watch=false -t "<name>"`). Every new test must fail for the right
+reason. Never run a whole project, a whole suite or `scripts/verify.mjs` — the `verifier` phase does
+that later in the run, and repeating it here only costs time.
 
 A **compile failure** because the production API does not exist yet is an acceptable red — say so in
 `notes`, naming the missing type or member. A test that passes on the first run is a bug in the test

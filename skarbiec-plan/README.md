@@ -5,7 +5,7 @@ Personal wealth-management web app and a deliberate microservices learning proje
 ## How we work
 
 1. **`/design <idea>`** — interview, writes `specs/<slug>.md` from `specs/_template.md`, stops at `status: draft`. You review it and flip it to `status: approved`.
-2. **`/build <spec> [--tier 1|2]`** — runs Tests → Implement → Verify → Review → Ship on an approved spec, opens a PR against `master`. **You merge it** — no agent ever merges.
+2. **`/build <spec> [--tier 1|2]`** — runs Tests → Implement → Verify → Review → Stage on an approved spec and leaves the whole change staged on `feat/<slug>`. **The commit, the push, the PR and the merge are yours** — no agent commits, pushes or merges.
 3. **`/fix <bug>`** — reproduces the bug, finds the root cause, writes `specs/fix-<slug>.md` with a reproduction test as its acceptance criterion, and after your approval runs the same pipeline as `/build`.
 4. **`/check`** — quick repo-wide verification (`node scripts/verify.mjs`) with a five-line summary.
 5. **`/ops <task>`** — CI, dependabot, runner, branch cleanup.

@@ -73,6 +73,12 @@ Changing a convention or a hard rule in the same change that motivated it: updat
 ## Definition of done
 - Tests green, including tenancy isolation for any new user-owned resource.
 - Zero warnings (`TreatWarningsAsErrors`), `dotnet format` clean.
+
+> **Who runs what.** While implementing, run only `dotnet test <project> --filter "FullyQualifiedName~<Name>"`
+> for the tests you are driving green. `dotnet format`, a solution build, the full suites and
+> `scripts/verify.mjs` belong to the `verifier` phase that runs right after — repeating them here
+> buys nothing and costs minutes. The exception is `dotnet format` immediately after
+> `dotnet ef migrations add`, because generated migrations are not formatted.
 - Handler registered in `Program.cs`; endpoint mapped; migration present if the model changed.
 - `requests/*.http` and the generated TS client updated when the API surface changed.
 - Rules/ADRs updated when a convention or hard rule changed.

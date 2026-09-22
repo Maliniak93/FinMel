@@ -39,4 +39,4 @@ Valuation, allocation, rebalancing, quantity-recompute math: table-driven `[Theo
 ## Other facts
 - Health-check tests poll `/health/ready` for up to 10 s (a fresh Testcontainers Postgres/RabbitMQ can take a moment to become ready).
 - `Testing:DisableBackgroundJobs` is set to `true` on every test host by `SkarbiecApiFactory`; a service with scheduled work (Quartz) must check this key before scheduling anything, and provide a `NoOp*` implementation of any trigger interface a slice test still needs to resolve.
-- Run one project at a time: `dotnet test services/<Service>/Skarbiec.<Service>.Tests` (add `--filter "FullyQualifiedName~<Name>"` to target one class while iterating).
+- Run one project at a time, and while iterating always narrow it: `dotnet test services/<Service>/Skarbiec.<Service>.Tests --filter "FullyQualifiedName~<Name>"`. The unfiltered project run belongs to the `verifier` phase (`scripts/verify.mjs`), which runs right after you — doing it here just repeats it.
