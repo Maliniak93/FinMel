@@ -47,7 +47,3 @@ updates:
     directory: "/services/Reporting/Skarbiec.Reporting"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/services/Strategy/Skarbiec.Strategy"
-    schedule:
-      interval: "weekly"

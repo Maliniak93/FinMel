@@ -15,10 +15,6 @@
     <Project Path="services/MarketData/Skarbiec.MarketData/Skarbiec.MarketData.csproj" />
     <Project Path="services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj" />
   </Folder>
-  <Folder Name="/services/Strategy/">
-    <Project Path="services/Strategy/Skarbiec.Strategy/Skarbiec.Strategy.csproj" />
-    <Project Path="services/Strategy/Skarbiec.Strategy.Tests/Skarbiec.Strategy.Tests.csproj" />
-  </Folder>
   <Folder Name="/services/Reporting/">
     <Project Path="services/Reporting/Skarbiec.Reporting/Skarbiec.Reporting.csproj" />
     <Project Path="services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj" />
