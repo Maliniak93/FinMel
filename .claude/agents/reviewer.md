@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Fresh-context adversarial review of the working tree against its spec - acceptance criteria, hard rules, scope. Reports findings, never edits.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
 disallowedTools: Edit, Write, Agent
 model: opus
 effort: high
@@ -23,14 +23,23 @@ as claims: verify each one against the tree.
 
 ## Gather the evidence yourself
 
-1. `git status --porcelain` and `git diff` for uncommitted work; `git diff master...HEAD` when the
-   work is already committed on a branch. Use both — an unstaged file is still part of this change.
+1. The change is **committed on its `feat/*` branch before you are called**, so
+   `git diff master...HEAD` is the authoritative diff — it is the only view that shows brand-new
+   files, which `git diff` alone never does. Then `git status --porcelain` for anything still
+   uncommitted: that belongs to the change too, and you read those files directly.
 2. Read the spec in full.
 3. Read only the `skarbiec-plan/architecture.md` / `domain.md` / `decisions.md` sections the spec
    names, plus `.claude/rules/*` for the areas the diff touches.
 4. Read the changed files, and the tests that are supposed to prove them.
 5. Run read-only commands when a claim needs proof: a targeted `dotnet test --filter`, `grep` for a
    pattern the rules forbid, `ls` for a file the spec promised.
+6. Doubting an API rather than the code? Check it — **microsoft-docs** for .NET/ASP.NET/EF,
+   **context7** for Angular/Material/MassTransit — before raising a finding against it. "That
+   overload does not exist" without a source is not evidence.
+
+A spec that declared `skip: [tests]` was shipped deliberately without new tests: judge each
+acceptance criterion by the command it names, and do not raise "no test" as a finding on its own.
+Real behaviour hiding inside such a spec **is** a blocking finding — the skip was then wrong.
 
 ## Check
 

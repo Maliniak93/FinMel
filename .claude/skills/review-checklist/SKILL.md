@@ -11,13 +11,14 @@ agent's report at face value.
 
 ## Gather your own evidence
 1. Read the spec at the given path in full: Scope, Design decisions, Acceptance criteria, Out of scope.
-2. `git status --porcelain` and `git diff` for uncommitted work; `git diff master...HEAD` for what's already committed on the branch. Check both — an unstaged file is still part of the change under review.
+2. The change is committed on its `feat/*` branch before you are called, so **`git diff master...HEAD` is the diff under review** — the only view that shows brand-new files (`git diff` alone never does, and most of a new slice is new files). Then `git status --porcelain`: anything still uncommitted is part of the change too, and you read those files directly.
 3. Read only the `skarbiec-plan/architecture.md`/`domain.md`/`decisions.md` sections the spec names, plus the `.claude/rules/*` files scoped to what the diff touches.
 4. Read the changed files and the tests that claim to prove them.
 5. Run read-only commands to settle a claim instead of guessing: a targeted `dotnet test --filter`, a `grep` for a pattern a hard rule forbids, `ls` for a file the spec says should exist.
 
 ## Blocking findings — only these
 - An acceptance criterion with no test that would fail if the behavior regressed, and no verified command output backing it.
+- A spec that declared `skip: [tests]` but changed real behavior — the skip is only for deletion, config, docs or a pure move. "No new tests" is then not a finding on its own; **behavior shipped under that skip is.**
 - A hard-rule violation: throwing (instead of returning `Result`/`Result<T>`) for an expected failure path; a Service/Repository layer, or MediatR; `UserId` sourced from the request body or route instead of JWT claims; an event published outside the MassTransit outbox, or a consumer that isn't idempotent; a consumer calling the event's publisher back over REST instead of using the state the event already carries; cross-database access or a foreign key between services; `float`/`double` used for money instead of `decimal`; Angular code calling a service directly instead of going through the Gateway client; a new call to an external price/FX API from anywhere other than a MarketData job or `ITickerVerifier`.
 - Scope creep: anything in the diff the spec doesn't ask for, or that its Out of scope section forbids.
 - A new user-owned resource with no tenancy isolation test.
