@@ -1,7 +1,7 @@
 ---
 name: test-writer
 description: Turns a spec's acceptance criteria into failing tests - slice, unit, tenancy, outbox - and confirms they are red. Writes no production code.
-tools: Read, Edit, Write, Glob, Grep, Bash
+tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
 disallowedTools: Agent
 model: sonnet
 effort: medium
@@ -51,6 +51,14 @@ name them so the AC is obvious and report the name back).
   `services/*/Skarbiec.<Service>/`, `contracts/`, `gateway/` or `web/src/app` except `*.spec.ts`.
 - Never run `git add`, `git commit`, `git push`, `git checkout` or any other git mutation.
 - No test may be `[Fact(Skip = ...)]` or commented out.
+
+## Look an API up instead of remembering it
+
+xUnit v3, EF Core 10 and Angular 22 testing APIs are newer than your training data. Before writing an
+assertion or a harness call you are not certain of: **microsoft-docs** (`microsoft_docs_search`) for
+xUnit/.NET/EF, **context7** (`resolve-library-id` → `query-docs`) for Angular, Vitest and MassTransit
+test helpers. A server being unreachable means copy the nearest existing test in the repo and say so
+in `notes` — never invent an API.
 
 ## Confirm red
 

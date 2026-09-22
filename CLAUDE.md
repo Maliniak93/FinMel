@@ -15,6 +15,7 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | Test — **Docker must be running** (Testcontainers) | `dotnet test` |
 | Format check | `dotnet format Skarbiec.slnx --verify-no-changes` |
 | One-shot verification: format → build → tests → web → API client | `node scripts/verify.mjs [--quick\|--all\|--projects A,B]` |
+| Live plan status (specs vs. git vs. open PRs); `--write` refreshes the block in `skarbiec-plan/README.md` | `node scripts/plan-status.mjs [--write] [--no-gh]` |
 | Frontend dev server | `cd web && npm start` |
 | Frontend unit tests (Vitest) | `cd web && npm test` |
 | Regenerate the TS client after an API change — reads the build-time OpenAPI files once spec-00 lands, until then needs the stack running | `cd web && npm run gen:api` |
@@ -50,7 +51,7 @@ skarbiec-plan/            # planning docs: product, architecture, domain, decisi
 Path-scoped rules in `.claude/rules/` (`dotnet.md`, `messaging.md`, `testing.md`, `angular.md`, `domain.md`) load automatically when you touch matching files — read the matching rule before creating files in an area you have not touched yet. .NET 10 and Angular 22 move faster than training data: verify an API through microsoft-docs (.NET/ASP.NET/EF) or context7 (Angular, MassTransit) instead of writing it from memory.
 
 ## Workflow
-`/design <idea>` writes a spec into `skarbiec-plan/specs/` and stops for your approval → `/build <spec>` runs test-writer → implementer → verifier → reviewer → ops, which opens a PR on `feat/<slug>` → you merge. `/fix <bug>` reproduces, writes a one-criterion fix spec and runs the same pipeline; `/check` runs verification; `/ops <task>` handles CI and GitHub chores.
+`/design <idea>` writes a spec into `skarbiec-plan/specs/` and stops for your approval — new behaviour, a change to existing behaviour, or a cleanup → `/build <spec>` cuts `feat/<slug>` from master first, then runs test-writer → implementer → verifier → reviewer → ops, which commits, pushes and opens the PR → you merge. A spec with `skip: [tests]` (no behaviour changes) skips the test phase; `/build --skip tests,review` overrides it for one run. `/fix <bug>` reproduces, writes a one-criterion fix spec and runs the same pipeline; `/check` runs verification; `/ops <task>` handles CI and GitHub chores.
 Tier 1 = a precedent for this exists in the same service (Sonnet). Tier 2 = new pattern, cross-service work, or an algorithm (Opus).
 Definition of done: tests green including tenancy, zero warnings, `dotnet format` clean, TS client regenerated when the API changed, `requests/*.http` updated, rules and ADRs updated when a convention changes.
 Agents never run git — only `ops`, and only on `feat/*`.
