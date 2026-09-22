@@ -9,7 +9,7 @@ dashboard (traces/logs/metrics out of the box, ADR-014).
 ### Per-service database users (ADR-003)
 
 One PostgreSQL instance hosts a database per service (`identity_db`, `portfolio_db`,
-`marketdata_db`, `strategy_db`, `reporting_db`). Each database is provisioned with its **own**
+`marketdata_db`, `reporting_db`). Each database is provisioned with its **own**
 Postgres role, scoped so it can only connect to its own database:
 
 - `Skarbiec.AppHost/AppHost.cs` has a local `AddServiceDatabase(serviceName, databaseName)`
