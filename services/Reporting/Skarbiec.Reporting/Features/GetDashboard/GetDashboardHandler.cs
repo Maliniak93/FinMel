@@ -44,18 +44,28 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
             .OrderByDescending(p => p.ValuePln)
             .ToList();
 
-        var byAssetClass = snapshots
-            .SelectMany(s => ValuationBreakdown.Deserialize(s.BreakdownJson))
-            .GroupBy(e => e.AssetClass)
-            .Select(g =>
+        // spec-03: the per-class breakdown is a GROUP BY over the AssetValuation lines sharing each
+        // portfolio's latest (PortfolioId, Date) — the same join as above — instead of the JSONB
+        // blob the snapshot used to carry. Lines are tenancy-filtered in their own right, so this
+        // can never reach another user's assets.
+        var assetClassTotals = await db.AssetValuations
+            .AsNoTracking()
+            .Where(l => portfolioId == null || l.PortfolioId == portfolioId)
+            .Join(
+                latestDatePerPortfolio,
+                l => new { l.PortfolioId, l.Date },
+                p => new { p.PortfolioId, p.Date },
+                (l, _) => l)
+            .GroupBy(l => l.AssetClass)
+            .Select(g => new { AssetClass = g.Key, ValuePln = g.Sum(l => l.ValuePln) })
+            .ToListAsync(cancellationToken);
+
+        var byAssetClass = assetClassTotals
+            .Select(t => new DashboardAssetClassValue
             {
-                var value = g.Sum(e => e.ValuePln);
-                return new DashboardAssetClassValue
-                {
-                    AssetClass = g.Key,
-                    ValuePln = value,
-                    Percentage = netWorthPln == 0m ? 0m : Math.Round(value / netWorthPln * 100m, 2),
-                };
+                AssetClass = t.AssetClass,
+                ValuePln = t.ValuePln,
+                Percentage = netWorthPln == 0m ? 0m : Math.Round(t.ValuePln / netWorthPln * 100m, 2),
             })
             .OrderByDescending(b => b.ValuePln)
             .ToList();

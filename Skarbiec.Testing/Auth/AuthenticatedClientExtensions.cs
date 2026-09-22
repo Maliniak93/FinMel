@@ -27,8 +27,8 @@ public static class AuthenticatedClientExtensions
 
     /// <summary>
     /// A client carrying a <see cref="SystemCaller"/> token (T2.11) — for exercising bulk/cross-user
-    /// internal endpoints (e.g. Portfolio's positions-for-valuation) the way Reporting's consumer
-    /// calls them, rather than as any particular user.
+    /// internal endpoints (MarketData's prices/fx latest-batch, the only two left after ADR-021)
+    /// the way Reporting's consumer calls them, rather than as any particular user.
     /// </summary>
     public static HttpClient CreateSystemAuthenticatedClient<TProgram>(this SkarbiecApiFactory<TProgram> factory)
         where TProgram : class

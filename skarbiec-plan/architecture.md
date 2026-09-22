@@ -37,8 +37,6 @@ Angular talks only to the Gateway (ADR-013).
 
 | Today (`master`) | Target | Closed by |
 |---|---|---|
-| Reporting pulls positions from Portfolio over REST (`SystemCaller`) on every snapshot | Reporting keeps a local `Position` read model fed by `AssetPositionChanged`/`AssetRemoved`/`Portfolio*` | spec-02, spec-03 |
-| `ValuationSnapshot.BreakdownJson` (JSONB) | per-asset `AssetValuation` lines; the breakdown becomes `GROUP BY AssetClass` over lines | spec-03 |
 | `AssetChanged`/`TransactionRecorded` publish with no consumers; updating or deleting a transaction publishes nothing | replaced by `AssetPositionChanged`/`AssetRemoved` from every mutating slice | spec-02 |
 | `PriceSyncJob` syncs every dictionary instrument | syncs only instruments with `InstrumentUsage.AssetCount > 0` | spec-04 |
 | History backfill on first use of an *existing* instrument isn't wired | `HistoryBackfillJob` fires from the `InstrumentUsage` consumer on first use | spec-04 |

@@ -7,7 +7,6 @@ using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
-using Skarbiec.Reporting.Portfolio;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Reporting.Valuation;
 using Skarbiec.ServiceDefaults.Authentication;
@@ -19,11 +18,12 @@ using Skarbiec.Testing.Containers;
 namespace Skarbiec.Reporting.Tests;
 
 /// <summary>
-/// End-to-end (T2.11 AC): <c>DailyPricesSynced</c> in, <see cref="ValuationSnapshot"/> rows out,
-/// idempotently. Builds its own provider (rather than <c>ReportingApiFactory</c>) with fake
-/// Portfolio/MarketData clients on a queue name unique to this test class — the consumer needs
-/// RabbitMQ + Postgres but no HTTP host, mirroring Identity's
-/// <c>UserRegisteredIdempotentConsumerTests</c>.
+/// End-to-end (spec-03 AC8-12): <c>DailyPricesSynced</c> in, <see cref="AssetValuation"/> lines and
+/// <see cref="ValuationSnapshot"/> rows out — computed from Reporting's own local <see cref="Position"/>
+/// table, never Portfolio over REST (ADR-021). No <c>IPositionsClient</c> is registered in this
+/// container at all: the AC8 fact this class proves is precisely that the consumer no longer needs
+/// one. Builds its own provider (no HTTP host needed) on a queue name unique to this test class,
+/// mirroring <c>AssetPositionChangedConsumerTests</c>.
 /// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
@@ -32,7 +32,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
     public async ValueTask InitializeAsync()
     {
-        await using var provider = BuildProvider(new FakePositionsClient(), new FakePriceQuoteClient());
+        await using var provider = BuildProvider(new FakePriceQuoteClient());
         await using var scope = provider.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<ReportingDbContext>().Database.MigrateAsync();
 
@@ -42,7 +42,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
-    public async Task Consume_DailyPricesSynced_ComputesSnapshotsForEveryPortfolioAcrossUsers()
+    public async Task Consume_DailyPricesSynced_ValuesEveryPortfolioFromLocalPositions()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
@@ -50,126 +50,216 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
         var userAId = Guid.NewGuid();
         var portfolioAId = Guid.NewGuid();
+        var assetAId = Guid.NewGuid();
         var userBId = Guid.NewGuid();
         var portfolioBId = Guid.NewGuid();
+        var assetBId = Guid.NewGuid();
 
-        var positionsClient = new FakePositionsClient()
-            .WithPosition(new PositionForValuation
-            {
-                UserId = userAId,
-                PortfolioId = portfolioAId,
-                AssetClass = AssetClass.Stock,
-                ValuationMode = AssetValuationMode.Market,
-                Currency = "PLN",
-                Quantity = 10,
-                InstrumentId = stockInstrumentId,
-            })
-            .WithPosition(new PositionForValuation
-            {
-                UserId = userBId,
-                PortfolioId = portfolioBId,
-                AssetClass = AssetClass.RealEstate,
-                ValuationMode = AssetValuationMode.Manual,
-                Currency = "PLN",
-                Quantity = 0,
-                ManualValueAmount = 300_000m,
-            });
+        await using (var seedProvider = BuildProvider(new FakePriceQuoteClient()))
+        {
+            await using var scope = seedProvider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+
+            await db.SeedPositionAsync(assetAId, userAId, portfolioAId, cancellationToken,
+                assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
+                instrumentId: stockInstrumentId, currency: "PLN", quantity: 10m);
+
+            await db.SeedPositionAsync(assetBId, userBId, portfolioBId, cancellationToken,
+                assetClass: AssetClass.RealEstate, valuationMode: AssetValuationMode.Manual,
+                currency: "PLN", quantity: 0m, manualValueAmount: 300_000m);
+        }
 
         var priceQuoteClient = new FakePriceQuoteClient()
             .WithPrice(stockInstrumentId, new InstrumentPriceLookup("PLN", snapshotDate, 150m));
 
-        await RunConsumerAsync(positionsClient, priceQuoteClient, async provider =>
+        await RunConsumerAsync(priceQuoteClient, async provider =>
         {
-            var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(new DailyPricesSynced
-            {
-                RunId = Guid.NewGuid(),
-                SyncDate = snapshotDate,
-                SyncedCount = 1,
-                FailedCount = 0,
-                NoDataCount = 0,
-            }, cancellationToken);
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
             var snapshotA = await WaitForSnapshotAsync(provider, portfolioAId, snapshotDate, cancellationToken);
             var snapshotB = await WaitForSnapshotAsync(provider, portfolioBId, snapshotDate, cancellationToken);
 
             Assert.Equal(userAId, snapshotA.UserId);
-            Assert.Equal(1500m, snapshotA.TotalPln); // 10 units x 150 PLN, same-day quote.
-            Assert.False(snapshotA.IsStale);
+            Assert.Equal(1_500m, snapshotA.TotalPln); // 10 units x 150 PLN, same-day quote.
 
             Assert.Equal(userBId, snapshotB.UserId);
             Assert.Equal(300_000m, snapshotB.TotalPln);
         }, cancellationToken);
     }
 
-    /// <summary>M1.4 AC: a currency-valued asset (no instrument, no manual amount) flows
-    /// event → snapshot with the correct PLN value — the case that valued at 0 before this mode
-    /// existed as an explicit branch in <see cref="Skarbiec.Reporting.Valuation.ValuationAlgorithm"/>.</summary>
     [Fact]
-    public async Task Consume_DailyPricesSynced_CurrencyValuedAssetValuesThroughFxRate()
+    public async Task Consume_DailyPricesSynced_SkipsArchivedPortfolios()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var snapshotDate = new DateOnly(2026, 8, 12);
+        var snapshotDate = new DateOnly(2026, 8, 10);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var archivedPortfolioId = Guid.NewGuid();
+        var archivedAssetId = Guid.NewGuid();
 
-        var positionsClient = new FakePositionsClient()
-            .WithPosition(new PositionForValuation
-            {
-                UserId = userId,
-                PortfolioId = portfolioId,
-                AssetClass = AssetClass.Cash,
-                ValuationMode = AssetValuationMode.CurrencyValued,
-                Currency = "EUR",
-                Quantity = 1_000m, // 1000 EUR cash — no instrument, no manual value.
-            });
-
-        var priceQuoteClient = new FakePriceQuoteClient()
-            .WithFxRate("EURPLN", new FxRateLookup(snapshotDate, 4.30m));
-
-        await RunConsumerAsync(positionsClient, priceQuoteClient, async provider =>
+        await using (var seedProvider = BuildProvider(new FakePriceQuoteClient()))
         {
-            var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(new DailyPricesSynced
-            {
-                RunId = Guid.NewGuid(),
-                SyncDate = snapshotDate,
-                SyncedCount = 1,
-                FailedCount = 0,
-                NoDataCount = 0,
-            }, cancellationToken);
+            await using var scope = seedProvider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            await db.SeedPositionAsync(archivedAssetId, userId, archivedPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 1_000m, portfolioIsArchived: true);
+        }
 
-            // 1000 EUR x 4.30 PLN/EUR = 4300 PLN — not 0, which is what pre-M1.4 code would have
-            // produced (it treated "no InstrumentId" as manual, and ManualValueAmount is null here).
-            Assert.Equal(userId, snapshot.UserId);
-            Assert.Equal(4_300m, snapshot.TotalPln);
-            Assert.False(snapshot.IsStale);
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
+
+            // No snapshot to wait on for a portfolio that must never get one — give the consumer a
+            // full run's worth of time before asserting none appeared.
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            await using var scope = provider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+
+            Assert.False(await db.ValuationSnapshots.IgnoreQueryFilters()
+                .AnyAsync(s => s.PortfolioId == archivedPortfolioId, cancellationToken));
+            Assert.False(await db.AssetValuations.IgnoreQueryFilters()
+                .AnyAsync(l => l.AssetId == archivedAssetId, cancellationToken));
         }, cancellationToken);
     }
 
     [Fact]
-    public async Task Consume_SameMessageIdDeliveredTwice_SnapshotComputedOnlyOnce()
+    public async Task Consume_DailyPricesSynced_WritesOneLinePerPositionSummingToTheSnapshot()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 10);
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var stockInstrumentId = Guid.NewGuid();
+
+        var marketAssetId = Guid.NewGuid();
+        var manualAssetId = Guid.NewGuid();
+        var cashAssetId = Guid.NewGuid();
+
+        await using (var seedProvider = BuildProvider(new FakePriceQuoteClient()))
+        {
+            await using var scope = seedProvider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+
+            await db.SeedPositionAsync(marketAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
+                instrumentId: stockInstrumentId, currency: "PLN", quantity: 10m);
+
+            await db.SeedPositionAsync(manualAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.RealEstate, valuationMode: AssetValuationMode.Manual,
+                currency: "PLN", quantity: 0m, manualValueAmount: 300_000m);
+
+            await db.SeedPositionAsync(cashAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "EUR", quantity: 1_000m);
+        }
+
+        var priceQuoteClient = new FakePriceQuoteClient()
+            .WithPrice(stockInstrumentId, new InstrumentPriceLookup("PLN", snapshotDate, 150m))
+            .WithFxRate("EURPLN", new FxRateLookup(snapshotDate, 4.30m));
+
+        await RunConsumerAsync(priceQuoteClient, async provider =>
+        {
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+
+            await using var scope = provider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+            var lines = await db.AssetValuations.IgnoreQueryFilters()
+                .Where(l => l.PortfolioId == portfolioId && l.Date == snapshotDate)
+                .ToListAsync(cancellationToken);
+
+            Assert.Equal(3, lines.Count);
+
+            var marketLine = Assert.Single(lines, l => l.AssetId == marketAssetId);
+            Assert.Equal(10m, marketLine.Quantity);
+            Assert.Equal(150m, marketLine.PriceUsed);
+            Assert.Equal(snapshotDate, marketLine.PriceDate);
+            Assert.Equal(1_500m, marketLine.ValuePln);
+
+            var manualLine = Assert.Single(lines, l => l.AssetId == manualAssetId);
+            Assert.Null(manualLine.PriceUsed);
+            Assert.Equal(300_000m, manualLine.ValuePln);
+
+            var cashLine = Assert.Single(lines, l => l.AssetId == cashAssetId);
+            Assert.Equal(4.30m, cashLine.FxRateUsed);
+            Assert.Equal(4_300m, cashLine.ValuePln);
+
+            Assert.Equal(lines.Sum(l => l.ValuePln), snapshot.TotalPln);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Consume_WithQuoteOlderThanSevenDays_MarksOnlyThatLineAndTheSnapshotStale()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 20);
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+
+        var staleInstrumentId = Guid.NewGuid();
+        var staleAssetId = Guid.NewGuid();
+        var freshInstrumentId = Guid.NewGuid();
+        var freshAssetId = Guid.NewGuid();
+
+        await using (var seedProvider = BuildProvider(new FakePriceQuoteClient()))
+        {
+            await using var scope = seedProvider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+
+            await db.SeedPositionAsync(staleAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
+                instrumentId: staleInstrumentId, currency: "PLN", quantity: 1m);
+
+            await db.SeedPositionAsync(freshAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Etf, valuationMode: AssetValuationMode.Market,
+                instrumentId: freshInstrumentId, currency: "PLN", quantity: 1m);
+        }
+
+        var priceQuoteClient = new FakePriceQuoteClient()
+            .WithPrice(staleInstrumentId, new InstrumentPriceLookup("PLN", snapshotDate.AddDays(-10), 100m))
+            .WithPrice(freshInstrumentId, new InstrumentPriceLookup("PLN", snapshotDate, 50m));
+
+        await RunConsumerAsync(priceQuoteClient, async provider =>
+        {
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            Assert.True(snapshot.IsStale);
+
+            await using var scope = provider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+            var lines = await db.AssetValuations.IgnoreQueryFilters()
+                .Where(l => l.PortfolioId == portfolioId && l.Date == snapshotDate)
+                .ToListAsync(cancellationToken);
+
+            Assert.True(Assert.Single(lines, l => l.AssetId == staleAssetId).IsStale);
+            Assert.False(Assert.Single(lines, l => l.AssetId == freshAssetId).IsStale);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Consume_SameMessageIdTwice_LeavesOneSnapshotAndOneLinePerAsset()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 11);
-        var portfolioId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
 
-        var positionsClient = new FakePositionsClient()
-            .WithPosition(new PositionForValuation
-            {
-                UserId = userId,
-                PortfolioId = portfolioId,
-                AssetClass = AssetClass.Cash,
-                ValuationMode = AssetValuationMode.Manual,
-                Currency = "PLN",
-                Quantity = 0,
-                ManualValueAmount = 42m,
-            });
+        await using (var seedProvider = BuildProvider(new FakePriceQuoteClient()))
+        {
+            await using var scope = seedProvider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
 
-        await RunConsumerAsync(positionsClient, new FakePriceQuoteClient(), async provider =>
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.Manual,
+                currency: "PLN", quantity: 0m, manualValueAmount: 42m);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
             var messageId = Guid.NewGuid();
@@ -195,23 +285,36 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-            var snapshots = await db.ValuationSnapshots
-                .IgnoreQueryFilters()
+
+            var snapshots = await db.ValuationSnapshots.IgnoreQueryFilters()
                 .Where(s => s.PortfolioId == portfolioId && s.Date == snapshotDate)
                 .ToListAsync(cancellationToken);
+            Assert.Single(snapshots);
 
-            var snapshot = Assert.Single(snapshots);
-            Assert.Equal(42m, snapshot.TotalPln);
+            var lines = await db.AssetValuations.IgnoreQueryFilters()
+                .Where(l => l.AssetId == assetId && l.Date == snapshotDate)
+                .ToListAsync(cancellationToken);
+            Assert.Single(lines);
+        }, cancellationToken);
+    }
+
+    private static async Task PublishSyncAsync(ServiceProvider provider, DateOnly snapshotDate, CancellationToken cancellationToken)
+    {
+        var bus = provider.GetRequiredService<IBus>();
+        await bus.Publish(new DailyPricesSynced
+        {
+            RunId = Guid.NewGuid(),
+            SyncDate = snapshotDate,
+            SyncedCount = 1,
+            FailedCount = 0,
+            NoDataCount = 0,
         }, cancellationToken);
     }
 
     private async Task RunConsumerAsync(
-        IPositionsClient positionsClient,
-        IPriceQuoteClient priceQuoteClient,
-        Func<ServiceProvider, Task> action,
-        CancellationToken cancellationToken)
+        IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken)
     {
-        await using var provider = BuildProvider(positionsClient, priceQuoteClient);
+        await using var provider = BuildProvider(priceQuoteClient);
         var hostedServices = provider.GetServices<IHostedService>().ToList();
 
         foreach (var hostedService in hostedServices)
@@ -221,8 +324,8 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
         try
         {
-            // See UserRegisteredIdempotentConsumerTests: a publish fired immediately after
-            // StartAsync can race the exchange->queue binding on a fresh queue and be dropped.
+            // See AssetPositionChangedConsumerTests: a publish fired immediately after StartAsync can
+            // race the exchange->queue binding on a fresh queue and be dropped.
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
             await action(provider);
@@ -244,8 +347,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         {
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-            var snapshot = await db.ValuationSnapshots
-                .IgnoreQueryFilters()
+            var snapshot = await db.ValuationSnapshots.IgnoreQueryFilters()
                 .SingleOrDefaultAsync(s => s.PortfolioId == portfolioId && s.Date == date, cancellationToken);
 
             if (snapshot is not null)
@@ -259,11 +361,10 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         throw new TimeoutException($"No ValuationSnapshot for portfolio {portfolioId} on {date} within the deadline.");
     }
 
-    private ServiceProvider BuildProvider(IPositionsClient positionsClient, IPriceQuoteClient priceQuoteClient)
+    private ServiceProvider BuildProvider(IPriceQuoteClient priceQuoteClient)
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton(positionsClient);
         services.AddSingleton(priceQuoteClient);
 
         // No HTTP request in this bare provider (same as production: a MassTransit consumer has no
@@ -278,10 +379,9 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         {
             x.SetKebabCaseEndpointNameFormatter();
 
-            // No UseBusOutbox() here: this test only exercises the consumer-side inbox
-            // (UseEntityFrameworkOutbox on the receive endpoint, wired by
-            // IdempotentConsumerDefinition), never IBus/IPublishEndpoint from a DI scope, so the
-            // producer-side bus outbox and its background delivery poller would be dead weight.
+            // No UseBusOutbox() here: this test only exercises the consumer-side inbox, never
+            // IBus/IPublishEndpoint from a DI scope, so the producer-side bus outbox and its
+            // background delivery poller would be dead weight.
             x.AddEntityFrameworkOutbox<ReportingDbContext>(o => o.UsePostgres());
 
             x.AddConsumer<DailyPricesSyncedConsumer>(typeof(TestConsumerDefinition));

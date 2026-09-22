@@ -3,12 +3,12 @@ export const meta = {
   description: 'Spec to a staged tree: branch, failing tests, implementation, verification, adversarial review',
   whenToUse: 'Invoked by /build on a spec whose status is approved. Not for exploratory work - the spec is the contract.',
   phases: [
-    { title: 'Branch', detail: 'ops cuts feat/<slug> from master before a single file is written', model: 'sonnet' },
-    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test (skippable)', model: 'sonnet' },
+    { title: 'Branch', detail: 'ops cuts feat/<slug> from master before a single file is written', model: 'haiku' },
+    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; sonnet/high on tier 1, opus/high on tier 2 (skippable)' },
     { title: 'Implement', detail: 'implementer does the work; sonnet/high on tier 1, opus/xhigh on tier 2' },
     { title: 'Verify', detail: 'verifier runs scripts/verify.mjs; failures loop back to Implement', model: 'haiku' },
-    { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'opus' },
-    { title: 'Stage', detail: 'ops flips the spec to done and leaves everything staged - the commit, push and PR are yours', model: 'sonnet' },
+    { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'claude-opus-5-5' },
+    { title: 'Stage', detail: 'ops flips the spec to done and leaves everything staged - the commit, push and PR are yours', model: 'haiku' },
   ],
 }
 
@@ -114,7 +114,11 @@ if (!spec) {
 
 const skipped = new Set((Array.isArray(skip) ? skip : [skip]).map((s) => String(s).trim().toLowerCase()))
 
-let model = tier >= 2 ? 'opus' : 'sonnet'
+const OPUS = 'claude-opus-5-5'
+// Mechanical ops phases (cut, stage, finish) need no judgment beyond reading frontmatter.
+const MECHANICAL = { model: 'haiku', effort: 'low' }
+
+let model = tier >= 2 ? OPUS : 'sonnet'
 let effort = tier >= 2 ? 'xhigh' : 'high'
 
 let rounds = 0
@@ -161,6 +165,7 @@ const stage = (label) =>
       'Report the branch and the number of staged files (`git diff --cached --name-only`).',
     ],
     STAGE,
+    MECHANICAL,
   )
 
 // ---------------------------------------------------------------- branch
@@ -180,6 +185,7 @@ const cut = await step(
     'If you are on master or another branch with changes that are not this spec (the spec file itself belongs to this change), stop: return `blocked: true` and name those files in notes instead of sweeping them along.',
   ],
   BRANCH,
+  MECHANICAL,
 )
 
 if (!cut) return stop('branch', { reason: 'ops returned no result' })
@@ -206,6 +212,7 @@ if (skipped.has('tests')) {
       'Run them and confirm they are red for the right reason. Write no production code.',
     ],
     TESTS,
+    tier >= 2 ? { model: OPUS, effort: 'high' } : { model: 'sonnet', effort: 'high' },
   )
 
   if (!tests) return stop('tests', { reason: 'test-writer returned no result' })
@@ -264,7 +271,7 @@ for (let round = 0; ; round++) {
   // Tier 1 gets one extra round on opus after escalating; tier 2 gets exactly maxRounds.
   if (round === maxRounds && tier === 1 && !escalated) {
     escalated = true
-    model = 'opus'
+    model = OPUS
     effort = 'xhigh'
     log('tier 1 exhausted its fix rounds - escalating the implementer to opus/xhigh for one final round')
   }
@@ -370,6 +377,7 @@ const staged = await step(
     `implementer report: ${JSON.stringify(impl)}`,
   ],
   STAGE,
+  MECHANICAL,
 )
 
 if (!staged) return stop('stage', { reason: 'ops returned no result' })

@@ -3,7 +3,9 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
-/// <summary>Stands in for <see cref="IPriceQuoteClient"/> — see <see cref="FakePositionsClient"/> for why.</summary>
+/// <summary>Stands in for <see cref="IPriceQuoteClient"/> so a consumer test can pin prices and FX
+/// rates without standing up MarketData's own Testcontainer host (mirrors Portfolio's
+/// <c>FakeInstrumentLookupClient</c>).</summary>
 public sealed class FakePriceQuoteClient : IPriceQuoteClient
 {
     private readonly Dictionary<Guid, InstrumentPriceLookup> _prices = [];

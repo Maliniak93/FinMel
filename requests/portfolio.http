@@ -152,10 +152,3 @@ Content-Type: application/json
 ### Delete a transaction
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
 Authorization: Bearer {{authToken}}
-
-
-### --- Internal / system-caller only (ADR/SystemCaller policy) ---
-
-### Positions for valuation
-GET {{baseUrl}}/api/portfolio/positions-for-valuation?page=1
-Authorization: Bearer {{authToken}}

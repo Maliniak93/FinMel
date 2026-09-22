@@ -53,16 +53,15 @@ var portfolioService = builder.AddProject<Projects.Skarbiec_Portfolio>("portfoli
     .WaitFor(marketDataService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-// T2.11: DailyPricesSynced consumer calls Portfolio's positions-for-valuation and MarketData's
-// price/FX batch endpoints directly (not through the Gateway) — same WithReference rationale as
-// Portfolio's own MarketData reference above.
+// Consumes Portfolio's events off RabbitMQ (spec-03) — no reference to portfolio-service, since the
+// DailyPricesSynced consumer values from its own Position read model now. Its one remaining REST
+// dependency is MarketData's price/FX batch, called directly (not through the Gateway) — same
+// WithReference rationale as Portfolio's own MarketData reference above.
 var reportingService = builder.AddProject<Projects.Skarbiec_Reporting>("reporting-service")
     .WithReference(reportingDb.ConnectionString)
     .WaitFor(reportingDb.Database)
     .WithReference(rabbitmq)
     .WaitFor(rabbitmq)
-    .WithReference(portfolioService)
-    .WaitFor(portfolioService)
     .WithReference(marketDataService)
     .WaitFor(marketDataService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);

@@ -7,10 +7,10 @@ How features get designed and built (ADR-024). Operational version of the approv
 | Agent | Model / effort | Tools | Preloaded skill | Job | Returns |
 |---|---|---|---|---|---|
 | `implementer` | sonnet/high (Tier 1); opus/xhigh (Tier 2, or after Tier-1 escalation) | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7, Playwright MCP — no `Agent` | `backend-playbook`, `frontend-playbook` | drives tests to green per the spec; updates `requests/*.http`, the TS client, and any rule/ADR it changes the convention of. Runs **only** `dotnet test --filter` on its own tests (+ `gen:api`/`typecheck` after an API change, `dotnet format` after a migration) — every suite belongs to the verifier | `{filesTouched[], projects[], commandsRun[], notes[]}` |
-| `test-writer` | sonnet/medium | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7 | `testing-playbook` | writes failing tests from the spec's acceptance criteria (slice/unit/tenancy/outbox), runs them **filtered** to confirm red | `{tests[{name,file,ac}], projects[]}` |
+| `test-writer` | sonnet/high (Tier 1) · opus/high (Tier 2) | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7 | `testing-playbook` | writes failing tests from the spec's acceptance criteria (slice/unit/tenancy/outbox), runs them **filtered** to confirm red | `{tests[{name,file,ac}], projects[]}` |
 | `verifier` | haiku/low | Bash, Read | — | runs `node scripts/verify.mjs --projects …`, parses the result | `{ok, failures[{step,summary,file?}]}` |
 | `reviewer` | opus/high | Read, Grep, Glob, Bash + microsoft-docs, context7 — no Edit/Write | `review-checklist` | fresh context; diffs the staged change (`git diff --cached`) against the spec and the hard rules; flags only what breaks correctness or an acceptance criterion | `{findings[{severity: blocking\|minor, file, line, claim, evidence}]}` |
-| `ops` | sonnet/medium | Bash, Read, Edit, Write, Glob, Grep + GitHub MCP (reads + review comments only) | `ops-playbook` | in a build run: branch + `git add -A`, nothing more; outside one: commits, PRs, CI triage, dependabot, runner, `.github/**` | `{branch, stagedFiles?, notes[]}` |
+| `ops` | sonnet/medium (haiku/low for the mechanical branch/stage phases of a build run) | Bash, Read, Edit, Write, Glob, Grep + GitHub MCP (reads + review comments only) | `ops-playbook` | in a build run: branch + `git add -A`, nothing more; outside one: commits, PRs, CI triage, dependabot, runner, `.github/**` | `{branch, stagedFiles?, notes[]}` |
 | `Explore` (built-in) | default, skips CLAUDE.md | read-only | — | codebase research for `/design` and `/fix` | text |
 
 Author ≠ reviewer (ADR-024): the reviewer always runs in a clean context and never edits a file.
@@ -93,17 +93,17 @@ What can be a script or a hook is not a prompt (cheaper, deterministic, no drift
 | Orchestration | the `Workflow` script (`build-feature.js`) — zero model tokens spent on control flow |
 | Plan status (which spec stands where, open PRs, rotting branches) | `scripts/plan-status.mjs`, derived from spec frontmatter + git + `gh`. A `SessionStart` hook injects it into every session, so no session ever starts from a stale README; `--write` refreshes the generated block in `skarbiec-plan/README.md`. Only "Open loops" there stays hand-written — that is judgement, not data |
 
-## Cost per feature (indicative — API list prices: Haiku 4.5 $1/$5, Sonnet 5 $2/$10, Opus 5 $5/$25 per MTok)
+## Cost per feature (indicative — API list prices: Haiku 4.5 $1/$5, Sonnet 5 $2/$10, Opus 5.5 $4/$20 per MTok; `opus` means `claude-opus-5-5`, pinned by full id)
 
 | Stage | Model | Typical tokens | Cost |
 |---|---|---|---|
-| `/design` | Opus (main session) | 30–80k | $0.3–0.8 |
-| ops — branch + stage (×1–3 per run) | Sonnet | 5–15k each | < $0.1 |
-| test-writer (skipped on a no-behaviour spec) | Sonnet | 40–100k | $0.1–0.3 |
+| `/design` | Opus, xhigh (main session) | 30–80k | $0.3–0.8 |
+| ops — branch + stage (×1–3 per run) | Haiku | 5–15k each | < $0.1 |
+| test-writer (skipped on a no-behaviour spec) | Sonnet / Opus (by tier) | 40–100k | $0.1–0.3 |
 | implementer (Tier 1 / Tier 2) | Sonnet / Opus | 100–300k | $0.3–0.8 / $0.8–2.5 |
 | verifier (×2–3 per run) | Haiku | 10–30k | < $0.1 |
 | reviewer (skippable with `--skip review`) | Opus | 40–100k | $0.3–0.8 |
-| ops — final stage (spec → done, `git add -A`) | Sonnet | 5–15k | < $0.1 |
+| ops — final stage (spec → done, `git add -A`) | Haiku | 5–15k | < $0.1 |
 | **Total per feature** | | | **~$1–2 (Tier 1), ~$2–5 (Tier 2)** |
 
 Tier 2 starts on Opus rather than trying Sonnet first: a failed attempt plus its fix-rounds costs more than starting with the stronger model.

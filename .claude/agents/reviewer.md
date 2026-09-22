@@ -3,7 +3,7 @@ name: reviewer
 description: Fresh-context adversarial review of the working tree against its spec - acceptance criteria, hard rules, scope. Reports findings, never edits.
 tools: Read, Grep, Glob, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
 disallowedTools: Edit, Write, Agent
-model: opus
+model: claude-opus-5-5
 effort: high
 color: red
 skills:

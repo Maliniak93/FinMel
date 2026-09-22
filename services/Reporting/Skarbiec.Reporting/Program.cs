@@ -5,7 +5,6 @@ using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Features.GetNetWorthHistory;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
-using Skarbiec.Reporting.Portfolio;
 using Skarbiec.ServiceDefaults.Http;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.ServiceDefaults.OpenApi;
@@ -32,19 +31,25 @@ if (!OpenApiBuildTime.IsActive)
         ?? throw new InvalidOperationException("Missing connection string 'reporting-db'.");
     builder.Services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(reportingConnectionString));
 
-    // T2.11: consumes DailyPricesSynced (published by MarketData, T2.10) through the T0.12 idempotent
-    // inbox template.
+    // Consumes DailyPricesSynced (published by MarketData, T2.10) plus Portfolio's position and
+    // portfolio-lifecycle events (spec-02/spec-03), each through the T0.12 idempotent inbox
+    // template. Arity-1 AddConsumer<T> with the definition as a Type — the two-generic form doesn't
+    // compile here (.claude/rules/messaging.md).
     builder.AddRabbitMqMessaging<WebApplicationBuilder, ReportingDbContext>(
-        configureConsumers: x => x.AddConsumer<DailyPricesSyncedConsumer>(typeof(DailyPricesSyncedConsumerDefinition)));
+        configureConsumers: x =>
+        {
+            x.AddConsumer<DailyPricesSyncedConsumer>(typeof(DailyPricesSyncedConsumerDefinition));
+            x.AddConsumer<AssetPositionChangedConsumer>(typeof(AssetPositionChangedConsumerDefinition));
+            x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedConsumerDefinition));
+            x.AddConsumer<PortfolioArchivedConsumer>(typeof(PortfolioArchivedConsumerDefinition));
+            x.AddConsumer<PortfolioRestoredConsumer>(typeof(PortfolioRestoredConsumerDefinition));
+            x.AddConsumer<PortfolioDeletedConsumer>(typeof(PortfolioDeletedConsumerDefinition));
+        });
 
-    // The consumer has no caller JWT to forward (it's triggered by a message, not a request) and needs
-    // every user's data, not one — SystemTokenHandler mints a SystemCaller token instead of
+    // The one surviving cross-service REST call (ADR-021): the daily prices/FX batch. The consumer
+    // has no caller JWT to forward (it's triggered by a message, not a request) and needs every
+    // user's data, not one — SystemTokenHandler mints a SystemCaller token instead of
     // JwtForwardingHandler's token passthrough.
-    builder.Services.AddHttpClient<IPositionsClient, PortfolioPositionsClient>(client =>
-    {
-        client.BaseAddress = new Uri("https+http://portfolio-service");
-    }).AddSystemTokenHandler();
-
     builder.Services.AddHttpClient<IPriceQuoteClient, MarketDataPriceClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");

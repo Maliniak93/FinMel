@@ -628,52 +628,6 @@
           }
         }
       }
-    },
-    "/api/portfolio/positions-for-valuation": {
-      "get": {
-        "tags": [
-          "GetPositionsForValuationEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PositionsForValuationPage"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -909,90 +863,6 @@
               "string"
             ],
             "format": "int32"
-          }
-        }
-      },
-      "PositionForValuationResponse": {
-        "required": [
-          "userId",
-          "portfolioId",
-          "assetId",
-          "assetClass",
-          "valuationMode",
-          "currency",
-          "quantity"
-        ],
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "assetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "assetClass": {
-            "$ref": "#/components/schemas/AssetClass"
-          },
-          "valuationMode": {
-            "$ref": "#/components/schemas/AssetValuationMode"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "quantity": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "instrumentId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "manualValueAmount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "manualValueDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          }
-        }
-      },
-      "PositionsForValuationPage": {
-        "required": [
-          "items",
-          "hasMore"
-        ],
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PositionForValuationResponse"
-            }
-          },
-          "hasMore": {
-            "type": "boolean"
           }
         }
       },
@@ -1257,9 +1127,6 @@
     },
     {
       "name": "DeleteTransactionEndpoint"
-    },
-    {
-      "name": "GetPositionsForValuationEndpoint"
     }
   ]
 }

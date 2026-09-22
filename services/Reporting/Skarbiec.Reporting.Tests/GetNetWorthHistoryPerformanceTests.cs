@@ -1,9 +1,7 @@
 using System.Diagnostics;
-using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Features.GetNetWorthHistory;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.Reporting.Valuation;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
@@ -32,8 +30,6 @@ public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture
         // measures.
         await using (var seedDb = CreateDbContext(userId))
         {
-            var breakdownJson = ValuationBreakdown.Serialize([new AssetClassBreakdownEntry(AssetClass.Cash, 1000m)]);
-
             for (var i = 0; i < 365; i++)
             {
                 var date = today.AddDays(-i);
@@ -46,7 +42,6 @@ public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture
                         PortfolioId = portfolioId,
                         Date = date,
                         TotalPln = 1000m + i,
-                        BreakdownJson = breakdownJson,
                         IsStale = false,
                     });
                 }

@@ -3,18 +3,19 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.MarketData;
-using Skarbiec.Reporting.Portfolio;
 using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
 /// <summary>
 /// On <see cref="DailyPricesSynced"/> (T2.10), recomputes every user's <see cref="ValuationSnapshot"/>
-/// for every portfolio (E5, ADR-015). Idempotent via the inbox template (T0.12, applied through
-/// <see cref="DailyPricesSyncedConsumerDefinition"/>) plus the upsert-by-(PortfolioId, Date) unique
-/// index — a redelivered event or a manual rerun overwrites the same rows instead of duplicating
-/// them. Runs with no caller JWT (background consumer) and needs every user's data, not one — see
-/// <c>SystemCaller</c> for the trust boundary the Portfolio/MarketData clients authenticate through.
+/// and its <see cref="AssetValuation"/> lines for every portfolio (E5, ADR-015). Positions come from
+/// Reporting's own <see cref="Position"/> read model, fed by Portfolio's events (spec-03, ADR-021) —
+/// the only remaining cross-service call is the prices/FX batch to MarketData, authenticated with a
+/// <c>SystemCaller</c> token because a message-driven consumer has no caller JWT to forward and
+/// needs every user's data, not one. Idempotent via the inbox template (T0.12, applied through
+/// <see cref="DailyPricesSyncedConsumerDefinition"/>) plus the upsert-by-(PortfolioId, Date) and
+/// -(AssetId, Date) unique indexes — a redelivery or a manual rerun overwrites the same rows.
 /// </summary>
 /// <remarks>
 /// Isolation mirrors <c>PriceSyncJob</c> (same "one bad input doesn't stop the rest" philosophy):
@@ -22,13 +23,12 @@ namespace Skarbiec.Reporting.Messaging;
 /// message, and nothing is written to the DB for it until it succeeds — so no failed statement ever
 /// reaches Postgres to poison the single ambient transaction the EF outbox wraps this consume in
 /// (no savepoints are available to recover mid-transaction otherwise). A total failure to reach
-/// Portfolio or MarketData at all is a different failure mode — there's nothing to compute for
-/// anyone — so it's deliberately left to propagate and let the inbox's retry policy
-/// (<c>UseMessageRetry</c>) recover once the dependency is back, same as any other transient fault.
+/// MarketData at all is a different failure mode — there's nothing to compute for anyone — so it's
+/// deliberately left to propagate and let the inbox's retry policy (<c>UseMessageRetry</c>) recover
+/// once the dependency is back, same as any other transient fault.
 /// </remarks>
 public sealed class DailyPricesSyncedConsumer(
     ReportingDbContext db,
-    IPositionsClient positionsClient,
     IPriceQuoteClient priceQuoteClient,
     ILogger<DailyPricesSyncedConsumer> logger) : IConsumer<DailyPricesSynced>
 {
@@ -39,7 +39,16 @@ public sealed class DailyPricesSyncedConsumer(
         var snapshotDate = context.Message.SyncDate;
         var cancellationToken = context.CancellationToken;
 
-        var positions = await positionsClient.GetAllPositionsAsync(cancellationToken);
+        // Bypasses the tenancy filter deliberately (IgnoreQueryFilters): this consumer has no
+        // single current user to filter by, and it values every user's portfolios in one pass by
+        // design. Archived portfolios are excluded from valuation, same as before spec-03 — their
+        // last snapshot simply stays where it was.
+        var positions = await db.Positions
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(p => !p.PortfolioIsArchived)
+            .ToListAsync(cancellationToken);
+
         if (positions.Count == 0)
         {
             logger.LogInformation("DailyPricesSyncedConsumer: no positions to value for {SnapshotDate}.", snapshotDate);
@@ -49,13 +58,15 @@ public sealed class DailyPricesSyncedConsumer(
         var pricesByInstrument = await FetchPricesAsync(positions, snapshotDate, cancellationToken);
         var fxRatesByPair = await FetchFxRatesAsync(positions, pricesByInstrument, snapshotDate, cancellationToken);
 
-        // Bypasses the tenancy filter deliberately (IgnoreQueryFilters): this consumer has no
-        // single current user to filter by, and it's upserting across every user's portfolios in
-        // one pass by design.
         var existingSnapshots = await db.ValuationSnapshots
             .IgnoreQueryFilters()
             .Where(s => s.Date == snapshotDate)
             .ToDictionaryAsync(s => s.PortfolioId, cancellationToken);
+
+        var existingLines = await db.AssetValuations
+            .IgnoreQueryFilters()
+            .Where(l => l.Date == snapshotDate)
+            .ToDictionaryAsync(l => l.AssetId, cancellationToken);
 
         var computed = 0;
         var failed = 0;
@@ -64,7 +75,7 @@ public sealed class DailyPricesSyncedConsumer(
         {
             try
             {
-                UpsertSnapshot(group.Key, group.First().UserId, group.ToList(), pricesByInstrument, fxRatesByPair, snapshotDate, existingSnapshots);
+                UpsertPortfolio(group.Key, [.. group], pricesByInstrument, fxRatesByPair, snapshotDate, existingSnapshots, existingLines);
                 computed++;
             }
             catch (Exception ex)
@@ -81,18 +92,21 @@ public sealed class DailyPricesSyncedConsumer(
             snapshotDate, computed, failed);
     }
 
-    private void UpsertSnapshot(
+    private void UpsertPortfolio(
         Guid portfolioId,
-        Guid userId,
-        IReadOnlyList<PositionForValuation> portfolioPositions,
+        IReadOnlyList<Position> portfolioPositions,
         IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument,
         IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
         DateOnly snapshotDate,
-        IReadOnlyDictionary<Guid, ValuationSnapshot> existingSnapshots)
+        IReadOnlyDictionary<Guid, ValuationSnapshot> existingSnapshots,
+        IReadOnlyDictionary<Guid, AssetValuation> existingLines)
     {
-        var positions = portfolioPositions
+        var userId = portfolioPositions[0].UserId;
+
+        var valuationPositions = portfolioPositions
             .Select(p => new ValuationPosition
             {
+                AssetId = p.AssetId,
                 AssetClass = p.AssetClass,
                 ValuationMode = p.ValuationMode,
                 Currency = p.Currency,
@@ -102,13 +116,17 @@ public sealed class DailyPricesSyncedConsumer(
             })
             .ToList();
 
-        var result = ValuationAlgorithm.Calculate(positions, pricesByInstrument, fxRatesByPair, snapshotDate);
-        var breakdownJson = ValuationBreakdown.Serialize(result.Breakdown);
+        var result = ValuationAlgorithm.Calculate(valuationPositions, pricesByInstrument, fxRatesByPair, snapshotDate);
+
+        foreach (var valued in result.Lines)
+        {
+            UpsertLine(portfolioId, userId, valued, snapshotDate, existingLines);
+        }
 
         if (existingSnapshots.TryGetValue(portfolioId, out var snapshot))
         {
+            snapshot.UserId = userId;
             snapshot.TotalPln = result.TotalPln;
-            snapshot.BreakdownJson = breakdownJson;
             snapshot.IsStale = result.IsStale;
         }
         else
@@ -120,14 +138,50 @@ public sealed class DailyPricesSyncedConsumer(
                 PortfolioId = portfolioId,
                 Date = snapshotDate,
                 TotalPln = result.TotalPln,
-                BreakdownJson = breakdownJson,
                 IsStale = result.IsStale,
             });
         }
     }
 
+    private void UpsertLine(
+        Guid portfolioId,
+        Guid userId,
+        ValuedPosition valued,
+        DateOnly snapshotDate,
+        IReadOnlyDictionary<Guid, AssetValuation> existingLines)
+    {
+        if (existingLines.TryGetValue(valued.AssetId, out var line))
+        {
+            line.UserId = userId;
+            line.AssetClass = valued.AssetClass;
+            line.Quantity = valued.Quantity;
+            line.PriceUsed = valued.PriceUsed;
+            line.PriceDate = valued.PriceDate;
+            line.FxRateUsed = valued.FxRateUsed;
+            line.ValuePln = valued.ValuePln;
+            line.IsStale = valued.IsStale;
+            return;
+        }
+
+        db.AssetValuations.Add(new AssetValuation
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PortfolioId = portfolioId,
+            AssetId = valued.AssetId,
+            Date = snapshotDate,
+            AssetClass = valued.AssetClass,
+            Quantity = valued.Quantity,
+            PriceUsed = valued.PriceUsed,
+            PriceDate = valued.PriceDate,
+            FxRateUsed = valued.FxRateUsed,
+            ValuePln = valued.ValuePln,
+            IsStale = valued.IsStale,
+        });
+    }
+
     private async Task<IReadOnlyDictionary<Guid, InstrumentPriceLookup>> FetchPricesAsync(
-        IReadOnlyList<PositionForValuation> positions, DateOnly snapshotDate, CancellationToken cancellationToken)
+        IReadOnlyList<Position> positions, DateOnly snapshotDate, CancellationToken cancellationToken)
     {
         var instrumentIds = positions
             .Where(p => p.InstrumentId is { })
@@ -141,7 +195,7 @@ public sealed class DailyPricesSyncedConsumer(
     }
 
     private async Task<IReadOnlyDictionary<string, FxRateLookup>> FetchFxRatesAsync(
-        IReadOnlyList<PositionForValuation> positions,
+        IReadOnlyList<Position> positions,
         IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument,
         DateOnly snapshotDate,
         CancellationToken cancellationToken)

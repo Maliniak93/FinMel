@@ -62,3 +62,16 @@ xUnit constructs a new test class instance per `[Fact]`.
 Services that register scheduled work (e.g. MarketData's Quartz jobs, Phase 2) should check
 `TestingDefaults.DisableBackgroundJobsConfigKey` before scheduling it, so slice tests never race a
 background job touching the same data.
+
+## Windows EventLog is off in test hosts
+
+The same factory also sets `Logging:EventLog:LogLevel:Default = "None"`. `WebApplication.CreateBuilder`
+registers the Windows EventLog provider by default, and it is the one provider that ignores the
+general log levels — it always writes `Warning` and above. A run builds and disposes one host per
+`[Fact]` in a single process, and the native handle behind that provider does not survive the first
+host's disposal: every later host that logs a warning gets `ObjectDisposedException('EventLogInternal')`
+thrown back out of `Logger.Log`. Because it usually surfaces during shutdown (MassTransit logs a
+warning when a bus stop runs past its timeout on a loaded broker), the exception escapes
+`WebApplicationFactory.DisposeAsync` and fails whichever test happened to own that host — never the
+one that caused it. Don't remove the setting; a service needing real event-log output in a test
+should register the provider itself.
