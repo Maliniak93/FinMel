@@ -15,10 +15,10 @@ namespace Skarbiec.MarketData.Sources;
 /// request path (enforced by <c>ArchitectureTests.OnlySourcesNamespace_DependsOn_PriceSourceAbstractions</c>).
 /// </summary>
 /// <remarks>
-/// "In use" (E4 AC: "only instruments attached to assets") can't be determined yet — Portfolio has no
-/// <c>InstrumentId</c> on <c>Asset</c> until T2.9 lands. Until then, every instrument in MarketData's
-/// own dictionary stands in for "in use"; swap <see cref="GetInstrumentsToSyncAsync"/> for a Portfolio
-/// REST call (or a locally-maintained usage set from <c>AssetChanged</c>) once T2.9 exists.
+/// "In use" (E4 AC: "only instruments attached to assets") isn't known here yet: every instrument in
+/// MarketData's own dictionary stands in for it. spec-04 replaces that with a locally-maintained
+/// usage set built from Portfolio's <c>AssetPositionChanged</c>/<c>AssetRemoved</c> events (spec-02),
+/// which <see cref="GetInstrumentsToSyncAsync"/> will then filter by — never a REST call back.
 /// </remarks>
 [DisallowConcurrentExecution]
 public sealed class PriceSyncJob(

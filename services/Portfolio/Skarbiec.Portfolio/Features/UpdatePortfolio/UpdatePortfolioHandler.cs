@@ -32,6 +32,9 @@ public sealed class UpdatePortfolioHandler(PortfolioDbContext dbContext)
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return portfolio.ToResponse();
+        // This slice never writes assets, so the count is the same before and after the save.
+        var assetCount = await dbContext.Assets.CountAsync(a => a.PortfolioId == id, cancellationToken);
+
+        return portfolio.ToResponse(assetCount);
     }
 }

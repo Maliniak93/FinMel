@@ -1,0 +1,17 @@
+{
+  "assetId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "portfolioId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "userId": "9c858901-8a57-4791-81fe-4c455b099bc9",
+  "assetClass": 2,
+  "valuationMode": 0,
+  "instrumentId": "11111111-1111-1111-1111-111111111111",
+  "currency": "USD",
+  "quantity": 12.5,
+  "manualValueAmount": null,
+  "manualValueDate": null,
+  "portfolioIsArchived": false,
+  "version": 3,
+  "occurredAtUtc": "2026-01-15T10:00:00+00:00",
+  "correlationId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
+  "schemaHint": "this field does not exist yet and must not break deserialization"
+}

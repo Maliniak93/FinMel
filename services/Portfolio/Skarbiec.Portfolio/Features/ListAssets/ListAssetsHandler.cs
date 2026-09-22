@@ -17,13 +17,16 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext)
             return PortfolioErrors.NotFound(portfolioId);
         }
 
-        var assets = await dbContext.Assets
+        // transactionCount as a correlated subquery inside this one query (spec-02) — no N+1, no
+        // second round trip, and no counter column to drift out of sync with the Transactions table.
+        var rows = await dbContext.Assets
             .AsNoTracking()
             .Where(a => a.PortfolioId == portfolioId)
             .OrderBy(a => a.Name)
+            .Select(a => new { Asset = a, TransactionCount = dbContext.Transactions.Count(t => t.AssetId == a.Id) })
             .ToListAsync(cancellationToken);
 
-        IReadOnlyList<AssetResponse> response = assets.Select(a => a.ToResponse()).ToList();
+        IReadOnlyList<AssetResponse> response = rows.Select(r => r.Asset.ToResponse(r.TransactionCount)).ToList();
         return Result<IReadOnlyList<AssetResponse>>.Success(response);
     }
 }

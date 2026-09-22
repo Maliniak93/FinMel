@@ -8,12 +8,15 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext)
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
-        var asset = await dbContext.Assets
+        // transactionCount as a correlated subquery inside this one query (spec-02) — see ListAssets.
+        var row = await dbContext.Assets
             .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == assetId && a.PortfolioId == portfolioId, cancellationToken);
+            .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
+            .Select(a => new { Asset = a, TransactionCount = dbContext.Transactions.Count(t => t.AssetId == a.Id) })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        return asset is null
+        return row is null
             ? AssetErrors.NotFound(assetId)
-            : asset.ToResponse();
+            : row.Asset.ToResponse(row.TransactionCount);
     }
 }

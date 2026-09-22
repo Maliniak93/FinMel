@@ -1,4 +1,5 @@
 using NetArchTest.Rules;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.ServiceDefaults.Tenancy;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -51,5 +52,17 @@ public sealed class ArchitectureTests
 
         Assert.All(requestTypes, t => Assert.Null(
             t.GetProperty("UserId")));
+    }
+
+    /// <summary>
+    /// spec-02 AC-14: <c>Portfolio.AssetCount</c> / <c>Asset.TransactionCount</c> are gone — the delete
+    /// guards and the response counts are computed from the child tables (<c>Assets.AnyAsync</c>,
+    /// <c>Transactions.AnyAsync</c>, correlated subqueries), never kept in sync by hand.
+    /// </summary>
+    [Fact]
+    public void PortfolioEntities_ExposeNoDenormalizedCounters()
+    {
+        Assert.Null(typeof(PortfolioEntity).GetProperty("AssetCount"));
+        Assert.Null(typeof(Asset).GetProperty("TransactionCount"));
     }
 }

@@ -1,5 +1,5 @@
 using System.Net;
-using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
@@ -38,18 +38,14 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.NoContent, deletePortfolio.StatusCode);
     }
 
+    /// <summary>spec-02 AC-13: the guard is now provable through the API alone (no counter to seed) — Transactions.AnyAsync replaces the TransactionCount check.</summary>
     [Fact]
     public async Task Remove_AssetWithTransactions_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var ownerId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(ownerId);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-
-        // Transaction doesn't exist as an entity until T1.3 (which depends on this task) —
-        // TransactionCount is the denormalized stand-in T1.3's RecordTransaction will maintain.
-        // Seeded directly here since there's no API to record a real transaction yet.
-        await BumpTransactionCountAsync(ownerId, assetId, cancellationToken);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1), cancellationToken);
 
         var response = await client.DeleteAsync(AssetUri(portfolioId, assetId), cancellationToken);
 
@@ -68,13 +64,5 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         var response = await client.DeleteAsync(AssetUri(portfolioId, Guid.NewGuid()), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    private async Task BumpTransactionCountAsync(Guid ownerId, Guid assetId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = CreateDbContext(ownerId);
-        var asset = await dbContext.Assets.SingleAsync(a => a.Id == assetId, cancellationToken);
-        asset.TransactionCount = 1;
-        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

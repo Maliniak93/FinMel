@@ -14,8 +14,13 @@ public sealed class ListPortfoliosHandler(PortfolioDbContext dbContext)
             query = query.Where(p => !p.IsArchived);
         }
 
-        var portfolios = await query.OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        // assetCount as a correlated subquery inside this one query (spec-02) — no N+1, no second
+        // round trip, and no counter column to drift out of sync with the Assets table.
+        var rows = await query
+            .OrderBy(p => p.Name)
+            .Select(p => new { Portfolio = p, AssetCount = dbContext.Assets.Count(a => a.PortfolioId == p.Id) })
+            .ToListAsync(cancellationToken);
 
-        return portfolios.Select(p => p.ToResponse()).ToList();
+        return rows.Select(r => r.Portfolio.ToResponse(r.AssetCount)).ToList();
     }
 }

@@ -6,7 +6,8 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.RemoveAsset;
 
-public sealed class RemoveAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint)
+public sealed class RemoveAssetHandler(
+    PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, TimeProvider timeProvider)
 {
     public async Task<Result> HandleAsync(Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -18,22 +19,24 @@ public sealed class RemoveAssetHandler(PortfolioDbContext dbContext, IPublishEnd
             return AssetErrors.NotFound(assetId);
         }
 
-        if (asset.TransactionCount > 0)
+        // The transactions themselves answer the guard (spec-02) — no denormalized counter to keep
+        // in sync, and the tenancy query filter scopes the check to this user's rows anyway.
+        var hasTransactions = await dbContext.Transactions.AnyAsync(t => t.AssetId == assetId, cancellationToken);
+        if (hasTransactions)
         {
             return AssetErrors.HasTransactions(assetId);
         }
 
-        var portfolio = await dbContext.Portfolios.FirstAsync(p => p.Id == portfolioId, cancellationToken);
-        portfolio.AssetCount--;
-
         dbContext.Assets.Remove(asset);
 
-        await publishEndpoint.Publish(new AssetChanged
+        // Terminal for this asset (spec-02 design decision 3): no version, no further position
+        // event. Published before SaveChangesAsync so it commits with the deletion (ADR-012).
+        await publishEndpoint.Publish(new AssetRemoved
         {
             AssetId = asset.Id,
             PortfolioId = portfolioId,
             UserId = dbContext.CurrentUserId,
-            Kind = AssetChangeKind.Removed
+            OccurredAtUtc = timeProvider.GetUtcNow()
         }, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);

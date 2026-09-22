@@ -28,6 +28,7 @@ public sealed class CreatePortfolioHandler(PortfolioDbContext dbContext)
         dbContext.Portfolios.Add(portfolio);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return portfolio.ToResponse();
+        // A brand-new portfolio holds no assets — no need to count what we just created (spec-02).
+        return portfolio.ToResponse(assetCount: 0);
     }
 }

@@ -1,13 +1,12 @@
-using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
-using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateAsset;
 
-public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, IInstrumentLookupClient instrumentLookupClient)
+public sealed class UpdateAssetHandler(
+    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, IInstrumentLookupClient instrumentLookupClient)
 {
     public async Task<Result<AssetResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, UpdateAssetRequest request, CancellationToken cancellationToken)
@@ -73,16 +72,15 @@ public sealed class UpdateAssetHandler(PortfolioDbContext dbContext, IPublishEnd
         // (ADR-009), driven by RecordTransaction/UpdateTransaction/DeleteTransaction and AddAsset's own
         // optional initial transaction — never a second, parallel path here.
 
-        await publishEndpoint.Publish(new AssetChanged
-        {
-            AssetId = asset.Id,
-            PortfolioId = portfolioId,
-            UserId = dbContext.CurrentUserId,
-            Kind = AssetChangeKind.Updated
-        }, cancellationToken);
+        // Carries the post-update state — mode, instrument, currency and manual value as they stand
+        // after the assignments above (spec-02 AC-2).
+        await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return asset.ToResponse();
+        // This slice never writes transactions, so the count is the same before and after the save.
+        var transactionCount = await dbContext.Transactions.CountAsync(t => t.AssetId == assetId, cancellationToken);
+
+        return asset.ToResponse(transactionCount);
     }
 }

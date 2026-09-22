@@ -35,12 +35,13 @@ public sealed class Asset : IUserOwned
     public Guid? InstrumentId { get; set; }
 
     /// <summary>
-    /// Denormalized count of transactions against this asset. Transaction doesn't exist yet
-    /// (T1.3, which depends on this task) — this counter lets RemoveAsset block a hard delete on
-    /// an asset that still has transactions today (ADR-009: transactions are the source of truth
-    /// for quantity, so removing an asset must not orphan its transaction history); T1.3's
-    /// RecordTransaction/DeleteTransaction must increment/decrement it. Mirrors the AssetCount
-    /// decision made on Portfolio in T1.1.
+    /// Ordering counter for this asset's published <c>AssetPositionChanged</c> events (spec-02):
+    /// <c>PositionEventPublisher</c> is its only writer and bumps it on every published mutation, so
+    /// a consumer can drop an event older than the state it already holds. A newly created asset is
+    /// published at 0. Deliberately not the <c>xmin</c> concurrency token: that is a wrapping
+    /// transaction id, and it does not move when the asset row itself isn't written — which is
+    /// exactly the archive/restore fan-out, where only <c>Portfolio.IsArchived</c> changes
+    /// (spec-02 design decision 1).
     /// </summary>
-    public int TransactionCount { get; set; }
+    public long Version { get; set; }
 }

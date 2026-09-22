@@ -192,6 +192,53 @@ describe('Portfolios', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(callsBefore);
   });
 
+  // spec-02 AC-17: an archived portfolio's row menu offers Restore instead of Archive.
+  it('shows Restore only for archived portfolios', async () => {
+    const archived: PortfolioResponse = { ...portfolio, isArchived: true };
+    await setup(jsonResponse([archived]));
+
+    const overlayContainer = TestBed.inject(OverlayContainer);
+    const trigger = fixture.debugElement
+      .query(By.directive(MatMenuTrigger))
+      .injector.get(MatMenuTrigger);
+
+    trigger.openMenu();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const menuText = overlayContainer.getContainerElement().textContent ?? '';
+    expect(menuText).toContain('Restore');
+    expect(menuText).not.toContain('Archive');
+  });
+
+  it('restores an archived portfolio after confirmation and reloads', async () => {
+    const archived: PortfolioResponse = { ...portfolio, isArchived: true };
+    await setup(jsonResponse([archived]));
+    const callsBefore = fetchSpy.mock.calls.length;
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ ...archived, isArchived: false }));
+    fetchSpy.mockResolvedValueOnce(jsonResponse([{ ...archived, isArchived: false }]));
+
+    await component['restore'](archived);
+    await fixture.whenStable();
+
+    const restoreCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+    expect(restoreCall.method).toBe('POST');
+    expect(restoreCall.url).toContain(`/portfolios/${portfolio.id}/restore`);
+    expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 2);
+  });
+
+  it('does not restore when the confirmation is cancelled', async () => {
+    const archived: PortfolioResponse = { ...portfolio, isArchived: true };
+    await setup(jsonResponse([archived]));
+    const callsBefore = fetchSpy.mock.calls.length;
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    await component['restore'](archived);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(callsBefore);
+  });
+
   it('deletes an empty portfolio after confirmation and reloads', async () => {
     await setup(jsonResponse([portfolio]));
     const callsBefore = fetchSpy.mock.calls.length;

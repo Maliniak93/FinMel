@@ -1,5 +1,4 @@
 using System.Net;
-using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
@@ -26,18 +25,14 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(HttpStatusCode.NotFound, getAfterDelete.StatusCode);
     }
 
+    /// <summary>spec-02 AC-13: the guard is now provable through the API alone (no counter to seed) — Assets.AnyAsync replaces the AssetCount check.</summary>
     [Fact]
     public async Task Delete_PortfolioContainingAssets_ReturnsConflictPointingToArchive()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var ownerId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(ownerId);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-
-        // Asset doesn't exist as an entity until T1.2 (which depends on this task) — AssetCount is
-        // the denormalized stand-in T1.2's AddAsset/RemoveAsset will maintain. Seeded directly here
-        // since there's no API to create a real asset yet.
-        await BumpAssetCountAsync(ownerId, portfolioId, cancellationToken);
+        await client.AddAssetAsync(portfolioId, cancellationToken);
 
         var response = await client.DeleteAsync(PortfolioUri(portfolioId), cancellationToken);
 
@@ -57,13 +52,5 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         var response = await client.DeleteAsync(PortfolioUri(Guid.NewGuid()), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    private async Task BumpAssetCountAsync(Guid ownerId, Guid portfolioId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = CreateDbContext(ownerId);
-        var portfolio = await dbContext.Portfolios.SingleAsync(p => p.Id == portfolioId, cancellationToken);
-        portfolio.AssetCount = 1;
-        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }
