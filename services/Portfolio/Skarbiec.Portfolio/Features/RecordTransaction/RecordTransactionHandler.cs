@@ -1,12 +1,10 @@
-using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
-using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.RecordTransaction;
 
-public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint)
+public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
     public async Task<Result<TransactionResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, RecordTransactionRequest request, CancellationToken cancellationToken)
@@ -56,18 +54,11 @@ public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, IPubl
         }
 
         asset.Quantity = recomputed.Value;
-        asset.TransactionCount++;
         dbContext.Transactions.Add(transaction);
 
-        await publishEndpoint.Publish(new TransactionRecorded
-        {
-            TransactionId = transaction.Id,
-            AssetId = assetId,
-            UserId = dbContext.CurrentUserId,
-            Type = transaction.Type,
-            Quantity = transaction.Quantity,
-            Date = transaction.Date
-        }, cancellationToken);
+        // The position, not the transaction, is the fact consumers care about: the event carries the
+        // recomputed quantity (spec-02 AC-3), so nobody has to replay the history to get it.
+        await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

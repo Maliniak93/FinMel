@@ -46,6 +46,24 @@ public sealed class ListPortfoliosEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal(2, body!.Count);
     }
 
+    /// <summary>spec-02 AC-14: assetCount is computed from the Assets table, with no counter column in the database.</summary>
+    [Fact]
+    public async Task List_PortfolioWithTwoAssets_ReportsAssetCountFromAssets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        await client.AddAssetAsync(portfolioId, cancellationToken, name: "Asset 1");
+        await client.AddAssetAsync(portfolioId, cancellationToken, name: "Asset 2");
+
+        var response = await client.GetAsync(PortfoliosUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<List<PortfolioResponse>>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var portfolio = Assert.Single(body!);
+        Assert.Equal(2, portfolio.AssetCount);
+    }
+
     /// <summary>M1.3: an out-of-set currency row must not break the list either — reads keep working.</summary>
     [Fact]
     public async Task List_IncludesPortfolioWithOutOfSetCurrency()

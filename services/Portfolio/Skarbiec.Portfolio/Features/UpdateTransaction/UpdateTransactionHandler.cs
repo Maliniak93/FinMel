@@ -4,7 +4,7 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.UpdateTransaction;
 
-public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext)
+public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
     public async Task<Result<TransactionResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, Guid id, UpdateTransactionRequest request, CancellationToken cancellationToken)
@@ -67,6 +67,10 @@ public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext)
         transaction.FeeAmount = candidate.FeeAmount;
         transaction.Date = candidate.Date;
         asset.Quantity = recomputed.Value;
+
+        // Editing a transaction moves the quantity, which is the source of truth for the position
+        // (ADR-009) — so it publishes, where before spec-02 it published nothing at all (AC-4).
+        await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         try
         {

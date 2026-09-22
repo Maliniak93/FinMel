@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.ArchivePortfolio;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
@@ -13,6 +15,7 @@ using Skarbiec.Portfolio.Features.ListPortfolios;
 using Skarbiec.Portfolio.Features.ListTransactions;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
+using Skarbiec.Portfolio.Features.RestorePortfolio;
 using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
@@ -36,8 +39,9 @@ if (!OpenApiBuildTime.IsActive)
         ?? throw new InvalidOperationException("Missing connection string 'portfolio-db'.");
     builder.Services.AddDbContext<PortfolioDbContext>(options => options.UseNpgsql(portfolioConnectionString));
 
-    // No consumers yet (T1.5) — Portfolio only publishes AssetChanged/TransactionRecorded through the
-    // outbox; Reporting subscribes in Phase 2.
+    // No consumers yet — Portfolio only publishes (AssetPositionChanged/AssetRemoved and the
+    // Portfolio* lifecycle events, spec-02) through the outbox; Reporting and MarketData subscribe
+    // in spec-03/spec-04.
     builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
 
     // AddAsset/UpdateAsset validate a market asset's InstrumentId against MarketData (T2.9) — resilience
@@ -51,12 +55,18 @@ if (!OpenApiBuildTime.IsActive)
 
 builder.Services.AddValidation();
 
+// Same TimeProvider.System registration Reporting and MarketData's jobs use, so a test can inject a
+// fake clock and pin an event's OccurredAtUtc (spec-02 design decision 5).
+builder.Services.TryAddSingleton(TimeProvider.System);
+
+builder.Services.AddScoped<PositionEventPublisher>();
 builder.Services.AddScoped<CreatePortfolioHandler>();
 builder.Services.AddScoped<UpdatePortfolioHandler>();
 builder.Services.AddScoped<ListPortfoliosHandler>();
 builder.Services.AddScoped<GetPortfolioHandler>();
 builder.Services.AddScoped<DeletePortfolioHandler>();
 builder.Services.AddScoped<ArchivePortfolioHandler>();
+builder.Services.AddScoped<RestorePortfolioHandler>();
 builder.Services.AddScoped<AddAssetHandler>();
 builder.Services.AddScoped<UpdateAssetHandler>();
 builder.Services.AddScoped<ListAssetsHandler>();
@@ -80,6 +90,7 @@ app.MapListPortfoliosEndpoint();
 app.MapGetPortfolioEndpoint();
 app.MapDeletePortfolioEndpoint();
 app.MapArchivePortfolioEndpoint();
+app.MapRestorePortfolioEndpoint();
 app.MapAddAssetEndpoint();
 app.MapUpdateAssetEndpoint();
 app.MapListAssetsEndpoint();

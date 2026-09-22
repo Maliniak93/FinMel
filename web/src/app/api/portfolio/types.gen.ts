@@ -237,6 +237,24 @@ export type PostApiPortfolioPortfoliosByIdArchiveResponses = {
 
 export type PostApiPortfolioPortfoliosByIdArchiveResponse = PostApiPortfolioPortfoliosByIdArchiveResponses[keyof PostApiPortfolioPortfoliosByIdArchiveResponses];
 
+export type PostApiPortfolioPortfoliosByIdRestoreData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{id}/restore';
+};
+
+export type PostApiPortfolioPortfoliosByIdRestoreResponses = {
+    /**
+     * OK
+     */
+    200: PortfolioResponse;
+};
+
+export type PostApiPortfolioPortfoliosByIdRestoreResponse = PostApiPortfolioPortfoliosByIdRestoreResponses[keyof PostApiPortfolioPortfoliosByIdRestoreResponses];
+
 export type GetApiPortfolioPortfoliosByPortfolioIdAssetsData = {
     body?: never;
     path: {

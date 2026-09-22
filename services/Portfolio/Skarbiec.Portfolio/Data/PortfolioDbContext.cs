@@ -42,9 +42,9 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             // ValuationMode (M1.4) needs no explicit config here — stored as its int ordinal by
             // convention, same as AssetClass above it.
 
-            // No navigation/FK to Portfolio — cross-aggregate reference by plain Guid (see the
-            // AssetCount denormalization decision on Portfolio, T1.1), but still worth indexing
-            // since every asset query in this service filters by PortfolioId.
+            // No navigation/FK to Portfolio — cross-aggregate reference by plain Guid (ADR-003),
+            // but still worth indexing: every asset query in this service filters by PortfolioId,
+            // including the correlated assetCount subquery and the archive/restore fan-out (spec-02).
             asset.HasIndex(a => a.PortfolioId);
 
             // No FK to MarketData either (ADR-003) — indexed anyway now that AddAsset/UpdateAsset
@@ -56,8 +56,9 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             // own xmin system column instead of an app-managed token — Postgres bumps it on every
             // UPDATE regardless of which handler runs, so RecordTransaction (T1.3) is covered too
             // without touching it. Shadow property: xmin already exists on every row, nothing to
-            // migrate.
-            asset.Property<uint>("Version")
+            // migrate. Named "Xmin" after its column since spec-02 gave Asset a real, app-managed
+            // "Version" counter for event ordering — the two are unrelated and must not share a name.
+            asset.Property<uint>("Xmin")
                 .HasColumnName("xmin")
                 .HasColumnType("xid")
                 .ValueGeneratedOnAddOrUpdate()
@@ -75,7 +76,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             // Same xmin concurrency token as Asset (see above) — protects a transaction row
             // itself against two concurrent edits/deletes of that exact transaction.
-            transaction.Property<uint>("Version")
+            transaction.Property<uint>("Xmin")
                 .HasColumnName("xmin")
                 .HasColumnType("xid")
                 .ValueGeneratedOnAddOrUpdate()

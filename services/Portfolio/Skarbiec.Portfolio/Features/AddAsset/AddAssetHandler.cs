@@ -1,13 +1,12 @@
-using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
-using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.AddAsset;
 
-public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, IInstrumentLookupClient instrumentLookupClient)
+public sealed class AddAssetHandler(
+    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, IInstrumentLookupClient instrumentLookupClient)
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, AddAssetRequest request, CancellationToken cancellationToken)
     {
@@ -105,37 +104,20 @@ public sealed class AddAssetHandler(PortfolioDbContext dbContext, IPublishEndpoi
         }
 
         dbContext.Assets.Add(asset);
-        portfolio.AssetCount++;
-
-        // Published before SaveChangesAsync since the interceptor only stamps Asset.UserId during
-        // that call (ADR-006) — dbContext.CurrentUserId is available immediately (ADR-012: publish
-        // inside the same SaveChanges as the business write).
-        await publishEndpoint.Publish(new AssetChanged
-        {
-            AssetId = asset.Id,
-            PortfolioId = portfolioId,
-            UserId = dbContext.CurrentUserId,
-            Kind = AssetChangeKind.Created
-        }, cancellationToken);
 
         if (initialTransaction is not null)
         {
             dbContext.Transactions.Add(initialTransaction);
-            asset.TransactionCount++;
-
-            await publishEndpoint.Publish(new TransactionRecorded
-            {
-                TransactionId = initialTransaction.Id,
-                AssetId = asset.Id,
-                UserId = dbContext.CurrentUserId,
-                Type = initialTransaction.Type,
-                Quantity = initialTransaction.Quantity,
-                Date = initialTransaction.Date
-            }, cancellationToken);
         }
+
+        // One event for the finished position, published before SaveChangesAsync so the outbox row
+        // commits in the same transaction as the rows above (ADR-012) — the optional initial
+        // transaction is already folded into asset.Quantity, so a consumer sees the asset's real
+        // opening state, not a zero it would have to correct a moment later (spec-02 AC-1).
+        await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return asset.ToResponse();
+        return asset.ToResponse(initialTransaction is null ? 0 : 1);
     }
 }

@@ -16,6 +16,7 @@ import {
   deleteApiPortfolioPortfoliosById,
   getApiPortfolioPortfolios,
   postApiPortfolioPortfoliosByIdArchive,
+  postApiPortfolioPortfoliosByIdRestore,
   type PortfolioResponse,
 } from '../../api/portfolio';
 import { getApiReportingDashboard, type DashboardPortfolioValue } from '../../api/reporting';
@@ -130,7 +131,7 @@ export class Portfolios {
         .open(ConfirmDialog, {
           data: {
             title: 'Archive this portfolio?',
-            message: `"${portfolio.name}" will be hidden from your default list — nothing is deleted, and you can still see it by toggling "Show archived". Archiving can't be undone from here yet.`,
+            message: `"${portfolio.name}" will be hidden from your default list — nothing is deleted, and you can still see it by toggling "Show archived".`,
             confirmLabel: 'Archive',
           },
         })
@@ -145,6 +146,36 @@ export class Portfolios {
     if (result.error) {
       this.snackBar.open(
         readProblemDetails(result.error).detail ?? 'Failed to archive portfolio.',
+        'Dismiss',
+      );
+      return;
+    }
+
+    this.portfoliosResource.reload();
+  }
+
+  // Mirror of archive() — the row menu offers exactly one of the two, decided by isArchived.
+  protected async restore(portfolio: PortfolioResponse): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: 'Restore this portfolio?',
+            message: `"${portfolio.name}" will return to your default list.`,
+            confirmLabel: 'Restore',
+          },
+        })
+        .afterClosed(),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await postApiPortfolioPortfoliosByIdRestore({ path: { id: portfolio.id } });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? 'Failed to restore portfolio.',
         'Dismiss',
       );
       return;

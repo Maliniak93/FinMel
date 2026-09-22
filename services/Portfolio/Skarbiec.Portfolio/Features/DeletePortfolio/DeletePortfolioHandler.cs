@@ -1,10 +1,13 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.DeletePortfolio;
 
-public sealed class DeletePortfolioHandler(PortfolioDbContext dbContext)
+public sealed class DeletePortfolioHandler(
+    PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, TimeProvider timeProvider)
 {
     public async Task<Result> HandleAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -14,12 +17,24 @@ public sealed class DeletePortfolioHandler(PortfolioDbContext dbContext)
             return PortfolioErrors.NotFound(id);
         }
 
-        if (portfolio.AssetCount > 0)
+        // The assets themselves answer the guard (spec-02) — no denormalized counter to keep in sync.
+        var hasAssets = await dbContext.Assets.AnyAsync(a => a.PortfolioId == id, cancellationToken);
+        if (hasAssets)
         {
             return PortfolioErrors.HasAssets(id);
         }
 
         dbContext.Portfolios.Remove(portfolio);
+
+        // Only an empty portfolio reaches this line, so there is no asset fan-out to publish
+        // alongside it. Published before SaveChangesAsync so it commits with the deletion (ADR-012).
+        await publishEndpoint.Publish(new PortfolioDeleted
+        {
+            PortfolioId = portfolio.Id,
+            UserId = dbContext.CurrentUserId,
+            OccurredAtUtc = timeProvider.GetUtcNow()
+        }, cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

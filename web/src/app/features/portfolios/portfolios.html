@@ -83,7 +83,12 @@
               <mat-icon>edit</mat-icon>
               <span>Edit</span>
             </button>
-            @if (!portfolio.isArchived) {
+            @if (portfolio.isArchived) {
+              <button mat-menu-item type="button" (click)="restore(portfolio)">
+                <mat-icon>unarchive</mat-icon>
+                <span>Restore</span>
+              </button>
+            } @else {
               <button mat-menu-item type="button" (click)="archive(portfolio)">
                 <mat-icon>archive</mat-icon>
                 <span>Archive</span>

@@ -27,11 +27,11 @@ The class → default-mode mapping is a default, not a hard constraint — Marke
 
 | Entity | Fields | Changes vs today |
 |---|---|---|
-| `Portfolio` | `Id, UserId, Name, Description?, Currency, IsArchived` | `AssetCount` removed **(target — spec-02)** — delete guard becomes `Assets.AnyAsync` |
-| `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed **(target — spec-02)** — delete guard becomes `Transactions.AnyAsync` |
+| `Portfolio` | `Id, UserId, Name, Description?, Currency, IsArchived` | `AssetCount` removed (spec-02) — delete guard is `Assets.AnyAsync` |
+| `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02) — delete guard is `Transactions.AnyAsync`; `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out) |
 | `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FeeAmount, Date, xmin` | unchanged |
 
-Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write **(target — spec-02: today only add/update-asset do; transaction update/delete publish nothing)**.
+Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write (spec-02); removal publishes `AssetRemoved`, and archive/restore publish `PortfolioArchived`/`PortfolioRestored` plus one `AssetPositionChanged` per asset carrying the new archived flag.
 
 ```mermaid
 erDiagram
@@ -56,6 +56,7 @@ erDiagram
         numeric manual_value_amount "Manual only"
         date manual_value_date "Manual only"
         uuid instrument_id "Market only"
+        bigint version "AssetPositionChanged ordering"
         xid xmin "concurrency token"
     }
     TRANSACTION {

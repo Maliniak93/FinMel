@@ -4,7 +4,7 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.DeleteTransaction;
 
-public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext)
+public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
     public async Task<Result> HandleAsync(Guid portfolioId, Guid assetId, Guid id, CancellationToken cancellationToken)
     {
@@ -38,8 +38,11 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext)
         }
 
         asset.Quantity = recomputed.Value;
-        asset.TransactionCount--;
         dbContext.Transactions.Remove(transaction);
+
+        // Deleting a transaction moves the quantity, which is the source of truth for the position
+        // (ADR-009) — so it publishes, where before spec-02 it published nothing at all (AC-5).
+        await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         try
         {

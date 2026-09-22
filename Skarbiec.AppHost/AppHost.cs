@@ -39,8 +39,8 @@ var marketDataService = builder.AddProject<Projects.Skarbiec_MarketData>("market
     .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-// T1.5: publishes AssetChanged/TransactionRecorded through the outbox — RabbitMQ reference lands
-// alongside this, its first published event. T2.9: AddAsset/UpdateAsset validate a market asset's
+// Publishes AssetPositionChanged/AssetRemoved and the Portfolio* lifecycle events through the outbox
+// (spec-02) — hence the RabbitMQ reference. T2.9: AddAsset/UpdateAsset validate a market asset's
 // InstrumentId by calling MarketData directly (not through the Gateway) — WithReference here is what
 // injects the "Services:marketdata-service:..." config the typed HttpClient's service discovery
 // resolves "https+http://marketdata-service" against.

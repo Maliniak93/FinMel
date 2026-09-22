@@ -203,6 +203,36 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{id}/restore": {
+      "post": {
+        "tags": [
+          "RestorePortfolioEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/assets": {
       "post": {
         "tags": [
@@ -1197,6 +1227,9 @@
     },
     {
       "name": "ArchivePortfolioEndpoint"
+    },
+    {
+      "name": "RestorePortfolioEndpoint"
     },
     {
       "name": "AddAssetEndpoint"

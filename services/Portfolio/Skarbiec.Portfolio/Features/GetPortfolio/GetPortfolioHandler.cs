@@ -8,12 +8,15 @@ public sealed class GetPortfolioHandler(PortfolioDbContext dbContext)
 {
     public async Task<Result<PortfolioResponse>> HandleAsync(Guid id, CancellationToken cancellationToken)
     {
-        var portfolio = await dbContext.Portfolios
+        // assetCount as a correlated subquery inside this one query (spec-02) — see ListPortfolios.
+        var row = await dbContext.Portfolios
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            .Where(p => p.Id == id)
+            .Select(p => new { Portfolio = p, AssetCount = dbContext.Assets.Count(a => a.PortfolioId == p.Id) })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        return portfolio is null
+        return row is null
             ? PortfolioErrors.NotFound(id)
-            : portfolio.ToResponse();
+            : row.Portfolio.ToResponse(row.AssetCount);
     }
 }
