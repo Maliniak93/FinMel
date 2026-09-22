@@ -7,7 +7,7 @@ namespace Skarbiec.MarketData.Tests;
 /// compiled assembly.
 /// </summary>
 /// <remarks>
-/// Decision: unlike Portfolio/Strategy/Reporting, MarketData has no "<c>Data</c> entities must
+/// Decision: unlike Portfolio/Reporting, MarketData has no "<c>Data</c> entities must
 /// implement <c>IUserOwned</c>" rule here — Instrument/PriceQuote/FxRate are global reference data
 /// shared across users, not user-owned (ADR-006 scope note in T0.13); MarketData has no tenancy
 /// query filter at all. Custom per-user instruments are revisited in Phase 2.

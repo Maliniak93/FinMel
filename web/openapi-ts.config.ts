@@ -1,7 +1,4 @@
-// Strategy excluded: spec-00-hygiene wires build-time OpenAPI generation (below) only into
-// Identity/Portfolio/MarketData/Reporting's csproj, not Strategy's — it's removed outright by
-// spec-01, so it never gets a web/openapi/strategy.json to read. Its already-generated
-// src/app/api/strategy/ client is untouched until spec-01 deletes it along with the service.
+// Only these four services wire build-time OpenAPI generation (below), per ADR-020.
 const services = ['identity', 'portfolio', 'marketdata', 'reporting'] as const;
 
 export default services.map((service) => ({

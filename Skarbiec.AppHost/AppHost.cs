@@ -21,7 +21,6 @@ var rabbitmq = builder.AddRabbitMQ("rabbitmq", password: rabbitmqPassword)
 var identityDb = await AddServiceDatabase("identity", "identity_db");
 var portfolioDb = await AddServiceDatabase("portfolio", "portfolio_db");
 var marketDataDb = await AddServiceDatabase("marketdata", "marketdata_db");
-var strategyDb = await AddServiceDatabase("strategy", "strategy_db");
 var reportingDb = await AddServiceDatabase("reporting", "reporting_db");
 
 // First real service (T0.5); the rest land in T0.13.
@@ -54,11 +53,6 @@ var portfolioService = builder.AddProject<Projects.Skarbiec_Portfolio>("portfoli
     .WaitFor(marketDataService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-var strategyService = builder.AddProject<Projects.Skarbiec_Strategy>("strategy-service")
-    .WithReference(strategyDb.ConnectionString)
-    .WaitFor(strategyDb.Database)
-    .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
-
 // T2.11: DailyPricesSynced consumer calls Portfolio's positions-for-valuation and MarketData's
 // price/FX batch endpoints directly (not through the Gateway) — same WithReference rationale as
 // Portfolio's own MarketData reference above.
@@ -83,8 +77,6 @@ builder.AddProject<Projects.Skarbiec_Gateway>("gateway")
     .WaitFor(portfolioService)
     .WithReference(marketDataService)
     .WaitFor(marketDataService)
-    .WithReference(strategyService)
-    .WaitFor(strategyService)
     .WithReference(reportingService)
     .WaitFor(reportingService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);

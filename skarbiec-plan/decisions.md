@@ -114,7 +114,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ---
 
-## ADR-020 🕐 Four services — Strategy folded into Reporting
+## ADR-020 ✅ Four services — Strategy folded into Reporting
+
+**Shipped:** 2026-09-22 (spec-01).
 
 **Context:** Strategy was scaffolded as an empty skeleton in Phases 0–2; every feature planned for it (target allocation, rebalancing, emergency fund, savings goals) was always Phase-3+ scope and needs exactly the valuation data Reporting already owns. Running it as a fifth service earns no extra microservices-learning value that a vertical slice inside Reporting wouldn't also teach.
 **Decision:** fold Strategy into Reporting. Four services + gateway: Identity, Portfolio, MarketData, Reporting. Strategy's project, tests, Gateway route, AppHost registration, CI job and dependabot entry are removed (spec-01). "Few services, many patterns" (ADR-001) stands unchanged — this narrows the count, not the principle.
