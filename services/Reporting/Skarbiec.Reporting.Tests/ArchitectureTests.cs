@@ -52,4 +52,19 @@ public sealed class ArchitectureTests
         Assert.All(requestTypes, t => Assert.Null(
             t.GetProperty("UserId")));
     }
+
+    /// <summary>
+    /// spec-03 AC15: Reporting stops calling Portfolio over REST — <c>DailyPricesSyncedConsumer</c>
+    /// values every portfolio from its own local <c>Position</c> table instead of
+    /// <c>PortfolioPositionsClient</c>. No type may remain in the old <c>Skarbiec.Reporting.Portfolio</c>
+    /// namespace and nothing may still be named like a Portfolio HTTP client.
+    /// </summary>
+    [Fact]
+    public void ReportingAssembly_ContainsNoPortfolioHttpClientTypes()
+    {
+        var types = Types.InAssembly(typeof(Program).Assembly).GetTypes().ToList();
+
+        Assert.DoesNotContain(types, t => t.Namespace == "Skarbiec.Reporting.Portfolio");
+        Assert.DoesNotContain(types, t => t.Name.EndsWith("PositionsClient", StringComparison.Ordinal));
+    }
 }

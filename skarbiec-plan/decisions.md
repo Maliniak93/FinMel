@@ -122,7 +122,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Decision:** fold Strategy into Reporting. Four services + gateway: Identity, Portfolio, MarketData, Reporting. Strategy's project, tests, Gateway route, AppHost registration, CI job and dependabot entry are removed (spec-01). "Few services, many patterns" (ADR-001) stands unchanged — this narrows the count, not the principle.
 **Consequences:** one less service to run, trace and deploy; insight features become vertical slices inside Reporting, computed directly against `AssetValuation` with no cross-service call for them at all. Amends ADR-001.
 
-## ADR-021 🕐 Event-carried state transfer for positions; REST narrowed to validation + batch
+## ADR-021 ✅ Event-carried state transfer for positions; REST narrowed to validation + batch
+
+**Shipped:** 2026-09-22 (spec-02 publishes the events, spec-03 consumes them and deletes the REST query).
 
 **Context:** today Reporting fetches positions from Portfolio over REST (`SystemCaller`) on every snapshot cycle, via `GetPositionsForValuation` + `PortfolioPositionsClient` (decided in T2.11). This couples snapshot computation to Portfolio's availability and latency, and re-implements query logic an event could carry for free.
 **Decision:** position facts travel as events carrying full state (`AssetPositionChanged`, `AssetRemoved`, `Portfolio*`) through the outbox; Reporting maintains a local `Position` read model via idempotent consumers (inbox) instead of querying Portfolio. REST between services narrows to exactly two uses: request-path validation (Portfolio → MarketData ticker/instrument lookup) and a once-daily prices/FX batch (Reporting → MarketData). Supersedes the T2.11 `positions-for-valuation` decision; narrows ADR-015.

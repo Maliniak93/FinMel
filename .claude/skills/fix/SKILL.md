@@ -3,7 +3,7 @@ name: fix
 description: Reproduce a bug, find its root cause, write a one-criterion fix spec, and (after approval) run the same build pipeline that ships features. Never patches without a failing reproduction.
 argument-hint: "<bug description, failing test name, verify failure, or log path>"
 disable-model-invocation: true
-model: opus
+model: claude-opus-5-5
 effort: high
 ---
 

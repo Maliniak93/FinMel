@@ -44,8 +44,9 @@ public static class AuthenticationExtensions
 
         builder.Services.AddAuthorization(options =>
         {
-            // T2.11: bulk/cross-user internal endpoints (e.g. Portfolio's positions-for-valuation)
-            // require this instead of a bare RequireAuthorization() — see SystemCaller.
+            // T2.11: bulk/cross-user internal endpoints (MarketData's prices/fx latest-batch, the
+            // only two left after ADR-021) require this instead of a bare RequireAuthorization()
+            // — see SystemCaller.
             options.AddPolicy(SystemCaller.PolicyName, policy =>
                 policy.RequireClaim(SystemCaller.ClaimType, SystemCaller.ClaimValue));
         });

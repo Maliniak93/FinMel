@@ -3,7 +3,8 @@ name: design
 description: Interview the user about a feature, a change to existing behaviour, or a refactor, then write a build-ready spec in skarbiec-plan/specs/. Writes no code.
 argument-hint: "<feature, change or refactor description>"
 disable-model-invocation: true
-model: opus
+model: claude-opus-5-5
+effort: xhigh
 ---
 
 Turn `$ARGUMENTS` into a spec that `/build` can execute unattended. You write a document, never code.

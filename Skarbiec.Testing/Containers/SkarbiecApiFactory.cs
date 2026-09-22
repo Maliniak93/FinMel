@@ -24,6 +24,18 @@ public abstract class SkarbiecApiFactory<TProgram>(SkarbiecContainersFixture con
         builder.UseSetting($"ConnectionStrings:{databaseConnectionStringName}", containers.PostgresConnectionString);
         builder.UseSetting("ConnectionStrings:rabbitmq", containers.RabbitMqConnectionString);
         builder.UseSetting(TestingDefaults.DisableBackgroundJobsConfigKey, "true");
+
+        // WebApplication.CreateBuilder registers the Windows EventLog provider by default, and it is
+        // the one provider that ignores the general log levels — it always writes Warning and above.
+        // A test run builds and disposes one host per fact in a single process, and the native
+        // EventLog handle behind that provider does not survive the first host's disposal: every
+        // later host that logs a warning gets ObjectDisposedException('EventLogInternal') thrown
+        // back out of Logger.Log. It surfaces during shutdown (MassTransit logs a warning when a bus
+        // stop runs past its timeout on a loaded broker), so the exception escapes
+        // WebApplicationFactory.DisposeAsync and fails whichever test happened to own that host —
+        // never the one that caused it. Tests have no business writing to the machine's event log
+        // anyway; silencing the provider by its alias keeps Console/Debug output intact.
+        builder.UseSetting("Logging:EventLog:LogLevel:Default", "None");
     }
 
     /// <summary>

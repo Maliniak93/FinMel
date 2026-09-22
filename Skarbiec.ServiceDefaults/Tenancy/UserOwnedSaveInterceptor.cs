@@ -13,11 +13,15 @@ namespace Skarbiec.ServiceDefaults.Tenancy;
 /// </summary>
 /// <remarks>
 /// The "already set" escape hatch (T2.11) is for system-context writers with no single request
-/// user to read from <see cref="ICurrentUser"/> — Reporting's <c>DailyPricesSynced</c> consumer
-/// computes snapshots for many users in one message and sets each row's <c>UserId</c> itself from
-/// Portfolio's own data (trusted internal source, not a request body — ADR-006's guarantee is
-/// unchanged). Every other call site leaves <c>UserId</c> at its <c>Guid.Empty</c> default and is
-/// stamped exactly as before.
+/// user to read from <see cref="ICurrentUser"/>: every Reporting consumer runs that way, since a
+/// message has no <c>HttpContext</c> and <see cref="ICurrentUser"/>'s <c>UserId</c> is
+/// <see cref="Guid.Empty"/> there. <c>AssetPositionChangedConsumer</c>, <c>AssetRemovedConsumer</c>,
+/// <c>PortfolioArchivedConsumer</c>/<c>PortfolioRestoredConsumer</c> and
+/// <c>PortfolioDeletedConsumer</c> take the <c>UserId</c> straight off the event, and
+/// <c>DailyPricesSyncedConsumer</c> computes snapshots and valuation lines for many users in one
+/// message, taking each row's <c>UserId</c> from the <c>Position</c> read model those events built
+/// (trusted internal source, not a request body — ADR-006's guarantee is unchanged). Every other
+/// call site leaves <c>UserId</c> at its <c>Guid.Empty</c> default and is stamped exactly as before.
 /// </remarks>
 public sealed class UserOwnedSaveInterceptor(ICurrentUser currentUser) : SaveChangesInterceptor
 {

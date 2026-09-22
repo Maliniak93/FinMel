@@ -4,8 +4,11 @@ using Skarbiec.Reporting.Valuation;
 namespace Skarbiec.Reporting.Tests;
 
 /// <summary>
-/// Pure unit tests on 03-domain-model.md §Valuation algorithm (T2.11 AC) — no Testcontainers,
-/// mirrors Portfolio's <c>TransactionQuantityCalculatorTests</c> container-free style.
+/// Pure unit tests on 03-domain-model.md §Valuation algorithm (T2.11 AC, extended spec-03 AC10) —
+/// no Testcontainers, mirrors Portfolio's <c>TransactionQuantityCalculatorTests</c> container-free
+/// style. spec-03 design decision 6: the algorithm stays pure and returns one <see cref="ValuedPosition"/>
+/// line per input position (never fewer — a position with no usable quote/rate still gets a
+/// zero-valued, stale line, never a silently dropped one) instead of a pre-aggregated breakdown.
 /// </summary>
 public sealed class ValuationAlgorithmTests
 {
@@ -15,7 +18,8 @@ public sealed class ValuationAlgorithmTests
     [Fact]
     public void Calculate_MarketAssetInForeignCurrency_ConvertsThroughFxRate()
     {
-        var positions = new[] { MarketPosition(AssetClass.Stock, quantity: 10) };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { MarketPosition(assetId, AssetClass.Stock, quantity: 10) };
         var prices = Prices((InstrumentId, "USD", SnapshotDate, 100m));
         var fx = FxRates(("USDPLN", SnapshotDate, 4m));
 
@@ -24,12 +28,21 @@ public sealed class ValuationAlgorithmTests
         // 10 units x $100 x 4 PLN/USD = 4000 PLN.
         Assert.Equal(4000m, result.TotalPln);
         Assert.False(result.IsStale);
+
+        var line = Assert.Single(result.Lines);
+        Assert.Equal(assetId, line.AssetId);
+        Assert.Equal(4000m, line.ValuePln);
+        Assert.Equal(100m, line.PriceUsed);
+        Assert.Equal(SnapshotDate, line.PriceDate);
+        Assert.Equal(4m, line.FxRateUsed);
+        Assert.False(line.IsStale);
     }
 
     [Fact]
     public void Calculate_MarketAssetInBaseCurrency_SkipsFxLookup()
     {
-        var positions = new[] { MarketPosition(AssetClass.Stock, quantity: 5) };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { MarketPosition(assetId, AssetClass.Stock, quantity: 5) };
         var prices = Prices((InstrumentId, "PLN", SnapshotDate, 200m));
         var fx = FxRates(); // empty — PLN needs no rate.
 
@@ -37,6 +50,7 @@ public sealed class ValuationAlgorithmTests
 
         Assert.Equal(1000m, result.TotalPln);
         Assert.False(result.IsStale);
+        Assert.Equal(1000m, Assert.Single(result.Lines).ValuePln);
     }
 
     [Theory]
@@ -47,7 +61,8 @@ public sealed class ValuationAlgorithmTests
     public void Calculate_LastKnownPriceFallback_StalenessFollowsAgeInDays(int ageDays, bool expectedStale)
     {
         var quoteDate = SnapshotDate.AddDays(-ageDays);
-        var positions = new[] { MarketPosition(AssetClass.Stock, quantity: 1) };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { MarketPosition(assetId, AssetClass.Stock, quantity: 1) };
         var prices = Prices((InstrumentId, "PLN", quoteDate, 100m));
         var fx = FxRates();
 
@@ -56,12 +71,14 @@ public sealed class ValuationAlgorithmTests
         // The last known price still values the position — staleness is a flag, not an exclusion.
         Assert.Equal(100m, result.TotalPln);
         Assert.Equal(expectedStale, result.IsStale);
+        Assert.Equal(expectedStale, Assert.Single(result.Lines).IsStale);
     }
 
     [Fact]
     public void Calculate_FxRateOlderThanThreshold_MarksStaleEvenWithFreshPrice()
     {
-        var positions = new[] { MarketPosition(AssetClass.Stock, quantity: 1) };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { MarketPosition(assetId, AssetClass.Stock, quantity: 1) };
         var prices = Prices((InstrumentId, "USD", SnapshotDate, 100m));
         var fx = FxRates(("USDPLN", SnapshotDate.AddDays(-10), 4m));
 
@@ -69,12 +86,14 @@ public sealed class ValuationAlgorithmTests
 
         Assert.Equal(400m, result.TotalPln);
         Assert.True(result.IsStale);
+        Assert.True(Assert.Single(result.Lines).IsStale);
     }
 
     [Fact]
-    public void Calculate_MarketAssetWithNoQuoteAtAll_ContributesNothingAndMarksStale()
+    public void Calculate_MarketAssetWithNoQuoteAtAll_ProducesZeroValuedStaleLine_NeverDropped()
     {
-        var positions = new[] { MarketPosition(AssetClass.Stock, quantity: 10) };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { MarketPosition(assetId, AssetClass.Stock, quantity: 10) };
         var prices = Prices(); // never synced.
         var fx = FxRates();
 
@@ -82,49 +101,123 @@ public sealed class ValuationAlgorithmTests
 
         Assert.Equal(0m, result.TotalPln);
         Assert.True(result.IsStale);
-        Assert.Empty(result.Breakdown);
+
+        // spec-03: one AssetValuation per position, always — a missing quote never drops the line,
+        // it produces a zero-valued, stale one instead (the AC10 contract DailyPricesSyncedConsumer
+        // relies on to write exactly one row per position).
+        var line = Assert.Single(result.Lines);
+        Assert.Equal(assetId, line.AssetId);
+        Assert.Equal(0m, line.ValuePln);
+        Assert.Null(line.PriceUsed);
+        Assert.Null(line.PriceDate);
+        Assert.True(line.IsStale);
     }
 
     [Fact]
     public void Calculate_ManualAssetInForeignCurrency_ConvertsAtSnapshotDateRate()
     {
-        var positions = new[] { ManualPosition(AssetClass.RealEstate, 50_000m, "EUR") };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { ManualPosition(assetId, AssetClass.RealEstate, 50_000m, "EUR") };
         var fx = FxRates(("EURPLN", SnapshotDate, 4.3m));
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
 
         Assert.Equal(215_000m, result.TotalPln);
         Assert.False(result.IsStale);
+
+        var line = Assert.Single(result.Lines);
+        Assert.Equal(215_000m, line.ValuePln);
+        Assert.Null(line.PriceUsed);
+        Assert.Null(line.PriceDate);
+        Assert.Equal(4.3m, line.FxRateUsed);
     }
 
     [Fact]
     public void Calculate_ManualAssetInBaseCurrency_UsesValueDirectly()
     {
-        var positions = new[] { ManualPosition(AssetClass.Other, 12_345.67m, "PLN") };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { ManualPosition(assetId, AssetClass.Other, 12_345.67m, "PLN") };
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), FxRates(), SnapshotDate);
 
         Assert.Equal(12_345.67m, result.TotalPln);
         Assert.False(result.IsStale);
+        Assert.Equal(12_345.67m, Assert.Single(result.Lines).ValuePln);
     }
 
     [Fact]
-    public void Calculate_MixOfMarketAndManualAcrossAssetClasses_BreaksDownPerAssetClass()
+    public void Calculate_MixOfMarketAndManualAcrossAssetClasses_ProducesOneLineEachSummingToTheTotal()
     {
         var stockInstrumentId = Guid.NewGuid();
+        var stockAssetId = Guid.NewGuid();
+        var realEstateAssetId = Guid.NewGuid();
         var positions = new ValuationPosition[]
         {
-            new() { AssetClass = AssetClass.Stock, ValuationMode = AssetValuationMode.Market, Currency = "PLN", Quantity = 2, InstrumentId = stockInstrumentId },
-            new() { AssetClass = AssetClass.RealEstate, ValuationMode = AssetValuationMode.Manual, Currency = "PLN", Quantity = 0, ManualValueAmount = 300_000m },
+            new() { AssetId = stockAssetId, AssetClass = AssetClass.Stock, ValuationMode = AssetValuationMode.Market, Currency = "PLN", Quantity = 2, InstrumentId = stockInstrumentId },
+            new() { AssetId = realEstateAssetId, AssetClass = AssetClass.RealEstate, ValuationMode = AssetValuationMode.Manual, Currency = "PLN", Quantity = 0, ManualValueAmount = 300_000m },
         };
         var prices = Prices((stockInstrumentId, "PLN", SnapshotDate, 150m));
 
         var result = ValuationAlgorithm.Calculate(positions, prices, FxRates(), SnapshotDate);
 
         Assert.Equal(300_300m, result.TotalPln);
-        Assert.Equal(2, result.Breakdown.Count);
-        Assert.Contains(result.Breakdown, e => e.AssetClass == AssetClass.Stock && e.ValuePln == 300m);
-        Assert.Contains(result.Breakdown, e => e.AssetClass == AssetClass.RealEstate && e.ValuePln == 300_000m);
+        Assert.Equal(2, result.Lines.Count);
+        Assert.Equal(result.Lines.Sum(l => l.ValuePln), result.TotalPln);
+
+        var stockLine = Assert.Single(result.Lines, l => l.AssetId == stockAssetId);
+        Assert.Equal(AssetClass.Stock, stockLine.AssetClass);
+        Assert.Equal(300m, stockLine.ValuePln);
+
+        var realEstateLine = Assert.Single(result.Lines, l => l.AssetId == realEstateAssetId);
+        Assert.Equal(AssetClass.RealEstate, realEstateLine.AssetClass);
+        Assert.Equal(300_000m, realEstateLine.ValuePln);
+    }
+
+    /// <summary>spec-03 AC10: one market, one manual and one currency-valued position each produce
+    /// exactly one line, correctly shaped per mode (PriceUsed/PriceDate market-only, FxRateUsed on
+    /// every non-PLN line), summing to the total.</summary>
+    [Fact]
+    public void Calculate_ThreeValuationModes_ProducesOneLineEach()
+    {
+        var marketAssetId = Guid.NewGuid();
+        var manualAssetId = Guid.NewGuid();
+        var cashAssetId = Guid.NewGuid();
+        var stockInstrumentId = Guid.NewGuid();
+
+        var positions = new ValuationPosition[]
+        {
+            new() { AssetId = marketAssetId, AssetClass = AssetClass.Stock, ValuationMode = AssetValuationMode.Market, Currency = "PLN", Quantity = 10, InstrumentId = stockInstrumentId },
+            new() { AssetId = manualAssetId, AssetClass = AssetClass.RealEstate, ValuationMode = AssetValuationMode.Manual, Currency = "PLN", Quantity = 0, ManualValueAmount = 300_000m },
+            new() { AssetId = cashAssetId, AssetClass = AssetClass.Cash, ValuationMode = AssetValuationMode.CurrencyValued, Currency = "EUR", Quantity = 1_000m },
+        };
+
+        var prices = Prices((stockInstrumentId, "PLN", SnapshotDate, 150m));
+        var fx = FxRates(("EURPLN", SnapshotDate, 4.30m));
+
+        var result = ValuationAlgorithm.Calculate(positions, prices, fx, SnapshotDate);
+
+        Assert.Equal(3, result.Lines.Count);
+        Assert.Equal(1_500m + 300_000m + 4_300m, result.TotalPln);
+        Assert.False(result.IsStale);
+
+        var marketLine = Assert.Single(result.Lines, l => l.AssetId == marketAssetId);
+        Assert.Equal(1_500m, marketLine.ValuePln);
+        Assert.Equal(150m, marketLine.PriceUsed);
+        Assert.Equal(SnapshotDate, marketLine.PriceDate);
+        Assert.False(marketLine.IsStale);
+
+        var manualLine = Assert.Single(result.Lines, l => l.AssetId == manualAssetId);
+        Assert.Equal(300_000m, manualLine.ValuePln);
+        Assert.Null(manualLine.PriceUsed);
+        Assert.Null(manualLine.PriceDate);
+        Assert.False(manualLine.IsStale);
+
+        var cashLine = Assert.Single(result.Lines, l => l.AssetId == cashAssetId);
+        Assert.Equal(4_300m, cashLine.ValuePln);
+        Assert.Null(cashLine.PriceUsed);
+        Assert.Null(cashLine.PriceDate);
+        Assert.Equal(4.30m, cashLine.FxRateUsed);
+        Assert.False(cashLine.IsStale);
     }
 
     // --- M1.4: currency-valued mode (value = Quantity × FxRate(currency→PLN), no instrument, no manual amount). ---
@@ -132,7 +225,8 @@ public sealed class ValuationAlgorithmTests
     [Fact]
     public void Calculate_CurrencyValuedAssetInBaseCurrency_SkipsFxLookup()
     {
-        var positions = new[] { CurrencyValuedPosition(AssetClass.Cash, quantity: 1_500m, currency: "PLN") };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { CurrencyValuedPosition(assetId, AssetClass.Cash, quantity: 1_500m, currency: "PLN") };
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), FxRates(), SnapshotDate);
 
@@ -143,7 +237,8 @@ public sealed class ValuationAlgorithmTests
     [Fact]
     public void Calculate_CurrencyValuedAssetInForeignCurrency_ConvertsThroughFxRate()
     {
-        var positions = new[] { CurrencyValuedPosition(AssetClass.Cash, quantity: 1_000m, currency: "EUR") };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { CurrencyValuedPosition(assetId, AssetClass.Cash, quantity: 1_000m, currency: "EUR") };
         var fx = FxRates(("EURPLN", SnapshotDate, 4.30m));
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
@@ -151,12 +246,14 @@ public sealed class ValuationAlgorithmTests
         // 1000 EUR x 4.30 PLN/EUR = 4300 PLN.
         Assert.Equal(4_300m, result.TotalPln);
         Assert.False(result.IsStale);
+        Assert.Equal(4.30m, Assert.Single(result.Lines).FxRateUsed);
     }
 
     [Fact]
     public void Calculate_CurrencyValuedAssetWithStaleRate_ValuesButMarksStale()
     {
-        var positions = new[] { CurrencyValuedPosition(AssetClass.Deposit, quantity: 500m, currency: "USD") };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { CurrencyValuedPosition(assetId, AssetClass.Deposit, quantity: 500m, currency: "USD") };
         var fx = FxRates(("USDPLN", SnapshotDate.AddDays(-10), 3.65m));
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
@@ -165,25 +262,32 @@ public sealed class ValuationAlgorithmTests
         // contract as market/manual).
         Assert.Equal(1_825m, result.TotalPln);
         Assert.True(result.IsStale);
+        Assert.True(Assert.Single(result.Lines).IsStale);
     }
 
     [Fact]
-    public void Calculate_CurrencyValuedAssetWithNoRateAtAll_ContributesNothingAndMarksStale_NeverZeroByAccident()
+    public void Calculate_CurrencyValuedAssetWithNoRateAtAll_ProducesZeroValuedStaleLine_NeverZeroByAccident()
     {
-        var positions = new[] { CurrencyValuedPosition(AssetClass.Cash, quantity: 1_000m, currency: "EUR") };
+        var assetId = Guid.NewGuid();
+        var positions = new[] { CurrencyValuedPosition(assetId, AssetClass.Cash, quantity: 1_000m, currency: "EUR") };
         var fx = FxRates(); // no EURPLN row at all.
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
 
-        // Missing rate: excluded from the total/breakdown entirely (not silently valued at 0 PLN and
-        // included) — the same "no quote at all" contract ValueMarketAsset already has.
+        // Missing rate: still exactly one line (spec-03 — no AssetValuation is ever silently
+        // dropped), valued at 0 PLN and flagged stale rather than excluded from the total.
         Assert.Equal(0m, result.TotalPln);
         Assert.True(result.IsStale);
-        Assert.Empty(result.Breakdown);
+
+        var line = Assert.Single(result.Lines);
+        Assert.Equal(assetId, line.AssetId);
+        Assert.Equal(0m, line.ValuePln);
+        Assert.True(line.IsStale);
     }
 
-    private static ValuationPosition MarketPosition(AssetClass assetClass, decimal quantity) => new()
+    private static ValuationPosition MarketPosition(Guid assetId, AssetClass assetClass, decimal quantity) => new()
     {
+        AssetId = assetId,
         AssetClass = assetClass,
         ValuationMode = AssetValuationMode.Market,
         Currency = "PLN", // irrelevant for market assets — the instrument's own quote currency governs FX.
@@ -191,8 +295,9 @@ public sealed class ValuationAlgorithmTests
         InstrumentId = InstrumentId,
     };
 
-    private static ValuationPosition ManualPosition(AssetClass assetClass, decimal manualValue, string currency) => new()
+    private static ValuationPosition ManualPosition(Guid assetId, AssetClass assetClass, decimal manualValue, string currency) => new()
     {
+        AssetId = assetId,
         AssetClass = assetClass,
         ValuationMode = AssetValuationMode.Manual,
         Currency = currency,
@@ -200,8 +305,9 @@ public sealed class ValuationAlgorithmTests
         ManualValueAmount = manualValue,
     };
 
-    private static ValuationPosition CurrencyValuedPosition(AssetClass assetClass, decimal quantity, string currency) => new()
+    private static ValuationPosition CurrencyValuedPosition(Guid assetId, AssetClass assetClass, decimal quantity, string currency) => new()
     {
+        AssetId = assetId,
         AssetClass = assetClass,
         ValuationMode = AssetValuationMode.CurrencyValued,
         Currency = currency,

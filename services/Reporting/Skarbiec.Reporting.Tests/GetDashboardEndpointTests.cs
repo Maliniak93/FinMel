@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.Reporting.Valuation;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -25,12 +24,13 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(
-                userId, retirementId, snapshotDate, 1000m, cancellationToken,
-                breakdown: [new AssetClassBreakdownEntry(AssetClass.Stock, 1000m)]);
-            await db.SeedSnapshotAsync(
-                userId, savingsId, snapshotDate, 500m, cancellationToken,
-                breakdown: [new AssetClassBreakdownEntry(AssetClass.Cash, 500m)]);
+            await db.SeedSnapshotAsync(userId, retirementId, snapshotDate, 1000m, cancellationToken);
+            await db.SeedValuationLineAsync(
+                userId, retirementId, Guid.NewGuid(), snapshotDate, 1000m, cancellationToken, assetClass: AssetClass.Stock);
+
+            await db.SeedSnapshotAsync(userId, savingsId, snapshotDate, 500m, cancellationToken);
+            await db.SeedValuationLineAsync(
+                userId, savingsId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Cash);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -172,5 +172,32 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
 
         Assert.Equal(0m, body!.NetWorthPln);
         Assert.Empty(body.ByPortfolio);
+    }
+
+    /// <summary>spec-03 AC14: ByAssetClass is grouped from AssetValuation, a second tenancy-scoped
+    /// entity alongside ValuationSnapshot — this proves the query filter covers it too, not just the
+    /// snapshot table already proven by <see cref="Get_NeverIncludesAnotherUsersSnapshots"/>.</summary>
+    [Fact]
+    public async Task Get_NeverIncludesAnotherUsersAssetValuations()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userAId = Guid.NewGuid();
+        var userBId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+
+        await using (var db = CreateDbContext(userAId))
+        {
+            await db.SeedSnapshotAsync(userAId, portfolioId, snapshotDate, 5000m, cancellationToken);
+            await db.SeedValuationLineAsync(
+                userAId, portfolioId, Guid.NewGuid(), snapshotDate, 5000m, cancellationToken, assetClass: AssetClass.Stock);
+        }
+
+        using var userBClient = Factory.CreateAuthenticatedClient(userBId);
+        var response = await userBClient.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(0m, body!.NetWorthPln);
+        Assert.Empty(body.ByAssetClass);
     }
 }

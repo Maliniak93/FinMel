@@ -9,7 +9,6 @@ using Skarbiec.Portfolio.Features.DeletePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.GetAsset;
 using Skarbiec.Portfolio.Features.GetPortfolio;
-using Skarbiec.Portfolio.Features.GetPositionsForValuation;
 using Skarbiec.Portfolio.Features.ListAssets;
 using Skarbiec.Portfolio.Features.ListPortfolios;
 using Skarbiec.Portfolio.Features.ListTransactions;
@@ -39,9 +38,9 @@ if (!OpenApiBuildTime.IsActive)
         ?? throw new InvalidOperationException("Missing connection string 'portfolio-db'.");
     builder.Services.AddDbContext<PortfolioDbContext>(options => options.UseNpgsql(portfolioConnectionString));
 
-    // No consumers yet — Portfolio only publishes (AssetPositionChanged/AssetRemoved and the
-    // Portfolio* lifecycle events, spec-02) through the outbox; Reporting and MarketData subscribe
-    // in spec-03/spec-04.
+    // No consumers — Portfolio only publishes (AssetPositionChanged/AssetRemoved and the
+    // Portfolio* lifecycle events, spec-02) through the outbox; Reporting consumes them (spec-03)
+    // and MarketData joins in spec-04.
     builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
 
     // AddAsset/UpdateAsset validate a market asset's InstrumentId against MarketData (T2.9) — resilience
@@ -76,7 +75,6 @@ builder.Services.AddScoped<RecordTransactionHandler>();
 builder.Services.AddScoped<ListTransactionsHandler>();
 builder.Services.AddScoped<UpdateTransactionHandler>();
 builder.Services.AddScoped<DeleteTransactionHandler>();
-builder.Services.AddScoped<GetPositionsForValuationHandler>();
 
 var app = builder.Build();
 
@@ -100,7 +98,6 @@ app.MapRecordTransactionEndpoint();
 app.MapListTransactionsEndpoint();
 app.MapUpdateTransactionEndpoint();
 app.MapDeleteTransactionEndpoint();
-app.MapGetPositionsForValuationEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton
 // service (T0.15 AC) — mirrors Skarbiec.Identity's /api/identity/me.

@@ -133,9 +133,9 @@ erDiagram
 
 | Entity | Fields | Role |
 |---|---|---|
-| `Position` | copy of the `AssetPositionChanged` payload + `UpdatedAt`; unique `AssetId` | **(target — spec-03, new)** upserted from the inbox; `IsArchived` kept current from `Portfolio*` events |
-| `ValuationSnapshot` | `Id, UserId, PortfolioId, Date, TotalPln, IsStale` | `BreakdownJson` removed **(target — spec-03)** — breakdown becomes `GROUP BY AssetClass` over `AssetValuation` lines |
-| `AssetValuation` | `Id, UserId, PortfolioId, AssetId, Date, AssetClass, Quantity, PriceUsed?, PriceDate?, FxRateUsed?, ValuePln, IsStale`; unique `(AssetId, Date)` | **(target — spec-03, new)** the basis for P/L per asset, emergency fund and goal math, and TWR — nothing needs recomputing from scratch |
+| `Position` | copy of the `AssetPositionChanged` payload + `UpdatedAt`; `AssetId` is the primary key | upserted from the inbox; `PortfolioIsArchived` kept current from `Portfolio*` events |
+| `ValuationSnapshot` | `Id, UserId, PortfolioId, Date, TotalPln, IsStale` | breakdown is a `GROUP BY AssetClass` over `AssetValuation` lines, not a stored JSON blob |
+| `AssetValuation` | `Id, UserId, PortfolioId, AssetId, Date, AssetClass, Quantity, PriceUsed?, PriceDate?, FxRateUsed?, ValuePln, IsStale`; unique `(AssetId, Date)` | the basis for P/L per asset, emergency fund and goal math, and TWR — nothing needs recomputing from scratch |
 | `TargetAllocation` + `TargetAllocationLine` | scope (`PortfolioId?`, null = total), lines `AssetClass → TargetPercent, ToleranceBand`; unique `(UserId, PortfolioId?)` | **(target — insights spec, after spec-03)** |
 | `EmergencyFund` + `EmergencyFundAsset` | `MonthlyExpenses, TargetMonths` + designated assets, validated locally against `Position` | **(target — insights spec)** |
 | `SavingsGoal` + `SavingsGoalAsset` | `Name, TargetAmount, Deadline, AnnualReturnRate` + linked assets | **(target — insights spec)** |
@@ -147,7 +147,7 @@ erDiagram
     POSITION ||--o{ ASSET_VALUATION : "valued over time"
     TARGET_ALLOCATION ||--o{ TARGET_ALLOCATION_LINE : has
     POSITION {
-        uuid asset_id PK "target - spec-03, read model"
+        uuid asset_id PK "read model"
         uuid portfolio_id
         uuid user_id
         string asset_class
@@ -166,7 +166,7 @@ erDiagram
         bool is_stale
     }
     ASSET_VALUATION {
-        uuid id PK "target - spec-03"
+        uuid id PK
         uuid asset_id FK
         date date
         string asset_class

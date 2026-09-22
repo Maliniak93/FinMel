@@ -54,24 +54,6 @@ export type PortfolioResponse = {
     assetCount: number | string;
 };
 
-export type PositionForValuationResponse = {
-    userId: string;
-    portfolioId: string;
-    assetId: string;
-    assetClass: AssetClass;
-    valuationMode: AssetValuationMode;
-    currency: string;
-    quantity: number | string;
-    instrumentId?: null | string;
-    manualValueAmount?: null | number | string;
-    manualValueDate?: null | string;
-};
-
-export type PositionsForValuationPage = {
-    items: Array<PositionForValuationResponse>;
-    hasMore: boolean;
-};
-
 export type RecordTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
@@ -428,22 +410,3 @@ export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByI
 };
 
 export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses];
-
-export type GetApiPortfolioPositionsForValuationData = {
-    body?: never;
-    path?: never;
-    query?: {
-        page?: number | string;
-        pageSize?: number | string;
-    };
-    url: '/api/portfolio/positions-for-valuation';
-};
-
-export type GetApiPortfolioPositionsForValuationResponses = {
-    /**
-     * OK
-     */
-    200: PositionsForValuationPage;
-};
-
-export type GetApiPortfolioPositionsForValuationResponse = GetApiPortfolioPositionsForValuationResponses[keyof GetApiPortfolioPositionsForValuationResponses];
