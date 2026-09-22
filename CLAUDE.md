@@ -51,10 +51,11 @@ skarbiec-plan/            # planning docs: product, architecture, domain, decisi
 Path-scoped rules in `.claude/rules/` (`dotnet.md`, `messaging.md`, `testing.md`, `angular.md`, `domain.md`) load automatically when you touch matching files — read the matching rule before creating files in an area you have not touched yet. .NET 10 and Angular 22 move faster than training data: verify an API through microsoft-docs (.NET/ASP.NET/EF) or context7 (Angular, MassTransit) instead of writing it from memory.
 
 ## Workflow
-`/design <idea>` writes a spec into `skarbiec-plan/specs/` and stops for your approval — new behaviour, a change to existing behaviour, or a cleanup → `/build <spec>` cuts `feat/<slug>` from master first, then runs test-writer → implementer → verifier → reviewer → ops, which commits, pushes and opens the PR → you merge. A spec with `skip: [tests]` (no behaviour changes) skips the test phase; `/build --skip tests,review` overrides it for one run. `/fix <bug>` reproduces, writes a one-criterion fix spec and runs the same pipeline; `/check` runs verification; `/ops <task>` handles CI and GitHub chores.
+`/design <idea>` writes a spec into `skarbiec-plan/specs/` and stops for your approval — new behaviour, a change to existing behaviour, or a cleanup → `/build <spec>` cuts `feat/<slug>` from master first, then runs test-writer → implementer → verifier → reviewer → ops, which stops at `git add -A`: **you commit, push, open the PR and merge**. A spec with `skip: [tests]` (no behaviour changes) skips the test phase; `/build --skip tests,review` overrides it for one run. `/fix <bug>` reproduces, writes a one-criterion fix spec and runs the same pipeline; `/check` runs verification; `/ops <task>` handles CI and GitHub chores.
 Tier 1 = a precedent for this exists in the same service (Sonnet). Tier 2 = new pattern, cross-service work, or an algorithm (Opus).
 Definition of done: tests green including tenancy, zero warnings, `dotnet format` clean, TS client regenerated when the API changed, `requests/*.http` updated, rules and ADRs updated when a convention changes.
-Agents never run git — only `ops`, and only on `feat/*`.
+Agents never run git — only `ops`, and inside a build run only `git switch -c` and `git add -A`; commit/push/PR happen in an explicit `/ops` chore or by your own hand.
+`scripts/verify.mjs` runs once per Verify phase, in the `verifier` agent alone — the implementer and test-writer run only `--filter`ed tests, never a full suite, `dotnet build`, `dotnet format` or the npm checks.
 
 ## Documentation (read on demand)
 | File | Content |

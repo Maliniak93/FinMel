@@ -51,7 +51,8 @@ No reproduction → stop and say exactly what you tried and what you saw. Do not
 Present at most 10 lines: symptom, root cause + evidence, fix approach, tier, the AC-1 test name. Ask for
 approval. Only after an explicit yes: set `status: approved`, then call the `Workflow` tool with
 `{ name: 'build-feature', args: { spec: 'skarbiec-plan/specs/fix-<slug>.md', tier: <tier>, maxRounds: 2 } }`
-and report exactly as `/build` does (status, PR URL, tests, files, rounds — merging is the user's).
+and report exactly as `/build` does (status, branch, staged files, tests, rounds, minor findings, then
+the commit/push/PR commands — the run stages the change and stops; committing and the PR are the user's).
 
 ## Hard constraints
 

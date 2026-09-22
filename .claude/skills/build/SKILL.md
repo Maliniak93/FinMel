@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build an approved spec end-to-end - branch, failing tests, implementation, verification, adversarial review, PR - through the build-feature workflow.
+description: Build an approved spec end-to-end - branch, failing tests, implementation, verification, adversarial review - and leave it staged for your own commit and PR.
 argument-hint: "<spec slug or path> [--tier 1|2] [--skip tests,review] [+Nk]"
 disable-model-invocation: true
 ---
@@ -26,8 +26,8 @@ the workflow script owns the flow, the agents do the work.
    - `--skip review` is a deliberate one-off for a trivial run; it never belongs in a spec file.
 6. A `+Nk` argument is the user's token budget directive for the turn — leave it in place and do not
    put it into `args`; the workflow reads it through `budget`.
-7. Set the frontmatter to `status: building` by editing the spec file directly; the spec is tracked,
-   so this edit ships inside the feature's PR.
+7. Set the frontmatter to `status: building` by editing the spec file directly. `skarbiec-plan/specs/`
+   is gitignored, so this edit stays local - it feeds `plan-status.mjs`, not the PR.
 8. Call the `Workflow` tool with
    `{ name: 'build-feature', args: { spec: "<resolved path>", tier: <tier>, maxRounds: 2, skip: [<skipped phases>] } }`
    and wait for it.
@@ -35,19 +35,24 @@ the workflow script owns the flow, the agents do the work.
 ## Phases the workflow runs
 
 `Branch` (ops cuts `feat/<slug>` from master **before** anything is written) → `Tests` → `Implement`
-→ `Verify` ⇄ `Implement` → `Review` (ops commits the tree, reviewer diffs `master...HEAD`) ⇄
-`Implement`+`Verify` → `Ship` (push, PR, spec → `done`, minor findings posted on the PR).
+→ `Verify` ⇄ `Implement` → `Review` (ops stages the tree, reviewer diffs `git diff --cached`) ⇄
+`Implement`+`Verify` → `Stage` (spec → `done`, `git add -A`).
+
+**The run never commits, pushes or opens a PR.** It ends with the whole change staged on its branch;
+committing, pushing and opening the PR are the user's, by hand.
 
 ## Report (at most 10 lines, after the workflow returns)
 
-- `ready-for-merge` → status, PR URL, branch, tests written (count + names, or "none — spec skipped
-  tests"), files touched (count), fix rounds, minor findings posted, and one line: **merging is
-  yours** - review the PR and merge it when CI is green.
+- `staged` → branch, staged file count, tests written (count + names, or "none — spec skipped
+  tests"), files touched (count), fix rounds, then the minor review findings (one line each:
+  `file:line — claim`; say "none" when the list is empty), then the three commands to finish:
+  `git commit -m "<spec title>"` · `git push -u origin <branch>` · `gh pr create --base master`.
+  Do not run them and do not offer to.
 - `blocked` → the `stage`, then the `failures` or blocking `findings` verbatim but trimmed, then the
-  choice: fix the spec and re-run `/build <slug>` (the work already sits committed on `feat/<slug>`,
+  choice: fix the spec and re-run `/build <slug>` (the work sits in the working tree on `feat/<slug>`,
   so nothing is lost), or fix the named problem by hand first. Leave `status: building` in the spec -
   it is accurate.
 - `blocked` at `stage: branch` means the working tree held changes that are not this spec. Name them
   and stop - do not offer to sweep them into the branch.
-- The workflow already left the spec at `status: done` with the PR link on a successful ship. Do not
-  edit the spec yourself after a run, and never merge the PR.
+- The workflow already left the spec at `status: done` on a successful run. Do not edit the spec
+  yourself afterwards, and never commit, push, open or merge anything.

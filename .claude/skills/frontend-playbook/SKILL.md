@@ -40,5 +40,7 @@ instead of constructor injection, native control flow (`@if`/`@for` with `track`
 ## Verification (all must pass)
 `npm run typecheck` · `npm run lint` · `npm run build` · `npm test` · `npm run format:check` (prettier runs on edit via a hook; this just confirms it stayed clean). Keep bundle sizes inside the configured budgets — a budget warning is a build failure here.
 
+> **Who runs them.** `scripts/verify.mjs` runs all five in the `verifier` phase. While implementing, run only the spec you are driving green (`npm test -- --watch=false -t "<name>"`), plus the single `npm run typecheck` that follows a `gen:api` regeneration. Running the suites yourself only repeats the verifier a few minutes early.
+
 ## Testing
 Vitest specs live next to the component they test (`thing.spec.ts` beside `thing.ts`). Node must be ≥ 22.22.3, ≥ 24.15.0, or ≥ 26 — Angular CLI 22 refuses older runtimes outright.

@@ -1,14 +1,14 @@
 export const meta = {
   name: 'build-feature',
-  description: 'Spec to PR: branch, failing tests, implementation, verification, adversarial review, PR',
+  description: 'Spec to a staged tree: branch, failing tests, implementation, verification, adversarial review',
   whenToUse: 'Invoked by /build on a spec whose status is approved. Not for exploratory work - the spec is the contract.',
   phases: [
     { title: 'Branch', detail: 'ops cuts feat/<slug> from master before a single file is written', model: 'sonnet' },
     { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test (skippable)', model: 'sonnet' },
     { title: 'Implement', detail: 'implementer does the work; sonnet/high on tier 1, opus/xhigh on tier 2' },
     { title: 'Verify', detail: 'verifier runs scripts/verify.mjs; failures loop back to Implement', model: 'haiku' },
-    { title: 'Review', detail: 'ops commits the tree, reviewer diffs it against the spec (skippable)', model: 'opus' },
-    { title: 'Ship', detail: 'ops pushes, opens the PR and posts the minor findings on it', model: 'sonnet' },
+    { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'opus' },
+    { title: 'Stage', detail: 'ops flips the spec to done and leaves everything staged - the commit, push and PR are yours', model: 'sonnet' },
   ],
 }
 
@@ -94,13 +94,11 @@ const REVIEW = {
   required: ['findings', 'summary'],
 }
 
-const SHIP = {
+const STAGE = {
   type: 'object',
   properties: {
     branch: { type: 'string' },
-    commit: { type: 'string' },
-    prUrl: { type: 'string' },
-    ciStatus: { type: 'string' },
+    stagedFiles: { type: 'number' },
     notes: { type: 'array', items: { type: 'string' } },
   },
   required: ['branch'],
@@ -150,18 +148,19 @@ const verify = (label) =>
     VERIFY,
   )
 
-// One commit per run, amended on every re-freeze: the reviewer always diffs `master...HEAD`.
-const freeze = (label) =>
+// Nothing is ever committed by the pipeline: `git add -A` is the whole freeze, and the reviewer
+// diffs the index (`git diff --cached`), which - unlike a bare `git diff` - does show new files.
+const stage = (label) =>
   step(
     'ops',
     label,
     [
-      `Freeze the working tree for the spec at \`${spec}\` in one commit on its branch, so the reviewer can diff it.`,
-      'Read the spec frontmatter for `title` and `branch`. Confirm you are on that branch - never commit on master.',
-      '`git add -A`, then commit with the spec title as the subject. If your own freeze commit from this run is already HEAD, amend it instead of stacking a second commit.',
-      'Do not push. Do not open a PR. Report the commit sha.',
+      `Stage the working tree for the spec at \`${spec}\` so the reviewer sees the whole change.`,
+      'Read the spec frontmatter for `title` and `branch`. Confirm you are on that branch - never stage work on master.',
+      'Run `git add -A` and nothing else. No commit, no push, no PR - the user does all three by hand.',
+      'Report the branch and the number of staged files (`git diff --cached --name-only`).',
     ],
-    SHIP,
+    STAGE,
   )
 
 // ---------------------------------------------------------------- branch
@@ -291,21 +290,21 @@ for (let round = 0; ; round++) {
 
 if (skipped.has('review')) {
   phase('Review')
-  log('Review skipped by request - shipping on a green verify alone')
+  log('Review skipped by request - staging on a green verify alone')
 } else {
   for (let round = 0; ; round++) {
     phase('Review')
     if (broke()) return stop('review', { reason: 'budget' })
 
-    const frozen = await freeze(`commit the tree for review (round ${round + 1})`)
-    if (!frozen) return stop('review', { reason: 'ops could not commit the tree for review' })
+    const ready = await stage(`stage the tree for review (round ${round + 1})`)
+    if (!ready) return stop('review', { reason: 'ops could not stage the tree for review' })
 
     review = await step(
       'reviewer',
       `adversarial review (round ${round + 1})`,
       [
         `Review the change for the spec at \`${spec}\`.`,
-        `It is committed on \`${frozen.branch}\` - \`git diff master...HEAD\` is the diff under review. Also run \`git status --porcelain\`: anything still uncommitted belongs to this change too.`,
+        `It is staged - not committed - on \`${ready.branch}\`, so \`git diff --cached\` is the diff under review (it shows new files; a bare \`git diff\` does not). Also run \`git status --porcelain\`: anything still unstaged belongs to this change too.`,
         `tests claimed: ${JSON.stringify(tests.tests)}`,
         `implementer report: ${JSON.stringify(impl)}`,
         tests.tests.length ? null : 'This spec declared `skip: [tests]` - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
@@ -352,40 +351,39 @@ if (skipped.has('review')) {
   }
 }
 
-// ---------------------------------------------------------------- ship
+// ---------------------------------------------------------------- stage
 
-phase('Ship')
-if (broke()) return stop('ship', { reason: 'budget' })
+phase('Stage')
+if (broke()) return stop('stage', { reason: 'budget' })
 
 const minor = review ? review.findings.filter((f) => f.severity === 'minor') : []
 
-const ship = await step(
+const staged = await step(
   'ops',
-  'push, open the PR, post the minor findings',
+  'flip the spec to done and leave the tree staged',
   [
-    `Ship the work for the spec at \`${spec}\`. It is already committed on its branch.`,
-    'Read the spec frontmatter for `title` and `branch`. Check the commit subject matches the spec title and amend it if it does not; commit anything still unstaged into that same commit.',
-    'Push with -u, then open the PR to master. Do not merge.',
-    'Then set the spec frontmatter to `status: done`, append the PR URL under a `## Result` heading in the spec file, and land that edit as a second commit pushed to the same branch - the first commit is already pushed, so never amend it and never force-push.',
-    minor.length
-      ? `Finally post these minor review findings on the PR as one review with inline comments (GitHub MCP: create a pending review, add a comment per finding at its file and line, submit it as COMMENT - never as an approval or a change request). A finding with no file or line goes into the review body: ${JSON.stringify(minor)}`
-      : 'The review left no minor findings - post no review comments.',
+    `Finish the run for the spec at \`${spec}\`. Nothing is committed and nothing may be: the user commits, pushes and opens the PR by hand.`,
+    'Read the spec frontmatter for `title` and `branch`. Confirm you are on that branch.',
+    'Set the spec frontmatter to `status: done` and, under a `## Result` heading at the end of the spec (create it if missing), record that the change is staged on its branch and awaiting the user\'s own commit and PR.',
+    'Then run `git add -A`. No commit, no push, no `gh pr create`, no PR review comments - there is no PR yet.',
+    'Report the branch and the number of staged files.',
     `implementer report: ${JSON.stringify(impl)}`,
   ],
-  SHIP,
+  STAGE,
 )
 
-if (!ship) return stop('ship', { reason: 'ops returned no result' })
+if (!staged) return stop('stage', { reason: 'ops returned no result' })
 
-log(`PR: ${ship.prUrl || 'not reported - check the ops notes'}`)
+const branch = staged.branch || cut.branch
+log(`staged on ${branch} - ${staged.stagedFiles ?? '?'} file(s); commit, push and PR are yours`)
 
 return {
-  status: 'ready-for-merge',
-  pr: ship.prUrl || null,
-  branch: ship.branch || cut.branch,
-  ciStatus: ship.ciStatus || null,
+  status: 'staged',
+  branch,
+  stagedFiles: staged.stagedFiles ?? null,
+  nextSteps: [`git commit -m "<spec title>"`, `git push -u origin ${branch}`, `gh pr create --base master --head ${branch}`],
   review: review ? review.summary : 'review skipped',
-  minorFindings: minor.length,
+  minorFindings: minor,
   skipped: [...skipped],
   tests,
   impl,

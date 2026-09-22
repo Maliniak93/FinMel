@@ -21,6 +21,9 @@ The delegation message describes one chore, and for a build-run step carries `sp
 
 A `/build` run calls you three times, in this order. Do **only** the step you were asked for.
 
+**A build run never commits, pushes or opens a PR.** Those three are the user's, by hand, after the
+run reports. Your whole job in a build run is the branch and `git add -A`.
+
 ## 1. Branch step — before a single file is written
 
 1. `git status --porcelain` and `git rev-parse --abbrev-ref HEAD`.
@@ -33,37 +36,30 @@ A `/build` run calls you three times, in this order. Do **only** the step you we
    `origin/master`, branch from `origin/master` and say so in `notes`.
 5. Nothing else — no commit, no push, no PR.
 
-## 2. Freeze step — after a green verify, before the review
+## 2. Stage step — after a green verify, before the review
 
-1. Confirm you are on `feat/<slug>`. Never commit on `master`.
-2. `git add -A`, then commit with the spec `title` as the subject and this trailer:
-   `Co-Authored-By: Claude <noreply@anthropic.com>`.
-3. One commit per build run: if your own freeze commit from this run is already `HEAD`, amend it
-   instead of stacking a second one. Amending is safe here — nothing has been pushed yet.
-4. No push, no PR. Report the sha. This commit is what the reviewer diffs, which is the whole point
-   of the step: `git diff` alone never shows a brand-new file, and most of a new slice is new files.
+1. Confirm you are on `feat/<slug>`. Never stage work on `master`.
+2. `git add -A`. That is the entire step — **no commit**, no push, no PR.
+3. Report the branch and how many files are staged (`git diff --cached --name-only`).
 
-## 3. Ship step — push → PR → spec status → review comments
+The reviewer diffs `git diff --cached`, which is the whole point of the step: a bare `git diff` never
+shows a brand-new file, and most of a new slice is new files. The index shows them.
 
-1. Check the commit subject matches the spec `title`; amend it if not, and fold in anything left
-   unstaged.
-2. `git push -u origin feat/<slug>`.
-3. `gh pr create --base master --head feat/<slug> --title "<spec title>" --body "<3-6 lines: what
-   changed, why, how it was verified, plus the spec path>"`. If a PR for the branch already exists,
-   push and report its URL instead of creating a second one.
-4. Edit the spec file: set `status: done` in the frontmatter and append the PR URL under a `## Result`
-   heading at the end. Create that heading if it is missing. Land that edit as a **second** commit and
-   push it — the first commit is already pushed, so never amend it and never force-push.
-5. Minor review findings in the delegation message → post them on the PR as one review:
-   `pull_request_review_write` method `create` for a pending review, one
-   `add_comment_to_pending_review` per finding at its `file`/`line`, then method `submit_pending`
-   with event **`COMMENT`** — never `APPROVE`, never `REQUEST_CHANGES`. A finding with no file or
-   line goes into the review body. No findings → post nothing.
-6. Optionally `gh run list --branch feat/<slug> --limit 1` for `ciStatus`. Do not wait for CI, and
-   never re-run or cancel a workflow unless asked.
+## 3. Stage step (final) — spec status → `git add -A`
+
+1. Edit the spec file: set `status: done` in the frontmatter, and under a `## Result` heading at the
+   end (create it if missing) record that the change is staged on `feat/<slug>` and waiting for the
+   user's own commit and PR.
+2. `git add -A` so that edit is staged with everything else.
+3. Nothing else. There is no PR yet, so there is nowhere to post review comments — the minor findings
+   travel back in the workflow's report instead, and the user sees them there.
+4. Report the branch and the staged file count.
 
 ## Hard constraints
 
+- **In a build run: `git add` only.** No `git commit`, no `git push`, no `gh pr create` — even when
+  the work is finished and green. Only a chore the user asked for directly (`/ops <task>`) may commit
+  or push, and only what that task names.
 - **Never merge.** `gh pr merge` is the user's decision, always. Do not ask an agent for it either.
 - Never push to `master`, never force-push, never `git rebase -i`, never delete a remote branch that
   is not yours from this run.
@@ -95,12 +91,11 @@ otherwise make the JSON your entire final message, with nothing before or after 
 ```json
 {
   "branch": "feat/hygiene",
-  "commit": "a1b2c3d",
-  "prUrl": "https://github.com/<owner>/<repo>/pull/48",
-  "ciStatus": "queued",
-  "notes": ["spec status set to done; PR URL appended under ## Result"]
+  "stagedFiles": 14,
+  "notes": ["spec set to status: done; nothing committed - the tree is staged for the user"]
 }
 ```
 
-Omit `prUrl` / `ciStatus` when the chore had none, and say why in `notes`. If you stopped early, set
-`branch` to the branch you were on and put the reason first in `notes`.
+A chore outside a build run may also report `commit`, `prUrl` and `ciStatus`; a build run never does,
+because it produces none of them. If you stopped early, set `branch` to the branch you were on and put
+the reason first in `notes`.
