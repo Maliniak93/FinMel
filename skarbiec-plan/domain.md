@@ -76,14 +76,15 @@ erDiagram
 
 | Entity | Fields | Role |
 |---|---|---|
-| `Currency` | `Code (PK), Name, Symbol, DecimalPlaces, DisplayOrder` | **(target — spec-04, new)** no `FallbackRateToPln`, no `IsPivot` (PLN is the fixed base). Seed: PLN, EUR, USD, GBP, CHF |
+| `Currency` | `Code (PK), Name, Symbol, DecimalPlaces, DisplayOrder` | no `FallbackRateToPln`, no `IsPivot` (PLN is the fixed base). Seed: PLN, EUR, USD, GBP, CHF |
 | `Instrument` | `Id, Ticker, Name, Source, QuoteCurrency, AssetClass, VerificationStatus` | unchanged; `QuoteCurrency` is unconstrained (whatever the provider quotes) |
 | `PriceQuote` | `InstrumentId, Date, ClosePrice` — unique (instrument, date) | unchanged |
 | `FxRate` | `Pair (e.g. USDPLN), Date, Rate` — unique (pair, date) | unchanged |
-| `SyncRun` | + `Kind: Prices \| Fx \| Backfill` | **(target — spec-04)** one log shape for all three jobs |
-| `InstrumentUsage` | `InstrumentId (PK), AssetCount, FirstUsedAt` | **(target — spec-04, new)** built from the `AssetPositionChanged`/`AssetRemoved` consumer; `PriceSyncJob` syncs only `AssetCount > 0` |
+| `SyncRun` | + `Kind: Prices \| Fx \| Backfill` | one log shape for all three jobs |
+| `InstrumentUsage` | `InstrumentId (PK), AssetCount, FirstUsedAt` | derived from `AssetInstrumentLink`; `PriceSyncJob` syncs only `AssetCount > 0` |
+| `AssetInstrumentLink` | `AssetId (PK), InstrumentId?, Version, IsRemoved` | per-asset state from the `AssetPositionChanged`/`AssetRemoved` consumers — makes them idempotent and order-safe (version compare, terminal `IsRemoved` tombstone) |
 
-Jobs: `FxSyncJob` **(target — spec-04)** daily over every catalog currency, 12-month backfill on first run; `PriceSyncJob` today syncs every dictionary instrument, target-only instruments in use; `HistoryBackfillJob` today fires for a newly created custom instrument, target also fires from the `InstrumentUsage` consumer on first use of an existing one. All three respect `Testing:DisableBackgroundJobs`.
+Jobs: `FxSyncJob` daily over every catalog currency, 12-month backfill on a currency's first run; `PriceSyncJob` syncs only instruments in use; `HistoryBackfillJob` fires for a newly created custom instrument and from the `InstrumentUsage` consumer on an instrument's first use. All three write a `SyncRun` and respect `Testing:DisableBackgroundJobs`.
 
 ```mermaid
 erDiagram
@@ -91,7 +92,7 @@ erDiagram
     INSTRUMENT ||--o| INSTRUMENT_USAGE : "tracked by"
     CURRENCY ||--o{ FX_RATE : "quoted via pair"
     CURRENCY {
-        string code PK "target - spec-04"
+        string code PK
         string name
         string symbol
         int decimal_places
@@ -117,13 +118,13 @@ erDiagram
         numeric rate
     }
     INSTRUMENT_USAGE {
-        uuid instrument_id PK "target - spec-04"
+        uuid instrument_id PK
         int asset_count
         datetime first_used_at
     }
     SYNC_RUN {
         uuid id PK
-        string kind "Prices Fx Backfill; Kind field is target - spec-04"
+        string kind "Prices Fx Backfill"
         datetime started_at
         bool success
     }

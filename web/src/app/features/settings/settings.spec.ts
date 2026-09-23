@@ -15,13 +15,15 @@ const noRunYet: SyncStatusResponse = { hasRun: false };
 
 const completedRun: SyncStatusResponse = {
   hasRun: true,
-  runId: '11111111-1111-1111-1111-111111111111',
-  status: 1,
-  startedAt: '2026-08-10T18:30:00Z',
-  finishedAt: '2026-08-10T18:31:00Z',
-  syncedCount: 5,
-  noDataCount: 0,
-  failedCount: 0,
+  prices: {
+    runId: '11111111-1111-1111-1111-111111111111',
+    status: 1,
+    startedAt: '2026-08-10T18:30:00Z',
+    finishedAt: '2026-08-10T18:31:00Z',
+    syncedCount: 5,
+    noDataCount: 0,
+    failedCount: 0,
+  },
 };
 
 // The generated client calls `fetch(request)` with a single `Request` instance (see
@@ -79,6 +81,41 @@ describe('Settings', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Completed');
     expect(text).toContain('synced 5');
+  });
+
+  it('shows the last Prices run and the last FX run', async () => {
+    // spec-04 AC23 / design decision 14: SyncStatusResponse is reshaped (ADR-019, not kept
+    // compatible) into per-kind summaries — this literal only compiles once the generated client
+    // (web/api/marketdata) picks up the new `prices`/`fx`/`backfill` shape from `npm run gen:api`.
+    const pricesAndFxRun: SyncStatusResponse = {
+      hasRun: true,
+      prices: {
+        runId: '11111111-1111-1111-1111-111111111111',
+        status: 1,
+        startedAt: '2026-08-10T18:30:00Z',
+        finishedAt: '2026-08-10T18:31:00Z',
+        syncedCount: 5,
+        noDataCount: 0,
+        failedCount: 0,
+      },
+      fx: {
+        runId: '22222222-2222-2222-2222-222222222222',
+        status: 1,
+        startedAt: '2026-08-10T13:00:00Z',
+        finishedAt: '2026-08-10T13:00:30Z',
+        syncedCount: 4,
+        noDataCount: 0,
+        failedCount: 0,
+      },
+    };
+
+    await setup(jsonResponse(pricesAndFxRun));
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('Prices');
+    expect(text).toContain('FX');
+    expect(text).toContain('synced 5');
+    expect(text).toContain('synced 4');
   });
 
   it('reloads the status after a successful trigger', async () => {

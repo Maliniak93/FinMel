@@ -18,7 +18,7 @@ namespace Skarbiec.MarketData.Tests;
 /// Quartz enqueuing mechanics for backfill (T2.7 AC): triggering a backfill returns before the
 /// external source is ever called, and the scheduled job then fires on its own — no manual
 /// second trigger — landing the data. <see cref="HistoryBackfillJobTests"/> covers the job's own
-/// backfill logic (range, FX, idempotency) without any of this scheduling machinery, mirroring how
+/// backfill logic (range, idempotency) without any of this scheduling machinery, mirroring how
 /// <see cref="PriceSyncJobTests"/>/<see cref="PriceSyncSchedulingTests"/> split T2.6's tests.
 /// </summary>
 [Collection(TestingDefaults.CollectionName)]
@@ -55,7 +55,6 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
         var to = DateOnly.FromDateTime(DateTime.UtcNow);
         var from = to.AddDays(-365);
         var quotes = Enumerable.Range(0, 366).Select(offset => new InstrumentQuote(instrumentId, from.AddDays(offset), 100m)).ToList();
-        var fxRates = Enumerable.Range(0, 366).Select(offset => new FxRateQuote("USDPLN", from.AddDays(offset), 4m)).ToList();
         var priceSource = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         // Completion signal for the polling loop below: HistoryFetchCount only proves the fetch was
@@ -75,7 +74,6 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
         builder.Configuration["ConnectionStrings:marketdata-db"] = _containers.PostgresConnectionString;
         builder.Services.AddDbContext<MarketDataDbContext>(o => o.UseNpgsql(_containers.PostgresConnectionString));
         builder.Services.AddSingleton<IPriceSource>(priceSource);
-        builder.Services.AddSingleton<IFxRateSource>(new ScriptedFxRateSource(historyResult: PriceFetchResult<FxRateQuote>.Success(fxRates)));
         builder.Services.AddQuartz(q =>
         {
             q.SchedulerId = "AUTO"; // unique per instance — same reasoning as PriceSyncJobExtensions.
@@ -122,9 +120,6 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
             var storedQuotes = await db.PriceQuotes.Where(q => q.InstrumentId == instrumentId).ToListAsync(cancellationToken);
             Assert.Equal(quotes.Count, storedQuotes.Count);
             Assert.True(storedQuotes.Min(q => q.Date) <= from);
-
-            var storedFxRates = await db.FxRates.Where(r => r.Pair == "USDPLN").ToListAsync(cancellationToken);
-            Assert.Equal(fxRates.Count, storedFxRates.Count);
         }
         finally
         {

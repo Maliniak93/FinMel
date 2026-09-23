@@ -11,11 +11,12 @@ using Skarbiec.Testing.Containers;
 namespace Skarbiec.MarketData.Tests;
 
 /// <summary>
-/// HistoryBackfillJob's business logic (T2.7 AC: ≥1 year backfilled, FX backfilled alongside a
-/// non-PLN instrument, idempotent re-run) exercised via <see cref="HistoryBackfillJob.RunAsync"/>
-/// directly — no Quartz scheduler involved, mirroring <see cref="PriceSyncJobTests"/>. Enqueuing
-/// mechanics (returns before any fetch happens, a scheduled run actually lands the data) are covered
-/// separately in <see cref="HistoryBackfillSchedulingTests"/>.
+/// HistoryBackfillJob's business logic (T2.7 AC: ≥1 year backfilled, idempotent re-run; spec-04
+/// design decision 6: FX backfill moved out to <see cref="FxSyncJob"/> entirely, so this job no
+/// longer depends on <see cref="IFxRateSource"/> at all) exercised via
+/// <see cref="HistoryBackfillJob.RunAsync"/> directly — no Quartz scheduler involved, mirroring
+/// <see cref="PriceSyncJobTests"/>. Enqueuing mechanics are covered separately in
+/// <see cref="HistoryBackfillSchedulingTests"/>.
 /// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
@@ -23,8 +24,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
     private static readonly DateOnly OneYearAgo = Today.AddDays(-365);
 
+    /// <summary>spec-04 AC19: a USD (non-PLN) instrument's backfill still writes only its own quote
+    /// history — no <see cref="FxRate"/> row, which is now FxSyncJob's job alone (design decision 6).</summary>
     [Fact]
-    public async Task RunAsync_UsdInstrument_BackfillsOneYearOfQuotesAndItsFxPair()
+    public async Task RunAsync_UsdInstrument_BackfillsOneYearOfQuotes_AndWritesNoFxRates()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
@@ -34,25 +37,23 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         await db.SaveChangesAsync(cancellationToken);
 
         var quotes = OneYearOfDates().Select(d => new InstrumentQuote(instrument.Id, d, 100m)).ToList();
-        var fxRates = OneYearOfDates().Select(d => new FxRateQuote("USDPLN", d, 4m)).ToList();
-
         var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
-        var fxSource = new ScriptedFxRateSource(historyResult: PriceFetchResult<FxRateQuote>.Success(fxRates));
 
-        var job = new HistoryBackfillJob(db, [source], fxSource, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
 
         var storedQuotes = await db.PriceQuotes.Where(q => q.InstrumentId == instrument.Id).ToListAsync(cancellationToken);
         Assert.Equal(quotes.Count, storedQuotes.Count);
         Assert.True(storedQuotes.Min(q => q.Date) <= OneYearAgo);
 
-        var storedFxRates = await db.FxRates.Where(r => r.Pair == "USDPLN").ToListAsync(cancellationToken);
-        Assert.Equal(fxRates.Count, storedFxRates.Count);
-        Assert.True(storedFxRates.Min(r => r.Date) <= OneYearAgo);
+        Assert.Equal(0, await db.FxRates.CountAsync(cancellationToken));
     }
 
+    /// <summary>spec-04 AC19: every HistoryBackfillJob run — including a PLN instrument's, which never
+    /// needed FX in the first place — writes one <see cref="SyncRun"/> with <c>Kind = Backfill</c> so
+    /// all three jobs share one run log (design decision 7).</summary>
     [Fact]
-    public async Task RunAsync_PlnInstrument_DoesNotBackfillFx()
+    public async Task RunAsync_WritesSyncRunWithKindBackfill()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
@@ -63,16 +64,12 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
 
         var quotes = OneYearOfDates().Select(d => new InstrumentQuote(instrument.Id, d, 350m)).ToList();
         var source = new ScriptedPriceSource(PriceSource.Nbp, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
-        // No historyResult scripted: FetchHistoryAsync throws if called — proves a PLN instrument
-        // never triggers an FX backfill (there's nothing to convert).
-        var fxSource = new ScriptedFxRateSource();
 
-        var job = new HistoryBackfillJob(db, [source], fxSource, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
 
-        Assert.Equal(0, fxSource.HistoryFetchCount);
-        Assert.Equal(quotes.Count, await db.PriceQuotes.CountAsync(q => q.InstrumentId == instrument.Id, cancellationToken));
-        Assert.Equal(0, await db.FxRates.CountAsync(cancellationToken));
+        var run = await db.SyncRuns.SingleAsync(cancellationToken);
+        Assert.Equal(SyncRunKind.Backfill, run.Kind);
     }
 
     [Fact]
@@ -88,28 +85,20 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var dates = OneYearOfDates();
 
         var firstQuotes = dates.Select(d => new InstrumentQuote(instrument.Id, d, 100m)).ToList();
-        var firstFx = dates.Select(d => new FxRateQuote("USDPLN", d, 4m)).ToList();
         var firstSource = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(firstQuotes));
-        var firstFxSource = new ScriptedFxRateSource(historyResult: PriceFetchResult<FxRateQuote>.Success(firstFx));
-        var firstJob = new HistoryBackfillJob(db, [firstSource], firstFxSource, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var firstJob = new HistoryBackfillJob(db, [firstSource], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await firstJob.RunAsync(instrument.Id, cancellationToken);
 
         var secondQuotes = dates.Select(d => new InstrumentQuote(instrument.Id, d, 105m)).ToList();
-        var secondFx = dates.Select(d => new FxRateQuote("USDPLN", d, 4.10m)).ToList();
         var secondSource = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(secondQuotes));
-        var secondFxSource = new ScriptedFxRateSource(historyResult: PriceFetchResult<FxRateQuote>.Success(secondFx));
-        var secondJob = new HistoryBackfillJob(db, [secondSource], secondFxSource, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var secondJob = new HistoryBackfillJob(db, [secondSource], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await secondJob.RunAsync(instrument.Id, cancellationToken);
 
         Assert.Equal(dates.Count, await db.PriceQuotes.CountAsync(q => q.InstrumentId == instrument.Id, cancellationToken));
-        Assert.Equal(dates.Count, await db.FxRates.CountAsync(r => r.Pair == "USDPLN", cancellationToken));
 
         var latestDate = dates[^1];
         var latestQuote = await db.PriceQuotes.SingleAsync(q => q.InstrumentId == instrument.Id && q.Date == latestDate, cancellationToken);
         Assert.Equal(105m, latestQuote.Close);
-
-        var latestFx = await db.FxRates.SingleAsync(r => r.Pair == "USDPLN" && r.Date == latestDate, cancellationToken);
-        Assert.Equal(4.10m, latestFx.Rate);
     }
 
     private static List<DateOnly> OneYearOfDates() =>

@@ -20,11 +20,19 @@ public sealed class ScriptedPriceSource(
 
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
+    private readonly List<Guid> _latestFetchedInstrumentIds = [];
+
     public int HistoryFetchCount { get; private set; }
+
+    /// <summary>Every instrument id the caller passed to <see cref="FetchLatestAsync"/> — the scripted
+    /// result ignores them, so a "which instruments were asked for" assertion must read them from here.</summary>
+    public IReadOnlyList<Guid> LatestFetchedInstrumentIds => _latestFetchedInstrumentIds;
 
     public Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken)
     {
+        _latestFetchedInstrumentIds.AddRange(instruments.Select(i => i.Id));
+
         if (latestResult is null)
         {
             throw new NotSupportedException($"This {nameof(ScriptedPriceSource)} wasn't given a latestResult.");

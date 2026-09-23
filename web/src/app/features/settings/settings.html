@@ -1,7 +1,7 @@
 <h1>Settings</h1>
 
 <section class="settings-page__section">
-  <h2>Price sync</h2>
+  <h2>Market data sync</h2>
 
   <div class="settings-page__sync-row">
     <button
@@ -26,17 +26,30 @@
       @if (!status.hasRun) {
         <span class="settings-page__status-text">No sync has run yet.</span>
       } @else {
-        <mat-chip-set>
-          <mat-chip>{{ syncRunStatusLabel(status.status) }}</mat-chip>
-        </mat-chip-set>
-        <span class="settings-page__status-text">
-          Started {{ status.startedAt | date: 'medium' }}
-          @if (status.finishedAt) {
-            · finished {{ status.finishedAt | date: 'medium' }}
+        <div class="settings-page__runs">
+          @for (kind of runKinds; track kind.key) {
+            @let run = status[kind.key];
+
+            <div class="settings-page__run">
+              <span class="settings-page__run-label">{{ kind.label }}</span>
+              @if (run) {
+                <mat-chip-set>
+                  <mat-chip>{{ syncRunStatusLabel(run.status) }}</mat-chip>
+                </mat-chip-set>
+                <span class="settings-page__status-text">
+                  Started {{ run.startedAt | date: 'medium' }}
+                  @if (run.finishedAt) {
+                    · finished {{ run.finishedAt | date: 'medium' }}
+                  }
+                  · synced {{ run.syncedCount }}, no data {{ run.noDataCount }}, failed
+                  {{ run.failedCount }}
+                </span>
+              } @else {
+                <span class="settings-page__status-text">Not run yet.</span>
+              }
+            </div>
           }
-          · synced {{ status.syncedCount }}, no data {{ status.noDataCount }}, failed
-          {{ status.failedCount }}
-        </span>
+        </div>
       }
     }
   </div>

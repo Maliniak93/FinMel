@@ -9,6 +9,7 @@ using Skarbiec.MarketData.Features.GetLatestPricesBatch;
 using Skarbiec.MarketData.Features.GetSyncStatus;
 using Skarbiec.MarketData.Features.SearchInstruments;
 using Skarbiec.MarketData.Features.TriggerSync;
+using Skarbiec.MarketData.Messaging;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Nbp;
@@ -28,17 +29,24 @@ if (!OpenApiBuildTime.IsActive)
 {
     builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
 
-    // No consumers yet (T2.10) — MarketData only publishes DailyPricesSynced through the outbox;
-    // Reporting subscribes in T2.11.
-    builder.AddRabbitMqMessaging<WebApplicationBuilder, MarketDataDbContext>();
+    // Publishes DailyPricesSynced through the outbox (T2.10); consumes Portfolio's position events
+    // into the InstrumentUsage read model PriceSyncJob filters by (spec-04).
+    builder.AddRabbitMqMessaging<WebApplicationBuilder, MarketDataDbContext>(
+        configureConsumers: x =>
+        {
+            x.AddConsumer<AssetPositionChangedConsumer>(typeof(AssetPositionChangedConsumerDefinition));
+            x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedConsumerDefinition));
+        });
 
     builder.AddNbpSources();
     builder.AddStooqSource();
     builder.AddCoinGeckoSource();
     builder.AddPriceSyncJob();
+    builder.AddFxSyncJob(); // after AddPriceSyncJob — it reuses that call's scheduler (see FxSyncJobExtensions).
     builder.AddHistoryBackfillJob();
     builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
         .AddSource(PriceSyncJob.ActivitySourceName)
+        .AddSource(FxSyncJob.ActivitySourceName)
         .AddSource(HistoryBackfillJob.ActivitySourceName));
 }
 

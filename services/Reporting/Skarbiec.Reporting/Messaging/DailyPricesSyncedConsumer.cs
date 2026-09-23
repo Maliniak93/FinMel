@@ -16,6 +16,8 @@ namespace Skarbiec.Reporting.Messaging;
 /// needs every user's data, not one. Idempotent via the inbox template (T0.12, applied through
 /// <see cref="DailyPricesSyncedConsumerDefinition"/>) plus the upsert-by-(PortfolioId, Date) and
 /// -(AssetId, Date) unique indexes — a redelivery or a manual rerun overwrites the same rows.
+/// Both <see cref="PriceSyncKind"/> values recompute identically (spec-04 design decision 8): a
+/// same-day Prices run followed by an Fx run simply overwrites that day's rows with fresher inputs.
 /// </summary>
 /// <remarks>
 /// Isolation mirrors <c>PriceSyncJob</c> (same "one bad input doesn't stop the rest" philosophy):

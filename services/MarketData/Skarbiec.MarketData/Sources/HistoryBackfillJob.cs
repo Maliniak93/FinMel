@@ -7,24 +7,22 @@ namespace Skarbiec.MarketData.Sources;
 
 /// <summary>
 /// One-off backfill for a single instrument's price history (E4 [M]: min. 1 year back where the
-/// source allows) plus, when the instrument isn't PLN-quoted, the matching FX pair's history — a USD
-/// instrument needs a year of USD/PLN for its history chart to be honest (T2.7 scope). Enqueued by
-/// <see cref="IHistoryBackfillTrigger"/> when an instrument enters use; external APIs are still called
-/// only from a Quartz job (ADR-007), same as <see cref="PriceSyncJob"/> — this is its one-off,
-/// per-instrument counterpart. Chunking a long range is each <see cref="IPriceSource"/>/
-/// <see cref="IFxRateSource"/> implementation's own concern (T2.3-T2.5), not this job's.
+/// source allows). Enqueued by <see cref="IHistoryBackfillTrigger"/> when an instrument is created
+/// (T2.8) or enters use (spec-04); external APIs are still called only from a Quartz job (ADR-007),
+/// same as <see cref="PriceSyncJob"/> — this is its one-off, per-instrument counterpart. Chunking a
+/// long range is each <see cref="IPriceSource"/> implementation's own concern (T2.3-T2.5), not this
+/// job's. A currency's FX history is <see cref="FxSyncJob"/>'s job, not a per-instrument side effect
+/// (spec-04 design decision 6).
 /// </summary>
 /// <remarks>
-/// Nothing calls <see cref="IHistoryBackfillTrigger.EnqueueAsync"/> yet — the two real trigger points
-/// (a custom instrument's creation, T2.8; an instrument's first attach to an asset, T2.9) don't exist
-/// as request handlers until those tasks land. Wire the call in from there once they do, the same way
-/// T2.6 documented deferring its "in use" filter to T2.9.
+/// Writes one <see cref="SyncRun"/> (<see cref="SyncRunKind.Backfill"/>) per run so all three jobs
+/// share one run log, but publishes nothing: one instrument's history gives Reporting nothing new to
+/// recompute (spec-04 design decision 7).
 /// </remarks>
 [DisallowConcurrentExecution]
 public sealed class HistoryBackfillJob(
     MarketDataDbContext db,
     IEnumerable<IPriceSource> priceSources,
-    IFxRateSource fxRateSource,
     TimeProvider timeProvider,
     ILogger<HistoryBackfillJob> logger) : IJob
 {
@@ -33,7 +31,6 @@ public sealed class HistoryBackfillJob(
     /// <summary>Registered with OpenTelemetry tracing in Program.cs, same as <see cref="PriceSyncJob.ActivitySourceName"/>.</summary>
     public const string ActivitySourceName = "Skarbiec.MarketData.HistoryBackfillJob";
 
-    private const string BaseCurrency = "PLN"; // ADR-008
     private const int BackfillDays = 365; // E4 [M]: "min. 1 year back"
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
@@ -51,11 +48,22 @@ public sealed class HistoryBackfillJob(
         using var activity = ActivitySource.StartActivity("HistoryBackfillJob.Run");
         activity?.SetTag("skarbiec.instrument.id", instrumentId);
 
+        var run = new SyncRun
+        {
+            Id = Guid.NewGuid(),
+            Kind = SyncRunKind.Backfill,
+            StartedAt = timeProvider.GetUtcNow(),
+            Status = SyncRunStatus.Running,
+        };
+        db.SyncRuns.Add(run);
+        await db.SaveChangesAsync(cancellationToken);
+
         var instrument = await db.Instruments.AsNoTracking()
             .SingleOrDefaultAsync(i => i.Id == instrumentId, cancellationToken);
         if (instrument is null)
         {
             logger.LogWarning("HistoryBackfillJob: instrument {InstrumentId} not found; skipping.", instrumentId);
+            await FinishAsync(run, synced: 0, noData: 0, failed: 1, cancellationToken);
             return;
         }
 
@@ -68,20 +76,14 @@ public sealed class HistoryBackfillJob(
             logger.LogWarning(
                 "HistoryBackfillJob: no IPriceSource registered for {Source}; instrument {InstrumentId} not backfilled.",
                 instrument.Source, instrumentId);
+            await FinishAsync(run, synced: 0, noData: 0, failed: 1, cancellationToken);
             return;
         }
 
         var (outcome, quoteCount) = await BackfillInstrumentAsync(source, instrument, from, to, cancellationToken);
 
-        var fxCount = 0;
-        if (!string.Equals(instrument.QuoteCurrency, BaseCurrency, StringComparison.OrdinalIgnoreCase))
-        {
-            fxCount = await BackfillFxAsync(instrument.QuoteCurrency, from, to, cancellationToken);
-        }
-
         // Only a custom instrument (Features/AddCustomInstrument, T2.8) is ever Unverified going in —
-        // this is the one-off check that resolves it, based on its own ticker's fetch outcome alone
-        // (a currency's separate FX backfill failing doesn't say anything about the ticker's validity).
+        // this is the one-off check that resolves it, based on its own ticker's fetch outcome alone.
         if (instrument.VerificationStatus == InstrumentVerificationStatus.Unverified)
         {
             var verified = outcome == PriceFetchOutcome.Success && quoteCount > 0;
@@ -94,11 +96,24 @@ public sealed class HistoryBackfillJob(
                     cancellationToken);
         }
 
+        await FinishAsync(
+            run,
+            synced: outcome == PriceFetchOutcome.Success ? 1 : 0,
+            noData: outcome == PriceFetchOutcome.NoData ? 1 : 0,
+            failed: outcome == PriceFetchOutcome.Error ? 1 : 0,
+            cancellationToken);
+
+        activity?.SetTag("skarbiec.sync_run.id", run.Id);
         activity?.SetTag("skarbiec.backfill.quotes", quoteCount);
-        activity?.SetTag("skarbiec.backfill.fx_rates", fxCount);
         logger.LogInformation(
-            "HistoryBackfillJob: instrument {InstrumentId} backfilled {QuoteCount} quote(s), {FxCount} FX rate(s) for {From}..{To}.",
-            instrumentId, quoteCount, fxCount, from, to);
+            "HistoryBackfillJob: instrument {InstrumentId} backfilled {QuoteCount} quote(s) for {From}..{To}.",
+            instrumentId, quoteCount, from, to);
+    }
+
+    private async Task FinishAsync(SyncRun run, int synced, int noData, int failed, CancellationToken cancellationToken)
+    {
+        run.Finish(timeProvider.GetUtcNow(), synced, noData, failed);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<(PriceFetchOutcome Outcome, int Count)> BackfillInstrumentAsync(
@@ -123,27 +138,5 @@ public sealed class HistoryBackfillJob(
 
         await QuoteUpsert.UpsertInstrumentQuotesAsync(db, result.Values, cancellationToken);
         return (result.Outcome, result.Values.Count);
-    }
-
-    private async Task<int> BackfillFxAsync(
-        string currencyCode, DateOnly from, DateOnly to, CancellationToken cancellationToken)
-    {
-        var result = await SafeFetch.RunAsync(
-            () => fxRateSource.FetchHistoryAsync(currencyCode, from, to, cancellationToken),
-            ex => $"FX history fetch for {currencyCode} threw unexpectedly: {ex.Message}");
-
-        if (result.Outcome == PriceFetchOutcome.Error)
-        {
-            logger.LogWarning("HistoryBackfillJob: FX history fetch for {CurrencyCode} failed: {Reason}", currencyCode, result.ErrorReason);
-            return 0;
-        }
-
-        if (result.Outcome == PriceFetchOutcome.NoData)
-        {
-            return 0;
-        }
-
-        await QuoteUpsert.UpsertFxRatesAsync(db, result.Values, cancellationToken);
-        return result.Values.Count;
     }
 }

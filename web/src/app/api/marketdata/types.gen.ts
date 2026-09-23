@@ -84,15 +84,21 @@ export type PriceSource = number;
 
 export type SyncRunStatus = number;
 
+export type SyncRunSummary = {
+    runId: string;
+    status: SyncRunStatus;
+    startedAt: string;
+    finishedAt?: null | string;
+    syncedCount: number | string;
+    noDataCount: number | string;
+    failedCount: number | string;
+};
+
 export type SyncStatusResponse = {
     hasRun: boolean;
-    runId?: null | string;
-    status?: null | SyncRunStatus;
-    startedAt?: null | string;
-    finishedAt?: null | string;
-    syncedCount?: null | number | string;
-    noDataCount?: null | number | string;
-    failedCount?: null | number | string;
+    prices?: null | SyncRunSummary;
+    fx?: null | SyncRunSummary;
+    backfill?: null | SyncRunSummary;
 };
 
 export type GetApiMarketdataInstrumentsSearchData = {

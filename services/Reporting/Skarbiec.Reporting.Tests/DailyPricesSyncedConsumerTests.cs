@@ -298,6 +298,51 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
+    /// <summary>spec-04 AC21: an Fx-kind DailyPricesSynced recomputes exactly as a Prices-kind one
+    /// does (design decision 8) — both kinds trigger a snapshot recompute, never just one per day, and
+    /// the consumer's existing (PortfolioId, Date) upsert keeps a same-day Prices-then-Fx pair
+    /// idempotent regardless of which kind arrives second.</summary>
+    [Fact]
+    public async Task Consume_FxKind_RecomputesSnapshots()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 10);
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var seedProvider = BuildProvider(new FakePriceQuoteClient()))
+        {
+            await using var scope = seedProvider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "EUR", quantity: 100m);
+        }
+
+        var priceQuoteClient = new FakePriceQuoteClient()
+            .WithFxRate("EURPLN", new FxRateLookup(snapshotDate, 4.30m));
+
+        await RunConsumerAsync(priceQuoteClient, async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new DailyPricesSynced
+            {
+                RunId = Guid.NewGuid(),
+                SyncDate = snapshotDate,
+                SyncedCount = 1,
+                FailedCount = 0,
+                NoDataCount = 0,
+                Kind = PriceSyncKind.Fx,
+            }, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+
+            Assert.Equal(430m, snapshot.TotalPln); // 100 EUR x 4.30 EURPLN.
+        }, cancellationToken);
+    }
+
     private static async Task PublishSyncAsync(ServiceProvider provider, DateOnly snapshotDate, CancellationToken cancellationToken)
     {
         var bus = provider.GetRequiredService<IBus>();

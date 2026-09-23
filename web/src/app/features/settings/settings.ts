@@ -22,6 +22,13 @@ function syncRunStatusLabel(status: SyncRunStatus | null | undefined): string {
     : (SYNC_RUN_STATUS_LABELS[Number(status)] ?? 'Unknown');
 }
 
+// The response also carries `backfill` (one per-instrument history run) for shape uniformity, but
+// only the two daily jobs are shown here (spec-04 design decision 14).
+const RUN_KINDS = [
+  { key: 'prices', label: 'Prices' },
+  { key: 'fx', label: 'FX' },
+] as const;
+
 @Component({
   selector: 'app-settings',
   imports: [DatePipe, MatButtonModule, MatChipsModule, MatProgressSpinnerModule],
@@ -32,6 +39,7 @@ export class Settings {
   protected readonly triggering = signal(false);
   protected readonly triggerError = signal<string | null>(null);
   protected readonly syncRunStatusLabel = syncRunStatusLabel;
+  protected readonly runKinds = RUN_KINDS;
 
   protected readonly statusResource = resource({
     loader: async ({ abortSignal }) => {

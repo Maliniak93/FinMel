@@ -5,11 +5,19 @@ namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 /// <summary>FX counterpart to <see cref="ScriptedPriceSource"/> — see its doc comment.</summary>
 public sealed class ScriptedFxRateSource(
     PriceFetchResult<FxRateQuote>? latestResult = null,
-    PriceFetchResult<FxRateQuote>? historyResult = null) : IFxRateSource
+    PriceFetchResult<FxRateQuote>? historyResult = null,
+    IReadOnlyDictionary<string, PriceFetchResult<FxRateQuote>>? historyResultsByCode = null) : IFxRateSource
 {
+    private readonly List<HistoryFetch> _historyFetches = [];
+
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
-    public int HistoryFetchCount { get; private set; }
+    /// <summary>Every <see cref="FetchHistoryAsync"/> call with the arguments the caller actually passed —
+    /// the scripted result ignores them, so a range or per-currency assertion must read them from here
+    /// rather than from the canned data.</summary>
+    public IReadOnlyList<HistoryFetch> HistoryFetches => _historyFetches;
+
+    public int HistoryFetchCount => _historyFetches.Count;
 
     public Task<PriceFetchResult<FxRateQuote>> FetchLatestAsync(
         IReadOnlyCollection<string> currencyCodes, CancellationToken cancellationToken)
@@ -25,7 +33,15 @@ public sealed class ScriptedFxRateSource(
     public Task<PriceFetchResult<FxRateQuote>> FetchHistoryAsync(
         string currencyCode, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
-        HistoryFetchCount++;
+        _historyFetches.Add(new HistoryFetch(currencyCode, from, to));
+
+        // Per-currency override (FxSyncJobTests' backfill-isolation AC) takes priority over the
+        // single shared historyResult below, so one currency can be scripted to fail while every
+        // other currency in the same run still succeeds.
+        if (historyResultsByCode is not null && historyResultsByCode.TryGetValue(currencyCode, out var scripted))
+        {
+            return Task.FromResult(scripted);
+        }
 
         if (historyResult is null)
         {
@@ -34,4 +50,6 @@ public sealed class ScriptedFxRateSource(
 
         return Task.FromResult(historyResult);
     }
+
+    public sealed record HistoryFetch(string CurrencyCode, DateOnly From, DateOnly To);
 }

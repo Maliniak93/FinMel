@@ -4,17 +4,15 @@ using Skarbiec.Contracts;
 namespace Skarbiec.MarketData.Data;
 
 /// <summary>
-/// Starter dictionary (T2.1 scope) so the app has something to sync against day one. Illustrative
-/// placeholders, not the user's real holdings — replace/extend via instrument search (T2.8) once
-/// real holdings are known. Idempotent (checked against each entity's natural key), safe to call
-/// on every startup.
+/// Starter dictionary (T2.1 scope) so the app has something to sync against day one, plus the
+/// currency catalog <see cref="Sources.FxSyncJob"/> runs against (spec-04). The instruments are
+/// illustrative placeholders, not the user's real holdings — replace/extend via instrument search
+/// (T2.8) once real holdings are known. Writes no <see cref="FxRate"/>: FxSyncJob's first-run 12-month
+/// backfill gives every catalog currency its history. Idempotent (checked against each entity's
+/// natural key), safe to call on every startup.
 /// </summary>
 public static class MarketDataSeeder
 {
-    // Fixed in the past so PriceSyncJob's (T2.6) real daily rows never collide with this bootstrap
-    // row on the FxRate (Pair, Date) unique index.
-    private static readonly DateOnly BootstrapDate = new(2020, 1, 1);
-
     private static readonly (string Ticker, string Name, PriceSource Source, string QuoteCurrency, AssetClass AssetClass)[] SeedInstruments =
     [
         // NBP's cenyzlota endpoint (T2.3) prices 1 gram, not a troy ounce, despite the "XAU" ticker
@@ -26,13 +24,15 @@ public static class MarketDataSeeder
         ("ethereum", "Ethereum", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
     ];
 
-    // Bootstrap reference rates only — real rates arrive daily via PriceSyncJob (T2.6).
-    private static readonly (string Pair, decimal Rate)[] SeedFxRates =
+    // A superset of SupportedCurrencies.All (asserted by MarketDataSeederTests, not a constraint):
+    // GBP/CHF are synced even though no user can pick them yet.
+    private static readonly (string Code, string Name, string Symbol)[] SeedCurrencies =
     [
-        ("USDPLN", 3.65m),
-        ("EURPLN", 4.25m),
-        ("GBPPLN", 4.90m),
-        ("CHFPLN", 4.55m),
+        ("PLN", "Polish Zloty", "zł"),
+        ("EUR", "Euro", "€"),
+        ("USD", "US Dollar", "$"),
+        ("GBP", "British Pound", "£"),
+        ("CHF", "Swiss Franc", "CHF"),
     ];
 
     public static async Task SeedAsync(MarketDataDbContext db, CancellationToken cancellationToken = default)
@@ -57,21 +57,24 @@ public static class MarketDataSeeder
             }
         }
 
-        foreach (var seed in SeedFxRates)
-        {
-            var exists = await db.FxRates.AnyAsync(
-                r => r.Pair == seed.Pair && r.Date == BootstrapDate, cancellationToken);
+        var existingCodes = await db.Currencies.Select(c => c.Code).ToListAsync(cancellationToken);
 
-            if (!exists)
+        for (var displayOrder = 0; displayOrder < SeedCurrencies.Length; displayOrder++)
+        {
+            var seed = SeedCurrencies[displayOrder];
+            if (existingCodes.Contains(seed.Code))
             {
-                db.FxRates.Add(new FxRate
-                {
-                    Id = Guid.NewGuid(),
-                    Pair = seed.Pair,
-                    Date = BootstrapDate,
-                    Rate = seed.Rate,
-                });
+                continue;
             }
+
+            db.Currencies.Add(new Currency
+            {
+                Code = seed.Code,
+                Name = seed.Name,
+                Symbol = seed.Symbol,
+                DecimalPlaces = 2,
+                DisplayOrder = displayOrder,
+            });
         }
 
         await db.SaveChangesAsync(cancellationToken);

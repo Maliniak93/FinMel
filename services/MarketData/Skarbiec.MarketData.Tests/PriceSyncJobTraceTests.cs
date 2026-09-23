@@ -56,16 +56,14 @@ public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers)
             AssetClass = AssetClass.Stock,
         };
         db.Instruments.Add(instrument);
+        // spec-04: PriceSyncJob syncs only instruments in use.
+        db.InstrumentUsages.Add(new InstrumentUsage { InstrumentId = instrument.Id, AssetCount = 1, FirstUsedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync(cancellationToken);
 
         var source = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, new DateOnly(2026, 8, 6), 100m)]));
-        // M1.4: the FX branch always runs now (SupportedCurrencies.All), but this instrument is
-        // PLN-quoted, so an empty Success response is enough — this test only cares about trace
-        // propagation on the price-quote publish, not FX outcomes.
-        var fx = new ScriptedFxRateSource(PriceFetchResult<FxRateQuote>.Success([]));
 
-        var job = new PriceSyncJob(db, [source], fx, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await job.RunAsync(cancellationToken);
 
         var jobActivity = Assert.Single(activities, a => a.OperationName == "PriceSyncJob.Run");

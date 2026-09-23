@@ -100,4 +100,18 @@ internal static class MarketDataApi
         db.FxRates.Add(new FxRate { Id = Guid.NewGuid(), Pair = pair, Date = date, Rate = rate });
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>Seeds the spec-04 currency catalog (PLN + every FxSyncJob-covered non-PLN currency)
+    /// directly, without going through <c>MarketDataSeeder</c> — used by tests that need the catalog
+    /// present but don't care about the rest of the seeder's starter dictionary.</summary>
+    public static async Task SeedCurrencyCatalogAsync(this MarketDataDbContext db, CancellationToken cancellationToken)
+    {
+        db.Currencies.AddRange(
+            new Currency { Code = "PLN", Name = "Polish Zloty", Symbol = "zl", DecimalPlaces = 2, DisplayOrder = 0 },
+            new Currency { Code = "EUR", Name = "Euro", Symbol = "EUR", DecimalPlaces = 2, DisplayOrder = 1 },
+            new Currency { Code = "USD", Name = "US Dollar", Symbol = "$", DecimalPlaces = 2, DisplayOrder = 2 },
+            new Currency { Code = "GBP", Name = "British Pound", Symbol = "GBP", DecimalPlaces = 2, DisplayOrder = 3 },
+            new Currency { Code = "CHF", Name = "Swiss Franc", Symbol = "CHF", DecimalPlaces = 2, DisplayOrder = 4 });
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }

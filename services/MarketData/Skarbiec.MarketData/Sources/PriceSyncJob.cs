@@ -2,29 +2,27 @@ using System.Diagnostics;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
-using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
 
 /// <summary>
-/// Daily sync: FX rates + quotes for every instrument in the dictionary, isolating per-source
-/// failures so one bad vendor doesn't stop the rest (E4 [M], ADR-007). External APIs are called only
-/// from here — <see cref="IPriceSource"/>/<see cref="IFxRateSource"/> implementations never run in a
-/// request path (enforced by <c>ArchitectureTests.OnlySourcesNamespace_DependsOn_PriceSourceAbstractions</c>).
+/// Daily sync: quotes for every instrument in use, isolating per-source failures so one bad vendor
+/// doesn't stop the rest (E4 [M], ADR-007). External APIs are called only from here and the other
+/// Quartz jobs — <see cref="IPriceSource"/> implementations never run in a request path (enforced by
+/// <c>ArchitectureTests.OnlySourcesNamespace_DependsOn_PriceSourceAbstractions</c>). FX rates are
+/// <see cref="FxSyncJob"/>'s job, not this one's (spec-04 design decision 6).
 /// </summary>
 /// <remarks>
-/// "In use" (E4 AC: "only instruments attached to assets") isn't known here yet: every instrument in
-/// MarketData's own dictionary stands in for it. spec-04 replaces that with a locally-maintained
-/// usage set built from Portfolio's <c>AssetPositionChanged</c>/<c>AssetRemoved</c> events (spec-02),
-/// which <see cref="GetInstrumentsToSyncAsync"/> will then filter by — never a REST call back.
+/// "In use" (E4 AC: "only instruments attached to assets") is MarketData's own
+/// <see cref="InstrumentUsage"/> read model, built from Portfolio's <c>AssetPositionChanged</c>/
+/// <c>AssetRemoved</c> events (spec-04) — never a REST call back to Portfolio.
 /// </remarks>
 [DisallowConcurrentExecution]
 public sealed class PriceSyncJob(
     MarketDataDbContext db,
     IEnumerable<IPriceSource> priceSources,
-    IFxRateSource fxRateSource,
     IPublishEndpoint publishEndpoint,
     TimeProvider timeProvider,
     ILogger<PriceSyncJob> logger) : IJob
@@ -34,8 +32,6 @@ public sealed class PriceSyncJob(
     /// <summary>Registered with OpenTelemetry tracing in Program.cs — ServiceDefaults only adds the
     /// app's own ApplicationName-named source plus MassTransit's, not this one.</summary>
     public const string ActivitySourceName = "Skarbiec.MarketData.PriceSyncJob";
-
-    private const string BaseCurrency = "PLN"; // ADR-008
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
@@ -50,13 +46,14 @@ public sealed class PriceSyncJob(
         var run = new SyncRun
         {
             Id = Guid.NewGuid(),
+            Kind = SyncRunKind.Prices,
             StartedAt = timeProvider.GetUtcNow(),
             Status = SyncRunStatus.Running,
         };
         db.SyncRuns.Add(run);
         await db.SaveChangesAsync(cancellationToken);
 
-        var instruments = await GetInstrumentsToSyncAsync(cancellationToken);
+        var (instruments, skipped) = await GetInstrumentsToSyncAsync(cancellationToken);
         var sourcesByType = priceSources.ToDictionary(s => s.Source);
 
         var synced = 0;
@@ -102,66 +99,7 @@ public sealed class PriceSyncJob(
             }
         }
 
-        // M1.4: union with every user-selectable currency (Skarbiec.Contracts.SupportedCurrencies),
-        // not just the currencies today's instruments happen to quote in. Before this, a currency
-        // with no instrument behind it (EUR: nothing quotes in it; the seeded USD coverage was
-        // incidental to three instruments) never got a daily rate at all — a currency-valued asset
-        // (M1.4's third valuation mode) in that currency would value off MarketDataSeeder's 2020
-        // bootstrap rate forever, flagged stale but never corrected. NBP table A returns every
-        // published currency in one call regardless of what's asked for (NbpFxRateSource's own doc
-        // comment), so this costs no extra HTTP request — it only changes which rows land.
-        var instrumentCurrencies = new HashSet<string>(
-            instruments.Select(i => i.QuoteCurrency).Where(c => !string.Equals(c, BaseCurrency, StringComparison.OrdinalIgnoreCase)),
-            StringComparer.OrdinalIgnoreCase);
-
-        var currencies = instrumentCurrencies
-            .Concat(SupportedCurrencies.All)
-            .Where(c => !string.Equals(c, BaseCurrency, StringComparison.OrdinalIgnoreCase))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        // currencies is never empty now (SupportedCurrencies.All always has EUR/USD beyond PLN), so
-        // the FX branch always runs — it's no longer conditional on instrument coverage.
-        var fxResult = await SafeFetch.RunAsync(
-            () => fxRateSource.FetchLatestAsync(currencies, cancellationToken),
-            ex => $"FX fetch threw unexpectedly: {ex.Message}");
-
-        switch (fxResult.Outcome)
-        {
-            case PriceFetchOutcome.Success:
-                var syncedPairs = await QuoteUpsert.UpsertFxRatesAsync(db, fxResult.Values, cancellationToken);
-                var syncedCurrencies = currencies.Count(c => syncedPairs.Contains(c.ToUpperInvariant() + BaseCurrency));
-                synced += syncedCurrencies;
-
-                // FailedCount decision (M1.4): a supported-set currency nobody currently holds an
-                // instrument in (e.g. EUR before any EUR instrument/asset exists) doesn't count as a
-                // failure just because NBP's response didn't happen to include it — MarketData can't
-                // see Portfolio's assets (ADR-003, no cross-DB joins) to know if it's actually "in
-                // use" beyond instrument coverage, and failing closed on a currency nobody's
-                // valuation depends on today is noise that would make a routine run look Partial. A
-                // currency an instrument actually quotes in still counts exactly as before — that one
-                // *is* a real signal something's wrong.
-                var missingInstrumentBacked = currencies
-                    .Where(c => !syncedPairs.Contains(c.ToUpperInvariant() + BaseCurrency))
-                    .Count(instrumentCurrencies.Contains);
-                failed += missingInstrumentBacked;
-                break;
-            case PriceFetchOutcome.NoData:
-                noData += currencies.Count;
-                break;
-            case PriceFetchOutcome.Error:
-                logger.LogWarning("PriceSyncJob: FX fetch failed: {Reason}", fxResult.ErrorReason);
-                // Same instrument-backed scoping as the Success branch above — a total FX outage is
-                // still only a *failure* for currencies something actually depends on today.
-                failed += currencies.Count(instrumentCurrencies.Contains);
-                break;
-        }
-
-        run.FinishedAt = timeProvider.GetUtcNow();
-        run.SyncedCount = synced;
-        run.NoDataCount = noData;
-        run.FailedCount = failed;
-        run.Status = DetermineStatus(synced, noData, failed);
+        run.Finish(timeProvider.GetUtcNow(), synced, noData, failed);
 
         // Partial runs still publish (T2.10 scope): Reporting's snapshots fall back to last-known
         // prices anyway (domain valuation algorithm), so a partially-failed run is still useful
@@ -178,6 +116,7 @@ public sealed class PriceSyncJob(
                 SyncedCount = synced,
                 FailedCount = failed,
                 NoDataCount = noData,
+                Kind = PriceSyncKind.Prices,
             }, cancellationToken);
         }
 
@@ -188,19 +127,27 @@ public sealed class PriceSyncJob(
         activity?.SetTag("skarbiec.sync_run.synced", synced);
         activity?.SetTag("skarbiec.sync_run.no_data", noData);
         activity?.SetTag("skarbiec.sync_run.failed", failed);
+        activity?.SetTag("skarbiec.sync_run.skipped", skipped);
 
+        // Skipped is logged, not stored: the SyncRun counters keep meaning "attempted" (spec-04
+        // design decision 13).
         logger.LogInformation(
-            "PriceSyncJob run {RunId} finished: {Status} (synced={Synced}, noData={NoData}, failed={Failed}).",
-            run.Id, run.Status, synced, noData, failed);
+            "PriceSyncJob run {RunId} finished: {Status} (synced={Synced}, noData={NoData}, failed={Failed}, skipped={Skipped}).",
+            run.Id, run.Status, synced, noData, failed, skipped);
     }
 
-    private static SyncRunStatus DetermineStatus(int synced, int noData, int failed) => failed switch
+    /// <summary>Only instruments some live asset points at (<see cref="InstrumentUsage.AssetCount"/>
+    /// &gt; 0). No exception for <c>Unverified</c> instruments: <see cref="HistoryBackfillJob"/> resolves
+    /// those on creation and on first use, so nothing waits on this daily job for them.</summary>
+    private async Task<(List<Instrument> Selected, int Skipped)> GetInstrumentsToSyncAsync(CancellationToken cancellationToken)
     {
-        0 => SyncRunStatus.Completed,
-        _ when synced > 0 || noData > 0 => SyncRunStatus.Partial,
-        _ => SyncRunStatus.Failed,
-    };
+        var selected = await db.Instruments
+            .AsNoTracking()
+            .Where(i => db.InstrumentUsages.Any(u => u.InstrumentId == i.Id && u.AssetCount > 0))
+            .ToListAsync(cancellationToken);
 
-    private Task<List<Instrument>> GetInstrumentsToSyncAsync(CancellationToken cancellationToken) =>
-        db.Instruments.AsNoTracking().ToListAsync(cancellationToken);
+        var total = await db.Instruments.CountAsync(cancellationToken);
+
+        return (selected, total - selected.Count);
+    }
 }

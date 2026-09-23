@@ -136,7 +136,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Decision:** gRPC is withdrawn from the plan entirely — no route in the redesigned architecture uses it. A Reporting→MarketData `latest-batch` gRPC exercise remains a candidate in `ideas.md`, not a commitment.
 **Consequences:** one less protocol/toolchain to stand up (proto codegen, HTTP/2 wiring, Aspire/compose config) for a service count that no longer needs it. Part of ADR-015.
 
-## ADR-023 🕐 Currency catalog in MarketData + separate FxSyncJob, backfill instead of fallback
+## ADR-023 ✅ Currency catalog in MarketData + separate FxSyncJob, backfill instead of fallback
+
+**Shipped:** 2026-09-22 (spec-04).
 
 **Context:** worktree branch `worktree-marketdata-currency-redesign` prototyped a `Currency` catalog with a `FallbackRateToPln` field for currencies missing a fresh rate. Separately, the M1 modification set (`praca_2026-08-12`) solved the same underlying problem differently: `PriceSyncJob` syncs an FX rate for every `SupportedCurrencies` code, so a currency-valued asset's rate is never stuck on the seeder's 2020 bootstrap row. A fallback rate would be a second, weaker source of truth for a fact a proper backfill already fixes.
 **Decision:** a `Currency` catalog lives in MarketData (`Code, Name, Symbol, DecimalPlaces, DisplayOrder`; seed PLN, EUR, USD, GBP, CHF) with no `FallbackRateToPln` and no `IsPivot` — PLN is the fixed base (ADR-008). A dedicated `FxSyncJob` runs daily for every catalog currency; its first run backfills 12 months of history. This absorbs the worktree branch's intent without its fallback-rate design.

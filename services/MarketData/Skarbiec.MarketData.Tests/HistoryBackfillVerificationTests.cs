@@ -34,9 +34,8 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
 
         var quotes = new[] { new InstrumentQuote(instrument.Id, Today, 420m) };
         var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
-        var fxSource = new ScriptedFxRateSource(historyResult: PriceFetchResult<FxRateQuote>.Success([new FxRateQuote("USDPLN", Today, 4m)]));
 
-        var job = new HistoryBackfillJob(db, [source], fxSource, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
@@ -49,9 +48,8 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        // PLN-quoted so the job never needs to backfill FX alongside it (see RunAsync_PlnInstrument_
-        // DoesNotBackfillFx in HistoryBackfillJobTests) — keeps this test scoped to the instrument's
-        // own fetch outcome, without also having to script an FX source it doesn't care about.
+        // spec-04 design decision 6: HistoryBackfillJob no longer touches FX at all — a PLN or a
+        // non-PLN instrument's backfill both only ever depend on the instrument's own fetch outcome.
         var instrument = NewUnverifiedInstrument("BOGUS.PL", PriceSource.Stooq, "PLN");
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
@@ -59,7 +57,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var source = new ScriptedPriceSource(
             PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Error("malformed Stooq history payload: unrecognized header"));
 
-        var job = new HistoryBackfillJob(db, [source], new ScriptedFxRateSource(), TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken); // must not throw — same "no 500" contract as the request path.
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
@@ -78,7 +76,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
 
         var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.NoData());
 
-        var job = new HistoryBackfillJob(db, [source], new ScriptedFxRateSource(), TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
@@ -109,7 +107,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
 
         var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Error("transient failure"));
 
-        var job = new HistoryBackfillJob(db, [source], new ScriptedFxRateSource(), TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
