@@ -7,11 +7,33 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Skarbiec.Portfolio.Migrations;
 
 /// <inheritdoc />
-public partial class AddMassTransitOutbox : Migration
+public partial class InitialCreate : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
     {
+        migrationBuilder.CreateTable(
+            name: "Assets",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                PortfolioId = table.Column<Guid>(type: "uuid", nullable: false),
+                AssetClass = table.Column<int>(type: "integer", nullable: false),
+                Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
+                Quantity = table.Column<decimal>(type: "numeric(18,8)", precision: 18, scale: 8, nullable: false),
+                ValuationMode = table.Column<int>(type: "integer", nullable: false),
+                ManualValueAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: true),
+                ManualValueDate = table.Column<DateOnly>(type: "date", nullable: true),
+                InstrumentId = table.Column<Guid>(type: "uuid", nullable: true),
+                Version = table.Column<long>(type: "bigint", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_Assets", x => x.Id);
+            });
+
         migrationBuilder.CreateTable(
             name: "PortfolioInboxState",
             columns: table => new
@@ -49,6 +71,40 @@ public partial class AddMassTransitOutbox : Migration
             constraints: table =>
             {
                 table.PrimaryKey("PK_PortfolioOutboxState", x => x.OutboxId);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "Portfolios",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                Currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
+                IsArchived = table.Column<bool>(type: "boolean", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_Portfolios", x => x.Id);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "Transactions",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                AssetId = table.Column<Guid>(type: "uuid", nullable: false),
+                Type = table.Column<int>(type: "integer", nullable: false),
+                Quantity = table.Column<decimal>(type: "numeric(18,8)", precision: 18, scale: 8, nullable: false),
+                UnitPriceAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                FeeAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                Date = table.Column<DateOnly>(type: "date", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_Transactions", x => x.Id);
             });
 
         migrationBuilder.CreateTable(
@@ -94,6 +150,16 @@ public partial class AddMassTransitOutbox : Migration
             });
 
         migrationBuilder.CreateIndex(
+            name: "IX_Assets_InstrumentId",
+            table: "Assets",
+            column: "InstrumentId");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_Assets_PortfolioId",
+            table: "Assets",
+            column: "PortfolioId");
+
+        migrationBuilder.CreateIndex(
             name: "IX_PortfolioInboxState_Delivered",
             table: "PortfolioInboxState",
             column: "Delivered");
@@ -124,13 +190,33 @@ public partial class AddMassTransitOutbox : Migration
             name: "IX_PortfolioOutboxState_Created",
             table: "PortfolioOutboxState",
             column: "Created");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_Portfolios_UserId_Name",
+            table: "Portfolios",
+            columns: new[] { "UserId", "Name" },
+            unique: true);
+
+        migrationBuilder.CreateIndex(
+            name: "IX_Transactions_AssetId",
+            table: "Transactions",
+            column: "AssetId");
     }
 
     /// <inheritdoc />
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.DropTable(
+            name: "Assets");
+
+        migrationBuilder.DropTable(
             name: "PortfolioOutboxMessage");
+
+        migrationBuilder.DropTable(
+            name: "Portfolios");
+
+        migrationBuilder.DropTable(
+            name: "Transactions");
 
         migrationBuilder.DropTable(
             name: "PortfolioInboxState");

@@ -12,8 +12,8 @@ using Skarbiec.Reporting.Data;
 namespace Skarbiec.Reporting.Migrations
 {
     [DbContext(typeof(ReportingDbContext))]
-    [Migration("20260922123335_PositionsAndAssetValuations")]
-    partial class PositionsAndAssetValuations
+    [Migration("20260923133222_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

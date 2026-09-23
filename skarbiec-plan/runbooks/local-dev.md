@@ -39,6 +39,8 @@ docker volume rm skarbiec.apphost-<hash>-postgres-data skarbiec.apphost-<hash>-r
 
 Aspire recreates both volumes — and, for Postgres, every per-service database and role — on the next `dotnet run --project Skarbiec.AppHost`. Safe at any time while the project stays local-only: there is no real data to lose.
 
+Squashing a service's migration history to a single `InitialCreate` (spec-06, ADR-019) is exactly this "destructive or squashed EF migration" case — drop the volumes above before the next Aspire run so every service migrates cleanly against a fresh, empty database.
+
 ## Manual sync trigger
 
 The Settings page (`web/src/app/features/settings/`) has a button that triggers MarketData's sync jobs on demand, instead of waiting for the daily schedule.

@@ -12,15 +12,15 @@ using Skarbiec.Portfolio.Data;
 namespace Skarbiec.Portfolio.Migrations
 {
     [DbContext(typeof(PortfolioDbContext))]
-    [Migration("20260812075640_CurrencyValuedAssets")]
-    partial class CurrencyValuedAssets
+    [Migration("20260923133207_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -229,16 +229,16 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasPrecision(18, 8)
                         .HasColumnType("numeric(18,8)");
 
-                    b.Property<int>("TransactionCount")
-                        .HasColumnType("integer");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("ValuationMode")
                         .HasColumnType("integer");
 
-                    b.Property<uint>("Version")
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<uint>("Xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
@@ -258,9 +258,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<int>("AssetCount")
-                        .HasColumnType("integer");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -320,7 +317,7 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
-                    b.Property<uint>("Version")
+                    b.Property<uint>("Xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
