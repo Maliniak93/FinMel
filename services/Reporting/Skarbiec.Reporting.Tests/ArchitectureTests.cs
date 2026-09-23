@@ -10,6 +10,17 @@ namespace Skarbiec.Reporting.Tests;
 public sealed class ArchitectureTests
 {
     /// <summary>
+    /// spec-07 design decision 4: the last known prices and FX rates are global reference data, not
+    /// user data — no <c>UserId</c>, no query filter (ADR-006 covers user-owned entities only). Listed
+    /// by type so any other entity added to the namespace is still forced to be tenant-scoped.
+    /// </summary>
+    private static readonly HashSet<Type> GlobalReferenceData =
+    [
+        typeof(Skarbiec.Reporting.Data.LatestInstrumentPrice),
+        typeof(Skarbiec.Reporting.Data.LatestFxRate),
+    ];
+
+    /// <summary>
     /// Decision: every class in <c>Skarbiec.Reporting.Data</c> other than the DbContext and its
     /// design-time factory is a domain entity and must implement <see cref="IUserOwned"/> —
     /// Reporting is one of the three tenancy-filtered services (ADR-006, T0.13). No entities exist
@@ -26,7 +37,8 @@ public sealed class ArchitectureTests
             .Where(t => t.IsClass
                 && !t.IsAbstract
                 && !t.Name.EndsWith("DbContext", StringComparison.Ordinal)
-                && !t.Name.EndsWith("DbContextFactory", StringComparison.Ordinal))
+                && !t.Name.EndsWith("DbContextFactory", StringComparison.Ordinal)
+                && !GlobalReferenceData.Contains(t))
             .ToList();
 
         Assert.All(entityTypes, t => Assert.True(

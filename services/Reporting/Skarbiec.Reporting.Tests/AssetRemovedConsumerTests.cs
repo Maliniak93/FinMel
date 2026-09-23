@@ -1,39 +1,31 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.ServiceDefaults.Tenancy;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
 /// <summary>
 /// <c>AssetRemoved</c> in, <see cref="Position"/> gone but its historical
 /// <see cref="AssetValuation"/> lines kept — spec-03 AC5, design decision 2 ("AssetRemoved keeps the
-/// lines": deleting an asset must not silently change what last month's net worth was). Builds its
-/// own provider on a queue name unique to this test class, mirroring
-/// <c>AssetPositionChangedConsumerTests</c>.
+/// lines": deleting an asset must not silently change what last month's net worth was). Since
+/// spec-07 (AC8) only today's line of the removed asset goes, and today's snapshot of its portfolio
+/// is recomputed from what is left. Builds its own provider on a queue name unique to this test class.
 /// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
     private const string QueueName = "asset-removed-consumer-test";
 
-    public async ValueTask InitializeAsync()
-    {
-        await using var provider = BuildProvider();
-        await using var scope = provider.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<ReportingDbContext>().Database.MigrateAsync();
-
-        await containers.ResetDatabaseAsync();
-    }
+    public async ValueTask InitializeAsync() => await MigrateAndResetAsync(containers);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -46,11 +38,8 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         var userId = Guid.NewGuid();
         var valuationDate = new DateOnly(2026, 8, 1);
 
-        await using (var seedProvider = BuildProvider())
+        await using (var db = OpenDbContext(containers))
         {
-            await using var scope = seedProvider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-
             await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken);
             await db.SeedValuationLineAsync(userId, portfolioId, assetId, valuationDate, 1_000m, cancellationToken);
         }
@@ -58,13 +47,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(new AssetRemoved
-            {
-                AssetId = assetId,
-                PortfolioId = portfolioId,
-                UserId = userId,
-                OccurredAtUtc = DateTimeOffset.UtcNow,
-            }, cancellationToken);
+            await bus.Publish(Removed(assetId, portfolioId, userId), cancellationToken);
 
             await WaitForPositionGoneAsync(provider, assetId, cancellationToken);
 
@@ -78,77 +61,100 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         }, cancellationToken);
     }
 
-    private async Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken)
+    /// <summary>spec-07 AC8: the removed asset's line for today goes, the snapshot equals what remains, and earlier history is untouched.</summary>
+    [Fact]
+    public async Task Consume_RemovesTodaysLineAndRecomputesSnapshot()
     {
-        await using var provider = BuildProvider();
-        var hostedServices = provider.GetServices<IHostedService>().ToList();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var yesterday = today.AddDays(-1);
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var removedAssetId = Guid.NewGuid();
+        var keptAssetId = Guid.NewGuid();
 
-        foreach (var hostedService in hostedServices)
+        await using (var db = OpenDbContext(containers))
         {
-            await hostedService.StartAsync(cancellationToken);
+            await db.SeedPositionAsync(removedAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedPositionAsync(keptAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 2_000m);
+
+            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, yesterday, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, portfolioId, keptAssetId, today, 2_000m, cancellationToken, quantity: 2_000m);
+            await db.SeedSnapshotAsync(userId, portfolioId, today, 3_000m, cancellationToken);
         }
 
-        try
+        await RunConsumerAsync(async provider =>
         {
-            // See AssetPositionChangedConsumerTests: a publish fired immediately after StartAsync can
-            // race the exchange->queue binding on a fresh queue and be dropped.
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(Removed(removedAssetId, portfolioId, userId), cancellationToken);
 
-            await action(provider);
-        }
-        finally
-        {
-            for (var i = hostedServices.Count - 1; i >= 0; i--)
-            {
-                await hostedServices[i].StopAsync(cancellationToken);
-            }
-        }
+            await WaitForPositionGoneAsync(provider, removedAssetId, cancellationToken);
+
+            var snapshot = await GetSnapshotAsync(containers, portfolioId, today, cancellationToken);
+            Assert.NotNull(snapshot);
+            Assert.Equal(2_000m, snapshot.TotalPln);
+            Assert.Equal(userId, snapshot.UserId);
+
+            var todaysLine = Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
+            Assert.Equal(keptAssetId, todaysLine.AssetId);
+            Assert.Equal(2_000m, todaysLine.ValuePln);
+
+            var yesterdaysLine = Assert.Single(await GetLinesAsync(containers, portfolioId, yesterday, cancellationToken));
+            Assert.Equal(removedAssetId, yesterdaysLine.AssetId);
+        }, cancellationToken);
     }
 
-    private static async Task WaitForPositionGoneAsync(ServiceProvider provider, Guid assetId, CancellationToken cancellationToken)
+    /// <summary>spec-07 AC8: removing the only asset leaves today's snapshot at zero rather than the stale pre-removal value.</summary>
+    [Fact]
+    public async Task Consume_LastAsset_SetsTodaysSnapshotToZero()
     {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
-        while (DateTimeOffset.UtcNow < deadline)
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
         {
-            await using var scope = provider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-            var stillExists = await db.Positions.IgnoreQueryFilters().AnyAsync(p => p.AssetId == assetId, cancellationToken);
-
-            if (!stillExists)
-            {
-                return;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedSnapshotAsync(userId, portfolioId, today, 1_000m, cancellationToken);
         }
 
-        throw new TimeoutException($"Position for asset {assetId} was not deleted within the deadline.");
-    }
-
-    private ServiceProvider BuildProvider()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<ICurrentUser, DesignTimeCurrentUser>();
-
-        services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
-
-        services.AddMassTransit(x =>
+        await RunConsumerAsync(async provider =>
         {
-            x.SetKebabCaseEndpointNameFormatter();
-            x.AddEntityFrameworkOutbox<ReportingDbContext>(o => o.UsePostgres());
-            x.AddConsumer<AssetRemovedConsumer>(typeof(TestConsumerDefinition));
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(Removed(assetId, portfolioId, userId), cancellationToken);
 
-            x.UsingRabbitMq((context, cfg) =>
-            {
-                cfg.Host(new Uri(containers.RabbitMqConnectionString));
+            await WaitForPositionGoneAsync(provider, assetId, cancellationToken);
 
-                cfg.ConfigureEndpoints(context);
-            });
-        });
+            var snapshot = await GetSnapshotAsync(containers, portfolioId, today, cancellationToken);
+            Assert.NotNull(snapshot);
+            Assert.Equal(0m, snapshot.TotalPln);
+            Assert.Equal(userId, snapshot.UserId);
 
-        return services.BuildServiceProvider();
+            Assert.Empty(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
+        }, cancellationToken);
     }
+
+    private static AssetRemoved Removed(Guid assetId, Guid portfolioId, Guid userId) => new()
+    {
+        AssetId = assetId,
+        PortfolioId = portfolioId,
+        UserId = userId,
+        OccurredAtUtc = DateTimeOffset.UtcNow,
+    };
+
+    private Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
+        RunAsync(
+            containers,
+            x => x.AddConsumer<AssetRemovedConsumer>(typeof(TestConsumerDefinition)),
+            action,
+            cancellationToken);
 
     private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<AssetRemovedConsumer, ReportingDbContext>
     {
