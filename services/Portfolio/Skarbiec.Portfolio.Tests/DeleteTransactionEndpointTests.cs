@@ -53,23 +53,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Delete_LastTransaction_UnblocksAssetRemoval()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-        var buyId = await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
-        // RemoveAsset (T1.2) 409s while TransactionCount > 0 — proves DeleteTransaction decrements it.
-        var blockedRemoval = await client.DeleteAsync(AssetUri(portfolioId, assetId), cancellationToken);
-        Assert.Equal(HttpStatusCode.Conflict, blockedRemoval.StatusCode);
-
-        await client.DeleteAsync(TransactionUri(portfolioId, assetId, buyId), cancellationToken);
-        var removal = await client.DeleteAsync(AssetUri(portfolioId, assetId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NoContent, removal.StatusCode);
-    }
-
-    [Fact]
     public async Task Delete_ForNonExistentTransaction_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

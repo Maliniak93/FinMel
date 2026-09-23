@@ -141,12 +141,61 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         }, cancellationToken);
     }
 
-    private static AssetRemoved Removed(Guid assetId, Guid portfolioId, Guid userId) => new()
+    /// <summary>
+    /// spec-08 AC-7: an <see cref="AssetRemoved"/> fanned out by a portfolio delete removes the
+    /// <see cref="Position"/> only. <c>PortfolioDeletedConsumer</c> sweeps the lines and snapshots on
+    /// its own queue, so a revaluation here could land after that sweep and resurrect a zero snapshot
+    /// for a portfolio that no longer exists — today's snapshot and lines must stay exactly as seeded.
+    /// </summary>
+    [Fact]
+    public async Task Consume_CascadedFromPortfolio_RemovesPositionWithoutRevaluing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var removedAssetId = Guid.NewGuid();
+        var siblingAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(removedAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedPositionAsync(siblingAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 2_000m);
+
+            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, portfolioId, siblingAssetId, today, 2_000m, cancellationToken, quantity: 2_000m);
+            await db.SeedSnapshotAsync(userId, portfolioId, today, 3_000m, cancellationToken);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(Removed(removedAssetId, portfolioId, userId, cascadedFromPortfolio: true), cancellationToken);
+
+            // Position removal and any revaluation commit in the same inbox transaction, so once the
+            // Position is gone the snapshot and lines are final.
+            await WaitForPositionGoneAsync(provider, removedAssetId, cancellationToken);
+
+            var snapshot = await GetSnapshotAsync(containers, portfolioId, today, cancellationToken);
+            Assert.NotNull(snapshot);
+            Assert.Equal(3_000m, snapshot.TotalPln);
+
+            var todaysLines = await GetLinesAsync(containers, portfolioId, today, cancellationToken);
+            Assert.Equal(2, todaysLines.Count);
+            Assert.Contains(todaysLines, l => l.AssetId == removedAssetId && l.ValuePln == 1_000m);
+            Assert.Contains(todaysLines, l => l.AssetId == siblingAssetId && l.ValuePln == 2_000m);
+        }, cancellationToken);
+    }
+
+    private static AssetRemoved Removed(Guid assetId, Guid portfolioId, Guid userId, bool cascadedFromPortfolio = false) => new()
     {
         AssetId = assetId,
         PortfolioId = portfolioId,
         UserId = userId,
         OccurredAtUtc = DateTimeOffset.UtcNow,
+        CascadedFromPortfolio = cascadedFromPortfolio,
     };
 
     private Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>

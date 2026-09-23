@@ -94,22 +94,10 @@
                 <span>Archive</span>
               </button>
             }
-            @if (portfolio.assetCount === 0) {
-              <button mat-menu-item type="button" (click)="remove(portfolio)">
-                <mat-icon>delete</mat-icon>
-                <span>Delete</span>
-              </button>
-            } @else {
-              <button
-                mat-menu-item
-                type="button"
-                disabled
-                matTooltip="Portfolios with assets can't be deleted — archive it instead."
-              >
-                <mat-icon>delete</mat-icon>
-                <span>Delete</span>
-              </button>
-            }
+            <button mat-menu-item type="button" (click)="remove(portfolio)">
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
           </mat-menu>
         </td>
       </ng-container>

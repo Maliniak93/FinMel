@@ -189,13 +189,20 @@ export class Assets {
     });
   }
 
+  // The delete cascades to the asset's transactions (spec-08), so the confirmation names them
+  // whenever there are any.
   protected async remove(asset: AssetResponse): Promise<void> {
+    const transactionCount = Number(asset.transactionCount);
+    const message =
+      transactionCount > 0
+        ? `"${asset.name}" and its ${transactionCount} ${transactionCount === 1 ? 'transaction' : 'transactions'} will be permanently deleted. This can't be undone.`
+        : `"${asset.name}" will be permanently deleted. This can't be undone.`;
     const confirmed = await firstValueFrom(
       this.dialog
         .open(ConfirmDialog, {
           data: {
             title: 'Delete this asset?',
-            message: `"${asset.name}" will be permanently deleted. This can't be undone.`,
+            message,
             confirmLabel: 'Delete',
             destructive: true,
           },

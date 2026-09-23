@@ -26,8 +26,8 @@ Angular talks only to the Gateway (ADR-013).
 | Event | Payload | Published when |
 |---|---|---|
 | `AssetPositionChanged` | `AssetId, PortfolioId, UserId, AssetClass, ValuationMode, InstrumentId?, Currency, Quantity, ManualValueAmount?, ManualValueDate?, PortfolioIsArchived, Version` | after **every** position mutation: add/update asset, record/update/delete transaction |
-| `AssetRemoved` | `AssetId, PortfolioId, UserId` | remove asset |
-| `PortfolioArchived` / `PortfolioRestored` / `PortfolioDeleted` | `PortfolioId, UserId` | the matching slice (`Restore` is a new slice — no "unarchive" exists today) |
+| `AssetRemoved` | `AssetId, PortfolioId, UserId, CascadedFromPortfolio` | remove asset (its transactions go with it); also one per asset on portfolio delete, flagged `CascadedFromPortfolio` so Reporting skips the revaluation (spec-08) |
+| `PortfolioArchived` / `PortfolioRestored` / `PortfolioDeleted` | `PortfolioId, UserId` | the matching slice (`Restore` is a new slice — no "unarchive" exists today); `PortfolioDeleted` cascades to the assets and their transactions and is accompanied by one `AssetRemoved` per asset (spec-08) |
 | `DailyPricesSynced` | as today, plus `Kind: Prices \| Fx` | end of a sync job |
 | `UserRegistered` | as today | no consumer yet (Notifications is an idea, not built) |
 
@@ -39,7 +39,7 @@ Angular talks only to the Gateway (ADR-013).
 |---|---|---|
 | `AssetChanged`/`TransactionRecorded` publish with no consumers; updating or deleting a transaction publishes nothing | replaced by `AssetPositionChanged`/`AssetRemoved` from every mutating slice | spec-02 |
 | Strategy service exists as an empty skeleton | removed; its future features live in Reporting | spec-01 |
-| `Portfolio.AssetCount` / `Asset.TransactionCount` counters; unused `ApplicationUser.BaseCurrency` | removed — delete guards use `AnyAsync`; PLN is the only base currency everywhere (ADR-008) | spec-02, spec-05 |
+| `Portfolio.AssetCount` / `Asset.TransactionCount` counters; unused `ApplicationUser.BaseCurrency` | removed — deletes cascade in the handler (spec-08); PLN is the only base currency everywhere (ADR-008) | spec-02, spec-05, spec-08 |
 | 3/5/7/1 migrations per service, carrying task-history names | one `InitialCreate` migration per service (ADR-019) | spec-06 |
 | Worktree branch `worktree-marketdata-currency-redesign` (a currency catalog + `FxSyncJob` prototype) | superseded by spec-04's design (no fallback rate) | delete after spec-04 merges |
 

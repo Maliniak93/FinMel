@@ -254,24 +254,26 @@ describe('Portfolios', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 2);
   });
 
-  it('shows a snackbar and does not reload when delete is rejected (portfolio has assets)', async () => {
+  // spec-08 AC-10: delete no longer has a 409-specific path, but any server failure still surfaces
+  // the ProblemDetails detail in a snackbar and skips the reload.
+  it('shows a snackbar and does not reload when delete fails on the server', async () => {
     await setup(jsonResponse([portfolio]));
     const callsBefore = fetchSpy.mock.calls.length;
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
-          detail: 'Portfolio has assets and cannot be deleted; archive it instead.',
-          errorCode: 'Conflict.PortfolioHasAssets',
+          detail: 'Something went wrong while deleting the portfolio.',
+          errorCode: 'Unexpected',
         },
-        409,
+        500,
       ),
     );
 
     await component['remove'](portfolio);
 
     expect(snackBar.open).toHaveBeenCalledWith(
-      'Portfolio has assets and cannot be deleted; archive it instead.',
+      'Something went wrong while deleting the portfolio.',
       'Dismiss',
     );
     expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 1);
@@ -339,9 +341,15 @@ describe('Portfolios', () => {
       ) as HTMLButtonElement | undefined;
     }
 
-    it('disables Delete for a portfolio with assets (gating unchanged by the column swap)', async () => {
+    // spec-08 AC-9: delete cascades, so a portfolio with assets is deletable straight from the
+    // menu — the confirmation dialog, not a disabled item, is where the safety lives.
+    it('enables Delete for a portfolio with assets and warns about its assets in the confirmation', async () => {
       const withAssets: PortfolioResponse = { ...portfolio, assetCount: 2 };
       await setup(jsonResponse([withAssets]));
+      const callsBefore = fetchSpy.mock.calls.length;
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 204 }));
+      fetchSpy.mockResolvedValueOnce(jsonResponse([]));
 
       const overlayContainer = TestBed.inject(OverlayContainer);
       const trigger = fixture.debugElement
@@ -352,7 +360,23 @@ describe('Portfolios', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(deleteButtonInOverlay(overlayContainer)?.disabled).toBe(true);
+      const deleteButton = deleteButtonInOverlay(overlayContainer);
+      expect(deleteButton?.disabled).toBe(false);
+      // No "archive it instead" tooltip any more — MatTooltip marks its host with this class.
+      expect(deleteButton?.classList.contains('mat-mdc-tooltip-trigger')).toBe(false);
+
+      deleteButton!.click();
+      await vi.waitFor(() => expect(dialog.open).toHaveBeenCalled());
+
+      const message = (dialog.open.mock.calls[0][1] as { data: { message: string } }).data.message;
+      expect(message).toMatch(
+        /^"Retirement" and its 2 assets?(\(s\))?, with all their transactions, will be permanently deleted\. This can't be undone\.$/,
+      );
+
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 2));
+      const deleteCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+      expect(deleteCall.method).toBe('DELETE');
+      expect(deleteCall.url).toContain(`/portfolios/${portfolio.id}`);
     });
 
     it('enables Delete for a portfolio with no assets (gating unchanged by the column swap)', async () => {

@@ -103,6 +103,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
                 PortfolioId = Guid.NewGuid(),
                 UserId = Guid.NewGuid(),
                 OccurredAtUtc = DateTimeOffset.UtcNow,
+                CascadedFromPortfolio = false,
             }, cancellationToken);
 
             var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);

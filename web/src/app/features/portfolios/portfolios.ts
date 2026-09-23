@@ -184,13 +184,20 @@ export class Portfolios {
     this.portfoliosResource.reload();
   }
 
+  // The delete cascades to the portfolio's assets and their transactions (spec-08), so the
+  // confirmation says so whenever there is anything to take with it.
   protected async remove(portfolio: PortfolioResponse): Promise<void> {
+    const assetCount = Number(portfolio.assetCount);
+    const message =
+      assetCount > 0
+        ? `"${portfolio.name}" and its ${assetCount} ${assetCount === 1 ? 'asset' : 'assets'}, with all their transactions, will be permanently deleted. This can't be undone.`
+        : `"${portfolio.name}" will be permanently deleted. This can't be undone.`;
     const confirmed = await firstValueFrom(
       this.dialog
         .open(ConfirmDialog, {
           data: {
             title: 'Delete this portfolio?',
-            message: `"${portfolio.name}" will be permanently deleted. This can't be undone.`,
+            message,
             confirmLabel: 'Delete',
             destructive: true,
           },

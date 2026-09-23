@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
@@ -25,33 +26,26 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.NotFound, getAfterDelete.StatusCode);
     }
 
+    /// <summary>spec-08 AC-3: removing an asset cascades to its transactions — no "delete them first" step.</summary>
     [Fact]
-    public async Task Remove_LastAsset_UnblocksPortfolioDelete()
+    public async Task Remove_AssetWithTransactions_RemovesAssetAndItsTransactions()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-
-        await client.DeleteAsync(AssetUri(portfolioId, assetId), cancellationToken);
-        var deletePortfolio = await client.DeleteAsync(PortfolioUri(portfolioId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NoContent, deletePortfolio.StatusCode);
-    }
-
-    /// <summary>spec-02 AC-13: the guard is now provable through the API alone (no counter to seed) — Transactions.AnyAsync replaces the TransactionCount check.</summary>
-    [Fact]
-    public async Task Remove_AssetWithTransactions_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 2m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Sell, 1m, new DateOnly(2026, 1, 2), cancellationToken);
 
         var response = await client.DeleteAsync(AssetUri(portfolioId, assetId), cancellationToken);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        var getAfterFailedDelete = await client.GetAsync(AssetUri(portfolioId, assetId), cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, getAfterFailedDelete.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var getAfterDelete = await client.GetAsync(AssetUri(portfolioId, assetId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, getAfterDelete.StatusCode);
+
+        // No endpoint lists a deleted asset's transactions, so the orphan check reads the database.
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == assetId, cancellationToken));
     }
 
     [Fact]

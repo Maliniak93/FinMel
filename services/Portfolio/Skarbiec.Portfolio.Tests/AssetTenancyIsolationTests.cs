@@ -122,6 +122,34 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    /// <summary>
+    /// spec-08 AC-5: now that DELETE cascades to transactions, a stranger's delete — through the
+    /// owner's portfolio id or the stranger's own — must still stop at the 404 and leave the
+    /// owner's asset and every one of its transactions intact.
+    /// </summary>
+    [Fact]
+    public async Task Delete_AssetWithTransactionsByStranger_ReturnsNotFoundAndLeavesTransactions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (ownerPortfolioId, assetIds) = await owner.CreatePortfolioWithAssetsAndTransactionsAsync(
+            cancellationToken, assetCount: 1, transactionsPerAsset: 2);
+        var assetId = assetIds[0];
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+
+        var viaOwnersPortfolio = await stranger.DeleteAsync(AssetUri(ownerPortfolioId, assetId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.DeleteAsync(AssetUri(strangerPortfolioId, assetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+
+        var getAsset = await owner.GetAsync(AssetUri(ownerPortfolioId, assetId), cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, getAsset.StatusCode);
+        Assert.Equal(2, (await owner.ListTransactionsAsync(ownerPortfolioId, assetId, cancellationToken)).TotalCount);
+    }
+
     private static UpdateAssetRequest UpdatePayload() => new()
     {
         AssetClass = AssetClass.Cash,

@@ -31,3 +31,6 @@ skarbiec-plan/specs/
 
 # hey-api generator error dumps
 web/openapi-ts-error-*.log
+
+# Playwright MCP session artifacts
+.playwright-mcp/
