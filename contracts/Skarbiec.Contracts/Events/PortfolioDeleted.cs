@@ -1,9 +1,10 @@
 namespace Skarbiec.Contracts.Events;
 
 /// <summary>
-/// Published by Portfolio when a portfolio is hard-deleted (spec-02). Only an empty portfolio can be
-/// deleted — one holding assets is a 409 pointing at archive — so no <see cref="AssetRemoved"/>
-/// accompanies it.
+/// Published by Portfolio when a portfolio is hard-deleted (spec-02). The delete cascades to its
+/// assets and their transactions (spec-08), so it is accompanied in the same transaction by one
+/// <see cref="AssetRemoved"/> per asset carrying <c>CascadedFromPortfolio = true</c> — a consumer
+/// tracking per-asset state needs no portfolio-to-asset mapping of its own.
 /// </summary>
 public sealed record PortfolioDeleted
 {

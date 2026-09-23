@@ -19,27 +19,37 @@ public sealed class RemoveAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        // The transactions themselves answer the guard (spec-02) — no denormalized counter to keep
-        // in sync, and the tenancy query filter scopes the check to this user's rows anyway.
-        var hasTransactions = await dbContext.Transactions.AnyAsync(t => t.AssetId == assetId, cancellationToken);
-        if (hasTransactions)
-        {
-            return AssetErrors.HasTransactions(assetId);
-        }
+        // The delete cascades to the asset's transactions explicitly — portfolio_db has no FKs, so
+        // the database cascades nothing (spec-08). The tenancy query filter scopes the load to this
+        // user's rows.
+        var transactions = await dbContext.Transactions
+            .Where(t => t.AssetId == assetId)
+            .ToListAsync(cancellationToken);
 
+        dbContext.Transactions.RemoveRange(transactions);
         dbContext.Assets.Remove(asset);
 
         // Terminal for this asset (spec-02 design decision 3): no version, no further position
-        // event. Published before SaveChangesAsync so it commits with the deletion (ADR-012).
+        // event. Published before SaveChangesAsync so it commits with the deletions (ADR-012).
         await publishEndpoint.Publish(new AssetRemoved
         {
             AssetId = asset.Id,
             PortfolioId = portfolioId,
             UserId = dbContext.CurrentUserId,
-            OccurredAtUtc = timeProvider.GetUtcNow()
+            OccurredAtUtc = timeProvider.GetUtcNow(),
+            CascadedFromPortfolio = false
         }, cancellationToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // A transaction recorded concurrently moved the asset's xmin: nothing is deleted, so no
+            // orphan transaction is left behind, and the user retries (spec-08).
+            return TransactionErrors.ConcurrentModification();
+        }
 
         return Result.Success();
     }

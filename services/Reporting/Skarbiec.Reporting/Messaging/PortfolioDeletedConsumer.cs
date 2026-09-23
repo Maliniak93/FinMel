@@ -12,8 +12,11 @@ namespace Skarbiec.Reporting.Messaging;
 /// <remarks>
 /// Valuation history goes too, unlike on <c>AssetRemoved</c> (spec-03 design decision 1):
 /// <c>GetDashboard</c> sums the latest snapshot per portfolio, so rows left behind would keep a
-/// ghost value in net worth forever. Portfolio only allows deleting an empty portfolio, so this
-/// normally removes little — and it sweeps up anything orphaned by a lost <c>AssetRemoved</c>.
+/// ghost value in net worth forever. A portfolio delete cascades to its assets (spec-08), so this
+/// event arrives alongside one <c>AssetRemoved</c> per asset flagged <c>CascadedFromPortfolio</c>;
+/// those only drop their <see cref="Position"/> and never revalue, so whichever queue runs first,
+/// this sweep is what removes the portfolio's lines and snapshots — plus any position its
+/// <c>AssetRemoved</c> has not removed yet, or never will if it was lost.
 /// </remarks>
 public sealed class PortfolioDeletedConsumer(ReportingDbContext db) : IConsumer<PortfolioDeleted>
 {

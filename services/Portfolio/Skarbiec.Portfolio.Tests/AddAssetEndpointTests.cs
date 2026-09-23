@@ -482,17 +482,4 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Equal(AssetValuationMode.Manual, body!.ValuationMode);
     }
-
-    [Fact]
-    public async Task Add_AssetToPortfolio_MakesPortfolioDeleteConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.AddAssetAsync(portfolioId, cancellationToken, name: "Blocks portfolio delete", assetClass: AssetClass.Cash, manualValue: 1m);
-
-        var deleteResponse = await client.DeleteAsync(PortfolioUri(portfolioId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Conflict, deleteResponse.StatusCode);
-    }
 }

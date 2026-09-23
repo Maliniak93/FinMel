@@ -54,6 +54,8 @@ POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/r
 Authorization: Bearer {{authToken}}
 
 ### Delete a portfolio
+# Cascades: its assets and their transactions are deleted too, and one AssetRemoved per asset
+# (CascadedFromPortfolio = true) is published with PortfolioDeleted (spec-08). 204.
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}
 Authorization: Bearer {{authToken}}
 
@@ -112,6 +114,7 @@ Content-Type: application/json
 }
 
 ### Remove an asset
+# Cascades: the asset's transactions are deleted too, and AssetRemoved is published (spec-08). 204.
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 

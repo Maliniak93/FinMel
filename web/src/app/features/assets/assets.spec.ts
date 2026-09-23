@@ -1,6 +1,9 @@
+import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
@@ -184,25 +187,70 @@ describe('Assets', () => {
     expect(fetchSpy.mock.calls.length).toBe(callsBefore);
   });
 
-  it('shows a snackbar and does not reload when delete is rejected (asset has transactions)', async () => {
+  // spec-08 AC-10: delete no longer has a 409-specific path, but any server failure still surfaces
+  // the ProblemDetails detail in a snackbar and skips the reload.
+  it('shows a snackbar and does not reload when delete fails on the server', async () => {
     await setup(jsonResponse([asset]));
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = fetchSpy.mock.calls.length;
     fetchSpy.mockImplementationOnce(async () =>
       jsonResponse(
         {
-          detail: 'Asset has transactions and cannot be removed.',
-          errorCode: 'Conflict.AssetHasTransactions',
+          detail: 'Something went wrong while deleting the asset.',
+          errorCode: 'Unexpected',
         },
-        409,
+        500,
       ),
     );
 
     await component['remove'](asset);
 
     expect(snackBar.open).toHaveBeenCalledWith(
-      'Asset has transactions and cannot be removed.',
+      'Something went wrong while deleting the asset.',
       'Dismiss',
     );
+    expect(fetchSpy.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  // spec-08 AC-10: delete cascades to the asset's transactions, so the menu item is always enabled
+  // and the confirmation names how many transactions go with it.
+  it('deletes an asset with transactions after a confirmation naming the transaction count', async () => {
+    const withTransactions: AssetResponse = { ...asset, transactionCount: 3 };
+    await setup(jsonResponse([withTransactions]));
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = fetchSpy.mock.calls.length;
+    fetchSpy.mockImplementationOnce(async () => new Response(null, { status: 204 }));
+
+    const overlayContainer = TestBed.inject(OverlayContainer);
+    const trigger = fixture.debugElement
+      .query(By.directive(MatMenuTrigger))
+      .injector.get(MatMenuTrigger);
+
+    trigger.openMenu();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const deleteButton = Array.from(
+      overlayContainer.getContainerElement().querySelectorAll('button'),
+    ).find((button) => (button.textContent ?? '').includes('Delete')) as
+      HTMLButtonElement | undefined;
+    expect(deleteButton?.disabled).toBe(false);
+    // No "can't be deleted" tooltip any more — MatTooltip marks its host with this class.
+    expect(deleteButton?.classList.contains('mat-mdc-tooltip-trigger')).toBe(false);
+
+    deleteButton!.click();
+    await vi.waitFor(() => expect(dialog.open).toHaveBeenCalled());
+
+    const message = (dialog.open.mock.calls[0][1] as { data: { message: string } }).data.message;
+    expect(message).toMatch(
+      /^"Apple" and its 3 transactions?(\(s\))? will be permanently deleted\. This can't be undone\.$/,
+    );
+
+    // The DELETE, then the assets reload.
+    await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
+    const deleteCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+    expect(deleteCall.method).toBe('DELETE');
+    expect(deleteCall.url).toContain(asset.id);
   });
 
   it("shows a market asset's last price and date", async () => {

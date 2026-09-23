@@ -85,6 +85,36 @@ internal static class PortfolioApi
         return (portfolioId, assetId);
     }
 
+    /// <summary>
+    /// spec-08: a portfolio holding <paramref name="assetCount"/> assets, each with
+    /// <paramref name="transactionsPerAsset"/> Buy transactions — the children a cascading delete
+    /// must take with it (or, for a stranger, must leave untouched).
+    /// </summary>
+    public static async Task<(Guid PortfolioId, IReadOnlyList<Guid> AssetIds)> CreatePortfolioWithAssetsAndTransactionsAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        int assetCount = 2,
+        int transactionsPerAsset = 2,
+        string portfolioName = "Retirement")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var assetIds = new List<Guid>();
+
+        for (var i = 0; i < assetCount; i++)
+        {
+            var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: $"Asset {i + 1}");
+            for (var t = 0; t < transactionsPerAsset; t++)
+            {
+                await client.RecordTransactionAsync(
+                    portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1).AddDays(t), cancellationToken);
+            }
+
+            assetIds.Add(assetId);
+        }
+
+        return (portfolioId, assetIds);
+    }
+
     /// <summary>Records a transaction and returns its id.</summary>
     public static async Task<Guid> RecordTransactionAsync(
         this HttpClient client,

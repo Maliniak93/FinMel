@@ -36,12 +36,15 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
 {
     private static readonly Guid UserId = Guid.NewGuid();
 
+    private readonly SaveChangesCounter _saveChanges = new();
+
     private ServiceProvider _provider = null!;
 
     public async ValueTask InitializeAsync()
     {
         _provider = HostlessOutboxProvider.Build<PortfolioDbContext>(containers, services =>
         {
+            services.ConfigureDbContext<PortfolioDbContext>(options => options.AddInterceptors(_saveChanges));
             services.AddSingleton<ICurrentUser>(new StubCurrentUser(UserId));
             services.AddSingleton<IInstrumentLookupClient>(new FakeInstrumentLookupClient());
             services.AddSingleton(TimeProvider.System);
@@ -458,5 +461,118 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         var evt = Assert.Single(events);
         Assert.Equal(portfolioResult.Value.Id, evt.PortfolioId);
         Assert.Equal(UserId, evt.UserId);
+    }
+
+    /// <summary>
+    /// spec-08 AC-2: the portfolio, its assets and their transactions are removed and the outbox
+    /// holds one <see cref="AssetRemoved"/> (cascaded) per asset plus one <see cref="PortfolioDeleted"/>
+    /// — all in a single save, so no consumer can ever see a half-deleted portfolio.
+    /// </summary>
+    [Fact]
+    public async Task DeletePortfolio_WithAssets_RemovesChildrenAndWritesAssetRemovedPerAssetAndPortfolioDeleted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = _provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+
+        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Cascade portfolio" }, cancellationToken)).Value.Id;
+        var assetIds = new List<Guid>
+        {
+            await AddAssetWithBuyAsync(scope.ServiceProvider, portfolioId, "Shares 1", cancellationToken),
+            await AddAssetWithBuyAsync(scope.ServiceProvider, portfolioId, "Shares 2", cancellationToken),
+        };
+
+        // A sibling portfolio the cascade must not reach.
+        var siblingPortfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Sibling portfolio" }, cancellationToken)).Value.Id;
+        var siblingAssetId = await AddAssetWithBuyAsync(scope.ServiceProvider, siblingPortfolioId, "Sibling shares", cancellationToken);
+
+        _saveChanges.Reset();
+
+        var deleteResult = await scope.ServiceProvider.GetRequiredService<DeletePortfolioHandler>()
+            .HandleAsync(portfolioId, cancellationToken);
+
+        Assert.True(deleteResult.IsSuccess);
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.False(await verifyDb.Portfolios.AnyAsync(p => p.Id == portfolioId, cancellationToken));
+        Assert.False(await verifyDb.Assets.AnyAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+        Assert.False(await verifyDb.Transactions.AnyAsync(t => assetIds.Contains(t.AssetId), cancellationToken));
+        Assert.True(await verifyDb.Assets.AnyAsync(a => a.Id == siblingAssetId, cancellationToken));
+        Assert.True(await verifyDb.Transactions.AnyAsync(t => t.AssetId == siblingAssetId, cancellationToken));
+
+        var removed = await verifyDb.ReadPublishedAsync<AssetRemoved>(cancellationToken);
+        Assert.Equal(assetIds.Order(), removed.Select(e => e.AssetId).Order());
+        Assert.All(removed, e =>
+        {
+            Assert.True(e.CascadedFromPortfolio);
+            Assert.Equal(portfolioId, e.PortfolioId);
+            Assert.Equal(UserId, e.UserId);
+        });
+
+        var deleted = Assert.Single(await verifyDb.ReadPublishedAsync<PortfolioDeleted>(cancellationToken));
+        Assert.Equal(portfolioId, deleted.PortfolioId);
+        Assert.Equal(UserId, deleted.UserId);
+    }
+
+    /// <summary>
+    /// spec-08 AC-4: removing an asset takes its transactions with it and writes one
+    /// non-cascaded <see cref="AssetRemoved"/>, all in a single save.
+    /// </summary>
+    [Fact]
+    public async Task RemoveAsset_WithTransactions_RemovesTransactionsAndWritesAssetRemoved()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = _provider.CreateAsyncScope();
+
+        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
+        var assetId = await AddAssetWithBuyAsync(scope.ServiceProvider, portfolioId, "Shares", cancellationToken);
+        var keptAssetId = await AddAssetWithBuyAsync(scope.ServiceProvider, portfolioId, "Kept shares", cancellationToken);
+
+        _saveChanges.Reset();
+
+        var removeResult = await scope.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
+            .HandleAsync(portfolioId, assetId, cancellationToken);
+
+        Assert.True(removeResult.IsSuccess);
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.False(await verifyDb.Assets.AnyAsync(a => a.Id == assetId, cancellationToken));
+        Assert.False(await verifyDb.Transactions.AnyAsync(t => t.AssetId == assetId, cancellationToken));
+        Assert.True(await verifyDb.Transactions.AnyAsync(t => t.AssetId == keptAssetId, cancellationToken));
+        Assert.True(await verifyDb.Portfolios.AnyAsync(p => p.Id == portfolioId, cancellationToken));
+
+        var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetRemoved>(cancellationToken));
+        Assert.Equal(assetId, evt.AssetId);
+        Assert.Equal(portfolioId, evt.PortfolioId);
+        Assert.Equal(UserId, evt.UserId);
+        Assert.False(evt.CascadedFromPortfolio);
+    }
+
+    private static async Task<Guid> AddAssetWithBuyAsync(
+        IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
+    {
+        var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
+            portfolioId,
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            cancellationToken);
+        Assert.True(assetResult.IsSuccess);
+
+        var buyResult = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+            portfolioId,
+            assetResult.Value.Id,
+            new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 5m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) },
+            cancellationToken);
+        Assert.True(buyResult.IsSuccess);
+
+        return assetResult.Value.Id;
     }
 }

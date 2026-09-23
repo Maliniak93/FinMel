@@ -132,22 +132,10 @@
               <mat-icon>edit</mat-icon>
               <span>Edit</span>
             </button>
-            @if (asset.transactionCount === 0) {
-              <button mat-menu-item type="button" (click)="remove(asset)">
-                <mat-icon>delete</mat-icon>
-                <span>Delete</span>
-              </button>
-            } @else {
-              <button
-                mat-menu-item
-                type="button"
-                disabled
-                matTooltip="Assets with transactions can't be deleted."
-              >
-                <mat-icon>delete</mat-icon>
-                <span>Delete</span>
-              </button>
-            }
+            <button mat-menu-item type="button" (click)="remove(asset)">
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
           </mat-menu>
         </td>
       </ng-container>

@@ -19,6 +19,12 @@ namespace Skarbiec.Reporting.Messaging;
 /// it with the recompute, so today's lines and snapshot agree — a portfolio left empty gets a zero
 /// snapshot rather than keeping the pre-removal value (spec-07 AC8). An archived portfolio is left
 /// alone, same as on <c>AssetPositionChanged</c>.
+/// <para>
+/// A removal fanned out by a portfolio delete (<see cref="AssetRemoved.CascadedFromPortfolio"/>,
+/// spec-08) only drops the <see cref="Position"/>: <c>PortfolioDeletedConsumer</c> sweeps the lines
+/// and snapshots on its own, concurrently consumed queue, so a revaluation here could land after
+/// that sweep and write a zero snapshot for a portfolio that no longer exists.
+/// </para>
 /// </remarks>
 public sealed class AssetRemovedConsumer(ReportingDbContext db, PortfolioSnapshotWriter snapshotWriter) : IConsumer<AssetRemoved>
 {
@@ -44,7 +50,7 @@ public sealed class AssetRemovedConsumer(ReportingDbContext db, PortfolioSnapsho
         // one — still inside the inbox transaction (ADR-012).
         await db.SaveChangesAsync(cancellationToken);
 
-        if (position.PortfolioIsArchived)
+        if (message.CascadedFromPortfolio || position.PortfolioIsArchived)
         {
             return;
         }
