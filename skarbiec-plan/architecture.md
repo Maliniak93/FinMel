@@ -38,9 +38,6 @@ Angular talks only to the Gateway (ADR-013).
 | Today (`master`) | Target | Closed by |
 |---|---|---|
 | `AssetChanged`/`TransactionRecorded` publish with no consumers; updating or deleting a transaction publishes nothing | replaced by `AssetPositionChanged`/`AssetRemoved` from every mutating slice | spec-02 |
-| `PriceSyncJob` syncs every dictionary instrument | syncs only instruments with `InstrumentUsage.AssetCount > 0` | spec-04 |
-| History backfill on first use of an *existing* instrument isn't wired | `HistoryBackfillJob` fires from the `InstrumentUsage` consumer on first use | spec-04 |
-| No currency catalog; FX sync covers supported currencies ad hoc | `Currency` catalog + `FxSyncJob` (daily; 12-month backfill on first run) | spec-04 |
 | Strategy service exists as an empty skeleton | removed; its future features live in Reporting | spec-01 |
 | `Portfolio.AssetCount` / `Asset.TransactionCount` counters; unused `ApplicationUser.BaseCurrency` | removed — delete guards use `AnyAsync`; PLN is the only base currency everywhere (ADR-008) | spec-02, spec-05 |
 | 3/5/7/1 migrations per service, carrying task-history names | one `InitialCreate` migration per service (ADR-019) | spec-06 |

@@ -35,6 +35,7 @@ Full walkthrough and the poison-message story: `Skarbiec.ServiceDefaults/Messagi
       configureConsumers: x => x.AddConsumer<XConsumer>(typeof(XConsumerDefinition)));
   ```
   The two-generic form `AddConsumer<TConsumer, TDefinition>()` **does not compile here** — `IRegistrationConfigurator`'s own arity-1 `AddConsumer<T>` hides the extension method.
+- Queue names come from the consumer class name (kebab-case, no service prefix). When two services consume the same event with same-named consumer classes (Reporting's and MarketData's `AssetPositionChangedConsumer`), they would share one queue and compete for messages — each service seeing only part of them. The later service's definition sets its own name: `public XConsumerDefinition() => Endpoint(e => e.Name = "<service>-<event>");` (e.g. `market-data-asset-position-changed`).
 - The definition gives the endpoint inbox dedup by `MessageId`, a capped exponential retry, and the transport's `<queue>_error` queue once retry is exhausted. Keep the `Consume` body idempotent in spirit as well: the inbox stops redelivery, but anything the consumer calls outside its transaction can still run twice.
 - A consumer writing for many users bypasses the tenancy filter with `IgnoreQueryFilters()` — comment why, right there.
 

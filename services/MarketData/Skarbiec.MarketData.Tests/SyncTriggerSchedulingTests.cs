@@ -34,6 +34,7 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
         var instrumentId = await seedDb.SeedInstrumentAsync("XYZ.WA", "Xyz SA", PriceSource.Stooq, "PLN", cancellationToken);
+        await SeedInUseAsync(seedDb, instrumentId, cancellationToken);
 
         var (host, _) = await BuildHostAsync(
             new GatedPriceSource(
@@ -69,6 +70,7 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
         var instrumentId = await seedDb.SeedInstrumentAsync("SLOW.WA", "Slow SA", PriceSource.Stooq, "PLN", cancellationToken);
+        await SeedInUseAsync(seedDb, instrumentId, cancellationToken);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var (host, _) = await BuildHostAsync(
@@ -101,6 +103,13 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
             gate.TrySetResult();
             await CleanUpAsync(host, cancellationToken);
         }
+    }
+
+    // spec-04: PriceSyncJob syncs only instruments with InstrumentUsage.AssetCount > 0.
+    private static async Task SeedInUseAsync(MarketDataDbContext db, Guid instrumentId, CancellationToken cancellationToken)
+    {
+        db.InstrumentUsages.Add(new InstrumentUsage { InstrumentId = instrumentId, AssetCount = 1, FirstUsedAt = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static TaskCompletionSource CompletedGate()

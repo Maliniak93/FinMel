@@ -508,37 +508,26 @@
       "SyncRunStatus": {
         "type": "integer"
       },
-      "SyncStatusResponse": {
+      "SyncRunSummary": {
         "required": [
-          "hasRun"
+          "runId",
+          "status",
+          "startedAt",
+          "syncedCount",
+          "noDataCount",
+          "failedCount"
         ],
         "type": "object",
         "properties": {
-          "hasRun": {
-            "type": "boolean"
-          },
           "runId": {
-            "type": [
-              "null",
-              "string"
-            ],
+            "type": "string",
             "format": "uuid"
           },
           "status": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/SyncRunStatus"
-              }
-            ]
+            "$ref": "#/components/schemas/SyncRunStatus"
           },
           "startedAt": {
-            "type": [
-              "null",
-              "string"
-            ],
+            "type": "string",
             "format": "date-time"
           },
           "finishedAt": {
@@ -551,7 +540,6 @@
           "syncedCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
-              "null",
               "integer",
               "string"
             ],
@@ -560,7 +548,6 @@
           "noDataCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
-              "null",
               "integer",
               "string"
             ],
@@ -569,11 +556,51 @@
           "failedCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
-              "null",
               "integer",
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "SyncStatusResponse": {
+        "required": [
+          "hasRun"
+        ],
+        "type": "object",
+        "properties": {
+          "hasRun": {
+            "type": "boolean"
+          },
+          "prices": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SyncRunSummary"
+              }
+            ]
+          },
+          "fx": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SyncRunSummary"
+              }
+            ]
+          },
+          "backfill": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SyncRunSummary"
+              }
+            ]
           }
         }
       }

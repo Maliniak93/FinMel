@@ -36,7 +36,7 @@ Authorization: Bearer {{authToken}}
 POST {{baseUrl}}/api/marketdata/sync/trigger
 Authorization: Bearer {{authToken}}
 
-### Get sync status
+### Get sync status — the latest run per kind: { hasRun, prices?, fx?, backfill? }
 GET {{baseUrl}}/api/marketdata/sync/status
 Authorization: Bearer {{authToken}}
 
