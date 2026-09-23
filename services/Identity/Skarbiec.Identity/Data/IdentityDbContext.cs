@@ -1,7 +1,6 @@
 using MassTransit;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Skarbiec.Contracts;
 
 namespace Skarbiec.Identity.Data;
 
@@ -17,7 +16,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         builder.Entity<ApplicationUser>(user =>
         {
             user.Property(u => u.DisplayName).HasMaxLength(200);
-            user.Property(u => u.BaseCurrency).HasMaxLength(3).HasDefaultValue(Money.BaseCurrency);
         });
 
         builder.Entity<RefreshToken>(refreshToken =>
