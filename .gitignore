@@ -28,6 +28,7 @@ Thumbs.db
 # private files
 skarbiec-plan/archive/
 skarbiec-plan/specs/
+skarbiec-plan/errors/
 
 # hey-api generator error dumps
 web/openapi-ts-error-*.log
