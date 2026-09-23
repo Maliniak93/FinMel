@@ -5,6 +5,7 @@ using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Features.GetNetWorthHistory;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
+using Skarbiec.Reporting.Valuation;
 using Skarbiec.ServiceDefaults.Http;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.ServiceDefaults.OpenApi;
@@ -14,7 +15,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddServiceOpenApi();
 
-// T2.12: GetNetWorthHistory resolves the 1M/1Y/YTD range boundaries against "today" — same
+// T2.12: GetNetWorthHistory resolves the 1M/1Y/YTD range boundaries against "today" (and since
+// spec-07, PortfolioSnapshotWriter picks the date the position events revalue) — same
 // TimeProvider.System registration MarketData's Quartz jobs use, so tests can inject a fake later
 // without touching production wiring.
 builder.Services.TryAddSingleton(TimeProvider.System);
@@ -30,6 +32,10 @@ if (!OpenApiBuildTime.IsActive)
     var reportingConnectionString = builder.Configuration.GetConnectionString("reporting-db")
         ?? throw new InvalidOperationException("Missing connection string 'reporting-db'.");
     builder.Services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(reportingConnectionString));
+
+    // spec-07: the one valuation writer, shared by the DailyPricesSynced consumer and the position
+    // event consumers that revalue today's snapshot. Scoped, so it gets the consume scope's DbContext.
+    builder.Services.AddScoped<PortfolioSnapshotWriter>();
 
     // Consumes DailyPricesSynced (published by MarketData, T2.10) plus Portfolio's position and
     // portfolio-lifecycle events (spec-02/spec-03), each through the T0.12 idempotent inbox

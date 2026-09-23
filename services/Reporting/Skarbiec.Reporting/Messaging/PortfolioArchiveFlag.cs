@@ -5,11 +5,12 @@ namespace Skarbiec.Reporting.Messaging;
 
 /// <summary>
 /// The one line <see cref="PortfolioArchivedConsumer"/> and <see cref="PortfolioRestoredConsumer"/>
-/// share — archive and restore are the same write with a flipped flag.
+/// share — archive and restore are the same write with a flipped flag. Returns whether the
+/// portfolio has any positions at all, so restore knows whether there is anything to revalue.
 /// </summary>
 internal static class PortfolioArchiveFlag
 {
-    public static async Task ApplyAsync(
+    public static async Task<bool> ApplyAsync(
         ReportingDbContext db, Guid portfolioId, bool isArchived, CancellationToken cancellationToken)
     {
         // IgnoreQueryFilters: a consumer has no request user to filter by — see
@@ -23,7 +24,7 @@ internal static class PortfolioArchiveFlag
 
         if (positions.Count == 0)
         {
-            return;
+            return false;
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -34,5 +35,6 @@ internal static class PortfolioArchiveFlag
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

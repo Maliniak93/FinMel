@@ -13,6 +13,8 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<AssetValuation> AssetValuations => Set<AssetValuation>();
     public DbSet<ValuationSnapshot> ValuationSnapshots => Set<ValuationSnapshot>();
+    public DbSet<LatestInstrumentPrice> LatestInstrumentPrices => Set<LatestInstrumentPrice>();
+    public DbSet<LatestFxRate> LatestFxRates => Set<LatestFxRate>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -68,6 +70,25 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
             // exactly this pair — the P95 <1s AC's seeded-year scale needs this to stay an index
             // scan instead of a sequential one.
             snapshot.HasIndex(s => new { s.UserId, s.Date });
+        });
+
+        // spec-07: the last prices and FX rates the daily batch returned, so the position-event path
+        // values from local data. Global reference data — not IUserOwned, so the query filter below
+        // skips them (design decision 4). Natural keys, one row each, same column shapes as
+        // MarketData's own PriceQuote/FxRate.
+        modelBuilder.Entity<LatestInstrumentPrice>(price =>
+        {
+            price.HasKey(p => p.InstrumentId);
+            price.Property(p => p.InstrumentId).ValueGeneratedNever();
+            price.Property(p => p.QuoteCurrency).HasMaxLength(3);
+            price.Property(p => p.Close).HasPrecision(18, 8);
+        });
+
+        modelBuilder.Entity<LatestFxRate>(rate =>
+        {
+            rate.HasKey(r => r.Pair);
+            rate.Property(r => r.Pair).HasMaxLength(6);
+            rate.Property(r => r.Rate).HasPrecision(18, 8);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).

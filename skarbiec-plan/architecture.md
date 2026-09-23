@@ -119,6 +119,7 @@ sequenceDiagram
     PF->>MQ: publish (from outbox, after commit)
     MQ->>RP: deliver AssetPositionChanged
     RP->>RP: inbox check, upsert Position
+    RP->>RP: revalue today's snapshot + lines of that portfolio<br/>from local LatestInstrumentPrice / LatestFxRate (ADR-025)
     MQ->>MD: deliver AssetPositionChanged
     MD->>MD: inbox check, upsert InstrumentUsage
     alt first use of this instrument
@@ -145,6 +146,7 @@ sequenceDiagram
     RP->>RP: inbox check
     RP->>MD: REST prices/latest-batch + fx/latest-batch
     MD-->>RP: batch prices/rates
+    RP->>RP: keep them in LatestInstrumentPrice / LatestFxRate
     RP->>RP: value local Positions → AssetValuation lines +<br/>ValuationSnapshot (last-known price, stale > 7 days)
 ```
 

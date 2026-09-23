@@ -18,6 +18,9 @@ namespace Skarbiec.Reporting.Messaging;
 /// -(AssetId, Date) unique indexes — a redelivery or a manual rerun overwrites the same rows.
 /// Both <see cref="PriceSyncKind"/> values recompute identically (spec-04 design decision 8): a
 /// same-day Prices run followed by an Fx run simply overwrites that day's rows with fresher inputs.
+/// Since spec-07 it also keeps every fetched price and rate in <see cref="LatestInstrumentPrice"/> /
+/// <see cref="LatestFxRate"/>, and the per-portfolio upsert lives in <see cref="PortfolioSnapshotWriter"/>,
+/// shared with the position-event path that revalues today from those local rows (ADR-025).
 /// </summary>
 /// <remarks>
 /// Isolation mirrors <c>PriceSyncJob</c> (same "one bad input doesn't stop the rest" philosophy):
@@ -32,10 +35,9 @@ namespace Skarbiec.Reporting.Messaging;
 public sealed class DailyPricesSyncedConsumer(
     ReportingDbContext db,
     IPriceQuoteClient priceQuoteClient,
+    PortfolioSnapshotWriter snapshotWriter,
     ILogger<DailyPricesSyncedConsumer> logger) : IConsumer<DailyPricesSynced>
 {
-    private const string BaseCurrency = "PLN"; // ADR-008
-
     public async Task Consume(ConsumeContext<DailyPricesSynced> context)
     {
         var snapshotDate = context.Message.SyncDate;
@@ -60,6 +62,9 @@ public sealed class DailyPricesSyncedConsumer(
         var pricesByInstrument = await FetchPricesAsync(positions, snapshotDate, cancellationToken);
         var fxRatesByPair = await FetchFxRatesAsync(positions, pricesByInstrument, snapshotDate, cancellationToken);
 
+        await RememberLatestPricesAsync(pricesByInstrument, cancellationToken);
+        await RememberLatestFxRatesAsync(fxRatesByPair, cancellationToken);
+
         var existingSnapshots = await db.ValuationSnapshots
             .IgnoreQueryFilters()
             .Where(s => s.Date == snapshotDate)
@@ -77,7 +82,16 @@ public sealed class DailyPricesSyncedConsumer(
         {
             try
             {
-                UpsertPortfolio(group.Key, [.. group], pricesByInstrument, fxRatesByPair, snapshotDate, existingSnapshots, existingLines);
+                List<Position> portfolioPositions = [.. group];
+                snapshotWriter.UpsertPortfolio(
+                    group.Key,
+                    portfolioPositions[0].UserId,
+                    portfolioPositions,
+                    pricesByInstrument,
+                    fxRatesByPair,
+                    snapshotDate,
+                    existingSnapshots.GetValueOrDefault(group.Key),
+                    existingLines);
                 computed++;
             }
             catch (Exception ex)
@@ -92,94 +106,6 @@ public sealed class DailyPricesSyncedConsumer(
         logger.LogInformation(
             "DailyPricesSyncedConsumer: snapshot run for {SnapshotDate} finished: {Computed} portfolio(s) computed, {Failed} failed.",
             snapshotDate, computed, failed);
-    }
-
-    private void UpsertPortfolio(
-        Guid portfolioId,
-        IReadOnlyList<Position> portfolioPositions,
-        IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument,
-        IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
-        DateOnly snapshotDate,
-        IReadOnlyDictionary<Guid, ValuationSnapshot> existingSnapshots,
-        IReadOnlyDictionary<Guid, AssetValuation> existingLines)
-    {
-        var userId = portfolioPositions[0].UserId;
-
-        var valuationPositions = portfolioPositions
-            .Select(p => new ValuationPosition
-            {
-                AssetId = p.AssetId,
-                AssetClass = p.AssetClass,
-                ValuationMode = p.ValuationMode,
-                Currency = p.Currency,
-                Quantity = p.Quantity,
-                InstrumentId = p.InstrumentId,
-                ManualValueAmount = p.ManualValueAmount,
-            })
-            .ToList();
-
-        var result = ValuationAlgorithm.Calculate(valuationPositions, pricesByInstrument, fxRatesByPair, snapshotDate);
-
-        foreach (var valued in result.Lines)
-        {
-            UpsertLine(portfolioId, userId, valued, snapshotDate, existingLines);
-        }
-
-        if (existingSnapshots.TryGetValue(portfolioId, out var snapshot))
-        {
-            snapshot.UserId = userId;
-            snapshot.TotalPln = result.TotalPln;
-            snapshot.IsStale = result.IsStale;
-        }
-        else
-        {
-            db.ValuationSnapshots.Add(new ValuationSnapshot
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                PortfolioId = portfolioId,
-                Date = snapshotDate,
-                TotalPln = result.TotalPln,
-                IsStale = result.IsStale,
-            });
-        }
-    }
-
-    private void UpsertLine(
-        Guid portfolioId,
-        Guid userId,
-        ValuedPosition valued,
-        DateOnly snapshotDate,
-        IReadOnlyDictionary<Guid, AssetValuation> existingLines)
-    {
-        if (existingLines.TryGetValue(valued.AssetId, out var line))
-        {
-            line.UserId = userId;
-            line.AssetClass = valued.AssetClass;
-            line.Quantity = valued.Quantity;
-            line.PriceUsed = valued.PriceUsed;
-            line.PriceDate = valued.PriceDate;
-            line.FxRateUsed = valued.FxRateUsed;
-            line.ValuePln = valued.ValuePln;
-            line.IsStale = valued.IsStale;
-            return;
-        }
-
-        db.AssetValuations.Add(new AssetValuation
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            PortfolioId = portfolioId,
-            AssetId = valued.AssetId,
-            Date = snapshotDate,
-            AssetClass = valued.AssetClass,
-            Quantity = valued.Quantity,
-            PriceUsed = valued.PriceUsed,
-            PriceDate = valued.PriceDate,
-            FxRateUsed = valued.FxRateUsed,
-            ValuePln = valued.ValuePln,
-            IsStale = valued.IsStale,
-        });
     }
 
     private async Task<IReadOnlyDictionary<Guid, InstrumentPriceLookup>> FetchPricesAsync(
@@ -202,19 +128,84 @@ public sealed class DailyPricesSyncedConsumer(
         DateOnly snapshotDate,
         CancellationToken cancellationToken)
     {
-        // Every non-PLN currency actually in play: a market asset's own quote currency (not its
-        // Asset.Currency — the price is denominated in whatever the instrument quotes in), or a
-        // manual/currency-valued asset's own Currency (M1.4: both non-market modes key off Currency,
-        // so filtering on InstrumentId is null already covers the new mode with no change here).
-        var currencies = pricesByInstrument.Values.Select(p => p.QuoteCurrency)
-            .Concat(positions.Where(p => p.InstrumentId is null).Select(p => p.Currency))
-            .Where(c => !string.Equals(c, BaseCurrency, StringComparison.OrdinalIgnoreCase))
-            .Select(c => c.ToUpperInvariant() + BaseCurrency)
-            .Distinct()
-            .ToList();
+        var pairs = PortfolioSnapshotWriter.RequiredFxPairs(positions, pricesByInstrument);
 
-        return currencies.Count == 0
+        return pairs.Count == 0
             ? new Dictionary<string, FxRateLookup>()
-            : await priceQuoteClient.GetLatestFxRatesAsync(currencies, snapshotDate, cancellationToken);
+            : await priceQuoteClient.GetLatestFxRatesAsync(pairs, snapshotDate, cancellationToken);
+    }
+
+    /// <summary>
+    /// spec-07: keeps every fetched close in <see cref="LatestInstrumentPrice"/> so the position-event
+    /// path can value with it later. Only moves forward — a run returning an older quote than the
+    /// stored one (a rerun for a past day) leaves the stored row alone. Staged, not saved: it commits
+    /// with this consume's one <c>SaveChangesAsync</c>.
+    /// </summary>
+    private async Task RememberLatestPricesAsync(
+        IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument, CancellationToken cancellationToken)
+    {
+        if (pricesByInstrument.Count == 0)
+        {
+            return;
+        }
+
+        var instrumentIds = pricesByInstrument.Keys.ToList();
+        var stored = await db.LatestInstrumentPrices
+            .Where(p => instrumentIds.Contains(p.InstrumentId))
+            .ToDictionaryAsync(p => p.InstrumentId, cancellationToken);
+
+        foreach (var (instrumentId, price) in pricesByInstrument)
+        {
+            if (!stored.TryGetValue(instrumentId, out var row))
+            {
+                db.LatestInstrumentPrices.Add(new LatestInstrumentPrice
+                {
+                    InstrumentId = instrumentId,
+                    QuoteCurrency = price.QuoteCurrency,
+                    Date = price.Date,
+                    Close = price.Close,
+                });
+            }
+            else if (price.Date >= row.Date)
+            {
+                row.QuoteCurrency = price.QuoteCurrency;
+                row.Date = price.Date;
+                row.Close = price.Close;
+            }
+        }
+    }
+
+    /// <summary>spec-07: the <see cref="LatestFxRate"/> twin of <see cref="RememberLatestPricesAsync"/> — same forward-only rule, pairs stored in canonical uppercase.</summary>
+    private async Task RememberLatestFxRatesAsync(
+        IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair, CancellationToken cancellationToken)
+    {
+        if (fxRatesByPair.Count == 0)
+        {
+            return;
+        }
+
+        var pairs = fxRatesByPair.Keys.Select(p => p.ToUpperInvariant()).Distinct().ToList();
+        var stored = await db.LatestFxRates
+            .Where(r => pairs.Contains(r.Pair))
+            .ToDictionaryAsync(r => r.Pair, cancellationToken);
+
+        foreach (var (key, rate) in fxRatesByPair)
+        {
+            var pair = key.ToUpperInvariant();
+            if (!stored.TryGetValue(pair, out var row))
+            {
+                stored[pair] = db.LatestFxRates.Add(new LatestFxRate
+                {
+                    Pair = pair,
+                    Date = rate.Date,
+                    Rate = rate.Rate,
+                }).Entity;
+            }
+            else if (rate.Date >= row.Date)
+            {
+                row.Date = rate.Date;
+                row.Rate = rate.Rate;
+            }
+        }
     }
 }

@@ -2,22 +2,27 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
+using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
 /// <summary>
 /// Upserts Reporting's local <see cref="Position"/> read model from <see cref="AssetPositionChanged"/>
-/// (spec-03, ADR-021). The event carries the full position state, so nothing here calls Portfolio
-/// back — that is the whole point of the read model.
+/// (spec-03, ADR-021), then revalues today's snapshot and lines of the event's portfolio from the
+/// locally stored last prices and rates (spec-07, ADR-025). The event carries the full position
+/// state, so nothing here calls Portfolio back — that is the whole point of the read model.
 /// </summary>
 /// <remarks>
 /// Ordering is by the event's own per-asset <c>Version</c> counter, not by a timestamp: clocks
 /// across a publisher and a consumer are not a total order, the counter is (spec-03 design
 /// decision 4). An event older than the stored row is dropped so an out-of-order redelivery cannot
 /// resurrect an older quantity; an equal version is the same state, so applying it is harmless.
+/// A dropped event revalues nothing, and neither does an archived portfolio — its last snapshot
+/// stays where it was (spec-07).
 /// </remarks>
 public sealed class AssetPositionChangedConsumer(
     ReportingDbContext db,
+    PortfolioSnapshotWriter snapshotWriter,
     ILogger<AssetPositionChangedConsumer> logger) : IConsumer<AssetPositionChanged>
 {
     public async Task Consume(ConsumeContext<AssetPositionChanged> context)
@@ -75,6 +80,15 @@ public sealed class AssetPositionChangedConsumer(
             position.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
+        // Saved first so the revaluation's read of the portfolio's positions sees this one — still
+        // inside the inbox transaction, so both commit or neither does (ADR-012).
         await db.SaveChangesAsync(cancellationToken);
+
+        if (message.PortfolioIsArchived)
+        {
+            return;
+        }
+
+        await snapshotWriter.RevalueTodayAsync(message.PortfolioId, message.UserId, cancellationToken);
     }
 }

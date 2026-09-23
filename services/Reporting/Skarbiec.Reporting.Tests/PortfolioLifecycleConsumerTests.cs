@@ -1,16 +1,15 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.ServiceDefaults.Tenancy;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
@@ -30,14 +29,7 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
     private const string RestoredQueueName = "portfolio-restored-consumer-test";
     private const string DeletedQueueName = "portfolio-deleted-consumer-test";
 
-    public async ValueTask InitializeAsync()
-    {
-        await using var provider = BuildProvider();
-        await using var scope = provider.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<ReportingDbContext>().Database.MigrateAsync();
-
-        await containers.ResetDatabaseAsync();
-    }
+    public async ValueTask InitializeAsync() => await MigrateAndResetAsync(containers);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -50,11 +42,8 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
         var assetOneId = Guid.NewGuid();
         var assetTwoId = Guid.NewGuid();
 
-        await using (var seedProvider = BuildProvider())
+        await using (var db = OpenDbContext(containers))
         {
-            await using var scope = seedProvider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-
             await db.SeedPositionAsync(assetOneId, userId, portfolioId, cancellationToken, portfolioIsArchived: false);
             await db.SeedPositionAsync(assetTwoId, userId, portfolioId, cancellationToken, portfolioIsArchived: false);
         }
@@ -97,11 +86,8 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
         var otherAssetId = Guid.NewGuid();
         var valuationDate = new DateOnly(2026, 8, 1);
 
-        await using (var seedProvider = BuildProvider())
+        await using (var db = OpenDbContext(containers))
         {
-            await using var scope = seedProvider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-
             await db.SeedPositionAsync(deletedAssetId, userId, deletedPortfolioId, cancellationToken);
             await db.SeedValuationLineAsync(userId, deletedPortfolioId, deletedAssetId, valuationDate, 1_000m, cancellationToken);
             await db.SeedSnapshotAsync(userId, deletedPortfolioId, valuationDate, 1_000m, cancellationToken);
@@ -136,103 +122,61 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
         }, cancellationToken);
     }
 
-    private async Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken)
+    /// <summary>spec-07 AC9: a restored portfolio gets today's snapshot back right away, recomputed from its positions.</summary>
+    [Fact]
+    public async Task Restored_RevaluesTodaysSnapshot()
     {
-        await using var provider = BuildProvider();
-        var hostedServices = provider.GetServices<IHostedService>().ToList();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var cashAssetId = Guid.NewGuid();
+        var depositAssetId = Guid.NewGuid();
 
-        foreach (var hostedService in hostedServices)
+        await using (var db = OpenDbContext(containers))
         {
-            await hostedService.StartAsync(cancellationToken);
+            await db.SeedPositionAsync(cashAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 1_000m, portfolioIsArchived: true);
+            await db.SeedPositionAsync(depositAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 500m, portfolioIsArchived: true);
         }
 
-        try
+        await RunConsumerAsync(async provider =>
         {
-            // See AssetPositionChangedConsumerTests: a publish fired immediately after StartAsync can
-            // race the exchange->queue binding on a fresh queue and be dropped.
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-
-            await action(provider);
-        }
-        finally
-        {
-            for (var i = hostedServices.Count - 1; i >= 0; i--)
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new PortfolioRestored
             {
-                await hostedServices[i].StopAsync(cancellationToken);
-            }
-        }
+                PortfolioId = portfolioId,
+                UserId = userId,
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken);
+
+            Assert.Equal(1_500m, snapshot.TotalPln);
+            Assert.Equal(userId, snapshot.UserId);
+            Assert.False(snapshot.IsStale);
+
+            var lines = await GetLinesAsync(containers, portfolioId, today, cancellationToken);
+            Assert.Equal(2, lines.Count);
+            Assert.Equal(1_000m, Assert.Single(lines, l => l.AssetId == cashAssetId).ValuePln);
+            Assert.Equal(500m, Assert.Single(lines, l => l.AssetId == depositAssetId).ValuePln);
+        }, cancellationToken);
     }
 
-    private static async Task<List<Position>> WaitForPositionsAsync(
-        ServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken, Func<List<Position>, bool> predicate)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            await using var scope = provider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-            var positions = await db.Positions.IgnoreQueryFilters()
-                .Where(p => p.PortfolioId == portfolioId)
-                .ToListAsync(cancellationToken);
-
-            if (positions.Count > 0 && predicate(positions))
+    private Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
+        RunAsync(
+            containers,
+            x =>
             {
-                return positions;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
-        }
-
-        throw new TimeoutException($"Positions for portfolio {portfolioId} never matched the expected state within the deadline.");
-    }
-
-    private static async Task WaitForNoPositionsAsync(ServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            await using var scope = provider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-            var stillExists = await db.Positions.IgnoreQueryFilters().AnyAsync(p => p.PortfolioId == portfolioId, cancellationToken);
-
-            if (!stillExists)
-            {
-                return;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
-        }
-
-        throw new TimeoutException($"Positions for portfolio {portfolioId} were not deleted within the deadline.");
-    }
-
-    private ServiceProvider BuildProvider()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<ICurrentUser, DesignTimeCurrentUser>();
-
-        services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
-
-        services.AddMassTransit(x =>
-        {
-            x.SetKebabCaseEndpointNameFormatter();
-            x.AddEntityFrameworkOutbox<ReportingDbContext>(o => o.UsePostgres());
-
-            x.AddConsumer<PortfolioArchivedConsumer>(typeof(ArchivedConsumerDefinition));
-            x.AddConsumer<PortfolioRestoredConsumer>(typeof(RestoredConsumerDefinition));
-            x.AddConsumer<PortfolioDeletedConsumer>(typeof(DeletedConsumerDefinition));
-
-            x.UsingRabbitMq((context, cfg) =>
-            {
-                cfg.Host(new Uri(containers.RabbitMqConnectionString));
-
-                cfg.ConfigureEndpoints(context);
-            });
-        });
-
-        return services.BuildServiceProvider();
-    }
+                x.AddConsumer<PortfolioArchivedConsumer>(typeof(ArchivedConsumerDefinition));
+                x.AddConsumer<PortfolioRestoredConsumer>(typeof(RestoredConsumerDefinition));
+                x.AddConsumer<PortfolioDeletedConsumer>(typeof(DeletedConsumerDefinition));
+            },
+            action,
+            cancellationToken);
 
     private sealed class ArchivedConsumerDefinition : IdempotentConsumerDefinition<PortfolioArchivedConsumer, ReportingDbContext>
     {

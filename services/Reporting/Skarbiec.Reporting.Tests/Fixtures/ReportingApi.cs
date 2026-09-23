@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
+using Skarbiec.Reporting.Features.GetDashboard;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
@@ -136,5 +138,99 @@ internal static class ReportingApi
         });
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Seeds one <see cref="LatestFxRate"/> row (spec-07) — the last known rate the
+    /// <c>DailyPricesSynced</c> consumer would otherwise have stored, which the position-event path
+    /// values foreign currencies with.</summary>
+    public static async Task SeedLatestFxRateAsync(
+        this ReportingDbContext db,
+        string pair,
+        DateOnly date,
+        decimal rate,
+        CancellationToken cancellationToken)
+    {
+        db.Set<LatestFxRate>().Add(new LatestFxRate
+        {
+            Pair = pair,
+            Date = date,
+            Rate = rate,
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Seeds one <see cref="LatestInstrumentPrice"/> row (spec-07) — the last known close
+    /// the <c>DailyPricesSynced</c> consumer would otherwise have stored for <paramref name="instrumentId"/>.</summary>
+    public static async Task SeedLatestInstrumentPriceAsync(
+        this ReportingDbContext db,
+        Guid instrumentId,
+        string quoteCurrency,
+        DateOnly date,
+        decimal close,
+        CancellationToken cancellationToken)
+    {
+        db.Set<LatestInstrumentPrice>().Add(new LatestInstrumentPrice
+        {
+            InstrumentId = instrumentId,
+            QuoteCurrency = quoteCurrency,
+            Date = date,
+            Close = close,
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Polls <c>/health/ready</c> until the host's bus reports started — a message published before
+    /// the consumer's queue is bound would be dropped. Arrange only: throws if never ready.
+    /// </summary>
+    public static async Task WaitUntilReadyAsync(this HttpClient client, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
+
+        throw new TimeoutException("The Reporting host never reported ready.");
+    }
+
+    /// <summary>
+    /// Polls <c>GET /dashboard</c> with <paramref name="client"/> until its body satisfies
+    /// <paramref name="predicate"/> (an event-driven write lands asynchronously), then returns that
+    /// raw response for the test to assert on. After 15 s returns the last response as-is, so the
+    /// caller's own assertion reports what the dashboard actually said.
+    /// </summary>
+    public static async Task<HttpResponseMessage> GetDashboardWhenAsync(
+        this HttpClient client, Func<DashboardResponse, bool> predicate, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (true)
+        {
+            var response = await client.GetAsync(DashboardUri, cancellationToken);
+            if (DateTimeOffset.UtcNow >= deadline || !response.IsSuccessStatusCode)
+            {
+                return response;
+            }
+
+            // Read as a string, not ReadFromJsonAsync: that disposes the content's cached read
+            // stream, and the caller reads this same response again.
+            var body = JsonSerializer.Deserialize<DashboardResponse>(
+                await response.Content.ReadAsStringAsync(cancellationToken), JsonSerializerOptions.Web);
+            if (body is not null && predicate(body))
+            {
+                return response;
+            }
+
+            response.Dispose();
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
     }
 }
