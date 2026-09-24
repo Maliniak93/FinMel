@@ -1,0 +1,7 @@
+@use '../asset-form';
+
+.asset-form-dialog__title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

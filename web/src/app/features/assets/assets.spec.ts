@@ -12,6 +12,7 @@ import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetResponse, PortfolioResponse } from '../../api/portfolio';
 import { formatMoney } from '../../shared/format-money';
+import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
 import { Assets } from './assets';
 
@@ -171,6 +172,27 @@ describe('Assets', () => {
     await fixture.whenStable();
 
     expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  // Spec #105: the create/edit shell lives in asset-form/ now and is 560px wide so the type-picker
+  // tile grid fits.
+  it('opens the asset-form shell 560px wide for create and edit', async () => {
+    await setup(jsonResponse([asset]));
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    component['openCreateDialog']();
+    component['openEditDialog'](asset);
+
+    expect(dialog.open).toHaveBeenNthCalledWith(
+      1,
+      AssetFormDialog,
+      expect.objectContaining({ width: '560px', data: { portfolioId } }),
+    );
+    expect(dialog.open).toHaveBeenNthCalledWith(
+      2,
+      AssetFormDialog,
+      expect.objectContaining({ width: '560px', data: { portfolioId, asset } }),
+    );
   });
 
   it('does not reload when the create dialog is dismissed without saving', async () => {

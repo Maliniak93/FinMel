@@ -26,7 +26,7 @@ import { readProblemDetails } from '../../core/auth/problem-details';
 import { formatMoney } from '../../shared/format-money';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { assetClassLabel } from './asset-class';
-import { AssetFormDialog } from './asset-form-dialog/asset-form-dialog';
+import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
 
 // A manual valuation older than this is flagged as stale, prompting a refresh (no ADR/backlog
@@ -177,7 +177,7 @@ export class Assets {
 
   protected openCreateDialog(): void {
     const ref = this.dialog.open(AssetFormDialog, {
-      width: '480px',
+      width: '560px',
       data: { portfolioId: this.portfolioId() },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
@@ -189,7 +189,7 @@ export class Assets {
 
   protected openEditDialog(asset: AssetResponse): void {
     const ref = this.dialog.open(AssetFormDialog, {
-      width: '480px',
+      width: '560px',
       data: { portfolioId: this.portfolioId(), asset },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {

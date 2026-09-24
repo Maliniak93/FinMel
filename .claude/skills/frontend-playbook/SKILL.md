@@ -29,7 +29,7 @@ instead of constructor injection, native control flow (`@if`/`@for` with `track`
 ## Gotchas
 - **`MatDialogModule`/`MatSnackBarModule` in a component's `imports`**, when that component only injects `MatDialog`/`MatSnackBar` (no `<mat-dialog-*>` markup of its own), shadows the TestBed provider override in specs. Only import them where the directives are actually used in the template.
 - **Enums arrive over the wire as raw ints** (e.g. `AssetClass`) — never assume a string. Keep one label map per enum, next to where it's displayed.
-- **`DateOnly` round-trips as a `"YYYY-MM-DD"` string** — never construct it with `new Date(isoString)` (parses as UTC midnight, can render as the previous day depending on the viewer's offset). Use explicit local-midnight construction/formatting helpers (`toDateOnly`/`fromDateOnly` — see `asset-form-dialog.ts`), built from `getFullYear()`/`getMonth()`/`getDate()`, not string slicing of a `Date`'s ISO output.
+- **`DateOnly` round-trips as a `"YYYY-MM-DD"` string** — never construct it with `new Date(isoString)` (parses as UTC midnight, can render as the previous day depending on the viewer's offset). Use explicit local-midnight construction/formatting helpers (`toDateOnly`/`fromDateOnly` in `shared/date-only.ts` — import them, never copy them), built from `getFullYear()`/`getMonth()`/`getDate()`, not string slicing of a `Date`'s ISO output.
 - Money: the server computes every monetary value as `decimal` — the client only formats, via `Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' })` (see `shared/format-money.ts`). Never do arithmetic on a formatted or floating-point amount client-side.
 
 ## API changes

@@ -1,0 +1,7 @@
+<app-asset-basics-fields [group]="form.controls.basics" />
+
+<app-manual-value-fields [group]="form.controls.valuation" />
+
+@if (!isEdit()) {
+  <app-first-transaction-fields [group]="form.controls.initialTransaction" />
+}

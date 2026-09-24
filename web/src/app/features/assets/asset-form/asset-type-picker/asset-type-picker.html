@@ -1,0 +1,8 @@
+<div class="asset-type-picker">
+  @for (tile of tiles; track tile.value) {
+    <button type="button" class="asset-type-picker__tile" (click)="picked.emit(tile.value)">
+      <mat-icon aria-hidden="true">{{ tile.icon }}</mat-icon>
+      <span>{{ tile.label }}</span>
+    </button>
+  }
+</div>
