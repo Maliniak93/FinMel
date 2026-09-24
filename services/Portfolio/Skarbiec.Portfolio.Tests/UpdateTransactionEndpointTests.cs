@@ -92,4 +92,24 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC7: editing a transaction of an archived
+    /// portfolio's asset is a 409 <c>Conflict.PortfolioArchived</c>; transaction and quantity stay.</summary>
+    [Fact]
+    public async Task Update_InArchivedPortfolio_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var buyId = await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Buy, Quantity = 15m, UnitPrice = 100m, Date = new DateOnly(2026, 1, 1) };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(portfolioId, assetId, buyId), update, cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        Assert.Equal(10m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+        var page = await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(10m, page.Items.Single(t => t.Id == buyId).Quantity);
+    }
 }

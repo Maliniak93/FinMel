@@ -88,4 +88,23 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC7: deleting a transaction of an archived
+    /// portfolio's asset is a 409 <c>Conflict.PortfolioArchived</c>; transaction and quantity stay.</summary>
+    [Fact]
+    public async Task Delete_InArchivedPortfolio_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var buyId = await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        var response = await client.DeleteAsync(TransactionUri(portfolioId, assetId, buyId), cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        Assert.Equal(10m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+        var page = await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken);
+        Assert.Contains(page.Items, t => t.Id == buyId);
+    }
 }

@@ -31,7 +31,7 @@ The class → default-mode mapping is a default, not a hard constraint — Marke
 | `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out) |
 | `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FeeAmount, Date, xmin` | unchanged |
 
-Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write (spec-02); removal publishes `AssetRemoved` (deleting its transactions with it), deleting a portfolio publishes `PortfolioDeleted` plus one `AssetRemoved { CascadedFromPortfolio = true }` per asset (spec-08), and archive/restore publish `PortfolioArchived`/`PortfolioRestored` plus one `AssetPositionChanged` per asset carrying the new archived flag.
+Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write (spec-02); removal publishes `AssetRemoved` (deleting its transactions with it), deleting a portfolio publishes `PortfolioDeleted` plus one `AssetRemoved { CascadedFromPortfolio = true }` per asset (spec-08), and archive/restore publish `PortfolioArchived`/`PortfolioRestored` plus one `AssetPositionChanged` per asset carrying the new archived flag. An archived portfolio is read-only: adding, updating or removing its assets, and recording, updating or deleting their transactions, returns 409 `Conflict.PortfolioArchived` until it is restored. Renaming or deleting the portfolio itself stays allowed.
 
 ```mermaid
 erDiagram
@@ -135,7 +135,7 @@ erDiagram
 | Entity | Fields | Role |
 |---|---|---|
 | `Position` | copy of the `AssetPositionChanged` payload + `UpdatedAt`; `AssetId` is the primary key | upserted from the inbox; `PortfolioIsArchived` kept current from `Portfolio*` events |
-| `ValuationSnapshot` | `Id, UserId, PortfolioId, Date, TotalPln, IsStale` | breakdown is a `GROUP BY AssetClass` over `AssetValuation` lines, not a stored JSON blob; written by the daily sync, and for today also by every position event from the `Latest*` tables (ADR-025) |
+| `ValuationSnapshot` | `Id, UserId, PortfolioId, Date, TotalPln, IsStale` | breakdown is a `GROUP BY AssetClass` over `AssetValuation` lines, not a stored JSON blob; written by the daily sync, and for today also by every position event from the `Latest*` tables (ADR-025); `PortfolioArchived` zeroes today's snapshot, so an archived portfolio drops out of net worth while its earlier snapshots stay |
 | `AssetValuation` | `Id, UserId, PortfolioId, AssetId, Date, AssetClass, Quantity, PriceUsed?, PriceDate?, FxRateUsed?, ValuePln, IsStale`; unique `(AssetId, Date)` | the basis for P/L per asset, emergency fund and goal math, and TWR — nothing needs recomputing from scratch |
 | `LatestInstrumentPrice` | `InstrumentId` (PK), `QuoteCurrency, Date, Close` | last close seen in the daily batch — global reference data, no `UserId` (ADR-025) |
 | `LatestFxRate` | `Pair` (PK, e.g. `USDPLN`), `Date, Rate` | last rate seen in the daily batch — global reference data, no `UserId` (ADR-025) |

@@ -48,6 +48,17 @@ internal static class PortfolioApi
     }
 
     /// <summary>
+    /// Archives <paramref name="portfolioId"/>. From then on every asset/transaction write in it is
+    /// a 409 (archived-portfolio-out-of-net-worth) — arrange any content the fact needs first.
+    /// </summary>
+    public static async Task ArchivePortfolioAsync(
+        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync($"{PortfolioUri(portfolioId)}/archive", content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
     /// Adds an asset to <paramref name="portfolioId"/> and returns its id. No InitialTransaction is
     /// sent (M1.5), so the asset starts at quantity 0 with zero transactions — quantity is driven
     /// purely by transactions (ADR-009), never a directly-settable request field.

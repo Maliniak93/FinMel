@@ -18,11 +18,20 @@
         <h1>Transactions</h1>
       }
     </div>
-    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-      <mat-icon>add</mat-icon>
-      New transaction
-    </button>
+    @if (!isArchived()) {
+      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+        <mat-icon>add</mat-icon>
+        New transaction
+      </button>
+    }
   </div>
+
+  @if (isArchived()) {
+    <p class="transactions-page__archived-notice" role="status">
+      <mat-icon>inventory_2</mat-icon>
+      This portfolio is archived — restore it to make changes.
+    </p>
+  }
 
   @if (assetResource.error(); as assetError) {
     <div class="transactions-page__state" role="alert">
@@ -42,9 +51,11 @@
     @if (page.items.length === 0) {
       <div class="transactions-page__state">
         <p>No transactions recorded for this asset yet.</p>
-        <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-          Record your first transaction
-        </button>
+        @if (!isArchived()) {
+          <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+            Record your first transaction
+          </button>
+        }
       </div>
     } @else {
       <table mat-table [dataSource]="page.items" class="transactions-page__table">
@@ -122,8 +133,8 @@
           </td>
         </ng-container>
 
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
       </table>
 
       <mat-paginator

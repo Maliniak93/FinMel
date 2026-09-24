@@ -557,6 +557,87 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         Assert.False(evt.CascadedFromPortfolio);
     }
 
+    /// <summary>
+    /// archived-portfolio-out-of-net-worth AC6 (outbox half): every one of the six asset/transaction
+    /// writes into an archived portfolio fails with <c>Conflict.PortfolioArchived</c> before it
+    /// writes anything — no business row changes and not a single outbox row is added, so Reporting
+    /// never sees an event it would otherwise silently ignore. Each write runs in its own scope so a
+    /// half-applied change tracked by one handler cannot hide behind another's early return.
+    /// </summary>
+    [Fact]
+    public async Task WriteToArchivedPortfolio_WritesNoEvent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Archived outbox portfolio" }, cancellationToken)).Value.Id;
+            assetId = await AddAssetWithBuyAsync(arrange.ServiceProvider, portfolioId, "Shares", cancellationToken);
+            Assert.True((await arrange.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
+                .HandleAsync(portfolioId, cancellationToken)).IsSuccess);
+        }
+
+        Guid transactionId;
+        int outboxRowsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            var db = before.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+            transactionId = await db.Transactions.Where(t => t.AssetId == assetId).Select(t => t.Id).SingleAsync(cancellationToken);
+            outboxRowsBefore = await db.Set<OutboxMessage>().CountAsync(cancellationToken);
+        }
+
+        var writes = new (string Name, Func<IServiceProvider, Task<Error>> Write)[]
+        {
+            ("AddAsset", async s => (await s.GetRequiredService<AddAssetHandler>().HandleAsync(
+                portfolioId,
+                new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "New cash", Currency = "PLN", ManualValue = 100m, ManualValueDate = new DateOnly(2026, 1, 1) },
+                cancellationToken)).Error),
+            ("UpdateAsset", async s => (await s.GetRequiredService<UpdateAssetHandler>().HandleAsync(
+                portfolioId,
+                assetId,
+                new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", ManualValue = 1m, ManualValueDate = new DateOnly(2026, 1, 3) },
+                cancellationToken)).Error),
+            ("RecordTransaction", async s => (await s.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+                portfolioId,
+                assetId,
+                new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 3) },
+                cancellationToken)).Error),
+            ("UpdateTransaction", async s => (await s.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
+                portfolioId,
+                assetId,
+                transactionId,
+                new UpdateTransactionRequest { Type = TransactionType.Buy, Quantity = 50m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) },
+                cancellationToken)).Error),
+            ("DeleteTransaction", async s => (await s.GetRequiredService<DeleteTransactionHandler>()
+                .HandleAsync(portfolioId, assetId, transactionId, cancellationToken)).Error),
+            ("RemoveAsset", async s => (await s.GetRequiredService<RemoveAssetHandler>()
+                .HandleAsync(portfolioId, assetId, cancellationToken)).Error),
+        };
+
+        foreach (var (name, write) in writes)
+        {
+            await using var scope = _provider.CreateAsyncScope();
+            var error = await write(scope.ServiceProvider);
+            Assert.True(
+                error.Code == PortfolioAssertions.PortfolioArchivedErrorCode,
+                $"{name} on an archived portfolio returned '{error.Code}', expected '{PortfolioAssertions.PortfolioArchivedErrorCode}'.");
+        }
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
+        var asset = await verifyDb.Assets.SingleAsync(a => a.PortfolioId == portfolioId, cancellationToken);
+        Assert.Equal(assetId, asset.Id);
+        Assert.Equal("Shares", asset.Name);
+        Assert.Equal(5m, asset.Quantity);
+        var transaction = await verifyDb.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        Assert.Equal(transactionId, transaction.Id);
+        Assert.Equal(5m, transaction.Quantity);
+    }
+
     private static async Task<Guid> AddAssetWithBuyAsync(
         IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
     {

@@ -1,6 +1,9 @@
+import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
@@ -8,6 +11,7 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type {
   AssetResponse,
   PagedResponseOfTransactionResponse,
+  PortfolioResponse,
   TransactionResponse,
 } from '../../api/portfolio';
 import { Transactions } from './transactions';
@@ -35,6 +39,15 @@ const asset: AssetResponse = {
   manualValue: 1000,
   manualValueDate: '2020-01-01',
   transactionCount: 1,
+};
+
+const portfolio: PortfolioResponse = {
+  id: portfolioId,
+  name: 'Retirement',
+  description: null,
+  currency: 'PLN',
+  isArchived: false,
+  assetCount: 1,
 };
 
 const transaction: TransactionResponse = {
@@ -73,13 +86,19 @@ describe('Transactions', () => {
     fetchSpy.mockRestore();
   });
 
+  // The owning portfolio (GET /portfolios/{id}, no "/assets" in the URL) is what tells the page
+  // whether it is archived (archived-portfolio-out-of-net-worth) — AssetResponse carries no flag.
   async function setup(
     transactionsResponse: Response,
     assetResponse = jsonResponse(asset),
+    portfolioResponse = jsonResponse(portfolio),
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
-      return url.includes('/transactions') ? transactionsResponse : assetResponse;
+      if (url.includes('/transactions')) {
+        return transactionsResponse;
+      }
+      return url.includes('/assets') ? assetResponse : portfolioResponse.clone();
     });
     dialog = { open: vi.fn() };
     snackBar = { open: vi.fn() };
@@ -214,5 +233,76 @@ describe('Transactions', () => {
     expect(component['pageIndex']()).toBe(1);
     expect(component['pageSize']()).toBe(10);
     expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  // archived-portfolio-out-of-net-worth AC12: every transaction write on an archived portfolio's
+  // asset is a 409 on the backend, so the page offers none — no New transaction / Record your first
+  // transaction, no Edit / Delete in any row menu — and shows the archived notice instead.
+  describe('archived portfolio is read-only', () => {
+    const archivedPortfolio: PortfolioResponse = { ...portfolio, isArchived: true };
+    const archivedNotice = /This portfolio is archived\W+restore it to make changes/;
+
+    function pageText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function pageButtonTexts(): string[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+        (button) => button.textContent?.trim() ?? '',
+      );
+    }
+
+    // Opens every row menu the page renders (if any) and returns what the overlay offers.
+    async function rowMenuText(): Promise<string> {
+      const overlayContainer = TestBed.inject(OverlayContainer);
+      for (const triggerElement of fixture.debugElement.queryAll(By.directive(MatMenuTrigger))) {
+        triggerElement.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        await fixture.whenStable();
+      }
+      return overlayContainer.getContainerElement().textContent ?? '';
+    }
+
+    it('archived portfolio is read-only: no record / edit / delete actions, archived notice shown', async () => {
+      await setup(
+        jsonResponse(pagedResponse([transaction])),
+        jsonResponse(asset),
+        jsonResponse(archivedPortfolio),
+      );
+
+      // The history itself is still listed — archived is read-only, not hidden.
+      expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
+      expect(pageText()).toMatch(archivedNotice);
+      expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(false);
+
+      const menuText = await rowMenuText();
+      expect(menuText).not.toContain('Edit');
+      expect(menuText).not.toContain('Delete');
+    });
+
+    it('archived portfolio is read-only: the empty state offers no record button', async () => {
+      await setup(
+        jsonResponse(pagedResponse([])),
+        jsonResponse(asset),
+        jsonResponse(archivedPortfolio),
+      );
+
+      expect(pageText()).toMatch(archivedNotice);
+      const buttons = pageButtonTexts();
+      expect(buttons.some((text) => text.includes('New transaction'))).toBe(false);
+      expect(buttons.some((text) => text.includes('Record your first transaction'))).toBe(false);
+    });
+
+    it('archived portfolio is read-only: an active portfolio keeps its actions and shows no notice', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])));
+
+      expect(pageText()).not.toMatch(archivedNotice);
+      expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(true);
+
+      const menuText = await rowMenuText();
+      expect(menuText).toContain('Edit');
+      expect(menuText).toContain('Delete');
+    });
   });
 });

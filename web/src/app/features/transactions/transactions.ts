@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, input, resource, signal } from '@angular/core';
+import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -13,6 +13,7 @@ import { firstValueFrom } from 'rxjs';
 
 import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
+  getApiPortfolioPortfoliosById,
   getApiPortfolioPortfoliosByPortfolioIdAssetsById,
   getApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
   type TransactionResponse,
@@ -50,16 +51,6 @@ export class Transactions {
   readonly portfolioId = input.required<string>();
   readonly assetId = input.required<string>();
 
-  protected readonly displayedColumns = [
-    'date',
-    'type',
-    'quantity',
-    'unitPrice',
-    'fee',
-    'value',
-    'actions',
-  ];
-
   protected readonly pageIndex = signal(0);
   protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
 
@@ -76,6 +67,41 @@ export class Transactions {
       return result.data;
     },
   });
+
+  // AssetResponse carries no archived flag, so the owning portfolio is loaded for it alone. Loaded
+  // once: nothing on this page can archive or restore it, so reload() leaves it alone.
+  protected readonly portfolioResource = resource({
+    params: () => ({ portfolioId: this.portfolioId() }),
+    loader: async ({ params, abortSignal }) => {
+      const result = await getApiPortfolioPortfoliosById({
+        path: { id: params.portfolioId },
+        signal: abortSignal,
+      });
+      if (result.error) {
+        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load portfolio.');
+      }
+      return result.data;
+    },
+  });
+
+  // An archived portfolio is read-only: Portfolio rejects every transaction write on its assets
+  // with 409 (archived-portfolio-out-of-net-worth), so the page offers no record / edit / delete
+  // action and shows a notice instead. The history stays listed. If the portfolio fails to load,
+  // the asset load right next to it fails the same way and the page shows that error.
+  protected readonly isArchived = computed(
+    () => this.portfolioResource.hasValue() && this.portfolioResource.value().isArchived,
+  );
+
+  // The actions column holds only Edit / Delete, so an archived portfolio drops it entirely.
+  protected readonly displayedColumns = computed(() => [
+    'date',
+    'type',
+    'quantity',
+    'unitPrice',
+    'fee',
+    'value',
+    ...(this.isArchived() ? [] : ['actions']),
+  ]);
 
   protected readonly transactionsResource = resource({
     params: () => ({

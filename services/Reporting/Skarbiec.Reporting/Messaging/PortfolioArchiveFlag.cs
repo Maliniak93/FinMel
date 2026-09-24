@@ -6,7 +6,7 @@ namespace Skarbiec.Reporting.Messaging;
 /// <summary>
 /// The one line <see cref="PortfolioArchivedConsumer"/> and <see cref="PortfolioRestoredConsumer"/>
 /// share — archive and restore are the same write with a flipped flag. Returns whether the
-/// portfolio has any positions at all, so restore knows whether there is anything to revalue.
+/// portfolio has any positions at all, so both know whether there is anything to revalue.
 /// </summary>
 internal static class PortfolioArchiveFlag
 {

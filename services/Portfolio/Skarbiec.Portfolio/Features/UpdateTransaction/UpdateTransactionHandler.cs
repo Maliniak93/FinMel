@@ -17,6 +17,11 @@ public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext, Posit
             return AssetErrors.NotFound(assetId);
         }
 
+        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        {
+            return PortfolioErrors.Archived(portfolioId);
+        }
+
         var transaction = await dbContext.Transactions
             .FirstOrDefaultAsync(t => t.Id == id && t.AssetId == assetId, cancellationToken);
 

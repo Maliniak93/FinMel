@@ -13,11 +13,20 @@
         }
       </h1>
     </div>
-    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-      <mat-icon>add</mat-icon>
-      New asset
-    </button>
+    @if (!isArchived()) {
+      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+        <mat-icon>add</mat-icon>
+        New asset
+      </button>
+    }
   </div>
+
+  @if (isArchived()) {
+    <p class="assets-page__archived-notice" role="status">
+      <mat-icon>inventory_2</mat-icon>
+      This portfolio is archived — restore it to make changes.
+    </p>
+  }
 
   @if (portfolioResource.error(); as portfolioError) {
     <div class="assets-page__state" role="alert">
@@ -36,9 +45,11 @@
   } @else if (assetsResource.hasValue() && assetsResource.value().length === 0) {
     <div class="assets-page__state">
       <p>This portfolio doesn't have any assets yet.</p>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        Add your first asset
-      </button>
+      @if (!isArchived()) {
+        <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+          Add your first asset
+        </button>
+      }
     </div>
   } @else if (assetsResource.hasValue()) {
     <table mat-table [dataSource]="assetsResource.value()" class="assets-page__table">
@@ -144,8 +155,8 @@
         </td>
       </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
     </table>
   }
 </div>

@@ -47,6 +47,20 @@ Content-Type: application/json
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/archive
 Authorization: Bearer {{authToken}}
 
+### Add an asset to the archived portfolio (409)
+# Run right after the archive above. An archived portfolio is read-only: every asset and transaction
+# write in it is 409 with errorCode Conflict.PortfolioArchived until it is restored
+# (archived-portfolio-out-of-net-worth). Renaming or deleting the portfolio itself still works.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Cash",
+  "name": "Cash in an archived portfolio",
+  "currency": "PLN"
+}
+
 ### Restore an archived portfolio
 # Mirror of archive: 200 with isArchived=false. Repeating it on a portfolio that is not archived is
 # a no-op — still 200, but nothing is published (spec-02).

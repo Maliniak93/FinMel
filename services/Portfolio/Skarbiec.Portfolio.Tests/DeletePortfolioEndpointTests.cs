@@ -59,4 +59,24 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC8: the read-only rule does not block deleting
+    /// an archived portfolio — the delete still cascades to its assets and succeeds.</summary>
+    [Fact]
+    public async Task Delete_ArchivedPortfolio_Succeeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetIds) = await client.CreatePortfolioWithAssetsAndTransactionsAsync(
+            cancellationToken, assetCount: 1, transactionsPerAsset: 1);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        var response = await client.DeleteAsync(PortfolioUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var getPortfolio = await client.GetAsync(PortfolioUri(portfolioId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, getPortfolio.StatusCode);
+        var getAsset = await client.GetAsync(AssetUri(portfolioId, assetIds[0]), cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, getAsset.StatusCode);
+    }
 }

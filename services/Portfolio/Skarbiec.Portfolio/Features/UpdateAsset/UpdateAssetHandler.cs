@@ -19,6 +19,11 @@ public sealed class UpdateAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
+        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        {
+            return PortfolioErrors.Archived(portfolioId);
+        }
+
         // Switching modes is allowed (T2.9, extended to three modes by M1.4) — transactions are
         // untouched either way (this handler never writes to the Transaction table), only the
         // valuation fields below move.

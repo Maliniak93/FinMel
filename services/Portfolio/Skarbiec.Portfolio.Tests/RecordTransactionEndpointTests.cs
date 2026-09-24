@@ -145,4 +145,23 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
             [TransactionType.Dividend, TransactionType.Sell, TransactionType.Buy],
             page.Items.Select(t => t.Type));
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC7: recording a transaction on an asset of an
+    /// archived portfolio is a 409 <c>Conflict.PortfolioArchived</c> and the quantity is unchanged.</summary>
+    [Fact]
+    public async Task Record_InArchivedPortfolio_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 5m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var request = new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 3m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) };
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        Assert.Equal(5m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+        Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).TotalCount);
+    }
 }

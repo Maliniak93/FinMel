@@ -17,6 +17,11 @@ public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, Posit
             return AssetErrors.NotFound(assetId);
         }
 
+        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        {
+            return PortfolioErrors.Archived(portfolioId);
+        }
+
         var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
         if (unitPrice.IsFailure)
         {
