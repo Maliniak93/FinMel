@@ -3,6 +3,7 @@ using OpenTelemetry;
 using OpenTelemetry.Trace;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.AddCustomInstrument;
+using Skarbiec.MarketData.Features.GetFxRate;
 using Skarbiec.MarketData.Features.GetFxRatesBatch;
 using Skarbiec.MarketData.Features.GetInstrument;
 using Skarbiec.MarketData.Features.GetLatestPricesBatch;
@@ -57,6 +58,7 @@ builder.Services.AddScoped<AddCustomInstrumentHandler>();
 builder.Services.AddScoped<GetInstrumentHandler>();
 builder.Services.AddScoped<GetLatestPricesBatchHandler>();
 builder.Services.AddScoped<GetFxRatesBatchHandler>();
+builder.Services.AddScoped<GetFxRateHandler>();
 builder.Services.AddScoped<TriggerSyncHandler>();
 builder.Services.AddScoped<GetSyncStatusHandler>();
 
@@ -71,6 +73,7 @@ app.MapAddCustomInstrumentEndpoint();
 app.MapGetInstrumentEndpoint();
 app.MapGetLatestPricesBatchEndpoint();
 app.MapGetFxRatesBatchEndpoint();
+app.MapGetFxRateEndpoint();
 app.MapTriggerSyncEndpoint();
 app.MapGetSyncStatusEndpoint();
 

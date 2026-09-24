@@ -126,7 +126,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-021 ✅ Event-carried state transfer for positions; REST narrowed to validation + batch
 
-**Amended by ADR-027.**
+**Amended by ADR-026, ADR-027.**
 
 **Shipped:** 2026-09-22 (spec-02 publishes the events, spec-03 consumes them and deletes the REST query).
 
@@ -151,6 +151,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 ## ADR-024 ✅ Development model — spec as the unit of work
 
 **Context:** the task-list-per-phase model (`archive/zadania/phase-*.md`) served Phases 0–2 well as a learning scaffold, but doesn't fit a codebase past bring-up: it has no place for agent delegation, per-role model selection, or a deterministic pipeline — a human executed each task in order.
+**Amended 2026-09-24:** specs moved from files to GitHub issues on the FinMel project — Status Todo/In progress/Done replaces the `draft`/`approved`/`building`/`done` frontmatter, publishing the issue after the `/design` interview is the approval, the `skip-tests` label replaces `skip: [tests]`, and a merged PR with `Closes #<n>` marks it done. The rest of the decision below stands; read "spec file" as "spec issue" (`workflow.md` → The board).
 **Decision:** the spec is the unit of work (`skarbiec-plan/specs/<slug>.md`, shaped by `specs/_template.md`). `/design` interviews and writes a spec at `status: draft`; the user approves it to `status: approved` (Definition of Ready: every AC maps to a test or command, tier is set, no open questions remain). `/build <spec>` runs a deterministic script (`Workflow` — zero model tokens spent on control flow) through Tests → Implement → Verify → Review → Stage, delegating each phase to an agent whose model/effort matches that phase's difficulty (Haiku for mechanical verification, Sonnet for tests/implementation/ops, Opus for review and Tier-2 implementation). Author ≠ reviewer: the reviewer runs in a fresh context, adversarial to the spec, and returns structured findings, not prose. The pipeline's only git mutations are `git switch -c feat/<slug>` and `git add -A`: it never commits, pushes or opens a PR — the user does all three by hand, and always merges.
 **Consequences:** git operations, PR merges and branch cleanup stay entirely the user's call — the orchestrator never commits and never merges. The reviewer therefore diffs the index (`git diff --cached`), which shows new files just as a commit would. Minor review findings come back in the run's report instead of being posted on a PR that does not exist yet. Definition of Done: verify green, review has no `blocking` findings, the whole change staged on `feat/<slug>`, spec flipped to `status: done`, and any rule/ADR the spec touched staged with it. Verification is run once per Verify phase by the `verifier` alone — the implementer and test-writer run only `--filter`ed tests, so no suite is paid for twice. Full operational detail lives in `workflow.md`.
 
@@ -160,9 +161,11 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Decision:** Reporting stores the last prices and FX rates it fetched in the daily batch (`LatestInstrumentPrice`, `LatestFxRate`: global reference data, no `UserId`). `AssetPositionChanged`, `AssetRemoved`, `PortfolioArchived` and `PortfolioRestored` consumers recompute the affected portfolio's snapshot and lines for today from these local tables, inside the inbox transaction and serialized per portfolio by an advisory lock. No new REST call: ADR-021's two REST uses are unchanged. Amends ADR-015 (the dashboard is consistent with positions within one event delivery; prices stay daily).
 **Consequences:** one valuation writer shared by the sync and the event path. A price or rate never seen by Reporting values at 0 with the stale flag until the next sync. Past snapshots are still not recomputed. Archiving values only non-archived positions, so it writes a zero snapshot for today: an archived portfolio drops out of net worth from the archive date on, and its earlier snapshots stay (spec `archived-portfolio-out-of-net-worth`). Spec: `spec-07-dashboard-instant-revaluation`.
 
-## ADR-026 🕐 Third REST use — Portfolio → MarketData FX rate lookup on the request path
+## ADR-026 ✅ Third REST use — Portfolio → MarketData FX rate lookup on the request path
 
 **Amended by ADR-027.**
+
+**Shipped:** 2026-09-24 (spec `transactions-pln-value-and-fee-removal`).
 
 **Context:** each transaction must store its FX rate to PLN from its own date so the transactions table can show a comparable `Value (PLN)` (spec `transactions-pln-value-and-fee-removal`). Portfolio has no FX data; MarketData holds the full `FxRate(Pair, Date, Rate)` history. ADR-021 limits service-to-service REST to two uses.
 **Decision:** add a third REST use: Portfolio asks MarketData for the latest `{currency}PLN` rate on or before the transaction date while recording, updating or creating-with-initial a transaction. The endpoint is `GET /internal/fx/{currency}/rate?date=` (anonymous, service-only, ADR-027). It fails closed like the instrument lookup: MarketData unreachable → 503, no rate for the date → the transaction is saved with a `null` rate. PLN assets never call MarketData (rate 1). The loser was a local FX copy in Portfolio fed by a new full-state FX event plus a backfill: cleaner for ADR-021, too heavy for one column. Amends ADR-021.

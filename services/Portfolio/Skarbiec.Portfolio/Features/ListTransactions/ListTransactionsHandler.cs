@@ -14,11 +14,14 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var assetExists = await dbContext.Assets
+        // Every transaction is in its asset's currency, so the lookup doubles as the existence check.
+        var currency = await dbContext.Assets
             .AsNoTracking()
-            .AnyAsync(a => a.Id == assetId && a.PortfolioId == portfolioId, cancellationToken);
+            .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
+            .Select(a => a.Currency)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!assetExists)
+        if (currency is null)
         {
             return AssetErrors.NotFound(assetId);
         }
@@ -35,7 +38,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
 
         return new PagedResponse<TransactionResponse>
         {
-            Items = [.. transactions.Select(t => t.ToResponse())],
+            Items = [.. transactions.Select(t => t.ToResponse(currency))],
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount

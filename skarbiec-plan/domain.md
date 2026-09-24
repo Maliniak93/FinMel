@@ -29,7 +29,7 @@ The class → default-mode mapping is a default, not a hard constraint — Marke
 |---|---|---|
 | `Portfolio` | `Id, UserId, Name, Description?, Currency, IsArchived` | `AssetCount` removed (spec-02); delete cascades to its assets and their transactions in the handler (spec-08) |
 | `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out) |
-| `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FeeAmount, Date, xmin` | unchanged |
+| `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, xmin` | `FeeAmount` removed; `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when MarketData has none that early (ADR-026) |
 
 Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write (spec-02); removal publishes `AssetRemoved` (deleting its transactions with it), deleting a portfolio publishes `PortfolioDeleted` plus one `AssetRemoved { CascadedFromPortfolio = true }` per asset (spec-08), and archive/restore publish `PortfolioArchived`/`PortfolioRestored` plus one `AssetPositionChanged` per asset carrying the new archived flag. An archived portfolio is read-only: adding, updating or removing its assets, and recording, updating or deleting their transactions, returns 409 `Conflict.PortfolioArchived` until it is restored. Renaming or deleting the portfolio itself stays allowed.
 
@@ -63,10 +63,10 @@ erDiagram
         uuid id PK
         uuid user_id
         uuid asset_id FK
-        string type "Buy Sell Deposit Withdraw Dividend Interest Fee"
+        string type "Buy Sell Deposit Withdraw Dividend Interest"
         numeric quantity
         numeric unit_price_amount
-        numeric fee_amount
+        numeric fx_rate_to_pln "null = no rate on or before date"
         date date
         xid xmin "concurrency token"
     }
@@ -232,7 +232,8 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 
 - `TargetAllocationLine` percentages within one allocation sum to exactly 100.
 - A `Sell` transaction cannot take asset quantity below 0, checked across the asset's full transaction history.
-- Amounts and quantities ≥ 0; fees ≥ 0.
+- Amounts and quantities ≥ 0.
+- An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
 - One `PriceQuote` per (instrument, date); one `FxRate` per (pair, date) — unique indexes.
 - Every user-owned entity carries `UserId` from the JWT — enforced by an architecture test, never trusted from the request body (ADR-006).
 - A user-chosen currency (`Portfolio.Currency`, `Asset.Currency`) is one of `SupportedCurrencies` (PLN/EUR/USD, default PLN, canonical uppercase) — validated on write only; this does not constrain `Instrument.QuoteCurrency` or `FxRate.Pair`.
@@ -241,7 +242,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 ## Conscious simplifications
 
 - **Single-entry transactions**: `Dividend`/`Interest` do not create an offsetting cash-asset flow — they record that income happened, not where the cash landed. Modeling a full double-entry ledger was judged not worth it for a personal-use app.
-- **Fees in the asset's own currency**: a `Transaction.FeeAmount` is denominated in `Asset.Currency`, never a separate currency — avoids a second FX lookup per transaction.
+- **PLN value frozen at the transaction-date rate**: a transaction's PLN value is `Quantity × UnitPriceAmount × FxRateToPln`, with the rate fixed when the transaction is written and never recomputed later (e.g. after an older-history backfill) — a `null` rate fills in only when that transaction is edited (ADR-026).
 - **PLN-only base currency**: every valuation ends in PLN (ADR-008); there is no per-user reporting currency.
 
 ## Cross-service reference rule (ADR-003)

@@ -145,7 +145,6 @@ Content-Type: application/json
   "type": "Deposit",
   "quantity": 1,
   "unitPrice": 5000,
-  "fee": 0,
   "date": "2026-08-18"
 }
 
@@ -162,7 +161,6 @@ Content-Type: application/json
   "type": "Deposit",
   "quantity": 1,
   "unitPrice": 5200,
-  "fee": 0,
   "date": "2026-08-18"
 }
 

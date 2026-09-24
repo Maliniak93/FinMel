@@ -31,6 +31,10 @@ internal static class MarketDataApi
 
     public static string InternalInstrumentUri(Guid id) => $"/internal/instruments/{id}";
 
+    /// <summary>GetFxRate (ADR-026): the latest <c>{currency}PLN</c> rate on or before <paramref name="date"/>.</summary>
+    public static string InternalFxRateUri(string currency, DateOnly date) =>
+        $"/internal/fx/{currency}/rate?date={date:yyyy-MM-dd}";
+
     public static string SearchInstrumentsUri(string? q = null, int? limit = null)
     {
         var parameters = new List<string>();

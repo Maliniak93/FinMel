@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
@@ -81,11 +82,14 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     /// <summary>M1.5 AC: "Create with one → quantity matches a from-scratch recompute, and the
-    /// transaction is listed by ListTransactions."</summary>
+    /// transaction is listed by ListTransactions." transactions-pln-value-and-fee-removal AC8: the
+    /// listed transaction carries the asset's currency and its PLN value at the transaction-date
+    /// rate (5 × 150 USD × 4.00), and no fee.</summary>
     [Fact]
     public async Task Add_WithInitialTransaction_QuantityMatchesRecomputeAndTransactionIsListed()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.FxRateLookupClient.WithRate("USD", 4.00m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var request = new AddAssetRequest
@@ -99,7 +103,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
                 Type = TransactionType.Buy,
                 Quantity = 5m,
                 UnitPrice = 150m,
-                Fee = 2m,
                 Date = new DateOnly(2026, 1, 1)
             }
         };
@@ -113,13 +116,84 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(1, body.TransactionCount);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, body.Id, cancellationToken);
 
-        var transactions = await client.ListTransactionsAsync(portfolioId, body.Id, cancellationToken);
-        var listed = Assert.Single(transactions.Items);
+        var listResponse = await client.GetAsync(TransactionsUri(portfolioId, body.Id), cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        var listedJson = Assert.Single((await listResponse.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray());
+        listedJson.AssertCarriesNoFee();
+        var listed = listedJson.Deserialize<TransactionResponse>(JsonSerializerOptions.Web)!;
         Assert.Equal(TransactionType.Buy, listed.Type);
         Assert.Equal(5m, listed.Quantity);
         Assert.Equal(150m, listed.UnitPrice);
-        Assert.Equal(2m, listed.Fee);
+        Assert.Equal("USD", listed.Currency);
+        Assert.Equal(3000.00m, listed.ValuePln);
         Assert.Equal(new DateOnly(2026, 1, 1), listed.Date);
+        Assert.Equal(("USD", new DateOnly(2026, 1, 1)), Assert.Single(Factory.FxRateLookupClient.Calls));
+    }
+
+    /// <summary>transactions-pln-value-and-fee-removal: the initial transaction resolves its PLN rate
+    /// like RecordTransaction does — MarketData being down is a 503 and no half-created asset is left
+    /// behind.</summary>
+    [Fact]
+    public async Task Add_WithInitialTransactionWhenFxUnavailable_ReturnsServiceUnavailableAndCreatesNoAsset()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.FxRateLookupClient.WithUnavailable("EUR");
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Euro account",
+            Currency = "EUR",
+            InitialTransaction = new RecordTransactionRequest
+            {
+                Type = TransactionType.Deposit,
+                Quantity = 500m,
+                UnitPrice = 1m,
+                Date = new DateOnly(2026, 3, 4)
+            }
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Single(Factory.FxRateLookupClient.Calls);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+    }
+
+    /// <summary>transactions-pln-value-and-fee-removal: a PLN asset's initial transaction is valued
+    /// at rate 1 without asking MarketData.</summary>
+    [Fact]
+    public async Task Add_PlnAssetWithInitialTransaction_ValuePlnEqualsAmountWithoutFxLookup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Checking account",
+            Currency = "PLN",
+            InitialTransaction = new RecordTransactionRequest
+            {
+                Type = TransactionType.Deposit,
+                Quantity = 1_000m,
+                UnitPrice = 1m,
+                Date = new DateOnly(2026, 3, 4)
+            }
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        var listed = Assert.Single((await client.ListTransactionsAsync(portfolioId, body!.Id, cancellationToken)).Items);
+        Assert.Equal("PLN", listed.Currency);
+        Assert.Equal(1000.00m, listed.ValuePln);
+        Assert.Empty(Factory.FxRateLookupClient.Calls);
     }
 
     /// <summary>M1.5 AC: "An invalid initial transaction → 400, and no asset is created (assert the

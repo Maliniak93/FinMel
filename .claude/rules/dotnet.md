@@ -55,6 +55,7 @@ Messaging lives in `messaging.md`, tests in `testing.md`, domain rules in `domai
 
 ## HTTP between services
 
+- Exactly three call sites are allowed (ADR-021, ADR-026): Portfolio → MarketData instrument lookup (`GET /internal/instruments/{id}`) and FX rate lookup (`GET /internal/fx/{currency}/rate?date=`), both on the request path, and the daily Reporting → MarketData price/FX batch (`POST /internal/prices/latest-batch`, `/internal/fx/latest-batch`). A new one needs an ADR.
 - One typed `HttpClient` per dependency, based at `https+http://<service>-service` (Aspire service discovery). Resilience comes from ServiceDefaults' `ConfigureHttpClientDefaults` — do not add retry or circuit-breaker policies per client.
 - The callee maps every service-only endpoint through `app.MapInternalGroup("<path>")` (ServiceDefaults), which puts it at `/internal/<path>`, anonymous and excluded from OpenAPI (ADR-027). `/internal` sits outside `/api/`, so the Gateway has no route to it; never add one. Callers send no token — no handler on the typed client, no user or system JWT.
 - `/internal` endpoints serve global data only (no `UserId`): no identity reaches them, so a `UserId`-scoped `/internal` endpoint is forbidden. Anything user-scoped stays on `/api/<service>/...` behind `.RequireAuthorization()`.

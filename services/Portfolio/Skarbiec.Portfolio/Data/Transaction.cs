@@ -17,6 +17,12 @@ public sealed class Transaction : IUserOwned
     /// </summary>
     public decimal UnitPriceAmount { get; set; }
 
-    public decimal FeeAmount { get; set; }
+    /// <summary>
+    /// The <c>{Asset.Currency}PLN</c> rate frozen at write time — the latest MarketData rate on or
+    /// before <see cref="Date"/> (ADR-026); <c>1</c> for a PLN asset. <see langword="null"/> when
+    /// MarketData had no rate that early, so the transaction's PLN value is unknown.
+    /// </summary>
+    public decimal? FxRateToPln { get; set; }
+
     public required DateOnly Date { get; set; }
 }

@@ -12,7 +12,5 @@ public sealed record RecordTransactionRequest
 
     public required decimal UnitPrice { get; init; }
 
-    public decimal Fee { get; init; }
-
     public required DateOnly Date { get; init; }
 }

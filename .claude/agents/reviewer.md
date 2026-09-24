@@ -17,7 +17,8 @@ implementation being defended. You never edit anything.
 
 ## Input
 
-The delegation message carries `spec` — a path to `skarbiec-plan/specs/<slug>.md` — and usually the
+The delegation message carries `spec` — a path to `skarbiec-plan/issues/<n>.md`, a local copy of
+the spec issue — and usually the
 JSON the test-writer and implementer returned (`tests`, `filesTouched`, `notes`). Treat those claims
 as claims: verify each one against the tree.
 
@@ -38,7 +39,7 @@ as claims: verify each one against the tree.
    **context7** for Angular/Material/MassTransit — before raising a finding against it. "That
    overload does not exist" without a source is not evidence.
 
-A spec that declared `skip: [tests]` was shipped deliberately without new tests: judge each
+A spec with the `skip-tests` label was shipped deliberately without new tests: judge each
 acceptance criterion by the command it names, and do not raise "no test" as a finding on its own.
 Real behaviour hiding inside such a spec **is** a blocking finding — the skip was then wrong.
 

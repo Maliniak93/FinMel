@@ -24,6 +24,14 @@ public sealed class UpdateAssetHandler(
             return PortfolioErrors.Archived(portfolioId);
         }
 
+        // Each transaction's frozen PLN rate belongs to the asset's currency (ADR-026), so the
+        // currency locks once there is one.
+        if (!string.Equals(request.Currency, asset.Currency, StringComparison.Ordinal)
+            && await dbContext.Transactions.AnyAsync(t => t.AssetId == assetId, cancellationToken))
+        {
+            return AssetErrors.CurrencyLockedByTransactions;
+        }
+
         // Switching modes is allowed (T2.9, extended to three modes by M1.4) — transactions are
         // untouched either way (this handler never writes to the Transaction table), only the
         // valuation fields below move.

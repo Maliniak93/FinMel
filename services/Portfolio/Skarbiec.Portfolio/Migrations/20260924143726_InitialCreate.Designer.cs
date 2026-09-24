@@ -12,7 +12,7 @@ using Skarbiec.Portfolio.Data;
 namespace Skarbiec.Portfolio.Migrations
 {
     [DbContext(typeof(PortfolioDbContext))]
-    [Migration("20260923133207_InitialCreate")]
+    [Migration("20260924143726_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -299,9 +299,9 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
-                    b.Property<decimal>("FeeAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                    b.Property<decimal?>("FxRateToPln")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 8)

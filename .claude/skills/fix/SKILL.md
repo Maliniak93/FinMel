@@ -1,14 +1,19 @@
 ---
 name: fix
-description: Reproduce a bug, find its root cause, write a one-criterion fix spec, and (after approval) run the same build pipeline that ships features. Never patches without a failing reproduction.
+description: Reproduce a bug, find its root cause, publish a one-criterion fix spec as an issue on the FinMel GitHub project, and (after approval) build it with the same pipeline that ships features. Never patches without a failing reproduction.
 argument-hint: "<bug description, failing test name, verify failure, or log path>"
 disable-model-invocation: true
 model: claude-opus-5-5
 effort: high
 ---
 
-Turn the bug in `$ARGUMENTS` into a verified fix. You diagnose and specify; the pipeline implements, so the
-author of the fix is never its reviewer.
+Turn the bug in `$ARGUMENTS` into a verified fix. You diagnose and specify; the pipeline implements,
+so the author of the fix is never its reviewer.
+
+## 0. Is it already known?
+
+`node scripts/plan-status.mjs` lists every open spec issue. One that
+already covers the bug → say so and ask whether to build that one (`/build #<n>`) instead.
 
 ## 1. Reproduce before anything else
 
@@ -31,33 +36,47 @@ No reproduction → stop and say exactly what you tried and what you saw. Do not
 - If the cause is a missing design (an event that does not exist, a rule the ADRs never decided), say so and stop:
   that is `/design`, not `/fix`.
 
-## 3. Write the fix spec
+## 3. Draft the fix issue
 
-`skarbiec-plan/specs/fix-<slug>.md` from `skarbiec-plan/specs/_template.md`, kept short:
+In the session scratchpad as `fix-<slug>.md`, from `.claude/skills/design/issue-template.md` —
+**never in the repo**. Keep it short:
 
-- Frontmatter: `title: Fix: <symptom>`, `status: draft`, `branch: feat/fix-<slug>`, `created`, `tier` — **1** unless
-  the fix changes an event contract, a data model, or crosses a service boundary (then **2**).
-- Goal = observed vs expected, one sentence each. Why = the root cause and its evidence.
+- Title `Fix: <symptom>`. Tier **1** unless the fix changes an event contract, a data model, or
+  crosses a service boundary (then **2**).
+- Goal = expected behaviour, one sentence. **Current behaviour** = the observed symptom and the
+  reproduction you ran. Why = the root cause and its evidence.
 - Scope = the files and slices that must change; Out of scope = the neighbouring refactor you were tempted by.
 - Design decisions = the fix approach and why it targets the cause.
 - Acceptance criteria: **AC-1 is a reproduction test** that fails today and passes after the fix, named
   `Method_Scenario_Outcome` in the right test project (or `*.spec.ts` for Angular); **AC-2** = the touched
   projects stay green — proof `node scripts/verify.mjs --projects <A,B|web>`. Add more only for edge cases the
   root cause implies.
-- Risks / open questions empty.
+- Leave empty sections and HTML comments alone — publishing strips them.
 
-## 4. Approve and build
+## 4. Approve, publish, build
 
-Present at most 10 lines: symptom, root cause + evidence, fix approach, tier, the AC-1 test name. Ask for
-approval. Only after an explicit yes: set `status: approved`, then call the `Workflow` tool with
-`{ name: 'build-feature', args: { spec: 'skarbiec-plan/specs/fix-<slug>.md', tier: <tier>, maxRounds: 2 } }`
-and report exactly as `/build` does (status, branch, staged files, tests, rounds, minor findings, then
-the commit/push/PR commands — the run stages the change and stops; committing and the PR are the user's).
+Run `node scripts/gh-project.mjs check --body-file <scratchpad>/fix-<slug>.md` and fix what it lists.
+Then present at most 10 lines: symptom, root cause + evidence, fix approach, tier, the AC-1 test name. Ask for
+approval; iterate on the draft until the user says yes. Only after an explicit yes:
+
+```
+node scripts/gh-project.mjs create --title "Fix: <symptom>" --body-file <scratchpad>/fix-<slug>.md \
+  --slug <slug> --tier <1|2> --kind fix
+```
+
+It prints `{"number","url","branch"}` — the branch is `fix/<slug>`. If it fails after the issue exists it
+prints the URL: finish the missing fields with `node scripts/gh-project.mjs set <number> <field> <value>`
+instead of creating a duplicate.
+
+Then build it exactly as `/build` does: `node scripts/gh-project.mjs prepare <number>`, then the
+`Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`. The workflow posts
+its own report on the issue; report to the user as `/build` does (at most 10 lines, ending with the
+three `nextSteps` commands, which you never run).
 
 ## Hard constraints
 
 - Write no production code and no test yourself — the test-writer writes the reproduction test, the implementer
-  fixes it, the reviewer checks it. Your only files are the spec and nothing else.
+  fixes it, the reviewer checks it. Your only artefact is the issue.
 - Never run `git add`, `git commit`, `git push`, `git switch`, `git checkout`, `git stash`. Read-only git is fine.
 - A flaky test is a bug in the test or the fixture, not a reason to retry until green — treat it like any other bug.
 - Never widen the fix into cleanup. One cause, one fix, one PR.

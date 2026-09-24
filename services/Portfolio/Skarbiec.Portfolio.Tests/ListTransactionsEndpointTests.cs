@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -61,6 +62,40 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.Equal(2, page.Items.Count);
         Assert.Equal(new DateOnly(2026, 1, 3), page.Items[0].Date);
         Assert.Equal(new DateOnly(2026, 1, 2), page.Items[1].Date);
+    }
+
+    /// <summary>transactions-pln-value-and-fee-removal AC8: every listed transaction carries the
+    /// asset's currency and its server-computed PLN value (<c>null</c> when no rate was known), and
+    /// no fee.</summary>
+    [Fact]
+    public async Task List_ReturnsCurrencyAndValuePln()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var pricedDate = new DateOnly(2026, 3, 4);
+        var unpricedDate = new DateOnly(2020, 1, 2);
+        Factory.FxRateLookupClient.WithRate("EUR", pricedDate, 4.30m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "EUR");
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 2m, pricedDate, cancellationToken, unitPrice: 50m);
+        Factory.FxRateLookupClient.WithNotFound("EUR");
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, unpricedDate, cancellationToken, unitPrice: 50m);
+
+        var response = await client.GetAsync(TransactionsUri(portfolioId, assetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(2, items.Count);
+        Assert.All(items, item =>
+        {
+            item.AssertCarriesNoFee();
+            Assert.Equal("EUR", item.GetProperty("currency").GetString());
+        });
+        var priced = items[0].Deserialize<TransactionResponse>(JsonSerializerOptions.Web)!;
+        var unpriced = items[1].Deserialize<TransactionResponse>(JsonSerializerOptions.Web)!;
+        Assert.Equal(pricedDate, priced.Date);
+        Assert.Equal(430.00m, priced.ValuePln);
+        Assert.Equal(unpricedDate, unpriced.Date);
+        Assert.Null(unpriced.ValuePln);
     }
 
     [Fact]

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Live status of the plan: every spec in skarbiec-plan/specs/ against what git and GitHub actually
-// say. Derived, never hand-written — the README's status table drifted three ways within two weeks
-// of being written, because nothing recomputed it.
+// Live status of the plan: every open spec issue on the FinMel GitHub project (read through
+// `scripts/gh-project.mjs list`) against what git and GitHub actually say. Derived, never
+// hand-written — the README's status table drifted three ways within two weeks of being written,
+// because nothing recomputed it.
 //
 // Usage: node scripts/plan-status.mjs [--write] [--no-gh]
 //
@@ -10,9 +11,11 @@
 //   --write      also replace the block between the `status:start` / `status:end` markers in
 //                skarbiec-plan/README.md. Everything outside those markers is hand-written and is
 //                never touched — "Open loops" is judgement, not data.
-//   --no-gh      skip the GitHub query (open PRs). Implied when `gh` is missing or unauthenticated.
+//   --no-gh      skip the GitHub queries (spec issues, open PRs) and report git alone. Implied when
+//                `gh` is missing or unauthenticated.
 //
-// Never mutates the repository: only `git` plumbing reads and one `gh pr list`. Exit code 0 in every
+// Never mutates the repository: only `git` plumbing reads, one `gh-project.mjs list` and one
+// `gh pr list`. Exit code 0 in every
 // normal case including a missing `gh` — a status report that fails a session start would be worse
 // than a slightly thinner one. Exit 2 only when `--write` cannot find its markers, which is a real
 // misconfiguration the user must fix.
@@ -21,17 +24,18 @@
 // gives every child process an explicit cwd, so it runs from anywhere (hooks run from wherever the
 // session happens to be). `gh` gets a short timeout: a session start must not wait on the network.
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SPECS_DIR = path.join(REPO_ROOT, "skarbiec-plan", "specs");
+const GH_PROJECT = path.join(REPO_ROOT, "scripts", "gh-project.mjs");
 const README = path.join(REPO_ROOT, "skarbiec-plan", "README.md");
 const START = "<!-- status:start -->";
 const END = "<!-- status:end -->";
 const GH_TIMEOUT_MS = 8000;
+const PROJECT_TIMEOUT_MS = 20000; // item-list plus one sub-issue call per epic
 const TRUNK = "master";
 
 // ---------------------------------------------------------------------------------------------
@@ -57,38 +61,16 @@ const lines = (text) => (text ? text.split(/\r?\n/).map((l) => l.trim()).filter(
 // specs
 // ---------------------------------------------------------------------------------------------
 
-// Minimal frontmatter reader: `key: value` pairs between the first two `---` fences. Enough for the
-// spec template's flat frontmatter — deliberately not a YAML parser.
-function frontmatter(file) {
-  const text = readFileSync(file, "utf8");
-  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return {};
-
-  const out = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    const hit = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
-    if (!hit) continue;
-    out[hit[1]] = hit[2].trim().replace(/^["']|["']$/g, "");
+// Every issue on the project, or null when GitHub is skipped or unreachable.
+function readSpecs(enabled) {
+  if (!enabled) return null;
+  const raw = run(process.execPath, [GH_PROJECT, "list"], PROJECT_TIMEOUT_MS);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
-  return out;
-}
-
-function readSpecs() {
-  if (!existsSync(SPECS_DIR)) return [];
-  return readdirSync(SPECS_DIR)
-    .filter((f) => f.endsWith(".md") && f !== "_template.md")
-    .sort()
-    .map((f) => {
-      const fm = frontmatter(path.join(SPECS_DIR, f));
-      return {
-        slug: f.replace(/\.md$/, ""),
-        title: fm.title || "",
-        status: fm.status || "?",
-        tier: fm.tier || "?",
-        branch: fm.branch || "",
-        skip: fm.skip && fm.skip !== "[]" ? fm.skip : "",
-      };
-    });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -110,11 +92,13 @@ function repoFacts() {
   return { head, dirty, localBranches, remoteBranches, mergedLocal, behindTrunk };
 }
 
-function openPullRequests(enabled) {
+// Recent PRs of every state: the open ones for the report, the merged ones to catch a card whose PR
+// merged without `Closes #n`.
+function pullRequests(enabled) {
   if (!enabled) return null;
   const raw = run(
     process.platform === "win32" ? "gh.exe" : "gh",
-    ["pr", "list", "--state", "open", "--limit", "30", "--json", "number,title,headRefName"],
+    ["pr", "list", "--state", "all", "--limit", "60", "--json", "number,title,headRefName,state"],
     GH_TIMEOUT_MS,
   );
   if (!raw) return null;
@@ -125,13 +109,42 @@ function openPullRequests(enabled) {
   }
 }
 
+// What `/build` can take now: the first open sub-issue of each epic (the rest wait for it), then
+// standalone specs, Tier 1 before Tier 2. Epics themselves are never buildable.
+function nextUp(specs) {
+  const byNumber = new Map(specs.map((s) => [s.number, s]));
+  const inEpic = new Set(specs.flatMap((s) => (s.epic ? s.subIssues || [] : [])));
+  const ready = [];
+  for (const epic of specs.filter((s) => s.epic && s.status !== "Done")) {
+    const first = (epic.subIssues || []).map((n) => byNumber.get(n)).find((s) => s && s.status !== "Done");
+    if (first?.status === "Todo") ready.push({ ...first, via: `epic #${epic.number}` });
+  }
+  const standalone = specs
+    .filter((s) => !s.epic && s.status === "Todo" && !inEpic.has(s.number))
+    .sort((a, b) => Number(a.tier ?? 9) - Number(b.tier ?? 9));
+  return [...ready, ...standalone];
+}
+
+// Cards whose state disagrees with git or GitHub.
+function mismatches(specs, facts, prs) {
+  const merged = new Set((prs || []).filter((p) => p.state === "MERGED").map((p) => p.headRefName));
+  const out = [];
+  for (const s of specs.filter((x) => !x.epic && x.branch && x.status !== "Done")) {
+    const exists = facts.localBranches.has(s.branch) || facts.remoteBranches.has(s.branch);
+    if (merged.has(s.branch)) out.push(`#${s.number}: PR from \`${s.branch}\` merged but the issue is open (PR body lacked \`Closes #${s.number}\`) — close it`);
+    else if (s.status === "Todo" && exists) out.push(`#${s.number}: card is Todo but \`${s.branch}\` exists — a run started without moving the card`);
+  }
+  return out;
+}
+
 // Where a spec's branch actually stands, in one phrase. Order matters: the most decisive fact wins.
 function branchState(spec, facts, prs) {
-  if (!spec.branch) return "no branch named in the spec";
+  if (spec.epic) return `epic of ${(spec.subIssues || []).map((n) => `#${n}`).join(", ") || "no sub-issues yet"}`;
+  if (!spec.branch) return "no Branch field on the card";
 
   const local = facts.localBranches.has(spec.branch);
   const remote = facts.remoteBranches.has(spec.branch);
-  if (!local && !remote) return spec.status === "done" ? "shipped, branch cleaned up" : "not started";
+  if (!local && !remote) return "not started";
 
   const ref = local ? spec.branch : `origin/${spec.branch}`;
   const ahead = Number(git("rev-list", "--count", `${TRUNK}..${ref}`) ?? "0");
@@ -145,7 +158,7 @@ function branchState(spec, facts, prs) {
 // Lane branches, local or on origin, that belong to no spec and no open PR — the ones that quietly
 // rot after their PR is merged. Spec branches are already covered by the table above.
 function strayBranches(facts, prs, specs) {
-  const owned = new Set(specs.map((s) => s.branch).filter(Boolean));
+  const owned = new Set((specs || []).map((s) => s.branch).filter(Boolean));
   const withPr = new Set((prs || []).map((p) => p.headRefName));
   const candidates = new Set([...facts.localBranches, ...facts.remoteBranches]);
 
@@ -164,22 +177,39 @@ function strayBranches(facts, prs, specs) {
 // render
 // ---------------------------------------------------------------------------------------------
 
-function render(specs, facts, prs) {
+function render(specs, facts, allPrs) {
+  const prs = allPrs && allPrs.filter((p) => p.state === "OPEN");
   const out = [];
   out.push("<!-- Generated by `node scripts/plan-status.mjs --write`. Do not edit by hand. -->");
   out.push("");
 
-  if (specs.length) {
-    out.push("| Spec | Status | Tier | Where it stands |");
-    out.push("|---|---|---|---|");
-    for (const s of specs) {
-      const status = s.skip ? `${s.status} · skip ${s.skip}` : s.status;
-      out.push(`| \`${s.slug}\` | ${status} | ${s.tier} | ${branchState(s, facts, prs)} |`);
+  const open = (specs || []).filter((s) => s.status !== "Done");
+  if (specs === null) {
+    out.push("**Spec issues:** not checked (`gh` unavailable or skipped).");
+  } else if (open.length) {
+    out.push("| Issue | Title | Status | Tier · Kind | Where it stands |");
+    out.push("|---|---|---|---|---|");
+    for (const s of open) {
+      const kind = [s.tier ?? "?", s.kind ?? (s.epic ? "Epic" : "?"), s.skipTests && "skip-tests"].filter(Boolean).join(" · ");
+      out.push(`| #${s.number} | ${s.title.replace(/\|/g, "\\|")} | ${s.status ?? "?"} | ${kind} | ${branchState(s, facts, prs)} |`);
     }
   } else {
-    out.push("No specs in `skarbiec-plan/specs/`.");
+    out.push("No open spec issues on the project.");
   }
+  if (specs?.length > open.length) out.push(`\n${specs.length - open.length} spec issue(s) done.`);
   out.push("");
+
+  if (specs) {
+    const next = nextUp(specs);
+    out.push(
+      next.length
+        ? `**Next up:** ${next.map((s) => `\`/build #${s.number}\` ${s.title} (tier ${s.tier ?? "?"}${s.via ? `, ${s.via}` : ""})`).join(" · ")}`
+        : "**Next up:** nothing in Todo — `/design` something.",
+    );
+    const wrong = mismatches(specs, facts, allPrs);
+    if (wrong.length) out.push(`**Mismatches:** ${wrong.join(" · ")}`);
+    out.push("");
+  }
 
   const head = facts.head || "unknown";
   const dirt = facts.dirty.length ? `${facts.dirty.length} uncommitted file(s)` : "clean";
@@ -195,7 +225,7 @@ function render(specs, facts, prs) {
   }
 
   const strays = strayBranches(facts, prs, specs);
-  if (strays.length) out.push(`**Lane branches with no spec and no PR:** ${strays.join(" · ")}`);
+  if (specs && strays.length) out.push(`**Lane branches with no spec issue and no PR:** ${strays.join(" · ")}`);
 
   return out.join("\n");
 }
@@ -213,9 +243,9 @@ if (!git("rev-parse", "--is-inside-work-tree")) {
   process.exit(0);
 }
 
-const specs = readSpecs();
+const specs = readSpecs(useGh);
 const facts = repoFacts();
-const prs = openPullRequests(useGh);
+const prs = pullRequests(useGh);
 const block = render(specs, facts, prs);
 
 process.stdout.write(`# Plan status — live, from git and GitHub (skarbiec-plan/README.md may lag)\n\n${block}\n`);

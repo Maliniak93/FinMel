@@ -99,7 +99,7 @@ public partial class InitialCreate : Migration
                 Type = table.Column<int>(type: "integer", nullable: false),
                 Quantity = table.Column<decimal>(type: "numeric(18,8)", precision: 18, scale: 8, nullable: false),
                 UnitPriceAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                FeeAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                FxRateToPln = table.Column<decimal>(type: "numeric(18,8)", precision: 18, scale: 8, nullable: true),
                 Date = table.Column<DateOnly>(type: "date", nullable: false)
             },
             constraints: table =>

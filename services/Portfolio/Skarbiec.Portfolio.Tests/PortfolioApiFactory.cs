@@ -17,11 +17,21 @@ public sealed class PortfolioApiFactory(SkarbiecContainersFixture containers)
     /// </summary>
     public FakeInstrumentLookupClient InstrumentLookupClient { get; } = new();
 
+    /// <summary>
+    /// Replaces the real MarketData-calling <see cref="IFxRateLookupClient"/> the same way
+    /// (transactions-pln-value-and-fee-removal): every transaction write resolves its PLN rate
+    /// against this fake, which also records each call.
+    /// </summary>
+    public FakeFxRateLookupClient FxRateLookupClient { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
 
         builder.ConfigureTestServices(services =>
-            services.AddSingleton<IInstrumentLookupClient>(InstrumentLookupClient));
+        {
+            services.AddSingleton<IInstrumentLookupClient>(InstrumentLookupClient);
+            services.AddSingleton<IFxRateLookupClient>(FxRateLookupClient);
+        });
     }
 }

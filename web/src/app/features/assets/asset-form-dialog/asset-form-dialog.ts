@@ -38,7 +38,6 @@ import { formatMoney } from '../../../shared/format-money';
 import {
   isPricedTransactionType,
   quantityFieldLabel,
-  showsFeeField,
   TRANSACTION_TYPE_BUY,
   TRANSACTION_TYPE_DEPOSIT,
   TRANSACTION_TYPES,
@@ -242,7 +241,6 @@ export class AssetFormDialog {
     ],
     quantity: [0, [Validators.min(0)]],
     unitPrice: [1, [Validators.min(0)]],
-    fee: [0, [Validators.min(0)]],
     date: [new Date(), [Validators.required]],
   });
 
@@ -252,7 +250,6 @@ export class AssetFormDialog {
   protected readonly transactionIsPriced = computed(() =>
     isPricedTransactionType(this.transactionType()),
   );
-  protected readonly transactionShowsFee = computed(() => showsFeeField(this.transactionType()));
   protected readonly transactionQuantityLabel = computed(() =>
     quantityFieldLabel(this.transactionType()),
   );
@@ -450,10 +447,9 @@ export class AssetFormDialog {
     return {
       type: values.type,
       quantity: values.quantity,
-      // Unit price/fee are hidden (and meaningless) for non-trade types — same rule as
-      // TransactionFormDialog: 1/0 keeps `quantity * unitPrice` a single Value formula end to end.
+      // Unit price is hidden (and meaningless) for non-trade types — same rule as
+      // TransactionFormDialog: 1 keeps `quantity × unitPrice` a single value formula end to end.
       unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
-      fee: showsFeeField(values.type) ? values.fee : 0,
       date: toDateOnly(values.date),
     };
   }

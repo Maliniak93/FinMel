@@ -56,7 +56,8 @@ const transaction: TransactionResponse = {
   type: 0,
   quantity: 10,
   unitPrice: 100,
-  fee: 5,
+  currency: 'EUR',
+  valuePln: 4300,
   date: '2024-01-15',
 };
 
@@ -233,6 +234,44 @@ describe('Transactions', () => {
     expect(component['pageIndex']()).toBe(1);
     expect(component['pageSize']()).toBe(10);
     expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  // transactions-pln-value-and-fee-removal AC12: the table shows each transaction's own currency and
+  // its server-computed PLN value (no unit price, no fee, no client-side money math); a transaction
+  // whose rate was unknown shows an em dash instead of a value.
+  it('renders currency and PLN value columns', async () => {
+    const unpriced: TransactionResponse = {
+      ...transaction,
+      id: '44444444-4444-4444-4444-444444444444',
+      date: '2019-01-02',
+      valuePln: null,
+    };
+    await setup(jsonResponse(pagedResponse([transaction, unpriced])));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const headers = Array.from(element.querySelectorAll('thead th'), (th) =>
+      (th.textContent ?? '').trim(),
+    ).filter((text) => text.length > 0);
+    expect(headers).toEqual(['Date', 'Type', 'Quantity', 'Currency', 'Value (PLN)']);
+    expect(headers).not.toContain('Unit price');
+    expect(headers).not.toContain('Fee');
+
+    const rows = Array.from(element.querySelectorAll('tbody tr.mat-mdc-row'));
+    expect(rows.length).toBe(2);
+    // Whitespace is stripped because pl-PL separates the currency (and any digit groups) with
+    // non-breaking spaces.
+    const cellTexts = (row: Element) =>
+      Array.from(row.querySelectorAll('td'), (td) => (td.textContent ?? '').replace(/\s/g, ''));
+
+    const pricedCells = cellTexts(rows[0]);
+    expect(pricedCells[3]).toBe('EUR');
+    expect(pricedCells[4]).toBe('4300,00zł');
+
+    const unpricedCells = cellTexts(rows[1]);
+    expect(unpricedCells[3]).toBe('EUR');
+    expect(unpricedCells[4]).toBe('—');
   });
 
   // archived-portfolio-out-of-net-worth AC12: every transaction write on an archived portfolio's

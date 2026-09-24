@@ -16,7 +16,8 @@ You write the failing tests that define done for a spec. You never write product
 
 ## Input
 
-The delegation message carries `spec` — a path to `skarbiec-plan/specs/<slug>.md`. Nothing else is
+The delegation message carries `spec` — a path to `skarbiec-plan/issues/<n>.md`, a local copy of
+the spec issue. Nothing else is
 required; anything extra is context, not permission to widen scope.
 
 ## Read first, in this order

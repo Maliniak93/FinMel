@@ -10,12 +10,10 @@ export const TRANSACTION_TYPES: readonly { value: TransactionType; label: string
   { value: 3, label: 'Withdraw' },
   { value: 4, label: 'Dividend' },
   { value: 5, label: 'Interest' },
-  { value: 6, label: 'Fee' },
 ];
 
 const BUY = 0;
 const SELL = 1;
-const FEE = 6;
 
 // Exported for callers that need to set/compare a specific transaction type by name rather than by
 // index into TRANSACTION_TYPES (asset-form-dialog's initial-transaction default, T1.11).
@@ -28,17 +26,11 @@ export function transactionTypeLabel(value: TransactionType): string {
 
 // Only Buy/Sell are priced trades against a unit price (TransactionQuantityCalculator treats every
 // other type as a plain quantity delta or value-only movement) — the form hides "unit price" for
-// the rest and submits 1 for it, so `quantity * unitPrice` stays one formula for the Value column
+// the rest and submits 1 for it, so the server's `quantity × unitPrice` PLN value stays one formula
 // across every row instead of branching per type.
 export function isPricedTransactionType(value: TransactionType): boolean {
   const type = Number(value);
   return type === BUY || type === SELL;
-}
-
-// TransactionType.Fee already *is* the fee being recorded — a separate "fee" amount on the same
-// row would double up on the same concept, so that field is hidden only for this one type.
-export function showsFeeField(value: TransactionType): boolean {
-  return Number(value) !== FEE;
 }
 
 export function quantityFieldLabel(value: TransactionType): string {

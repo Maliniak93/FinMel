@@ -1,6 +1,6 @@
 # Ideas
 
-Future features and platform work, condensed from the old backlog and roadmap (`archive/05-backlog.md`, `archive/zadania/phase-3..5-*.md`). One line each. Pick one up with `/design <idea>` when it's time — that turns a line here into a spec.
+Future features and platform work, condensed from the old backlog and roadmap (`archive/05-backlog.md`, `archive/zadania/phase-3..5-*.md`). One line each. Pick one up with `/design <idea>` when it's time — that turns a line here into a spec issue on the FinMel project.
 
 Tier is a starting guess (see `workflow.md` → Tier rule); `/design` sets the real one.
 

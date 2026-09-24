@@ -20,6 +20,7 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { formatMoney } from '../../shared/format-money';
 import { assetClassLabel } from '../assets/asset-class';
 import { TransactionFormDialog } from './transaction-form-dialog/transaction-form-dialog';
 import { transactionTypeLabel } from './transaction-type';
@@ -97,8 +98,7 @@ export class Transactions {
     'date',
     'type',
     'quantity',
-    'unitPrice',
-    'fee',
+    'currency',
     'value',
     ...(this.isArchived() ? [] : ['actions']),
   ]);
@@ -125,14 +125,7 @@ export class Transactions {
 
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly transactionTypeLabel = transactionTypeLabel;
-
-  protected formatMoney(amount: number | string, currency: string): string {
-    try {
-      return new Intl.NumberFormat('pl-PL', { style: 'currency', currency }).format(Number(amount));
-    } catch {
-      return `${amount} ${currency}`;
-    }
-  }
+  protected readonly formatMoney = formatMoney;
 
   protected formatQuantity(quantity: number | string): string {
     return new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 8 }).format(Number(quantity));
@@ -143,13 +136,6 @@ export class Transactions {
   // mat-paginator's `[length]` input, which requires a real number.
   protected asNumber(value: number | string): number {
     return Number(value);
-  }
-
-  // Buy/Sell price against a real unit price; every other type submits 1 for unit price
-  // (transaction-form-dialog.ts), so quantity * unitPrice reduces to "the amount itself" for those
-  // rows without a second formula.
-  protected transactionValue(transaction: TransactionResponse): number {
-    return Number(transaction.quantity) * Number(transaction.unitPrice);
   }
 
   protected onPage(event: PageEvent): void {

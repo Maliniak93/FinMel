@@ -895,14 +895,6 @@
             ],
             "format": "double"
           },
-          "fee": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
           "date": {
             "type": "string",
             "format": "date"
@@ -916,7 +908,7 @@
           "type",
           "quantity",
           "unitPrice",
-          "fee",
+          "currency",
           "date"
         ],
         "type": "object",
@@ -948,9 +940,13 @@
             ],
             "format": "double"
           },
-          "fee": {
+          "currency": {
+            "type": "string"
+          },
+          "valuePln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "null",
               "number",
               "string"
             ],
@@ -1053,14 +1049,6 @@
             "format": "double"
           },
           "unitPrice": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "fee": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",

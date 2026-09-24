@@ -17,7 +17,7 @@ Angular talks only to the Gateway (ADR-013).
 ## Communication rules (ADR-021)
 
 - **Domain facts travel as events with full state** (event-carried state transfer), through the MassTransit EF outbox; consumers are idempotent (inbox, dedup by `MessageId`). A consumer never calls back to the publisher over REST to fill in what the event didn't carry.
-- **REST between services survives in exactly two places**: (1) request-path validation — Portfolio → MarketData `GET /internal/instruments/{id}` when creating a market asset; (2) a once-daily batch — Reporting → MarketData `POST /internal/prices/latest-batch` + `/internal/fx/latest-batch`, called from the snapshot consumer. Service-only endpoints live under `/internal/**` (mapped through `MapInternalGroup`): anonymous, absent from OpenAPI, serving global data only, and unreachable through the Gateway, which routes only `/api/<service>/**`. Callers send no token — isolation is the network's job (ADR-027).
+- **REST between services survives in exactly three places**: (1) request-path validation — Portfolio → MarketData `GET /internal/instruments/{id}` when creating a market asset; (2) a once-daily batch — Reporting → MarketData `POST /internal/prices/latest-batch` + `/internal/fx/latest-batch`, called from the snapshot consumer; (3) a request-path FX rate lookup — Portfolio → MarketData `GET /internal/fx/{currency}/rate?date=` when a transaction on a non-PLN asset is recorded or updated, to freeze its transaction-date PLN rate, with the same fail-closed 503 as the instrument lookup (ADR-026). Service-only endpoints live under `/internal/**` (mapped through `MapInternalGroup`): anonymous, absent from OpenAPI, serving global data only, and unreachable through the Gateway, which routes only `/api/<service>/**`. Callers send no token — isolation is the network's job (ADR-027).
 - **Insights are computed locally** in Reporting from `AssetValuation`, as of the last snapshot — no fan-out on page load; a "Sync now" button re-triggers the sync jobs.
 - **gRPC is withdrawn from the plan** (ADR-022) — the Strategy→Portfolio route disappears along with Strategy itself. A Reporting→MarketData batch exercise remains a candidate in `ideas.md`, not a commitment.
 
@@ -81,7 +81,7 @@ flowchart TB
     GW --> MD["MarketData"]
     GW --> RP["Reporting"]
 
-    PF -->|"REST: validate instrument"| MD
+    PF -->|"REST: validate instrument,<br/>FX rate lookup"| MD
     RP -->|"REST: prices/fx batch, daily"| MD
 
     ID -->|"event: UserRegistered"| MQ["RabbitMQ"]
@@ -101,7 +101,7 @@ flowchart TB
     ASPIRE -.-> GW & ID & PF & MD & RP
 ```
 
-Solid = REST/HTTP (Gateway routing and the two narrow inter-service exceptions above); `event:`-labeled = RabbitMQ/MassTransit; dotted = Aspire telemetry, not a data dependency.
+Solid = REST/HTTP (Gateway routing and the three narrow inter-service exceptions above); `event:`-labeled = RabbitMQ/MassTransit; dotted = Aspire telemetry, not a data dependency.
 
 ### Sequence: asset mutation → position + usage
 

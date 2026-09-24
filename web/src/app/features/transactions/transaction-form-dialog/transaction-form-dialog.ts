@@ -22,7 +22,6 @@ import {
 import {
   isPricedTransactionType,
   quantityFieldLabel,
-  showsFeeField,
   TRANSACTION_TYPES,
 } from '../transaction-type';
 
@@ -76,21 +75,19 @@ export class TransactionFormDialog {
     type: [this.data.transaction?.type ?? 0, [Validators.required]],
     quantity: [Number(this.data.transaction?.quantity ?? 0), [Validators.min(0)]],
     unitPrice: [Number(this.data.transaction?.unitPrice ?? 0), [Validators.min(0)]],
-    fee: [Number(this.data.transaction?.fee ?? 0), [Validators.min(0)]],
     date: [
       this.data.transaction ? fromDateOnly(this.data.transaction.date) : new Date(),
       [Validators.required],
     ],
   });
 
-  // Signal mirror of the type control so the template can reactively show/hide the unit-price and
-  // fee fields (signals-first per angular.md, rather than reading form.controls.type.value directly
-  // in the template).
+  // Signal mirror of the type control so the template can reactively show/hide the unit-price field
+  // (signals-first per angular.md, rather than reading form.controls.type.value directly in the
+  // template).
   private readonly selectedType = toSignal(this.form.controls.type.valueChanges, {
     initialValue: this.form.controls.type.value,
   });
   protected readonly isPriced = computed(() => isPricedTransactionType(this.selectedType()));
-  protected readonly showsFee = computed(() => showsFeeField(this.selectedType()));
   protected readonly quantityLabel = computed(() => quantityFieldLabel(this.selectedType()));
 
   protected async onSubmit(): Promise<void> {
@@ -110,10 +107,9 @@ export class TransactionFormDialog {
     const body = {
       type: values.type,
       quantity: values.quantity,
-      // Unit price/fee are hidden (and meaningless) for non-trade types — 1/0 keeps
-      // `quantity * unitPrice` a single Value formula end to end (transaction-type.ts).
+      // Unit price is hidden (and meaningless) for non-trade types — 1 keeps `quantity × unitPrice`
+      // a single value formula end to end (transaction-type.ts).
       unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
-      fee: showsFeeField(values.type) ? values.fee : 0,
       date: toDateOnly(values.date),
     };
 
