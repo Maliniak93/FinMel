@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -393,6 +394,58 @@ describe('Portfolios', () => {
       await fixture.whenStable();
 
       expect(deleteButtonInOverlay(overlayContainer)?.disabled).toBe(false);
+    });
+  });
+
+  // portfolio-description-tooltip: description read back as a tooltip on the name link.
+  describe('description tooltip', () => {
+    function tooltipOn(link: number): MatTooltip {
+      return fixture.debugElement.queryAll(By.css('td a'))[link].injector.get(MatTooltip);
+    }
+
+    it('shows the portfolio description as a tooltip on its name', async () => {
+      const withDescription: PortfolioResponse = { ...portfolio, description: 'Long-term savings' };
+      await setup(jsonResponse([withDescription]));
+
+      const tooltip = tooltipOn(0);
+      expect(tooltip.message).toBe('Long-term savings');
+      expect(tooltip.disabled).toBe(false);
+    });
+
+    it('does not show a tooltip for a portfolio without a description', async () => {
+      await setup(jsonResponse([portfolio])); // shared fixture has description: null
+
+      expect(tooltipOn(0).disabled).toBe(true);
+    });
+
+    it('treats a whitespace-only description as no description', async () => {
+      const blank: PortfolioResponse = { ...portfolio, description: '   ' };
+      await setup(jsonResponse([blank]));
+
+      expect(tooltipOn(0).disabled).toBe(true);
+    });
+
+    it('truncates a description longer than 200 characters', async () => {
+      const long: PortfolioResponse = {
+        ...portfolio,
+        id: '22222222-2222-2222-2222-222222222222',
+        description: 'a'.repeat(250),
+      };
+      const exact: PortfolioResponse = {
+        ...portfolio,
+        id: '33333333-3333-3333-3333-333333333333',
+        description: 'b'.repeat(200),
+      };
+      await setup(jsonResponse([long, exact]));
+
+      const longTooltip = tooltipOn(0);
+      expect(longTooltip.message).toBe(`${'a'.repeat(200)}…`);
+      expect(longTooltip.message.length).toBe(201);
+      expect(longTooltip.disabled).toBe(false);
+
+      const exactTooltip = tooltipOn(1);
+      expect(exactTooltip.message).toBe('b'.repeat(200));
+      expect(exactTooltip.disabled).toBe(false);
     });
   });
 });

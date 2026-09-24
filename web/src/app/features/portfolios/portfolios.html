@@ -36,7 +36,13 @@
       <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef>Name</th>
         <td mat-cell *matCellDef="let portfolio">
-          <a [routerLink]="['/portfolios', portfolio.id, 'assets']">{{ portfolio.name }}</a>
+          <a
+            [routerLink]="['/portfolios', portfolio.id, 'assets']"
+            [matTooltip]="descriptionTooltip(portfolio)"
+            [matTooltipDisabled]="!descriptionTooltip(portfolio)"
+            matTooltipClass="portfolio-description-tooltip"
+            >{{ portfolio.name }}</a
+          >
         </td>
       </ng-container>
 

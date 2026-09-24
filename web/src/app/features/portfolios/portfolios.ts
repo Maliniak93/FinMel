@@ -107,6 +107,17 @@ export class Portfolios {
     return this.portfolioValues().get(portfolioId);
   }
 
+  // null when there's nothing to show: no description, or whitespace-only. Truncated to 200 chars
+  // (after trimming) with a trailing "…" when longer — the full text stays readable in the edit
+  // dialog, this is just a hover/focus hint on the name link.
+  protected descriptionTooltip(portfolio: PortfolioResponse): string | null {
+    const trimmed = portfolio.description?.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return trimmed.length > 200 ? `${trimmed.slice(0, 200).trimEnd()}…` : trimmed;
+  }
+
   protected openCreateDialog(): void {
     const ref = this.dialog.open(PortfolioFormDialog, { width: '480px', data: {} });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
