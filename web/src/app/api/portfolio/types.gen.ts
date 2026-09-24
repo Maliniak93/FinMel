@@ -58,7 +58,6 @@ export type RecordTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
     unitPrice: number | string;
-    fee?: number | string;
     date: string;
 };
 
@@ -68,7 +67,8 @@ export type TransactionResponse = {
     type: TransactionType;
     quantity: number | string;
     unitPrice: number | string;
-    fee: number | string;
+    currency: string;
+    valuePln?: null | number | string;
     date: string;
 };
 
@@ -93,7 +93,6 @@ export type UpdateTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
     unitPrice: number | string;
-    fee?: number | string;
     date: string;
 };
 

@@ -6,7 +6,10 @@ using Skarbiec.Portfolio.MarketData;
 namespace Skarbiec.Portfolio.Features.AddAsset;
 
 public sealed class AddAssetHandler(
-    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, IInstrumentLookupClient instrumentLookupClient)
+    PortfolioDbContext dbContext,
+    PositionEventPublisher positionEventPublisher,
+    IInstrumentLookupClient instrumentLookupClient,
+    IFxRateLookupClient fxRateLookupClient)
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, AddAssetRequest request, CancellationToken cancellationToken)
     {
@@ -78,12 +81,6 @@ public sealed class AddAssetHandler(
                 return unitPrice.Error;
             }
 
-            var fee = Money.Create(transactionRequest.Fee, asset.Currency);
-            if (fee.IsFailure)
-            {
-                return fee.Error;
-            }
-
             initialTransaction = new Transaction
             {
                 Id = Guid.NewGuid(),
@@ -91,7 +88,6 @@ public sealed class AddAssetHandler(
                 Type = transactionRequest.Type,
                 Quantity = transactionRequest.Quantity,
                 UnitPriceAmount = unitPrice.Value.Amount,
-                FeeAmount = fee.Value.Amount,
                 Date = transactionRequest.Date
             };
 
@@ -105,6 +101,16 @@ public sealed class AddAssetHandler(
                 return recomputed.Error;
             }
 
+            // Same rate resolution as RecordTransaction (ADR-026), after every other check and still
+            // before anything is staged — MarketData being down leaves no half-created asset either.
+            var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(
+                asset.Currency, transactionRequest.Date, cancellationToken);
+            if (fxRateToPln.IsFailure)
+            {
+                return fxRateToPln.Error;
+            }
+
+            initialTransaction.FxRateToPln = fxRateToPln.Value;
             asset.Quantity = recomputed.Value;
         }
 

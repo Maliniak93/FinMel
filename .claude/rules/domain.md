@@ -13,7 +13,7 @@ Target model. Items marked *(target — spec-0x)* are not implemented yet; do no
 ## Assets and transactions
 
 - `AssetClass` (`Skarbiec.Contracts`): Cash, Deposit, Stock, Etf, Bond, Crypto, PreciousMetal, RealEstate, Other.
-- `TransactionType`: Buy, Sell, Deposit, Withdraw, Dividend, Interest, Fee. **Buy/Deposit increase quantity, Sell/Withdraw decrease it**; Dividend, Interest and Fee do not change quantity. Quantity is derived from transactions, never stored as an independent truth (ADR-009).
+- `TransactionType`: Buy, Sell, Deposit, Withdraw, Dividend, Interest. **Buy/Deposit increase quantity, Sell/Withdraw decrease it**; Dividend and Interest do not change quantity. Quantity is derived from transactions, never stored as an independent truth (ADR-009).
 - Manual-valuation assets may exist with no transactions at all.
 
 ## Valuation modes
@@ -41,7 +41,7 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 
 **Identity** — `User` (`DisplayName`, no `BaseCurrency` — PLN-only, ADR-008), `RefreshToken`.
 
-**Portfolio** — `Portfolio (Id, UserId, Name, Description?, Currency, IsArchived)`; `Asset (Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin)`; `Transaction (Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FeeAmount, Date, xmin)`. Deletes cascade explicitly in the handler, not the database (no FKs inside `portfolio_db`): deleting a portfolio removes its assets and their transactions, deleting an asset removes its transactions — every removal and outbox event in one `SaveChangesAsync`. No denormalized child counters. `Asset.Version` is the per-asset ordering counter on `AssetPositionChanged`, written only by `PositionEventPublisher`; `xmin` stays the concurrency token and is a separate thing (it doesn't move when only the portfolio's archived flag changes).
+**Portfolio** — `Portfolio (Id, UserId, Name, Description?, Currency, IsArchived)`; `Asset (Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin)`; `Transaction (Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, xmin)`, where `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when there is none that early (ADR-026). Deletes cascade explicitly in the handler, not the database (no FKs inside `portfolio_db`): deleting a portfolio removes its assets and their transactions, deleting an asset removes its transactions — every removal and outbox event in one `SaveChangesAsync`. No denormalized child counters. `Asset.Version` is the per-asset ordering counter on `AssetPositionChanged`, written only by `PositionEventPublisher`; `xmin` stays the concurrency token and is a separate thing (it doesn't move when only the portfolio's archived flag changes).
 
 **MarketData** — `Instrument (Id, Ticker, Name, Source, QuoteCurrency, AssetClass, VerificationStatus)`, where `InstrumentVerificationStatus` is `Verified | Unverified | Failed` and records the ADR-018 ticker check made once at creation; it is never re-checked from a valuation path, and `Verified` must stay the 0 member (it is the column's `HasDefaultValue`). `PriceQuote`; `FxRate`; `SyncRun (+ Kind: Prices | Fx | Backfill)`; `Currency`; `InstrumentUsage (InstrumentId PK, AssetCount, FirstUsedAt)`, derived from per-asset `AssetInstrumentLink (AssetId PK, InstrumentId?, Version, IsRemoved)` rows maintained from `AssetPositionChanged`/`AssetRemoved` so `PriceSyncJob` syncs only instruments actually in use and first use triggers a history backfill.
 
@@ -51,7 +51,8 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 
 - Target-allocation lines sum to 100; each line carries its own tolerance band.
 - A Sell or Withdraw may never take an asset's quantity below 0 — **at any point in its transaction history**, not just at the end (editing or deleting an older transaction must be re-checked against the whole timeline).
-- Amounts, quantities and fees are ≥ 0.
+- Amounts and quantities are ≥ 0.
+- An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
 - An archived portfolio is read-only: every asset and transaction write in it is 409 `Conflict.PortfolioArchived`, checked after the tenancy lookup so a stranger still gets 404. Renaming or deleting the portfolio stays allowed.
 - Unique: one `PriceQuote` per (instrument, date), one `FxRate` per (pair, date), one `AssetValuation` per (asset, date).
 - Every user-owned entity has `UserId` — enforced by a NetArchTest architecture test.
@@ -68,7 +69,7 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 
 ## Conscious simplifications
 
-Transactions are single-entry: a Dividend or Interest on one asset creates no matching cash inflow anywhere, and a fee is expressed in the asset's own currency (there is no separate fee currency). The base currency is PLN only — the user picks a currency per portfolio and asset, but every valuation is reported in PLN.
+Transactions are single-entry: a Dividend or Interest on one asset creates no matching cash inflow anywhere. A transaction's PLN value is frozen at the transaction-date rate — never recomputed later; a `null` rate fills in only when that transaction is edited (ADR-026). The base currency is PLN only — the user picks a currency per portfolio and asset, but every valuation is reported in PLN.
 
 ## Misc
 

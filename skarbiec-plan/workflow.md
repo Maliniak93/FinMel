@@ -1,6 +1,18 @@
 # Workflow
 
-How features get designed and built (ADR-024). Operational version of the approved redesign plan, Część III.
+How features get designed and built (ADR-024). A spec is a GitHub issue on the **FinMel project** — never a file in the repo.
+
+## The board
+
+| Field / label | Values | Set by |
+|---|---|---|
+| Status (built-in) | Todo → In progress → Done | `/design` and `/fix` publish at Todo; `/build` sets In progress; merging a PR with `Closes #<n>` closes the issue and the project's "Item closed" workflow sets Done |
+| Tier | 1, 2 | `/design` / `/fix`; `/build --tier` overrides for one run |
+| Kind | New, Change, Cleanup, Fix | `/design` / `/fix` |
+| Branch | `feat/<slug>`, `fix/<slug>` (none on an epic) | `/design` / `/fix` |
+| labels | `spec` (buildable), `epic` (umbrella of a split — its sub-issues are built, never the epic), `skip-tests` | `/design` / `/fix` |
+
+Every board operation goes through `scripts/gh-project.mjs` (`init`, `create`, `get`, `list`, `set`, `comment`, `tick`) — the one place that knows the project number and its fields. `/board` shows what to build next; the `SessionStart` hook shows the same open issues against git.
 
 ## Agents (`.claude/agents/*.md`)
 
@@ -17,48 +29,48 @@ Author ≠ reviewer (ADR-024): the reviewer always runs in a clean context and n
 
 **Documentation access:** .NET 10 and Angular 22 are newer than any model's training data, so the three agents that write or judge code reach the doc servers themselves — microsoft-docs for .NET/ASP.NET/EF, context7 for Angular/Material/MassTransit. `ops` holds GitHub MCP for reads and PR review comments only; the `git-guard` hook sees `Bash` alone, so every repository state change stays on `git`/`gh`, and no agent has a merge tool.
 
-## Pipeline — `/build <spec> [--tier 1|2] [--skip tests,review] [+Nk]`
+## Pipeline — `/build #<issue> [--tier 1|2] [--skip tests,review] [+Nk]`
 
 ```mermaid
 flowchart LR
-    B[Branch: feat/slug from master] --> T[Tests]
+    B[Branch: issue branch from master] --> T[Tests]
     T --> I[Implement] --> V{Verify}
     V -- fail --> IF[Implement: fix] --> V
     V -- ok --> C[Stage: git add -A]
     C --> R{Review}
     R -- blocking --> IF
-    R -- clean --> S[Stage: spec to done, git add -A]
-    S --> Done([report: staged, minor findings, commit/push/PR commands])
+    R -- clean --> S[Stage: git add -A]
+    S --> Done([gh-project.mjs report: comment + tick ACs; commit/push/PR commands])
 ```
 
-- **Branch first (D1).** `ops` cuts `feat/<slug>` from an up-to-date `master` before a single file is written, and stops the run if the tree holds anything that is not this spec. An interrupted run therefore leaves its work on its own branch, never loose on `master`, and re-running `/build <slug>` picks that branch back up.
+- **Branch first (D1).** `ops` cuts the issue's branch from an up-to-date `master` before a single file is written, and stops the run if the tree holds anything that is not this spec. An interrupted run therefore leaves its work on its own branch, never loose on `master`, and re-running `/build #<n>` picks that branch back up.
 - **Stage before review (D2).** After a green verify, `ops` runs `git add -A` so the reviewer diffs `git diff --cached`. A bare `git diff` never shows a brand-new file, and most of a new slice is new files — the index does show them, so staging is enough and no commit is needed.
-- **The pipeline never commits, pushes or opens a PR (D3).** It ends with the change staged on its branch and the spec at `status: done`; the commit message, the push and the PR are the user's, written by hand. No agent has ever merged, and now none of them commits either.
+- **The pipeline never commits, pushes or opens a PR (D3).** It ends with the change staged on its branch and the run report commented on the issue; the commit message, the push and the PR are the user's, written by hand. No agent has ever merged, and now none of them commits either.
 - **Verify fails:** up to `maxRounds` (default 2) fix/verify cycles. On Tier 1, the model escalates to opus/xhigh after 2 failed rounds for one final attempt; past that, the run stops with `status: blocked` and the failures.
-- **Review has `blocking` findings:** implementer addresses them, verify re-runs; up to `maxRounds` rounds, else `status: blocked`. `minor` findings never block the run — there is no PR to post them on, so they come back in the workflow's report and `/build` prints them, one line each.
-- **Skippable phases.** `Tests` and `Review` can be skipped; `Verify` never — it is the definition of green. A spec declares `skip: [tests]` in its frontmatter when it adds and alters no behaviour (deletion, config, docs, a pure move); every acceptance criterion must then be provable by a command, a grep or an existing test class. `/build --skip tests,review` overrides the frontmatter for one run. A spec **without** the flag whose test-writer produces nothing still stops the run — that means its criteria were not testable as written, which is worth knowing.
-- `/build` is a skill with `disable-model-invocation: true` that calls `Workflow({name: 'build-feature', args})`: control flow is a script (`.claude/workflows/build-feature.js`), not model tokens. Each agent receives the spec's file path and the prior phase's structured output — never the conversation history or a raw diff.
+- **Review has `blocking` findings:** implementer addresses them, verify re-runs; up to `maxRounds` rounds, else `status: blocked`. `minor` findings never block the run — there is no PR to post them on, so they come back in the workflow's report and `/build` prints them and posts them on the issue.
+- **Skippable phases.** `Tests` and `Review` can be skipped; `Verify` never — it is the definition of green. A spec issue carries the `skip-tests` label when it adds and alters no behaviour (deletion, config, docs, a pure move); every acceptance criterion must then be provable by a command, a grep or an existing test class. `/build --skip tests,review` overrides the label for one run. A spec **without** the flag whose test-writer produces nothing still stops the run — that means its criteria were not testable as written, which is worth knowing.
+- `/build` is a skill with `disable-model-invocation: true` that calls `Workflow({name: 'build-feature', args})`: control flow is a script (`.claude/workflows/build-feature.js`), not model tokens. `/build` first writes the issue body to a gitignored local copy (`skarbiec-plan/issues/<n>.md`, via `gh-project.mjs get --out`); each agent receives that path, the branch and title, and the prior phase's structured output — never the conversation history or a raw diff.
 - `+Nk` sets a token budget checked before every phase; going over it returns `status: blocked` with a report, never a silent partial run.
-- `resumeFromRunId` resumes a run inside the same session; across sessions, re-running `/build <slug>` on the existing branch is the recovery path.
-- **Bugs go through `/fix <bug>`**, not a hand patch: it reproduces first, localizes the root cause (with `Explore`), writes `specs/fix-<slug>.md` whose AC-1 is the reproduction test, and after approval calls the same `build-feature` workflow — so a fix gets the same test-writer → implementer → verifier → reviewer path as a feature, and the diagnostician never reviews its own fix.
-- **Changes to existing behaviour go through `/design`**, not `/fix`: a bug is code failing its own intent, a change is the intent moving. `/design` sends `Explore` after the current implementation first and records it under "Current behaviour" in the spec.
+- `resumeFromRunId` resumes a run inside the same session; across sessions, re-running `/build #<n>` on the existing branch is the recovery path.
+- **Bugs go through `/fix <bug>`**, not a hand patch: it reproduces first, localizes the root cause (with `Explore`), publishes a `Fix`-kind issue on `fix/<slug>` whose AC-1 is the reproduction test, and after approval runs the same `/build` steps — so a fix gets the same test-writer → implementer → verifier → reviewer path as a feature, and the diagnostician never reviews its own fix.
+- **Changes to existing behaviour go through `/design`**, not `/fix`: a bug is code failing its own intent, a change is the intent moving. `/design` sends `Explore` after the current implementation first and records it under "Current behaviour" in the spec. A spec that needs fixing is amended in place (`gh issue edit`), never duplicated.
 
 ## Definition of Ready (before `/build` will accept a spec)
 
-- `status: approved`.
-- Every acceptance criterion names a test or a command that proves it.
-- `tier` is set (1 or 2).
-- `skip` is set deliberately — `[]` for anything that changes behaviour, `[tests]` only for a spec that changes none.
-- "Risks / open questions" is empty.
+- An open issue on the project with the `spec` label, Status Todo (or In progress for a resumed run), and a Branch — publishing it at all means you approved it in `/design`.
+- Every acceptance criterion is a checkbox that names a test or a command that proves it.
+- Tier is set (1 or 2).
+- `skip-tests` is set deliberately — only on a spec that changes no behaviour.
+- No open question left in the body.
 
 ## Definition of Done
 
 - `node scripts/verify.mjs` is green.
 - Review has zero `blocking` findings.
-- The whole change is staged on `feat/<slug>` — nothing committed, nothing pushed.
-- The spec is flipped to `status: done`, with its Result section saying the change awaits the user's commit and PR.
+- The whole change is staged on the issue's branch — nothing committed, nothing pushed.
+- The run report is commented on the issue and its acceptance criteria are ticked.
 - Any rule or ADR the spec touched is staged with it.
-- The user then commits, pushes and opens the PR by hand, and merges it when CI is green.
+- The user then commits, pushes and opens the PR (`Closes #<n>`) by hand, and merges it when CI is green — which moves the card to Done.
 
 ## Tier rule
 
@@ -75,9 +87,9 @@ No budget is enforced by default — a `/build` run goes to completion. Passing 
 
 ## Git conventions
 
-- Branch: `feat/<slug>`, where `<slug>` is the spec's filename stem — cut by `ops`.
+- Branch: the issue's Branch field — `feat/<slug>`, or `fix/<slug>` for a fix — cut by `ops`.
 - Commit message: the spec's title — written by the **user**, who also pushes and opens the PR. A build run stops at `git add -A`.
-- PR: opened by the user against `master`. **The user always merges — no agent merges, ever.**
+- PR: opened by the user against `master`, body `Closes #<n>`. **The user always merges — no agent merges, ever.**
 - An agent commits or pushes only inside an explicit `/ops <task>` that asks for it; never inside `/build` or `/fix`.
 - `git-guard` hook: commit/push on `feat/*`, and `gh pr create --base master` from `feat/*`, run without asking; `gh pr merge` always asks; a push to `master` asks; a force-push is denied outright. It is a backstop for the `/ops` lane — the build pipeline no longer reaches it. Legacy lanes (`praca_*`, `[MT]\d`) keep whatever behavior they already had.
 
@@ -91,7 +103,8 @@ What can be a script or a hook is not a prompt (cheaper, deterministic, no drift
 | Formatting | `format-on-edit` hook (`PostToolUse` on Edit/Write); `web/**` → prettier, `.cs` is left to the implementer's own gate |
 | Implementer quality gate | `Stop` hook running `verify.mjs --quick` (format + build of touched projects only) — the implementer cannot end its turn on a red build |
 | Orchestration | the `Workflow` script (`build-feature.js`) — zero model tokens spent on control flow |
-| Plan status (which spec stands where, open PRs, rotting branches) | `scripts/plan-status.mjs`, derived from spec frontmatter + git + `gh`. A `SessionStart` hook injects it into every session, so no session ever starts from a stale README; `--write` refreshes the generated block in `skarbiec-plan/README.md`. Only "Open loops" there stays hand-written — that is judgement, not data |
+| Board mechanics | `scripts/gh-project.mjs`: `check`/`create`/`edit` clean a draft (HTML comments, empty sections) and refuse one without Goal, Out of scope or a `proof:` per AC; `prepare` decides whether an issue is buildable, writes its local copy, resolves tier/skips, moves the card and prints the exact workflow args; `report` formats and posts the run report and ticks the ACs. So `/build` and `/board` run on Haiku as relays, and the ops agent only pastes one pre-built command |
+| Plan status (which spec stands where, open PRs, rotting branches) | `scripts/plan-status.mjs`, derived from the project's spec issues + git + `gh`. A `SessionStart` hook injects it into every session, so no session ever starts from a stale README; `--write` refreshes the generated block in `skarbiec-plan/README.md`. Only "Open loops" there stays hand-written — that is judgement, not data |
 
 ## Cost per feature (indicative — API list prices: Haiku 4.5 $1/$5, Sonnet 5 $2/$10, Opus 5.5 $4/$20 per MTok; `opus` means `claude-opus-5-5`, pinned by full id)
 
@@ -103,7 +116,7 @@ What can be a script or a hook is not a prompt (cheaper, deterministic, no drift
 | implementer (Tier 1 / Tier 2) | Sonnet / Opus | 100–300k | $0.3–0.8 / $0.8–2.5 |
 | verifier (×2–3 per run) | Haiku | 10–30k | < $0.1 |
 | reviewer (skippable with `--skip review`) | Opus | 40–100k | $0.3–0.8 |
-| ops — final stage (spec → done, `git add -A`) | Haiku | 5–15k | < $0.1 |
+| ops — final stage (`git add -A`) | Haiku | 5–15k | < $0.1 |
 | **Total per feature** | | | **~$1–2 (Tier 1), ~$2–5 (Tier 2)** |
 
 Tier 2 starts on Opus rather than trying Sonnet first: a failed attempt plus its fix-rounds costs more than starting with the stronger model.

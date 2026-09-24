@@ -15,7 +15,8 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | Test — **Docker must be running** (Testcontainers) | `dotnet test` |
 | Format check | `dotnet format Skarbiec.slnx --verify-no-changes` |
 | One-shot verification: format → build → tests → web → API client | `node scripts/verify.mjs [--quick\|--all\|--projects A,B]` |
-| Live plan status (specs vs. git vs. open PRs); `--write` refreshes the block in `skarbiec-plan/README.md` | `node scripts/plan-status.mjs [--write] [--no-gh]` |
+| Live plan status (spec issues on the GitHub project vs. git vs. open PRs); `--write` refreshes the block in `skarbiec-plan/README.md` | `node scripts/plan-status.mjs [--write] [--no-gh]` |
+| Spec issues on the FinMel project: read, list, move a card, comment, tick ACs | `node scripts/gh-project.mjs get\|list\|set\|comment\|tick` |
 | Frontend dev server | `cd web && npm start` |
 | Frontend unit tests (Vitest) | `cd web && npm test` |
 | Regenerate the TS client after an API change — reads the build-time OpenAPI files once spec-00 lands, until then needs the stack running | `cd web && npm run gen:api` |
@@ -31,7 +32,7 @@ gateway/                  # YARP
 contracts/                # Skarbiec.Contracts — events/DTOs edited in place, Result, Money, enums
 web/                      # Angular 22 frontend
 scripts/  requests/       # verify.mjs · .http files per service
-skarbiec-plan/            # planning docs: product, architecture, domain, decisions, workflow, ideas, specs/, runbooks/ (archive/ = history)
+skarbiec-plan/            # planning docs: product, architecture, domain, decisions, workflow, ideas, runbooks/ (archive/ = history)
 ```
 
 ## Hard architecture rules
@@ -40,7 +41,7 @@ skarbiec-plan/            # planning docs: product, architecture, domain, decisi
 3. Handlers return `Result`/`Result<T>`; the endpoint maps a failure to ProblemDetails. Never throw for an expected failure (ADR-017).
 4. Database per service. Reference other services by id only — no FKs, no cross-DB queries (ADR-003).
 5. Domain facts are events carrying full state, published only through the MassTransit EF outbox; consumers are idempotent (inbox) and never call the publisher back (ADR-012, ADR-021).
-6. REST between services only for request-path validation (Portfolio→MarketData instrument lookup) and the daily Reporting→MarketData price/FX batch — both on `/internal` endpoints (`MapInternalGroup`: anonymous, not in OpenAPI, unreachable through the Gateway, global data only), called with no token. No gRPC (ADR-021, ADR-022, ADR-027).
+6. REST between services only for request-path lookups (Portfolio→MarketData instrument lookup, and the transaction-date FX rate lookup) and the daily Reporting→MarketData price/FX batch — all on `/internal` endpoints (`MapInternalGroup`: anonymous, not in OpenAPI, unreachable through the Gateway, global data only), called with no token. No gRPC (ADR-021, ADR-022, ADR-026, ADR-027).
 7. External price APIs are called only from MarketData jobs; the single exception is ticker verification through `ITickerVerifier` (ADR-007, ADR-018).
 8. Every user-owned entity carries `UserId` from JWT claims — never from the request. EF global query filter; tenancy isolation tests are part of DoD (ADR-006).
 9. Money is `decimal`/`Money`, base currency PLN (ADR-008).
@@ -51,7 +52,7 @@ skarbiec-plan/            # planning docs: product, architecture, domain, decisi
 Path-scoped rules in `.claude/rules/` (`dotnet.md`, `messaging.md`, `testing.md`, `angular.md`, `domain.md`) load automatically when you touch matching files — read the matching rule before creating files in an area you have not touched yet. .NET 10 and Angular 22 move faster than training data: verify an API through microsoft-docs (.NET/ASP.NET/EF) or context7 (Angular, MassTransit) instead of writing it from memory.
 
 ## Workflow
-`/design <idea>` writes a spec into `skarbiec-plan/specs/` and stops for your approval — new behaviour, a change to existing behaviour, or a cleanup → `/build <spec>` cuts `feat/<slug>` from master first, then runs test-writer → implementer → verifier → reviewer → ops, which stops at `git add -A`: **you commit, push, open the PR and merge**. A spec with `skip: [tests]` (no behaviour changes) skips the test phase; `/build --skip tests,review` overrides it for one run. `/fix <bug>` reproduces, writes a one-criterion fix spec and runs the same pipeline; `/check` runs verification; `/ops <task>` handles CI and GitHub chores.
+Specs are GitHub issues on the **FinMel project** (Status Todo → In progress → Done; custom fields Tier, Kind, Branch; labels `spec`, `epic`, `skip-tests`) — there are no spec files in the repo. `/design <idea>` interviews, drafts in the scratchpad and, after your approval, publishes the issue (new behaviour, a change to existing behaviour, or a cleanup; a split becomes an `epic` with sub-issues) → `/build #<n>` moves the card to In progress, cuts the issue's branch from master, runs test-writer → implementer → verifier → reviewer → ops, which stops at `git add -A`, then comments the run report on the issue: **you commit, push, open the PR (`Closes #<n>`, so merging moves the card to Done) and merge**. The `skip-tests` label (no behaviour changes) skips the test phase; `/build --skip tests,review` overrides it for one run. `/fix <bug>` reproduces, publishes a one-criterion `fix/<slug>` issue and runs the same pipeline; `/board` shows what to build next; `/check` runs verification; `/ops <task>` handles CI and GitHub chores.
 Tier 1 = a precedent for this exists in the same service (Sonnet). Tier 2 = new pattern, cross-service work, or an algorithm (Opus).
 Definition of done: tests green including tenancy, zero warnings, `dotnet format` clean, TS client regenerated when the API changed, `requests/*.http` updated, rules and ADRs updated when a convention changes.
 Agents never run git — only `ops`, and inside a build run only `git switch -c` and `git add -A`; commit/push/PR happen in an explicit `/ops` chore or by your own hand.

@@ -31,6 +31,26 @@ internal static class PortfolioAssertions
         var code = errorCode is JsonElement element ? element.GetString() : errorCode?.ToString();
         Assert.Equal(PortfolioArchivedErrorCode, code);
     }
+
+    /// <summary>
+    /// transactions-pln-value-and-fee-removal: a transaction as it goes over the wire carries no
+    /// <c>fee</c> of any spelling. Checked on the raw JSON, because a typed read would silently drop
+    /// a property the response type no longer declares.
+    /// </summary>
+    public static void AssertCarriesNoFee(this JsonElement transaction) =>
+        Assert.DoesNotContain(
+            transaction.EnumerateObject(),
+            p => p.Name.StartsWith("fee", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Reads <paramref name="response"/>'s body as a detached JSON element, for wire-shape assertions.</summary>
+    public static async Task<JsonElement> ReadJsonAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        using var document = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        return document.RootElement.Clone();
+    }
+
     /// <summary>
     /// AC: "Quantity always equals recompute-from-scratch after any mutation" — re-derives
     /// <see cref="Asset.Quantity"/> from the full transaction history returned by the API and

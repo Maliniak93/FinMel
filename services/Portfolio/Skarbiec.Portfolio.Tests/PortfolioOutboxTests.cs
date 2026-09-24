@@ -47,6 +47,7 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
             services.ConfigureDbContext<PortfolioDbContext>(options => options.AddInterceptors(_saveChanges));
             services.AddSingleton<ICurrentUser>(new StubCurrentUser(UserId));
             services.AddSingleton<IInstrumentLookupClient>(new FakeInstrumentLookupClient());
+            services.AddSingleton<IFxRateLookupClient>(new FakeFxRateLookupClient());
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<PositionEventPublisher>();
             services.AddScoped<CreatePortfolioHandler>();

@@ -69,13 +69,14 @@ internal static class PortfolioApi
         CancellationToken cancellationToken,
         string name = "Test asset",
         AssetClass assetClass = AssetClass.Stock,
-        decimal manualValue = 0m)
+        decimal manualValue = 0m,
+        string currency = "PLN")
     {
         var request = new AddAssetRequest
         {
             AssetClass = assetClass,
             Name = name,
-            Currency = "PLN",
+            Currency = currency,
             ManualValue = manualValue,
             ManualValueDate = new DateOnly(2026, 1, 1)
         };
@@ -86,12 +87,16 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
     }
 
-    /// <summary>The common arrange step: a portfolio holding one asset, both owned by <paramref name="client"/>'s user.</summary>
+    /// <summary>
+    /// The common arrange step: a portfolio holding one asset, both owned by <paramref name="client"/>'s
+    /// user. <paramref name="currency"/> is the asset's — a non-PLN one makes every transaction write
+    /// resolve its PLN rate through <see cref="FakeFxRateLookupClient"/>.
+    /// </summary>
     public static async Task<(Guid PortfolioId, Guid AssetId)> CreatePortfolioWithAssetAsync(
-        this HttpClient client, CancellationToken cancellationToken)
+        this HttpClient client, CancellationToken cancellationToken, string currency = "PLN")
     {
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, currency: currency);
 
         return (portfolioId, assetId);
     }

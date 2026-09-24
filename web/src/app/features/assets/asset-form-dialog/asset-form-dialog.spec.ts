@@ -462,13 +462,28 @@ describe('AssetFormDialog', () => {
 
       const request = fetchSpy.mock.calls[0][0] as Request;
       const body = await request.json();
+      // transactions-pln-value-and-fee-removal AC13: the first transaction carries no fee.
       expect(body.initialTransaction).toEqual({
         type: 2,
         quantity: 1000,
         unitPrice: 1,
-        fee: 0,
         date: expect.any(String),
       });
+    });
+
+    // transactions-pln-value-and-fee-removal AC13: the first-transaction sub-form has no fee
+    // control and offers no Fee type.
+    it('has no fee control and offers no Fee type', async () => {
+      await setup({ portfolioId });
+      component['form'].controls.name.setValue('Checking account');
+      component['toggleAddFirstTransaction']();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(Object.keys(component['transactionForm'].controls)).not.toContain('fee');
+      expect(component['transactionTypes'].map((type) => type.label)).not.toContain('Fee');
+      const element = fixture.nativeElement as HTMLElement;
+      expect(element.querySelector('[formcontrolname="fee"]')).toBeNull();
     });
 
     it('checked → defaults to Buy for a market class', async () => {
@@ -524,6 +539,30 @@ describe('AssetFormDialog', () => {
       await component['onSubmit']();
 
       expect(component['form'].controls.name.hasError('server')).toBe(true);
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    // transactions-pln-value-and-fee-removal: a currency change on an asset that already has
+    // transactions is a 400 field error on Currency, which lands on the currency control.
+    it('surfaces the currency-locked error on the currency control when editing', async () => {
+      await setup({ portfolioId, asset: { ...cashAsset, transactionCount: 1 } });
+      fetchSpy.mockResolvedValue(
+        jsonResponse(
+          {
+            detail: 'Validation failed.',
+            errors: {
+              Currency: ["The currency can't change once the asset has transactions."],
+            },
+          },
+          400,
+        ),
+      );
+
+      component['form'].controls.currency.setValue('EUR');
+
+      await component['onSubmit']();
+
+      expect(component['form'].controls.currency.hasError('server')).toBe(true);
       expect(dialogRef.close).not.toHaveBeenCalled();
     });
 

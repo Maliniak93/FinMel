@@ -18,7 +18,7 @@ agent's report at face value.
 
 ## Blocking findings — only these
 - An acceptance criterion with no test that would fail if the behavior regressed, and no verified command output backing it.
-- A spec that declared `skip: [tests]` but changed real behavior — the skip is only for deletion, config, docs or a pure move. "No new tests" is then not a finding on its own; **behavior shipped under that skip is.**
+- A spec with the `skip-tests` label but changed real behavior — the skip is only for deletion, config, docs or a pure move. "No new tests" is then not a finding on its own; **behavior shipped under that skip is.**
 - A hard-rule violation: throwing (instead of returning `Result`/`Result<T>`) for an expected failure path; a Service/Repository layer, or MediatR; `UserId` sourced from the request body or route instead of JWT claims; an event published outside the MassTransit outbox, or a consumer that isn't idempotent; a consumer calling the event's publisher back over REST instead of using the state the event already carries; cross-database access or a foreign key between services; `float`/`double` used for money instead of `decimal`; Angular code calling a service directly instead of going through the Gateway client; a new call to an external price/FX API from anywhere other than a MarketData job or `ITickerVerifier`.
 - Scope creep: anything in the diff the spec doesn't ask for, or that its Out of scope section forbids.
 - A new user-owned resource with no tenancy isolation test.

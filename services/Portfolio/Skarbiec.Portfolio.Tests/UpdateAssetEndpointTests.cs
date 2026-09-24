@@ -29,11 +29,13 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+        // transactions-pln-value-and-fee-removal: the asset has a transaction, so its currency is
+        // locked; the update keeps PLN and changes everything else.
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Crypto,
             Name = "Renamed",
-            Currency = "USD",
+            Currency = "PLN",
             ManualValue = 42.42m,
             ManualValueDate = new DateOnly(2026, 6, 15)
         };
@@ -44,7 +46,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Equal(AssetClass.Crypto, body!.AssetClass);
         Assert.Equal("Renamed", body.Name);
-        Assert.Equal("USD", body.Currency);
+        Assert.Equal("PLN", body.Currency);
         Assert.Equal(3m, body.Quantity);
         Assert.Equal(42.42m, body.ManualValue);
         Assert.Equal(new DateOnly(2026, 6, 15), body.ManualValueDate);
@@ -153,7 +155,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         {
             AssetClass = AssetClass.Stock,
             Name = "Now market",
-            Currency = "USD",
+            Currency = "PLN", // unchanged: the Buy above locks the asset's currency.
             InstrumentId = instrumentId
         };
 
@@ -218,7 +220,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         {
             AssetClass = AssetClass.Cash,
             Name = "Now currency-valued",
-            Currency = "EUR",
+            Currency = "PLN", // unchanged: the Deposit above locks the asset's currency.
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -296,6 +298,89 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var response = await client.PutAsJsonAsync(AssetUri(otherPortfolioId, assetId), request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    /// <summary>transactions-pln-value-and-fee-removal AC9: once an asset has a transaction its
+    /// stored PLN rates are tied to its currency. Changing the currency is a 400 field error on
+    /// <c>Currency</c>, and the asset keeps its currency.</summary>
+    [Fact]
+    public async Task Update_ChangeCurrencyWithTransactions_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Locked", manualValue: 100m, currency: "PLN");
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "Locked",
+            Currency = "EUR",
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.Contains(problem.Errors, e => e.Key.Equals(nameof(UpdateAssetRequest.Currency), StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("PLN", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
+    }
+
+    /// <summary>transactions-pln-value-and-fee-removal AC9: an asset without transactions has no
+    /// stored rates yet, so its currency stays freely editable.</summary>
+    [Fact]
+    public async Task Update_ChangeCurrencyWithoutTransactions_ReturnsOk()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Free", manualValue: 100m, currency: "PLN");
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "Free",
+            Currency = "EUR",
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.Equal("EUR", body!.Currency);
+        Assert.Equal("EUR", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
+    }
+
+    /// <summary>transactions-pln-value-and-fee-removal AC10: the archived guard runs before the
+    /// currency lock. An archived portfolio answers 409 <c>Conflict.PortfolioArchived</c>, not the
+    /// currency-lock 400, even for an asset whose currency is locked by its transactions.</summary>
+    [Fact]
+    public async Task Update_ChangeCurrencyOnArchivedPortfolio_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Euro stock", manualValue: 100m, currency: "EUR");
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "Euro stock",
+            Currency = "USD",
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        Assert.Equal("EUR", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
     }
 
     /// <summary>archived-portfolio-out-of-net-worth AC6: updating an asset of an archived portfolio

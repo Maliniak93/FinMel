@@ -17,7 +17,6 @@ public sealed class TransactionQuantityCalculatorTests
     [InlineData(TransactionType.Withdraw, 4, 6)]
     [InlineData(TransactionType.Dividend, 4, 10)]
     [InlineData(TransactionType.Interest, 4, 10)]
-    [InlineData(TransactionType.Fee, 4, 10)]
     public void Recompute_EachTransactionType_ProducesExpectedQuantity(TransactionType type, decimal quantity, decimal expected)
     {
         Transaction[] transactions =

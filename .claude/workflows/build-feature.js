@@ -1,14 +1,14 @@
 export const meta = {
   name: 'build-feature',
   description: 'Spec to a staged tree: branch, failing tests, implementation, verification, adversarial review',
-  whenToUse: 'Invoked by /build on a spec whose status is approved. Not for exploratory work - the spec is the contract.',
+  whenToUse: 'Invoked by /build and /fix on an open spec issue from the FinMel project (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
-    { title: 'Branch', detail: 'ops cuts feat/<slug> from master before a single file is written', model: 'haiku' },
+    { title: 'Branch', detail: 'ops cuts the issue branch (feat/<slug> or fix/<slug>) from master before a single file is written', model: 'haiku' },
     { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; sonnet/high on tier 1, opus/high on tier 2 (skippable)' },
     { title: 'Implement', detail: 'implementer does the work; sonnet/high on tier 1, opus/xhigh on tier 2' },
     { title: 'Verify', detail: 'verifier runs scripts/verify.mjs; failures loop back to Implement', model: 'haiku' },
     { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'claude-opus-5-5' },
-    { title: 'Stage', detail: 'ops flips the spec to done and leaves everything staged - the commit, push and PR are yours', model: 'haiku' },
+    { title: 'Stage', detail: 'ops leaves everything staged - the commit, push and PR are yours', model: 'haiku' },
   ],
 }
 
@@ -106,16 +106,24 @@ const STAGE = {
 
 // ---------------------------------------------------------------- setup
 
-const { spec, tier = 1, maxRounds = 2, skip = [] } = args || {}
+const { spec, issue, branch: issueBranch, title, tier = 1, maxRounds = 2, skip = [] } = args || {}
 
-if (!spec) {
-  return { status: 'blocked', stage: 'input', reason: 'args.spec is required - the path to skarbiec-plan/specs/<slug>.md' }
+if (!(spec && issue && issueBranch && title)) {
+  return {
+    status: 'blocked',
+    stage: 'input',
+    reason: 'args.spec (skarbiec-plan/issues/<n>.md), args.issue, args.branch and args.title are all required',
+  }
 }
+
+// The spec is a gitignored local copy of a GitHub issue: branch and title arrive as args, and nobody
+// edits the file - the issue and its project card carry all state.
+const whereBranch = `The spec is a local copy of issue #${issue}: the branch is \`${issueBranch}\` and the title is "${title}". Never edit the spec file - it is gitignored.`
 
 const skipped = new Set((Array.isArray(skip) ? skip : [skip]).map((s) => String(s).trim().toLowerCase()))
 
 const OPUS = 'claude-opus-5-5'
-// Mechanical ops phases (cut, stage, finish) need no judgment beyond reading frontmatter.
+// Mechanical ops phases (cut, stage, finish) need no judgment.
 const MECHANICAL = { model: 'haiku', effort: 'low' }
 
 let model = tier >= 2 ? OPUS : 'sonnet'
@@ -129,11 +137,50 @@ let review = null
 
 const RESERVE = 40000
 const broke = () => Boolean(budget.total) && budget.remaining() < RESERVE
-const stop = (stage, extra) => Object.assign({ status: 'blocked', stage, spec, tier, tests, impl, rounds }, extra)
-
 // Every phase runs one agent and stops the whole run if that agent dies or refuses.
 async function step(agentType, label, lines, schema, opts) {
   const result = await agent(lines.filter(Boolean).join('\n'), Object.assign({ agentType, schema, label }, opts || {}))
+  return result
+}
+
+// What the caller needs from the agents' reports - names and counts, never the whole JSON.
+const compact = () => ({
+  tests: tests.tests.map((t) => t.name),
+  filesTouched: impl ? impl.filesTouched.length : 0,
+  openQuestions: (impl && impl.openQuestions) || [],
+})
+
+// The run report is built here, as data, and formatted and posted by `gh-project.mjs report`: no
+// model writes the issue comment, the ops agent only pastes one command.
+const clip = (text, n) => (text && String(text).length > n ? `${String(text).slice(0, n)}…` : text)
+const findingsOf = (list) => (list || []).map((f) => ({ file: f.file, line: f.line, claim: clip(f.claim, 300) }))
+// One line, single-quoted for bash (a `'` inside becomes `'"'"'`), so it matches the
+// `node scripts/gh-project.mjs report` permission rule and runs without a prompt.
+const reportCommand = (run) => [
+  'Run exactly this command, verbatim, as one Bash call:',
+  '```',
+  `node scripts/gh-project.mjs report ${issue} --json '${JSON.stringify(run).replace(/'/g, `'"'"'`)}'`,
+  '```',
+]
+
+async function stop(stage, extra) {
+  const result = Object.assign({ status: 'blocked', stage, issue, tier, rounds }, compact(), extra)
+  await step(
+    'ops',
+    'post the blocked report on the issue',
+    [`Post the report of a blocked build run on issue #${issue}. Touch no git state.`].concat(
+      reportCommand({
+        status: 'blocked',
+        stage,
+        reason: clip(result.reason, 300),
+        failures: (result.failures || []).map((f) => ({ step: f.step, summary: clip(f.summary, 300), file: f.file })),
+        blocking: findingsOf(result.findings),
+      }),
+      ['Report the branch you are on, and the command output in notes.'],
+    ),
+    STAGE,
+    MECHANICAL,
+  )
   return result
 }
 
@@ -160,7 +207,8 @@ const stage = (label) =>
     label,
     [
       `Stage the working tree for the spec at \`${spec}\` so the reviewer sees the whole change.`,
-      'Read the spec frontmatter for `title` and `branch`. Confirm you are on that branch - never stage work on master.',
+      whereBranch,
+      'Confirm you are on that branch - never stage work on master.',
       'Run `git add -A` and nothing else. No commit, no push, no PR - the user does all three by hand.',
       'Report the branch and the number of staged files (`git diff --cached --name-only`).',
     ],
@@ -173,14 +221,15 @@ const stage = (label) =>
 phase('Branch')
 log(`Spec ${spec} - tier ${tier}, implementer on ${model}/${effort}, max ${maxRounds} fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`)
 
-if (broke()) return stop('branch', { reason: 'budget' })
+if (broke()) return await stop('branch', { reason: 'budget' })
 
 const cut = await step(
   'ops',
-  'cut feat/<slug> from master',
+  'cut the issue branch from master',
   [
     `Create the branch for the spec at \`${spec}\`. Create the branch and nothing else - no commit, no push, no PR.`,
-    'Read the spec frontmatter for `branch`. `git fetch origin` first; branch from an up-to-date master and say so in notes if local master was behind.',
+    whereBranch,
+    '`git fetch origin` first; branch from an up-to-date master and say so in notes if local master was behind.',
     'If you are already on that branch, stay on it - this is a resumed run - and report its uncommitted changes in notes.',
     'If you are on master or another branch with changes that are not this spec (the spec file itself belongs to this change), stop: return `blocked: true` and name those files in notes instead of sweeping them along.',
   ],
@@ -188,8 +237,8 @@ const cut = await step(
   MECHANICAL,
 )
 
-if (!cut) return stop('branch', { reason: 'ops returned no result' })
-if (cut.blocked) return stop('branch', { reason: 'the working tree holds changes that are not this spec', notes: cut.notes || [] })
+if (!cut) return await stop('branch', { reason: 'ops returned no result' })
+if (cut.blocked) return await stop('branch', { reason: 'the working tree holds changes that are not this spec', notes: cut.notes || [] })
 
 log(`working on ${cut.branch}`)
 
@@ -200,7 +249,7 @@ phase('Tests')
 if (skipped.has('tests')) {
   log('Tests skipped - this spec proves its acceptance criteria with commands, not new tests')
 } else {
-  if (broke()) return stop('tests', { reason: 'budget' })
+  if (broke()) return await stop('tests', { reason: 'budget' })
 
   tests = await step(
     'test-writer',
@@ -215,11 +264,11 @@ if (skipped.has('tests')) {
     tier >= 2 ? { model: OPUS, effort: 'high' } : { model: 'sonnet', effort: 'high' },
   )
 
-  if (!tests) return stop('tests', { reason: 'test-writer returned no result' })
+  if (!tests) return await stop('tests', { reason: 'test-writer returned no result' })
 
   if (!tests.tests.length) {
-    return stop('tests', {
-      reason: 'test-writer produced no tests. If this spec genuinely needs none, add `skip: [tests]` to its frontmatter and re-run; otherwise its acceptance criteria are not testable.',
+    return await stop('tests', {
+      reason: 'test-writer produced no tests. If this spec genuinely needs none, add the `skip-tests` label to its issue and re-run; otherwise its acceptance criteria are not testable.',
       notes: tests.notes || [],
     })
   }
@@ -230,7 +279,7 @@ if (skipped.has('tests')) {
 // ---------------------------------------------------------------- implement
 
 phase('Implement')
-if (broke()) return stop('implement', { reason: 'budget' })
+if (broke()) return await stop('implement', { reason: 'budget' })
 
 impl = await implement(
   'implement the spec',
@@ -246,8 +295,8 @@ impl = await implement(
       ],
 )
 
-if (!impl) return stop('implement', { reason: 'implementer returned no result' })
-if (impl.status === 'blocked') return stop('implement', { reason: 'implementer blocked' })
+if (!impl) return await stop('implement', { reason: 'implementer returned no result' })
+if (impl.status === 'blocked') return await stop('implement', { reason: 'implementer blocked' })
 
 log(`implementer touched ${impl.filesTouched.length} file(s)`)
 
@@ -255,10 +304,10 @@ log(`implementer touched ${impl.filesTouched.length} file(s)`)
 
 for (let round = 0; ; round++) {
   phase('Verify')
-  if (broke()) return stop('verify', { reason: 'budget' })
+  if (broke()) return await stop('verify', { reason: 'budget' })
 
   const verified = await verify(`verify round ${round + 1}`)
-  if (!verified) return stop('verify', { reason: 'verifier returned no result' })
+  if (!verified) return await stop('verify', { reason: 'verifier returned no result' })
 
   if (verified.ok) {
     log(`verify green after ${rounds} fix round(s)`)
@@ -277,11 +326,11 @@ for (let round = 0; ; round++) {
   }
   if (round >= (escalated ? maxRounds + 1 : maxRounds)) {
     log('verify still red after the final round - stopping')
-    return stop('verify', { failures: verified.failures })
+    return await stop('verify', { failures: verified.failures })
   }
 
   phase('Implement')
-  if (broke()) return stop('implement', { reason: 'budget' })
+  if (broke()) return await stop('implement', { reason: 'budget' })
 
   impl = await implement(`fix verify failures (round ${round + 1})`, [
     `Fix exactly these verification failures: ${JSON.stringify(verified.failures)}`,
@@ -289,8 +338,8 @@ for (let round = 0; ; round++) {
     'Do not refactor around them and do not weaken or delete a test.',
   ])
 
-  if (!impl) return stop('implement', { reason: 'implementer returned no result on a fix round' })
-  if (impl.status === 'blocked') return stop('implement', { reason: 'implementer blocked on a fix round' })
+  if (!impl) return await stop('implement', { reason: 'implementer returned no result on a fix round' })
+  if (impl.status === 'blocked') return await stop('implement', { reason: 'implementer blocked on a fix round' })
 }
 
 // ---------------------------------------------------------------- review loop
@@ -301,10 +350,10 @@ if (skipped.has('review')) {
 } else {
   for (let round = 0; ; round++) {
     phase('Review')
-    if (broke()) return stop('review', { reason: 'budget' })
+    if (broke()) return await stop('review', { reason: 'budget' })
 
     const ready = await stage(`stage the tree for review (round ${round + 1})`)
-    if (!ready) return stop('review', { reason: 'ops could not stage the tree for review' })
+    if (!ready) return await stop('review', { reason: 'ops could not stage the tree for review' })
 
     review = await step(
       'reviewer',
@@ -314,13 +363,13 @@ if (skipped.has('review')) {
         `It is staged - not committed - on \`${ready.branch}\`, so \`git diff --cached\` is the diff under review (it shows new files; a bare \`git diff\` does not). Also run \`git status --porcelain\`: anything still unstaged belongs to this change too.`,
         `tests claimed: ${JSON.stringify(tests.tests)}`,
         `implementer report: ${JSON.stringify(impl)}`,
-        tests.tests.length ? null : 'This spec declared `skip: [tests]` - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
+        tests.tests.length ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
         'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',
       ],
       REVIEW,
     )
 
-    if (!review) return stop('review', { reason: 'reviewer returned no result' })
+    if (!review) return await stop('review', { reason: 'reviewer returned no result' })
 
     const blocking = review.findings.filter((f) => f.severity === 'blocking')
     if (!blocking.length) {
@@ -329,10 +378,10 @@ if (skipped.has('review')) {
     }
 
     log(`review returned ${blocking.length} blocking finding(s)`)
-    if (round >= maxRounds) return stop('review', { findings: blocking, summary: review.summary })
+    if (round >= maxRounds) return await stop('review', { findings: blocking, summary: review.summary })
 
     phase('Implement')
-    if (broke()) return stop('implement', { reason: 'budget' })
+    if (broke()) return await stop('implement', { reason: 'budget' })
 
     impl = await implement(`address blocking findings (round ${round + 1})`, [
       `Address exactly these blocking review findings: ${JSON.stringify(blocking)}`,
@@ -340,19 +389,19 @@ if (skipped.has('review')) {
       'A finding you disagree with goes into notes with the reason - do not silently ignore it.',
     ])
 
-    if (!impl) return stop('implement', { reason: 'implementer returned no result on a review fix' })
-    if (impl.status === 'blocked') return stop('implement', { reason: 'implementer blocked on a review fix' })
+    if (!impl) return await stop('implement', { reason: 'implementer returned no result on a review fix' })
+    if (impl.status === 'blocked') return await stop('implement', { reason: 'implementer blocked on a review fix' })
 
     rounds = rounds + 1
 
     phase('Verify')
-    if (broke()) return stop('verify', { reason: 'budget' })
+    if (broke()) return await stop('verify', { reason: 'budget' })
 
     const reverified = await verify(`verify after review fix (round ${round + 1})`)
-    if (!reverified) return stop('verify', { reason: 'verifier returned no result after a review fix' })
+    if (!reverified) return await stop('verify', { reason: 'verifier returned no result after a review fix' })
     if (!reverified.ok) {
       log('the review fix broke verification - stopping')
-      return stop('verify', { failures: reverified.failures })
+      return await stop('verify', { failures: reverified.failures })
     }
     log('verify green again after the review fix')
   }
@@ -361,26 +410,35 @@ if (skipped.has('review')) {
 // ---------------------------------------------------------------- stage
 
 phase('Stage')
-if (broke()) return stop('stage', { reason: 'budget' })
+if (broke()) return await stop('stage', { reason: 'budget' })
 
 const minor = review ? review.findings.filter((f) => f.severity === 'minor') : []
 
 const staged = await step(
   'ops',
-  'flip the spec to done and leave the tree staged',
+  'leave the tree staged',
   [
     `Finish the run for the spec at \`${spec}\`. Nothing is committed and nothing may be: the user commits, pushes and opens the PR by hand.`,
-    'Read the spec frontmatter for `title` and `branch`. Confirm you are on that branch.',
-    'Set the spec frontmatter to `status: done` and, under a `## Result` heading at the end of the spec (create it if missing), record that the change is staged on its branch and awaiting the user\'s own commit and PR.',
-    'Then run `git add -A`. No commit, no push, no `gh pr create`, no PR review comments - there is no PR yet.',
-    'Report the branch and the number of staged files.',
-    `implementer report: ${JSON.stringify(impl)}`,
-  ],
+    whereBranch,
+    'Confirm you are on that branch.',
+    'Run `git add -A`. No commit, no push, no `gh pr create`, no PR review comments - there is no PR yet.',
+    'Then post the run report on the issue.',
+  ].concat(
+    reportCommand({
+      status: 'staged',
+      branch: issueBranch,
+      tests: tests.tests.map((t) => t.name),
+      rounds,
+      reviewRan: Boolean(review),
+      minor: findingsOf(minor),
+    }),
+    ['Report the branch, the number of staged files (`git diff --cached --name-only`), and the report command output in notes.'],
+  ),
   STAGE,
   MECHANICAL,
 )
 
-if (!staged) return stop('stage', { reason: 'ops returned no result' })
+if (!staged) return await stop('stage', { reason: 'ops returned no result' })
 
 const branch = staged.branch || cut.branch
 log(`staged on ${branch} - ${staged.stagedFiles ?? '?'} file(s); commit, push and PR are yours`)
@@ -389,13 +447,12 @@ return {
   status: 'staged',
   branch,
   stagedFiles: staged.stagedFiles ?? null,
-  nextSteps: [`git commit -m "<spec title>"`, `git push -u origin ${branch}`, `gh pr create --base master --head ${branch}`],
-  review: review ? review.summary : 'review skipped',
-  minorFindings: minor,
+  nextSteps: [`git commit -m "${title}"`, `git push -u origin ${branch}`, `gh pr create --base master --head ${branch} --title "${title}" --body "Closes #${issue}"`],
+  review: review ? clip(review.summary, 400) : 'review skipped',
+  minorFindings: findingsOf(minor),
   skipped: [...skipped],
-  tests,
-  impl,
   rounds,
-  spec,
+  issue,
   tier,
+  ...compact(),
 }

@@ -25,9 +25,9 @@ You turn a spec's failing tests green with the smallest correct change, and noth
 
 The delegation message carries some of these, as paths and JSON — never as file contents:
 
-- `spec` — path to `skarbiec-plan/specs/<slug>.md`. Always present.
+- `spec` — path to `skarbiec-plan/issues/<n>.md`, a local copy of the spec issue. Always present.
 - `tests` — `[{ name, file, ac }]` written by the test-writer, plus the test `projects`. **Absent when
-  the spec declared `skip: [tests]`** — that spec adds no behaviour, so nothing is red to start with:
+  the spec issue carries the `skip-tests` label** — that spec adds no behaviour, so nothing is red to start with:
   implement its Scope, run the command every acceptance criterion names as its proof, report those in
   `commandsRun`, and leave every existing suite green. Writing a test there is scope creep, not zeal.
   An acceptance criterion whose named proof is `scripts/verify.mjs` or a full suite is already proven

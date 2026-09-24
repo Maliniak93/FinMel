@@ -49,6 +49,9 @@ Authorization: Bearer {{authToken}}
 ### Get instrument details (Portfolio's instrument lookup)
 GET {{marketDataUrl}}/internal/instruments/{{addCustomInstrument.response.body.id}}
 
+### Get FX rate (Portfolio's transaction-date rate lookup, ADR-026) — the latest EURPLN rate on or before the date; 404 when there is none
+GET {{marketDataUrl}}/internal/fx/EUR/rate?date=2026-08-18
+
 ### Latest prices batch
 POST {{marketDataUrl}}/internal/prices/latest-batch
 Content-Type: application/json

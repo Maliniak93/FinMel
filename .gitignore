@@ -27,7 +27,6 @@ Thumbs.db
 
 # private files
 skarbiec-plan/archive/
-skarbiec-plan/specs/
 skarbiec-plan/errors/
 
 # hey-api generator error dumps
@@ -35,3 +34,6 @@ web/openapi-ts-error-*.log
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# Local copies of spec issues written by /build and /fix (scripts/gh-project.mjs get --out)
+skarbiec-plan/issues/

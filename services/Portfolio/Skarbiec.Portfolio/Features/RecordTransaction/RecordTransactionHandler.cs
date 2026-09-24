@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.RecordTransaction;
 
-public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
+public sealed class RecordTransactionHandler(
+    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, IFxRateLookupClient fxRateLookupClient)
 {
     public async Task<Result<TransactionResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, RecordTransactionRequest request, CancellationToken cancellationToken)
@@ -28,12 +30,6 @@ public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, Posit
             return unitPrice.Error;
         }
 
-        var fee = Money.Create(request.Fee, asset.Currency);
-        if (fee.IsFailure)
-        {
-            return fee.Error;
-        }
-
         var transaction = new Transaction
         {
             Id = Guid.NewGuid(),
@@ -41,7 +37,6 @@ public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, Posit
             Type = request.Type,
             Quantity = request.Quantity,
             UnitPriceAmount = unitPrice.Value.Amount,
-            FeeAmount = fee.Value.Amount,
             Date = request.Date
         };
 
@@ -58,6 +53,14 @@ public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, Posit
             return recomputed.Error;
         }
 
+        // Last check before the write: only a valid request on an active portfolio asks MarketData.
+        var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
+        if (fxRateToPln.IsFailure)
+        {
+            return fxRateToPln.Error;
+        }
+
+        transaction.FxRateToPln = fxRateToPln.Value;
         asset.Quantity = recomputed.Value;
         dbContext.Transactions.Add(transaction);
 
@@ -67,6 +70,6 @@ public sealed class RecordTransactionHandler(PortfolioDbContext dbContext, Posit
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return transaction.ToResponse();
+        return transaction.ToResponse(asset.Currency);
     }
 }

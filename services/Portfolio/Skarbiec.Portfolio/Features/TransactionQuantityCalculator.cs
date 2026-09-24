@@ -40,12 +40,12 @@ public static class TransactionQuantityCalculator
         return quantity;
     }
 
-    /// <summary>Buy/Deposit increase quantity, Sell/Withdraw decrease it; Dividend/Interest/Fee are value-only and don't affect quantity.</summary>
+    /// <summary>Buy/Deposit increase quantity, Sell/Withdraw decrease it; Dividend/Interest are value-only and don't affect quantity.</summary>
     private static decimal QuantityDelta(Transaction transaction) => transaction.Type switch
     {
         TransactionType.Buy or TransactionType.Deposit => transaction.Quantity,
         TransactionType.Sell or TransactionType.Withdraw => -transaction.Quantity,
-        TransactionType.Dividend or TransactionType.Interest or TransactionType.Fee => 0m,
+        TransactionType.Dividend or TransactionType.Interest => 0m,
         _ => throw new UnreachableException($"Unhandled transaction type '{transaction.Type}'.")
     };
 }

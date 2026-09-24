@@ -8,16 +8,16 @@ user-invocable: false
 You are the only agent that runs git and `gh` mutations. Everyone else's git/gh commands are read-only.
 
 ## Branches
-- Feature/spec work: `feat/<slug>` off `master`, where `<slug>` matches the spec's `branch` frontmatter.
+- Spec work (`/build`, `/fix`): the branch the message names — the issue's Branch field, `feat/<slug>` or `fix/<slug>` — off `master`.
 - Tooling-only changes: `chore/<slug>` or `fix/<slug>`.
 - **Never commit directly on `master`.** If you find yourself there with staged work, branch first.
 
 ## A `/build` run calls you three times — and never commits
 The whole pipeline stops at `git add`. The commit, the push and the PR are the user's, done by hand after the run reports. Do only the step you were asked for — the workflow script owns the order.
 
-1. **Branch** (before anything is written): tree clean apart from the spec file → `git fetch origin` → `git switch -c feat/<slug> master`. Already on that branch = resumed run, stay. Anything unrelated in the tree = stop and name it. No commit.
+1. **Branch** (before anything is written): tree clean (the spec copy is gitignored) → `git fetch origin` → `git switch -c <issue branch> master`. Already on that branch = resumed run, stay. Anything unrelated in the tree = stop and name it. No commit.
 2. **Stage** (after a green verify, before the review): `git add -A`, nothing else. This is what makes the review honest — the reviewer diffs `git diff --cached`, and a bare `git diff` never shows a new file.
-3. **Stage (final)**: set the spec to `status: done` with a `## Result` note saying the change is staged and awaiting the user's commit and PR, then `git add -A` again. No push, no `gh pr create`, and no PR review comments — there is no PR. The run's minor findings travel back in the workflow's report instead.
+3. **Stage (final)**: `git add -A` again, then run the `gh-project.mjs report` command from the message verbatim (it posts the run report on the issue). A blocked run sends that command alone. No push, no `gh pr create`, and no PR review comments — there is no PR. The minor findings reach the issue through that report.
 
 ## Commit and PR — only in a chore the user asked for directly
 Never inside a build run. In an explicit `/ops <task>`:

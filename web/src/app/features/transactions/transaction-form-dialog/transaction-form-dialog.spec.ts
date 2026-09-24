@@ -24,7 +24,8 @@ const existingTransaction: TransactionResponse = {
   type: 0, // Buy
   quantity: 10,
   unitPrice: 100,
-  fee: 5,
+  currency: 'EUR',
+  valuePln: 4300,
   date: '2024-01-15',
 };
 
@@ -75,6 +76,7 @@ describe('TransactionFormDialog', () => {
     expect(request.url).toContain(`/assets/${assetId}/transactions`);
     const body = await request.json();
     expect(body.unitPrice).toBe(100);
+    expect(body).not.toHaveProperty('fee');
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
@@ -85,7 +87,6 @@ describe('TransactionFormDialog', () => {
     expect(component['form'].controls.type.value).toBe(0);
     expect(component['form'].controls.quantity.value).toBe(10);
     expect(component['form'].controls.unitPrice.value).toBe(100);
-    expect(component['form'].controls.fee.value).toBe(5);
     expect(component['form'].controls.date.value).toEqual(new Date(2024, 0, 15));
 
     await component['onSubmit']();
@@ -96,10 +97,11 @@ describe('TransactionFormDialog', () => {
     expect(request.url).toContain(existingTransaction.id);
     const body = await request.json();
     expect(body.date).toBe('2024-01-15');
+    expect(body).not.toHaveProperty('fee');
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
-  it('sends unit price 1 and fee 0 for a Deposit, where both fields are hidden', async () => {
+  it('sends unit price 1 for a Deposit, where the unit-price field is hidden', async () => {
     await setup({ portfolioId, assetId });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction, type: 2 }, 201));
 
@@ -107,7 +109,6 @@ describe('TransactionFormDialog', () => {
     component['form'].controls.quantity.setValue(500);
 
     expect(component['isPriced']()).toBe(false);
-    expect(component['showsFee']()).toBe(true);
     expect(component['quantityLabel']()).toBe('Amount');
 
     await component['onSubmit']();
@@ -115,23 +116,23 @@ describe('TransactionFormDialog', () => {
     const request = fetchSpy.mock.calls[0][0] as Request;
     const body = await request.json();
     expect(body.unitPrice).toBe(1);
+    expect(body).not.toHaveProperty('fee');
   });
 
-  it('sends fee 0 for a Fee transaction, where the fee field is hidden', async () => {
+  // transactions-pln-value-and-fee-removal AC13: Fee is gone as a transaction type and as a field.
+  it('offers no Fee type', async () => {
     await setup({ portfolioId, assetId });
-    fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction, type: 6 }, 201));
 
-    component['form'].controls.type.setValue(6); // Fee
-    component['form'].controls.quantity.setValue(20);
-    component['form'].controls.fee.setValue(999);
+    const labels = component['transactionTypes'].map((type) => type.label);
+    expect(labels).toEqual(['Buy', 'Sell', 'Deposit', 'Withdraw', 'Dividend', 'Interest']);
+    expect(Object.keys(component['form'].controls)).not.toContain('fee');
 
-    expect(component['showsFee']()).toBe(false);
-
-    await component['onSubmit']();
-
-    const request = fetchSpy.mock.calls[0][0] as Request;
-    const body = await request.json();
-    expect(body.fee).toBe(0);
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[formcontrolname="fee"]')).toBeNull();
+    const fieldLabels = Array.from(element.querySelectorAll('mat-label'), (label) =>
+      (label.textContent ?? '').trim(),
+    );
+    expect(fieldLabels).not.toContain('Fee');
   });
 
   it('does not submit an invalid form', async () => {

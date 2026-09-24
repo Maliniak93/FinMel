@@ -49,6 +49,13 @@ if (!OpenApiBuildTime.IsActive)
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");
     });
+
+    // Transaction writes freeze the transaction-date PLN rate (ADR-026) — same wiring as above:
+    // MarketData's /internal endpoint, no token.
+    builder.Services.AddHttpClient<IFxRateLookupClient, MarketDataFxRateLookupClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://marketdata-service");
+    });
 }
 
 builder.Services.AddValidation();

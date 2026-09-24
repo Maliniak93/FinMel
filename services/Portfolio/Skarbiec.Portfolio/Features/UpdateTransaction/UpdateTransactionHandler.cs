@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateTransaction;
 
-public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
+public sealed class UpdateTransactionHandler(
+    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, IFxRateLookupClient fxRateLookupClient)
 {
     public async Task<Result<TransactionResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, Guid id, UpdateTransactionRequest request, CancellationToken cancellationToken)
@@ -36,12 +38,6 @@ public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext, Posit
             return unitPrice.Error;
         }
 
-        var fee = Money.Create(request.Fee, asset.Currency);
-        if (fee.IsFailure)
-        {
-            return fee.Error;
-        }
-
         // Recompute over the rest of the history plus the edited candidate, without touching the
         // tracked `transaction` yet — a rejected edit must leave the database untouched (AC).
         var otherTransactions = await dbContext.Transactions
@@ -56,7 +52,6 @@ public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext, Posit
             Type = request.Type,
             Quantity = request.Quantity,
             UnitPriceAmount = unitPrice.Value.Amount,
-            FeeAmount = fee.Value.Amount,
             Date = request.Date
         };
 
@@ -66,10 +61,18 @@ public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext, Posit
             return recomputed.Error;
         }
 
+        // Re-resolved on every update, whatever changed, so the stored rate always matches the
+        // current date (ADR-026) — and a rate that was unknown before can fill in here.
+        var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
+        if (fxRateToPln.IsFailure)
+        {
+            return fxRateToPln.Error;
+        }
+
         transaction.Type = candidate.Type;
         transaction.Quantity = candidate.Quantity;
         transaction.UnitPriceAmount = candidate.UnitPriceAmount;
-        transaction.FeeAmount = candidate.FeeAmount;
+        transaction.FxRateToPln = fxRateToPln.Value;
         transaction.Date = candidate.Date;
         asset.Quantity = recomputed.Value;
 
@@ -86,6 +89,6 @@ public sealed class UpdateTransactionHandler(PortfolioDbContext dbContext, Posit
             return TransactionErrors.ConcurrentModification();
         }
 
-        return transaction.ToResponse();
+        return transaction.ToResponse(asset.Currency);
     }
 }
