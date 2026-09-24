@@ -11,6 +11,8 @@ import { client as marketDataClient } from '../../api/marketdata/client.gen';
 import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetResponse, PortfolioResponse } from '../../api/portfolio';
+import { formatMoney } from '../../shared/format-money';
+import { VALUATION_MODE } from './asset-valuation-mode';
 import { Assets } from './assets';
 
 // See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
@@ -57,6 +59,26 @@ const marketAsset: AssetResponse = {
   quantity: 10,
   instrumentId,
   transactionCount: 0,
+};
+
+const currencyValuedAsset: AssetResponse = {
+  id: '55555555-5555-5555-5555-555555555555',
+  portfolioId,
+  assetClass: 0,
+  valuationMode: VALUATION_MODE.CurrencyValued,
+  name: 'Cash',
+  currency: 'PLN',
+  quantity: 1000,
+  manualValue: null,
+  manualValueDate: null,
+  transactionCount: 1,
+};
+
+const currencyValuedEurAsset: AssetResponse = {
+  ...currencyValuedAsset,
+  id: '66666666-6666-6666-6666-666666666666',
+  currency: 'EUR',
+  quantity: 250,
 };
 
 function requestUrl(input: unknown): string {
@@ -313,5 +335,65 @@ describe('Assets', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('No price yet');
+  });
+
+  // spec fix-currency-valued-asset-value AC-1: a currency-valued asset's Value cell is its quantity
+  // in its own currency, not its (always-null) manualValue.
+  it("shows a currency-valued asset's quantity as its value", async () => {
+    await setup(jsonResponse([currencyValuedAsset]));
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(formatMoney(1000, 'PLN'));
+    expect(text).not.toContain('0,00 zł');
+  });
+
+  // spec fix-currency-valued-asset-value AC-2: no valuation date exists for a currency-valued asset,
+  // so "Valued on" shows an em dash and never the manual Stale chip (its manualValueDate is null,
+  // which `isStale` would otherwise treat as 1970-01-01).
+  it('does not flag a currency-valued asset as stale', async () => {
+    await setup(jsonResponse([currencyValuedAsset]));
+
+    const cell = (fixture.nativeElement as HTMLElement).querySelector(
+      'td.mat-column-manualValueDate',
+    );
+    expect(cell?.textContent).toContain('—');
+    expect(cell?.textContent).not.toContain('Stale');
+  });
+
+  // spec fix-currency-valued-asset-value AC-3: out of scope explicitly excludes converting to PLN —
+  // the list shows the asset's own currency, like a market asset shown in its quote currency.
+  it('shows a non-PLN currency-valued asset in its own currency', async () => {
+    await setup(jsonResponse([currencyValuedEurAsset]));
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(formatMoney(250, 'EUR'));
+  });
+
+  // spec fix-currency-valued-asset-value AC-4: the manual Stale chip is unchanged for Manual assets —
+  // it fires only when the hand-typed valuation date is more than 6 months old.
+  it('flags only a manual asset with an old valuation date as stale', async () => {
+    const staleDate = new Date();
+    staleDate.setMonth(staleDate.getMonth() - 7);
+    const freshDate = new Date();
+    freshDate.setDate(freshDate.getDate() - 7);
+
+    const staleManualAsset: AssetResponse = {
+      ...asset,
+      id: '77777777-7777-7777-7777-777777777777',
+      manualValueDate: staleDate.toISOString().slice(0, 10),
+    };
+    const freshManualAsset: AssetResponse = {
+      ...asset,
+      id: '88888888-8888-8888-8888-888888888888',
+      name: 'Fresh',
+      manualValueDate: freshDate.toISOString().slice(0, 10),
+    };
+
+    await setup(jsonResponse([staleManualAsset, freshManualAsset]));
+
+    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr.mat-mdc-row');
+    expect(rows.length).toBe(2);
+    expect(rows[0].textContent).toContain('Stale — refresh me');
+    expect(rows[1].textContent).not.toContain('Stale');
   });
 });
