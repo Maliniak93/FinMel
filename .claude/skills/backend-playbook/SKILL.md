@@ -8,8 +8,8 @@ user-invocable: false
 Target architecture: 4 services — Identity, Portfolio, MarketData, Reporting — behind the YARP Gateway. No gRPC.
 Domain facts travel as events carrying **full state** through the MassTransit EF outbox; consumers are idempotent
 via the inbox and never call the publisher back over REST. REST between services is allowed only for: (1)
-request-path validation — Portfolio → MarketData instrument lookup, forwarding the caller's JWT; (2) Reporting →
-MarketData price/FX batch endpoints, authenticated with a SystemCaller token.
+request-path validation — Portfolio → MarketData instrument lookup; (2) Reporting → MarketData price/FX batch
+endpoints. Both hit anonymous `/internal/**` endpoints with no token (ADR-027).
 
 ## New vertical slice
 1. Create `Features/<Name>/` with `<Name>Endpoint.cs`, `<Name>Handler.cs`, `<Name>Request.cs`/`<Name>Response.cs`. No Service/Repository layer, no MediatR.
@@ -39,8 +39,8 @@ MarketData price/FX batch endpoints, authenticated with a SystemCaller token.
 
 ## Cross-service HTTP — the only two allowed call sites
 - Typed client: `builder.Services.AddHttpClient<IThing, Impl>(c => c.BaseAddress = new Uri("https+http://<service>-service"))`.
-- User-context call (Portfolio → MarketData instrument lookup): add `.AddJwtForwardingHandler()` — forwards the caller's own JWT.
-- Reporting → MarketData batch endpoints only: add `.AddSystemTokenHandler()`, and the MarketData endpoint requires `.RequireAuthorization(SystemCaller.PolicyName)`. Never use `AddSystemTokenHandler` anywhere else.
+- No token and no delegating handler on the typed client: the call goes to the callee's `/internal/<path>` endpoint.
+- Callee side: map the endpoint through `app.MapInternalGroup("<path>")` (ServiceDefaults) instead of `MapGroup("/api/...")` — anonymous, excluded from OpenAPI, and outside `/api/`, so the Gateway cannot route to it. Global data only: a `UserId`-scoped `/internal` endpoint is forbidden, because no identity reaches it. If the SPA reads the same data, keep the public authorized route and map the `/internal` twin beside it on the same handler (see `GetInstrumentEndpoint`).
 - On failure/timeout, return a `ServiceUnavailable.<Detail>` `Result` from the handler (maps to 503) — never let the exception bubble as a bare 500.
 
 ## Quartz jobs (MarketData only — ADR-007)

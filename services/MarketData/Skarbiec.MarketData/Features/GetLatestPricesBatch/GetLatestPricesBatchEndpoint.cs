@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
-using Skarbiec.ServiceDefaults.Authentication;
+using Skarbiec.ServiceDefaults.Http;
 
 namespace Skarbiec.MarketData.Features.GetLatestPricesBatch;
 
@@ -7,9 +7,9 @@ public static class GetLatestPricesBatchEndpoint
 {
     public static IEndpointRouteBuilder MapGetLatestPricesBatchEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/marketdata/prices");
+        var group = app.MapInternalGroup("prices");
 
-        group.MapPost("/latest-batch", HandleAsync).RequireAuthorization(SystemCaller.PolicyName);
+        group.MapPost("/latest-batch", HandleAsync);
 
         return app;
     }

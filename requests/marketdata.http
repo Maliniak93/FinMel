@@ -41,11 +41,16 @@ GET {{baseUrl}}/api/marketdata/sync/status
 Authorization: Bearer {{authToken}}
 
 
-### --- Internal / system-caller only (SystemCaller policy) ---
+### --- Service-only /internal endpoints (ADR-027) ---
+# Anonymous and unreachable through the Gateway: call MarketData directly (its Aspire HTTPS port,
+# launchSettings.json), with no token.
+@marketDataUrl = https://localhost:60587
+
+### Get instrument details (Portfolio's instrument lookup)
+GET {{marketDataUrl}}/internal/instruments/{{addCustomInstrument.response.body.id}}
 
 ### Latest prices batch
-POST {{baseUrl}}/api/marketdata/prices/latest-batch
-Authorization: Bearer {{authToken}}
+POST {{marketDataUrl}}/internal/prices/latest-batch
 Content-Type: application/json
 
 {
@@ -54,8 +59,7 @@ Content-Type: application/json
 }
 
 ### Latest FX rates batch
-POST {{baseUrl}}/api/marketdata/fx/latest-batch
-Authorization: Bearer {{authToken}}
+POST {{marketDataUrl}}/internal/fx/latest-batch
 Content-Type: application/json
 
 {

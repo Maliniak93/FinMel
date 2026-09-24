@@ -22,6 +22,15 @@ internal static class MarketDataApi
 
     public static string InstrumentUri(Guid id) => $"{InstrumentsUri}/{id}";
 
+    /// <summary>MarketData's own OpenAPI document (Development only) — the TS client generator's input.</summary>
+    public const string OpenApiDocumentUri = "/api/marketdata/openapi/v1.json";
+
+    // Service-only endpoints (ADR-027): anonymous, outside /api/, so the Gateway has no route to them.
+    public const string InternalLatestPricesBatchUri = "/internal/prices/latest-batch";
+    public const string InternalFxRatesBatchUri = "/internal/fx/latest-batch";
+
+    public static string InternalInstrumentUri(Guid id) => $"/internal/instruments/{id}";
+
     public static string SearchInstrumentsUri(string? q = null, int? limit = null)
     {
         var parameters = new List<string>();

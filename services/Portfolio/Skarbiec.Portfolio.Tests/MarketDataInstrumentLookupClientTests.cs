@@ -1,17 +1,61 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Portfolio.MarketData;
+using Skarbiec.Portfolio.Tests.Fixtures;
+using Skarbiec.Testing;
+using Skarbiec.Testing.Auth;
+using Skarbiec.Testing.Containers;
+using Skarbiec.Testing.Http;
 
 namespace Skarbiec.Portfolio.Tests;
 
 /// <summary>
-/// Exercises <see cref="MarketDataInstrumentLookupClient"/> directly against a real (but
-/// unreachable) <see cref="HttpClient"/> — no Testcontainers/WebApplicationFactory involved, since
-/// the point is the client's own exception handling, not the HTTP pipeline around it. Proves T2.9's
-/// AC ("MarketData unavailable → 503, not a hang") one layer below the endpoint tests, which instead
-/// substitute <see cref="Fixtures.FakeInstrumentLookupClient"/> and never touch this class.
+/// Exercises <see cref="MarketDataInstrumentLookupClient"/> directly. The failure-mode facts use a
+/// real (but unreachable) <see cref="HttpClient"/> — the point there is the client's own exception
+/// handling, proving T2.9's "MarketData unavailable → 503, not a hang" one layer below the endpoint
+/// tests, which substitute <see cref="FakeInstrumentLookupClient"/> and never touch this class. The
+/// wire-shape fact instead goes through Portfolio's own <c>IHttpClientFactory</c> registration, so
+/// every handler <c>Program.cs</c> puts in front of the client runs (ADR-027: no token forwarded).
 /// </summary>
-public sealed class MarketDataInstrumentLookupClientTests
+[Collection(TestingDefaults.CollectionName)]
+public sealed class MarketDataInstrumentLookupClientTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task CheckAsync_CallsInternalPath_WithoutAuthorizationHeader()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var recorder = new HttpRequestRecorder();
+        await using var host = Factory.WithRecordedOutboundHttp(recorder);
+        var instrumentId = Guid.NewGuid();
+
+        // An inbound user request carrying a JWT is in flight while the lookup runs — exactly what
+        // AddAsset/UpdateAsset look like when they validate an InstrumentId.
+        var httpContextAccessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
+        httpContextAccessor.HttpContext.Request.Headers.Authorization = $"Bearer {Factory.IssueAccessToken(Guid.NewGuid())}";
+        try
+        {
+            // Portfolio's factory swaps IInstrumentLookupClient for a fake, so build the real typed
+            // client from the named HttpClient Program.cs registered for it.
+            var httpClient = host.Services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IInstrumentLookupClient));
+            var client = new MarketDataInstrumentLookupClient(httpClient);
+
+            var status = await client.CheckAsync(instrumentId, cancellationToken);
+
+            Assert.Equal(InstrumentLookupStatus.Found, status);
+        }
+        finally
+        {
+            httpContextAccessor.HttpContext = null;
+        }
+
+        var request = Assert.Single(recorder.Requests);
+        Assert.Multiple(
+            () => Assert.Equal(HttpMethod.Get, request.Method),
+            () => Assert.Equal($"/internal/instruments/{instrumentId}", request.Uri.AbsolutePath),
+            () => Assert.Null(request.Authorization));
+    }
+
     [Fact]
     public async Task CheckAsync_TargetPortHasNothingListening_ReturnsUnavailableAndDoesNotHang()
     {

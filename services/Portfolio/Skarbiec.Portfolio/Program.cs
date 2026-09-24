@@ -20,7 +20,6 @@ using Skarbiec.Portfolio.Features.UpdatePortfolio;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.MarketData;
 using Skarbiec.ServiceDefaults.Authentication;
-using Skarbiec.ServiceDefaults.Http;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.ServiceDefaults.OpenApi;
 
@@ -44,12 +43,12 @@ if (!OpenApiBuildTime.IsActive)
     builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
 
     // AddAsset/UpdateAsset validate a market asset's InstrumentId against MarketData (T2.9) — resilience
-    // and service discovery come from ServiceDefaults' ConfigureHttpClientDefaults; the JWT-forwarding
-    // handler passes the caller's own token through (dotnet.md token passthrough).
+    // and service discovery come from ServiceDefaults' ConfigureHttpClientDefaults; the call goes to
+    // MarketData's /internal endpoint with no token (ADR-027).
     builder.Services.AddHttpClient<IInstrumentLookupClient, MarketDataInstrumentLookupClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");
-    }).AddJwtForwardingHandler();
+    });
 }
 
 builder.Services.AddValidation();

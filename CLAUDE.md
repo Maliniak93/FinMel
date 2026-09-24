@@ -40,7 +40,7 @@ skarbiec-plan/            # planning docs: product, architecture, domain, decisi
 3. Handlers return `Result`/`Result<T>`; the endpoint maps a failure to ProblemDetails. Never throw for an expected failure (ADR-017).
 4. Database per service. Reference other services by id only — no FKs, no cross-DB queries (ADR-003).
 5. Domain facts are events carrying full state, published only through the MassTransit EF outbox; consumers are idempotent (inbox) and never call the publisher back (ADR-012, ADR-021).
-6. REST between services only for request-path validation (Portfolio→MarketData instrument lookup, JWT forwarded) and the daily Reporting→MarketData price/FX batch (`SystemCaller`). No gRPC (ADR-021, ADR-022).
+6. REST between services only for request-path validation (Portfolio→MarketData instrument lookup) and the daily Reporting→MarketData price/FX batch — both on `/internal` endpoints (`MapInternalGroup`: anonymous, not in OpenAPI, unreachable through the Gateway, global data only), called with no token. No gRPC (ADR-021, ADR-022, ADR-027).
 7. External price APIs are called only from MarketData jobs; the single exception is ticker verification through `ITickerVerifier` (ADR-007, ADR-018).
 8. Every user-owned entity carries `UserId` from JWT claims — never from the request. EF global query filter; tenancy isolation tests are part of DoD (ADR-006).
 9. Money is `decimal`/`Money`, base currency PLN (ADR-008).

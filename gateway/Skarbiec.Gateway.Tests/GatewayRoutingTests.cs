@@ -99,6 +99,24 @@ public sealed class GatewayRoutingTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task InternalPath_ThroughGateway_Returns404()
+    {
+        // Service-only endpoints live on /internal, outside the /api/<service>/** space the Gateway
+        // routes (ADR-027) — so a browser has no way to reach them, token or not.
+        using var client = _gateway.CreateClient();
+
+        var instrument = await client.GetAsync($"/internal/instruments/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
+        var pricesBatch = await client.PostAsJsonAsync(
+            "/internal/prices/latest-batch",
+            new { InstrumentIds = new[] { Guid.NewGuid() }, AsOfDate = new DateOnly(2026, 8, 10) },
+            TestContext.Current.CancellationToken);
+
+        Assert.Multiple(
+            () => Assert.Equal(HttpStatusCode.NotFound, instrument.StatusCode),
+            () => Assert.Equal(HttpStatusCode.NotFound, pricesBatch.StatusCode));
+    }
+
+    [Fact]
     public async Task Login_BurstBeyondRateLimit_Returns429()
     {
         using var client = _gateway.CreateClient();

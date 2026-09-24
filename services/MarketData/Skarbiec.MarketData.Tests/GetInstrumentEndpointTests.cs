@@ -11,12 +11,34 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 namespace Skarbiec.MarketData.Tests;
 
 /// <summary>
-/// HTTP-level behavior of Features/GetInstrument (T2.9): the endpoint Portfolio's AddAsset/
-/// UpdateAsset call internally to validate an <c>InstrumentId</c> before storing it.
+/// HTTP-level behavior of Features/GetInstrument (T2.9). One handler backs two routes (ADR-027):
+/// the public, authorized <c>/api/marketdata/instruments/{id}</c> the SPA reads, and its anonymous
+/// <c>/internal/instruments/{id}</c> twin Portfolio's AddAsset/UpdateAsset call with no token.
 /// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetInstrumentEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
+    [Fact]
+    public async Task Internal_Get_WithoutToken_ReturnsOk()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var seedDb = CreateDbContext();
+        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 4), 212.00m, cancellationToken);
+
+        using var client = Factory.CreateClient();
+        var response = await client.GetAsync(InternalInstrumentUri(instrumentId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<InstrumentDetailsResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(instrumentId, body.Id);
+        Assert.Equal("AAPL.US", body.Ticker);
+        Assert.Equal("USD", body.QuoteCurrency);
+        Assert.Equal(212.00m, body.LastPrice);
+        Assert.Equal(new DateOnly(2026, 8, 4), body.LastPriceDate);
+    }
+
     [Fact]
     public async Task Get_ExistingInstrument_ReturnsOkWithDetails()
     {

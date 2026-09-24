@@ -5,10 +5,10 @@ using Skarbiec.MarketData.Data;
 namespace Skarbiec.MarketData.Features.GetInstrument;
 
 /// <summary>
-/// Backs Portfolio's <c>InstrumentId</c> existence check (T2.9) — the first internal, service-to-
-/// service caller of MarketData's API. Same auth as every other instrument endpoint; the caller's
-/// JWT is simply forwarded (dotnet.md token passthrough), MarketData never learns it's Portfolio
-/// asking on a user's behalf rather than the user directly.
+/// Backs two routes over the same global data (ADR-027): the public, authorized
+/// <c>/api/marketdata/instruments/{id}</c> the SPA reads (assets list, edit dialog pre-fill), and its
+/// anonymous <c>/internal/instruments/{id}</c> twin behind Portfolio's <c>InstrumentId</c> existence
+/// check (T2.9), which sends no token.
 /// </summary>
 public sealed class GetInstrumentHandler(MarketDataDbContext dbContext)
 {
@@ -23,8 +23,7 @@ public sealed class GetInstrumentHandler(MarketDataDbContext dbContext)
         }
 
         // Same "latest row per instrument" lookup as SearchInstrumentsHandler, single-instrument
-        // case — lets Portfolio's asset list (T2.13) show last price/date/source per market asset
-        // without a second, batch-only endpoint (GetLatestPricesBatch is SystemCaller-only, T2.11).
+        // case — lets the SPA's asset list show last price/date per market asset.
         var latestQuote = await dbContext.PriceQuotes
             .AsNoTracking()
             .Where(q => q.InstrumentId == id)
