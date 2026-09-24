@@ -49,3 +49,10 @@ body {
   height: 100%;
 }
 /* You can add global styles to this file, and also import other style files */
+
+// Portfolio description tooltip (portfolios.html): the CDK overlay renders outside the component
+// host, so component styles (and ::ng-deep) can't reach it — this has to live globally. Preserves
+// line breaks the user typed into the description textarea.
+.portfolio-description-tooltip {
+  white-space: pre-line;
+}
