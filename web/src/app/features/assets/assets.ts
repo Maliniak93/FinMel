@@ -27,6 +27,7 @@ import { formatMoney } from '../../shared/format-money';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form-dialog/asset-form-dialog';
+import { VALUATION_MODE } from './asset-valuation-mode';
 
 // A manual valuation older than this is flagged as stale, prompting a refresh (no ADR/backlog
 // number given — domain-model.md just says "every N months").
@@ -149,6 +150,7 @@ export class Assets {
   protected readonly isStale = isStale;
   protected readonly isPriceStale = isPriceStale;
   protected readonly formatMoney = formatMoney;
+  protected readonly VALUATION_MODE = VALUATION_MODE;
 
   protected instrumentFor(asset: AssetResponse): InstrumentDetailsResponse | undefined {
     return asset.instrumentId
