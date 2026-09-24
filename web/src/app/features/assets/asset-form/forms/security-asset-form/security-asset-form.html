@@ -1,0 +1,13 @@
+<app-asset-basics-fields [group]="form.controls.basics" />
+
+<app-instrument-picker
+  [control]="form.controls.instrument"
+  [nameControl]="form.controls.basics.controls.name"
+  [assetClass]="assetClass()"
+  [allowCustomTicker]="true"
+  [existingInstrumentId]="asset()?.instrumentId"
+/>
+
+@if (!isEdit()) {
+  <app-first-transaction-fields [group]="form.controls.initialTransaction" />
+}

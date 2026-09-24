@@ -16,7 +16,7 @@ const BUY = 0;
 const SELL = 1;
 
 // Exported for callers that need to set/compare a specific transaction type by name rather than by
-// index into TRANSACTION_TYPES (asset-form-dialog's initial-transaction default, T1.11).
+// index into TRANSACTION_TYPES (first-transaction-fields' pre-fill, T1.11).
 export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
 export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
 

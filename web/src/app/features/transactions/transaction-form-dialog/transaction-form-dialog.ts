@@ -19,6 +19,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
+import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import {
   isPricedTransactionType,
   quantityFieldLabel,
@@ -29,21 +30,6 @@ export interface TransactionFormDialogData {
   portfolioId: string;
   assetId: string;
   transaction?: TransactionResponse;
-}
-
-function toDateOnly(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-// Constructs local midnight for the given calendar date instead of `new Date(dateOnly)`, which
-// parses as UTC midnight and shifts a day back in any negative-UTC-offset timezone (same helper as
-// asset-form-dialog.ts, T1.11).
-function fromDateOnly(dateOnly: string): Date {
-  const [year, month, day] = dateOnly.split('-').map(Number);
-  return new Date(year, month - 1, day);
 }
 
 @Component({

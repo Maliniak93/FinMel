@@ -1,0 +1,27 @@
+<div [formGroup]="group()">
+  <mat-form-field appearance="outline" class="asset-form__field">
+    <mat-label>Name</mat-label>
+    <input matInput type="text" formControlName="name" autocomplete="off" />
+    @if (group().controls.name.hasError('required')) {
+      <mat-error>Name is required.</mat-error>
+    } @else if (group().controls.name.hasError('maxlength')) {
+      <mat-error>Name is too long.</mat-error>
+    } @else if (group().controls.name.hasError('server')) {
+      <mat-error>{{ group().controls.name.getError('server') }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="asset-form__field">
+    <mat-label>Currency</mat-label>
+    <mat-select formControlName="currency">
+      @for (currency of currencies; track currency.code) {
+        <mat-option [value]="currency.code">{{ currency.label }}</mat-option>
+      }
+    </mat-select>
+    @if (group().controls.currency.hasError('required')) {
+      <mat-error>Currency is required.</mat-error>
+    } @else if (group().controls.currency.hasError('server')) {
+      <mat-error>{{ group().controls.currency.getError('server') }}</mat-error>
+    }
+  </mat-form-field>
+</div>

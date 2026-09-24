@@ -1,0 +1,48 @@
+<h2 mat-dialog-title class="asset-form-dialog__title">
+  @if (!isEdit && selection()) {
+    <button mat-icon-button type="button" aria-label="Back to asset types" (click)="back()">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+  }
+  {{ isEdit ? 'Edit asset' : 'New asset' }}
+</h2>
+
+<form (submit)="submit($event)" novalidate>
+  <mat-dialog-content>
+    @if (selection(); as selected) {
+      @switch (selected.kind) {
+        @case ('cash') {
+          <app-cash-asset-form [assetClass]="selected.assetClass" [asset]="data.asset" />
+        }
+        @case ('security') {
+          <app-security-asset-form [assetClass]="selected.assetClass" [asset]="data.asset" />
+        }
+        @case ('gold') {
+          <app-gold-asset-form [assetClass]="selected.assetClass" [asset]="data.asset" />
+        }
+        @case ('manual') {
+          <app-manual-asset-form [assetClass]="selected.assetClass" [asset]="data.asset" />
+        }
+      }
+    } @else {
+      <app-asset-type-picker (picked)="pick($event)" />
+    }
+
+    @if (formError()) {
+      <p class="asset-form__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    @if (selection()) {
+      <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+        @if (submitting()) {
+          <mat-spinner diameter="20" />
+        } @else {
+          {{ isEdit ? 'Save' : 'Create' }}
+        }
+      </button>
+    }
+  </mat-dialog-actions>
+</form>

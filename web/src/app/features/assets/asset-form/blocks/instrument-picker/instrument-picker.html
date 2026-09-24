@@ -1,0 +1,113 @@
+<mat-form-field appearance="outline" class="asset-form__field">
+  <mat-label>Instrument</mat-label>
+  <input
+    matInput
+    type="text"
+    [formControl]="instrumentControl"
+    [matAutocomplete]="instrumentAuto"
+    placeholder="Search by ticker or name"
+  />
+  <mat-autocomplete
+    #instrumentAuto="matAutocomplete"
+    [displayWith]="displayInstrument"
+    (optionSelected)="onInstrumentOptionSelected($event)"
+  >
+    @if (searchResource.hasValue()) {
+      @for (result of searchResource.value(); track result.id) {
+        <mat-option [value]="result">
+          {{ result.ticker }} — {{ result.name }}
+          @if (result.lastPrice !== null) {
+            ({{ formatMoney(result.lastPrice, result.quoteCurrency) }})
+          }
+        </mat-option>
+      }
+    }
+  </mat-autocomplete>
+  @if (searchResource.isLoading()) {
+    <mat-spinner matSuffix diameter="16" />
+  }
+</mat-form-field>
+
+@if (selectedInstrument(); as instrument) {
+  <p class="asset-form__selected-instrument">
+    Verified: {{ instrument.ticker }} — {{ instrument.name }} ({{ instrument.quoteCurrency }})
+  </p>
+} @else {
+  <p class="asset-form__hint">
+    Pick an existing instrument above, or verify a new ticker below — creation is blocked until one
+    is selected.
+  </p>
+}
+
+@if (allowCustomTicker()) {
+  <button
+    mat-button
+    type="button"
+    class="asset-form__custom-instrument-link"
+    (click)="toggleCustomInstrumentForm()"
+  >
+    {{ showCustomInstrumentForm() ? 'Cancel' : "Can't find it? Verify a new ticker" }}
+  </button>
+
+  @if (showCustomInstrumentForm()) {
+    <div class="asset-form__custom-instrument" [formGroup]="customInstrumentForm">
+      <mat-form-field appearance="outline" class="asset-form__field">
+        <mat-label>Ticker / id</mat-label>
+        <input matInput type="text" formControlName="ticker" autocomplete="off" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="asset-form__field">
+        <mat-label>Name</mat-label>
+        <input matInput type="text" formControlName="name" autocomplete="off" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="asset-form__field">
+        <mat-label>Quote currency</mat-label>
+        <input
+          matInput
+          type="text"
+          formControlName="quoteCurrency"
+          maxlength="3"
+          autocomplete="off"
+        />
+        <mat-hint>3-letter code, e.g. USD</mat-hint>
+      </mat-form-field>
+
+      @if (customInstrumentOutcome() === 'notFound') {
+        <p class="asset-form__error" role="alert">{{ customInstrumentMessage() }}</p>
+      } @else if (customInstrumentOutcome() === 'unreachable') {
+        <div class="asset-form__warning" role="alert">
+          <p>{{ customInstrumentMessage() }}</p>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="customInstrumentSubmitting()"
+            (click)="addInstrumentAnyway()"
+          >
+            Add anyway
+          </button>
+        </div>
+      } @else if (customInstrumentOutcome() === 'conflict') {
+        <p class="asset-form__error" role="alert">
+          {{ customInstrumentMessage() }} Try searching for it above instead.
+        </p>
+      } @else if (customInstrumentOutcome() === 'error') {
+        <p class="asset-form__error" role="alert">{{ customInstrumentMessage() }}</p>
+      }
+
+      <button
+        mat-flat-button
+        type="button"
+        color="primary"
+        [disabled]="customInstrumentSubmitting()"
+        (click)="submitCustomInstrument()"
+      >
+        @if (customInstrumentSubmitting()) {
+          <mat-spinner diameter="20" />
+        } @else {
+          Verify and add
+        }
+      </button>
+    </div>
+  }
+}

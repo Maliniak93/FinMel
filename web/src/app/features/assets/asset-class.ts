@@ -15,8 +15,8 @@ export const ASSET_CLASSES: readonly { value: AssetClass; label: string }[] = [
   { value: 8, label: 'Other' },
 ];
 
-// Named constants for the same values, so asset-valuation-mode.ts (M1.7) and callers that branch on
-// a specific class read as intent ("PreciousMetal") rather than a bare int repeated at each call site.
+// Named constants for the same values, so callers that branch on a specific class (the asset-form
+// shell's class-to-form mapping) read as intent ("PreciousMetal") rather than a bare int.
 export const ASSET_CLASS = {
   Cash: 0,
   Deposit: 1,

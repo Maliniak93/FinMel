@@ -1,0 +1,18 @@
+<app-asset-basics-fields [group]="form.controls.basics" />
+
+<app-instrument-picker
+  [control]="form.controls.instrument"
+  [nameControl]="form.controls.basics.controls.name"
+  [assetClass]="assetClass()"
+  [allowCustomTicker]="false"
+  [existingInstrumentId]="asset()?.instrumentId"
+/>
+
+<p class="asset-form__hint">
+  Precious metal has no custom-ticker lookup — the seeded gold instrument is already in the
+  dictionary above.
+</p>
+
+@if (!isEdit()) {
+  <app-first-transaction-fields [group]="form.controls.initialTransaction" />
+}
