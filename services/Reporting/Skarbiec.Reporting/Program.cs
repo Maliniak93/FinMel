@@ -6,7 +6,6 @@ using Skarbiec.Reporting.Features.GetNetWorthHistory;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Valuation;
-using Skarbiec.ServiceDefaults.Http;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.ServiceDefaults.OpenApi;
 
@@ -52,14 +51,12 @@ if (!OpenApiBuildTime.IsActive)
             x.AddConsumer<PortfolioDeletedConsumer>(typeof(PortfolioDeletedConsumerDefinition));
         });
 
-    // The one surviving cross-service REST call (ADR-021): the daily prices/FX batch. The consumer
-    // has no caller JWT to forward (it's triggered by a message, not a request) and needs every
-    // user's data, not one — SystemTokenHandler mints a SystemCaller token instead of
-    // JwtForwardingHandler's token passthrough.
+    // The one surviving cross-service REST call (ADR-021): the daily prices/FX batch, sent to
+    // MarketData's /internal endpoints with no token (ADR-027).
     builder.Services.AddHttpClient<IPriceQuoteClient, MarketDataPriceClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");
-    }).AddSystemTokenHandler();
+    });
 }
 
 var app = builder.Build();

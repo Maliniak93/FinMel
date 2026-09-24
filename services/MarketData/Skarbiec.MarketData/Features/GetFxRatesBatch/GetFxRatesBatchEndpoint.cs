@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
-using Skarbiec.ServiceDefaults.Authentication;
+using Skarbiec.ServiceDefaults.Http;
 
 namespace Skarbiec.MarketData.Features.GetFxRatesBatch;
 
@@ -7,9 +7,9 @@ public static class GetFxRatesBatchEndpoint
 {
     public static IEndpointRouteBuilder MapGetFxRatesBatchEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/marketdata/fx");
+        var group = app.MapInternalGroup("fx");
 
-        group.MapPost("/latest-batch", HandleAsync).RequireAuthorization(SystemCaller.PolicyName);
+        group.MapPost("/latest-batch", HandleAsync);
 
         return app;
     }

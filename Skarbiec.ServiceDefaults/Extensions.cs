@@ -10,7 +10,6 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.ErrorHandling;
-using Skarbiec.ServiceDefaults.Http;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -43,17 +42,6 @@ public static class Extensions
             // Turn on service discovery by default
             http.AddServiceDiscovery();
         });
-
-        // Needed by JwtForwardingHandler (T2.9's Portfolio->MarketData call, first internal
-        // service-to-service HTTP call in the solution) to read the inbound request's bearer token.
-        // Registered here so a service only needs to add the handler to its own typed client, not
-        // remember this too.
-        builder.Services.AddHttpContextAccessor();
-        builder.Services.AddTransient<JwtForwardingHandler>();
-
-        // T2.11: mints a SystemCaller JWT for typed clients used from background jobs/consumers
-        // that have no inbound request to forward a token from.
-        builder.Services.AddTransient<SystemTokenHandler>();
 
         return builder;
     }

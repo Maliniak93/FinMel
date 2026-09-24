@@ -4,9 +4,10 @@ using Skarbiec.Reporting.Valuation;
 namespace Skarbiec.Reporting.MarketData;
 
 /// <summary>
-/// Calls MarketData's <c>POST /api/marketdata/prices/latest-batch</c> and <c>/api/marketdata/fx/latest-batch</c>
-/// (T2.11). Resilience and service discovery come from ServiceDefaults; a total failure to reach
-/// MarketData is deliberately left to propagate — see <c>DailyPricesSyncedConsumer</c> for why.
+/// Calls MarketData's service-only <c>POST /internal/prices/latest-batch</c> and
+/// <c>/internal/fx/latest-batch</c> (T2.11) with no token (ADR-027). Resilience and service
+/// discovery come from ServiceDefaults; a total failure to reach MarketData is deliberately left to
+/// propagate — see <c>DailyPricesSyncedConsumer</c> for why.
 /// </summary>
 public sealed class MarketDataPriceClient(HttpClient httpClient) : IPriceQuoteClient
 {
@@ -21,7 +22,7 @@ public sealed class MarketDataPriceClient(HttpClient httpClient) : IPriceQuoteCl
         foreach (var batch in instrumentIds.Distinct().Chunk(BatchSize))
         {
             using var response = await httpClient.PostAsJsonAsync(
-                "/api/marketdata/prices/latest-batch",
+                "/internal/prices/latest-batch",
                 new LatestPricesBatchRequest(batch, asOfDate),
                 cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -46,7 +47,7 @@ public sealed class MarketDataPriceClient(HttpClient httpClient) : IPriceQuoteCl
         foreach (var batch in pairs.Distinct(StringComparer.OrdinalIgnoreCase).Chunk(BatchSize))
         {
             using var response = await httpClient.PostAsJsonAsync(
-                "/api/marketdata/fx/latest-batch",
+                "/internal/fx/latest-batch",
                 new FxRatesBatchRequest(batch, asOfDate),
                 cancellationToken);
             response.EnsureSuccessStatusCode();

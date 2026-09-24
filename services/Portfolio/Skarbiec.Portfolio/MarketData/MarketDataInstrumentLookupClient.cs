@@ -3,10 +3,10 @@ using System.Net;
 namespace Skarbiec.Portfolio.MarketData;
 
 /// <summary>
-/// Calls MarketData's <c>GET /api/marketdata/instruments/{id}</c> (T2.9's first internal, service-
-/// to-service call in the solution). Resilience (retry+jitter, circuit breaker, timeout) and service
-/// discovery come from <c>ConfigureHttpClientDefaults</c> in ServiceDefaults — nothing extra to wire
-/// here (dotnet.md "HTTP between services").
+/// Calls MarketData's service-only <c>GET /internal/instruments/{id}</c> (T2.9) with no token
+/// (ADR-027). Resilience (retry+jitter, circuit breaker, timeout) and service discovery come from
+/// <c>ConfigureHttpClientDefaults</c> in ServiceDefaults — nothing extra to wire here (dotnet.md
+/// "HTTP between services").
 /// </summary>
 public sealed class MarketDataInstrumentLookupClient(HttpClient httpClient) : IInstrumentLookupClient
 {
@@ -14,7 +14,7 @@ public sealed class MarketDataInstrumentLookupClient(HttpClient httpClient) : II
     {
         try
         {
-            using var response = await httpClient.GetAsync($"/api/marketdata/instruments/{instrumentId}", cancellationToken);
+            using var response = await httpClient.GetAsync($"/internal/instruments/{instrumentId}", cancellationToken);
 
             return response.StatusCode switch
             {

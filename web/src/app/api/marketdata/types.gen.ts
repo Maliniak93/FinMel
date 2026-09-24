@@ -24,21 +24,6 @@ export type CustomInstrumentResponse = {
     verificationStatus: InstrumentVerificationStatus;
 };
 
-export type FxRateResult = {
-    pair: string;
-    date: string;
-    rate: number | string;
-};
-
-export type FxRatesBatchRequest = {
-    pairs: Array<string>;
-    asOfDate: string;
-};
-
-export type FxRatesBatchResponse = {
-    rates: Array<FxRateResult>;
-};
-
 export type InstrumentDetailsResponse = {
     id: string;
     ticker: string;
@@ -49,13 +34,6 @@ export type InstrumentDetailsResponse = {
     verificationStatus: InstrumentVerificationStatus;
     lastPrice: null | number | string;
     lastPriceDate: null | string;
-};
-
-export type InstrumentQuoteResult = {
-    instrumentId: string;
-    quoteCurrency: string;
-    date: string;
-    close: number | string;
 };
 
 export type InstrumentSearchResult = {
@@ -70,15 +48,6 @@ export type InstrumentSearchResult = {
 };
 
 export type InstrumentVerificationStatus = number;
-
-export type LatestPricesBatchRequest = {
-    instrumentIds: Array<string>;
-    asOfDate: string;
-};
-
-export type LatestPricesBatchResponse = {
-    quotes: Array<InstrumentQuoteResult>;
-};
 
 export type PriceSource = number;
 
@@ -153,38 +122,6 @@ export type GetApiMarketdataInstrumentsByIdResponses = {
 };
 
 export type GetApiMarketdataInstrumentsByIdResponse = GetApiMarketdataInstrumentsByIdResponses[keyof GetApiMarketdataInstrumentsByIdResponses];
-
-export type PostApiMarketdataPricesLatestBatchData = {
-    body: LatestPricesBatchRequest;
-    path?: never;
-    query?: never;
-    url: '/api/marketdata/prices/latest-batch';
-};
-
-export type PostApiMarketdataPricesLatestBatchResponses = {
-    /**
-     * OK
-     */
-    200: LatestPricesBatchResponse;
-};
-
-export type PostApiMarketdataPricesLatestBatchResponse = PostApiMarketdataPricesLatestBatchResponses[keyof PostApiMarketdataPricesLatestBatchResponses];
-
-export type PostApiMarketdataFxLatestBatchData = {
-    body: FxRatesBatchRequest;
-    path?: never;
-    query?: never;
-    url: '/api/marketdata/fx/latest-batch';
-};
-
-export type PostApiMarketdataFxLatestBatchResponses = {
-    /**
-     * OK
-     */
-    200: FxRatesBatchResponse;
-};
-
-export type PostApiMarketdataFxLatestBatchResponse = PostApiMarketdataFxLatestBatchResponses[keyof PostApiMarketdataFxLatestBatchResponses];
 
 export type PostApiMarketdataSyncTriggerData = {
     body?: never;

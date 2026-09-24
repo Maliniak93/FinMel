@@ -11,9 +11,8 @@ namespace Skarbiec.Reporting.Messaging;
 /// On <see cref="DailyPricesSynced"/> (T2.10), recomputes every user's <see cref="ValuationSnapshot"/>
 /// and its <see cref="AssetValuation"/> lines for every portfolio (E5, ADR-015). Positions come from
 /// Reporting's own <see cref="Position"/> read model, fed by Portfolio's events (spec-03, ADR-021) —
-/// the only remaining cross-service call is the prices/FX batch to MarketData, authenticated with a
-/// <c>SystemCaller</c> token because a message-driven consumer has no caller JWT to forward and
-/// needs every user's data, not one. Idempotent via the inbox template (T0.12, applied through
+/// the only remaining cross-service call is the prices/FX batch to MarketData's <c>/internal</c>
+/// endpoints, sent with no token (ADR-027). Idempotent via the inbox template (T0.12, applied through
 /// <see cref="DailyPricesSyncedConsumerDefinition"/>) plus the upsert-by-(PortfolioId, Date) and
 /// -(AssetId, Date) unique indexes — a redelivery or a manual rerun overwrites the same rows.
 /// Both <see cref="PriceSyncKind"/> values recompute identically (spec-04 design decision 8): a

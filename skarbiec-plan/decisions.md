@@ -25,6 +25,8 @@ Abbreviated format. Status: ✅ accepted / 🕐 pending / ❌ rejected. ADR-001�
 
 ## ADR-005 ✅ Identity service + JWT; Gateway validates the token
 
+**Amended by ADR-027.**
+
 **Decision:** ASP.NET Identity in the Identity service; 15-minute access token + rotated refresh token in an httpOnly cookie. The Gateway (YARP) validates the signature and passes the JWT through (token passthrough) — downstream services read `UserId` from claims.
 **Consequences:** no shared session; revocation = short TTL + refresh rotation.
 
@@ -124,6 +126,8 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-021 ✅ Event-carried state transfer for positions; REST narrowed to validation + batch
 
+**Amended by ADR-027.**
+
 **Shipped:** 2026-09-22 (spec-02 publishes the events, spec-03 consumes them and deletes the REST query).
 
 **Context:** today Reporting fetches positions from Portfolio over REST (`SystemCaller`) on every snapshot cycle, via `GetPositionsForValuation` + `PortfolioPositionsClient` (decided in T2.11). This couples snapshot computation to Portfolio's availability and latency, and re-implements query logic an event could carry for free.
@@ -158,12 +162,14 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-026 🕐 Third REST use — Portfolio → MarketData FX rate lookup on the request path
 
+**Amended by ADR-027.**
+
 **Context:** each transaction must store its FX rate to PLN from its own date so the transactions table can show a comparable `Value (PLN)` (spec `transactions-pln-value-and-fee-removal`). Portfolio has no FX data; MarketData holds the full `FxRate(Pair, Date, Rate)` history. ADR-021 limits service-to-service REST to two uses.
 **Decision:** add a third REST use: Portfolio asks MarketData for the latest `{currency}PLN` rate on or before the transaction date while recording, updating or creating-with-initial a transaction. The endpoint is `GET /internal/fx/{currency}/rate?date=` (anonymous, service-only, ADR-027). It fails closed like the instrument lookup: MarketData unreachable → 503, no rate for the date → the transaction is saved with a `null` rate. PLN assets never call MarketData (rate 1). The loser was a local FX copy in Portfolio fed by a new full-state FX event plus a backfill: cleaner for ADR-021, too heavy for one column. Amends ADR-021.
 **Consequences:** non-PLN transaction writes depend on MarketData being up; a stored rate is frozen at write time and refreshed only when the transaction is edited; an asset's currency becomes immutable once it has transactions.
 
-## ADR-027 🕐 Service-only endpoints trust the network — `/internal`, no tokens between services
+## ADR-027 ✅ Service-only endpoints trust the network — `/internal`, no tokens between services
 
 **Context:** Portfolio forwards the user's JWT to MarketData for the instrument lookup, and Reporting self-mints a `SystemCaller` JWT for the daily batch. The data behind both is global (no `UserId`), and the shared symmetric signing key already lets every service mint any token, so the token proves nothing the network does not. It exists only because the Gateway exposes the whole `/api/marketdata/**` space, which also makes the batch endpoints reachable from a browser, held back only by a 403.
 **Decision:** service-only endpoints are mapped under `/internal/<path>` through `MapInternalGroup` (ServiceDefaults): anonymous, excluded from OpenAPI, and outside `/api/`, so the Gateway has no route to them by construction. Callers send no token. Only global data may be served on `/internal` — a `UserId`-scoped endpoint there is forbidden, because no identity reaches it. In production only the Gateway publishes a port; services sit on an internal network. The loser was asymmetric signing with JWKS or per-service credentials: real service identity, but machinery this single-user, one-host deployment does not need. Amends ADR-005, ADR-021, ADR-026.
-**Consequences:** `JwtForwardingHandler`, `SystemTokenHandler`, `SystemCaller` and the `System` policy are deleted; the browser → batch path is closed by routing, not by authorization; isolation of `/internal` now depends on the deployment's network, which `deploy/README.md` records as a requirement. Spec: `service-calls-without-tokens`.
+**Consequences:** `JwtForwardingHandler`, `SystemTokenHandler`, `SystemCaller` and the `System` policy are deleted; the browser → batch path is closed by routing, not by authorization; isolation of `/internal` now depends on the deployment's network, which `deploy/README.md` records as a requirement. When the browser also needs a service-to-service read, the public authorized route stays and an `/internal` twin sits beside it on the same handler (the instrument lookup: `/api/marketdata/instruments/{id}` for the SPA, `/internal/instruments/{id}` for Portfolio). Spec: `service-calls-without-tokens`.

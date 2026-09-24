@@ -111,3 +111,8 @@ squashed to a single `InitialCreate`. Production migration discipline arrives wi
 ## Production: docker compose on a VPS (T0.18)
 
 Not built yet — see `skarbiec-plan/zadania/phase-0-platform.md` T0.18.
+
+Requirement for whatever T0.18 builds: only the Gateway publishes a port; every service sits on an
+internal network the outside world cannot reach. Service-only endpoints under `/internal/**` are
+anonymous and trust the network, not a token (ADR-027) — exposing a service's port directly would
+expose them.

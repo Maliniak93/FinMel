@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { GetApiMarketdataInstrumentsByIdData, GetApiMarketdataInstrumentsByIdResponses, GetApiMarketdataInstrumentsSearchData, GetApiMarketdataInstrumentsSearchResponses, GetApiMarketdataSyncStatusData, GetApiMarketdataSyncStatusResponses, PostApiMarketdataFxLatestBatchData, PostApiMarketdataFxLatestBatchResponses, PostApiMarketdataInstrumentsData, PostApiMarketdataInstrumentsResponses, PostApiMarketdataPricesLatestBatchData, PostApiMarketdataPricesLatestBatchResponses, PostApiMarketdataSyncTriggerData, PostApiMarketdataSyncTriggerResponses } from './types.gen.js';
+import type { GetApiMarketdataInstrumentsByIdData, GetApiMarketdataInstrumentsByIdResponses, GetApiMarketdataInstrumentsSearchData, GetApiMarketdataInstrumentsSearchResponses, GetApiMarketdataSyncStatusData, GetApiMarketdataSyncStatusResponses, PostApiMarketdataInstrumentsData, PostApiMarketdataInstrumentsResponses, PostApiMarketdataSyncTriggerData, PostApiMarketdataSyncTriggerResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -30,24 +30,6 @@ export const postApiMarketdataInstruments = <ThrowOnError extends boolean = fals
 });
 
 export const getApiMarketdataInstrumentsById = <ThrowOnError extends boolean = false>(options: Options<GetApiMarketdataInstrumentsByIdData, ThrowOnError>): RequestResult<GetApiMarketdataInstrumentsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiMarketdataInstrumentsByIdResponses, unknown, ThrowOnError>({ url: '/api/marketdata/instruments/{id}', ...options });
-
-export const postApiMarketdataPricesLatestBatch = <ThrowOnError extends boolean = false>(options: Options<PostApiMarketdataPricesLatestBatchData, ThrowOnError>): RequestResult<PostApiMarketdataPricesLatestBatchResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiMarketdataPricesLatestBatchResponses, unknown, ThrowOnError>({
-    url: '/api/marketdata/prices/latest-batch',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const postApiMarketdataFxLatestBatch = <ThrowOnError extends boolean = false>(options: Options<PostApiMarketdataFxLatestBatchData, ThrowOnError>): RequestResult<PostApiMarketdataFxLatestBatchResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiMarketdataFxLatestBatchResponses, unknown, ThrowOnError>({
-    url: '/api/marketdata/fx/latest-batch',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
 
 export const postApiMarketdataSyncTrigger = <ThrowOnError extends boolean = false>(options?: Options<PostApiMarketdataSyncTriggerData, ThrowOnError>): RequestResult<PostApiMarketdataSyncTriggerResponses, unknown, ThrowOnError> => (options?.client ?? client).post<PostApiMarketdataSyncTriggerResponses, unknown, ThrowOnError>({ url: '/api/marketdata/sync/trigger', ...options });
 
