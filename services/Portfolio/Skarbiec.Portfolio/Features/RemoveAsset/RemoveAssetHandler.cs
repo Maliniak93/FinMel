@@ -19,6 +19,11 @@ public sealed class RemoveAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
+        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        {
+            return PortfolioErrors.Archived(portfolioId);
+        }
+
         // The delete cascades to the asset's transactions explicitly — portfolio_db has no FKs, so
         // the database cascades nothing (spec-08). The tenancy query filter scopes the load to this
         // user's rows.

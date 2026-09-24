@@ -482,4 +482,65 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Equal(AssetValuationMode.Manual, body!.ValuationMode);
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC6: an archived portfolio is read-only — adding
+    /// an asset is a 409 <c>Conflict.PortfolioArchived</c> and no asset row is written.</summary>
+    [Fact]
+    public async Task AddAsset_ToArchivedPortfolio_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Cash in an archived portfolio",
+            Currency = "PLN",
+            InitialTransaction = new RecordTransactionRequest
+            {
+                Type = TransactionType.Deposit,
+                Quantity = 1_000m,
+                UnitPrice = 1m,
+                Date = new DateOnly(2026, 1, 1)
+            }
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+    }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC9: tenancy wins over the archived check — a
+    /// stranger writing into someone else's archived portfolio gets 404, never a 409 that would
+    /// leak the portfolio's existence (and its archived state).</summary>
+    [Fact]
+    public async Task AddAsset_ToStrangersArchivedPortfolio_Returns404()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await owner.CreatePortfolioAsync(cancellationToken);
+        await owner.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Sneaky cash",
+            Currency = "PLN",
+            ManualValue = 100m,
+            ManualValueDate = new DateOnly(2026, 1, 1)
+        };
+
+        var response = await stranger.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await using var dbContext = CreateDbContext(ownerId);
+        Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+    }
 }

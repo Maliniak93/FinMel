@@ -104,6 +104,25 @@ describe('Portfolios', () => {
     );
   }
 
+  // A mutation reloads both the portfolios list and (archived-portfolio-out-of-net-worth) the
+  // dashboard behind "Total value", in no guaranteed order — so the reload GETs are left to the
+  // URL-routing base implementation from setup() and asserted by URL, never by call position.
+  function requestsFrom(index: number): Request[] {
+    return fetchSpy.mock.calls.slice(index).map(([input]: [unknown]) => input as Request);
+  }
+
+  function portfoliosListReloadedFrom(index: number): boolean {
+    return requestsFrom(index).some(
+      (request) => request.method === 'GET' && request.url.includes('/api/portfolio/portfolios'),
+    );
+  }
+
+  function dashboardFetchCount(): number {
+    return fetchSpy.mock.calls.filter(([input]: [unknown]) =>
+      requestUrl(input).includes('/api/reporting/dashboard'),
+    ).length;
+  }
+
   it('should create', async () => {
     await setup(jsonResponse([portfolio]));
     expect(component).toBeTruthy();
@@ -172,7 +191,6 @@ describe('Portfolios', () => {
     const callsBefore = fetchSpy.mock.calls.length;
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
     fetchSpy.mockResolvedValueOnce(jsonResponse({ ...portfolio, isArchived: true }));
-    fetchSpy.mockResolvedValueOnce(jsonResponse([{ ...portfolio, isArchived: true }]));
 
     await component['archive'](portfolio);
     await fixture.whenStable();
@@ -180,7 +198,7 @@ describe('Portfolios', () => {
     const archiveCall = fetchSpy.mock.calls[callsBefore][0] as Request;
     expect(archiveCall.method).toBe('POST');
     expect(archiveCall.url).toContain(`/portfolios/${portfolio.id}/archive`);
-    expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 2);
+    expect(portfoliosListReloadedFrom(callsBefore + 1)).toBe(true);
   });
 
   it('does not archive when the confirmation is cancelled', async () => {
@@ -218,7 +236,6 @@ describe('Portfolios', () => {
     const callsBefore = fetchSpy.mock.calls.length;
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
     fetchSpy.mockResolvedValueOnce(jsonResponse({ ...archived, isArchived: false }));
-    fetchSpy.mockResolvedValueOnce(jsonResponse([{ ...archived, isArchived: false }]));
 
     await component['restore'](archived);
     await fixture.whenStable();
@@ -226,7 +243,7 @@ describe('Portfolios', () => {
     const restoreCall = fetchSpy.mock.calls[callsBefore][0] as Request;
     expect(restoreCall.method).toBe('POST');
     expect(restoreCall.url).toContain(`/portfolios/${portfolio.id}/restore`);
-    expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 2);
+    expect(portfoliosListReloadedFrom(callsBefore + 1)).toBe(true);
   });
 
   it('does not restore when the confirmation is cancelled', async () => {
@@ -245,14 +262,52 @@ describe('Portfolios', () => {
     const callsBefore = fetchSpy.mock.calls.length;
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
     fetchSpy.mockResolvedValueOnce(new Response(null, { status: 204 }));
-    fetchSpy.mockResolvedValueOnce(jsonResponse([]));
 
     await component['remove'](portfolio);
     await fixture.whenStable();
 
     const deleteCall = fetchSpy.mock.calls[callsBefore][0] as Request;
     expect(deleteCall.method).toBe('DELETE');
-    expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 2);
+    expect(portfoliosListReloadedFrom(callsBefore + 1)).toBe(true);
+  });
+
+  // archived-portfolio-out-of-net-worth AC10: archive / restore / delete change what counts toward
+  // net worth, so the dashboard behind the "Total value" column is fetched again after each
+  // successful mutation — not only the portfolios list.
+  it('reloads total values after archive / restore / delete', async () => {
+    await setup(jsonResponse([portfolio]));
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const initialDashboardFetches = dashboardFetchCount();
+
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ ...portfolio, isArchived: true }));
+    await component['archive'](portfolio);
+    await fixture.whenStable();
+    expect(dashboardFetchCount()).toBe(initialDashboardFetches + 1);
+
+    const archived: PortfolioResponse = { ...portfolio, isArchived: true };
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ ...archived, isArchived: false }));
+    await component['restore'](archived);
+    await fixture.whenStable();
+    expect(dashboardFetchCount()).toBe(initialDashboardFetches + 2);
+
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await component['remove'](portfolio);
+    await fixture.whenStable();
+    expect(dashboardFetchCount()).toBe(initialDashboardFetches + 3);
+  });
+
+  it('does not reload total values when an archive fails on the server', async () => {
+    await setup(jsonResponse([portfolio]));
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const initialDashboardFetches = dashboardFetchCount();
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ detail: 'Something went wrong.', errorCode: 'Unexpected' }, 500),
+    );
+
+    await component['archive'](portfolio);
+    await fixture.whenStable();
+
+    expect(dashboardFetchCount()).toBe(initialDashboardFetches);
   });
 
   // spec-08 AC-10: delete no longer has a 409-specific path, but any server failure still surfaces
@@ -350,7 +405,6 @@ describe('Portfolios', () => {
       const callsBefore = fetchSpy.mock.calls.length;
       dialog.open.mockReturnValue({ afterClosed: () => of(true) });
       fetchSpy.mockResolvedValueOnce(new Response(null, { status: 204 }));
-      fetchSpy.mockResolvedValueOnce(jsonResponse([]));
 
       const overlayContainer = TestBed.inject(OverlayContainer);
       const trigger = fixture.debugElement
@@ -374,7 +428,7 @@ describe('Portfolios', () => {
         /^"Retirement" and its 2 assets?(\(s\))?, with all their transactions, will be permanently deleted\. This can't be undone\.$/,
       );
 
-      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 2));
+      await vi.waitFor(() => expect(portfoliosListReloadedFrom(callsBefore + 1)).toBe(true));
       const deleteCall = fetchSpy.mock.calls[callsBefore][0] as Request;
       expect(deleteCall.method).toBe('DELETE');
       expect(deleteCall.url).toContain(`/portfolios/${portfolio.id}`);

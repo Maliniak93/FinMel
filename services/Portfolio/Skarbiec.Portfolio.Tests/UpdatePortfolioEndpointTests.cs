@@ -100,4 +100,25 @@ public sealed class UpdatePortfolioEndpointTests(SkarbiecContainersFixture conta
             problem.Errors.Values.SelectMany(messages => messages),
             message => message.Contains(SupportedCurrencies.Accepted, StringComparison.Ordinal));
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC8: archiving makes the portfolio's contents
+    /// read-only, not the portfolio itself — renaming an archived portfolio still succeeds.</summary>
+    [Fact]
+    public async Task Update_ArchivedPortfolio_Succeeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        var response = await client.PutAsJsonAsync(
+            PortfolioUri(portfolioId),
+            new UpdatePortfolioRequest { Name = "Old savings", Description = "Kept for reference", Currency = "PLN" },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        Assert.Equal("Old savings", body!.Name);
+        Assert.True(body.IsArchived);
+    }
 }

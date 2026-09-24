@@ -74,11 +74,12 @@ export class Portfolios {
   });
 
   // Total value per portfolio is Reporting's existing dashboard read model (ByPortfolio), joined
-  // client-side on portfolioId — no new backend endpoint (S3). Loaded once, independent of the
-  // "Show archived" toggle: a portfolio absent from the payload (no snapshot yet, or an archived
-  // portfolio the read model doesn't carry) simply has no map entry, and the template renders an
-  // explicit placeholder rather than treating "missing" as "zero". If Reporting itself is
-  // unreachable, every row degrades to that same placeholder instead of blocking the whole list.
+  // client-side on portfolioId — no new backend endpoint (S3). Independent of the "Show archived"
+  // toggle, and reloaded after every archive / restore / delete, since each one changes what counts
+  // toward net worth (archived-portfolio-out-of-net-worth): a portfolio absent from the payload (no
+  // snapshot yet, or a deleted one) simply has no map entry, and the template renders an explicit
+  // placeholder rather than treating "missing" as "zero". If Reporting itself is unreachable, every
+  // row degrades to that same placeholder instead of blocking the whole list.
   protected readonly dashboardResource = resource({
     loader: async ({ abortSignal }) => {
       const result = await getApiReportingDashboard({ signal: abortSignal });
@@ -162,7 +163,7 @@ export class Portfolios {
       return;
     }
 
-    this.portfoliosResource.reload();
+    this.reloadAfterLifecycleChange();
   }
 
   // Mirror of archive() — the row menu offers exactly one of the two, decided by isArchived.
@@ -192,7 +193,7 @@ export class Portfolios {
       return;
     }
 
-    this.portfoliosResource.reload();
+    this.reloadAfterLifecycleChange();
   }
 
   // The delete cascades to the portfolio's assets and their transactions (spec-08), so the
@@ -229,6 +230,13 @@ export class Portfolios {
       return;
     }
 
+    this.reloadAfterLifecycleChange();
+  }
+
+  // Archive, restore and delete all change what counts toward net worth, so the "Total value"
+  // column is refetched along with the list (archived-portfolio-out-of-net-worth).
+  private reloadAfterLifecycleChange(): void {
     this.portfoliosResource.reload();
+    this.dashboardResource.reload();
   }
 }

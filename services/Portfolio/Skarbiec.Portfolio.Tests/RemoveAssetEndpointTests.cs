@@ -59,4 +59,23 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC6: removing an asset of an archived portfolio
+    /// is a 409 <c>Conflict.PortfolioArchived</c>; the asset and its transactions stay.</summary>
+    [Fact]
+    public async Task RemoveAsset_InArchivedPortfolio_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 2m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(portfolioId, assetId), cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        var stillThere = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(2m, stillThere.Quantity);
+        Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).TotalCount);
+    }
 }

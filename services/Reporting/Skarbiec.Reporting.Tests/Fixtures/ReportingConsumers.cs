@@ -128,7 +128,7 @@ internal static class ReportingConsumers
     /// satisfying <paramref name="predicate"/>, or throws <see cref="TimeoutException"/> after 15 s.
     /// </summary>
     public static async Task<T> WaitForAsync<T>(
-        ServiceProvider provider,
+        IServiceProvider provider,
         Func<ReportingDbContext, CancellationToken, Task<T>> probe,
         Func<T, bool> predicate,
         string description,
@@ -153,7 +153,7 @@ internal static class ReportingConsumers
     }
 
     public static async Task<Position> WaitForPositionAsync(
-        ServiceProvider provider, Guid assetId, CancellationToken cancellationToken, Func<Position, bool>? predicate = null)
+        IServiceProvider provider, Guid assetId, CancellationToken cancellationToken, Func<Position, bool>? predicate = null)
     {
         predicate ??= _ => true;
         var position = await WaitForAsync(
@@ -166,7 +166,7 @@ internal static class ReportingConsumers
         return position!;
     }
 
-    public static Task WaitForPositionGoneAsync(ServiceProvider provider, Guid assetId, CancellationToken cancellationToken) =>
+    public static Task WaitForPositionGoneAsync(IServiceProvider provider, Guid assetId, CancellationToken cancellationToken) =>
         WaitForAsync(
             provider,
             (db, ct) => db.Positions.IgnoreQueryFilters().AnyAsync(p => p.AssetId == assetId, ct),
@@ -175,7 +175,7 @@ internal static class ReportingConsumers
             cancellationToken);
 
     public static Task<List<Position>> WaitForPositionsAsync(
-        ServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken, Func<List<Position>, bool> predicate) =>
+        IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken, Func<List<Position>, bool> predicate) =>
         WaitForAsync(
             provider,
             (db, ct) => db.Positions.IgnoreQueryFilters().Where(p => p.PortfolioId == portfolioId).ToListAsync(ct),
@@ -183,7 +183,7 @@ internal static class ReportingConsumers
             $"The expected state of the Positions for portfolio {portfolioId}",
             cancellationToken);
 
-    public static Task WaitForNoPositionsAsync(ServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken) =>
+    public static Task WaitForNoPositionsAsync(IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken) =>
         WaitForAsync(
             provider,
             (db, ct) => db.Positions.IgnoreQueryFilters().AnyAsync(p => p.PortfolioId == portfolioId, ct),
@@ -192,7 +192,7 @@ internal static class ReportingConsumers
             cancellationToken);
 
     public static async Task<ValuationSnapshot> WaitForSnapshotAsync(
-        ServiceProvider provider,
+        IServiceProvider provider,
         Guid portfolioId,
         DateOnly date,
         CancellationToken cancellationToken,

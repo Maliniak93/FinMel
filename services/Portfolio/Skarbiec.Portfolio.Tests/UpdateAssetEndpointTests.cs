@@ -297,4 +297,31 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    /// <summary>archived-portfolio-out-of-net-worth AC6: updating an asset of an archived portfolio
+    /// is a 409 <c>Conflict.PortfolioArchived</c> and the asset keeps its previous state.</summary>
+    [Fact]
+    public async Task UpdateAsset_InArchivedPortfolio_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Before archive", manualValue: 100m);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "After archive",
+            Currency = "PLN",
+            ManualValue = 999m,
+            ManualValueDate = new DateOnly(2026, 6, 1)
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal("Before archive", unchanged.Name);
+        Assert.Equal(100m, unchanged.ManualValue);
+    }
 }

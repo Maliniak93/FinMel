@@ -166,6 +166,93 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// archived-portfolio-out-of-net-worth AC1: archiving revalues today's snapshot the way removing
+    /// the last asset does — the portfolio's only position (1000 PLN of cash) is now archived, so
+    /// today's <see cref="ValuationSnapshot"/> drops from 1000 to 0 and today's lines are gone.
+    /// </summary>
+    [Fact]
+    public async Task Consume_PortfolioArchived_SetsTodaysSnapshotToZero()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var cashAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(cashAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 1_000m, portfolioIsArchived: false);
+            await db.SeedValuationLineAsync(userId, portfolioId, cashAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedSnapshotAsync(userId, portfolioId, today, 1_000m, cancellationToken);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new PortfolioArchived
+            {
+                PortfolioId = portfolioId,
+                UserId = userId,
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 0m);
+
+            Assert.Equal(0m, snapshot.TotalPln);
+            Assert.Equal(userId, snapshot.UserId);
+            Assert.Empty(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// archived-portfolio-out-of-net-worth AC2: the archive revalues today only — yesterday's
+    /// snapshot and lines are history and stay exactly as they were. Today's snapshot reaching 0 is
+    /// the signal the consume finished, so the "unchanged" assertion cannot pass vacuously.
+    /// </summary>
+    [Fact]
+    public async Task Consume_PortfolioArchived_KeepsEarlierSnapshots()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var yesterday = today.AddDays(-1);
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var cashAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(cashAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 1_000m, portfolioIsArchived: false);
+            await db.SeedValuationLineAsync(userId, portfolioId, cashAssetId, yesterday, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedSnapshotAsync(userId, portfolioId, yesterday, 1_000m, cancellationToken);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new PortfolioArchived
+            {
+                PortfolioId = portfolioId,
+                UserId = userId,
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 0m);
+
+            var earlier = await GetSnapshotAsync(containers, portfolioId, yesterday, cancellationToken);
+            Assert.NotNull(earlier);
+            Assert.Equal(1_000m, earlier.TotalPln);
+
+            var earlierLine = Assert.Single(await GetLinesAsync(containers, portfolioId, yesterday, cancellationToken));
+            Assert.Equal(cashAssetId, earlierLine.AssetId);
+            Assert.Equal(1_000m, earlierLine.ValuePln);
+        }, cancellationToken);
+    }
+
     private Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
             containers,

@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, input, resource } from '@angular/core';
+import { Component, computed, inject, input, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
@@ -77,16 +77,6 @@ export class Assets {
 
   readonly portfolioId = input.required<string>();
 
-  protected readonly displayedColumns = [
-    'assetClass',
-    'name',
-    'quantity',
-    'currency',
-    'value',
-    'manualValueDate',
-    'actions',
-  ];
-
   protected readonly portfolioResource = resource({
     params: () => ({ portfolioId: this.portfolioId() }),
     loader: async ({ params, abortSignal }) => {
@@ -100,6 +90,24 @@ export class Assets {
       return result.data;
     },
   });
+
+  // An archived portfolio is read-only: Portfolio rejects every asset write into it with 409
+  // (archived-portfolio-out-of-net-worth), so the page offers no add / edit / remove action and
+  // shows a notice instead. The assets themselves stay listed.
+  protected readonly isArchived = computed(
+    () => this.portfolioResource.hasValue() && this.portfolioResource.value().isArchived,
+  );
+
+  // The actions column holds only Edit / Delete, so an archived portfolio drops it entirely.
+  protected readonly displayedColumns = computed(() => [
+    'assetClass',
+    'name',
+    'quantity',
+    'currency',
+    'value',
+    'manualValueDate',
+    ...(this.isArchived() ? [] : ['actions']),
+  ]);
 
   protected readonly assetsResource = resource({
     params: () => ({ portfolioId: this.portfolioId() }),

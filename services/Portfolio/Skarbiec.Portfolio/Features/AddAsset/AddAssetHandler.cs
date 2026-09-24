@@ -16,6 +16,11 @@ public sealed class AddAssetHandler(
             return PortfolioErrors.NotFound(portfolioId);
         }
 
+        if (portfolio.IsArchived)
+        {
+            return PortfolioErrors.Archived(portfolioId);
+        }
+
         var asset = new Asset
         {
             Id = Guid.NewGuid(),

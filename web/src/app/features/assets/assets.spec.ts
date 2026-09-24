@@ -396,4 +396,67 @@ describe('Assets', () => {
     expect(rows[0].textContent).toContain('Stale — refresh me');
     expect(rows[1].textContent).not.toContain('Stale');
   });
+
+  // archived-portfolio-out-of-net-worth AC11: the backend rejects every asset write into an archived
+  // portfolio with 409, so the page must not offer one — no New asset / Add your first asset, no
+  // Edit / Delete in any row menu — and says why instead.
+  describe('archived portfolio is read-only', () => {
+    const archivedPortfolio: PortfolioResponse = { ...portfolio, isArchived: true };
+    const archivedNotice = /This portfolio is archived\W+restore it to make changes/;
+
+    function pageText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function pageButtonTexts(): string[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+        (button) => button.textContent?.trim() ?? '',
+      );
+    }
+
+    // Opens every row menu the page renders (if any) and returns what the overlay offers.
+    async function rowMenuText(): Promise<string> {
+      const overlayContainer = TestBed.inject(OverlayContainer);
+      for (const triggerElement of fixture.debugElement.queryAll(By.directive(MatMenuTrigger))) {
+        triggerElement.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        await fixture.whenStable();
+      }
+      return overlayContainer.getContainerElement().textContent ?? '';
+    }
+
+    it('archived portfolio is read-only: no add / edit / remove actions, archived notice shown', async () => {
+      await setup(jsonResponse([asset, currencyValuedAsset]), jsonResponse(archivedPortfolio));
+
+      // The assets themselves are still listed — archived is read-only, not hidden.
+      expect(pageText()).toContain('Apple');
+      expect(pageText()).toMatch(archivedNotice);
+      expect(pageButtonTexts().some((text) => text.includes('New asset'))).toBe(false);
+
+      const menuText = await rowMenuText();
+      expect(menuText).not.toContain('Edit');
+      expect(menuText).not.toContain('Delete');
+    });
+
+    it('archived portfolio is read-only: the empty state offers no add button', async () => {
+      await setup(jsonResponse([]), jsonResponse(archivedPortfolio));
+
+      expect(pageText()).toMatch(archivedNotice);
+      const buttons = pageButtonTexts();
+      expect(buttons.some((text) => text.includes('New asset'))).toBe(false);
+      expect(buttons.some((text) => text.includes('Add your first asset'))).toBe(false);
+    });
+
+    it('archived portfolio is read-only: an active portfolio keeps its actions and shows no notice', async () => {
+      await setup(jsonResponse([asset]));
+
+      expect(pageText()).not.toMatch(archivedNotice);
+      expect(pageButtonTexts().some((text) => text.includes('New asset'))).toBe(true);
+
+      const menuText = await rowMenuText();
+      expect(menuText).toContain('Edit');
+      expect(menuText).toContain('Delete');
+    });
+  });
 });
