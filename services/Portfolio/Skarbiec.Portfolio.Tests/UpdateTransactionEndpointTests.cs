@@ -53,6 +53,34 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10m, untouchedBuy.Quantity);
     }
 
+    /// <summary>cash-transaction-types AC-4: editing a Cash asset's Deposit into a Sell is a 400
+    /// <c>Validation.TransactionTypeNotAllowed</c>, and the stored transaction and the balance are
+    /// exactly as before.</summary>
+    [Fact]
+    public async Task Update_ToDisallowedTypeOnCashAsset_ReturnsBadRequestAndNothingChanged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        await client.RecordTransactionAsync(
+            portfolioId, assetId, TransactionType.Deposit, 1_000m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+        var depositId = await client.RecordTransactionAsync(
+            portfolioId, assetId, TransactionType.Deposit, 500m, new DateOnly(2026, 1, 2), cancellationToken, unitPrice: 1m);
+        // A Sell of 100 after the opening 1000 would never oversell — only the type rule can reject it.
+        var update = new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 100m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 2) };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(portfolioId, assetId, depositId), update, cancellationToken);
+
+        await response.AssertTransactionTypeNotAllowedAsync(cancellationToken);
+        var stored = (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items.Single(t => t.Id == depositId);
+        Assert.Equal(TransactionType.Deposit, stored.Type);
+        Assert.Equal(500m, stored.Quantity);
+        Assert.Equal(1m, stored.UnitPrice);
+        Assert.Equal(new DateOnly(2026, 1, 2), stored.Date);
+        Assert.Equal(1_500m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+    }
+
     [Fact]
     public async Task Update_ForNonExistentTransaction_ReturnsNotFound()
     {

@@ -88,6 +88,27 @@ internal static class PortfolioApi
     }
 
     /// <summary>
+    /// cash-transaction-types: adds a currency-valued cash-like asset (<see cref="AssetClass.Cash"/> or
+    /// <see cref="AssetClass.Deposit"/> — neither InstrumentId nor ManualValue) with no transactions,
+    /// and returns its id. Such an asset accepts only Deposit/Withdraw transactions.
+    /// </summary>
+    public static async Task<Guid> AddCashAssetAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        CancellationToken cancellationToken,
+        AssetClass assetClass = AssetClass.Cash,
+        string currency = "PLN",
+        string name = "Cash account")
+    {
+        var request = new AddAssetRequest { AssetClass = assetClass, Name = name, Currency = currency };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+    }
+
+    /// <summary>
     /// The common arrange step: a portfolio holding one asset, both owned by <paramref name="client"/>'s
     /// user. <paramref name="currency"/> is the asset's — a non-PLN one makes every transaction write
     /// resolve its PLN rate through <see cref="FakeFxRateLookupClient"/>.

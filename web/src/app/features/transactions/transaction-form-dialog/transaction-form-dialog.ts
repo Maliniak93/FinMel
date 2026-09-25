@@ -12,6 +12,7 @@ import { MatSelectModule } from '@angular/material/select';
 import {
   postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
   putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
+  type AssetClass,
   type TransactionResponse,
 } from '../../../api/portfolio';
 import {
@@ -21,14 +22,16 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import {
+  allowedTransactionTypes,
   isPricedTransactionType,
   quantityFieldLabel,
-  TRANSACTION_TYPES,
 } from '../transaction-type';
 
 export interface TransactionFormDialogData {
   portfolioId: string;
   assetId: string;
+  // The asset's class decides which transaction types are offered (cash-transaction-types).
+  assetClass: AssetClass;
   transaction?: TransactionResponse;
 }
 
@@ -55,10 +58,12 @@ export class TransactionFormDialog {
   protected readonly isEdit = !!this.data.transaction;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
-  protected readonly transactionTypes = TRANSACTION_TYPES;
+  protected readonly transactionTypes = allowedTransactionTypes(this.data.assetClass);
 
+  // Create starts on the first type the class accepts — Deposit for Cash/Deposit, Buy otherwise;
+  // edit keeps the stored type.
   protected readonly form = this.formBuilder.nonNullable.group({
-    type: [this.data.transaction?.type ?? 0, [Validators.required]],
+    type: [this.data.transaction?.type ?? this.transactionTypes[0].value, [Validators.required]],
     quantity: [Number(this.data.transaction?.quantity ?? 0), [Validators.min(0)]],
     unitPrice: [Number(this.data.transaction?.unitPrice ?? 0), [Validators.min(0)]],
     date: [

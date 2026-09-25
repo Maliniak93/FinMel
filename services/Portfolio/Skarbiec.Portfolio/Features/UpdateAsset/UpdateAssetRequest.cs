@@ -38,8 +38,9 @@ public sealed record UpdateAssetRequest : IValidatableObject
     /// number that <c>UpdateAssetHandler</c> could apply without going through the calculator at all.
     /// A currency-valued asset with no transactions values at 0, exactly like a market/manual asset
     /// with no transactions; its quantity only moves via <c>RecordTransaction</c>/<c>UpdateTransaction</c>/
-    /// <c>DeleteTransaction</c> (typically <see cref="TransactionType.Deposit"/>/<see cref="TransactionType.Withdraw"/>
-    /// for cash-like classes) or <c>AddAsset</c>'s own optional initial transaction — never a direct
+    /// <c>DeleteTransaction</c> (only <see cref="TransactionType.Deposit"/>/<see cref="TransactionType.Withdraw"/>
+    /// for cash-like classes, enforced by <see cref="AssetTransactionTypes"/>) or <c>AddAsset</c>'s own
+    /// optional initial transaction — never a direct
     /// field on this request.
     /// </remarks>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

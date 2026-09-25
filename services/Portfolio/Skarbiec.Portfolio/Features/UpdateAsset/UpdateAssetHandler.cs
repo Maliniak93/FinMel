@@ -32,6 +32,18 @@ public sealed class UpdateAssetHandler(
             return AssetErrors.CurrencyLockedByTransactions;
         }
 
+        // A class change must not leave transactions of a type the new class does not accept
+        // (cash-transaction-types): only Deposit/Withdraw may stay on a Cash/Deposit asset.
+        var allowedTypes = AssetTransactionTypes.Allowed(request.AssetClass);
+        var disallowed = await dbContext.Transactions
+            .Where(t => t.AssetId == assetId && !allowedTypes.Contains(t.Type))
+            .Select(t => (TransactionType?)t.Type)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (disallowed is { } disallowedType)
+        {
+            return TransactionErrors.TypeNotAllowedForClass(disallowedType, request.AssetClass);
+        }
+
         // Switching modes is allowed (T2.9, extended to three modes by M1.4) — transactions are
         // untouched either way (this handler never writes to the Transaction table), only the
         // valuation fields below move.

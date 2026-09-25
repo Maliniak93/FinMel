@@ -1,9 +1,11 @@
+import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { TransactionResponse } from '../../../api/portfolio';
+import { ASSET_CLASS } from '../../assets/asset-class';
 import { TransactionFormDialog, type TransactionFormDialogData } from './transaction-form-dialog';
 
 // See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
@@ -17,6 +19,9 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 const portfolioId = '22222222-2222-2222-2222-222222222222';
 const assetId = '11111111-1111-1111-1111-111111111111';
+// cash-transaction-types: the dialog knows its asset's class. A market class (ETF) keeps every
+// transaction type, so the pre-existing cases below run against one.
+const assetClass = ASSET_CLASS.Etf;
 
 const existingTransaction: TransactionResponse = {
   id: '33333333-3333-3333-3333-333333333333',
@@ -61,8 +66,26 @@ describe('TransactionFormDialog', () => {
     await fixture.whenStable();
   }
 
+  // Opens the Type select the way a user does and reads the options Material renders into the
+  // overlay — what is offered, independent of how the dialog stores its list.
+  async function typeOptionLabels(): Promise<string[]> {
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      'mat-select[formcontrolname="type"] .mat-mdc-select-trigger',
+    );
+    if (!trigger) {
+      throw new Error('No Type select rendered.');
+    }
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return Array.from(
+      TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-option'),
+      (option) => (option.textContent ?? '').trim(),
+    );
+  }
+
   it('creates a Buy with the form values and closes with true on success', async () => {
-    await setup({ portfolioId, assetId });
+    await setup({ portfolioId, assetId, assetClass });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction }, 201));
 
     component['form'].controls.quantity.setValue(10);
@@ -81,7 +104,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('pre-fills the form from an existing transaction and updates via PUT on success', async () => {
-    await setup({ portfolioId, assetId, transaction: existingTransaction });
+    await setup({ portfolioId, assetId, assetClass, transaction: existingTransaction });
     fetchSpy.mockResolvedValue(jsonResponse(existingTransaction));
 
     expect(component['form'].controls.type.value).toBe(0);
@@ -102,7 +125,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('sends unit price 1 for a Deposit, where the unit-price field is hidden', async () => {
-    await setup({ portfolioId, assetId });
+    await setup({ portfolioId, assetId, assetClass });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction, type: 2 }, 201));
 
     component['form'].controls.type.setValue(2); // Deposit
@@ -120,11 +143,18 @@ describe('TransactionFormDialog', () => {
   });
 
   // transactions-pln-value-and-fee-removal AC13: Fee is gone as a transaction type and as a field.
+  // cash-transaction-types AC-8: run against a market class, which still offers all six types.
   it('offers no Fee type', async () => {
-    await setup({ portfolioId, assetId });
+    await setup({ portfolioId, assetId, assetClass });
 
-    const labels = component['transactionTypes'].map((type) => type.label);
-    expect(labels).toEqual(['Buy', 'Sell', 'Deposit', 'Withdraw', 'Dividend', 'Interest']);
+    expect(await typeOptionLabels()).toEqual([
+      'Buy',
+      'Sell',
+      'Deposit',
+      'Withdraw',
+      'Dividend',
+      'Interest',
+    ]);
     expect(Object.keys(component['form'].controls)).not.toContain('fee');
 
     const element = fixture.nativeElement as HTMLElement;
@@ -135,8 +165,42 @@ describe('TransactionFormDialog', () => {
     expect(fieldLabels).not.toContain('Fee');
   });
 
+  // cash-transaction-types AC-8: a Cash asset accepts only Deposit/Withdraw (the backend answers
+  // 400 to anything else), so the dialog offers only those two and starts on Deposit.
+  it('offers only Deposit/Withdraw for a Cash asset', async () => {
+    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash });
+
+    expect(component['form'].controls.type.value).toBe(2); // Deposit
+    expect(await typeOptionLabels()).toEqual(['Deposit', 'Withdraw']);
+  });
+
+  it('offers all six types and starts on Buy for a market asset (ETF)', async () => {
+    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Etf });
+
+    expect(component['form'].controls.type.value).toBe(0); // Buy
+    expect(await typeOptionLabels()).toEqual([
+      'Buy',
+      'Sell',
+      'Deposit',
+      'Withdraw',
+      'Dividend',
+      'Interest',
+    ]);
+  });
+
+  it('keeps the stored type when editing a Cash asset transaction', async () => {
+    await setup({
+      portfolioId,
+      assetId,
+      assetClass: ASSET_CLASS.Cash,
+      transaction: { ...existingTransaction, type: 3 }, // Withdraw
+    });
+
+    expect(component['form'].controls.type.value).toBe(3);
+  });
+
   it('does not submit an invalid form', async () => {
-    await setup({ portfolioId, assetId });
+    await setup({ portfolioId, assetId, assetClass });
     fetchSpy.mockResolvedValue(jsonResponse(existingTransaction, 201));
 
     component['form'].controls.quantity.setValue(-1);
@@ -148,7 +212,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('surfaces a validation error on the matching field, without closing', async () => {
-    await setup({ portfolioId, assetId });
+    await setup({ portfolioId, assetId, assetClass });
     fetchSpy.mockResolvedValue(
       jsonResponse(
         {
@@ -168,7 +232,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('surfaces the 409 history-breaking-edit conflict as a human-readable form banner', async () => {
-    await setup({ portfolioId, assetId, transaction: existingTransaction });
+    await setup({ portfolioId, assetId, assetClass, transaction: existingTransaction });
     fetchSpy.mockResolvedValue(
       jsonResponse(
         {
@@ -189,7 +253,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('surfaces the 400 oversell validation error as a human-readable form banner', async () => {
-    await setup({ portfolioId, assetId });
+    await setup({ portfolioId, assetId, assetClass });
     fetchSpy.mockResolvedValue(
       jsonResponse(
         {
@@ -213,7 +277,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('closes with false on cancel', async () => {
-    await setup({ portfolioId, assetId });
+    await setup({ portfolioId, assetId, assetClass });
 
     component['cancel']();
 

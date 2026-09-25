@@ -24,6 +24,12 @@ public sealed class AddAssetHandler(
             return PortfolioErrors.Archived(portfolioId);
         }
 
+        // Before the instrument and FX lookups: a disallowed opening type calls nothing and creates nothing.
+        if (request.InitialTransaction is { } initial && !AssetTransactionTypes.IsAllowed(request.AssetClass, initial.Type))
+        {
+            return TransactionErrors.TypeNotAllowedForClass(initial.Type, request.AssetClass);
+        }
+
         var asset = new Asset
         {
             Id = Guid.NewGuid(),

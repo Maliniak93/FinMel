@@ -19,17 +19,46 @@ internal static class PortfolioAssertions
     /// Result→ProblemDetails mapping equal to <see cref="PortfolioArchivedErrorCode"/>.
     /// </summary>
     public static async Task AssertPortfolioArchivedConflictAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioArchivedErrorCode, cancellationToken);
+
+    /// <summary>cash-transaction-types: the error code a transaction type the asset's class does not accept fails with (a top-level 400, no field key).</summary>
+    public const string TransactionTypeNotAllowedErrorCode = "Validation.TransactionTypeNotAllowed";
+
+    /// <summary>
+    /// Asserts <paramref name="response"/> is the 400 a Cash/Deposit asset answers to any transaction
+    /// type other than Deposit/Withdraw: <see cref="TransactionTypeNotAllowedErrorCode"/>, with a
+    /// detail that names the accepted types.
+    /// </summary>
+    public static async Task AssertTransactionTypeNotAllowedAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var problem = await response.AssertProblemAsync(
+            HttpStatusCode.BadRequest, TransactionTypeNotAllowedErrorCode, cancellationToken);
+        Assert.NotNull(problem.Detail);
+        Assert.Contains(nameof(Skarbiec.Contracts.TransactionType.Deposit), problem.Detail, StringComparison.Ordinal);
+        Assert.Contains(nameof(Skarbiec.Contracts.TransactionType.Withdraw), problem.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Asserts <paramref name="response"/> is a ProblemDetails with <paramref name="status"/> and the
+    /// <c>errorCode</c> extension stamped by the Result→ProblemDetails mapping equal to
+    /// <paramref name="errorCode"/>; returns the problem for further assertions.
+    /// </summary>
+    public static async Task<ProblemDetails> AssertProblemAsync(
+        this HttpResponseMessage response, HttpStatusCode status, string errorCode, CancellationToken cancellationToken)
+    {
+        Assert.Equal(status, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
         Assert.NotNull(problem);
         Assert.True(
-            problem.Extensions.TryGetValue("errorCode", out var errorCode),
-            "The 409 ProblemDetails carries no errorCode extension.");
-        var code = errorCode is JsonElement element ? element.GetString() : errorCode?.ToString();
-        Assert.Equal(PortfolioArchivedErrorCode, code);
+            problem.Extensions.TryGetValue("errorCode", out var rawCode),
+            $"The {(int)status} ProblemDetails carries no errorCode extension.");
+        var code = rawCode is JsonElement element ? element.GetString() : rawCode?.ToString();
+        Assert.Equal(errorCode, code);
+
+        return problem;
     }
 
     /// <summary>

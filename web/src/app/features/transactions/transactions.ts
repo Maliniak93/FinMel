@@ -22,7 +22,10 @@ import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../shared/format-money';
 import { assetClassLabel } from '../assets/asset-class';
-import { TransactionFormDialog } from './transaction-form-dialog/transaction-form-dialog';
+import {
+  TransactionFormDialog,
+  type TransactionFormDialogData,
+} from './transaction-form-dialog/transaction-form-dialog';
 import { transactionTypeLabel } from './transaction-type';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -150,11 +153,25 @@ export class Transactions {
     this.assetResource.reload();
   }
 
+  // The dialog filters its transaction types by the asset's class (cash-transaction-types), so it
+  // opens only once the asset has loaded; the buttons that open it are gated the same way.
+  private dialogData(): TransactionFormDialogData | null {
+    if (!this.assetResource.hasValue()) {
+      return null;
+    }
+    return {
+      portfolioId: this.portfolioId(),
+      assetId: this.assetId(),
+      assetClass: this.assetResource.value().assetClass,
+    };
+  }
+
   protected openCreateDialog(): void {
-    const ref = this.dialog.open(TransactionFormDialog, {
-      width: '480px',
-      data: { portfolioId: this.portfolioId(), assetId: this.assetId() },
-    });
+    const data = this.dialogData();
+    if (!data) {
+      return;
+    }
+    const ref = this.dialog.open(TransactionFormDialog, { width: '480px', data });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {
         this.reload();
@@ -163,9 +180,13 @@ export class Transactions {
   }
 
   protected openEditDialog(transaction: TransactionResponse): void {
+    const data = this.dialogData();
+    if (!data) {
+      return;
+    }
     const ref = this.dialog.open(TransactionFormDialog, {
       width: '480px',
-      data: { portfolioId: this.portfolioId(), assetId: this.assetId(), transaction },
+      data: { ...data, transaction },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {

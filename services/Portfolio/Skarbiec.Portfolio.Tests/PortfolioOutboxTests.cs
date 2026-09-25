@@ -639,6 +639,110 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         Assert.Equal(5m, transaction.Quantity);
     }
 
+    /// <summary>
+    /// cash-transaction-types AC-2..AC-5 (outbox half): every write rejected with
+    /// <c>Validation.TransactionTypeNotAllowed</c> — a Buy recorded on a Cash asset, a Deposit-class
+    /// asset opened with an Interest, a Cash Deposit edited into a Sell, a Stock holding a Buy turned
+    /// into Cash — fails before it writes anything: not one outbox row is added and no business row
+    /// moves. Each write runs in its own scope, as in <see cref="WriteToArchivedPortfolio_WritesNoEvent"/>.
+    /// </summary>
+    [Fact]
+    public async Task DisallowedTransactionTypeOnCashLikeAsset_WritesNoEvent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid cashAssetId;
+        Guid depositId;
+        Guid stockAssetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Cash rule outbox portfolio" }, cancellationToken)).Value.Id;
+            var cashResult = await arrange.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
+                portfolioId,
+                new AddAssetRequest
+                {
+                    AssetClass = AssetClass.Cash,
+                    Name = "Wallet",
+                    Currency = "PLN",
+                    InitialTransaction = new RecordTransactionRequest
+                    {
+                        Type = TransactionType.Deposit,
+                        Quantity = 1_000m,
+                        UnitPrice = 1m,
+                        Date = new DateOnly(2026, 1, 1)
+                    }
+                },
+                cancellationToken);
+            Assert.True(cashResult.IsSuccess);
+            cashAssetId = cashResult.Value.Id;
+            stockAssetId = await AddAssetWithBuyAsync(arrange.ServiceProvider, portfolioId, "Shares", cancellationToken);
+        }
+
+        int outboxRowsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            var db = before.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+            depositId = await db.Transactions.Where(t => t.AssetId == cashAssetId).Select(t => t.Id).SingleAsync(cancellationToken);
+            outboxRowsBefore = await db.Set<OutboxMessage>().CountAsync(cancellationToken);
+        }
+
+        var writes = new (string Name, Func<IServiceProvider, Task<Error>> Write)[]
+        {
+            ("RecordTransaction", async s => (await s.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+                portfolioId,
+                cashAssetId,
+                new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 3) },
+                cancellationToken)).Error),
+            ("AddAsset", async s => (await s.GetRequiredService<AddAssetHandler>().HandleAsync(
+                portfolioId,
+                new AddAssetRequest
+                {
+                    AssetClass = AssetClass.Deposit,
+                    Name = "Term deposit",
+                    Currency = "PLN",
+                    InitialTransaction = new RecordTransactionRequest
+                    {
+                        Type = TransactionType.Interest, Quantity = 10m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 3)
+                    }
+                },
+                cancellationToken)).Error),
+            ("UpdateTransaction", async s => (await s.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
+                portfolioId,
+                cashAssetId,
+                depositId,
+                new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 100m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 1) },
+                cancellationToken)).Error),
+            ("UpdateAsset", async s => (await s.GetRequiredService<UpdateAssetHandler>().HandleAsync(
+                portfolioId,
+                stockAssetId,
+                new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Now cash", Currency = "PLN" },
+                cancellationToken)).Error),
+        };
+
+        foreach (var (name, write) in writes)
+        {
+            await using var scope = _provider.CreateAsyncScope();
+            var error = await write(scope.ServiceProvider);
+            Assert.True(
+                error.Code == PortfolioAssertions.TransactionTypeNotAllowedErrorCode,
+                $"{name} with a type the cash-like class does not accept returned '{error.Code}', expected '{PortfolioAssertions.TransactionTypeNotAllowedErrorCode}'.");
+        }
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
+        Assert.Equal(2, await verifyDb.Assets.CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+        var cash = await verifyDb.Assets.SingleAsync(a => a.Id == cashAssetId, cancellationToken);
+        Assert.Equal(1_000m, cash.Quantity);
+        var deposit = await verifyDb.Transactions.SingleAsync(t => t.AssetId == cashAssetId, cancellationToken);
+        Assert.Equal(depositId, deposit.Id);
+        Assert.Equal(TransactionType.Deposit, deposit.Type);
+        var stock = await verifyDb.Assets.SingleAsync(a => a.Id == stockAssetId, cancellationToken);
+        Assert.Equal(AssetClass.Stock, stock.AssetClass);
+    }
+
     private static async Task<Guid> AddAssetWithBuyAsync(
         IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
     {

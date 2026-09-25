@@ -234,6 +234,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 - A `Sell` transaction cannot take asset quantity below 0, checked across the asset's full transaction history.
 - Amounts and quantities ≥ 0.
 - An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
+- A Cash/Deposit asset's transactions are only Deposit/Withdraw.
 - One `PriceQuote` per (instrument, date); one `FxRate` per (pair, date) — unique indexes.
 - Every user-owned entity carries `UserId` from the JWT — enforced by an architecture test, never trusted from the request body (ADR-006).
 - A user-chosen currency (`Portfolio.Currency`, `Asset.Currency`) is one of `SupportedCurrencies` (PLN/EUR/USD, default PLN, canonical uppercase) — validated on write only; this does not constrain `Instrument.QuoteCurrency` or `FxRate.Pair`.

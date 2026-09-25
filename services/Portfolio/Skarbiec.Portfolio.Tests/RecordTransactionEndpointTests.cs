@@ -287,6 +287,73 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
             page.Items.Select(t => t.Type));
     }
 
+    /// <summary>cash-transaction-types AC-2: a Cash asset accepts only Deposit/Withdraw — a Buy is a
+    /// 400 <c>Validation.TransactionTypeNotAllowed</c>, checked before the FX lookup and the
+    /// recompute, so the quantity and the transaction list stay as they were. (The "no outbox row"
+    /// half is proven hostless in <see cref="PortfolioOutboxTests"/>, where no bus can deliver and
+    /// delete the row before the assertion.)</summary>
+    [Fact]
+    public async Task Record_DisallowedTypeOnCashAsset_ReturnsBadRequestAndWritesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken, currency: "EUR");
+        await client.RecordTransactionAsync(
+            portfolioId, assetId, TransactionType.Deposit, 1_000m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+        var fxCallsBefore = Factory.FxRateLookupClient.Calls.Count;
+        var request = new RecordTransactionRequest
+        {
+            Type = TransactionType.Buy,
+            Quantity = 10m,
+            UnitPrice = 1m,
+            Date = new DateOnly(2026, 1, 2)
+        };
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertTransactionTypeNotAllowedAsync(cancellationToken);
+        Assert.Equal(fxCallsBefore, Factory.FxRateLookupClient.Calls.Count);
+        var asset = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(1_000m, asset.Quantity);
+        Assert.Equal(1, asset.TransactionCount);
+        var listed = Assert.Single((await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items);
+        Assert.Equal(TransactionType.Deposit, listed.Type);
+    }
+
+    /// <summary>cash-transaction-types AC-2: the two types a Cash asset does accept still record —
+    /// a Deposit and then a Withdraw both answer 201 and move the balance.</summary>
+    [Fact]
+    public async Task Record_DepositAndWithdrawOnCashAsset_Succeed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var deposit = new RecordTransactionRequest
+        {
+            Type = TransactionType.Deposit,
+            Quantity = 1_000m,
+            UnitPrice = 1m,
+            Date = new DateOnly(2026, 1, 1)
+        };
+        var withdraw = new RecordTransactionRequest
+        {
+            Type = TransactionType.Withdraw,
+            Quantity = 200m,
+            UnitPrice = 1m,
+            Date = new DateOnly(2026, 1, 2)
+        };
+
+        var depositResponse = await client.PostAsJsonAsync(TransactionsUri(portfolioId, assetId), deposit, cancellationToken);
+        var withdrawResponse = await client.PostAsJsonAsync(TransactionsUri(portfolioId, assetId), withdraw, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, depositResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, withdrawResponse.StatusCode);
+        Assert.Equal(800m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC7: recording a transaction on an asset of an
     /// archived portfolio is a 409 <c>Conflict.PortfolioArchived</c> and the quantity is unchanged.</summary>
     [Fact]
