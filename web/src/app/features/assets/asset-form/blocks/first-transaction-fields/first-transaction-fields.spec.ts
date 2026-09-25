@@ -23,7 +23,10 @@ describe('FirstTransactionFields', () => {
       providers: [provideNativeDateAdapter()],
     }).compileComponents();
 
-    group = createFirstTransactionGroup(TestBed.inject(FormBuilder), options.openingDeposit ?? false);
+    group = createFirstTransactionGroup(
+      TestBed.inject(FormBuilder),
+      options.openingDeposit ?? false,
+    );
     fixture = TestBed.createComponent(FirstTransactionFields);
     fixture.componentRef.setInput('group', group);
     if (options.openingDeposit !== undefined) {

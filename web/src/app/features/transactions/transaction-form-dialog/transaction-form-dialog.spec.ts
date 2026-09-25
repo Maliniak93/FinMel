@@ -78,8 +78,9 @@ describe('TransactionFormDialog', () => {
     trigger.click();
     fixture.detectChanges();
     await fixture.whenStable();
-    return Array.from(TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-option'), (option) =>
-      (option.textContent ?? '').trim(),
+    return Array.from(
+      TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-option'),
+      (option) => (option.textContent ?? '').trim(),
     );
   }
 
