@@ -32,6 +32,11 @@ public sealed class UpdateTransactionHandler(
             return TransactionErrors.NotFound(id);
         }
 
+        if (!AssetTransactionTypes.IsAllowed(asset.AssetClass, request.Type))
+        {
+            return TransactionErrors.TypeNotAllowedForClass(request.Type, asset.AssetClass);
+        }
+
         var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
         if (unitPrice.IsFailure)
         {

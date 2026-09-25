@@ -516,6 +516,46 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Null(body.ManualValueDate);
     }
 
+    /// <summary>cash-transaction-types AC-3: a cash-like class's opening transaction must be a
+    /// Deposit/Withdraw. Any other type is a 400 <c>Validation.TransactionTypeNotAllowed</c>, checked
+    /// before the FX lookup, and no asset (nor transaction) is created.</summary>
+    [Theory]
+    [InlineData(AssetClass.Cash, TransactionType.Buy)]
+    [InlineData(AssetClass.Deposit, TransactionType.Interest)]
+    public async Task Add_CashLikeClassWithDisallowedInitialType_ReturnsBadRequestAndCreatesNoAsset(
+        AssetClass assetClass, TransactionType initialType)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = assetClass,
+            Name = "Euro savings",
+            Currency = "EUR",
+            InitialTransaction = new RecordTransactionRequest
+            {
+                Type = initialType,
+                Quantity = 500m,
+                UnitPrice = 1m,
+                Date = new DateOnly(2026, 3, 4)
+            }
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        await response.AssertTransactionTypeNotAllowedAsync(cancellationToken);
+        Assert.Empty(Factory.FxRateLookupClient.Calls);
+        var portfolio = await client.GetAsync(PortfolioUri(portfolioId), cancellationToken);
+        var portfolioBody = await portfolio.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken);
+        Assert.Equal(0, portfolioBody!.AssetCount);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+    }
+
     [Fact]
     public async Task Add_WithValidInstrument_ReturnsCreatedWithMarketValuationMode()
     {

@@ -176,6 +176,30 @@ describe('Transactions', () => {
     expect(fetchSpy.mock.calls.length).toBe(callsBefore);
   });
 
+  // cash-transaction-types AC-9: the dialog filters its types by the asset's class, so the page
+  // hands over the loaded asset's class on both create and edit.
+  it('passes the asset class to the transaction dialog', async () => {
+    const cashAsset: AssetResponse = {
+      ...asset,
+      assetClass: 0, // Cash
+      valuationMode: 2, // CurrencyValued
+      name: 'Checking account',
+      currency: 'PLN',
+      manualValue: null,
+      manualValueDate: null,
+    };
+    await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(cashAsset));
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    component['openCreateDialog']();
+    component['openEditDialog'](transaction);
+
+    expect(dialog.open).toHaveBeenCalledTimes(2);
+    const [createCall, editCall] = dialog.open.mock.calls;
+    expect(createCall[1].data).toEqual({ portfolioId, assetId, assetClass: 0 });
+    expect(editCall[1].data).toEqual({ portfolioId, assetId, assetClass: 0, transaction });
+  });
+
   it('deletes a transaction after confirmation and reloads', async () => {
     await setup(jsonResponse(pagedResponse([transaction])));
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });

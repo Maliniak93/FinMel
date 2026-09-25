@@ -64,25 +64,36 @@ describe('CashAssetForm', () => {
   });
 
   describe('add first transaction (create only)', () => {
-    it('checked → defaults to Deposit and sends it', async () => {
-      await setup(0);
+    // cash-transaction-types AC-7: a cash-like asset's first transaction is an opening deposit —
+    // no type select and no unit price, only Amount and Date — sent as a Deposit at unit price 1.
+    it.each([
+      { assetClass: 0, className: 'Cash' },
+      { assetClass: 1, className: 'Deposit' },
+    ])('sends an opening deposit ($className)', async ({ assetClass }) => {
+      await setup(assetClass);
+      const element = fixture.nativeElement as HTMLElement;
 
       findControl(component.form, 'name').setValue('Checking account');
+      expect(renderedText(fixture)).toContain('Add opening deposit');
       await toggleFirstTransaction(fixture);
-      expect(findControl(component.form, 'type').value).toBe(2); // Deposit
-      expect(findControl(component.form, 'unitPrice').value).toBe(1);
-      findControl(component.form, 'quantity').setValue(1000);
+
+      expect(element.querySelector('mat-select[formcontrolname="type"]')).toBeNull();
+      expect(element.querySelector('[formcontrolname="unitPrice"]')).toBeNull();
+
+      findControl(component.form, 'quantity').setValue(500);
+      findControl(component.form, 'date').setValue(new Date(2026, 2, 5));
 
       // transactions-pln-value-and-fee-removal AC13: the first transaction carries no fee.
+      expect(component.form.valid).toBe(true);
       expect(component.toBody()).toEqual({
-        assetClass: 0,
+        assetClass,
         name: 'Checking account',
         currency: 'PLN',
         initialTransaction: {
-          type: 2,
-          quantity: 1000,
+          type: 2, // Deposit
+          quantity: 500,
           unitPrice: 1,
-          date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          date: '2026-03-05',
         },
       });
     });

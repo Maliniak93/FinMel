@@ -234,6 +234,62 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(500m, body.Quantity);
     }
 
+    /// <summary>cash-transaction-types AC-5: turning a Stock that holds a Buy into Cash would leave a
+    /// Cash asset with a type it does not accept — 400 <c>Validation.TransactionTypeNotAllowed</c>,
+    /// and the asset keeps its class, name and valuation mode.</summary>
+    [Fact]
+    public async Task Update_ToCashLikeClassWithDisallowedTransactions_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock, manualValue: 100m);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Now cash",
+            Currency = "PLN",
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertTransactionTypeNotAllowedAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(AssetClass.Stock, unchanged.AssetClass);
+        Assert.Equal("Shares", unchanged.Name);
+        Assert.Equal(AssetValuationMode.Manual, unchanged.ValuationMode);
+        Assert.Equal(100m, unchanged.ManualValue);
+        Assert.Equal(3m, unchanged.Quantity);
+    }
+
+    /// <summary>cash-transaction-types AC-5: the guard rejects only a real conflict — a Stock whose
+    /// transactions are all Deposits becomes Cash with a 200.</summary>
+    [Fact]
+    public async Task Update_ToCashLikeClassWithOnlyDepositTransactions_Succeeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Parked money", assetClass: AssetClass.Stock, manualValue: 100m);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 200m, new DateOnly(2026, 1, 2), cancellationToken, unitPrice: 1m);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Cash,
+            Name = "Now cash",
+            Currency = "PLN",
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
+        Assert.Equal(AssetClass.Cash, body!.AssetClass);
+        Assert.Equal(AssetValuationMode.CurrencyValued, body.ValuationMode);
+        Assert.Equal(500m, body.Quantity);
+    }
+
     /// <summary>Mirrors <see cref="AddAssetEndpointTests.Add_WithNeitherInstrumentIdNorManualValue_ReturnsBadRequest"/>
     /// on the update path: "neither" stays a 400 outside the currency-valued classes.</summary>
     [Fact]

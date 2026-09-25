@@ -2,9 +2,12 @@
 
 <p class="asset-form__hint">
   Valued automatically from {{ form.controls.basics.controls.currency.value }}'s exchange rate —
-  nothing else to fill in. Use "Add first transaction" below to deposit an opening amount.
+  nothing else to fill in. Use "Add opening deposit" below to deposit an opening amount.
 </p>
 
 @if (!isEdit()) {
-  <app-first-transaction-fields [group]="form.controls.initialTransaction" />
+  <app-first-transaction-fields
+    [group]="form.controls.initialTransaction"
+    [openingDeposit]="true"
+  />
 }

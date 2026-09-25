@@ -3,20 +3,22 @@
   [checked]="group().enabled"
   (change)="toggle($event.checked)"
 >
-  Add first transaction
+  {{ openingDeposit() ? 'Add opening deposit' : 'Add first transaction' }}
 </mat-checkbox>
 
 @if (group().enabled) {
   @let type = group().controls.type.value;
   <div class="asset-form__initial-transaction" [formGroup]="group()">
-    <mat-form-field appearance="outline" class="asset-form__field">
-      <mat-label>Type</mat-label>
-      <mat-select formControlName="type">
-        @for (transactionType of transactionTypes; track transactionType.value) {
-          <mat-option [value]="transactionType.value">{{ transactionType.label }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
+    @if (!openingDeposit()) {
+      <mat-form-field appearance="outline" class="asset-form__field">
+        <mat-label>Type</mat-label>
+        <mat-select formControlName="type">
+          @for (transactionType of transactionTypes; track transactionType.value) {
+            <mat-option [value]="transactionType.value">{{ transactionType.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
 
     <mat-form-field appearance="outline" class="asset-form__field">
       <mat-label>{{ quantityLabel(type) }}</mat-label>
@@ -28,7 +30,7 @@
       }
     </mat-form-field>
 
-    @if (isPriced(type)) {
+    @if (!openingDeposit() && isPriced(type)) {
       <mat-form-field appearance="outline" class="asset-form__field">
         <mat-label>Unit price</mat-label>
         <input matInput type="number" step="0.01" formControlName="unitPrice" />

@@ -70,6 +70,10 @@ export function buildInitialTransaction(
 })
 export class FirstTransactionFields {
   readonly group = input.required<FirstTransactionGroup>();
+  // cash-transaction-types: a cash-like asset accepts only Deposit/Withdraw, so its first transaction
+  // is always an opening Deposit — no type select and no unit price, just Amount and Date. Pair it with
+  // createFirstTransactionGroup(fb, true), whose fixed Deposit / unit price 1 is what gets sent.
+  readonly openingDeposit = input(false);
 
   protected readonly transactionTypes = TRANSACTION_TYPES;
   protected readonly isPriced = isPricedTransactionType;

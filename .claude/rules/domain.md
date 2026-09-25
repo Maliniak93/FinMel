@@ -53,6 +53,7 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 - A Sell or Withdraw may never take an asset's quantity below 0 — **at any point in its transaction history**, not just at the end (editing or deleting an older transaction must be re-checked against the whole timeline).
 - Amounts and quantities are ≥ 0.
 - An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
+- A Cash/Deposit asset's transactions are only Deposit/Withdraw — 400 `Validation.TransactionTypeNotAllowed` on every write (record, edit, opening transaction, class change); the rule lives in Portfolio's `AssetTransactionTypes`, mirrored by `allowedTransactionTypes` in the web client.
 - An archived portfolio is read-only: every asset and transaction write in it is 409 `Conflict.PortfolioArchived`, checked after the tenancy lookup so a stranger still gets 404. Renaming or deleting the portfolio stays allowed.
 - Unique: one `PriceQuote` per (instrument, date), one `FxRate` per (pair, date), one `AssetValuation` per (asset, date).
 - Every user-owned entity has `UserId` — enforced by a NetArchTest architecture test.

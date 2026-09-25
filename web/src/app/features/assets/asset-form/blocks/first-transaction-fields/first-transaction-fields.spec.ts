@@ -15,15 +15,20 @@ describe('FirstTransactionFields', () => {
   let fixture: ComponentFixture<FirstTransactionFields>;
   let group: ReturnType<typeof createFirstTransactionGroup>;
 
-  async function setup(): Promise<void> {
+  // `openingDeposit` mirrors how cash-asset-form renders the block (cash-transaction-types): its
+  // group is the currency-valued one and the block is told to show an opening deposit.
+  async function setup(options: { openingDeposit?: boolean } = {}): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [FirstTransactionFields],
       providers: [provideNativeDateAdapter()],
     }).compileComponents();
 
-    group = createFirstTransactionGroup(TestBed.inject(FormBuilder));
+    group = createFirstTransactionGroup(TestBed.inject(FormBuilder), options.openingDeposit ?? false);
     fixture = TestBed.createComponent(FirstTransactionFields);
     fixture.componentRef.setInput('group', group);
+    if (options.openingDeposit !== undefined) {
+      fixture.componentRef.setInput('openingDeposit', options.openingDeposit);
+    }
     await fixture.whenStable();
   }
 
@@ -85,6 +90,38 @@ describe('FirstTransactionFields', () => {
     await toggleFirstTransaction(fixture);
 
     expect(buildInitialTransaction(group)).toBeNull();
+  });
+
+  // cash-transaction-types AC-7: for a cash-like asset the first transaction is always an opening
+  // Deposit — only Amount and Date are asked for, and the built transaction is a Deposit at unit
+  // price 1.
+  it('openingDeposit hides type and price and builds a Deposit', async () => {
+    await setup({ openingDeposit: true });
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('mat-checkbox')?.textContent?.trim()).toBe('Add opening deposit');
+
+    await toggleFirstTransaction(fixture);
+
+    expect(element.querySelector('mat-select')).toBeNull();
+    expect(element.querySelector('[formcontrolname="type"]')).toBeNull();
+    expect(element.querySelector('[formcontrolname="unitPrice"]')).toBeNull();
+    expect(element.querySelector('[formcontrolname="quantity"]')).not.toBeNull();
+    expect(element.querySelector('[formcontrolname="date"]')).not.toBeNull();
+    const fieldLabels = Array.from(element.querySelectorAll('mat-label'), (label) =>
+      (label.textContent ?? '').trim(),
+    );
+    expect(fieldLabels).toEqual(['Amount', 'Date']);
+
+    findControl(group, 'quantity').setValue(500);
+    findControl(group, 'date').setValue(new Date(2026, 2, 5));
+
+    expect(buildInitialTransaction(group)).toEqual({
+      type: 2, // Deposit
+      quantity: 500,
+      unitPrice: 1,
+      date: '2026-03-05',
+    });
   });
 
   // transactions-pln-value-and-fee-removal AC13: the first-transaction sub-form has no fee.

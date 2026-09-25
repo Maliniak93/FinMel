@@ -148,6 +148,22 @@ Content-Type: application/json
   "date": "2026-08-18"
 }
 
+### Record a Buy on the Cash asset (400)
+# A Cash or Deposit asset accepts only Deposit/Withdraw transactions: any other type is 400 with
+# errorCode Validation.TransactionTypeNotAllowed, and nothing is written (cash-transaction-types).
+# The same rule answers AddAsset's initialTransaction, UpdateTransaction, and an UpdateAsset that
+# turns an asset holding other types into Cash/Deposit.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Buy",
+  "quantity": 1,
+  "unitPrice": 100,
+  "date": "2026-08-18"
+}
+
 ### List transactions (paged)
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions?page=1&pageSize=20
 Authorization: Bearer {{authToken}}

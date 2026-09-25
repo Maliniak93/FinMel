@@ -1,4 +1,5 @@
-import type { TransactionType } from '../../api/portfolio';
+import type { AssetClass, TransactionType } from '../../api/portfolio';
+import { ASSET_CLASS } from '../assets/asset-class';
 
 // Backend enum (Skarbiec.Contracts.TransactionType) serializes as its underlying int, so the
 // generated client types it as a bare `number` — labels for the UI have to be maintained here, in
@@ -14,11 +15,26 @@ export const TRANSACTION_TYPES: readonly { value: TransactionType; label: string
 
 const BUY = 0;
 const SELL = 1;
+const WITHDRAW = 3;
 
 // Exported for callers that need to set/compare a specific transaction type by name rather than by
 // index into TRANSACTION_TYPES (first-transaction-fields' pre-fill, T1.11).
 export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
 export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
+
+// cash-transaction-types: the mirror of Portfolio's AssetTransactionTypes rule (the API is the source
+// of truth and answers 400 to anything else) — a cash-like class (Cash, Deposit) accepts only
+// Deposit/Withdraw, every other class all six types, in TRANSACTION_TYPES order.
+const CASH_LIKE_CLASSES: readonly number[] = [ASSET_CLASS.Cash, ASSET_CLASS.Deposit];
+const CASH_LIKE_TYPES: readonly number[] = [TRANSACTION_TYPE_DEPOSIT, WITHDRAW];
+
+export function allowedTransactionTypes(
+  assetClass: AssetClass,
+): readonly { value: TransactionType; label: string }[] {
+  return CASH_LIKE_CLASSES.includes(Number(assetClass))
+    ? TRANSACTION_TYPES.filter((t) => CASH_LIKE_TYPES.includes(t.value))
+    : TRANSACTION_TYPES;
+}
 
 export function transactionTypeLabel(value: TransactionType): string {
   return TRANSACTION_TYPES.find((t) => t.value === Number(value))?.label ?? 'Unknown';

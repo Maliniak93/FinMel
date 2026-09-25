@@ -19,6 +19,15 @@ internal static class TransactionErrors
     public static Error MutationBreaksHistory(TransactionType type) =>
         new("Conflict.OversellsPosition", $"This change would make a later {type} take the asset quantity below zero (selling more than the position at some point in history).");
 
+    /// <summary>
+    /// A transaction type the asset's class does not accept (<see cref="AssetTransactionTypes"/>) — a
+    /// 400 on the new input, like <see cref="OversellsPosition"/>.
+    /// </summary>
+    public static Error TypeNotAllowedForClass(TransactionType type, AssetClass assetClass) =>
+        new(
+            "Validation.TransactionTypeNotAllowed",
+            $"A {assetClass} asset accepts only {string.Join(", ", AssetTransactionTypes.Allowed(assetClass))} transactions, not {type}.");
+
     public static Error ConcurrentModification() =>
         new("Conflict.ConcurrentModification", "The asset was modified by another request in the meantime; reload and try again.");
 }
