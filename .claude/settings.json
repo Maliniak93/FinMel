@@ -37,6 +37,7 @@
       "Bash(gh pr checks:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue view:*)",
+      "Bash(gh issue develop:*)",
       "Bash(node scripts/gh-project.mjs check:*)",
       "Bash(node scripts/gh-project.mjs prepare:*)",
       "Bash(node scripts/gh-project.mjs report:*)",

@@ -6,7 +6,7 @@ How features get designed and built (ADR-024). A spec is a GitHub issue on the *
 
 | Field / label | Values | Set by |
 |---|---|---|
-| Status (built-in) | Todo → In progress → Done | `/design` and `/fix` publish at Todo; `/build` sets In progress; merging a PR with `Closes #<n>` closes the issue and the project's "Item closed" workflow sets Done |
+| Status (built-in) | Todo → In progress → Done | `/design` and `/fix` publish at Todo; `/build` sets In progress; `/build` cuts the branch with `gh issue develop`, so it is the issue's linked branch and merging its PR closes the issue and the project's "Item closed" workflow sets Done |
 | Tier | 1, 2 | `/design` / `/fix`; `/build --tier` overrides for one run |
 | Kind | New, Change, Cleanup, Fix | `/design` / `/fix` |
 | Branch | `feat/<slug>`, `fix/<slug>` (none on an epic) | `/design` / `/fix` |
@@ -70,7 +70,7 @@ flowchart LR
 - The whole change is staged on the issue's branch — nothing committed, nothing pushed.
 - The run report is commented on the issue and its acceptance criteria are ticked.
 - Any rule or ADR the spec touched is staged with it.
-- The user then commits, pushes and opens the PR (`Closes #<n>`) by hand, and merges it when CI is green — which moves the card to Done.
+- The user then commits, pushes and opens the PR by hand, and merges it when CI is green — which moves the card to Done.
 
 ## Tier rule
 
@@ -89,7 +89,7 @@ No budget is enforced by default — a `/build` run goes to completion. Passing 
 
 - Branch: the issue's Branch field — `feat/<slug>`, or `fix/<slug>` for a fix — cut by `ops`.
 - Commit message: the spec's title — written by the **user**, who also pushes and opens the PR. A build run stops at `git add -A`.
-- PR: opened by the user against `master`, body `Closes #<n>`. **The user always merges — no agent merges, ever.**
+- PR: opened by the user against `master` from the issue's linked branch — no `Closes #<n>` needed. **The user always merges — no agent merges, ever.**
 - An agent commits or pushes only inside an explicit `/ops <task>` that asks for it; never inside `/build` or `/fix`.
 - `git-guard` hook: commit/push on `feat/*`, and `gh pr create --base master` from `feat/*`, run without asking; `gh pr merge` always asks; a push to `master` asks; a force-push is denied outright. It is a backstop for the `/ops` lane — the build pipeline no longer reaches it. Legacy lanes (`praca_*`, `[MT]\d`) keep whatever behavior they already had.
 

@@ -32,8 +32,10 @@ run reports. Your whole job in a build run is the branch and `git add -A`.
    `notes` and carry on.
 3. Otherwise the tree must be clean (the spec copy is gitignored, so it never shows). Anything else is
    a stop: return `blocked: true` and name those files instead of carrying them onto the branch.
-4. `git fetch origin`, then `git switch -c <branch> master`. If local `master` is behind
-   `origin/master`, branch from `origin/master` and say so in `notes`.
+4. `git fetch origin`, then `gh issue develop <n> --name <branch> --base master --checkout` — never
+   `git switch -c`. It creates the branch on GitHub as the issue's linked branch, so merging its PR
+   closes the issue (and the card goes Done) with no `Closes` keyword. If `<branch>` already exists
+   locally or on origin from an earlier run, `git switch <branch>` instead.
 5. Nothing else — no commit, no push, no PR.
 
 ## 2. Stage step — after a green verify, before the review

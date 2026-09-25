@@ -229,7 +229,7 @@ const cut = await step(
   [
     `Create the branch for the spec at \`${spec}\`. Create the branch and nothing else - no commit, no push, no PR.`,
     whereBranch,
-    '`git fetch origin` first; branch from an up-to-date master and say so in notes if local master was behind.',
+    `Cut it as the issue's linked branch - \`git fetch origin\`, then \`gh issue develop ${issue} --name ${issueBranch} --base master --checkout\` (never \`git switch -c\`). A linked branch is what closes the issue when its PR merges, with no \`Closes\` keyword. If \`${issueBranch}\` already exists locally or on origin (an earlier run), \`git switch ${issueBranch}\` instead.`,
     'If you are already on that branch, stay on it - this is a resumed run - and report its uncommitted changes in notes.',
     'If you are on master or another branch with changes that are not this spec (the spec file itself belongs to this change), stop: return `blocked: true` and name those files in notes instead of sweeping them along.',
   ],
@@ -447,7 +447,7 @@ return {
   status: 'staged',
   branch,
   stagedFiles: staged.stagedFiles ?? null,
-  nextSteps: [`git commit -m "${title}"`, `git push -u origin ${branch}`, `gh pr create --base master --head ${branch} --title "${title}" --body "Closes #${issue}"`],
+  nextSteps: [`git commit -m "${title}"`, `git push -u origin ${branch}`, `gh pr create --base master --head ${branch} --title "${title}" --body "Spec: #${issue}"`],
   review: review ? clip(review.summary, 400) : 'review skipped',
   minorFindings: findingsOf(minor),
   skipped: [...skipped],
