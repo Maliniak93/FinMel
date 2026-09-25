@@ -93,7 +93,7 @@ function repoFacts() {
 }
 
 // Recent PRs of every state: the open ones for the report, the merged ones to catch a card whose PR
-// merged without `Closes #n`.
+// merged without closing its issue (branch not linked to the issue).
 function pullRequests(enabled) {
   if (!enabled) return null;
   const raw = run(
@@ -131,7 +131,7 @@ function mismatches(specs, facts, prs) {
   const out = [];
   for (const s of specs.filter((x) => !x.epic && x.branch && x.status !== "Done")) {
     const exists = facts.localBranches.has(s.branch) || facts.remoteBranches.has(s.branch);
-    if (merged.has(s.branch)) out.push(`#${s.number}: PR from \`${s.branch}\` merged but the issue is open (PR body lacked \`Closes #${s.number}\`) — close it`);
+    if (merged.has(s.branch)) out.push(`#${s.number}: PR from \`${s.branch}\` merged but the issue is open (branch not linked to the issue) — close it`);
     else if (s.status === "Todo" && exists) out.push(`#${s.number}: card is Todo but \`${s.branch}\` exists — a run started without moving the card`);
   }
   return out;

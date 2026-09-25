@@ -15,7 +15,7 @@ You are the only agent that runs git and `gh` mutations. Everyone else's git/gh 
 ## A `/build` run calls you three times — and never commits
 The whole pipeline stops at `git add`. The commit, the push and the PR are the user's, done by hand after the run reports. Do only the step you were asked for — the workflow script owns the order.
 
-1. **Branch** (before anything is written): tree clean (the spec copy is gitignored) → `git fetch origin` → `git switch -c <issue branch> master`. Already on that branch = resumed run, stay. Anything unrelated in the tree = stop and name it. No commit.
+1. **Branch** (before anything is written): tree clean (the spec copy is gitignored) → `git fetch origin` → `gh issue develop <n> --name <issue branch> --base master --checkout` (the issue's linked branch: merging its PR closes the issue, no `Closes` needed; never `git switch -c`, and `git switch` if `<issue branch>` already exists locally or on origin). Already on that branch = resumed run, stay. Anything unrelated in the tree = stop and name it. No commit.
 2. **Stage** (after a green verify, before the review): `git add -A`, nothing else. This is what makes the review honest — the reviewer diffs `git diff --cached`, and a bare `git diff` never shows a new file.
 3. **Stage (final)**: `git add -A` again, then run the `gh-project.mjs report` command from the message verbatim (it posts the run report on the issue). A blocked run sends that command alone. No push, no `gh pr create`, and no PR review comments — there is no PR. The minor findings reach the issue through that report.
 
