@@ -48,4 +48,14 @@ describe('Shell', () => {
     expect(document.documentElement.style.getPropertyValue('color-scheme')).toBe('light');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
+
+  // term-deposits: a "Deposits" nav item leads to the cross-portfolio Deposits page.
+  it('offers a Deposits nav item linking to /deposits', () => {
+    const link = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
+    ).find((a) => (a.textContent ?? '').includes('Deposits'));
+
+    expect(link).toBeDefined();
+    expect(link!.getAttribute('href')).toBe('/deposits');
+  });
 });

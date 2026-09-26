@@ -18,7 +18,7 @@
         <h1>Transactions</h1>
       }
     </div>
-    @if (!isArchived() && assetResource.hasValue()) {
+    @if (!isReadOnly() && assetResource.hasValue()) {
       <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
         New transaction
@@ -30,6 +30,11 @@
     <p class="transactions-page__archived-notice" role="status">
       <mat-icon>inventory_2</mat-icon>
       This portfolio is archived — restore it to make changes.
+    </p>
+  } @else if (isTermDeposit()) {
+    <p class="transactions-page__archived-notice" role="status">
+      <mat-icon>savings</mat-icon>
+      A term deposit's transactions are managed by the deposit — edit the deposit to change them.
     </p>
   }
 
@@ -51,7 +56,7 @@
     @if (page.items.length === 0) {
       <div class="transactions-page__state">
         <p>No transactions recorded for this asset yet.</p>
-        @if (!isArchived() && assetResource.hasValue()) {
+        @if (!isReadOnly() && assetResource.hasValue()) {
           <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
             Record your first transaction
           </button>

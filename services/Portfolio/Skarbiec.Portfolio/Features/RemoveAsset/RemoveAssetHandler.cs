@@ -32,6 +32,14 @@ public sealed class RemoveAssetHandler(
             .ToListAsync(cancellationToken);
 
         dbContext.Transactions.RemoveRange(transactions);
+
+        // A term deposit's terms go with it (term-deposits).
+        var termDeposit = await dbContext.TermDeposits.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);
+        if (termDeposit is not null)
+        {
+            dbContext.TermDeposits.Remove(termDeposit);
+        }
+
         dbContext.Assets.Remove(asset);
 
         // Terminal for this asset (spec-02 design decision 3): no version, no further position

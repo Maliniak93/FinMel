@@ -368,4 +368,53 @@ describe('Transactions', () => {
       expect(menuText).toContain('Delete');
     });
   });
+
+  // term-deposits AC-16: a term deposit's transactions are system-managed (the backend answers 409
+  // Conflict.DepositTransactionsManaged to every write), so its view lists them but offers no
+  // record / edit / delete action, even in an active portfolio.
+  describe('term deposit transactions are system-managed', () => {
+    const depositAsset: AssetResponse = {
+      ...asset,
+      assetClass: 1, // Deposit
+      valuationMode: 2, // CurrencyValued
+      name: 'Term deposit',
+      currency: 'PLN',
+      quantity: 10000,
+      manualValue: null,
+      manualValueDate: null,
+    };
+    const openingDeposit: TransactionResponse = {
+      ...transaction,
+      type: 2, // Deposit
+      quantity: 10000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 10000,
+    };
+
+    function pageButtonTexts(): string[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+        (button) => button.textContent?.trim() ?? '',
+      );
+    }
+
+    it('the Deposit transactions view has no add / edit / delete actions', async () => {
+      await setup(jsonResponse(pagedResponse([openingDeposit])), jsonResponse(depositAsset));
+
+      // The opening transaction is still listed.
+      expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
+      expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(false);
+      expect(fixture.debugElement.queryAll(By.directive(MatMenuTrigger))).toHaveLength(0);
+      expect(fixture.nativeElement.querySelector('td.mat-column-actions')).toBeNull();
+    });
+
+    it('the Deposit transactions view offers no record button when empty either', async () => {
+      await setup(jsonResponse(pagedResponse([])), jsonResponse(depositAsset));
+
+      const buttons = pageButtonTexts();
+      expect(buttons.some((text) => text.includes('New transaction'))).toBe(false);
+      expect(buttons.some((text) => text.includes('Record your first transaction'))).toBe(false);
+    });
+  });
 });

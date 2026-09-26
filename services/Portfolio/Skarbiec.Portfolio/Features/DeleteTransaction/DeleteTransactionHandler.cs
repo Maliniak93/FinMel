@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.DeleteTransaction;
 
@@ -19,6 +20,12 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
         {
             return PortfolioErrors.Archived(portfolioId);
+        }
+
+        // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit (term-deposits).
+        if (asset.AssetClass == AssetClass.Deposit)
+        {
+            return DepositErrors.TransactionsManaged;
         }
 
         var transaction = await dbContext.Transactions

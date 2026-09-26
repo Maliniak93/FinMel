@@ -12,11 +12,19 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext)
         var row = await dbContext.Assets
             .AsNoTracking()
             .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
-            .Select(a => new { Asset = a, TransactionCount = dbContext.Transactions.Count(t => t.AssetId == a.Id) })
+            .Select(a => new
+            {
+                Asset = a,
+                TransactionCount = dbContext.Transactions.Count(t => t.AssetId == a.Id),
+                DepositMaturityDate = dbContext.TermDeposits
+                    .Where(t => t.AssetId == a.Id)
+                    .Select(t => (DateOnly?)t.MaturityDate)
+                    .FirstOrDefault()
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
         return row is null
             ? AssetErrors.NotFound(assetId)
-            : row.Asset.ToResponse(row.TransactionCount);
+            : row.Asset.ToResponse(row.TransactionCount, row.DepositMaturityDate);
     }
 }

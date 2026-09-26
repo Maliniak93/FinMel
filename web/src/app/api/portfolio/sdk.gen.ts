@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { DeleteApiPortfolioPortfoliosByIdData, DeleteApiPortfolioPortfoliosByIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, GetApiPortfolioMeData, GetApiPortfolioMeResponses, GetApiPortfolioPortfoliosByIdData, GetApiPortfolioPortfoliosByIdResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsData, GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses, GetApiPortfolioPortfoliosData, GetApiPortfolioPortfoliosResponses, PostApiPortfolioPortfoliosByIdArchiveData, PostApiPortfolioPortfoliosByIdArchiveResponses, PostApiPortfolioPortfoliosByIdRestoreData, PostApiPortfolioPortfoliosByIdRestoreResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsData, PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses, PostApiPortfolioPortfoliosData, PostApiPortfolioPortfoliosResponses, PutApiPortfolioPortfoliosByIdData, PutApiPortfolioPortfoliosByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses } from './types.gen.js';
+import type { DeleteApiPortfolioPortfoliosByIdData, DeleteApiPortfolioPortfoliosByIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, GetApiPortfolioDepositsData, GetApiPortfolioDepositsResponses, GetApiPortfolioMeData, GetApiPortfolioMeResponses, GetApiPortfolioPortfoliosByIdData, GetApiPortfolioPortfoliosByIdResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsData, GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses, GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, GetApiPortfolioPortfoliosData, GetApiPortfolioPortfoliosResponses, PostApiPortfolioPortfoliosByIdArchiveData, PostApiPortfolioPortfoliosByIdArchiveResponses, PostApiPortfolioPortfoliosByIdRestoreData, PostApiPortfolioPortfoliosByIdRestoreResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsData, PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses, PostApiPortfolioPortfoliosByPortfolioIdDepositsData, PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses, PostApiPortfolioPortfoliosData, PostApiPortfolioPortfoliosResponses, PutApiPortfolioPortfoliosByIdData, PutApiPortfolioPortfoliosByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -93,3 +93,25 @@ export const putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsBy
         ...options.headers
     }
 });
+
+export const postApiPortfolioPortfoliosByPortfolioIdDeposits = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdDepositsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}', ...options });
+
+export const putApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getApiPortfolioDeposits = <ThrowOnError extends boolean = false>(options?: Options<GetApiPortfolioDepositsData, ThrowOnError>): RequestResult<GetApiPortfolioDepositsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiPortfolioDepositsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/deposits', ...options });

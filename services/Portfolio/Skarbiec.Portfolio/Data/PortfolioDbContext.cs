@@ -13,6 +13,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<PortfolioEntity> Portfolios => Set<PortfolioEntity>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -81,6 +82,24 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
                 .HasColumnType("xid")
                 .ValueGeneratedOnAddOrUpdate()
                 .IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<TermDeposit>(termDeposit =>
+        {
+            // 1:1 with its Deposit-class asset (term-deposits): the asset id is the key and, unlike
+            // every other reference in this service, a real FK — both rows live in portfolio_db and
+            // one never exists without the other. RemoveAsset deletes the row explicitly; the
+            // cascade covers DeletePortfolio's asset sweep.
+            termDeposit.HasKey(t => t.AssetId);
+            termDeposit.HasOne<Asset>()
+                .WithOne()
+                .HasForeignKey<TermDeposit>(t => t.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            termDeposit.Property(t => t.BankName).HasMaxLength(100);
+            termDeposit.Property(t => t.Principal).HasPrecision(18, 2);
+            termDeposit.Property(t => t.AnnualInterestRatePercent).HasPrecision(7, 4);
+            termDeposit.Property(t => t.EarlyBreakInterestLossPercent).HasPrecision(5, 2);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).

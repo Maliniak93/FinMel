@@ -183,3 +183,76 @@ Content-Type: application/json
 ### Delete a transaction
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
 Authorization: Bearer {{authToken}}
+
+
+### --- Term deposits ---
+
+### Add a term deposit
+# Creates the Deposit-class asset (CurrencyValued), its system-managed opening Deposit transaction
+# (principal, start date, unit price 1, start-date PLN rate frozen) and its terms in one save, and
+# publishes AssetPositionChanged with quantity = principal. 201 with the maturity date, projection
+# and status (term-deposits). Enums are ints: termUnit 0 = Days, 1 = Months; capitalization
+# 0 = AtMaturity, 1 = Monthly, 2 = Quarterly, 3 = Yearly; status 0 = Active, 1 = Due.
+# @name addDeposit
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "3-month deposit",
+  "bankName": "Example bank",
+  "currency": "PLN",
+  "principal": 10000.00,
+  "startDate": "2026-01-15",
+  "termLength": 3,
+  "termUnit": 1,
+  "annualInterestRatePercent": 6,
+  "capitalization": 0,
+  "taxExempt": false,
+  "earlyBreakInterestLossPercent": 100
+}
+
+### List every deposit across portfolios
+# Portfolio name and archived flag, terms, projection and status (Due once the maturity date is on or
+# before today's Europe/Warsaw date).
+GET {{baseUrl}}/api/portfolio/deposits
+Authorization: Bearer {{authToken}}
+
+### Get a deposit
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+
+### Update a deposit
+# Same fields as add, minus the currency (immutable). Rewrites the opening transaction in place and
+# publishes AssetPositionChanged with the new quantity.
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "6-month deposit",
+  "bankName": "Example bank",
+  "principal": 15000.00,
+  "startDate": "2026-02-01",
+  "termLength": 6,
+  "termUnit": 1,
+  "annualInterestRatePercent": 5.5,
+  "capitalization": 2,
+  "taxExempt": false,
+  "earlyBreakInterestLossPercent": 100
+}
+
+### Record a transaction on the deposit (409)
+# A term deposit's transactions are system-managed: recording, editing or deleting one is 409 with
+# errorCode Conflict.DepositTransactionsManaged. Creating or editing a Deposit-class asset through
+# .../assets is 400 Validation.UseDepositEndpoints. Delete the deposit with DELETE .../assets/{id}.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addDeposit.response.body.assetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": 2,
+  "quantity": 500,
+  "unitPrice": 1,
+  "date": "2026-02-01"
+}

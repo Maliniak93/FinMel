@@ -1,0 +1,182 @@
+<h2 mat-dialog-title>{{ isEdit ? 'Edit deposit' : 'New deposit' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>Name</mat-label>
+      <input matInput type="text" formControlName="name" autocomplete="off" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>Name is required.</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>Name is too long.</mat-error>
+      } @else if (form.controls.name.hasError('server')) {
+        <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>Bank</mat-label>
+      <input matInput type="text" formControlName="bankName" autocomplete="off" />
+      @if (form.controls.bankName.hasError('maxlength')) {
+        <mat-error>Bank name is too long.</mat-error>
+      } @else if (form.controls.bankName.hasError('server')) {
+        <mat-error>{{ form.controls.bankName.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (choosesPortfolio) {
+      <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+        <mat-label>Portfolio</mat-label>
+        <mat-select formControlName="portfolioId">
+          @if (portfoliosResource.hasValue()) {
+            @for (portfolio of portfoliosResource.value(); track portfolio.id) {
+              <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
+            }
+          }
+        </mat-select>
+        @if (portfoliosResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        }
+        @if (form.controls.portfolioId.hasError('required')) {
+          <mat-error>Portfolio is required.</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (!isEdit) {
+      <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+        <mat-label>Currency</mat-label>
+        <mat-select formControlName="currency">
+          @for (currency of currencies; track currency.code) {
+            <mat-option [value]="currency.code">{{ currency.label }}</mat-option>
+          }
+        </mat-select>
+        @if (form.controls.currency.hasError('required')) {
+          <mat-error>Currency is required.</mat-error>
+        } @else if (form.controls.currency.hasError('server')) {
+          <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>Principal</mat-label>
+      <input matInput type="number" step="0.01" formControlName="principal" />
+      @if (form.controls.principal.hasError('required')) {
+        <mat-error>Principal is required.</mat-error>
+      } @else if (form.controls.principal.hasError('min')) {
+        <mat-error>Principal must be greater than 0.</mat-error>
+      } @else if (form.controls.principal.hasError('server')) {
+        <mat-error>{{ form.controls.principal.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>Start date</mat-label>
+      <input matInput [matDatepicker]="startDatePicker" formControlName="startDate" />
+      <mat-datepicker-toggle matIconSuffix [for]="startDatePicker"></mat-datepicker-toggle>
+      <mat-datepicker #startDatePicker></mat-datepicker>
+      @if (form.controls.startDate.hasError('required')) {
+        <mat-error>Start date is required.</mat-error>
+      } @else if (form.controls.startDate.hasError('server')) {
+        <mat-error>{{ form.controls.startDate.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="deposit-form-dialog__row">
+      <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+        <mat-label>Term</mat-label>
+        <input matInput type="number" step="1" formControlName="termLength" />
+        @if (form.controls.termLength.hasError('required')) {
+          <mat-error>Term is required.</mat-error>
+        } @else if (form.controls.termLength.hasError('min')) {
+          <mat-error>Term must be at least 1.</mat-error>
+        } @else if (form.controls.termLength.hasError('termMax')) {
+          <mat-error
+            >Term is at most {{ form.controls.termLength.getError('termMax').max }}.</mat-error
+          >
+        } @else if (form.controls.termLength.hasError('server')) {
+          <mat-error>{{ form.controls.termLength.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+        <mat-label>Unit</mat-label>
+        <mat-select formControlName="termUnit">
+          @for (unit of termUnits; track unit.value) {
+            <mat-option [value]="unit.value">{{ unit.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <p class="deposit-form-dialog__maturity">
+      Matures on
+      <strong>
+        @if (maturityDate(); as maturity) {
+          {{ maturity | date: 'mediumDate' }}
+        } @else {
+          —
+        }
+      </strong>
+    </p>
+
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>Annual interest rate (%)</mat-label>
+      <input matInput type="number" step="0.01" formControlName="annualInterestRatePercent" />
+      @if (form.controls.annualInterestRatePercent.hasError('required')) {
+        <mat-error>Interest rate is required.</mat-error>
+      } @else if (
+        form.controls.annualInterestRatePercent.hasError('min') ||
+        form.controls.annualInterestRatePercent.hasError('max')
+      ) {
+        <mat-error>Interest rate must be between 0 and 100.</mat-error>
+      } @else if (form.controls.annualInterestRatePercent.hasError('server')) {
+        <mat-error>{{ form.controls.annualInterestRatePercent.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>Capitalisation</mat-label>
+      <mat-select formControlName="capitalization">
+        @for (capitalization of capitalizations; track capitalization.value) {
+          <mat-option [value]="capitalization.value">{{ capitalization.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-slide-toggle formControlName="taxExempt" class="deposit-form-dialog__toggle">
+      IKE/IKZE — no Belka tax
+    </mat-slide-toggle>
+
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>Interest lost on early break (%)</mat-label>
+      <input matInput type="number" step="0.01" formControlName="earlyBreakInterestLossPercent" />
+      @if (form.controls.earlyBreakInterestLossPercent.hasError('required')) {
+        <mat-error>Early-break loss is required.</mat-error>
+      } @else if (
+        form.controls.earlyBreakInterestLossPercent.hasError('min') ||
+        form.controls.earlyBreakInterestLossPercent.hasError('max')
+      ) {
+        <mat-error>Early-break loss must be between 0 and 100.</mat-error>
+      } @else if (form.controls.earlyBreakInterestLossPercent.hasError('server')) {
+        <mat-error>{{ form.controls.earlyBreakInterestLossPercent.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="deposit-form-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ isEdit ? 'Save' : 'Create' }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -89,4 +89,23 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         var asset = Assert.Single(assets!);
         Assert.Equal("GBP", asset.Currency);
     }
+
+    /// <summary>term-deposits: a Deposit-class asset carries its maturity date on <c>AssetResponse</c>
+    /// (the asset list shows the "Due" chip from it); every other asset carries none.</summary>
+    [Fact]
+    public async Task List_WithTermDeposit_CarriesDepositMaturityDateOnlyOnTheDeposit()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+
+        var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var assets = await response.Content.ReadFromJsonAsync<List<AssetResponse>>(cancellationToken);
+        Assert.NotNull(assets);
+        Assert.Equal(new DateOnly(2026, 4, 15), assets.Single(a => a.Id == deposit.AssetId).DepositMaturityDate);
+        Assert.Null(assets.Single(a => a.Id == cashId).DepositMaturityDate);
+    }
 }

@@ -1,8 +1,12 @@
 using System.Net.Http.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
+using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
@@ -35,6 +39,86 @@ internal static class PortfolioApi
 
     public static string TransactionUri(Guid portfolioId, Guid assetId, Guid transactionId) =>
         $"{PortfoliosUri}/{portfolioId}/assets/{assetId}/transactions/{transactionId}";
+
+    /// <summary>term-deposits: every deposit of the calling user, across all their portfolios.</summary>
+    public const string AllDepositsUri = "/api/portfolio/deposits";
+
+    public static string DepositsUri(Guid portfolioId) =>
+        $"{PortfoliosUri}/{portfolioId}/deposits";
+
+    public static string DepositUri(Guid portfolioId, Guid assetId) =>
+        $"{PortfoliosUri}/{portfolioId}/deposits/{assetId}";
+
+    /// <summary>
+    /// term-deposits: a valid <see cref="AddDepositRequest"/> — by default the spec's AC-1 terms
+    /// (10 000.00 PLN at 6 % from 2026-01-15 for 3 months, capitalised at maturity, taxed), which
+    /// mature on 2026-04-15 with a net interest of 119.83. Override only what the fact is about;
+    /// derive an invalid request with a <c>with</c> expression.
+    /// </summary>
+    public static AddDepositRequest NewDepositRequest(
+        string name = "Term deposit",
+        string? bankName = "Test bank",
+        string currency = "PLN",
+        decimal principal = 10_000m,
+        DateOnly? startDate = null,
+        int termLength = 3,
+        DepositTermUnit termUnit = DepositTermUnit.Months,
+        decimal annualInterestRatePercent = 6m,
+        DepositCapitalization capitalization = DepositCapitalization.AtMaturity,
+        bool taxExempt = false,
+        decimal earlyBreakInterestLossPercent = 100m) => new()
+        {
+            Name = name,
+            BankName = bankName,
+            Currency = currency,
+            Principal = principal,
+            StartDate = startDate ?? new DateOnly(2026, 1, 15),
+            TermLength = termLength,
+            TermUnit = termUnit,
+            AnnualInterestRatePercent = annualInterestRatePercent,
+            Capitalization = capitalization,
+            TaxExempt = taxExempt,
+            EarlyBreakInterestLossPercent = earlyBreakInterestLossPercent
+        };
+
+    /// <summary>The <see cref="UpdateDepositRequest"/> carrying the same terms as <paramref name="request"/> (currency is immutable, so it is dropped).</summary>
+    public static UpdateDepositRequest ToUpdateRequest(this AddDepositRequest request) => new()
+    {
+        Name = request.Name,
+        BankName = request.BankName,
+        Principal = request.Principal,
+        StartDate = request.StartDate,
+        TermLength = request.TermLength,
+        TermUnit = request.TermUnit,
+        AnnualInterestRatePercent = request.AnnualInterestRatePercent,
+        Capitalization = request.Capitalization,
+        TaxExempt = request.TaxExempt,
+        EarlyBreakInterestLossPercent = request.EarlyBreakInterestLossPercent
+    };
+
+    /// <summary>
+    /// term-deposits: adds a term deposit to <paramref name="portfolioId"/> through the deposit
+    /// endpoint (the only way a Deposit-class asset comes to exist) and returns it. Defaults to
+    /// <see cref="NewDepositRequest"/>.
+    /// </summary>
+    public static async Task<DepositResponse> AddDepositAsync(
+        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddDepositRequest? request = null)
+    {
+        var response = await client.PostAsJsonAsync(DepositsUri(portfolioId), request ?? NewDepositRequest(), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
+    }
+
+    /// <summary>The common deposit arrange step: a portfolio holding one term deposit, both owned by <paramref name="client"/>'s user.</summary>
+    public static async Task<(Guid PortfolioId, DepositResponse Deposit)> CreatePortfolioWithDepositAsync(
+        this HttpClient client, CancellationToken cancellationToken, AddDepositRequest? request = null, string portfolioName = "Savings")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var deposit = await client.AddDepositAsync(portfolioId, cancellationToken, request);
+
+        return (portfolioId, deposit);
+    }
 
     /// <summary>Creates a portfolio and returns its id. Pass distinct <paramref name="name"/>s — the name is unique per user.</summary>
     public static async Task<Guid> CreatePortfolioAsync(
@@ -88,9 +172,10 @@ internal static class PortfolioApi
     }
 
     /// <summary>
-    /// cash-transaction-types: adds a currency-valued cash-like asset (<see cref="AssetClass.Cash"/> or
-    /// <see cref="AssetClass.Deposit"/> — neither InstrumentId nor ManualValue) with no transactions,
-    /// and returns its id. Such an asset accepts only Deposit/Withdraw transactions.
+    /// cash-transaction-types: adds a currency-valued <see cref="AssetClass.Cash"/> asset (neither
+    /// InstrumentId nor ManualValue) with no transactions, and returns its id. Such an asset accepts
+    /// only Deposit/Withdraw transactions. A Deposit-class asset goes through
+    /// <see cref="AddDepositAsync"/> instead (term-deposits).
     /// </summary>
     public static async Task<Guid> AddCashAssetAsync(
         this HttpClient client,

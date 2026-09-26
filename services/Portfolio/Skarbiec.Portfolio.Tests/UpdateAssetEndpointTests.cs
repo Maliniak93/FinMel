@@ -465,4 +465,48 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal("Before archive", unchanged.Name);
         Assert.Equal(100m, unchanged.ManualValue);
     }
+
+    /// <summary>
+    /// term-deposits AC-9: the asset endpoint never produces or edits a Deposit-class asset — turning
+    /// a Cash asset into a Deposit, turning a term deposit into Cash, or even re-saving a term deposit
+    /// as class Deposit here is a 400 <c>Validation.UseDepositEndpoints</c>, and the asset keeps its
+    /// class, name and quantity.
+    /// </summary>
+    [Theory]
+    [InlineData("cash-to-deposit")]
+    [InlineData("deposit-to-cash")]
+    [InlineData("deposit-stays-deposit")]
+    public async Task Update_ToOrFromDepositClass_ReturnsBadRequest(string change)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        Guid assetId;
+        AssetClass originalClass;
+        string originalName;
+        decimal originalQuantity;
+        AssetClass requestedClass;
+        if (change == "cash-to-deposit")
+        {
+            assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken, name: "Wallet");
+            await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Cash, "Wallet", 300m, AssetClass.Deposit);
+        }
+        else
+        {
+            assetId = (await client.AddDepositAsync(portfolioId, cancellationToken)).AssetId;
+            (originalClass, originalName, originalQuantity) = (AssetClass.Deposit, "Term deposit", 10_000m);
+            requestedClass = change == "deposit-to-cash" ? AssetClass.Cash : AssetClass.Deposit;
+        }
+
+        var request = new UpdateAssetRequest { AssetClass = requestedClass, Name = "Edited through assets", Currency = "PLN" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertUseDepositEndpointsAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(originalClass, unchanged.AssetClass);
+        Assert.Equal(originalName, unchanged.Name);
+        Assert.Equal(originalQuantity, unchanged.Quantity);
+    }
 }

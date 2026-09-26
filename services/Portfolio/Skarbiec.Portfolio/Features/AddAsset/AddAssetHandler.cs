@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.AddAsset;
@@ -22,6 +23,12 @@ public sealed class AddAssetHandler(
         if (portfolio.IsArchived)
         {
             return PortfolioErrors.Archived(portfolioId);
+        }
+
+        // A Deposit-class asset is a term deposit: it carries terms, so only AddDeposit creates one (term-deposits).
+        if (request.AssetClass == AssetClass.Deposit)
+        {
+            return DepositErrors.UseDepositEndpoints;
         }
 
         // Before the instrument and FX lookups: a disallowed opening type calls nothing and creates nothing.

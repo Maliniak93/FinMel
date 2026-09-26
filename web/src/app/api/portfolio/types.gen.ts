@@ -14,6 +14,20 @@ export type AddAssetRequest = {
     initialTransaction?: null | RecordTransactionRequest;
 };
 
+export type AddDepositRequest = {
+    name: string;
+    bankName?: null | string;
+    currency: string;
+    principal: number | string;
+    startDate: string;
+    termLength: number | string;
+    termUnit: DepositTermUnit;
+    annualInterestRatePercent: number | string;
+    capitalization: DepositCapitalization;
+    taxExempt?: boolean;
+    earlyBreakInterestLossPercent?: number | string;
+};
+
 export type AssetClass = number;
 
 export type AssetResponse = {
@@ -28,6 +42,7 @@ export type AssetResponse = {
     manualValueDate?: null | string;
     instrumentId?: null | string;
     transactionCount: number | string;
+    depositMaturityDate?: null | string;
 };
 
 export type AssetValuationMode = number;
@@ -37,6 +52,41 @@ export type CreatePortfolioRequest = {
     description?: null | string;
     currency?: string;
 };
+
+export type DepositCapitalization = number;
+
+export type DepositProjectionResponse = {
+    grossInterest: number | string;
+    tax: number | string;
+    netInterest: number | string;
+    finalAmount: number | string;
+    netProfitPercent: number | string;
+};
+
+export type DepositResponse = {
+    assetId: string;
+    portfolioId: string;
+    portfolioName: string;
+    portfolioIsArchived: boolean;
+    name: string;
+    bankName?: null | string;
+    currency: string;
+    principal: number | string;
+    startDate: string;
+    termLength: number | string;
+    termUnit: DepositTermUnit;
+    maturityDate: string;
+    annualInterestRatePercent: number | string;
+    capitalization: DepositCapitalization;
+    taxExempt: boolean;
+    earlyBreakInterestLossPercent: number | string;
+    projection: DepositProjectionResponse;
+    status: DepositStatus;
+};
+
+export type DepositStatus = number;
+
+export type DepositTermUnit = number;
 
 export type PagedResponseOfTransactionResponse = {
     items: Array<TransactionResponse>;
@@ -81,6 +131,19 @@ export type UpdateAssetRequest = {
     instrumentId?: null | string;
     manualValue?: null | number | string;
     manualValueDate?: null | string;
+};
+
+export type UpdateDepositRequest = {
+    name: string;
+    bankName?: null | string;
+    principal: number | string;
+    startDate: string;
+    termLength: number | string;
+    termUnit: DepositTermUnit;
+    annualInterestRatePercent: number | string;
+    capitalization: DepositCapitalization;
+    taxExempt?: boolean;
+    earlyBreakInterestLossPercent?: number | string;
 };
 
 export type UpdatePortfolioRequest = {
@@ -409,3 +472,75 @@ export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByI
 };
 
 export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsData = {
+    body: AddDepositRequest;
+    path: {
+        portfolioId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses = {
+    /**
+     * Created
+     */
+    201: DepositResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses];
+
+export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: DepositResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses];
+
+export type PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData = {
+    body: UpdateDepositRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}';
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: DepositResponse;
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses];
+
+export type GetApiPortfolioDepositsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/deposits';
+};
+
+export type GetApiPortfolioDepositsResponses = {
+    /**
+     * OK
+     */
+    200: Array<DepositResponse>;
+};
+
+export type GetApiPortfolioDepositsResponse = GetApiPortfolioDepositsResponses[keyof GetApiPortfolioDepositsResponses];

@@ -192,4 +192,25 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         var page = await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken);
         Assert.Equal(10m, page.Items.Single(t => t.Id == buyId).Quantity);
     }
+
+    /// <summary>term-deposits AC-10: the opening transaction of a term deposit is rewritten only
+    /// through <c>PUT .../deposits/{id}</c> — editing it here is a 409
+    /// <c>Conflict.DepositTransactionsManaged</c> and nothing changes.</summary>
+    [Fact]
+    public async Task Update_OnTermDeposit_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var openingId = Assert.Single((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items).Id;
+        var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 20_000m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 15) };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(portfolioId, deposit.AssetId, openingId), update, cancellationToken);
+
+        await response.AssertDepositTransactionsManagedAsync(cancellationToken);
+        Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+        var opening = Assert.Single((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items);
+        Assert.Equal(openingId, opening.Id);
+        Assert.Equal(10_000m, opening.Quantity);
+    }
 }

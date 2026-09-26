@@ -24,6 +24,12 @@ public sealed class PortfolioApiFactory(SkarbiecContainersFixture containers)
     /// </summary>
     public FakeFxRateLookupClient FxRateLookupClient { get; } = new();
 
+    /// <summary>
+    /// The host's <see cref="TimeProvider"/>: the real clock unless a fact pins it (term deposits'
+    /// Active/Due status is derived from the Europe/Warsaw date of "now").
+    /// </summary>
+    public AdjustableTimeProvider Clock { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -32,6 +38,7 @@ public sealed class PortfolioApiFactory(SkarbiecContainersFixture containers)
         {
             services.AddSingleton<IInstrumentLookupClient>(InstrumentLookupClient);
             services.AddSingleton<IFxRateLookupClient>(FxRateLookupClient);
+            services.AddSingleton<TimeProvider>(Clock);
         });
     }
 }

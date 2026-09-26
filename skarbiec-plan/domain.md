@@ -30,13 +30,17 @@ The class → default-mode mapping is a default, not a hard constraint — Marke
 | `Portfolio` | `Id, UserId, Name, Description?, Currency, IsArchived` | `AssetCount` removed (spec-02); delete cascades to its assets and their transactions in the handler (spec-08) |
 | `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out) |
 | `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, xmin` | `FeeAmount` removed; `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when MarketData has none that early (ADR-026) |
+| `TermDeposit` | `AssetId (PK, FK → Asset), UserId, BankName?, Principal, StartDate, TermLength, TermUnit (Days \| Months), MaturityDate, AnnualInterestRatePercent, Capitalization (AtMaturity \| Monthly \| Quarterly \| Yearly), TaxExempt, EarlyBreakInterestLossPercent` | new (term-deposits): the terms of a Deposit-class asset, 1:1 with it and the one real FK in `portfolio_db` (cascade delete); `MaturityDate` is derived on every write; the projection (`DepositInterestMath`: actual/365, gross per capitalisation period rounded half-away-from-zero to grosze, 19 % Belka tax per period rounded up, net compounded) and the `Active \| Due` status (Europe/Warsaw date) are computed at read time, never stored |
 
 Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write (spec-02); removal publishes `AssetRemoved` (deleting its transactions with it), deleting a portfolio publishes `PortfolioDeleted` plus one `AssetRemoved { CascadedFromPortfolio = true }` per asset (spec-08), and archive/restore publish `PortfolioArchived`/`PortfolioRestored` plus one `AssetPositionChanged` per asset carrying the new archived flag. An archived portfolio is read-only: adding, updating or removing its assets, and recording, updating or deleting their transactions, returns 409 `Conflict.PortfolioArchived` until it is restored. Renaming or deleting the portfolio itself stays allowed.
+
+A Deposit-class asset is a term deposit, created and edited only through the deposit slices (`AddDeposit`, `UpdateDeposit`): they write the `Asset`, its `TermDeposit` and a system-managed opening `Deposit` transaction (principal, start date, unit price 1) together. `UpdateDeposit` rewrites that opening transaction instead of adding a correction; `RemoveAsset` deletes the `TermDeposit` with the asset.
 
 ```mermaid
 erDiagram
     PORTFOLIO ||--o{ ASSET : contains
     ASSET ||--o{ TRANSACTION : records
+    ASSET ||--o| TERM_DEPOSIT : "Deposit class only"
     ASSET }o--o| INSTRUMENT : "valued by (ref, no FK)"
     PORTFOLIO {
         uuid id PK
@@ -69,6 +73,20 @@ erDiagram
         numeric fx_rate_to_pln "null = no rate on or before date"
         date date
         xid xmin "concurrency token"
+    }
+    TERM_DEPOSIT {
+        uuid asset_id PK, FK
+        uuid user_id
+        string bank_name
+        numeric principal
+        date start_date
+        int term_length
+        string term_unit "Days Months"
+        date maturity_date "derived on write"
+        numeric annual_interest_rate_percent
+        string capitalization "AtMaturity Monthly Quarterly Yearly"
+        bool tax_exempt "IKE/IKZE"
+        numeric early_break_interest_loss_percent
     }
 ```
 
@@ -235,6 +253,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 - Amounts and quantities ≥ 0.
 - An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
 - A Cash/Deposit asset's transactions are only Deposit/Withdraw.
+- A Deposit-class asset has exactly one `TermDeposit`; its transactions are system-managed — record/update/delete on it is 409 `Conflict.DepositTransactionsManaged`, and `AddAsset`/`UpdateAsset` reject class Deposit (or a change to or from it) with 400 `Validation.UseDepositEndpoints`.
 - One `PriceQuote` per (instrument, date); one `FxRate` per (pair, date) — unique indexes.
 - Every user-owned entity carries `UserId` from the JWT — enforced by an architecture test, never trusted from the request body (ADR-006).
 - A user-chosen currency (`Portfolio.Currency`, `Asset.Currency`) is one of `SupportedCurrencies` (PLN/EUR/USD, default PLN, canonical uppercase) — validated on write only; this does not constrain `Instrument.QuoteCurrency` or `FxRate.Pair`.

@@ -10,6 +10,8 @@ using Skarbiec.Portfolio.Features.ArchivePortfolio;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.DeletePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
+using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
 using Skarbiec.Portfolio.Features.RestorePortfolio;
@@ -57,6 +59,8 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
             services.AddScoped<UpdateTransactionHandler>();
             services.AddScoped<DeleteTransactionHandler>();
             services.AddScoped<RemoveAssetHandler>();
+            services.AddScoped<AddDepositHandler>();
+            services.AddScoped<UpdateDepositHandler>();
             services.AddScoped<ArchivePortfolioHandler>();
             services.AddScoped<RestorePortfolioHandler>();
             services.AddScoped<DeletePortfolioHandler>();
@@ -641,7 +645,7 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
 
     /// <summary>
     /// cash-transaction-types AC-2..AC-5 (outbox half): every write rejected with
-    /// <c>Validation.TransactionTypeNotAllowed</c> — a Buy recorded on a Cash asset, a Deposit-class
+    /// <c>Validation.TransactionTypeNotAllowed</c> — a Buy recorded on a Cash asset, a Cash
     /// asset opened with an Interest, a Cash Deposit edited into a Sell, a Stock holding a Buy turned
     /// into Cash — fails before it writes anything: not one outbox row is added and no business row
     /// moves. Each write runs in its own scope, as in <see cref="WriteToArchivedPortfolio_WritesNoEvent"/>.
@@ -699,8 +703,8 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
                 portfolioId,
                 new AddAssetRequest
                 {
-                    AssetClass = AssetClass.Deposit,
-                    Name = "Term deposit",
+                    AssetClass = AssetClass.Cash,
+                    Name = "Second wallet",
                     Currency = "PLN",
                     InitialTransaction = new RecordTransactionRequest
                     {
@@ -741,6 +745,204 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         Assert.Equal(TransactionType.Deposit, deposit.Type);
         var stock = await verifyDb.Assets.SingleAsync(a => a.Id == stockAssetId, cancellationToken);
         Assert.Equal(AssetClass.Stock, stock.AssetClass);
+    }
+
+    /// <summary>
+    /// term-deposits AC-5 (outbox half): AddDeposit writes the Deposit-class asset, its opening
+    /// transaction, its <see cref="TermDeposit"/> terms and one <see cref="AssetPositionChanged"/>
+    /// carrying the principal as the quantity — all in a single save.
+    /// </summary>
+    [Fact]
+    public async Task AddDeposit_PublishesPositionChangedWithPrincipal()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = _provider.CreateAsyncScope();
+        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Deposit outbox portfolio" }, cancellationToken)).Value.Id;
+
+        _saveChanges.Reset();
+
+        var result = await scope.ServiceProvider.GetRequiredService<AddDepositHandler>()
+            .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, _saveChanges.Count);
+        var assetId = result.Value.AssetId;
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var asset = await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken);
+        Assert.Equal(AssetClass.Deposit, asset.AssetClass);
+        Assert.Equal(10_000m, asset.Quantity);
+        Assert.Equal(1, await verifyDb.Transactions.CountAsync(t => t.AssetId == assetId, cancellationToken));
+        Assert.True(await verifyDb.Set<TermDeposit>().AnyAsync(t => t.AssetId == assetId, cancellationToken));
+
+        var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        Assert.Equal(assetId, evt.AssetId);
+        Assert.Equal(portfolioId, evt.PortfolioId);
+        Assert.Equal(UserId, evt.UserId);
+        Assert.Equal(AssetClass.Deposit, evt.AssetClass);
+        Assert.Equal(AssetValuationMode.CurrencyValued, evt.ValuationMode);
+        Assert.Equal("PLN", evt.Currency);
+        Assert.Equal(10_000m, evt.Quantity);
+        Assert.Null(evt.InstrumentId);
+        Assert.Null(evt.ManualValueAmount);
+        Assert.False(evt.PortfolioIsArchived);
+    }
+
+    /// <summary>
+    /// term-deposits AC-8 (outbox half): UpdateDeposit rewrites the opening transaction and the
+    /// quantity and writes exactly one further <see cref="AssetPositionChanged"/> with the new
+    /// quantity and a higher version, in a single save.
+    /// </summary>
+    [Fact]
+    public async Task UpdateDeposit_PublishesOnePositionChangedWithNewQuantity()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Deposit outbox portfolio" }, cancellationToken)).Value.Id;
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess);
+            assetId = added.Value.AssetId;
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var request = PortfolioApi.NewDepositRequest(principal: 15_000m, startDate: new DateOnly(2026, 2, 1), termLength: 6)
+                .ToUpdateRequest();
+            var result = await act.ServiceProvider.GetRequiredService<UpdateDepositHandler>()
+                .HandleAsync(portfolioId, assetId, request, cancellationToken);
+            Assert.True(result.IsSuccess);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        Assert.Equal(2, events.Count);
+        Assert.All(events, e => Assert.Equal(assetId, e.AssetId));
+        Assert.Equal(10_000m, events[0].Quantity);
+        Assert.Equal(15_000m, events[1].Quantity);
+        Assert.True(events[1].Version > events[0].Version);
+        Assert.Equal(AssetClass.Deposit, events[1].AssetClass);
+
+        var opening = await verifyDb.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        Assert.Equal(15_000m, opening.Quantity);
+        Assert.Equal(new DateOnly(2026, 2, 1), opening.Date);
+        Assert.Equal(15_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
+    /// term-deposits AC-11 (outbox half): RemoveAsset on a term deposit deletes the asset, its
+    /// opening transaction and its <see cref="TermDeposit"/> row and writes one non-cascaded
+    /// <see cref="AssetRemoved"/>, all in one save.
+    /// </summary>
+    [Fact]
+    public async Task RemoveAsset_TermDeposit_WritesAssetRemovedAndDeletesTermsInOneSave()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Deposit outbox portfolio" }, cancellationToken)).Value.Id;
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess);
+            assetId = added.Value.AssetId;
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
+                .HandleAsync(portfolioId, assetId, cancellationToken);
+            Assert.True(result.IsSuccess);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.False(await verifyDb.Assets.AnyAsync(a => a.Id == assetId, cancellationToken));
+        Assert.False(await verifyDb.Transactions.AnyAsync(t => t.AssetId == assetId, cancellationToken));
+        Assert.False(await verifyDb.Set<TermDeposit>().AnyAsync(t => t.AssetId == assetId, cancellationToken));
+
+        var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetRemoved>(cancellationToken));
+        Assert.Equal(assetId, evt.AssetId);
+        Assert.Equal(portfolioId, evt.PortfolioId);
+        Assert.Equal(UserId, evt.UserId);
+        Assert.False(evt.CascadedFromPortfolio);
+    }
+
+    /// <summary>
+    /// term-deposits AC-7 (outbox half): AddDeposit and UpdateDeposit into an archived portfolio
+    /// fail with <c>Conflict.PortfolioArchived</c> before writing anything — no outbox row, no terms change.
+    /// </summary>
+    [Fact]
+    public async Task DepositWriteToArchivedPortfolio_WritesNoEvent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Archived deposit portfolio" }, cancellationToken)).Value.Id;
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess);
+            assetId = added.Value.AssetId;
+            Assert.True((await arrange.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
+                .HandleAsync(portfolioId, cancellationToken)).IsSuccess);
+        }
+
+        int outboxRowsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            outboxRowsBefore = await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .Set<OutboxMessage>().CountAsync(cancellationToken);
+        }
+
+        var writes = new (string Name, Func<IServiceProvider, Task<Error>> Write)[]
+        {
+            ("AddDeposit", async s => (await s.GetRequiredService<AddDepositHandler>().HandleAsync(
+                portfolioId, PortfolioApi.NewDepositRequest(name: "Another"), cancellationToken)).Error),
+            ("UpdateDeposit", async s => (await s.GetRequiredService<UpdateDepositHandler>().HandleAsync(
+                portfolioId,
+                assetId,
+                PortfolioApi.NewDepositRequest(principal: 99_999m).ToUpdateRequest(),
+                cancellationToken)).Error),
+        };
+
+        foreach (var (name, write) in writes)
+        {
+            await using var scope = _provider.CreateAsyncScope();
+            var error = await write(scope.ServiceProvider);
+            Assert.True(
+                error.Code == PortfolioAssertions.PortfolioArchivedErrorCode,
+                $"{name} on an archived portfolio returned '{error.Code}', expected '{PortfolioAssertions.PortfolioArchivedErrorCode}'.");
+        }
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
+        Assert.Equal(1, await verifyDb.Assets.CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+        Assert.Equal(10_000m, (await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == assetId, cancellationToken)).Principal);
     }
 
     private static async Task<Guid> AddAssetWithBuyAsync(

@@ -22,6 +22,39 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioArchivedErrorCode, cancellationToken);
 
+    /// <summary>term-deposits: the 400 AddAsset/UpdateAsset answer when class Deposit is asked for, or an asset's class would change to or from Deposit.</summary>
+    public const string UseDepositEndpointsErrorCode = "Validation.UseDepositEndpoints";
+
+    /// <summary>term-deposits: the 409 every transaction write (record/update/delete) on a Deposit-class asset answers — its transactions are system-managed.</summary>
+    public const string DepositTransactionsManagedErrorCode = "Conflict.DepositTransactionsManaged";
+
+    /// <summary>Asserts <paramref name="response"/> is the 409 <see cref="DepositTransactionsManagedErrorCode"/> ProblemDetails.</summary>
+    public static async Task AssertDepositTransactionsManagedAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, DepositTransactionsManagedErrorCode, cancellationToken);
+
+    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="UseDepositEndpointsErrorCode"/> ProblemDetails.</summary>
+    public static async Task AssertUseDepositEndpointsAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseDepositEndpointsErrorCode, cancellationToken);
+
+    /// <summary>
+    /// term-deposits: asserts <paramref name="response"/> is a 400 ValidationProblemDetails with an
+    /// error keyed on <paramref name="field"/> (case-insensitive) — the key the deposit form maps the
+    /// message back onto.
+    /// </summary>
+    public static async Task AssertFieldValidationErrorAsync(
+        this HttpResponseMessage response, string field, CancellationToken cancellationToken)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.True(
+            problem.Errors.Keys.Any(k => k.Equals(field, StringComparison.OrdinalIgnoreCase)),
+            $"Expected a validation error keyed '{field}', got: {string.Join(", ", problem.Errors.Keys)}.");
+    }
+
     /// <summary>cash-transaction-types: the error code a transaction type the asset's class does not accept fails with (a top-level 400, no field key).</summary>
     public const string TransactionTypeNotAllowedErrorCode = "Validation.TransactionTypeNotAllowed";
 

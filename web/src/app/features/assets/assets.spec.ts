@@ -12,6 +12,9 @@ import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetResponse, PortfolioResponse } from '../../api/portfolio';
 import { formatMoney } from '../../shared/format-money';
+import { toDateOnly } from '../../shared/date-only';
+import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
+import { depositResponse } from '../deposits/testing/deposit-fixtures';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
 import { Assets } from './assets';
@@ -75,6 +78,24 @@ const currencyValuedAsset: AssetResponse = {
   transactionCount: 1,
 };
 
+// term-deposits: a Deposit-class asset carries its maturity date on AssetResponse.
+function depositAsset(maturityDate: string): AssetResponse {
+  return {
+    ...currencyValuedAsset,
+    id: '99999999-9999-9999-9999-999999999999',
+    assetClass: 1, // Deposit
+    name: 'Term deposit',
+    quantity: 10000,
+    depositMaturityDate: maturityDate,
+  };
+}
+
+function daysFromToday(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return toDateOnly(date);
+}
+
 const currencyValuedEurAsset: AssetResponse = {
   ...currencyValuedAsset,
   id: '66666666-6666-6666-6666-666666666666',
@@ -106,11 +127,17 @@ describe('Assets', () => {
     assetsResponse: Response,
     portfolioResponse = jsonResponse(portfolio),
     instrumentResponse?: Response,
+    depositResponseBody?: unknown,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
       if (url.includes('/instruments/')) {
         return instrumentResponse ?? jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (url.includes('/deposits')) {
+        return depositResponseBody
+          ? jsonResponse(depositResponseBody)
+          : jsonResponse({ detail: 'Not found.' }, 404);
       }
       return url.includes('/assets') ? assetsResponse : portfolioResponse;
     });
@@ -480,5 +507,64 @@ describe('Assets', () => {
       expect(menuText).toContain('Edit');
       expect(menuText).toContain('Delete');
     });
+  });
+
+  // term-deposits AC-16: a Deposit row is edited through DepositFormDialog (its terms live on the
+  // deposit endpoints), never the generic asset form.
+  it('Edit on a Deposit row opens DepositFormDialog, not the asset form', async () => {
+    const deposit = depositAsset('2027-01-01');
+    const terms = depositResponse({ assetId: deposit.id, portfolioId, maturityDate: '2027-01-01' });
+    await setup(jsonResponse([deposit]), undefined, undefined, terms);
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = fetchSpy.mock.calls.length;
+
+    component['openEditDialog'](deposit);
+
+    await vi.waitFor(() => expect(dialog.open).toHaveBeenCalled());
+    const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data?: unknown }];
+    expect(dialogType).toBe(DepositFormDialog);
+    expect(dialogType).not.toBe(AssetFormDialog);
+    // Addresses this deposit — whether the page hands over the loaded terms or just the ids.
+    expect(JSON.stringify(config?.data)).toContain(deposit.id);
+    // A save reloads the asset list.
+    await vi.waitFor(() =>
+      expect(
+        fetchSpy.mock.calls
+          .slice(callsBefore)
+          .some((call: unknown[]) =>
+            requestUrl(call[0]).endsWith(`/portfolios/${portfolioId}/assets`),
+          ),
+      ).toBe(true),
+    );
+  });
+
+  it('Edit on a non-Deposit row still opens the asset form', async () => {
+    await setup(jsonResponse([currencyValuedAsset]));
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    component['openEditDialog'](currencyValuedAsset);
+
+    expect(dialog.open).toHaveBeenCalledWith(AssetFormDialog, expect.anything());
+  });
+
+  // term-deposits AC-16: a Deposit whose maturity date has passed shows a "Due" chip; one still
+  // running does not.
+  it('a past-maturity Deposit row shows the "Due" chip', async () => {
+    const matured = { ...depositAsset(daysFromToday(-1)), name: 'Matured deposit' };
+    const running = {
+      ...depositAsset(daysFromToday(30)),
+      id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      name: 'Running deposit',
+    };
+    await setup(jsonResponse([matured, running]));
+
+    const rows = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr.mat-mdc-row'),
+    );
+    const maturedRow = rows.find((row) => (row.textContent ?? '').includes('Matured deposit'));
+    const runningRow = rows.find((row) => (row.textContent ?? '').includes('Running deposit'));
+    const chip = maturedRow?.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip');
+    expect(chip?.textContent).toContain('Due');
+    expect(runningRow?.textContent).not.toContain('Due');
   });
 });
