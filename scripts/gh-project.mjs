@@ -23,21 +23,24 @@
 //   node scripts/gh-project.mjs check --body-file <path> [--epic]
 //       Dry run of the cleaning and checking `create` does: prints "publishable" or the problems.
 //
-//   node scripts/gh-project.mjs edit <issue number> --body-file <path> [--tier 1|2]
+//   node scripts/gh-project.mjs edit <issue number> [--body-file <path>] [--tier 1|2] [--parent <epic number>]
 //       Replaces the body of an existing spec issue, cleaned and checked exactly like `create`.
+//       --parent attaches the issue to an epic as its next sub-issue — how an already published spec
+//       becomes one part of a split. Sub-issues build in the order they were attached.
 //
 //   node scripts/gh-project.mjs set <issue number> <field> <value>
 //       Sets one project field on an issue already in the project, e.g. `set 123 Status "In progress"`.
 //
 //   node scripts/gh-project.mjs get <issue number> [--out <path> [--raw]]
 //       Prints one JSON line: {number,title,url,state,labels,inProject,status,tier,kind,branch,epic,
-//       skipTests,subIssues:[{number,title,state}]}. --out also writes the issue to a local file: a
+//       skipTests,parent,subIssues:[{number,title,state}]}. --out also writes the issue to a local file: a
 //       title heading, one metadata line, then the body — or with --raw the body alone, as a draft
 //       to amend and publish back with `edit`.
 //
 //   node scripts/gh-project.mjs prepare <issue number> [--tier 1|2] [--skip tests,review]
 //       Everything /build does before the workflow: fetches the issue, decides whether it is
-//       buildable, writes the local copy to skarbiec-plan/issues/<n>.md, resolves tier and skipped
+//       buildable (an epic never is; a sub-issue is only once every earlier sibling is closed, since
+//       each part's branch is cut from master after the previous part merges), writes the local copy to skarbiec-plan/issues/<n>.md, resolves tier and skipped
 //       phases, and moves the card to In progress. Prints one JSON line — either
 //       {"ok":true,"resumed":bool,"workflowArgs":{...}} to pass to Workflow verbatim, or
 //       {"ok":false,"reason":"...","next":"..."} with what to run instead.
@@ -225,7 +228,7 @@ function fieldsOf(item, labels) {
 
 function fetchIssue(number) {
   const issue = JSON.parse(
-    gh(["issue", "view", String(number), "--repo", REPO, "--json", "number,title,body,state,labels,url"]),
+    gh(["issue", "view", String(number), "--repo", REPO, "--json", "number,title,body,state,labels,url,parent"]),
   );
   const labels = issue.labels.map((l) => l.name);
   const item = projectItems().find((i) => i.content.number === issue.number);
@@ -237,6 +240,7 @@ function fetchIssue(number) {
     labels,
     inProject: Boolean(item),
     ...fieldsOf(item, labels),
+    parent: issue.parent?.number ?? null,
   };
   result.subIssues = result.epic ? subIssues(issue.number) : [];
   return { result, body: issue.body.replace(/\r\n/g, "\n").trim() };
@@ -309,13 +313,27 @@ function create(flags) {
 
 function edit([number, ...rest]) {
   const flags = parseFlags(rest);
-  if (!number || !flags["body-file"]) throw new Error("usage: edit <issue number> --body-file <path> [--tier 1|2]");
+  const usage = "usage: edit <issue number> [--body-file <path>] [--tier 1|2] [--parent <epic number>]";
+  if (!number || !(flags["body-file"] || flags.tier || flags.parent)) throw new Error(usage);
   if (flags.tier && !["1", "2"].includes(flags.tier)) throw new Error("--tier must be 1 or 2");
-  const labels = JSON.parse(gh(["issue", "view", number, "--repo", REPO, "--json", "labels"])).labels.map((l) => l.name);
-  const body = preparedBody(flags["body-file"], labels.includes("epic"));
-  gh(["issue", "edit", number, "--repo", REPO, "--body-file", "-"], body);
-  if (flags.tier) setField(issueUrl(number), "Tier", flags.tier);
-  console.log(`#${number}: body replaced${flags.tier ? `, Tier = ${flags.tier}` : ""}`);
+  const done = [];
+  if (flags["body-file"]) {
+    const labels = JSON.parse(gh(["issue", "view", number, "--repo", REPO, "--json", "labels"])).labels.map((l) => l.name);
+    const body = preparedBody(flags["body-file"], labels.includes("epic"));
+    gh(["issue", "edit", number, "--repo", REPO, "--body-file", "-"], body);
+    done.push("body replaced");
+  }
+  if (flags.tier) {
+    setField(issueUrl(number), "Tier", flags.tier);
+    done.push(`Tier = ${flags.tier}`);
+  }
+  if (flags.parent) {
+    const parent = JSON.parse(gh(["issue", "view", flags.parent, "--repo", REPO, "--json", "labels"])).labels.map((l) => l.name);
+    if (!parent.includes("epic")) throw new Error(`#${flags.parent} is not an epic — create one with \`create --epic\` first`);
+    gh(["issue", "edit", number, "--repo", REPO, "--parent", flags.parent]);
+    done.push(`sub-issue of #${flags.parent}`);
+  }
+  console.log(`#${number}: ${done.join(", ")}`);
 }
 
 function set([number, field, value]) {
@@ -346,6 +364,14 @@ function prepare([number, ...rest]) {
     const open = issue.subIssues.filter((s) => s.state === "OPEN");
     const list = issue.subIssues.map((s) => `#${s.number} ${s.title} (${s.state.toLowerCase()})`).join("; ");
     return refuse(`an epic is never built itself — sub-issues: ${list || "none"}`, open.length ? `/build #${open[0].number}` : "/design to add its parts");
+  }
+  if (issue.parent) {
+    const siblings = subIssues(issue.parent);
+    const earlier = siblings.slice(0, siblings.findIndex((s) => s.number === issue.number)).filter((s) => s.state === "OPEN");
+    if (earlier.length) {
+      const list = earlier.map((s) => `#${s.number} ${s.title}`).join("; ");
+      return refuse(`part of epic #${issue.parent}, whose earlier part(s) are still open: ${list} — parts build in order, each from master after the previous one merged`, `/build #${earlier[0].number}`);
+    }
   }
   const missing = [!issue.labels.includes("spec") && "the `spec` label", !issue.inProject && "a card on the project", !issue.branch && "a Branch field"].filter(Boolean);
   if (missing.length) return refuse(`not a /design or /fix spec: missing ${missing.join(", ")}`, "/design to amend or republish it");

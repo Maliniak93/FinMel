@@ -12,7 +12,9 @@ How features get designed and built (ADR-024). A spec is a GitHub issue on the *
 | Branch | `feat/<slug>`, `fix/<slug>` (none on an epic) | `/design` / `/fix` |
 | labels | `spec` (buildable), `epic` (umbrella of a split — its sub-issues are built, never the epic), `skip-tests` | `/design` / `/fix` |
 
-Every board operation goes through `scripts/gh-project.mjs` (`init`, `create`, `get`, `list`, `set`, `comment`, `tick`) — the one place that knows the project number and its fields. `/board` shows what to build next; the `SessionStart` hook shows the same open issues against git.
+**Epics.** Either `/design` or `/fix` — at your request or on its own proposal, at any point of the interview or diagnosis — can split the work into an `epic` with one sub-issue per part. Each part is a full spec with its own tier, kind, branch and ACs, and leaves master green when it merges. Parts are attached in build order and built in that order: `prepare` refuses a part while an earlier sibling is still open, because every branch is cut from master. An already published spec becomes a part with `edit <n> --parent <epic>`. GitHub never closes the epic itself — `plan-status` flags it once every part is Done.
+
+Every board operation goes through `scripts/gh-project.mjs` (`init`, `check`, `create`, `edit`, `get`, `list`, `set`, `prepare`, `report`, `comment`, `tick`) — the one place that knows the project number and its fields. `/board` shows what to build next; the `SessionStart` hook shows the same open issues against git.
 
 ## Agents (`.claude/agents/*.md`)
 
@@ -52,7 +54,7 @@ flowchart LR
 - `/build` is a skill with `disable-model-invocation: true` that calls `Workflow({name: 'build-feature', args})`: control flow is a script (`.claude/workflows/build-feature.js`), not model tokens. `/build` first writes the issue body to a gitignored local copy (`skarbiec-plan/issues/<n>.md`, via `gh-project.mjs get --out`); each agent receives that path, the branch and title, and the prior phase's structured output — never the conversation history or a raw diff.
 - `+Nk` sets a token budget checked before every phase; going over it returns `status: blocked` with a report, never a silent partial run.
 - `resumeFromRunId` resumes a run inside the same session; across sessions, re-running `/build #<n>` on the existing branch is the recovery path.
-- **Bugs go through `/fix <bug>`**, not a hand patch: it reproduces first, localizes the root cause (with `Explore`), publishes a `Fix`-kind issue on `fix/<slug>` whose AC-1 is the reproduction test, and after approval runs the same `/build` steps — so a fix gets the same test-writer → implementer → verifier → reviewer path as a feature, and the diagnostician never reviews its own fix.
+- **Bugs go through `/fix <bug>`**, not a hand patch: it reproduces first, localizes the root cause (with `Explore`), publishes a `Fix`-kind issue on `fix/<slug>` whose AC-1 is the reproduction test (or, for several root causes or a fix that must land in sequence, an epic of such issues, building the first), and after approval runs the same `/build` steps — so a fix gets the same test-writer → implementer → verifier → reviewer path as a feature, and the diagnostician never reviews its own fix.
 - **Changes to existing behaviour go through `/design`**, not `/fix`: a bug is code failing its own intent, a change is the intent moving. `/design` sends `Explore` after the current implementation first and records it under "Current behaviour" in the spec. A spec that needs fixing is amended in place (`gh issue edit`), never duplicated.
 
 ## Definition of Ready (before `/build` will accept a spec)
