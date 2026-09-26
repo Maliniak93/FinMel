@@ -122,6 +122,42 @@ export const settledDeposit: DepositResponse = depositResponse({
 
 export const settledDepositFinalAmount = 10121.5;
 
+// asset-transfers-deposit-funding: one row of GET /api/portfolio/transfer-candidates — a Cash asset
+// the deposit form offers as its source of funds. Declared here (not imported from the generated
+// client) so the fixtures do not depend on when `gen:api` picks the endpoint up.
+export interface TransferCandidateFixture {
+  assetId: string;
+  name: string;
+  portfolioId: string;
+  portfolioName: string;
+  balance: number;
+}
+
+export const walletPortfolioId = '99999999-9999-9999-9999-999999999999';
+
+// A PLN Cash account holding 5 000 and a EUR one holding 2 500, both in a "Wallet" portfolio.
+export const plnCashCandidate: TransferCandidateFixture = {
+  assetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  name: 'Cash account',
+  portfolioId: walletPortfolioId,
+  portfolioName: 'Wallet',
+  balance: 5000,
+};
+
+export const eurCashCandidate: TransferCandidateFixture = {
+  assetId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  name: 'EUR account',
+  portfolioId: walletPortfolioId,
+  portfolioName: 'Wallet',
+  balance: 2500,
+};
+
+// The candidates per currency the fetch stubs answer with (a currency not listed has none).
+export const transferCandidatesByCurrency: Record<string, TransferCandidateFixture[]> = {
+  PLN: [plnCashCandidate],
+  EUR: [eurCashCandidate],
+};
+
 // The settlement preview of `dueDeposit` (GET .../deposits/{assetId}/settlement-preview): the part-1
 // projection, settled on the maturity date.
 export const dueDepositSettlementPreview = {

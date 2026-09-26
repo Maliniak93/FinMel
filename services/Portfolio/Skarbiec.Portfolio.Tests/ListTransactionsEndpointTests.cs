@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
+using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
@@ -96,6 +97,46 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.Equal(430.00m, priced.ValuePln);
         Assert.Equal(unpricedDate, unpriced.Date);
         Assert.Null(unpriced.ValuePln);
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-8: each leg of a transfer carries <c>transfer</c> — the
+    /// counterpart's asset and portfolio (ids and names) and the direction (Out on the Cash Withdraw,
+    /// In on the deposit's opening Deposit) — and a plain transaction carries none.
+    /// </summary>
+    [Fact]
+    public async Task List_TransferLeg_ReturnsCounterpart()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+
+        var cashResponse = await client.GetAsync(TransactionsUri(funded.CashPortfolioId, funded.CashAssetId), cancellationToken);
+        var depositResponse = await client.GetAsync(TransactionsUri(funded.DepositPortfolioId, funded.Deposit.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, cashResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, depositResponse.StatusCode);
+        var cashItems = (await cashResponse.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken))!.Items;
+        var depositItems = (await depositResponse.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken))!.Items;
+
+        var outLeg = Assert.Single(cashItems, t => t.Type == TransactionType.Withdraw);
+        Assert.NotNull(outLeg.Transfer);
+        Assert.Equal(funded.Deposit.AssetId, outLeg.Transfer.CounterpartAssetId);
+        Assert.Equal("Term deposit", outLeg.Transfer.CounterpartAssetName);
+        Assert.Equal(funded.DepositPortfolioId, outLeg.Transfer.CounterpartPortfolioId);
+        Assert.Equal("Savings", outLeg.Transfer.CounterpartPortfolioName);
+        Assert.Equal(TransferDirection.Out, outLeg.Transfer.Direction);
+
+        var plain = Assert.Single(cashItems, t => t.Type == TransactionType.Deposit);
+        Assert.Null(plain.Transfer);
+
+        var inLeg = Assert.Single(depositItems);
+        Assert.NotNull(inLeg.Transfer);
+        Assert.Equal(funded.CashAssetId, inLeg.Transfer.CounterpartAssetId);
+        Assert.Equal("Cash account", inLeg.Transfer.CounterpartAssetName);
+        Assert.Equal(funded.CashPortfolioId, inLeg.Transfer.CounterpartPortfolioId);
+        Assert.Equal("Wallet", inLeg.Transfer.CounterpartPortfolioName);
+        Assert.Equal(TransferDirection.In, inLeg.Transfer.Direction);
     }
 
     [Fact]

@@ -369,6 +369,123 @@ describe('Transactions', () => {
     });
   });
 
+  // asset-transfers-deposit-funding AC-12: a transfer leg (`transfer` set on the TransactionResponse)
+  // is labelled beside its type — "Transfer to <asset> (<portfolio>)" on the Out leg, "Transfer from
+  // …" on the In leg — and offers no Edit/Delete (the backend answers 409
+  // Conflict.TransferLegManaged), while a plain transaction on the same Cash asset keeps both.
+  describe('transfer legs', () => {
+    // Backend enum Skarbiec.Portfolio.Features.Transfers.TransferDirection arrives as an int, in C#
+    // declaration order.
+    const TRANSFER_DIRECTION = { Out: 0, In: 1 } as const;
+
+    const cashAsset: AssetResponse = {
+      ...asset,
+      assetClass: 0, // Cash
+      valuationMode: 2, // CurrencyValued
+      name: 'Cash account',
+      currency: 'PLN',
+      quantity: 4000,
+      manualValue: null,
+      manualValueDate: null,
+    };
+    const plainTopUp: TransactionResponse = {
+      ...transaction,
+      id: '55555555-5555-5555-5555-555555555555',
+      type: 2, // Deposit
+      quantity: 5000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 5000,
+      date: '2026-01-01',
+    };
+    const outLeg = {
+      ...transaction,
+      id: '66666666-6666-6666-6666-666666666666',
+      type: 3, // Withdraw
+      quantity: 1000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 1000,
+      date: '2026-01-15',
+      transfer: {
+        counterpartAssetId: '77777777-7777-7777-7777-777777777777',
+        counterpartAssetName: 'Term deposit',
+        counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
+        counterpartPortfolioName: 'Savings',
+        direction: TRANSFER_DIRECTION.Out,
+      },
+    } as TransactionResponse;
+    const inLeg = {
+      ...outLeg,
+      id: '99999999-9999-9999-9999-999999999999',
+      type: 2, // Deposit
+      transfer: {
+        counterpartAssetId: assetId,
+        counterpartAssetName: 'Cash account',
+        counterpartPortfolioId: portfolioId,
+        counterpartPortfolioName: 'Wallet',
+        direction: TRANSFER_DIRECTION.In,
+      },
+    } as TransactionResponse;
+
+    function rows(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'tbody tr.mat-mdc-row',
+        ),
+      );
+    }
+
+    function rowText(row: HTMLElement): string {
+      return (row.textContent ?? '').replace(/\s+/g, ' ');
+    }
+
+    async function openRowMenu(row: HTMLElement): Promise<string> {
+      const triggerElement = fixture.debugElement
+        .queryAll(By.directive(MatMenuTrigger))
+        .find((debugElement) => row.contains(debugElement.nativeElement));
+      if (!triggerElement) {
+        throw new Error('The row has no actions menu.');
+      }
+      triggerElement.injector.get(MatMenuTrigger).openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return TestBed.inject(OverlayContainer).getContainerElement().textContent ?? '';
+    }
+
+    function rowHasActions(row: HTMLElement): boolean {
+      return fixture.debugElement
+        .queryAll(By.directive(MatMenuTrigger))
+        .some((debugElement) => row.contains(debugElement.nativeElement));
+    }
+
+    it('labels the Out leg and offers it no edit / delete, while the plain row keeps both', async () => {
+      await setup(jsonResponse(pagedResponse([outLeg, plainTopUp])), jsonResponse(cashAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const [legRow, plainRow] = rows();
+      expect(rowText(legRow)).toContain('Transfer to Term deposit (Savings)');
+      expect(rowHasActions(legRow)).toBe(false);
+
+      expect(rowText(plainRow)).not.toContain('Transfer');
+      expect(rowHasActions(plainRow)).toBe(true);
+      const menuText = await openRowMenu(plainRow);
+      expect(menuText).toContain('Edit');
+      expect(menuText).toContain('Delete');
+    });
+
+    it('labels the In leg "Transfer from <asset> (<portfolio>)"', async () => {
+      await setup(jsonResponse(pagedResponse([inLeg, plainTopUp])), jsonResponse(cashAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const [legRow] = rows();
+      expect(rowText(legRow)).toContain('Transfer from Cash account (Wallet)');
+      expect(rowHasActions(legRow)).toBe(false);
+    });
+  });
+
   // term-deposits AC-16: a term deposit's transactions are system-managed (the backend answers 409
   // Conflict.DepositTransactionsManaged to every write), so its view lists them but offers no
   // record / edit / delete action, even in an active portfolio.

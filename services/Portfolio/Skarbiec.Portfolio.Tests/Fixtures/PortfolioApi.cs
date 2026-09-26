@@ -118,7 +118,8 @@ internal static class PortfolioApi
         decimal annualInterestRatePercent = 6m,
         DepositCapitalization capitalization = DepositCapitalization.AtMaturity,
         bool taxExempt = false,
-        decimal earlyBreakInterestLossPercent = 100m) => new()
+        decimal earlyBreakInterestLossPercent = 100m,
+        Guid? fundingAssetId = null) => new()
         {
             Name = name,
             BankName = bankName,
@@ -130,7 +131,8 @@ internal static class PortfolioApi
             AnnualInterestRatePercent = annualInterestRatePercent,
             Capitalization = capitalization,
             TaxExempt = taxExempt,
-            EarlyBreakInterestLossPercent = earlyBreakInterestLossPercent
+            EarlyBreakInterestLossPercent = earlyBreakInterestLossPercent,
+            FundingAssetId = fundingAssetId
         };
 
     /// <summary>The <see cref="UpdateDepositRequest"/> carrying the same terms as <paramref name="request"/> (currency is immutable, so it is dropped).</summary>
@@ -171,6 +173,101 @@ internal static class PortfolioApi
 
         return (portfolioId, deposit);
     }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: <c>GET /api/portfolio/transfer-candidates</c>. A <see langword="null"/>
+    /// argument leaves that query parameter out, so a fact can ask without it.
+    /// </summary>
+    public static string TransferCandidatesUri(string? currency = "PLN", string? assetClass = "Cash")
+    {
+        var query = new List<string>();
+        if (currency is not null)
+        {
+            query.Add($"currency={Uri.EscapeDataString(currency)}");
+        }
+
+        if (assetClass is not null)
+        {
+            query.Add($"assetClass={Uri.EscapeDataString(assetClass)}");
+        }
+
+        const string path = "/api/portfolio/transfer-candidates";
+        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
+    }
+
+    /// <summary>asset-transfers-deposit-funding: the default date a Cash asset is topped up on — before <see cref="NewDepositRequest"/>'s 2026-01-15 start.</summary>
+    public static readonly DateOnly DefaultTopUpDate = new(2026, 1, 1);
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: a <see cref="AssetClass.Cash"/> asset holding
+    /// <paramref name="balance"/>, from one ordinary Deposit transaction dated <paramref name="toppedUpOn"/>
+    /// (default <see cref="DefaultTopUpDate"/>). Returns the asset id.
+    /// </summary>
+    public static async Task<Guid> AddCashAssetWithBalanceAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        CancellationToken cancellationToken,
+        decimal balance = 5_000m,
+        DateOnly? toppedUpOn = null,
+        string currency = "PLN",
+        string name = "Cash account")
+    {
+        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken, currency: currency, name: name);
+        await client.RecordTransactionAsync(
+            portfolioId, cashId, TransactionType.Deposit, balance, toppedUpOn ?? DefaultTopUpDate, cancellationToken, unitPrice: 1m);
+
+        return cashId;
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: a PLN Cash asset holding <paramref name="balance"/> in a
+    /// portfolio of its own (<paramref name="portfolioName"/>), which is then archived — a counterpart a
+    /// transfer must refuse. Returns both ids.
+    /// </summary>
+    public static async Task<(Guid PortfolioId, Guid CashId)> AddArchivedCashAssetAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal balance = 5_000m,
+        string portfolioName = "Old wallet",
+        string name = "Archived cash")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        return (portfolioId, cashId);
+    }
+
+    /// <summary>asset-transfers-deposit-funding: what <see cref="CreateFundedDepositAsync"/> arranged.</summary>
+    public sealed record FundedDeposit(Guid CashPortfolioId, Guid CashAssetId, Guid DepositPortfolioId, DepositResponse Deposit);
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: the spec's funded deposit — a PLN "Cash account" holding
+    /// <paramref name="cashBalance"/> (topped up on <see cref="DefaultTopUpDate"/>) in a "Wallet"
+    /// portfolio, and a <paramref name="principal"/> deposit in a separate "Savings" portfolio funded from
+    /// it (a Cash → Deposit transfer on the deposit's 2026-01-15 start date).
+    /// </summary>
+    public static async Task<FundedDeposit> CreateFundedDepositAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal cashBalance = 5_000m,
+        decimal principal = 1_000m)
+    {
+        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance);
+        var depositPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var deposit = await client.AddDepositAsync(
+            depositPortfolioId, cancellationToken, NewDepositRequest(principal: principal, fundingAssetId: cashId));
+
+        return new FundedDeposit(cashPortfolioId, cashId, depositPortfolioId, deposit);
+    }
+
+    /// <summary>asset-transfers-deposit-funding: the single Withdraw on <paramref name="cashId"/> — the Cash leg of a funding transfer.</summary>
+    public static async Task<TransactionResponse> GetCashWithdrawAsync(
+        this HttpClient client, Guid portfolioId, Guid cashId, CancellationToken cancellationToken) =>
+        Assert.Single(
+            (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
 
     /// <summary>Creates a portfolio and returns its id. Pass distinct <paramref name="name"/>s — the name is unique per user.</summary>
     public static async Task<Guid> CreatePortfolioAsync(

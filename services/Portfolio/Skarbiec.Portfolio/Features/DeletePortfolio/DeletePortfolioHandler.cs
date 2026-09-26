@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.DeletePortfolio;
 
@@ -30,6 +31,12 @@ public sealed class DeletePortfolioHandler(
             .ToListAsync(cancellationToken);
 
         dbContext.Transactions.RemoveRange(transactions);
+
+        // Detach, never reverse (asset-transfers-deposit-funding): a transfer leg outside this portfolio
+        // stays as an ordinary transaction, its asset's quantity unchanged — so nothing is published for
+        // it. A transfer with both legs in here goes with the portfolio.
+        await dbContext.DetachCounterpartsAsync(transactions, cancellationToken);
+
         dbContext.Assets.RemoveRange(assets);
         dbContext.Portfolios.Remove(portfolio);
 

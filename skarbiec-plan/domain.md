@@ -29,17 +29,20 @@ The class → default-mode mapping is a default, not a hard constraint — Marke
 |---|---|---|
 | `Portfolio` | `Id, UserId, Name, Description?, Currency, IsArchived` | `AssetCount` removed (spec-02); delete cascades to its assets and their transactions in the handler (spec-08) |
 | `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out) |
-| `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, xmin` | `FeeAmount` removed; `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when MarketData has none that early (ADR-026) |
+| `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, TransferId?, xmin` | `FeeAmount` removed; `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when MarketData has none that early (ADR-026); `TransferId` (indexed, asset-transfers-deposit-funding) links the two legs of a transfer, `null` on an ordinary or detached transaction |
 | `TermDeposit` | `AssetId (PK, FK → Asset), UserId, BankName?, Principal, StartDate, TermLength, TermUnit (Days \| Months), MaturityDate, AnnualInterestRatePercent, Capitalization (AtMaturity \| Monthly \| Quarterly \| Yearly), TaxExempt, EarlyBreakInterestLossPercent, SettledOn?, SettledGrossInterest?, SettledTax?` | new (term-deposits): the terms of a Deposit-class asset, 1:1 with it and the one real FK in `portfolio_db` (cascade delete); `MaturityDate` is derived on every write; the projection (`DepositInterestMath`: actual/365, gross per capitalisation period rounded half-away-from-zero to grosze, 19 % Belka tax per period rounded up, net compounded) and the `Active \| Due \| Settled` status (Europe/Warsaw date; Settled wins) are computed at read time, never stored; the three `Settled*` fields (term-deposits-settlement) record what the bank actually paid, set together by `SettleDeposit` and null until then |
 
 Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write (spec-02); removal publishes `AssetRemoved` (deleting its transactions with it), deleting a portfolio publishes `PortfolioDeleted` plus one `AssetRemoved { CascadedFromPortfolio = true }` per asset (spec-08), and archive/restore publish `PortfolioArchived`/`PortfolioRestored` plus one `AssetPositionChanged` per asset carrying the new archived flag. An archived portfolio is read-only: adding, updating or removing its assets, and recording, updating or deleting their transactions, returns 409 `Conflict.PortfolioArchived` until it is restored. Renaming or deleting the portfolio itself stays allowed.
 
 A Deposit-class asset is a term deposit, created and edited only through the deposit slices (`AddDeposit`, `UpdateDeposit`): they write the `Asset`, its `TermDeposit` and a system-managed opening `Deposit` transaction (principal, start date, unit price 1) together. `UpdateDeposit` rewrites that opening transaction instead of adding a correction; `RemoveAsset` deletes the `TermDeposit` with the asset. `SettleDeposit` (term-deposits-settlement) settles a Due deposit: it stores the settlement fields and, when the net interest (gross − tax) is above 0, adds a second system-managed `Deposit` transaction of it on the settlement date, so the quantity becomes principal + net and the money stays in the deposit.
 
+A transfer (asset-transfers-deposit-funding) moves money between two of one user's assets — across portfolios too — as two linked transactions sharing a `TransferId`: a `Withdraw` on the source and a `Deposit` on the target, the same amount and date, unit price 1, each with its PLN rate frozen (ADR-026). The allowed routes live in `TransferRoutes` (Cash → Deposit; Deposit → Cash registered for the payout, no entry point yet), and each route enters through its own slice: `AddDeposit` with `fundingAssetId` makes the opening transaction the In leg of a Cash → Deposit transfer, and `UpdateDeposit` rewrites both legs when the principal or start date changes. The entry point recomputes and publishes `AssetPositionChanged` for both assets in one save; a counterpart that is not the user's, the same asset, off-route, in another currency or in an archived portfolio is 400 `Validation.InvalidTransferCounterpart`, and a source whose running balance would drop below 0 is 400 `Validation.InsufficientFunds`. `ListTransactions` returns a leg's counterpart (asset, portfolio, direction), `GetDeposit`/`ListDeposits` the funding asset, and `GET /api/portfolio/transfer-candidates` the pick list. Replay orders same-day transactions inflows first, so a same-day top-up and transfer out never fail on the Guid order.
+
 ```mermaid
 erDiagram
     PORTFOLIO ||--o{ ASSET : contains
     ASSET ||--o{ TRANSACTION : records
+    TRANSACTION |o--o| TRANSACTION : "transfer legs (shared transfer_id)"
     ASSET ||--o| TERM_DEPOSIT : "Deposit class only"
     ASSET }o--o| INSTRUMENT : "valued by (ref, no FK)"
     PORTFOLIO {
@@ -72,6 +75,7 @@ erDiagram
         numeric unit_price_amount
         numeric fx_rate_to_pln "null = no rate on or before date"
         date date
+        uuid transfer_id "shared by a transfer's two legs, indexed"
         xid xmin "concurrency token"
     }
     TERM_DEPOSIT {
@@ -254,6 +258,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 - An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
 - A Cash/Deposit asset's transactions are only Deposit/Withdraw.
 - A Deposit-class asset has exactly one `TermDeposit`; its transactions are system-managed — record/update/delete on it is 409 `Conflict.DepositTransactionsManaged`, and `AddAsset`/`UpdateAsset` reject class Deposit (or a change to or from it) with 400 `Validation.UseDepositEndpoints`.
+- A transfer is exactly two legs sharing a `TransferId`, changed only by their entry point — updating or deleting a leg through the transaction endpoints is 409 `Conflict.TransferLegManaged`; removing an asset (or deleting its portfolio) detaches its counterpart legs (`TransferId = null`, the other asset's quantity unchanged, no event), never reverses them.
 - A settled deposit's terms are immutable — `UpdateDeposit` on it is 409 `Conflict.DepositSettled`. It is settled at most once (409 `Conflict.DepositAlreadySettled`) and never before its maturity date (409 `Conflict.DepositNotDue`); deleting it stays allowed.
 - One `PriceQuote` per (instrument, date); one `FxRate` per (pair, date) — unique indexes.
 - Every user-owned entity carries `UserId` from the JWT — enforced by an architecture test, never trusted from the request body (ADR-006).
@@ -262,7 +267,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 
 ## Conscious simplifications
 
-- **Single-entry transactions**: `Dividend`/`Interest` do not create an offsetting cash-asset flow — they record that income happened, not where the cash landed. Modeling a full double-entry ledger was judged not worth it for a personal-use app.
+- **Single-entry transactions**: `Dividend`/`Interest` do not create an offsetting cash-asset flow — they record that income happened, not where the cash landed. Modeling a full double-entry ledger was judged not worth it for a personal-use app. Transfers are the exception: their two legs are linked by `TransferId` (asset-transfers-deposit-funding), while Dividend/Interest stay single-entry.
 - **PLN value frozen at the transaction-date rate**: a transaction's PLN value is `Quantity × UnitPriceAmount × FxRateToPln`, with the rate fixed when the transaction is written and never recomputed later (e.g. after an older-history backfill) — a `null` rate fills in only when that transaction is edited (ADR-026).
 - **PLN-only base currency**: every valuation ends in PLN (ADR-008); there is no per-user reporting currency.
 

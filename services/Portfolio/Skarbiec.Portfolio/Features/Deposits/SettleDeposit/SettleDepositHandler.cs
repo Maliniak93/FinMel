@@ -123,6 +123,8 @@ public sealed class SettleDepositHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, today);
+        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, today, funding);
     }
 }

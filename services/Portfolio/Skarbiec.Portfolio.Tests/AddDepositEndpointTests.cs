@@ -197,6 +197,234 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
     }
 
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-3 (HTTP half; the two events are proven by
+    /// <see cref="PortfolioOutboxTests.AddFundedDeposit_PublishesPositionChangedForBothAssets"/>): a
+    /// deposit funded from a PLN Cash asset in another portfolio moves the principal out of it as one
+    /// linked transfer — a Withdraw on Cash and the opening Deposit on the deposit, same amount, same
+    /// date, same <c>TransferId</c>.
+    /// </summary>
+    [Fact]
+    public async Task Add_FundedFromCash_MovesPrincipalWithLinkedLegs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 5_000m);
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+
+        var response = await client.PostAsJsonAsync(
+            DepositsUri(savingsId), NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(1_000m, body.Principal);
+        Assert.Equal(cashId, body.FundingAssetId);
+        Assert.Equal("Cash account", body.FundingAssetName);
+
+        Assert.Equal(4_000m, (await client.GetAssetAsync(walletId, cashId, cancellationToken)).Quantity);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(savingsId, body.AssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(walletId, cashId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(savingsId, body.AssetId, cancellationToken);
+
+        var withdraw = await client.GetCashWithdrawAsync(walletId, cashId, cancellationToken);
+        Assert.Equal(1_000m, withdraw.Quantity);
+        Assert.Equal(1m, withdraw.UnitPrice);
+        Assert.Equal(new DateOnly(2026, 1, 15), withdraw.Date);
+        Assert.Equal(1_000.00m, withdraw.ValuePln);
+        var opening = Assert.Single((await client.ListTransactionsAsync(savingsId, body.AssetId, cancellationToken)).Items);
+        Assert.Equal(TransactionType.Deposit, opening.Type);
+        Assert.Equal(1_000m, opening.Quantity);
+        Assert.Equal(1m, opening.UnitPrice);
+        Assert.Equal(new DateOnly(2026, 1, 15), opening.Date);
+
+        await using var dbContext = CreateDbContext(userId);
+        var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        var cashLeg = Assert.Single(legs, t => t.AssetId == cashId);
+        var depositLeg = Assert.Single(legs, t => t.AssetId == body.AssetId);
+        Assert.Equal(withdraw.Id, cashLeg.Id);
+        Assert.Equal(TransactionType.Withdraw, cashLeg.Type);
+        Assert.Equal(opening.Id, depositLeg.Id);
+        Assert.Equal(TransactionType.Deposit, depositLeg.Type);
+        Assert.Equal(cashLeg.Date, depositLeg.Date);
+        Assert.Equal(cashLeg.Quantity, depositLeg.Quantity);
+        // The top-up that funded the Cash asset is an ordinary transaction, not part of the transfer.
+        Assert.Equal(1, await dbContext.Transactions.CountAsync(t => t.AssetId == cashId && t.TransferId == null, cancellationToken));
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-3, same-day half: the Cash was topped up on the deposit's
+    /// start date itself, with exactly the principal — the transfer out replays after the same-day
+    /// top-up (inflows before outflows), never failing on the Guid order.
+    /// </summary>
+    [Fact]
+    public async Task Add_FundedSameDayAsCashTopUp_Succeeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var startDate = new DateOnly(2026, 1, 15);
+        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 1_000m, toppedUpOn: startDate);
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+
+        var response = await client.PostAsJsonAsync(
+            DepositsUri(savingsId),
+            NewDepositRequest(principal: 1_000m, startDate: startDate, fundingAssetId: cashId),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.Equal(0m, (await client.GetAssetAsync(walletId, cashId, cancellationToken)).Quantity);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(savingsId, body!.AssetId, cancellationToken)).Quantity);
+        var withdraw = await client.GetCashWithdrawAsync(walletId, cashId, cancellationToken);
+        Assert.Equal(startDate, withdraw.Date);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(walletId, cashId, cancellationToken);
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-4: a funding source off the Cash → Deposit route (a Stock, a
+    /// deposit), in another currency, in an archived portfolio, or unknown is a 400
+    /// <c>Validation.InvalidTransferCounterpart</c> — and nothing is written: no deposit, no leg, the
+    /// source untouched.
+    /// </summary>
+    [Theory]
+    [InlineData("stock")]
+    [InlineData("eur-cash")]
+    [InlineData("archived-cash")]
+    [InlineData("deposit-asset")]
+    [InlineData("unknown-id")]
+    public async Task Add_InvalidFundingSource_ReturnsBadRequest(string invalidCase)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        // A valid PLN Cash source next to the invalid one: the rejection is about the chosen source.
+        await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Valid cash");
+        var sourceId = invalidCase switch
+        {
+            "stock" => await client.AddAssetAsync(walletId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock),
+            "eur-cash" => await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, currency: "EUR", name: "EUR cash"),
+            "archived-cash" => (await client.AddArchivedCashAssetAsync(cancellationToken)).CashId,
+            "deposit-asset" => (await client.AddDepositAsync(walletId, cancellationToken, NewDepositRequest(name: "Other deposit"))).AssetId,
+            "unknown-id" => Guid.NewGuid(),
+            _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
+        };
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            DepositsUri(savingsId), NewDepositRequest(principal: 1_000m, fundingAssetId: sourceId), cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-4: a principal above the Cash balance is a 400
+    /// <c>Validation.InsufficientFunds</c>; no deposit is created and the Cash keeps its balance.
+    /// </summary>
+    [Fact]
+    public async Task Add_FundingExceedsBalance_ReturnsInsufficientFunds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 5_000m);
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+
+        var response = await client.PostAsJsonAsync(
+            DepositsUri(savingsId), NewDepositRequest(principal: 5_000.01m, fundingAssetId: cashId), cancellationToken);
+
+        await response.AssertInsufficientFundsAsync(cancellationToken);
+        await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: the balance is checked across the whole history, not just at
+    /// the end — a deposit starting before the Cash was topped up would take Cash below zero on its
+    /// start date, so it is <c>Validation.InsufficientFunds</c> although the final balance would cover it.
+    /// </summary>
+    [Fact]
+    public async Task Add_FundingDatedBeforeCashTopUp_ReturnsInsufficientFunds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(
+            walletId, cancellationToken, balance: 5_000m, toppedUpOn: new DateOnly(2026, 2, 1));
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+
+        var response = await client.PostAsJsonAsync(
+            DepositsUri(savingsId),
+            NewDepositRequest(principal: 1_000m, startDate: new DateOnly(2026, 1, 15), fundingAssetId: cashId),
+            cancellationToken);
+
+        await response.AssertInsufficientFundsAsync(cancellationToken);
+        await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: the entry asset's own archived portfolio stays a 409
+    /// <c>Conflict.PortfolioArchived</c> (as everywhere), even with a valid funding source; the Cash is untouched.
+    /// </summary>
+    [Fact]
+    public async Task Add_FundedIntoArchivedPortfolio_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken);
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        await client.ArchivePortfolioAsync(savingsId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            DepositsUri(savingsId), NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
+    }
+
+    /// <summary>asset-transfers-deposit-funding: a deposit without a funding source is new money — no transfer, no funding asset.</summary>
+    [Fact]
+    public async Task Add_WithoutFundingSource_HasNoTransferOrFundingAsset()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken);
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+
+        var response = await client.PostAsJsonAsync(DepositsUri(savingsId), NewDepositRequest(), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Null(body.FundingAssetId);
+        Assert.Null(body.FundingAssetName);
+        var opening = Assert.Single((await client.ListTransactionsAsync(savingsId, body.AssetId, cancellationToken)).Items);
+        Assert.Null(opening.Transfer);
+        await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+    }
+
     [Fact]
     public async Task Add_ForNonExistentPortfolio_ReturnsNotFound()
     {

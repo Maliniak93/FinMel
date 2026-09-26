@@ -57,6 +57,30 @@
           <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
         }
       </mat-form-field>
+
+      <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+        <mat-label>Source of funds</mat-label>
+        <mat-select formControlName="fundingAssetId">
+          <mat-option [value]="null">New money (from outside)</mat-option>
+          @if (fundingCandidatesResource.hasValue()) {
+            @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
+                  formatMoney(candidate.balance, form.controls.currency.value)
+                }})
+              </mat-option>
+            }
+          }
+        </mat-select>
+        @if (fundingCandidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        }
+      </mat-form-field>
+    } @else if (data.deposit; as deposit) {
+      <p class="deposit-form-dialog__funding">
+        Source of funds
+        <strong>{{ deposit.fundingAssetName ?? 'New money (from outside)' }}</strong>
+      </p>
     }
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
@@ -66,6 +90,15 @@
         <mat-error>Principal is required.</mat-error>
       } @else if (form.controls.principal.hasError('min')) {
         <mat-error>Principal must be greater than 0.</mat-error>
+      } @else if (form.controls.principal.hasError('exceedsBalance')) {
+        <mat-error>
+          Principal is above the source's balance ({{
+            formatMoney(
+              form.controls.principal.getError('exceedsBalance').balance,
+              form.controls.currency.value
+            )
+          }}).
+        </mat-error>
       } @else if (form.controls.principal.hasError('server')) {
         <mat-error>{{ form.controls.principal.getError('server') }}</mat-error>
       }

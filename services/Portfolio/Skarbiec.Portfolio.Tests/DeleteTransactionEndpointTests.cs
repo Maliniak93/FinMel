@@ -52,6 +52,35 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Contains(page.Items, t => t.Id == buyId);
     }
 
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-6 (delete half): the Cash Withdraw leg of a transfer cannot
+    /// be deleted on its own — 409 <c>Conflict.TransferLegManaged</c>, both legs stay and both
+    /// quantities hold — while the ordinary top-up beside it stays deletable (as far as history allows).
+    /// </summary>
+    [Fact]
+    public async Task Delete_TransferLeg_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+        var leg = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(
+            TransactionUri(funded.CashPortfolioId, funded.CashAssetId, leg.Id), cancellationToken);
+
+        await response.AssertTransferLegManagedAsync(cancellationToken);
+        await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
+
+        // Control: an ordinary Cash transaction is still deletable.
+        var extraTopUpId = await client.RecordTransactionAsync(
+            funded.CashPortfolioId, funded.CashAssetId, TransactionType.Deposit, 250m, new DateOnly(2026, 3, 1), cancellationToken, unitPrice: 1m);
+        var extraResponse = await client.DeleteAsync(
+            TransactionUri(funded.CashPortfolioId, funded.CashAssetId, extraTopUpId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, extraResponse.StatusCode);
+        Assert.Equal(4_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+    }
+
     [Fact]
     public async Task Delete_ForNonExistentTransaction_ReturnsNotFound()
     {

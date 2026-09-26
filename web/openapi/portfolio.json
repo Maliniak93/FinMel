@@ -864,6 +864,46 @@
           }
         }
       }
+    },
+    "/api/portfolio/transfer-candidates": {
+      "get": {
+        "tags": [
+          "ListTransferCandidatesEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assetClass",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TransferCandidateResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -999,6 +1039,13 @@
               "string"
             ],
             "format": "double"
+          },
+          "fundingAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -1299,6 +1346,19 @@
               "string"
             ],
             "format": "double"
+          },
+          "fundingAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "fundingAssetName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1559,10 +1619,86 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "transfer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionTransferResponse"
+              }
+            ]
+          }
+        }
+      },
+      "TransactionTransferResponse": {
+        "required": [
+          "counterpartAssetId",
+          "counterpartAssetName",
+          "counterpartPortfolioId",
+          "counterpartPortfolioName",
+          "direction"
+        ],
+        "type": "object",
+        "properties": {
+          "counterpartAssetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartAssetName": {
+            "type": "string"
+          },
+          "counterpartPortfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartPortfolioName": {
+            "type": "string"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/TransferDirection"
           }
         }
       },
       "TransactionType": {
+        "type": "integer"
+      },
+      "TransferCandidateResponse": {
+        "required": [
+          "assetId",
+          "name",
+          "portfolioId",
+          "portfolioName",
+          "balance"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioName": {
+            "type": "string"
+          },
+          "balance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "TransferDirection": {
         "type": "integer"
       },
       "UpdateAssetRequest": {
@@ -1815,6 +1951,9 @@
     },
     {
       "name": "SettleDepositEndpoint"
+    },
+    {
+      "name": "ListTransferCandidatesEndpoint"
     }
   ]
 }

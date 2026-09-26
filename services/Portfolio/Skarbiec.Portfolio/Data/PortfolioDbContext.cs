@@ -75,6 +75,10 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             // No navigation/FK to Asset (ADR-003) — every transaction query filters by AssetId.
             transaction.HasIndex(t => t.AssetId);
 
+            // A transfer's legs are found by their shared TransferId (asset-transfers-deposit-funding):
+            // the counterpart lookup of ListTransactions/deposits and the detach on asset removal.
+            transaction.HasIndex(t => t.TransferId);
+
             // Same xmin concurrency token as Asset (see above) — protects a transaction row
             // itself against two concurrent edits/deletes of that exact transaction.
             transaction.Property<uint>("Xmin")

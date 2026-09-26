@@ -72,7 +72,7 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 
 ## Conscious simplifications
 
-Transactions are single-entry: a Dividend or Interest on one asset creates no matching cash inflow anywhere. A transaction's PLN value is frozen at the transaction-date rate — never recomputed later; a `null` rate fills in only when that transaction is edited (ADR-026). The base currency is PLN only — the user picks a currency per portfolio and asset, but every valuation is reported in PLN.
+Transactions are single-entry: a Dividend or Interest on one asset creates no matching cash inflow anywhere. Transfers are the exception — their two legs (a Withdraw and a Deposit) are linked by `TransferId` and changed only by their entry point (asset-transfers-deposit-funding). A transaction's PLN value is frozen at the transaction-date rate — never recomputed later; a `null` rate fills in only when that transaction is edited (ADR-026). The base currency is PLN only — the user picks a currency per portfolio and asset, but every valuation is reported in PLN.
 
 ## Misc
 

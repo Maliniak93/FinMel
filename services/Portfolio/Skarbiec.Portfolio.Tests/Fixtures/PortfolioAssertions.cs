@@ -85,6 +85,46 @@ internal static class PortfolioAssertions
             $"Expected a validation error keyed '{field}', got: {string.Join(", ", problem.Errors.Keys)}.");
     }
 
+    /// <summary>asset-transfers-deposit-funding: the 400 for a transfer counterpart that is not the user's, the same asset, off-route, in another currency or in an archived portfolio.</summary>
+    public const string InvalidTransferCounterpartErrorCode = "Validation.InvalidTransferCounterpart";
+
+    /// <summary>asset-transfers-deposit-funding: the 400 when a transfer would take the source's running balance below zero anywhere in its history.</summary>
+    public const string InsufficientFundsErrorCode = "Validation.InsufficientFunds";
+
+    /// <summary>asset-transfers-deposit-funding: the 409 UpdateTransaction/DeleteTransaction answer for a transfer leg — only its entry point changes it.</summary>
+    public const string TransferLegManagedErrorCode = "Conflict.TransferLegManaged";
+
+    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="InvalidTransferCounterpartErrorCode"/> ProblemDetails.</summary>
+    public static async Task AssertInvalidTransferCounterpartAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidTransferCounterpartErrorCode, cancellationToken);
+
+    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="InsufficientFundsErrorCode"/> ProblemDetails.</summary>
+    public static async Task AssertInsufficientFundsAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, InsufficientFundsErrorCode, cancellationToken);
+
+    /// <summary>Asserts <paramref name="response"/> is the 409 <see cref="TransferLegManagedErrorCode"/> ProblemDetails.</summary>
+    public static async Task AssertTransferLegManagedAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, TransferLegManagedErrorCode, cancellationToken);
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: a Cash asset is exactly as arranged by
+    /// <see cref="PortfolioApi.AddCashAssetWithBalanceAsync"/> — quantity <paramref name="balance"/>,
+    /// its single top-up and no transfer leg.
+    /// </summary>
+    public static async Task AssertCashUntouchedAsync(
+        this HttpClient client, Guid portfolioId, Guid cashId, CancellationToken cancellationToken, decimal balance = 5_000m)
+    {
+        var cash = await client.GetAssetAsync(portfolioId, cashId, cancellationToken);
+        Assert.Equal(balance, cash.Quantity);
+        var topUp = Assert.Single((await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items);
+        Assert.Equal(Skarbiec.Contracts.TransactionType.Deposit, topUp.Type);
+        Assert.Equal(balance, topUp.Quantity);
+        Assert.Null(topUp.Transfer);
+    }
+
     /// <summary>cash-transaction-types: the error code a transaction type the asset's class does not accept fails with (a top-level 400, no field key).</summary>
     public const string TransactionTypeNotAllowedErrorCode = "Validation.TransactionTypeNotAllowed";
 

@@ -27,6 +27,7 @@ import {
   type TransactionFormDialogData,
 } from './transaction-form-dialog/transaction-form-dialog';
 import { transactionTypeLabel } from './transaction-type';
+import { transferLabel } from './transfer-direction';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -139,6 +140,7 @@ export class Transactions {
 
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly transactionTypeLabel = transactionTypeLabel;
+  protected readonly transferLabel = transferLabel;
   protected readonly formatMoney = formatMoney;
 
   protected formatQuantity(quantity: number | string): string {

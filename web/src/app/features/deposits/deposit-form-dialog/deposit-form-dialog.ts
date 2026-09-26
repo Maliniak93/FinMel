@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, resource, signal } from '@angular/core';
+import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
@@ -20,11 +20,13 @@ import { map } from 'rxjs';
 
 import {
   getApiPortfolioPortfolios,
+  getApiPortfolioTransferCandidates,
   postApiPortfolioPortfoliosByPortfolioIdDeposits,
   putApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId,
   type DepositCapitalization,
   type DepositResponse,
   type DepositTermUnit,
+  type TransferCandidateResponse,
   type UpdateDepositRequest,
 } from '../../../api/portfolio';
 import {
@@ -34,6 +36,8 @@ import {
 } from '../../../core/auth/problem-details';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
+import { formatMoney } from '../../../shared/format-money';
+import { ASSET_CLASS } from '../../assets/asset-class';
 import {
   DEPOSIT_CAPITALIZATIONS,
   DEPOSIT_TERM_UNIT,
@@ -94,6 +98,25 @@ export class DepositFormDialog {
   protected readonly currencies = SUPPORTED_CURRENCIES;
   protected readonly termUnits = DEPOSIT_TERM_UNITS;
   protected readonly capitalizations = DEPOSIT_CAPITALIZATIONS;
+  protected readonly formatMoney = formatMoney;
+
+  // A principal funded from Cash can't exceed that Cash's balance (asset-transfers-deposit-funding);
+  // new money has no cap. Reads its sibling `fundingAssetId`, so it is re-run whenever the source or
+  // the candidates change. The server re-checks against the whole Cash history.
+  private readonly principalWithinBalance = (control: AbstractControl): ValidationErrors | null => {
+    const fundingAssetId = control.parent?.get('fundingAssetId')?.value as
+      string | null | undefined;
+    if (!fundingAssetId || control.value === null || control.value === '') {
+      return null;
+    }
+    const source = this.fundingSource(fundingAssetId);
+    if (!source) {
+      return null;
+    }
+    return Number(control.value) > Number(source.balance)
+      ? { exceedsBalance: { balance: source.balance } }
+      : null;
+  };
 
   protected readonly form = this.formBuilder.nonNullable.group({
     name: [this.deposit?.name ?? '', [Validators.required, Validators.maxLength(200)]],
@@ -108,7 +131,7 @@ export class DepositFormDialog {
     ],
     principal: [
       this.deposit ? Number(this.deposit.principal) : (null as number | null),
-      [Validators.required, Validators.min(0.01)],
+      [Validators.required, Validators.min(0.01), this.principalWithinBalance],
     ],
     startDate: [
       this.deposit ? fromDateOnly(this.deposit.startDate) : (new Date() as Date | null),
@@ -135,6 +158,9 @@ export class DepositFormDialog {
       this.deposit ? Number(this.deposit.earlyBreakInterestLossPercent) : (100 as number | null),
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
+    // The source of funds (asset-transfers-deposit-funding): null is new money from outside the app,
+    // otherwise one of the transfer candidates. Chosen on create only — edit shows it read-only.
+    fundingAssetId: [{ value: null as string | null, disabled: this.isEdit }],
   });
 
   // Signal mirror of the form, so the read-only maturity date recomputes as start and term change.
@@ -164,12 +190,60 @@ export class DepositFormDialog {
     },
   });
 
+  // The Cash accounts a new deposit can be funded from: the transfer candidates of the chosen
+  // currency, reloaded whenever it changes. Edit never offers a choice, so it loads nothing.
+  private readonly selectedCurrency = computed(() => this.formValue().currency);
+
+  protected readonly fundingCandidatesResource = resource({
+    params: () => (this.isEdit ? undefined : { currency: this.selectedCurrency() }),
+    loader: async ({ params, abortSignal }) => {
+      const result = await getApiPortfolioTransferCandidates({
+        query: { currency: params.currency, assetClass: ASSET_CLASS.Cash },
+        signal: abortSignal,
+      });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? 'Failed to load the sources of funds.',
+        );
+      }
+      return result.data ?? [];
+    },
+  });
+
   constructor() {
-    // The cap validator had no parent to read the unit from while the group was being built.
+    // The cap validators had no parent to read their siblings from while the group was being built.
     this.form.controls.termLength.updateValueAndValidity({ emitEvent: false });
     this.form.controls.termUnit.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.termLength.updateValueAndValidity());
+    this.form.controls.fundingAssetId.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.form.controls.principal.updateValueAndValidity());
+
+    // New candidates (another currency): a source no longer listed falls back to new money, and the
+    // principal is re-checked against the balances just loaded.
+    effect(() => {
+      if (!this.fundingCandidatesResource.hasValue()) {
+        return;
+      }
+      const candidates = this.fundingCandidatesResource.value();
+      untracked(() => {
+        const fundingAssetId = this.form.controls.fundingAssetId;
+        if (
+          fundingAssetId.value !== null &&
+          !candidates.some((candidate) => candidate.assetId === fundingAssetId.value)
+        ) {
+          fundingAssetId.setValue(null);
+        }
+        this.form.controls.principal.updateValueAndValidity();
+      });
+    });
+  }
+
+  private fundingSource(assetId: string): TransferCandidateResponse | undefined {
+    return this.fundingCandidatesResource.hasValue()
+      ? this.fundingCandidatesResource.value().find((candidate) => candidate.assetId === assetId)
+      : undefined;
   }
 
   protected async onSubmit(): Promise<void> {
@@ -206,7 +280,12 @@ export class DepositFormDialog {
         })
       : await postApiPortfolioPortfoliosByPortfolioIdDeposits({
           path: { portfolioId: values.portfolioId },
-          body: { ...terms, currency: values.currency },
+          // New money leaves fundingAssetId out of the body altogether.
+          body: {
+            ...terms,
+            currency: values.currency,
+            fundingAssetId: values.fundingAssetId ?? undefined,
+          },
         });
 
     this.submitting.set(false);
@@ -224,6 +303,15 @@ export class DepositFormDialog {
   }
 
   private applyServerErrors(problem: ApiProblemDetails): void {
+    // The source of funds can't cover the principal on the start date — a principal error.
+    if (problem.errorCode === 'Validation.InsufficientFunds') {
+      this.form.controls.principal.setErrors({
+        server: problem.detail ?? 'The source of funds cannot cover this principal.',
+      });
+      this.form.controls.principal.markAsTouched();
+      return;
+    }
+
     if (applyFieldErrors(this.form, problem)) {
       return;
     }

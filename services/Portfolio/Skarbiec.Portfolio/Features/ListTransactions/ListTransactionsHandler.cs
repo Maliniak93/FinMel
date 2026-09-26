@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.ListTransactions;
 
@@ -36,9 +37,45 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        // The counterpart of every transfer leg on this page, in one query (asset-transfers-deposit-funding).
+        // Both legs of a transfer always sit on different assets, so the counterpart is the other asset's leg.
+        var transferIds = transactions
+            .Where(t => t.TransferId is not null)
+            .Select(t => t.TransferId!.Value)
+            .ToList();
+
+        var counterparts = await (
+                from leg in dbContext.Transactions.AsNoTracking()
+                where leg.TransferId != null && transferIds.Contains(leg.TransferId.Value) && leg.AssetId != assetId
+                join counterpartAsset in dbContext.Assets on leg.AssetId equals counterpartAsset.Id
+                join counterpartPortfolio in dbContext.Portfolios on counterpartAsset.PortfolioId equals counterpartPortfolio.Id
+                select new
+                {
+                    TransferId = leg.TransferId!.Value,
+                    AssetId = counterpartAsset.Id,
+                    AssetName = counterpartAsset.Name,
+                    PortfolioId = counterpartPortfolio.Id,
+                    PortfolioName = counterpartPortfolio.Name
+                })
+            .ToDictionaryAsync(c => c.TransferId, cancellationToken);
+
         return new PagedResponse<TransactionResponse>
         {
-            Items = [.. transactions.Select(t => t.ToResponse(currency))],
+            Items =
+            [
+                .. transactions.Select(t => t.ToResponse(
+                    currency,
+                    t.TransferId is { } transferId && counterparts.TryGetValue(transferId, out var counterpart)
+                        ? new TransactionTransferResponse
+                        {
+                            CounterpartAssetId = counterpart.AssetId,
+                            CounterpartAssetName = counterpart.AssetName,
+                            CounterpartPortfolioId = counterpart.PortfolioId,
+                            CounterpartPortfolioName = counterpart.PortfolioName,
+                            Direction = TransferLegs.DirectionOf(t)
+                        }
+                        : null))
+            ],
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount

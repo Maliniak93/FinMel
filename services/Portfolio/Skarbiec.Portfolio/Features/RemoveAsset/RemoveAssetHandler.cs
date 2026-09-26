@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.RemoveAsset;
 
@@ -32,6 +33,10 @@ public sealed class RemoveAssetHandler(
             .ToListAsync(cancellationToken);
 
         dbContext.Transactions.RemoveRange(transactions);
+
+        // Detach, never reverse (asset-transfers-deposit-funding): a transfer leg on another asset stays
+        // as an ordinary transaction, its asset's quantity unchanged — so nothing is published for it.
+        await dbContext.DetachCounterpartsAsync(transactions, cancellationToken);
 
         // A term deposit's terms go with it (term-deposits).
         var termDeposit = await dbContext.TermDeposits.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);

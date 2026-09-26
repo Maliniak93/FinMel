@@ -25,4 +25,13 @@ public sealed class Transaction : IUserOwned
     public decimal? FxRateToPln { get; set; }
 
     public required DateOnly Date { get; set; }
+
+    /// <summary>
+    /// The link of a transfer leg (asset-transfers-deposit-funding): a transfer is exactly two
+    /// transactions sharing this id — a Withdraw on the source asset and a Deposit on the target, same
+    /// quantity, same date, unit price 1. Written only by a transfer's entry point (e.g. AddDeposit),
+    /// never by the transaction endpoints; <see langword="null"/> on an ordinary transaction and on a
+    /// leg whose counterpart's asset was removed (detached).
+    /// </summary>
+    public Guid? TransferId { get; set; }
 }

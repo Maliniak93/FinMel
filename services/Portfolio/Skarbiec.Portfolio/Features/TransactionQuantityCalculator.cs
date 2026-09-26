@@ -8,8 +8,8 @@ namespace Skarbiec.Portfolio.Features;
 /// The single code path deriving <see cref="Asset.Quantity"/> from a transaction history
 /// ("light" event sourcing, ADR-009) — shared by RecordTransaction (T1.3) and, later,
 /// UpdateTransaction/DeleteTransaction (T1.4). Replays the given transactions in chronological
-/// order and fails if a Sell/Withdraw would take the running quantity below zero at any point in
-/// history, not just at the end.
+/// order (same-day inflows first) and fails if a Sell/Withdraw would take the running quantity below
+/// zero at any point in history, not just at the end.
 /// </summary>
 public static class TransactionQuantityCalculator
 {
@@ -25,9 +25,15 @@ public static class TransactionQuantityCalculator
         oversellError ??= TransactionErrors.OversellsPosition;
         var quantity = 0m;
 
-        // Same-day ties break on Id — arbitrary but deterministic; the domain doesn't track
-        // intra-day ordering, so this is a reasonable simplification (not exercised by any AC).
-        foreach (var transaction in transactions.OrderBy(t => t.Date).ThenBy(t => t.Id))
+        // The domain doesn't track intra-day ordering, so a same-day tie replays inflows (a positive
+        // delta) before everything else, then by Id for determinism (asset-transfers-deposit-funding):
+        // a same-day top-up followed by a transfer out must never fail on the random Guid order.
+        var ordered = transactions
+            .OrderBy(t => t.Date)
+            .ThenBy(t => QuantityDelta(t) > 0 ? 0 : 1)
+            .ThenBy(t => t.Id);
+
+        foreach (var transaction in ordered)
         {
             quantity += QuantityDelta(transaction);
 
