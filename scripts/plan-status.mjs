@@ -134,6 +134,11 @@ function mismatches(specs, facts, prs) {
     if (merged.has(s.branch)) out.push(`#${s.number}: PR from \`${s.branch}\` merged but the issue is open (branch not linked to the issue) — close it`);
     else if (s.status === "Todo" && exists) out.push(`#${s.number}: card is Todo but \`${s.branch}\` exists — a run started without moving the card`);
   }
+  // GitHub never closes a parent issue on its own, so an epic outlives its last merged part.
+  const byNumber = new Map(specs.map((s) => [s.number, s]));
+  for (const e of specs.filter((x) => x.epic && x.status !== "Done" && x.subIssues?.length)) {
+    if (e.subIssues.every((n) => byNumber.get(n)?.status === "Done")) out.push(`#${e.number}: every part is done — close the epic (\`gh issue close ${e.number}\`)`);
+  }
   return out;
 }
 

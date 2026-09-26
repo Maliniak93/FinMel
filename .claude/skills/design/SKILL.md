@@ -64,10 +64,46 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
 9. Scope is a promise: everything the change does **not** include goes under Out of scope, especially
    the adjacent thing the user will assume is included. For a change spec, the adjacent thing is
    usually "and while we are in there, clean up X" — name it and exclude it.
-10. Split only when the work has parts that can be built, reviewed and merged **independently**, each
-    on its own branch. Then draft one umbrella (Goal, Why, overall Out of scope, and a numbered list
-    of the parts in build order — no AC) plus one full spec per part. A spec that is merely long is
-    still one issue.
+10. Watch for a split the whole time — see **Splitting into an epic** below.
+
+## Splitting into an epic
+
+A split can come up at any moment — while you read the plan, when `Explore` reports back, in the
+middle of the interview, after the draft, or when `/build` blocked because the spec was too big —
+and from either side: the user says "split it", or you see the signal and **propose it yourself**
+instead of silently writing one oversized spec. Propose with `AskUserQuestion`: the cut you
+recommend (one line per part: what it delivers, what master can do after it merges), "keep it one
+spec" and, where it makes sense, a coarser or finer cut. The user decides.
+
+Signals worth a proposal:
+- the ACs fall into groups that share no test project and no slice;
+- the work spans services in sequence (contract + publisher → consumer → UI) and each step leaves
+  master working;
+- one part is mechanical (Tier 1, or `skip-tests` cleanup) and another is a new pattern (Tier 2) —
+  splitting lets each run with its own tier and skip;
+- the diff would be too large to review in one sitting (roughly > 12 ACs or > 3 services).
+
+A good cut:
+- **Each part is one issue, one branch, one PR**, with its own Goal, Scope, Out of scope and ACs that
+  prove it on its own — never an AC that only passes once a later part merges.
+- **Each part leaves master green and coherent.** A contract nobody publishes yet is fine; a
+  half-migrated slice, or a UI that calls an endpoint that does not exist yet, is not.
+- **Granular but not trivial:** a part too small for its own PR (a rename, one config line) folds into
+  its neighbour. A spec that is merely long is still one issue.
+- **Build order is merge order.** Parts are attached in build order and `prepare` refuses a part
+  while an earlier sibling is open, because every branch is cut from master. Work that is truly
+  independent of the rest is not a part — it is a separate spec with no epic.
+
+Drafting: the umbrella from `.claude/skills/design/epic-template.md` as `<slug>.md` (Goal, Why,
+Parts in build order, overall Out of scope, cross-part Design decisions — no AC), plus one full spec
+per part from `issue-template.md` as `<slug>-<n>-<part-slug>.md`, each with its own tier, kind and
+skip-tests. Check the umbrella with `check --epic` and every part with `check`. The approval summary
+lists the parts one line each (title, tier, kind, AC count).
+
+Converting an already published spec (the user asks, or `/build` blocked on it): the existing issue
+stays a part — narrow its body to that part with `edit --body-file`, never delete and re-create it —
+and the new epic is created around it. Attach in build order: create the epic, then for each part
+either `create --parent <epic>` (new part) or `edit <n> --parent <epic>` (the existing issue).
 
 ## Finish
 
@@ -86,8 +122,9 @@ node scripts/gh-project.mjs create --title "<title>" --body-file <scratchpad>/<s
   --slug <slug> --tier <1|2> --kind <new|change|cleanup> [--skip-tests]
 ```
 
-For a split: first the umbrella with `--epic`, then each part in build order with
-`--parent <umbrella number>`. The script prints `{"number","url","branch"}` per issue; if it fails
+For a split: first the umbrella with `--epic` (its `--tier` is the highest of its parts, its
+`--kind` the one most parts share), then each part in build order with `--parent <umbrella number>`
+and its own `--slug`, `--tier`, `--kind`, `--skip-tests`. The script prints `{"number","url","branch"}` per issue; if it fails
 after the issue exists, it prints the URL — finish the missing fields with
 `node scripts/gh-project.mjs set <number> <field> <value>` instead of creating a duplicate.
 
@@ -98,4 +135,4 @@ only what changes, and after the same explicit yes publish with
 the same spec.
 
 Reply with the issue link(s) and tell the user to run `/build #<number>` (for a split: the first
-part). Write no production code, no tests, no scaffolding at any point.
+part — each next part is buildable once the previous one has merged). Write no production code, no tests, no scaffolding at any point.
