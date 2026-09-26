@@ -100,6 +100,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             termDeposit.Property(t => t.Principal).HasPrecision(18, 2);
             termDeposit.Property(t => t.AnnualInterestRatePercent).HasPrecision(7, 4);
             termDeposit.Property(t => t.EarlyBreakInterestLossPercent).HasPrecision(5, 2);
+            termDeposit.Property(t => t.SettledGrossInterest).HasPrecision(18, 2);
+            termDeposit.Property(t => t.SettledTax).HasPrecision(18, 2);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).

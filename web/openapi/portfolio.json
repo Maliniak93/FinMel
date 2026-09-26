@@ -776,6 +776,94 @@
           }
         }
       }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settlement-preview": {
+      "get": {
+        "tags": [
+          "GetSettlementPreviewEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositSettlementPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settle": {
+      "post": {
+        "tags": [
+          "SettleDepositEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleDepositRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -995,6 +1083,12 @@
               "string"
             ],
             "format": "date"
+          },
+          "depositSettled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -1180,6 +1274,79 @@
           },
           "status": {
             "$ref": "#/components/schemas/DepositStatus"
+          },
+          "settledOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "settledGrossInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "settledTax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "DepositSettlementPreviewResponse": {
+        "required": [
+          "settledOn",
+          "grossInterest",
+          "tax",
+          "netInterest",
+          "finalAmount"
+        ],
+        "type": "object",
+        "properties": {
+          "settledOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "grossInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "netInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "finalAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -1301,6 +1468,40 @@
           "date": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "SettleDepositRequest": {
+        "required": [
+          "settledOn",
+          "grossInterest",
+          "tax"
+        ],
+        "type": "object",
+        "properties": {
+          "settledOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "grossInterest": {
+            "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -1608,6 +1809,12 @@
     },
     {
       "name": "ListDepositsEndpoint"
+    },
+    {
+      "name": "GetSettlementPreviewEndpoint"
+    },
+    {
+      "name": "SettleDepositEndpoint"
     }
   ]
 }

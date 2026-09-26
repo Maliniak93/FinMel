@@ -567,4 +567,27 @@ describe('Assets', () => {
     expect(chip?.textContent).toContain('Due');
     expect(runningRow?.textContent).not.toContain('Due');
   });
+
+  // term-deposits-settlement: a settled deposit is past maturity but no longer Due — AssetResponse
+  // carries `depositSettled`, and its row shows no "Due" chip.
+  it('a settled Deposit row shows no "Due" chip', async () => {
+    const matured = { ...depositAsset(daysFromToday(-1)), name: 'Matured deposit' };
+    const settled = {
+      ...depositAsset(daysFromToday(-1)),
+      id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      name: 'Settled deposit',
+      quantity: 10121.5,
+      depositSettled: true,
+    };
+    await setup(jsonResponse([matured, settled]));
+
+    const rows = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr.mat-mdc-row'),
+    );
+    const maturedRow = rows.find((row) => (row.textContent ?? '').includes('Matured deposit'));
+    const settledRow = rows.find((row) => (row.textContent ?? '').includes('Settled deposit'));
+    expect(maturedRow?.textContent).toContain('Due');
+    expect(settledRow).toBeDefined();
+    expect(settledRow?.textContent).not.toContain('Due');
+  });
 });

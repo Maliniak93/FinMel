@@ -98,6 +98,45 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.Equal(1, await dbContext.Transactions.CountAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
     }
 
+    /// <summary>
+    /// term-deposits-settlement AC-6: a stranger previewing or settling the owner's Due deposit — via
+    /// the owner's portfolio id or their own — gets 404 every time, and the deposit stays unsettled.
+    /// </summary>
+    [Fact]
+    public async Task Settle_ForeignDeposit_IsRejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var (ownerPortfolioId, deposit) = await owner.CreatePortfolioWithDepositAsync(cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+
+        var previewViaOwnersPortfolio = await stranger.GetAsync(
+            DepositSettlementPreviewUri(ownerPortfolioId, deposit.AssetId), cancellationToken);
+        var previewViaStrangersPortfolio = await stranger.GetAsync(
+            DepositSettlementPreviewUri(strangerPortfolioId, deposit.AssetId), cancellationToken);
+        var settleViaOwnersPortfolio = await stranger.PostAsJsonAsync(
+            SettleDepositUri(ownerPortfolioId, deposit.AssetId), NewSettleRequest(), cancellationToken);
+        var settleViaStrangersPortfolio = await stranger.PostAsJsonAsync(
+            SettleDepositUri(strangerPortfolioId, deposit.AssetId), NewSettleRequest(), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, previewViaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, previewViaStrangersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, settleViaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, settleViaStrangersPortfolio.StatusCode);
+        await owner.AssertDepositUnsettledAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
+        await using var dbContext = CreateDbContext(ownerId);
+        var terms = await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken);
+        Assert.Null(terms.SettledOn);
+        Assert.Null(terms.SettledGrossInterest);
+        Assert.Null(terms.SettledTax);
+        // Control: the owner can still settle it — the 404s were about the caller, not the deposit.
+        var ownSettle = await owner.PostAsJsonAsync(SettleDepositUri(ownerPortfolioId, deposit.AssetId), NewSettleRequest(), cancellationToken);
+        Assert.True(ownSettle.IsSuccessStatusCode, $"The owner's settle answered {(int)ownSettle.StatusCode}.");
+    }
+
     /// <summary>A stranger cannot add a deposit into the owner's portfolio — 404, and no row lands under either user.</summary>
     [Fact]
     public async Task Add_IntoStrangersPortfolio_ReturnsNotFound()

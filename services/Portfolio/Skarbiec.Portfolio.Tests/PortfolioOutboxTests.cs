@@ -11,6 +11,7 @@ using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.DeletePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
@@ -61,6 +62,7 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
             services.AddScoped<RemoveAssetHandler>();
             services.AddScoped<AddDepositHandler>();
             services.AddScoped<UpdateDepositHandler>();
+            services.AddScoped<SettleDepositHandler>();
             services.AddScoped<ArchivePortfolioHandler>();
             services.AddScoped<RestorePortfolioHandler>();
             services.AddScoped<DeletePortfolioHandler>();
@@ -843,6 +845,61 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
     }
 
     /// <summary>
+    /// term-deposits-settlement AC-3 (outbox half): SettleDeposit stores the settlement, adds the
+    /// net-interest Deposit transaction, raises the quantity to principal + net and writes exactly one
+    /// further <see cref="AssetPositionChanged"/> carrying that final quantity — all in a single save.
+    /// The host clock is the real one (today is well past the 2026-04-15 maturity).
+    /// </summary>
+    [Fact]
+    public async Task SettleDeposit_PublishesPositionChangedWithFinalAmount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Settlement outbox portfolio" }, cancellationToken)).Value.Id;
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess);
+            assetId = added.Value.AssetId;
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
+                .HandleAsync(portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        Assert.Equal(2, events.Count);
+        Assert.All(events, e => Assert.Equal(assetId, e.AssetId));
+        Assert.Equal(10_000m, events[0].Quantity);
+        Assert.Equal(10_119.83m, events[1].Quantity);
+        Assert.True(events[1].Version > events[0].Version);
+        Assert.Equal(AssetClass.Deposit, events[1].AssetClass);
+        Assert.Equal(UserId, events[1].UserId);
+
+        Assert.Equal(10_119.83m, (await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken)).Quantity);
+        var credit = await verifyDb.Transactions.SingleAsync(t => t.AssetId == assetId && t.Quantity == 119.83m, cancellationToken);
+        Assert.Equal(TransactionType.Deposit, credit.Type);
+        Assert.Equal(new DateOnly(2026, 4, 15), credit.Date);
+        var terms = await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        Assert.Equal(new DateOnly(2026, 4, 15), terms.SettledOn);
+        Assert.Equal(147.95m, terms.SettledGrossInterest);
+        Assert.Equal(28.12m, terms.SettledTax);
+    }
+
+    /// <summary>
     /// term-deposits AC-11 (outbox half): RemoveAsset on a term deposit deletes the asset, its
     /// opening transaction and its <see cref="TermDeposit"/> row and writes one non-cascaded
     /// <see cref="AssetRemoved"/>, all in one save.
@@ -889,7 +946,8 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
     }
 
     /// <summary>
-    /// term-deposits AC-7 (outbox half): AddDeposit and UpdateDeposit into an archived portfolio
+    /// term-deposits AC-7 (outbox half): AddDeposit, UpdateDeposit and (term-deposits-settlement)
+    /// SettleDeposit into an archived portfolio
     /// fail with <c>Conflict.PortfolioArchived</c> before writing anything — no outbox row, no terms change.
     /// </summary>
     [Fact]
@@ -927,6 +985,8 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
                 assetId,
                 PortfolioApi.NewDepositRequest(principal: 99_999m).ToUpdateRequest(),
                 cancellationToken)).Error),
+            ("SettleDeposit", async s => (await s.GetRequiredService<SettleDepositHandler>().HandleAsync(
+                portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken)).Error),
         };
 
         foreach (var (name, write) in writes)

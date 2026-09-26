@@ -8,6 +8,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -22,11 +23,21 @@ import {
   DepositFormDialog,
   type DepositFormDialogData,
 } from './deposit-form-dialog/deposit-form-dialog';
-import { DEPOSIT_STATUS, depositStatusLabel, formatPercent } from './deposit-terms';
+import {
+  DEPOSIT_STATUS,
+  depositStatusLabel,
+  formatPercent,
+  settlementAmounts,
+} from './deposit-terms';
+import {
+  SettleDepositDialog,
+  type SettleDepositDialogData,
+} from './settle-deposit-dialog/settle-deposit-dialog';
 
-// Every term deposit of the user across portfolios, with the server's projection and Active / Due
-// status (term-deposits). MatDialog/MatSnackBar are injected as services only — see assets.ts for
-// why MatDialogModule/MatSnackBarModule are deliberately not in `imports`.
+// Every term deposit of the user across portfolios, with the server's projection and Active / Due /
+// Settled status (term-deposits, term-deposits-settlement). MatDialog/MatSnackBar are injected as
+// services only — see assets.ts for why MatDialogModule/MatSnackBarModule are deliberately not in
+// `imports`.
 @Component({
   selector: 'app-deposits',
   imports: [
@@ -37,6 +48,7 @@ import { DEPOSIT_STATUS, depositStatusLabel, formatPercent } from './deposit-ter
     MatMenuModule,
     MatProgressSpinnerModule,
     MatTableModule,
+    MatTooltipModule,
   ],
   templateUrl: './deposits.html',
   styleUrl: './deposits.scss',
@@ -75,6 +87,27 @@ export class Deposits {
 
   protected isDue(deposit: DepositResponse): boolean {
     return Number(deposit.status) === DEPOSIT_STATUS.Due;
+  }
+
+  protected nameCellId(deposit: DepositResponse): string {
+    return `deposit-${deposit.assetId}-name`;
+  }
+
+  protected isSettled(deposit: DepositResponse): boolean {
+    return Number(deposit.status) === DEPOSIT_STATUS.Settled;
+  }
+
+  // A Settled row shows what the bank actually paid; any other row the server's projection.
+  protected netInterest(deposit: DepositResponse): number | string {
+    return this.isSettled(deposit)
+      ? this.settledAmounts(deposit).netInterest
+      : deposit.projection.netInterest;
+  }
+
+  protected finalAmount(deposit: DepositResponse): number | string {
+    return this.isSettled(deposit)
+      ? this.settledAmounts(deposit).finalAmount
+      : deposit.projection.finalAmount;
   }
 
   protected openCreateDialog(): void {
@@ -117,6 +150,24 @@ export class Deposits {
     }
 
     this.depositsResource.reload();
+  }
+
+  protected openSettleDialog(deposit: DepositResponse): void {
+    const data: SettleDepositDialogData = { deposit };
+    const ref = this.dialog.open(SettleDepositDialog, { width: '480px', data });
+    ref.afterClosed().subscribe((settled: boolean | undefined) => {
+      if (settled) {
+        this.depositsResource.reload();
+      }
+    });
+  }
+
+  private settledAmounts(deposit: DepositResponse): { netInterest: number; finalAmount: number } {
+    return settlementAmounts(
+      deposit.principal,
+      deposit.settledGrossInterest ?? 0,
+      deposit.settledTax ?? 0,
+    );
   }
 
   private openDialog(data: DepositFormDialogData): void {

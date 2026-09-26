@@ -1,0 +1,125 @@
+<h2 mat-dialog-title>Settle deposit</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="settle-deposit-dialog__name">{{ deposit.name }}</p>
+
+    <dl class="settle-deposit-dialog__summary">
+      <div>
+        <dt>Principal</dt>
+        <dd>{{ formatMoney(deposit.principal, deposit.currency) }}</dd>
+      </div>
+      <div>
+        <dt>Maturity</dt>
+        <dd>{{ maturityDate | date: 'mediumDate' }}</dd>
+      </div>
+    </dl>
+
+    @if (previewResource.error(); as loadError) {
+      <p class="settle-deposit-dialog__error" role="alert">{{ loadError.message }}</p>
+    } @else if (previewResource.isLoading()) {
+      <div class="settle-deposit-dialog__loading">
+        <mat-spinner diameter="24" />
+      </div>
+    }
+
+    <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
+      <mat-label>Settlement date</mat-label>
+      <input
+        matInput
+        [matDatepicker]="settledOnPicker"
+        [min]="minSettledOn"
+        [max]="maxSettledOn"
+        formControlName="settledOn"
+      />
+      <mat-datepicker-toggle matIconSuffix [for]="settledOnPicker"></mat-datepicker-toggle>
+      <mat-datepicker #settledOnPicker></mat-datepicker>
+      @if (form.controls.settledOn.hasError('required')) {
+        <mat-error>Settlement date is required.</mat-error>
+      } @else if (
+        form.controls.settledOn.hasError('settledOnBeforeStart') ||
+        form.controls.settledOn.hasError('matDatepickerMin')
+      ) {
+        <mat-error>Settlement date can't be before the start date.</mat-error>
+      } @else if (
+        form.controls.settledOn.hasError('settledOnInFuture') ||
+        form.controls.settledOn.hasError('matDatepickerMax')
+      ) {
+        <mat-error>Settlement date can't be in the future.</mat-error>
+      } @else if (form.controls.settledOn.hasError('server')) {
+        <mat-error>{{ form.controls.settledOn.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="settle-deposit-dialog__row">
+      <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
+        <mat-label>Gross interest</mat-label>
+        <input matInput type="number" step="0.01" formControlName="grossInterest" />
+        @if (form.controls.grossInterest.hasError('required')) {
+          <mat-error>Gross interest is required.</mat-error>
+        } @else if (form.controls.grossInterest.hasError('min')) {
+          <mat-error>Gross interest can't be negative.</mat-error>
+        } @else if (form.controls.grossInterest.hasError('server')) {
+          <mat-error>{{ form.controls.grossInterest.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
+        <mat-label>Tax</mat-label>
+        <input matInput type="number" step="0.01" formControlName="tax" />
+        @if (form.controls.tax.hasError('required')) {
+          <mat-error>Tax is required.</mat-error>
+        } @else if (form.controls.tax.hasError('min')) {
+          <mat-error>Tax can't be negative.</mat-error>
+        } @else if (form.controls.tax.hasError('taxOverGross')) {
+          <mat-error>Tax can't exceed the gross interest.</mat-error>
+        } @else if (form.controls.tax.hasError('server')) {
+          <mat-error>{{ form.controls.tax.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <dl class="settle-deposit-dialog__summary">
+      <div>
+        <dt>Net interest</dt>
+        <dd>
+          @if (amounts(); as settled) {
+            {{ formatMoney(settled.netInterest, deposit.currency) }}
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Final amount</dt>
+        <dd>
+          @if (amounts(); as settled) {
+            <strong>{{ formatMoney(settled.finalAmount, deposit.currency) }}</strong>
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+    </dl>
+
+    @if (formError()) {
+      <p class="settle-deposit-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      [disabled]="submitting() || !previewResource.hasValue()"
+    >
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        Settle
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

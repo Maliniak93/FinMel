@@ -108,4 +108,29 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(new DateOnly(2026, 4, 15), assets.Single(a => a.Id == deposit.AssetId).DepositMaturityDate);
         Assert.Null(assets.Single(a => a.Id == cashId).DepositMaturityDate);
     }
+
+    /// <summary>
+    /// term-deposits-settlement: <c>AssetResponse.DepositSettled</c> tells the asset list to drop the
+    /// "Due" chip — true on a settled deposit, false on an unsettled one, null on every other asset.
+    /// </summary>
+    [Fact]
+    public async Task List_WithSettledTermDeposit_CarriesDepositSettled()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, settled) = await client.CreatePortfolioWithDepositAsync(cancellationToken, NewDepositRequest(name: "Settled"));
+        var due = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Due"));
+        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        await client.SettleDepositAsync(portfolioId, settled.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var assets = await response.Content.ReadFromJsonAsync<List<AssetResponse>>(cancellationToken);
+        Assert.NotNull(assets);
+        Assert.True(assets.Single(a => a.Id == settled.AssetId).DepositSettled);
+        Assert.False(assets.Single(a => a.Id == due.AssetId).DepositSettled);
+        Assert.Null(assets.Single(a => a.Id == cashId).DepositSettled);
+    }
 }

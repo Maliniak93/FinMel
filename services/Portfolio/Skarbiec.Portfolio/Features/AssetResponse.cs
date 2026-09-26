@@ -21,6 +21,9 @@ public sealed record AssetResponse
 
     /// <summary>A Deposit-class asset's maturity date, read from its term-deposit terms; <see langword="null"/> for every other asset (term-deposits).</summary>
     public DateOnly? DepositMaturityDate { get; init; }
+
+    /// <summary>Whether a Deposit-class asset's term deposit is settled, so the asset list drops its "Due" chip; <see langword="null"/> for every other asset (term-deposits-settlement).</summary>
+    public bool? DepositSettled { get; init; }
 }
 
 public static class AssetMappingExtensions
@@ -29,21 +32,24 @@ public static class AssetMappingExtensions
     /// spec-02: <paramref name="transactionCount"/> is a parameter because the count lives in the
     /// Transactions table, not on the row — read slices project it as a correlated subquery inside
     /// their own query, and a slice that already knows the number passes it directly.
-    /// <paramref name="depositMaturityDate"/> likewise comes from the TermDeposits table (term-deposits).
+    /// <paramref name="depositMaturityDate"/> and <paramref name="depositSettled"/> likewise come from
+    /// the TermDeposits table (term-deposits, term-deposits-settlement).
     /// </summary>
-    public static AssetResponse ToResponse(this Asset asset, int transactionCount, DateOnly? depositMaturityDate = null) => new()
-    {
-        Id = asset.Id,
-        PortfolioId = asset.PortfolioId,
-        AssetClass = asset.AssetClass,
-        ValuationMode = asset.ValuationMode,
-        Name = asset.Name,
-        Currency = asset.Currency,
-        Quantity = asset.Quantity,
-        ManualValue = asset.ManualValueAmount,
-        ManualValueDate = asset.ManualValueDate,
-        InstrumentId = asset.InstrumentId,
-        TransactionCount = transactionCount,
-        DepositMaturityDate = depositMaturityDate
-    };
+    public static AssetResponse ToResponse(
+        this Asset asset, int transactionCount, DateOnly? depositMaturityDate = null, bool? depositSettled = null) => new()
+        {
+            Id = asset.Id,
+            PortfolioId = asset.PortfolioId,
+            AssetClass = asset.AssetClass,
+            ValuationMode = asset.ValuationMode,
+            Name = asset.Name,
+            Currency = asset.Currency,
+            Quantity = asset.Quantity,
+            ManualValue = asset.ManualValueAmount,
+            ManualValueDate = asset.ManualValueDate,
+            InstrumentId = asset.InstrumentId,
+            TransactionCount = transactionCount,
+            DepositMaturityDate = depositMaturityDate,
+            DepositSettled = depositSettled
+        };
 }

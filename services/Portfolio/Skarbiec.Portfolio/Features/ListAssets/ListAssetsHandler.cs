@@ -30,12 +30,16 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext)
                 DepositMaturityDate = dbContext.TermDeposits
                     .Where(t => t.AssetId == a.Id)
                     .Select(t => (DateOnly?)t.MaturityDate)
+                    .FirstOrDefault(),
+                DepositSettled = dbContext.TermDeposits
+                    .Where(t => t.AssetId == a.Id)
+                    .Select(t => (bool?)(t.SettledOn != null))
                     .FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
 
         IReadOnlyList<AssetResponse> response = rows
-            .Select(r => r.Asset.ToResponse(r.TransactionCount, r.DepositMaturityDate))
+            .Select(r => r.Asset.ToResponse(r.TransactionCount, r.DepositMaturityDate, r.DepositSettled))
             .ToList();
         return Result<IReadOnlyList<AssetResponse>>.Success(response);
     }
