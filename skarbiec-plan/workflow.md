@@ -22,9 +22,9 @@ Every board operation goes through `scripts/gh-project.mjs` (`init`, `check`, `c
 |---|---|---|---|---|---|
 | `implementer` | sonnet/high (Tier 1); opus/xhigh (Tier 2, or after Tier-1 escalation) | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7, Playwright MCP — no `Agent` | `backend-playbook`, `frontend-playbook` | drives tests to green per the spec; updates `requests/*.http`, the TS client, and any rule/ADR it changes the convention of. Runs **only** `dotnet test --filter` on its own tests (+ `gen:api`/`typecheck` after an API change, `dotnet format` after a migration) — every suite belongs to the verifier | `{filesTouched[], projects[], commandsRun[], notes[]}` |
 | `test-writer` | sonnet/high (Tier 1) · opus/high (Tier 2) | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7 | `testing-playbook` | writes failing tests from the spec's acceptance criteria (slice/unit/tenancy/outbox), runs them **filtered** to confirm red | `{tests[{name,file,ac}], projects[]}` |
-| `verifier` | haiku/low | Bash, Read | — | runs `node scripts/verify.mjs --projects …`, parses the result | `{ok, failures[{step,summary,file?}]}` |
+| `verifier` | haiku/low | Bash, Read | — | runs `node scripts/verify.mjs --projects …` (re-runs it once after `stop-stack.mjs` when a running stack blocked it), parses the result | `{ok, failures[{step,summary,file?}]}` |
 | `reviewer` | opus/high | Read, Grep, Glob, Bash + microsoft-docs, context7 — no Edit/Write | `review-checklist` | fresh context; diffs the staged change (`git diff --cached`) against the spec and the hard rules; flags only what breaks correctness or an acceptance criterion | `{findings[{severity: blocking\|minor, file, line, claim, evidence}]}` |
-| `ops` | sonnet/medium (haiku/low for the mechanical branch/stage phases of a build run) | Bash, Read, Edit, Write, Glob, Grep + GitHub MCP (reads + review comments only) | `ops-playbook` | in a build run: branch + `git add -A`, nothing more; outside one: commits, PRs, CI triage, dependabot, runner, `.github/**` | `{branch, stagedFiles?, notes[]}` |
+| `ops` | sonnet/medium (haiku/low for the mechanical branch/stage/ship phases of a build run) | Bash, Read, Edit, Write, Glob, Grep + GitHub MCP (reads + review comments only) | `ops-playbook` | in a build run: branch, `git add -A` before the review, then commit + push + PR with the commands the workflow gives it — never a merge; outside one: commits, PRs, CI triage, dependabot, runner, `.github/**` | `{branch, stagedFiles?, commit?, prUrl?, notes[]}` |
 | `Explore` (built-in) | default, skips CLAUDE.md | read-only | — | codebase research for `/design` and `/fix` | text |
 
 Author ≠ reviewer (ADR-024): the reviewer always runs in a clean context and never edits a file.
@@ -41,15 +41,16 @@ flowchart LR
     V -- ok --> C[Stage: git add -A]
     C --> R{Review}
     R -- blocking --> IF
-    R -- clean --> S[Stage: git add -A]
-    S --> Done([gh-project.mjs report: comment + tick ACs; commit/push/PR commands])
+    R -- clean --> S[Ship: add, commit, push, gh pr create]
+    S --> Done([gh-project.mjs report: comment with PR link + tick ACs; the user merges])
 ```
 
 - **Branch first (D1).** `ops` cuts the issue's branch from an up-to-date `master` before a single file is written, and stops the run if the tree holds anything that is not this spec. An interrupted run therefore leaves its work on its own branch, never loose on `master`, and re-running `/build #<n>` picks that branch back up.
-- **Stage before review (D2).** After a green verify, `ops` runs `git add -A` so the reviewer diffs `git diff --cached`. A bare `git diff` never shows a brand-new file, and most of a new slice is new files — the index does show them, so staging is enough and no commit is needed.
-- **The pipeline never commits, pushes or opens a PR (D3).** It ends with the change staged on its branch and the run report commented on the issue; the commit message, the push and the PR are the user's, written by hand. No agent has ever merged, and now none of them commits either.
+- **Stage before review (D2).** After a green verify, `ops` runs `git add -A` so the reviewer diffs `git diff --cached`. A bare `git diff` never shows a brand-new file, and most of a new slice is new files — the index does show them, so staging is enough and no commit is needed before the review.
+- **The pipeline ships, the user merges (D3).** Once the review is clean, the Ship step commits (the spec's title, `Spec: #<n>`, the co-author trailer), pushes the branch and opens the PR against `master`, then comments the run report with the PR link on the issue. The workflow builds every command; `ops` runs them verbatim, one Bash call each, so `git-guard` sees each one. A failure there stops the run at `stage: ship` with the remaining commands for the user. No agent merges, ever.
+- **A running stack never blocks a run (D4).** The local stack (Aspire AppHost, services, `ng serve`) locks build outputs and `node_modules` binaries. `verify.mjs` stops it itself on MSB3021/3026/3027 and retries the build; any agent blocked by it (locked file, port in use) runs `node scripts/stop-stack.mjs` and retries once. Nothing restarts the stack — that is the user's.
 - **Verify fails:** up to `maxRounds` (default 2) fix/verify cycles. On Tier 1, the model escalates to opus/xhigh after 2 failed rounds for one final attempt; past that, the run stops with `status: blocked` and the failures.
-- **Review has `blocking` findings:** implementer addresses them, verify re-runs; up to `maxRounds` rounds, else `status: blocked`. `minor` findings never block the run — there is no PR to post them on, so they come back in the workflow's report and `/build` prints them and posts them on the issue.
+- **Review has `blocking` findings:** implementer addresses them, verify re-runs; up to `maxRounds` rounds, else `status: blocked`. `minor` findings never block the run — they come back in the workflow's report, and `/build` prints them and posts them on the issue.
 - **Skippable phases.** `Tests` and `Review` can be skipped; `Verify` never — it is the definition of green. A spec issue carries the `skip-tests` label when it adds and alters no behaviour (deletion, config, docs, a pure move); every acceptance criterion must then be provable by a command, a grep or an existing test class. `/build --skip tests,review` overrides the label for one run. A spec **without** the flag whose test-writer produces nothing still stops the run — that means its criteria were not testable as written, which is worth knowing.
 - `/build` is a skill with `disable-model-invocation: true` that calls `Workflow({name: 'build-feature', args})`: control flow is a script (`.claude/workflows/build-feature.js`), not model tokens. `/build` first writes the issue body to a gitignored local copy (`skarbiec-plan/issues/<n>.md`, via `gh-project.mjs get --out`); each agent receives that path, the branch and title, and the prior phase's structured output — never the conversation history or a raw diff.
 - `+Nk` sets a token budget checked before every phase; going over it returns `status: blocked` with a report, never a silent partial run.
@@ -69,10 +70,10 @@ flowchart LR
 
 - `node scripts/verify.mjs` is green.
 - Review has zero `blocking` findings.
-- The whole change is staged on the issue's branch — nothing committed, nothing pushed.
-- The run report is commented on the issue and its acceptance criteria are ticked.
-- Any rule or ADR the spec touched is staged with it.
-- The user then commits, pushes and opens the PR by hand, and merges it when CI is green — which moves the card to Done.
+- The whole change is committed on the issue's branch, pushed, and its PR against `master` is open.
+- The run report, with the PR link, is commented on the issue and its acceptance criteria are ticked.
+- Any rule or ADR the spec touched is in the same commit.
+- The user merges the PR when CI is green — which closes the issue and moves the card to Done.
 
 ## Tier rule
 
@@ -90,10 +91,10 @@ No budget is enforced by default — a `/build` run goes to completion. Passing 
 ## Git conventions
 
 - Branch: the issue's Branch field — `feat/<slug>`, or `fix/<slug>` for a fix — cut by `ops`.
-- Commit message: the spec's title — written by the **user**, who also pushes and opens the PR. A build run stops at `git add -A`.
-- PR: opened by the user against `master` from the issue's linked branch — no `Closes #<n>` needed. **The user always merges — no agent merges, ever.**
-- An agent commits or pushes only inside an explicit `/ops <task>` that asks for it; never inside `/build` or `/fix`.
-- `git-guard` hook: commit/push on `feat/*`, and `gh pr create --base master` from `feat/*`, run without asking; `gh pr merge` always asks; a push to `master` asks; a force-push is denied outright. It is a backstop for the `/ops` lane — the build pipeline no longer reaches it. Legacy lanes (`praca_*`, `[MT]\d`) keep whatever behavior they already had.
+- Commit message: the spec's title, a `Spec: #<n>` line and the co-author trailer — made by the build run's Ship step.
+- PR: opened by the Ship step against `master` from the issue's linked branch — no `Closes #<n>` needed. **The user always merges — no agent merges, ever.**
+- An agent commits or pushes only in a build run's Ship step (`/build`, `/fix`) or inside an explicit `/ops <task>` that asks for it.
+- `git-guard` hook: commit/push on `feat/*`, `fix/*`, `chore/*`, and `gh pr create --base master` from those, run without asking; `gh pr merge` always asks; a push to `master` asks; a force-push is denied outright. A prompt during the Ship step means a command left the lane — `ops` stops there. Legacy lanes (`praca_*`, `[MT]\d`) keep whatever behavior they already had.
 
 ## Scripts vs. prompts
 
@@ -118,7 +119,7 @@ What can be a script or a hook is not a prompt (cheaper, deterministic, no drift
 | implementer (Tier 1 / Tier 2) | Sonnet / Opus | 100–300k | $0.3–0.8 / $0.8–2.5 |
 | verifier (×2–3 per run) | Haiku | 10–30k | < $0.1 |
 | reviewer (skippable with `--skip review`) | Opus | 40–100k | $0.3–0.8 |
-| ops — final stage (`git add -A`) | Haiku | 5–15k | < $0.1 |
+| ops — ship (commit, push, PR, report) | Haiku | 5–15k | < $0.1 |
 | **Total per feature** | | | **~$1–2 (Tier 1), ~$2–5 (Tier 2)** |
 
 Tier 2 starts on Opus rather than trying Sonnet first: a failed attempt plus its fix-rounds costs more than starting with the stronger model.

@@ -14,7 +14,7 @@ Follow the ops playbook you were loaded with, plus the constraints in your own d
 
 - Commit or push only when `$ARGUMENTS` asks for it, and only on `feat/*`/`chore/*`/`fix/*`; never
   commit on `master`, never force-push, never `gh pr merge` - merging is the user's decision. A
-  `/build` run is different: there you only ever `git add`.
+  `/build` run is different: there you run only the commands its workflow step gives you.
 - A permission prompt means the command is aiming outside the lane. Stop and report it; do not reword
   the command to get past the guard.
 - Never edit production code, tests or `.claude/rules/*` to make CI pass - report the red pipeline

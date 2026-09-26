@@ -22,8 +22,8 @@ The issue and its project card are updated by the caller, not by you.
 
 A build run calls you three times, in this order. Do **only** the step you were asked for.
 
-**A build run never commits, pushes or opens a PR.** Those three are the user's, by hand, after the
-run reports. Your whole job in a build run is the branch and `git add -A`.
+**A build run commits, pushes and opens the PR only in its last step (Ship)**, after a green verify
+and a clean review. **It never merges** — merging is the user's, always.
 
 ## 1. Branch step — before a single file is written
 
@@ -47,23 +47,29 @@ run reports. Your whole job in a build run is the branch and `git add -A`.
 The reviewer diffs `git diff --cached`, which is the whole point of the step: a bare `git diff` never
 shows a brand-new file, and most of a new slice is new files. The index shows them.
 
-## 3. Stage step (final)
+## 3. Ship step (final)
 
-1. Confirm you are on the issue branch, then `git add -A`.
-2. Run the `node scripts/gh-project.mjs report …` command the message gives you, **verbatim** — the
-   workflow built it, and the script formats and posts the run report on the issue (and ticks its
-   acceptance criteria). Do not rewrite, re-quote or summarise it.
-3. Nothing else — no commit, no push, no PR.
-4. Report the branch, the staged file count, and the report command's output in `notes`.
+1. Confirm you are on the issue branch — never commit on `master`.
+2. Run the commands the message gives you — `git add -A`, `git commit …`, `git push -u origin <branch>`,
+   `gh pr create --base master …` — in order, each **verbatim** as its own Bash call. The workflow
+   built them; do not reword, re-quote or merge them into one call.
+   - `git commit` has nothing to commit and the branch is already ahead of `origin/master` (a resumed
+     run) → carry on with the push.
+   - `gh pr create` finds a PR for the branch already open → take its URL (`gh pr view --json url`) and carry on.
+   - Any other failure, or a permission prompt → stop: run nothing further, return no `prUrl`, and put
+     the failing command and its error first in `notes`.
+3. Once the PR exists, run the `node scripts/gh-project.mjs report …` command **verbatim** — the script
+   formats and posts the run report on the issue (linking the PR, ticking its acceptance criteria).
+4. Report the branch, `commit` (`git rev-parse --short HEAD`), `prUrl`, and the report output in `notes`.
 
 A blocked run calls you once more for the same `report` command alone: run it verbatim and touch no
 git state.
 
 ## Hard constraints
 
-- **In a build run: `git add` only.** No `git commit`, no `git push`, no `gh pr create` — even when
-  the work is finished and green. Only a chore the user asked for directly (`/ops <task>`) may commit
-  or push, and only what that task names.
+- **In a build run, commit / push / `gh pr create` happen only in the Ship step**, and only the
+  commands the message gives you. The Branch and Stage steps never commit. Outside a build run, only a
+  chore the user asked for directly (`/ops <task>`) may commit or push, and only what that task names.
 - **Never merge.** `gh pr merge` is the user's decision, always. Do not ask an agent for it either.
 - Never push to `master`, never force-push, never `git rebase -i`, never delete a remote branch that
   is not yours from this run.
@@ -95,11 +101,12 @@ otherwise make the JSON your entire final message, with nothing before or after 
 ```json
 {
   "branch": "feat/hygiene",
-  "stagedFiles": 14,
-  "notes": ["nothing committed - the tree is staged for the user"]
+  "commit": "a1b2c3d",
+  "prUrl": "https://github.com/Maliniak93/FinMel/pull/120",
+  "notes": ["#115: report posted"]
 }
 ```
 
-A chore outside a build run may also report `commit`, `prUrl` and `ciStatus`; a build run never does,
-because it produces none of them. If you stopped early, set `branch` to the branch you were on and put
+The Branch and Stage steps report `stagedFiles` instead of `commit`/`prUrl`; a chore outside a build run
+may also report `ciStatus`. If you stopped early, set `branch` to the branch you were on and put
 the reason first in `notes`.

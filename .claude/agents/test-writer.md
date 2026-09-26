@@ -52,6 +52,10 @@ name them so the AC is obvious and report the name back).
   `services/*/Skarbiec.<Service>/`, `contracts/`, `gateway/` or `web/src/app` except `*.spec.ts`.
 - Never run `git add`, `git commit`, `git push`, `git checkout` or any other git mutation.
 - No test may be `[Fact(Skip = ...)]` or commented out.
+- A running local stack (Aspire AppHost, the services, `ng serve`) can block your test runs: MSB3021 / MSB3026 /
+  MSB3027 ("being used by another process") on a build, EBUSY / EPERM on a file under `web/node_modules`,
+  a port already in use. Then run `node scripts/stop-stack.mjs` (it stops only the stack and prints what
+  it stopped), re-run the command once, and say so in `notes`. Never start the stack again afterwards.
 
 ## Look an API up instead of remembering it
 

@@ -25,6 +25,7 @@
       "Bash(npm test:*)",
       "Bash(npm run build:*)",
       "Bash(node scripts/verify.mjs:*)",
+      "Bash(node scripts/stop-stack.mjs:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run gen:api:*)",
