@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.DeleteTransaction;
 
@@ -34,6 +35,13 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         if (transaction is null)
         {
             return TransactionErrors.NotFound(id);
+        }
+
+        // A transfer leg changes only through its transfer's entry point (asset-transfers-deposit-funding),
+        // so the two legs never drift apart.
+        if (transaction.TransferId is not null)
+        {
+            return TransferErrors.LegManaged;
         }
 
         // Recompute over what remains without the deleted transaction, without removing it from

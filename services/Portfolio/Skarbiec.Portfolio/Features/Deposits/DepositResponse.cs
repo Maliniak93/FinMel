@@ -50,16 +50,30 @@ public sealed record DepositResponse
 
     public decimal? SettledGrossInterest { get; init; }
     public decimal? SettledTax { get; init; }
+
+    /// <summary>
+    /// The Cash asset the principal was moved out of (asset-transfers-deposit-funding) — both
+    /// <see langword="null"/> when the money came from outside the app or the transfer was detached.
+    /// </summary>
+    public Guid? FundingAssetId { get; init; }
+
+    public string? FundingAssetName { get; init; }
 }
 
 public static class DepositMappingExtensions
 {
     /// <summary>
     /// The projection is computed here, at read time, from the stored terms — never stored itself.
-    /// <paramref name="today"/> is the Europe/Warsaw date (<see cref="WarsawCalendar.Today"/>).
+    /// <paramref name="today"/> is the Europe/Warsaw date (<see cref="WarsawCalendar.Today"/>);
+    /// <paramref name="funding"/> the deposit's funding source (<see cref="DepositFunding"/>), if any.
     /// </summary>
     public static DepositResponse ToResponse(
-        this TermDeposit terms, Asset asset, string portfolioName, bool portfolioIsArchived, DateOnly today)
+        this TermDeposit terms,
+        Asset asset,
+        string portfolioName,
+        bool portfolioIsArchived,
+        DateOnly today,
+        DepositFundingSource? funding)
     {
         var projection = DepositInterestMath.Project(new DepositTerms
         {
@@ -103,7 +117,9 @@ public static class DepositMappingExtensions
                 : terms.MaturityDate <= today ? DepositStatus.Due : DepositStatus.Active,
             SettledOn = terms.SettledOn,
             SettledGrossInterest = terms.SettledGrossInterest,
-            SettledTax = terms.SettledTax
+            SettledTax = terms.SettledTax,
+            FundingAssetId = funding?.AssetId,
+            FundingAssetName = funding?.AssetName
         };
     }
 }

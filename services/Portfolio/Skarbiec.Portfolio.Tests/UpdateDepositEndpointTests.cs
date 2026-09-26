@@ -82,6 +82,135 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(new DateOnly(2026, 8, 1), terms.MaturityDate);
     }
 
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-5 (HTTP half; both events are proven by
+    /// <see cref="PortfolioOutboxTests.UpdateFundedDeposit_PublishesPositionChangedForBothAssets"/>): a
+    /// new principal and start date on a funded deposit rewrite both legs of its transfer — Cash goes
+    /// from 4 000 to 3 500 — and the two legs stay linked, the funding source unchanged.
+    /// </summary>
+    [Fact]
+    public async Task Update_FundedDeposit_RewritesBothLegs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedDepositAsync(cancellationToken, cashBalance: 5_000m, principal: 1_000m);
+        var request = NewDepositRequest(principal: 1_500m, startDate: new DateOnly(2026, 2, 1)).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(
+            DepositUri(funded.DepositPortfolioId, funded.Deposit.AssetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(1_500m, body.Principal);
+        Assert.Equal(funded.CashAssetId, body.FundingAssetId);
+        Assert.Equal("Cash account", body.FundingAssetName);
+
+        Assert.Equal(3_500m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(1_500m, (await client.GetAssetAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken);
+
+        var withdraw = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        Assert.Equal(1_500m, withdraw.Quantity);
+        Assert.Equal(new DateOnly(2026, 2, 1), withdraw.Date);
+        Assert.Equal(1_500.00m, withdraw.ValuePln);
+        var opening = Assert.Single((await client.ListTransactionsAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Items);
+        Assert.Equal(1_500m, opening.Quantity);
+        Assert.Equal(new DateOnly(2026, 2, 1), opening.Date);
+        Assert.Equal(1_500.00m, opening.ValuePln);
+
+        await using var dbContext = CreateDbContext(userId);
+        var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        Assert.Equal(TransactionType.Withdraw, Assert.Single(legs, t => t.AssetId == funded.CashAssetId).Type);
+        Assert.Equal(TransactionType.Deposit, Assert.Single(legs, t => t.AssetId == funded.Deposit.AssetId).Type);
+        Assert.All(legs, leg => Assert.Equal(1_500m, leg.Quantity));
+        Assert.All(legs, leg => Assert.Equal(new DateOnly(2026, 2, 1), leg.Date));
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-5: a funded deposit's new start date re-freezes the FX rate
+    /// on both legs (ADR-026) — here for a EUR deposit funded from EUR Cash.
+    /// </summary>
+    [Fact]
+    public async Task Update_FundedEurDepositNewStartDate_ReFreezesRateOnBothLegs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.FxRateLookupClient
+            .WithRate("EUR", new DateOnly(2026, 1, 15), 4.20m)
+            .WithRate("EUR", new DateOnly(2026, 2, 1), 4.30m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, currency: "EUR", name: "EUR cash");
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var deposit = await client.AddDepositAsync(
+            savingsId, cancellationToken, NewDepositRequest(currency: "EUR", principal: 1_000m, fundingAssetId: cashId));
+        var request = NewDepositRequest(principal: 1_000m, startDate: new DateOnly(2026, 2, 1)).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(DepositUri(savingsId, deposit.AssetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var withdraw = await client.GetCashWithdrawAsync(walletId, cashId, cancellationToken);
+        Assert.Equal(4_300.00m, withdraw.ValuePln);
+        var opening = Assert.Single((await client.ListTransactionsAsync(savingsId, deposit.AssetId, cancellationToken)).Items);
+        Assert.Equal(4_300.00m, opening.ValuePln);
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-5: a principal the Cash cannot cover is a 400
+    /// <c>Validation.InsufficientFunds</c> and nothing changes — terms, both legs and both quantities.
+    /// </summary>
+    [Fact]
+    public async Task Update_FundedDepositBeyondCashBalance_ReturnsInsufficientFunds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedDepositAsync(cancellationToken, cashBalance: 5_000m, principal: 1_000m);
+        // 5 000 in Cash: 1 000 already moved, so anything above 5 000 in total cannot be covered.
+        var request = NewDepositRequest(principal: 5_000.01m).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(
+            DepositUri(funded.DepositPortfolioId, funded.Deposit.AssetId), request, cancellationToken);
+
+        await response.AssertInsufficientFundsAsync(cancellationToken);
+        await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding: with the funding Cash's portfolio archived, a change that
+    /// would rewrite the legs is a 409 <c>Conflict.PortfolioArchived</c> and nothing changes, while a
+    /// change that leaves the legs alone (a rename) still goes through.
+    /// </summary>
+    [Fact]
+    public async Task Update_FundedDepositWithArchivedCashPortfolio_RejectsLegChangesOnly()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+        await client.ArchivePortfolioAsync(funded.CashPortfolioId, cancellationToken);
+
+        var legChange = await client.PutAsJsonAsync(
+            DepositUri(funded.DepositPortfolioId, funded.Deposit.AssetId),
+            NewDepositRequest(principal: 1_500m).ToUpdateRequest(),
+            cancellationToken);
+
+        await legChange.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
+
+        var rename = await client.PutAsJsonAsync(
+            DepositUri(funded.DepositPortfolioId, funded.Deposit.AssetId),
+            NewDepositRequest(name: "Renamed deposit", principal: 1_000m).ToUpdateRequest(),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, rename.StatusCode);
+        Assert.Equal("Renamed deposit", (await client.GetDepositAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Name);
+    }
+
     /// <summary>AC-7: updating a deposit of an archived portfolio is a 409 and the deposit keeps its terms.</summary>
     [Fact]
     public async Task Update_ArchivedPortfolio_ReturnsConflict()

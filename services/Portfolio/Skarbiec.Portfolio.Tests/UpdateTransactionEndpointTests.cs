@@ -193,6 +193,42 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10m, page.Items.Single(t => t.Id == buyId).Quantity);
     }
 
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-6 (update half): the Cash Withdraw leg of a transfer is
+    /// changed only by its entry point — a PUT here is a 409 <c>Conflict.TransferLegManaged</c> and
+    /// nothing changes, while the ordinary top-up on the same Cash asset stays editable.
+    /// </summary>
+    [Fact]
+    public async Task Update_TransferLeg_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+        var leg = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        var legUpdate = new UpdateTransactionRequest { Type = TransactionType.Withdraw, Quantity = 200m, UnitPrice = 1m, Date = leg.Date };
+
+        var response = await client.PutAsJsonAsync(
+            TransactionUri(funded.CashPortfolioId, funded.CashAssetId, leg.Id), legUpdate, cancellationToken);
+
+        await response.AssertTransferLegManagedAsync(cancellationToken);
+        var unchanged = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        Assert.Equal(leg.Id, unchanged.Id);
+        Assert.Equal(1_000m, unchanged.Quantity);
+        Assert.NotNull(unchanged.Transfer);
+        Assert.Equal(4_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Quantity);
+
+        // Control: the plain top-up beside it is still an ordinary, editable transaction.
+        var topUp = Assert.Single(
+            (await client.ListTransactionsAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Deposit);
+        var topUpUpdate = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 6_000m, UnitPrice = 1m, Date = topUp.Date };
+        var topUpResponse = await client.PutAsJsonAsync(
+            TransactionUri(funded.CashPortfolioId, funded.CashAssetId, topUp.Id), topUpUpdate, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, topUpResponse.StatusCode);
+        Assert.Equal(5_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+    }
+
     /// <summary>term-deposits AC-10: the opening transaction of a term deposit is rewritten only
     /// through <c>PUT .../deposits/{id}</c> — editing it here is a 409
     /// <c>Conflict.DepositTransactionsManaged</c> and nothing changes.</summary>

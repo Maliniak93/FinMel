@@ -26,6 +26,7 @@ export type AddDepositRequest = {
     capitalization: DepositCapitalization;
     taxExempt?: boolean;
     earlyBreakInterestLossPercent?: number | string;
+    fundingAssetId?: null | string;
 };
 
 export type AssetClass = number;
@@ -86,6 +87,8 @@ export type DepositResponse = {
     settledOn?: null | string;
     settledGrossInterest?: null | number | string;
     settledTax?: null | number | string;
+    fundingAssetId?: null | string;
+    fundingAssetName?: null | string;
 };
 
 export type DepositSettlementPreviewResponse = {
@@ -138,9 +141,28 @@ export type TransactionResponse = {
     currency: string;
     valuePln?: null | number | string;
     date: string;
+    transfer?: null | TransactionTransferResponse;
+};
+
+export type TransactionTransferResponse = {
+    counterpartAssetId: string;
+    counterpartAssetName: string;
+    counterpartPortfolioId: string;
+    counterpartPortfolioName: string;
+    direction: TransferDirection;
 };
 
 export type TransactionType = number;
+
+export type TransferCandidateResponse = {
+    assetId: string;
+    name: string;
+    portfolioId: string;
+    portfolioName: string;
+    balance: number | string;
+};
+
+export type TransferDirection = number;
 
 export type UpdateAssetRequest = {
     assetClass: AssetClass;
@@ -600,3 +622,22 @@ export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleRespon
 };
 
 export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses];
+
+export type GetApiPortfolioTransferCandidatesData = {
+    body?: never;
+    path?: never;
+    query: {
+        currency: string;
+        assetClass: AssetClass;
+    };
+    url: '/api/portfolio/transfer-candidates';
+};
+
+export type GetApiPortfolioTransferCandidatesResponses = {
+    /**
+     * OK
+     */
+    200: Array<TransferCandidateResponse>;
+};
+
+export type GetApiPortfolioTransferCandidatesResponse = GetApiPortfolioTransferCandidatesResponses[keyof GetApiPortfolioTransferCandidatesResponses];

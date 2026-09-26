@@ -141,9 +141,64 @@ public sealed class TransactionQuantityCalculatorTests
         }
     }
 
-    private static Transaction NewTransaction(TransactionType type, decimal quantity, DateOnly date) => new()
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-1: same-day replay puts inflows before outflows, so a
+    /// same-day top-up followed by a transfer out never fails on the Guid order — here the Withdraw
+    /// has the lower Id, which the old Id tie-break replayed first. A Withdraw dated the day before
+    /// the Deposit still fails: the date order wins over the inflow-first rule.
+    /// </summary>
+    [Fact]
+    public void Recompute_SameDayInflowReplaysBeforeOutflow()
     {
-        Id = Guid.NewGuid(),
+        var lowerId = new Guid("00000000-0000-0000-0000-000000000001");
+        var higherId = new Guid("00000000-0000-0000-0000-000000000002");
+        var day = new DateOnly(2026, 1, 15);
+        Transaction[] sameDay =
+        [
+            NewTransaction(TransactionType.Withdraw, 1_000m, day, lowerId),
+            NewTransaction(TransactionType.Deposit, 1_000m, day, higherId)
+        ];
+        Transaction[] withdrawTheDayBefore =
+        [
+            NewTransaction(TransactionType.Withdraw, 1_000m, day.AddDays(-1), lowerId),
+            NewTransaction(TransactionType.Deposit, 1_000m, day, higherId)
+        ];
+
+        var sameDayResult = TransactionQuantityCalculator.Recompute(sameDay);
+        var dayBeforeResult = TransactionQuantityCalculator.Recompute(withdrawTheDayBefore);
+
+        Assert.True(sameDayResult.IsSuccess, sameDayResult.IsFailure ? sameDayResult.Error.Code : null);
+        Assert.Equal(0m, sameDayResult.Value);
+        Assert.True(dayBeforeResult.IsFailure);
+    }
+
+    /// <summary>
+    /// AC-1, the Buy/Sell side of the same rule (both are quantity deltas): a same-day Sell with the
+    /// lower Id still replays after the same-day Buy, whichever order the input lists them in.
+    /// </summary>
+    [Fact]
+    public void Recompute_SameDayBuyReplaysBeforeSellRegardlessOfIdAndListOrder()
+    {
+        var day = new DateOnly(2026, 3, 1);
+        Transaction[] transactions =
+        [
+            NewTransaction(TransactionType.Sell, 4m, day, new Guid("00000000-0000-0000-0000-000000000001")),
+            NewTransaction(TransactionType.Buy, 10m, day, new Guid("00000000-0000-0000-0000-000000000002")),
+            NewTransaction(TransactionType.Withdraw, 6m, day, new Guid("00000000-0000-0000-0000-000000000003"))
+        ];
+
+        var forward = TransactionQuantityCalculator.Recompute(transactions);
+        var reversed = TransactionQuantityCalculator.Recompute(transactions.Reverse());
+
+        Assert.True(forward.IsSuccess, forward.IsFailure ? forward.Error.Code : null);
+        Assert.Equal(0m, forward.Value);
+        Assert.True(reversed.IsSuccess, reversed.IsFailure ? reversed.Error.Code : null);
+        Assert.Equal(0m, reversed.Value);
+    }
+
+    private static Transaction NewTransaction(TransactionType type, decimal quantity, DateOnly date, Guid? id = null) => new()
+    {
+        Id = id ?? Guid.NewGuid(),
         AssetId = Guid.NewGuid(),
         Type = type,
         Quantity = quantity,

@@ -17,8 +17,13 @@ public sealed class GetDepositHandler(PortfolioDbContext dbContext, TimeProvider
                 select new { Terms = terms, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return row is null
-            ? DepositErrors.NotFound(assetId)
-            : row.Terms.ToResponse(row.Asset, row.PortfolioName, row.PortfolioIsArchived, WarsawCalendar.Today(timeProvider));
+        if (row is null)
+        {
+            return DepositErrors.NotFound(assetId);
+        }
+
+        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+
+        return row.Terms.ToResponse(row.Asset, row.PortfolioName, row.PortfolioIsArchived, WarsawCalendar.Today(timeProvider), funding);
     }
 }

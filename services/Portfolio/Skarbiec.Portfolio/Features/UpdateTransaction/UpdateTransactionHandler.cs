@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateTransaction;
@@ -37,6 +38,13 @@ public sealed class UpdateTransactionHandler(
         if (transaction is null)
         {
             return TransactionErrors.NotFound(id);
+        }
+
+        // A transfer leg changes only through its transfer's entry point (asset-transfers-deposit-funding),
+        // so the two legs never drift apart.
+        if (transaction.TransferId is not null)
+        {
+            return TransferErrors.LegManaged;
         }
 
         if (!AssetTransactionTypes.IsAllowed(asset.AssetClass, request.Type))

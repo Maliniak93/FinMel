@@ -189,4 +189,36 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-8: the funded deposit carries its funding asset's id and
+    /// name; a deposit of new money beside it carries neither.
+    /// </summary>
+    [Fact]
+    public async Task List_FundedDeposit_ReturnsFundingAsset()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+        var unfunded = await client.AddDepositAsync(
+            funded.DepositPortfolioId, cancellationToken, NewDepositRequest(name: "New money deposit"));
+
+        var response = await client.GetAsync(AllDepositsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var deposits = await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken);
+        Assert.NotNull(deposits);
+        Assert.Equal(2, deposits.Count);
+        var fundedListed = Assert.Single(deposits, d => d.AssetId == funded.Deposit.AssetId);
+        Assert.Equal(funded.CashAssetId, fundedListed.FundingAssetId);
+        Assert.Equal("Cash account", fundedListed.FundingAssetName);
+        var unfundedListed = Assert.Single(deposits, d => d.AssetId == unfunded.AssetId);
+        Assert.Null(unfundedListed.FundingAssetId);
+        Assert.Null(unfundedListed.FundingAssetName);
+
+        // GetDeposit carries the same pair.
+        var single = await client.GetDepositAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken);
+        Assert.Equal(funded.CashAssetId, single.FundingAssetId);
+        Assert.Equal("Cash account", single.FundingAssetName);
+    }
 }

@@ -1005,6 +1005,207 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         Assert.Equal(10_000m, (await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == assetId, cancellationToken)).Principal);
     }
 
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-3 (outbox half): a deposit funded from Cash in another
+    /// portfolio writes both legs and one <see cref="AssetPositionChanged"/> per asset — Cash at 4 000,
+    /// the deposit at 1 000 — all in a single save.
+    /// </summary>
+    [Fact]
+    public async Task AddFundedDeposit_PublishesPositionChangedForBothAssets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid savingsId;
+        Guid walletId;
+        Guid cashId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
+            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+        }
+
+        int positionEventsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            positionEventsBefore = (await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Count;
+        }
+
+        _saveChanges.Reset();
+
+        Guid depositId;
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
+                savingsId, PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+            depositId = result.Value.AssetId;
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(positionEventsBefore).ToList();
+        Assert.Equal(2, events.Count);
+        var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
+        Assert.Equal(4_000m, cashEvent.Quantity);
+        Assert.Equal(walletId, cashEvent.PortfolioId);
+        Assert.Equal(AssetClass.Cash, cashEvent.AssetClass);
+        Assert.Equal(UserId, cashEvent.UserId);
+        var depositEvent = Assert.Single(events, e => e.AssetId == depositId);
+        Assert.Equal(1_000m, depositEvent.Quantity);
+        Assert.Equal(savingsId, depositEvent.PortfolioId);
+        Assert.Equal(AssetClass.Deposit, depositEvent.AssetClass);
+
+        var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        Assert.Equal(4_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == cashId, cancellationToken)).Quantity);
+        Assert.Equal(1_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == depositId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-5 (outbox half): UpdateDeposit on a funded deposit rewrites
+    /// both legs and writes one further <see cref="AssetPositionChanged"/> per asset — Cash at 3 500,
+    /// the deposit at 1 500, each at a higher version — in a single save.
+    /// </summary>
+    [Fact]
+    public async Task UpdateFundedDeposit_PublishesPositionChangedForBothAssets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid savingsId;
+        Guid cashId;
+        Guid depositId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
+            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
+                savingsId, PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            depositId = added.Value.AssetId;
+        }
+
+        IReadOnlyList<AssetPositionChanged> eventsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            eventsBefore = await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var request = PortfolioApi.NewDepositRequest(principal: 1_500m, startDate: new DateOnly(2026, 2, 1)).ToUpdateRequest();
+            var result = await act.ServiceProvider.GetRequiredService<UpdateDepositHandler>()
+                .HandleAsync(savingsId, depositId, request, cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore.Count).ToList();
+        Assert.Equal(2, events.Count);
+        var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
+        Assert.Equal(3_500m, cashEvent.Quantity);
+        Assert.True(cashEvent.Version > eventsBefore.Where(e => e.AssetId == cashId).Max(e => e.Version));
+        var depositEvent = Assert.Single(events, e => e.AssetId == depositId);
+        Assert.Equal(1_500m, depositEvent.Quantity);
+        Assert.True(depositEvent.Version > eventsBefore.Where(e => e.AssetId == depositId).Max(e => e.Version));
+
+        var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.All(legs, leg => Assert.Equal(1_500m, leg.Quantity));
+        Assert.All(legs, leg => Assert.Equal(new DateOnly(2026, 2, 1), leg.Date));
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-7 (outbox half): removing a funded deposit writes its
+    /// <see cref="AssetRemoved"/> and detaches the Cash leg in the same save — but publishes nothing
+    /// for the Cash asset, whose quantity does not change.
+    /// </summary>
+    [Fact]
+    public async Task RemoveFundedDeposit_DetachesCashLegWithoutPublishingForIt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid savingsId;
+        Guid cashId;
+        Guid depositId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
+            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
+                savingsId, PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            depositId = added.Value.AssetId;
+        }
+
+        int positionEventsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            positionEventsBefore = (await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Count;
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
+                .HandleAsync(savingsId, depositId, cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(depositId, Assert.Single(await verifyDb.ReadPublishedAsync<AssetRemoved>(cancellationToken)).AssetId);
+        Assert.Equal(positionEventsBefore, (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Count);
+        var cashLeg = await verifyDb.Transactions.SingleAsync(t => t.AssetId == cashId && t.Type == TransactionType.Withdraw, cancellationToken);
+        Assert.Null(cashLeg.TransferId);
+        Assert.Equal(4_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == cashId, cancellationToken)).Quantity);
+    }
+
+    private static async Task<Guid> CreatePortfolioAsync(IServiceProvider services, string name, CancellationToken cancellationToken)
+    {
+        var result = await services.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = name }, cancellationToken);
+        Assert.True(result.IsSuccess);
+
+        return result.Value.Id;
+    }
+
+    /// <summary>A PLN Cash asset in <paramref name="portfolioId"/> topped up with <paramref name="balance"/> on 2026-01-01.</summary>
+    private static async Task<Guid> AddCashWithBalanceAsync(
+        IServiceProvider services, Guid portfolioId, decimal balance, CancellationToken cancellationToken)
+    {
+        var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
+            portfolioId,
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
+            cancellationToken);
+        Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
+
+        var topUp = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+            portfolioId,
+            assetResult.Value.Id,
+            new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = balance, UnitPrice = 1m, Date = PortfolioApi.DefaultTopUpDate },
+            cancellationToken);
+        Assert.True(topUp.IsSuccess, topUp.IsFailure ? topUp.Error.Code : null);
+
+        return assetResult.Value.Id;
+    }
+
     private static async Task<Guid> AddAssetWithBuyAsync(
         IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
     {

@@ -38,6 +38,14 @@ public sealed record AddDepositRequest : IValidatableObject
     [Range(typeof(decimal), "0", "100")]
     public decimal EarlyBreakInterestLossPercent { get; init; } = 100m;
 
+    /// <summary>
+    /// The Cash asset the principal moves out of (asset-transfers-deposit-funding) — a Cash → Deposit
+    /// transfer on <see cref="StartDate"/>, one of the user's same-currency Cash assets in an active
+    /// portfolio (<c>transfer-candidates</c>). Omitted: new money from outside the app. Fixed at
+    /// creation, like the currency — <c>UpdateDepositRequest</c> has no such field.
+    /// </summary>
+    public Guid? FundingAssetId { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         DepositTermsValidation.Validate(
             Principal, TermLength, TermUnit, AnnualInterestRatePercent, Capitalization, EarlyBreakInterestLossPercent);

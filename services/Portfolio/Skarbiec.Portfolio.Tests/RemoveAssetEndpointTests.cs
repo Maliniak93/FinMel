@@ -109,6 +109,74 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     /// <summary>
+    /// asset-transfers-deposit-funding AC-7: removing a funded deposit detaches — never reverses —
+    /// its transfer. The Cash Withdraw stays with <c>TransferId</c> null and Cash stays at 4 000; the
+    /// leg is now an ordinary transaction, so deleting it afterwards returns Cash to 5 000.
+    /// </summary>
+    [Fact]
+    public async Task Remove_FundedDeposit_DetachesCashLeg()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+        var leg = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(funded.DepositPortfolioId, funded.Deposit.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(funded.DepositPortfolioId, funded.Deposit.AssetId), cancellationToken)).StatusCode);
+        Assert.Equal(4_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        var detached = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        Assert.Equal(leg.Id, detached.Id);
+        Assert.Equal(1_000m, detached.Quantity);
+        Assert.Null(detached.Transfer);
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            var stored = await dbContext.Transactions.SingleAsync(t => t.Id == leg.Id, cancellationToken);
+            Assert.Null(stored.TransferId);
+            Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+        }
+
+        var deleteLeg = await client.DeleteAsync(TransactionUri(funded.CashPortfolioId, funded.CashAssetId, leg.Id), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteLeg.StatusCode);
+        Assert.Equal(5_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
+    /// asset-transfers-deposit-funding AC-7: removing the funding Cash asset instead leaves the
+    /// deposit and its opening transaction in place, unlinked, at the same quantity — and the deposit
+    /// no longer reports a funding asset.
+    /// </summary>
+    [Fact]
+    public async Task Remove_FundingCash_DetachesDepositLeg()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+        var opening = Assert.Single((await client.ListTransactionsAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Items);
+
+        var response = await client.DeleteAsync(AssetUri(funded.CashPortfolioId, funded.CashAssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(funded.CashPortfolioId, funded.CashAssetId), cancellationToken)).StatusCode);
+        var deposit = await client.GetDepositAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken);
+        Assert.Equal(1_000m, deposit.Principal);
+        Assert.Null(deposit.FundingAssetId);
+        Assert.Null(deposit.FundingAssetName);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Quantity);
+        var kept = Assert.Single((await client.ListTransactionsAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Items);
+        Assert.Equal(opening.Id, kept.Id);
+        Assert.Equal(1_000m, kept.Quantity);
+        Assert.Null(kept.Transfer);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Null((await dbContext.Transactions.SingleAsync(t => t.Id == opening.Id, cancellationToken)).TransferId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == funded.CashAssetId, cancellationToken));
+    }
+
+    /// <summary>
     /// term-deposits-settlement AC-7 (delete half): settling does not lock the deposit against
     /// deletion — the asset, both its transactions (opening + net-interest credit) and its terms go.
     /// </summary>

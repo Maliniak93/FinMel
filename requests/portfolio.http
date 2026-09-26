@@ -212,6 +212,62 @@ Content-Type: application/json
   "earlyBreakInterestLossPercent": 100
 }
 
+### Add a Cash account to fund a deposit from
+# A currency-valued Cash asset topped up with 5 000 PLN before the deposit's start date.
+# @name addFundingCash
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Cash",
+  "name": "Current account",
+  "currency": "PLN",
+  "initialTransaction": {
+    "type": "Deposit",
+    "quantity": 5000,
+    "unitPrice": 1,
+    "date": "2026-01-01"
+  }
+}
+
+### List transfer candidates (the deposit form's sources of funds)
+# The user's assets of that class and currency in non-archived portfolios, each with its balance
+# (quantity), ordered by portfolio name, then asset name (asset-transfers-deposit-funding).
+# assetClass takes the enum name or its int (0 = Cash). 400 for an unsupported currency or a
+# missing parameter.
+GET {{baseUrl}}/api/portfolio/transfer-candidates?currency=PLN&assetClass=Cash
+Authorization: Bearer {{authToken}}
+
+### Add a term deposit funded from cash
+# fundingAssetId moves the principal out of that Cash asset as one Cash → Deposit transfer: a
+# Withdraw on the Cash and the opening Deposit on the deposit, same amount and start date, linked by
+# a shared TransferId; both assets publish AssetPositionChanged in one save. 201 with fundingAssetId
+# and fundingAssetName. 400 Validation.InvalidTransferCounterpart for a source that is not the
+# user's same-currency Cash in an active portfolio, 400 Validation.InsufficientFunds when the Cash
+# can't cover the principal on the start date. The source is fixed at creation; the Cash leg is
+# 409 Conflict.TransferLegManaged on PUT/DELETE .../transactions/{id}, and removing either asset
+# detaches the other side's leg instead of reversing it.
+# @name addFundedDeposit
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Funded deposit",
+  "bankName": "Example bank",
+  "currency": "PLN",
+  "principal": 1000.00,
+  "startDate": "2026-01-15",
+  "termLength": 3,
+  "termUnit": 1,
+  "annualInterestRatePercent": 6,
+  "capitalization": 0,
+  "taxExempt": false,
+  "earlyBreakInterestLossPercent": 100,
+  "fundingAssetId": "{{addFundingCash.response.body.id}}"
+}
+
 ### List every deposit across portfolios
 # Portfolio name and archived flag, terms, projection and status (Due once the maturity date is on or
 # before today's Europe/Warsaw date).
@@ -223,8 +279,11 @@ GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/de
 Authorization: Bearer {{authToken}}
 
 ### Update a deposit
-# Same fields as add, minus the currency (immutable). Rewrites the opening transaction in place and
-# publishes AssetPositionChanged with the new quantity.
+# Same fields as add, minus the currency and the funding source (both immutable). Rewrites the
+# opening transaction in place and publishes AssetPositionChanged with the new quantity. On a funded
+# deposit a new principal or start date rewrites both transfer legs and publishes for both assets
+# (400 Validation.InsufficientFunds when the Cash can't cover it, 409 Conflict.PortfolioArchived when
+# the Cash's portfolio is archived).
 PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
