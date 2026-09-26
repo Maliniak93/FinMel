@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
+using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
@@ -27,6 +28,35 @@ internal static class PortfolioAssertions
 
     /// <summary>term-deposits: the 409 every transaction write (record/update/delete) on a Deposit-class asset answers — its transactions are system-managed.</summary>
     public const string DepositTransactionsManagedErrorCode = "Conflict.DepositTransactionsManaged";
+
+    /// <summary>term-deposits-settlement: the 409 preview/settle answer while the maturity date is still after today (Europe/Warsaw).</summary>
+    public const string DepositNotDueErrorCode = "Conflict.DepositNotDue";
+
+    /// <summary>term-deposits-settlement: the 409 preview/settle answer for a deposit that is already settled.</summary>
+    public const string DepositAlreadySettledErrorCode = "Conflict.DepositAlreadySettled";
+
+    /// <summary>term-deposits-settlement: the 409 UpdateDeposit answer for a settled deposit — its terms are immutable.</summary>
+    public const string DepositSettledErrorCode = "Conflict.DepositSettled";
+
+    /// <summary>
+    /// term-deposits-settlement: a rejected preview/settle "changes nothing" — the deposit is still
+    /// unsettled with no settlement data, its quantity is still <paramref name="principal"/> and it
+    /// still holds only its opening transaction.
+    /// </summary>
+    public static async Task AssertDepositUnsettledAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, decimal principal = 10_000m)
+    {
+        var deposit = await client.GetDepositAsync(portfolioId, assetId, cancellationToken);
+        Assert.NotEqual(DepositStatus.Settled, deposit.Status);
+        Assert.Null(deposit.SettledOn);
+        Assert.Null(deposit.SettledGrossInterest);
+        Assert.Null(deposit.SettledTax);
+
+        var asset = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(principal, asset.Quantity);
+        Assert.Equal(1, asset.TransactionCount);
+        Assert.False(asset.DepositSettled);
+    }
 
     /// <summary>Asserts <paramref name="response"/> is the 409 <see cref="DepositTransactionsManagedErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertDepositTransactionsManagedAsync(

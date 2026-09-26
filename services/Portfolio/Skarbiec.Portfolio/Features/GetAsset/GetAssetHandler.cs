@@ -19,12 +19,16 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext)
                 DepositMaturityDate = dbContext.TermDeposits
                     .Where(t => t.AssetId == a.Id)
                     .Select(t => (DateOnly?)t.MaturityDate)
+                    .FirstOrDefault(),
+                DepositSettled = dbContext.TermDeposits
+                    .Where(t => t.AssetId == a.Id)
+                    .Select(t => (bool?)(t.SettledOn != null))
                     .FirstOrDefault()
             })
             .FirstOrDefaultAsync(cancellationToken);
 
         return row is null
             ? AssetErrors.NotFound(assetId)
-            : row.Asset.ToResponse(row.TransactionCount, row.DepositMaturityDate);
+            : row.Asset.ToResponse(row.TransactionCount, row.DepositMaturityDate, row.DepositSettled);
     }
 }

@@ -192,7 +192,7 @@ Authorization: Bearer {{authToken}}
 # (principal, start date, unit price 1, start-date PLN rate frozen) and its terms in one save, and
 # publishes AssetPositionChanged with quantity = principal. 201 with the maturity date, projection
 # and status (term-deposits). Enums are ints: termUnit 0 = Days, 1 = Months; capitalization
-# 0 = AtMaturity, 1 = Monthly, 2 = Quarterly, 3 = Yearly; status 0 = Active, 1 = Due.
+# 0 = AtMaturity, 1 = Monthly, 2 = Quarterly, 3 = Yearly; status 0 = Active, 1 = Due, 2 = Settled.
 # @name addDeposit
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
 Authorization: Bearer {{authToken}}
@@ -255,4 +255,31 @@ Content-Type: application/json
   "quantity": 500,
   "unitPrice": 1,
   "date": "2026-02-01"
+}
+
+### Preview the settlement of a Due deposit
+# The part-1 projection (gross, tax, net, final amount) with settledOn defaulting to the maturity
+# date — what the settle dialog is pre-filled with (term-deposits-settlement). 409
+# Conflict.DepositNotDue before the maturity date (Europe/Warsaw), 409 Conflict.DepositAlreadySettled
+# once settled. The deposit updated above matures on 2026-08-01.
+# @name settlementPreview
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/settlement-preview
+Authorization: Bearer {{authToken}}
+
+### Settle the deposit
+# What the bank actually paid — here the previewed values; override them when the bank paid
+# something else. 400 unless grossInterest >= 0, 0 <= tax <= grossInterest and
+# startDate <= settledOn <= today. Stores the settlement, adds a system-managed Deposit transaction of
+# the net interest (gross - tax, none when 0) on settledOn with that date's PLN rate frozen, raises
+# the quantity to principal + net and publishes AssetPositionChanged, all in one save. 200 with the
+# deposit, now Settled. A settled deposit's terms are immutable: updating it is 409
+# Conflict.DepositSettled; deleting it (DELETE .../assets/{id}) stays allowed.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/settle
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "settledOn": "{{settlementPreview.response.body.settledOn}}",
+  "grossInterest": {{settlementPreview.response.body.grossInterest}},
+  "tax": {{settlementPreview.response.body.tax}}
 }

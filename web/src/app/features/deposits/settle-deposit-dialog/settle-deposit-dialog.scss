@@ -1,0 +1,44 @@
+.settle-deposit-dialog__name {
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
+.settle-deposit-dialog__summary {
+  display: flex;
+  gap: 24px;
+  margin: 0 0 16px;
+
+  dt {
+    opacity: 0.7;
+    font-size: 0.875em;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.settle-deposit-dialog__loading {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 16px;
+}
+
+.settle-deposit-dialog__field {
+  display: block;
+  width: 100%;
+}
+
+.settle-deposit-dialog__row {
+  display: flex;
+  gap: 12px;
+
+  .settle-deposit-dialog__field {
+    flex: 1;
+  }
+}
+
+.settle-deposit-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

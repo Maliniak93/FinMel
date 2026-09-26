@@ -2,13 +2,16 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Deposits;
 
-/// <summary>A term deposit's read-time status (term-deposits). Part 2 adds <c>Settled</c>.</summary>
+/// <summary>A term deposit's read-time status (term-deposits).</summary>
 public enum DepositStatus
 {
     Active,
 
     /// <summary>The maturity date is on or before today's Europe/Warsaw date.</summary>
     Due,
+
+    /// <summary>The deposit has been settled (term-deposits-settlement) — wins over Due and Active.</summary>
+    Settled,
 }
 
 /// <summary>The totals of <see cref="DepositProjection"/> — the per-period breakdown stays server-side.</summary>
@@ -41,6 +44,12 @@ public sealed record DepositResponse
     public required decimal EarlyBreakInterestLossPercent { get; init; }
     public required DepositProjectionResponse Projection { get; init; }
     public required DepositStatus Status { get; init; }
+
+    /// <summary>The settlement (term-deposits-settlement) — all three <see langword="null"/> until the deposit is settled.</summary>
+    public DateOnly? SettledOn { get; init; }
+
+    public decimal? SettledGrossInterest { get; init; }
+    public decimal? SettledTax { get; init; }
 }
 
 public static class DepositMappingExtensions
@@ -89,7 +98,12 @@ public static class DepositMappingExtensions
                 FinalAmount = projection.FinalAmount,
                 NetProfitPercent = projection.NetProfitPercent
             },
-            Status = terms.MaturityDate <= today ? DepositStatus.Due : DepositStatus.Active
+            Status = terms.SettledOn is not null
+                ? DepositStatus.Settled
+                : terms.MaturityDate <= today ? DepositStatus.Due : DepositStatus.Active,
+            SettledOn = terms.SettledOn,
+            SettledGrossInterest = terms.SettledGrossInterest,
+            SettledTax = terms.SettledTax
         };
     }
 }

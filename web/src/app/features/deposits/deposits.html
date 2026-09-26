@@ -27,7 +27,7 @@
     <table mat-table [dataSource]="depositsResource.value()" class="deposits-page__table">
       <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef>Name</th>
-        <td mat-cell *matCellDef="let deposit">{{ deposit.name }}</td>
+        <td mat-cell *matCellDef="let deposit" [id]="nameCellId(deposit)">{{ deposit.name }}</td>
       </ng-container>
 
       <ng-container matColumnDef="bankName">
@@ -69,18 +69,19 @@
         <td mat-cell *matCellDef="let deposit">{{ deposit.maturityDate | date: 'mediumDate' }}</td>
       </ng-container>
 
-      <!-- Server-computed projection: after Belka tax unless the deposit is IKE/IKZE. -->
+      <!-- Server-computed projection: after Belka tax unless the deposit is IKE/IKZE. A Settled row
+           shows what the bank actually paid instead. -->
       <ng-container matColumnDef="netInterest">
         <th mat-header-cell *matHeaderCellDef>Net profit</th>
         <td mat-cell *matCellDef="let deposit">
-          {{ formatMoney(deposit.projection.netInterest, deposit.currency) }}
+          {{ formatMoney(netInterest(deposit), deposit.currency) }}
         </td>
       </ng-container>
 
       <ng-container matColumnDef="finalAmount">
         <th mat-header-cell *matHeaderCellDef>Final amount</th>
         <td mat-cell *matCellDef="let deposit">
-          {{ formatMoney(deposit.projection.finalAmount, deposit.currency) }}
+          {{ formatMoney(finalAmount(deposit), deposit.currency) }}
         </td>
       </ng-container>
 
@@ -95,24 +96,41 @@
         </td>
       </ng-container>
 
-      <!-- A deposit of an archived portfolio is read-only, so its row offers no action. -->
+      <!-- A deposit of an archived portfolio is read-only, so its row offers no action. A Due deposit
+           can be settled; a Settled one's terms are immutable, so it offers Delete only. -->
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let deposit">
           @if (!deposit.portfolioIsArchived) {
+            @if (isDue(deposit)) {
+              <button
+                mat-icon-button
+                type="button"
+                matTooltip="Settle maturity"
+                [attr.aria-label]="'Settle maturity of ' + deposit.name"
+                (click)="openSettleDialog(deposit)"
+              >
+                <mat-icon>task_alt</mat-icon>
+              </button>
+            }
+            <!-- The name reaches the trigger as its description, not its label: only the settle
+                 button's label may mention settling. -->
             <button
               mat-icon-button
               type="button"
               [matMenuTriggerFor]="menu"
-              [attr.aria-label]="'Actions for ' + deposit.name"
+              aria-label="Actions for this deposit"
+              [attr.aria-describedby]="nameCellId(deposit)"
             >
               <mat-icon>more_vert</mat-icon>
             </button>
             <mat-menu #menu="matMenu">
-              <button mat-menu-item type="button" (click)="openEditDialog(deposit)">
-                <mat-icon>edit</mat-icon>
-                <span>Edit</span>
-              </button>
+              @if (!isSettled(deposit)) {
+                <button mat-menu-item type="button" (click)="openEditDialog(deposit)">
+                  <mat-icon>edit</mat-icon>
+                  <span>Edit</span>
+                </button>
+              }
               <button mat-menu-item type="button" (click)="remove(deposit)">
                 <mat-icon>delete</mat-icon>
                 <span>Delete</span>

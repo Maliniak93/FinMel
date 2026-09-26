@@ -66,6 +66,47 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
     }
 
     /// <summary>
+    /// term-deposits-settlement AC-8: a settled deposit is listed as <c>Settled</c> — which wins over
+    /// Due — with its settlement date and the amounts actually paid; an unsettled Due deposit beside
+    /// it carries no settlement data.
+    /// </summary>
+    [Fact]
+    public async Task List_SettledDeposit_ReturnsSettlement()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, settledDeposit) = await client.CreatePortfolioWithDepositAsync(
+            cancellationToken, NewDepositRequest(name: "Settled deposit"));
+        var dueDeposit = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Due deposit"));
+        await client.SettleDepositAsync(
+            portfolioId,
+            settledDeposit.AssetId,
+            cancellationToken,
+            NewSettleRequest(settledOn: new DateOnly(2026, 4, 16), grossInterest: 150.00m, tax: 28.50m));
+
+        var response = await client.GetAsync(AllDepositsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var deposits = await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken);
+        Assert.NotNull(deposits);
+        Assert.Equal(2, deposits.Count);
+
+        var settled = Assert.Single(deposits, d => d.AssetId == settledDeposit.AssetId);
+        Assert.Equal(DepositStatus.Settled, settled.Status);
+        Assert.Equal(new DateOnly(2026, 4, 16), settled.SettledOn);
+        Assert.Equal(150.00m, settled.SettledGrossInterest);
+        Assert.Equal(28.50m, settled.SettledTax);
+        Assert.Equal(new DateOnly(2026, 4, 15), settled.MaturityDate);
+
+        var due = Assert.Single(deposits, d => d.AssetId == dueDeposit.AssetId);
+        Assert.Equal(DepositStatus.Due, due.Status);
+        Assert.Null(due.SettledOn);
+        Assert.Null(due.SettledGrossInterest);
+        Assert.Null(due.SettledTax);
+    }
+
+    /// <summary>
     /// "Today" is the Europe/Warsaw date, not the UTC one: at 2026-04-14 22:30 UTC it is already
     /// 2026-04-15 in Warsaw (CEST, UTC+2), so a deposit maturing 2026-04-15 is Due.
     /// </summary>

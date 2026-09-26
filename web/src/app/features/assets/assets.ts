@@ -175,9 +175,13 @@ export class Assets {
   }
 
   // A term deposit is Due once its maturity date is today or earlier — the same rule as the
-  // Deposits page's server-side status, on the viewer's local calendar date.
+  // Deposits page's server-side status, on the viewer's local calendar date — until it is settled.
   protected isDepositDue(asset: AssetResponse): boolean {
-    return !!asset.depositMaturityDate && asset.depositMaturityDate <= toDateOnly(new Date());
+    return (
+      !asset.depositSettled &&
+      !!asset.depositMaturityDate &&
+      asset.depositMaturityDate <= toDateOnly(new Date())
+    );
   }
 
   protected formatQuantity(quantity: number | string): string {

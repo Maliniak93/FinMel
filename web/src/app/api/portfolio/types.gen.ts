@@ -43,6 +43,7 @@ export type AssetResponse = {
     instrumentId?: null | string;
     transactionCount: number | string;
     depositMaturityDate?: null | string;
+    depositSettled?: null | boolean;
 };
 
 export type AssetValuationMode = number;
@@ -82,6 +83,17 @@ export type DepositResponse = {
     earlyBreakInterestLossPercent: number | string;
     projection: DepositProjectionResponse;
     status: DepositStatus;
+    settledOn?: null | string;
+    settledGrossInterest?: null | number | string;
+    settledTax?: null | number | string;
+};
+
+export type DepositSettlementPreviewResponse = {
+    settledOn: string;
+    grossInterest: number | string;
+    tax: number | string;
+    netInterest: number | string;
+    finalAmount: number | string;
 };
 
 export type DepositStatus = number;
@@ -109,6 +121,12 @@ export type RecordTransactionRequest = {
     quantity?: number | string;
     unitPrice: number | string;
     date: string;
+};
+
+export type SettleDepositRequest = {
+    settledOn: string;
+    grossInterest: number | string;
+    tax: number | string;
 };
 
 export type TransactionResponse = {
@@ -544,3 +562,41 @@ export type GetApiPortfolioDepositsResponses = {
 };
 
 export type GetApiPortfolioDepositsResponse = GetApiPortfolioDepositsResponses[keyof GetApiPortfolioDepositsResponses];
+
+export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settlement-preview';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses = {
+    /**
+     * OK
+     */
+    200: DepositSettlementPreviewResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleData = {
+    body: SettleDepositRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settle';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses = {
+    /**
+     * OK
+     */
+    200: DepositResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses];

@@ -38,8 +38,14 @@ public sealed class UpdateDepositHandler(
             return PortfolioErrors.Archived(portfolioId);
         }
 
-        // A term deposit holds exactly one transaction — the system-managed opening Deposit — and it is
-        // rewritten in place, never corrected by a second one.
+        // A settled deposit's terms are immutable (term-deposits-settlement) — delete it instead.
+        if (terms.SettledOn is not null)
+        {
+            return DepositErrors.Settled;
+        }
+
+        // An unsettled term deposit holds exactly one transaction — the system-managed opening Deposit —
+        // and it is rewritten in place, never corrected by a second one.
         var opening = await dbContext.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken);
         var candidate = new Transaction
         {

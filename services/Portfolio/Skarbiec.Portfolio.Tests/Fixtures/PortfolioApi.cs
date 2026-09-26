@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 
@@ -48,6 +49,57 @@ internal static class PortfolioApi
 
     public static string DepositUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/deposits/{assetId}";
+
+    /// <summary>term-deposits-settlement: the settlement projection of a Due deposit.</summary>
+    public static string DepositSettlementPreviewUri(Guid portfolioId, Guid assetId) =>
+        $"{DepositUri(portfolioId, assetId)}/settlement-preview";
+
+    /// <summary>term-deposits-settlement: settles a Due deposit at maturity.</summary>
+    public static string SettleDepositUri(Guid portfolioId, Guid assetId) =>
+        $"{DepositUri(portfolioId, assetId)}/settle";
+
+    /// <summary>
+    /// term-deposits-settlement: "now" for a settlement fact — Warsaw 2026-04-20 12:00, five days after
+    /// the <see cref="NewDepositRequest"/> deposit's 2026-04-15 maturity, so that deposit is Due.
+    /// Pin it with <c>Factory.Clock.SetUtcNow(...)</c>.
+    /// </summary>
+    public static readonly DateTimeOffset AfterDefaultMaturityUtc = new(2026, 4, 20, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// term-deposits-settlement: a valid <see cref="SettleDepositRequest"/> — by default exactly the
+    /// part-1 projection of <see cref="NewDepositRequest"/>'s deposit (gross 147.95, tax 28.12 → net
+    /// 119.83, final 10 119.83) settled on its 2026-04-15 maturity. Override only what the fact is about.
+    /// </summary>
+    public static SettleDepositRequest NewSettleRequest(
+        DateOnly? settledOn = null,
+        decimal grossInterest = 147.95m,
+        decimal tax = 28.12m) => new()
+        {
+            SettledOn = settledOn ?? new DateOnly(2026, 4, 15),
+            GrossInterest = grossInterest,
+            Tax = tax
+        };
+
+    /// <summary>
+    /// term-deposits-settlement: settles <paramref name="assetId"/> (arrange only — the fact must have
+    /// pinned a clock past its maturity). Defaults to <see cref="NewSettleRequest"/>.
+    /// </summary>
+    public static async Task SettleDepositAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, SettleDepositRequest? request = null)
+    {
+        var response = await client.PostAsJsonAsync(SettleDepositUri(portfolioId, assetId), request ?? NewSettleRequest(), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>term-deposits: a deposit as <c>GET .../deposits/{assetId}</c> returns it.</summary>
+    public static async Task<DepositResponse> GetDepositAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(DepositUri(portfolioId, assetId), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
+    }
 
     /// <summary>
     /// term-deposits: a valid <see cref="AddDepositRequest"/> — by default the spec's AC-1 terms

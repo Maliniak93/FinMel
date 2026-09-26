@@ -20,7 +20,7 @@ export const DEPOSIT_CAPITALIZATIONS: readonly { value: DepositCapitalization; l
   { value: 3, label: 'Yearly' },
 ];
 
-export const DEPOSIT_STATUS = { Active: 0, Due: 1 } as const satisfies Record<
+export const DEPOSIT_STATUS = { Active: 0, Due: 1, Settled: 2 } as const satisfies Record<
   string,
   DepositStatus
 >;
@@ -34,7 +34,30 @@ export function maxTermLength(termUnit: DepositTermUnit): number {
 }
 
 export function depositStatusLabel(status: DepositStatus): string {
-  return Number(status) === DEPOSIT_STATUS.Due ? 'Due' : 'Active';
+  switch (Number(status)) {
+    case DEPOSIT_STATUS.Settled:
+      return 'Settled';
+    case DEPOSIT_STATUS.Due:
+      return 'Due';
+    default:
+      return 'Active';
+  }
+}
+
+// A settlement's net interest (gross − tax) and final amount (principal + net), for the settle
+// dialog's live preview and a Settled row — the server stores only the three inputs. Summed in whole
+// grosze so the display never shows a floating-point artefact; the server's decimals stay the truth.
+export function settlementAmounts(
+  principal: number | string,
+  grossInterest: number | string,
+  tax: number | string,
+): { netInterest: number; finalAmount: number } {
+  const toGrosze = (amount: number | string) => Math.round(Number(amount) * 100);
+  const netGrosze = toGrosze(grossInterest) - toGrosze(tax);
+  return {
+    netInterest: netGrosze / 100,
+    finalAmount: (toGrosze(principal) + netGrosze) / 100,
+  };
 }
 
 // Mirrors DepositInterestMath.MaturityDate for the form's read-only preview (the server stores the

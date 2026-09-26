@@ -42,6 +42,29 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(DepositStatus.Due, body.Status);
     }
 
+    /// <summary>term-deposits-settlement: <c>GetDeposit</c> returns the settlement data and the Settled status too.</summary>
+    [Fact]
+    public async Task Get_SettledDeposit_ReturnsSettlement()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.SettleDepositAsync(
+            portfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(settledOn: new DateOnly(2026, 4, 17), grossInterest: 150.00m, tax: 28.50m));
+
+        var response = await client.GetAsync(DepositUri(portfolioId, deposit.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(DepositStatus.Settled, body.Status);
+        Assert.Equal(new DateOnly(2026, 4, 17), body.SettledOn);
+        Assert.Equal(150.00m, body.SettledGrossInterest);
+        Assert.Equal(28.50m, body.SettledTax);
+        Assert.Equal(10_000m, body.Principal);
+    }
+
     /// <summary>A non-Deposit asset is not a deposit — 404, not its asset data.</summary>
     [Fact]
     public async Task Get_NonDepositAsset_ReturnsNotFound()

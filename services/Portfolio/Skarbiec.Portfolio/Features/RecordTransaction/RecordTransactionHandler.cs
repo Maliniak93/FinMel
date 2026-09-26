@@ -25,7 +25,7 @@ public sealed class RecordTransactionHandler(
             return PortfolioErrors.Archived(portfolioId);
         }
 
-        // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit (term-deposits).
+        // A term deposit's transactions are system-managed by the deposit slices (term-deposits).
         if (asset.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.TransactionsManaged;

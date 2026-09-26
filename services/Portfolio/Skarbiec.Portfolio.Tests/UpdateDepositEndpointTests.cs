@@ -102,6 +102,36 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
     }
 
+    /// <summary>
+    /// term-deposits-settlement AC-7 (update half): a settled deposit's terms are immutable — 409
+    /// <c>Conflict.DepositSettled</c>, and the terms, settlement and quantity stay as they were.
+    /// </summary>
+    [Fact]
+    public async Task Update_SettledDeposit_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.SettleDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var request = NewDepositRequest(name: "After settlement", principal: 20_000m).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(DepositUri(portfolioId, deposit.AssetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositSettledErrorCode, cancellationToken);
+        var unchanged = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal("Term deposit", unchanged.Name);
+        Assert.Equal(10_000m, unchanged.Principal);
+        Assert.Equal(DepositStatus.Settled, unchanged.Status);
+        Assert.Equal(147.95m, unchanged.SettledGrossInterest);
+        var asset = await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(10_119.83m, asset.Quantity);
+        Assert.Equal(2, asset.TransactionCount);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(10_000m, (await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken)).Principal);
+    }
+
     /// <summary>The same validation as AddDeposit applies; a rejected update leaves every row as it was.</summary>
     [Theory]
     [InlineData("principal-zero", nameof(UpdateDepositRequest.Principal))]
