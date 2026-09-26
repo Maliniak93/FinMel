@@ -26,7 +26,7 @@ as claims: verify each one against the tree.
 
 1. The change is **staged — not committed — on its `feat/*` branch before you are called**, so
    `git diff --cached` is the authoritative diff: the index shows brand-new files, which a bare
-   `git diff` never does. Nothing in this pipeline is ever committed, so `master...HEAD` shows
+   `git diff` never does. Nothing is committed before the review, so `master...HEAD` shows
    nothing — do not reach for it. Then `git status --porcelain` for anything still unstaged: that
    belongs to the change too, and you read those files directly.
 2. Read the spec in full.

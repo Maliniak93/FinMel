@@ -46,9 +46,9 @@
 //       {"ok":false,"reason":"...","next":"..."} with what to run instead.
 //
 //   node scripts/gh-project.mjs report <issue number> [--json '<run report>']   (else JSON on stdin)
-//       Formats a build run's result as an issue comment and posts it. On a staged run whose review
-//       ran, also ticks every acceptance criterion. The build-feature workflow calls this through
-//       its ops agent, so nobody hand-writes the comment.
+//       Formats a build run's result as an issue comment and posts it. On a shipped run it links the
+//       branch's open PR and, when the review ran, ticks every acceptance criterion. The
+//       build-feature workflow calls this through its ops agent, so nobody hand-writes the comment.
 //
 //   node scripts/gh-project.mjs list
 //       Prints a JSON array of every issue on the project with its fields; an epic also carries its
@@ -397,7 +397,7 @@ function prepare([number, ...rest]) {
   );
 }
 
-// The run report the build-feature workflow sends: {status: "staged"|"blocked", stage?, reason?,
+// The run report the build-feature workflow sends: {status: "shipped"|"blocked", stage?, reason?,
 // branch?, tests?: string[], rounds?, reviewRan?, minor?: [{file,line,claim}],
 // failures?: [{step,summary,file}], blocking?: [{file,line,claim}]}.
 function report([number, ...rest]) {
@@ -407,8 +407,9 @@ function report([number, ...rest]) {
   const where = (f) => [f.file, f.line].filter(Boolean).join(":") || "—";
   const lines = [];
 
-  if (run.status === "staged") {
-    lines.push(`**Built** on \`${run.branch}\` — staged, awaiting commit and PR.`, "");
+  if (run.status === "shipped") {
+    const [pr] = JSON.parse(gh(["pr", "list", "--repo", REPO, "--head", run.branch, "--state", "open", "--json", "url", "--limit", "1"]));
+    lines.push(`**Built** on \`${run.branch}\` — ${pr ? `PR ${pr.url} is open, awaiting your merge.` : "pushed, but no open PR was found for it."}`, "");
     lines.push(`- Tests: ${run.tests?.length ? run.tests.map((t) => `\`${t}\``).join(", ") : "none — skip-tests"}`);
     lines.push(`- Fix rounds: ${run.rounds ?? 0}`);
     lines.push(`- Review: ${run.reviewRan ? `clean, ${run.minor?.length ?? 0} minor finding(s)` : "skipped"}`);
@@ -417,12 +418,17 @@ function report([number, ...rest]) {
     lines.push(`**Blocked** at \`${run.stage ?? "?"}\`${run.reason ? ` — ${run.reason}` : ""}`, "");
     for (const f of run.failures ?? []) lines.push(`- ${f.step}: ${f.summary}${f.file ? ` (\`${f.file}\`)` : ""}`);
     for (const f of run.blocking ?? []) lines.push(`- \`${where(f)}\` — ${f.claim}`);
-    lines.push("", `Fix the spec or the named problem, then re-run \`/build #${number}\` — the work stays on its branch.`);
+    lines.push(
+      "",
+      run.stage === "ship"
+        ? "Verified and reviewed, but not shipped: finish the commit, push and PR by hand — a re-run of `/build` would repeat the whole pipeline."
+        : `Fix the spec or the named problem, then re-run \`/build #${number}\` — the work stays on its branch.`,
+    );
   }
 
   gh(["issue", "comment", String(number), "--repo", REPO, "--body-file", "-"], lines.join("\n"));
   console.log(`#${number}: report posted`);
-  if (run.status === "staged" && run.reviewRan) tick([number]);
+  if (run.status === "shipped" && run.reviewRan) tick([number]);
 }
 
 function list() {

@@ -1,6 +1,6 @@
 export const meta = {
   name: 'build-feature',
-  description: 'Spec to a staged tree: branch, failing tests, implementation, verification, adversarial review',
+  description: 'Spec to an open PR: branch, failing tests, implementation, verification, adversarial review, commit, push, PR',
   whenToUse: 'Invoked by /build and /fix on an open spec issue from the FinMel project (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
     { title: 'Branch', detail: 'ops cuts the issue branch (feat/<slug> or fix/<slug>) from master before a single file is written', model: 'haiku' },
@@ -8,7 +8,7 @@ export const meta = {
     { title: 'Implement', detail: 'implementer does the work; sonnet/high on tier 1, opus/xhigh on tier 2' },
     { title: 'Verify', detail: 'verifier runs scripts/verify.mjs; failures loop back to Implement', model: 'haiku' },
     { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'claude-opus-5-5' },
-    { title: 'Stage', detail: 'ops leaves everything staged - the commit, push and PR are yours', model: 'haiku' },
+    { title: 'Ship', detail: 'ops commits, pushes and opens the PR - merging is yours', model: 'haiku' },
   ],
 }
 
@@ -104,6 +104,17 @@ const STAGE = {
   required: ['branch'],
 }
 
+const SHIP = {
+  type: 'object',
+  properties: {
+    branch: { type: 'string' },
+    commit: { type: 'string' },
+    prUrl: { type: 'string' },
+    notes: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['branch'],
+}
+
 // ---------------------------------------------------------------- setup
 
 const { spec, issue, branch: issueBranch, title, tier = 1, maxRounds = 2, skip = [] } = args || {}
@@ -154,12 +165,13 @@ const compact = () => ({
 // model writes the issue comment, the ops agent only pastes one command.
 const clip = (text, n) => (text && String(text).length > n ? `${String(text).slice(0, n)}…` : text)
 const findingsOf = (list) => (list || []).map((f) => ({ file: f.file, line: f.line, claim: clip(f.claim, 300) }))
-// One line, single-quoted for bash (a `'` inside becomes `'"'"'`), so it matches the
-// `node scripts/gh-project.mjs report` permission rule and runs without a prompt.
+// Single-quoted for bash (a `'` inside becomes `'"'"'`), so every command stays one line that
+// matches its permission rule and runs without a prompt.
+const sq = (text) => `'${String(text).replace(/'/g, `'"'"'`)}'`
 const reportCommand = (run) => [
   'Run exactly this command, verbatim, as one Bash call:',
   '```',
-  `node scripts/gh-project.mjs report ${issue} --json '${JSON.stringify(run).replace(/'/g, `'"'"'`)}'`,
+  `node scripts/gh-project.mjs report ${issue} --json ${sq(JSON.stringify(run))}`,
   '```',
 ]
 
@@ -199,8 +211,9 @@ const verify = (label) =>
     VERIFY,
   )
 
-// Nothing is ever committed by the pipeline: `git add -A` is the whole freeze, and the reviewer
-// diffs the index (`git diff --cached`), which - unlike a bare `git diff` - does show new files.
+// Nothing is committed before the review: `git add -A` is the freeze, and the reviewer diffs the
+// index (`git diff --cached`), which - unlike a bare `git diff` - does show new files. The commit
+// comes in the Ship phase, once the review is clean.
 const stage = (label) =>
   step(
     'ops',
@@ -209,7 +222,7 @@ const stage = (label) =>
       `Stage the working tree for the spec at \`${spec}\` so the reviewer sees the whole change.`,
       whereBranch,
       'Confirm you are on that branch - never stage work on master.',
-      'Run `git add -A` and nothing else. No commit, no push, no PR - the user does all three by hand.',
+      'Run `git add -A` and nothing else. No commit, no push, no PR - those come after the review.',
       'Report the branch and the number of staged files (`git diff --cached --name-only`).',
     ],
     STAGE,
@@ -407,47 +420,62 @@ if (skipped.has('review')) {
   }
 }
 
-// ---------------------------------------------------------------- stage
+// ---------------------------------------------------------------- ship
 
-phase('Stage')
-if (broke()) return await stop('stage', { reason: 'budget' })
+phase('Ship')
+if (broke()) return await stop('ship', { reason: 'budget' })
 
 const minor = review ? review.findings.filter((f) => f.severity === 'minor') : []
 
-const staged = await step(
+// Every git/gh command is built here and run verbatim, one Bash call each, so the git-guard hook
+// sees each one (commit/push/PR on feat/* and fix/* pass silently; anything else prompts).
+const commitCommand = `git commit -m ${sq(title)} -m ${sq(`Spec: #${issue}`)} -m ${sq('Co-Authored-By: Claude <noreply@anthropic.com>')}`
+const pushCommand = `git push -u origin ${issueBranch}`
+const prCommand = `gh pr create --base master --head ${issueBranch} --title ${sq(title)} --body ${sq(`Spec: #${issue} - the build run report is on the issue. 🤖 Generated with [Claude Code](https://claude.com/claude-code)`)}`
+const shipCommands = ['git add -A', commitCommand, pushCommand, prCommand]
+
+const shipped = await step(
   'ops',
-  'leave the tree staged',
+  'commit, push and open the PR',
   [
-    `Finish the run for the spec at \`${spec}\`. Nothing is committed and nothing may be: the user commits, pushes and opens the PR by hand.`,
+    `Ship the verified and reviewed change for the spec at \`${spec}\`: commit it, push the branch and open its PR. Never merge - the user merges.`,
     whereBranch,
-    'Confirm you are on that branch.',
-    'Run `git add -A`. No commit, no push, no `gh pr create`, no PR review comments - there is no PR yet.',
-    'Then post the run report on the issue.',
+    `Confirm you are on \`${issueBranch}\` - never commit on master. Then run these commands in order, each verbatim as its own Bash call:`,
+    '```',
+    ...shipCommands,
+    '```',
+    '- `git commit` says there is nothing to commit and the branch is already ahead of `origin/master` (a resumed run committed it) → carry on with the push.',
+    '- `gh pr create` says a PR for the branch already exists → take its URL from `gh pr view --json url` and carry on.',
+    '- Any other failure, or a permission prompt → stop there: run nothing further (not even the report), return no `prUrl`, and put the failing command and its error first in notes.',
+    'Only once the PR exists, post the run report on the issue:',
   ].concat(
     reportCommand({
-      status: 'staged',
+      status: 'shipped',
       branch: issueBranch,
       tests: tests.tests.map((t) => t.name),
       rounds,
       reviewRan: Boolean(review),
       minor: findingsOf(minor),
     }),
-    ['Report the branch, the number of staged files (`git diff --cached --name-only`), and the report command output in notes.'],
+    ['Report the branch, the commit sha (`git rev-parse --short HEAD`), the PR URL as `prUrl`, and the report command output in notes.'],
   ),
-  STAGE,
+  SHIP,
   MECHANICAL,
 )
 
-if (!staged) return await stop('stage', { reason: 'ops returned no result' })
+if (!shipped) return await stop('ship', { reason: 'ops returned no result', nextSteps: shipCommands })
+if (!shipped.prUrl) {
+  return await stop('ship', { reason: clip((shipped.notes || [])[0] || 'ops opened no PR', 300), nextSteps: shipCommands })
+}
 
-const branch = staged.branch || cut.branch
-log(`staged on ${branch} - ${staged.stagedFiles ?? '?'} file(s); commit, push and PR are yours`)
+const branch = shipped.branch || cut.branch
+log(`shipped ${branch} - PR ${shipped.prUrl}; merging is yours`)
 
 return {
-  status: 'staged',
+  status: 'shipped',
   branch,
-  stagedFiles: staged.stagedFiles ?? null,
-  nextSteps: [`git commit -m "${title}"`, `git push -u origin ${branch}`, `gh pr create --base master --head ${branch} --title "${title}" --body "Spec: #${issue}"`],
+  commit: shipped.commit || null,
+  prUrl: shipped.prUrl,
   review: review ? clip(review.summary, 400) : 'review skipped',
   minorFindings: findingsOf(minor),
   skipped: [...skipped],

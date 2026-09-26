@@ -115,6 +115,10 @@ that gets checked, not a suite you run yourself.
   other git mutation. The ops agent owns git. Read-only `git status` / `git diff` is fine.
 - Never delete or weaken a test to make a run pass. Never mark a test skipped.
 - Never claim success you have not seen: if a command failed, it failed.
+- A running local stack (Aspire AppHost, the services, `ng serve`) can block your commands: MSB3021 / MSB3026 /
+  MSB3027 ("being used by another process") on a build, EBUSY / EPERM on a file under `web/node_modules`,
+  a port already in use. Then run `node scripts/stop-stack.mjs` (it stops only the stack and prints what
+  it stopped), re-run the command once, and say so in `notes`. Never start the stack again afterwards.
 - A `Stop` hook runs `node scripts/verify.mjs --quick` (format + build) when you try to finish. If it
   exits non-zero you are handed its stderr and must fix the cause. Do not route around it.
 

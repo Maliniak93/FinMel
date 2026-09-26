@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build a spec issue from the FinMel GitHub project end-to-end - branch, failing tests, implementation, verification, adversarial review - and leave it staged for your own commit and PR.
+description: Build a spec issue from the FinMel GitHub project end-to-end - branch, failing tests, implementation, verification, adversarial review, commit, push and PR - and leave the merge to you.
 argument-hint: "#<issue> [--tier 1|2] [--skip tests,review] [+Nk]"
 disable-model-invocation: true
 model: haiku
@@ -20,12 +20,13 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
 
 ## Report (at most 10 lines)
 
-- `staged` → the issue `url`, branch, staged file count, tests (`tests`, or "none — skip-tests"),
-  `filesTouched` count, `rounds`, each of `minorFindings` as `file:line — claim` ("none" when empty),
-  then the three `nextSteps` commands verbatim. Do not run them and do not offer to.
+- `shipped` → the `prUrl` (the merge is the user's), the issue `url`, branch and `commit`, tests
+  (`tests`, or "none — skip-tests"), `filesTouched` count, `rounds`, each of `minorFindings` as
+  `file:line — claim` ("none" when empty).
 - `blocked` → `stage`, then `reason`/`failures`/`findings` trimmed to one line each, then: fix the
   spec (`/design` amends the issue) or the named problem by hand, and re-run `/build #<n>` — the work
   stays on its branch. At `stage: branch` the tree held changes that are not this spec: name them and
-  stop; never offer to sweep them into the branch.
+  stop; never offer to sweep them into the branch. At `stage: ship` the change is verified and
+  reviewed but not shipped: print `reason` and the `nextSteps` commands verbatim for the user to finish by hand.
 
-Never commit, push, open or merge anything, and never touch the issue yourself.
+Never commit, push, open or merge anything yourself — the workflow ships, the user merges — and never touch the issue.

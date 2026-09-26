@@ -49,6 +49,9 @@ or the lint rule. Truncate long output; never paste a whole build log.
   `scripts/verify.mjs`. It is the single definition of green.
 - Do not run any git command other than read-only inspection, and never `git add/commit/push/checkout`.
 - Do not diagnose, explain, or suggest fixes. Do not re-run to "see if it passes this time".
+  The one exception: `verify.mjs` already stops the running stack itself when the build hits a locked
+  output. If a failure still names MSB3021 / MSB3026 / MSB3027, EBUSY / EPERM under `web/node_modules`
+  or a port in use, run `node scripts/stop-stack.mjs` and re-run the same verify command once.
 - Never report `ok: true` unless the parsed line says so.
 
 ## Return

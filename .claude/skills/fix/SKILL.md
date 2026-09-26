@@ -23,7 +23,9 @@ Pick the cheapest reproduction that actually shows the bug, in this order:
 - A red `verify.mjs` → re-run it for the named projects only: `node scripts/verify.mjs --projects <A,B|web>`.
 - A log path → read it; quote the failing lines.
 - A runtime or UI symptom → run the stack (`run` skill: `dotnet run --project Skarbiec.AppHost`, `cd web && npm start`)
-  and reproduce through `requests/<service>.http` or Playwright. Docker must be running.
+  and reproduce through `requests/<service>.http` or Playwright. Docker must be running. Stop it with
+  `node scripts/stop-stack.mjs` once you have the reproduction — a running stack locks the build outputs
+  the pipeline needs.
 
 No reproduction → stop and say exactly what you tried and what you saw. Do not guess at a fix.
 
@@ -90,14 +92,15 @@ with `--parent <umbrella number>`.
 Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the
 previous one has merged. Build exactly as `/build` does: `node scripts/gh-project.mjs prepare <number>`, then the
 `Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`. The workflow posts
-its own report on the issue; report to the user as `/build` does (at most 10 lines, ending with the
-three `nextSteps` commands, which you never run).
+its own report on the issue and ships the fix as a PR; report to the user as `/build` does (at most
+10 lines, leading with the `prUrl` — the merge is the user's).
 
 ## Hard constraints
 
 - Write no production code and no test yourself — the test-writer writes the reproduction test, the implementer
   fixes it, the reviewer checks it. Your only artefact is the issue.
-- Never run `git add`, `git commit`, `git push`, `git switch`, `git checkout`, `git stash`. Read-only git is fine.
+- Never run `git add`, `git commit`, `git push`, `git switch`, `git checkout`, `git stash` yourself — the
+  workflow's ops agent commits, pushes and opens the PR. Read-only git is fine. Never merge.
 - A flaky test is a bug in the test or the fixture, not a reason to retry until green — treat it like any other bug.
 - Never widen the fix into cleanup. One cause, one fix, one PR — several causes or a sequenced fix become an
   epic of such parts (3a), never one wide PR.

@@ -43,11 +43,15 @@
 //    (e.g. a Polish sentence containing "Failed to...") and reported a garbage test name. A run
 //    where Docker isn't reachable is detected up front from the output itself and reported as that,
 //    rather than as a misleading one-word "test".
+//  - A running local stack (Aspire AppHost + services) holds its bin/ outputs open, so the build fails
+//    with MSB3021/MSB3026/MSB3027 (locked file). On one of those codes this script stops the stack
+//    (`scripts/stop-stack.mjs`) and retries the build once; the log says what it stopped.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stopStack } from "./stop-stack.mjs";
 
 const IS_WIN = process.platform === "win32";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -364,6 +368,9 @@ function firstNonEmptyLines(text, n) {
 // Failure extraction (best-effort; always falls back to a truthful excerpt, never throws)
 // ---------------------------------------------------------------------------------------------
 
+// MSBuild's locked-output codes (not localized): copy failed / retrying / gave up after retries.
+const LOCKED_OUTPUT_RE = /\b(?:warning|error)\s+MSB30(?:21|26|27)\b/;
+
 // MSBuild/tsc shared diagnostic shape: `file(line,col): error CODE: message [project]`. The `error`/
 // `warning` keyword and the rule code are stable across locales — only `message` is localized, and
 // we never read it.
@@ -604,7 +611,14 @@ function main() {
   if (!formatResult.ok) return finish(false, [buildFailure("format", formatResult)]);
 
   // Step 2: build (warnings are errors via Directory.Build.props)
-  const buildResult = step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+  let buildResult = step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+  if (!buildResult.ok && LOCKED_OUTPUT_RE.test(`${buildResult.stdout}\n${buildResult.stderr}`)) {
+    const { stopped, left } = stopStack();
+    const names = stopped.map((p) => `${p.name} (${p.what})`).join(", ") || "nothing found";
+    console.log(`\nbuild outputs are locked by the running stack; stopped: ${names}`);
+    if (left?.length) console.log(`still running: ${left.map((p) => `${p.name} #${p.pid}`).join(", ")}`);
+    buildResult = step("build (retry after stopping the stack)", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+  }
   if (!buildResult.ok) return finish(false, [buildFailure("build", buildResult)]);
 
   if (args.quick) return finish(true, []);
