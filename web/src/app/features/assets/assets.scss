@@ -38,3 +38,15 @@
 .assets-page__table {
   width: 100%;
 }
+
+.assets-page__due {
+  display: inline-flex;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+// "Due" in warning colour: the term deposit has matured.
+.assets-page__chip--due {
+  --mat-chip-elevated-container-color: var(--mat-sys-error-container);
+  --mat-chip-label-text-color: var(--mat-sys-on-error-container);
+}

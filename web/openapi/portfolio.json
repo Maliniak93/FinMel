@@ -628,6 +628,154 @@
           }
         }
       }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/deposits": {
+      "post": {
+        "tags": [
+          "AddDepositEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDepositRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}": {
+      "put": {
+        "tags": [
+          "UpdateDepositEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDepositRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "GetDepositEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/deposits": {
+      "get": {
+        "tags": [
+          "ListDepositsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepositResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -681,6 +829,88 @@
                 "$ref": "#/components/schemas/RecordTransactionRequest"
               }
             ]
+          }
+        }
+      },
+      "AddDepositRequest": {
+        "required": [
+          "name",
+          "currency",
+          "principal",
+          "startDate",
+          "termLength",
+          "termUnit",
+          "annualInterestRatePercent",
+          "capitalization"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "bankName": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "principal": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "termLength": {
+            "maximum": 3650,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "termUnit": {
+            "$ref": "#/components/schemas/DepositTermUnit"
+          },
+          "annualInterestRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "capitalization": {
+            "$ref": "#/components/schemas/DepositCapitalization"
+          },
+          "taxExempt": {
+            "type": "boolean"
+          },
+          "earlyBreakInterestLossPercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -758,6 +988,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "depositMaturityDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         }
       },
@@ -785,6 +1022,172 @@
             "type": "string"
           }
         }
+      },
+      "DepositCapitalization": {
+        "type": "integer"
+      },
+      "DepositProjectionResponse": {
+        "required": [
+          "grossInterest",
+          "tax",
+          "netInterest",
+          "finalAmount",
+          "netProfitPercent"
+        ],
+        "type": "object",
+        "properties": {
+          "grossInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "netInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "finalAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "netProfitPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "DepositResponse": {
+        "required": [
+          "assetId",
+          "portfolioId",
+          "portfolioName",
+          "portfolioIsArchived",
+          "name",
+          "currency",
+          "principal",
+          "startDate",
+          "termLength",
+          "termUnit",
+          "maturityDate",
+          "annualInterestRatePercent",
+          "capitalization",
+          "taxExempt",
+          "earlyBreakInterestLossPercent",
+          "projection",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioName": {
+            "type": "string"
+          },
+          "portfolioIsArchived": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bankName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "principal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "termLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "termUnit": {
+            "$ref": "#/components/schemas/DepositTermUnit"
+          },
+          "maturityDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "annualInterestRatePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "capitalization": {
+            "$ref": "#/components/schemas/DepositCapitalization"
+          },
+          "taxExempt": {
+            "type": "boolean"
+          },
+          "earlyBreakInterestLossPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/DepositProjectionResponse"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DepositStatus"
+          }
+        }
+      },
+      "DepositStatus": {
+        "type": "integer"
+      },
+      "DepositTermUnit": {
+        "type": "integer"
       },
       "PagedResponseOfTransactionResponse": {
         "required": [
@@ -1004,6 +1407,84 @@
           }
         }
       },
+      "UpdateDepositRequest": {
+        "required": [
+          "name",
+          "principal",
+          "startDate",
+          "termLength",
+          "termUnit",
+          "annualInterestRatePercent",
+          "capitalization"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "bankName": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "principal": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "termLength": {
+            "maximum": 3650,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "termUnit": {
+            "$ref": "#/components/schemas/DepositTermUnit"
+          },
+          "annualInterestRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "capitalization": {
+            "$ref": "#/components/schemas/DepositCapitalization"
+          },
+          "taxExempt": {
+            "type": "boolean"
+          },
+          "earlyBreakInterestLossPercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "UpdatePortfolioRequest": {
         "required": [
           "name",
@@ -1115,6 +1596,18 @@
     },
     {
       "name": "DeleteTransactionEndpoint"
+    },
+    {
+      "name": "AddDepositEndpoint"
+    },
+    {
+      "name": "UpdateDepositEndpoint"
+    },
+    {
+      "name": "GetDepositEndpoint"
+    },
+    {
+      "name": "ListDepositsEndpoint"
     }
   ]
 }

@@ -8,6 +8,7 @@ import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth';
 import { Login } from './features/auth/login/login';
 import { Dashboard } from './features/dashboard/dashboard';
+import { Deposits } from './features/deposits/deposits';
 import { NotFound } from './features/not-found/not-found';
 import { Portfolios } from './features/portfolios/portfolios';
 import { Settings } from './features/settings/settings';
@@ -38,6 +39,12 @@ describe('app routing (authenticated)', () => {
   it('renders Portfolios at /portfolios', async () => {
     await harness.navigateByUrl('/portfolios', Shell);
     expect(harness.fixture.debugElement.query(By.directive(Portfolios))).toBeTruthy();
+  });
+
+  // term-deposits: the Deposits page lists every deposit across portfolios.
+  it('renders Deposits at /deposits', async () => {
+    await harness.navigateByUrl('/deposits', Shell);
+    expect(harness.fixture.debugElement.query(By.directive(Deposits))).toBeTruthy();
   });
 
   it('renders Settings at /settings', async () => {

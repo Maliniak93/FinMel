@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateTransaction;
@@ -22,6 +23,12 @@ public sealed class UpdateTransactionHandler(
         if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
         {
             return PortfolioErrors.Archived(portfolioId);
+        }
+
+        // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit (term-deposits).
+        if (asset.AssetClass == AssetClass.Deposit)
+        {
+            return DepositErrors.TransactionsManaged;
         }
 
         var transaction = await dbContext.Transactions

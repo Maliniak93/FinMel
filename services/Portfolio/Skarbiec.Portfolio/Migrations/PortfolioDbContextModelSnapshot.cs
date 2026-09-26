@@ -284,6 +284,53 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("Portfolios");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
+                {
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AnnualInterestRatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Capitalization")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("EarlyBreakInterestLossPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<DateOnly>("MaturityDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Principal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("TaxExempt")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("TermLength")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TermUnit")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AssetId");
+
+                    b.ToTable("TermDeposits");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -337,6 +384,15 @@ namespace Skarbiec.Portfolio.Migrations
                         .WithMany()
                         .HasForeignKey("InboxMessageId", "InboxConsumerId")
                         .HasPrincipalKey("MessageId", "ConsumerId");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
+                        .WithOne()
+                        .HasForeignKey("Skarbiec.Portfolio.Data.TermDeposit", "AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

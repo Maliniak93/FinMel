@@ -372,4 +372,23 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(5m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
         Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).TotalCount);
     }
+
+    /// <summary>term-deposits AC-10: a term deposit's transactions are system-managed — recording
+    /// any transaction on it is a 409 <c>Conflict.DepositTransactionsManaged</c> and nothing changes.</summary>
+    [Theory]
+    [InlineData(TransactionType.Deposit)]
+    [InlineData(TransactionType.Withdraw)]
+    public async Task Record_OnTermDeposit_ReturnsConflict(TransactionType type)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var request = new RecordTransactionRequest { Type = type, Quantity = 500m, UnitPrice = 1m, Date = new DateOnly(2026, 2, 1) };
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, deposit.AssetId), request, cancellationToken);
+
+        await response.AssertDepositTransactionsManagedAsync(cancellationToken);
+        Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).TotalCount);
+    }
 }

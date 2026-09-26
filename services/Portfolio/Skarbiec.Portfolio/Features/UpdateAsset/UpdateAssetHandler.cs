@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateAsset;
@@ -22,6 +23,13 @@ public sealed class UpdateAssetHandler(
         if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
         {
             return PortfolioErrors.Archived(portfolioId);
+        }
+
+        // A term deposit is edited only through UpdateDeposit, and no asset becomes or stops being one
+        // here — its terms and opening transaction would be left behind or missing (term-deposits).
+        if (asset.AssetClass == AssetClass.Deposit || request.AssetClass == AssetClass.Deposit)
+        {
+            return DepositErrors.UseDepositEndpoints;
         }
 
         // Each transaction's frozen PLN rate belongs to the asset's currency (ADR-026), so the

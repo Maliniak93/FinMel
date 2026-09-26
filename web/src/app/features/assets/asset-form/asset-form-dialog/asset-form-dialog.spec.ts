@@ -1,11 +1,13 @@
 import type { Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { By } from '@angular/platform-browser';
+import { of } from 'rxjs';
 
 import { client as marketDataClient } from '../../../../api/marketdata/client.gen';
 import { client as portfolioClient } from '../../../../api/portfolio/client.gen';
+import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
 import { ASSET_CLASS, ASSET_CLASSES } from '../../asset-class';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
 import { CashAssetForm } from '../forms/cash-asset-form/cash-asset-form';
@@ -36,10 +38,10 @@ const FORM_COMPONENTS: readonly Type<AssetFormComponent>[] = [
   ManualAssetForm,
 ];
 
-// Which per-kind form each AssetClass opens (spec #105, Scope → "Form components").
+// Which per-kind form each AssetClass opens (spec #105, Scope → "Form components"). Deposit opens
+// no form here: term-deposits hands it to DepositFormDialog.
 const EXPECTED_FORM: Record<number, Type<AssetFormComponent>> = {
   [ASSET_CLASS.Cash]: CashAssetForm,
-  [ASSET_CLASS.Deposit]: CashAssetForm,
   [ASSET_CLASS.Stock]: SecurityAssetForm,
   [ASSET_CLASS.Etf]: SecurityAssetForm,
   [ASSET_CLASS.Bond]: SecurityAssetForm,
@@ -134,7 +136,7 @@ describe('AssetFormDialog', () => {
       expect(picker()!.querySelectorAll('button')).toHaveLength(9);
       expect(renderedForms()).toEqual([]);
 
-      for (const { value } of ASSET_CLASSES) {
+      for (const { value } of ASSET_CLASSES.filter((c) => c.value !== ASSET_CLASS.Deposit)) {
         await pickTile(value);
 
         expect(picker()).toBeNull();
@@ -144,6 +146,28 @@ describe('AssetFormDialog', () => {
         await goBack();
       }
 
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    // term-deposits AC-16: a Deposit is a term deposit with real terms, created only through the
+    // deposit endpoint — its tile opens DepositFormDialog preset to this portfolio, never the cash
+    // form, and this dialog closes with the deposit dialog's result so the asset list reloads.
+    it('the Deposit tile opens DepositFormDialog preset to the current portfolio', async () => {
+      await setup({ portfolioId });
+      const matDialog = fixture.debugElement.injector.get(MatDialog);
+      const open = vi
+        .spyOn(matDialog, 'open')
+        .mockReturnValue({ afterClosed: () => of(true) } as unknown as MatDialogRef<unknown>);
+
+      await pickTile(ASSET_CLASS.Deposit);
+
+      expect(renderedForms()).toEqual([]);
+      expect(fixture.debugElement.query(By.directive(CashAssetForm))).toBeNull();
+      expect(open).toHaveBeenCalledWith(
+        DepositFormDialog,
+        expect.objectContaining({ data: expect.objectContaining({ portfolioId }) }),
+      );
+      await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 

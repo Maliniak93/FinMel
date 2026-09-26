@@ -107,4 +107,22 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         var page = await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken);
         Assert.Contains(page.Items, t => t.Id == buyId);
     }
+
+    /// <summary>term-deposits AC-10: deleting a term deposit's opening transaction is a 409
+    /// <c>Conflict.DepositTransactionsManaged</c> — the deposit is removed as a whole, through
+    /// <c>DELETE .../assets/{id}</c>, and nothing changes here.</summary>
+    [Fact]
+    public async Task Delete_OnTermDeposit_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var openingId = Assert.Single((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items).Id;
+
+        var response = await client.DeleteAsync(TransactionUri(portfolioId, deposit.AssetId, openingId), cancellationToken);
+
+        await response.AssertDepositTransactionsManagedAsync(cancellationToken);
+        Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Contains((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items, t => t.Id == openingId);
+    }
 }

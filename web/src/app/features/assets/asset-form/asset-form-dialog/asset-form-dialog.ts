@@ -1,7 +1,12 @@
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialog,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
@@ -16,6 +21,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../../core/auth/problem-details';
+import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
 import { ASSET_CLASS } from '../../asset-class';
 import { ASSET_FORM, INITIAL_TRANSACTION_KEY } from '../asset-form';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
@@ -31,11 +37,11 @@ export interface AssetFormDialogData {
 
 type AssetFormKind = 'cash' | 'security' | 'gold' | 'manual';
 
-// Which per-kind form each AssetClass opens.
+// Which per-kind form each AssetClass opens. A Deposit is a term deposit with its own dialog
+// (DepositFormDialog), so it never reaches a form here.
 function formKindFor(assetClass: AssetClass): AssetFormKind {
   switch (Number(assetClass)) {
     case ASSET_CLASS.Cash:
-    case ASSET_CLASS.Deposit:
       return 'cash';
     case ASSET_CLASS.Stock:
     case ASSET_CLASS.Etf:
@@ -70,6 +76,7 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
 })
 export class AssetFormDialog {
   private readonly dialogRef = inject(MatDialogRef<AssetFormDialog>);
+  private readonly dialog = inject(MatDialog);
   protected readonly data = inject<AssetFormDialogData>(MAT_DIALOG_DATA);
 
   protected readonly isEdit = !!this.data.asset;
@@ -87,6 +94,17 @@ export class AssetFormDialog {
 
   protected pick(assetClass: AssetClass): void {
     this.formError.set(null);
+
+    // A term deposit is created only through the deposit endpoint: hand over to its own dialog,
+    // preset to this portfolio, and close with its result so the asset list reloads after a save.
+    if (Number(assetClass) === ASSET_CLASS.Deposit) {
+      this.dialog
+        .open(DepositFormDialog, { width: '560px', data: { portfolioId: this.data.portfolioId } })
+        .afterClosed()
+        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
+      return;
+    }
+
     this.assetClass.set(assetClass);
   }
 

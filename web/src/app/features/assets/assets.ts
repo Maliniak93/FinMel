@@ -20,12 +20,15 @@ import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
   getApiPortfolioPortfoliosById,
   getApiPortfolioPortfoliosByPortfolioIdAssets,
+  getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId,
   type AssetResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { toDateOnly } from '../../shared/date-only';
 import { formatMoney } from '../../shared/format-money';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { assetClassLabel } from './asset-class';
+import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
+import { ASSET_CLASS, assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
 
@@ -171,6 +174,12 @@ export class Assets {
     return Number(asset.quantity) * Number(instrument.lastPrice);
   }
 
+  // A term deposit is Due once its maturity date is today or earlier — the same rule as the
+  // Deposits page's server-side status, on the viewer's local calendar date.
+  protected isDepositDue(asset: AssetResponse): boolean {
+    return !!asset.depositMaturityDate && asset.depositMaturityDate <= toDateOnly(new Date());
+  }
+
   protected formatQuantity(quantity: number | string): string {
     return new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 8 }).format(Number(quantity));
   }
@@ -188,9 +197,39 @@ export class Assets {
   }
 
   protected openEditDialog(asset: AssetResponse): void {
+    if (Number(asset.assetClass) === ASSET_CLASS.Deposit) {
+      void this.openDepositEditDialog(asset);
+      return;
+    }
+
     const ref = this.dialog.open(AssetFormDialog, {
       width: '560px',
       data: { portfolioId: this.portfolioId(), asset },
+    });
+    ref.afterClosed().subscribe((saved: boolean | undefined) => {
+      if (saved) {
+        this.assetsResource.reload();
+      }
+    });
+  }
+
+  // A term deposit's terms live on the deposit endpoints, so its row edits through DepositFormDialog
+  // with the loaded terms, never through the generic asset form.
+  private async openDepositEditDialog(asset: AssetResponse): Promise<void> {
+    const result = await getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId({
+      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    });
+    if (result.error || !result.data) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? 'Failed to load the deposit.',
+        'Dismiss',
+      );
+      return;
+    }
+
+    const ref = this.dialog.open(DepositFormDialog, {
+      width: '560px',
+      data: { deposit: result.data },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {

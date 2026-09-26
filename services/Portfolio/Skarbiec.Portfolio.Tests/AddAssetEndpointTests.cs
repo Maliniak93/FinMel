@@ -20,7 +20,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
 {
     [Theory]
     [InlineData(AssetClass.Cash)]
-    [InlineData(AssetClass.Deposit)]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
     [InlineData(AssetClass.Bond)]
@@ -483,7 +482,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     /// </para></summary>
     [Theory]
     [InlineData(AssetClass.Cash)]
-    [InlineData(AssetClass.Deposit)]
     public async Task Add_CurrencyValuedClassWithInitialDeposit_ReturnsCreatedAsCurrencyValuedWithQuantityFromTransaction(AssetClass assetClass)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -521,7 +519,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     /// before the FX lookup, and no asset (nor transaction) is created.</summary>
     [Theory]
     [InlineData(AssetClass.Cash, TransactionType.Buy)]
-    [InlineData(AssetClass.Deposit, TransactionType.Interest)]
+    [InlineData(AssetClass.Cash, TransactionType.Interest)]
     public async Task Add_CashLikeClassWithDisallowedInitialType_ReturnsBadRequestAndCreatesNoAsset(
         AssetClass assetClass, TransactionType initialType)
     {
@@ -656,5 +654,46 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         await using var dbContext = CreateDbContext(ownerId);
         Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
+    }
+
+    /// <summary>
+    /// term-deposits AC-9: a Deposit-class asset is created only through
+    /// <c>POST .../deposits</c> — every valuation shape of class Deposit sent here is a 400
+    /// <c>Validation.UseDepositEndpoints</c>, and nothing is written.
+    /// </summary>
+    [Theory]
+    [InlineData("currency-valued")]
+    [InlineData("currency-valued-with-opening-deposit")]
+    [InlineData("manual")]
+    public async Task Add_DepositClass_ReturnsBadRequest(string shape)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest { AssetClass = AssetClass.Deposit, Name = "Term deposit", Currency = "PLN" };
+        request = shape switch
+        {
+            "currency-valued" => request,
+            "currency-valued-with-opening-deposit" => request with
+            {
+                InitialTransaction = new RecordTransactionRequest
+                {
+                    Type = TransactionType.Deposit,
+                    Quantity = 1_000m,
+                    UnitPrice = 1m,
+                    Date = new DateOnly(2026, 1, 1)
+                }
+            },
+            "manual" => request with { ManualValue = 1_000m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        await response.AssertUseDepositEndpointsAsync(cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 }

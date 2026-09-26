@@ -21,7 +21,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../shared/format-money';
-import { assetClassLabel } from '../assets/asset-class';
+import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
 import {
   TransactionFormDialog,
   type TransactionFormDialogData,
@@ -96,14 +96,25 @@ export class Transactions {
     () => this.portfolioResource.hasValue() && this.portfolioResource.value().isArchived,
   );
 
-  // The actions column holds only Edit / Delete, so an archived portfolio drops it entirely.
+  // A term deposit's transactions are system-managed (term-deposits): its single opening Deposit is
+  // rewritten through the deposit itself, and Portfolio answers 409 to any write here.
+  protected readonly isTermDeposit = computed(
+    () =>
+      this.assetResource.hasValue() &&
+      Number(this.assetResource.value().assetClass) === ASSET_CLASS.Deposit,
+  );
+
+  // No record / edit / delete action where none would be accepted.
+  protected readonly isReadOnly = computed(() => this.isArchived() || this.isTermDeposit());
+
+  // The actions column holds only Edit / Delete, so a read-only view drops it entirely.
   protected readonly displayedColumns = computed(() => [
     'date',
     'type',
     'quantity',
     'currency',
     'value',
-    ...(this.isArchived() ? [] : ['actions']),
+    ...(this.isReadOnly() ? [] : ['actions']),
   ]);
 
   protected readonly transactionsResource = resource({

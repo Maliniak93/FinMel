@@ -23,10 +23,20 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext)
             .AsNoTracking()
             .Where(a => a.PortfolioId == portfolioId)
             .OrderBy(a => a.Name)
-            .Select(a => new { Asset = a, TransactionCount = dbContext.Transactions.Count(t => t.AssetId == a.Id) })
+            .Select(a => new
+            {
+                Asset = a,
+                TransactionCount = dbContext.Transactions.Count(t => t.AssetId == a.Id),
+                DepositMaturityDate = dbContext.TermDeposits
+                    .Where(t => t.AssetId == a.Id)
+                    .Select(t => (DateOnly?)t.MaturityDate)
+                    .FirstOrDefault()
+            })
             .ToListAsync(cancellationToken);
 
-        IReadOnlyList<AssetResponse> response = rows.Select(r => r.Asset.ToResponse(r.TransactionCount)).ToList();
+        IReadOnlyList<AssetResponse> response = rows
+            .Select(r => r.Asset.ToResponse(r.TransactionCount, r.DepositMaturityDate))
+            .ToList();
         return Result<IReadOnlyList<AssetResponse>>.Success(response);
     }
 }
