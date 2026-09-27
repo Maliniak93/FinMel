@@ -34,12 +34,17 @@ import {
   type PayOutDepositDialogData,
 } from './pay-out-deposit-dialog/pay-out-deposit-dialog';
 import {
+  RollOverDepositDialog,
+  type RollOverDepositDialogData,
+} from './roll-over-deposit-dialog/roll-over-deposit-dialog';
+import {
   SettleDepositDialog,
   type SettleDepositDialogData,
 } from './settle-deposit-dialog/settle-deposit-dialog';
 
 // Every term deposit of the user across portfolios, with the server's projection and Active / Due /
-// Settled / Paid out status (term-deposits, term-deposits-settlement, deposit-payout-to-cash).
+// Settled / Paid out status (term-deposits, term-deposits-settlement, deposit-payout-to-cash,
+// deposit-rollover).
 // MatDialog/MatSnackBar are injected as
 // services only — see assets.ts for why MatDialogModule/MatSnackBarModule are deliberately not in
 // `imports`.
@@ -104,6 +109,11 @@ export class Deposits {
 
   protected isPaidOut(deposit: DepositResponse): boolean {
     return Number(deposit.status) === DEPOSIT_STATUS.PaidOut;
+  }
+
+  // deposit-rollover: a Due or a Settled (not paid-out) deposit can start its next term.
+  protected canRollOver(deposit: DepositResponse): boolean {
+    return this.isDue(deposit) || this.isSettled(deposit);
   }
 
   // Settled or paid out: the terms are immutable and the row shows what the bank actually paid.
@@ -181,6 +191,16 @@ export class Deposits {
     const ref = this.dialog.open(PayOutDepositDialog, { width: '480px', data });
     ref.afterClosed().subscribe((paidOut: boolean | undefined) => {
       if (paidOut) {
+        this.depositsResource.reload();
+      }
+    });
+  }
+
+  protected openRollOverDialog(deposit: DepositResponse): void {
+    const data: RollOverDepositDialogData = { deposit };
+    const ref = this.dialog.open(RollOverDepositDialog, { width: '480px', data });
+    ref.afterClosed().subscribe((rolledOver: boolean | undefined) => {
+      if (rolledOver) {
         this.depositsResource.reload();
       }
     });

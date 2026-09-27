@@ -21,6 +21,7 @@ import {
   plnCashCandidate,
   reservePortfolio,
   reservePortfolioId,
+  rolledOverDeposit,
   savingsPortfolio,
   savingsPortfolioId,
   selectOptionLabels,
@@ -281,6 +282,57 @@ describe('DepositFormDialog', () => {
       capitalization: CAPITALIZATION.Monthly,
       taxExempt: true,
       earlyBreakInterestLossPercent: 50,
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  // deposit-rollover AC-10. Once rolled over (`rolloverCount > 0`) the principal and start date were
+  // produced by earlier terms: both controls are disabled, yet the PUT still carries their current
+  // values. A never rolled-over deposit (`rolloverCount` 0) keeps them editable — proven by the edit
+  // fact above, whose fixture carries `rolloverCount: 0`.
+  it('edit of a rolled-over deposit disables principal and start date, and the PUT still carries them', async () => {
+    await setup({ deposit: rolledOverDeposit }, () => jsonResponse(rolledOverDeposit));
+
+    expect(findControl(form(), 'principal').disabled).toBe(true);
+    expect(findControl(form(), 'startDate').disabled).toBe(true);
+    for (const editable of [
+      'name',
+      'bankName',
+      'termLength',
+      'termUnit',
+      'annualInterestRatePercent',
+      'capitalization',
+      'taxExempt',
+      'earlyBreakInterestLossPercent',
+    ]) {
+      expect(findControl(form(), editable).enabled).toBe(true);
+    }
+    const principalInput = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
+      'input[formcontrolname="principal"]',
+    );
+    expect(principalInput?.disabled).toBe(true);
+
+    await fill({ name: 'Renamed deposit', annualInterestRatePercent: 4.5, termLength: 6 });
+    // The new maturity follows the unchanged start date: 2026-04-15 + 6 months.
+    expect(renderedText(fixture)).toContain(mediumDate(2026, 10, 15));
+    await component['onSubmit']();
+
+    const [request] = writeRequests();
+    expect(request.method).toBe('PUT');
+    expect(request.url).toContain(
+      `/api/portfolio/portfolios/${rolledOverDeposit.portfolioId}/deposits/${rolledOverDeposit.assetId}`,
+    );
+    expect(await request.json()).toEqual({
+      name: 'Renamed deposit',
+      bankName: 'Bank G',
+      principal: 10119.83,
+      startDate: '2026-04-15',
+      termLength: 6,
+      termUnit: TERM_UNIT.Months,
+      annualInterestRatePercent: 4.5,
+      capitalization: CAPITALIZATION.AtMaturity,
+      taxExempt: false,
+      earlyBreakInterestLossPercent: 100,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });

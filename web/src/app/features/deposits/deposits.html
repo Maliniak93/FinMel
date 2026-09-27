@@ -103,8 +103,8 @@
       </ng-container>
 
       <!-- A deposit of an archived portfolio is read-only, so its row offers no action. A Due deposit
-           can be settled; a Settled one can be transferred to cash. The terms of a Settled or PaidOut
-           one are immutable, so its menu offers Delete only. -->
+           can be settled; a Settled one can be transferred to cash; either can be rolled over. The
+           terms of a Settled or PaidOut one are immutable, so its menu offers Delete only. -->
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let deposit">
@@ -132,6 +132,21 @@
                 (click)="openPayOutDialog(deposit)"
               >
                 <mat-icon>payments</mat-icon>
+              </button>
+            }
+            @if (canRollOver(deposit)) {
+              <!-- deposit-rollover: a Due or Settled (not paid-out) deposit starts its next term on the
+                   same asset. As above, the name is the description, and the label must not mention
+                   settling. -->
+              <button
+                mat-icon-button
+                type="button"
+                matTooltip="Roll over"
+                aria-label="Roll over"
+                [attr.aria-describedby]="nameCellId(deposit)"
+                (click)="openRollOverDialog(deposit)"
+              >
+                <mat-icon>autorenew</mat-icon>
               </button>
             }
             <!-- The name reaches the trigger as its description, not its label: only the settle

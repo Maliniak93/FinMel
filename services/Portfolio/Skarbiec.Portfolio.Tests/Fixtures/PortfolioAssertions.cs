@@ -44,6 +44,12 @@ internal static class PortfolioAssertions
     /// <summary>deposit-payout-to-cash: the 409 payout answer for a deposit that is already paid out.</summary>
     public const string DepositAlreadyPaidOutErrorCode = "Conflict.DepositAlreadyPaidOut";
 
+    /// <summary>deposit-rollover: the 409 UpdateDeposit answer when a rolled-over deposit's principal or start date would change.</summary>
+    public const string DepositRolledOverErrorCode = "Conflict.DepositRolledOver";
+
+    /// <summary>deposit-rollover: the 400 RollOverDeposit answer for a Due deposit sent without <c>grossInterest</c> or <c>tax</c>.</summary>
+    public const string SettlementAmountsRequiredErrorCode = "Validation.SettlementAmountsRequired";
+
     /// <summary>
     /// term-deposits-settlement: a rejected preview/settle "changes nothing" — the deposit is still
     /// unsettled with no settlement data, its quantity is still <paramref name="principal"/> and it

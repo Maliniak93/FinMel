@@ -914,6 +914,55 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/rollover": {
+      "post": {
+        "tags": [
+          "RollOverDepositEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollOverDepositRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/transfer-candidates": {
       "get": {
         "tags": [
@@ -1286,7 +1335,8 @@
           "taxExempt",
           "earlyBreakInterestLossPercent",
           "projection",
-          "status"
+          "status",
+          "rolloverCount"
         ],
         "type": "object",
         "properties": {
@@ -1421,6 +1471,14 @@
               "null",
               "string"
             ]
+          },
+          "rolloverCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -1607,6 +1665,46 @@
           "date": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "RollOverDepositRequest": {
+        "required": [
+          "annualInterestRatePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "annualInterestRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "grossInterest": {
+            "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -2040,6 +2138,9 @@
     },
     {
       "name": "PayOutDepositEndpoint"
+    },
+    {
+      "name": "RollOverDepositEndpoint"
     },
     {
       "name": "ListTransferCandidatesEndpoint"

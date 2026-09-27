@@ -5,9 +5,9 @@ namespace Skarbiec.Portfolio.Data;
 /// <summary>
 /// The terms of a Deposit-class <see cref="Asset"/> (term-deposits), 1:1 with it: <see cref="AssetId"/>
 /// is both the primary key and the FK to the asset row in this same database. Written only by the
-/// AddDeposit/UpdateDeposit/SettleDeposit slices; the principal reaches <see cref="Asset.Quantity"/>
-/// solely through the asset's system-managed opening Deposit transaction, and the settled net
-/// interest through a second system-managed Deposit transaction (ADR-009).
+/// AddDeposit/UpdateDeposit/SettleDeposit/RollOverDeposit slices; the principal reaches
+/// <see cref="Asset.Quantity"/> solely through the asset's system-managed opening Deposit transaction,
+/// and each term's settled net interest through a further system-managed Deposit transaction (ADR-009).
 /// </summary>
 public sealed class TermDeposit : IUserOwned
 {
@@ -43,4 +43,11 @@ public sealed class TermDeposit : IUserOwned
 
     /// <summary>The Belka tax the bank actually withheld.</summary>
     public decimal? SettledTax { get; set; }
+
+    /// <summary>
+    /// How many times RollOverDeposit started a next term on this asset (deposit-rollover). Stored, not
+    /// derived from the transactions: once above 0 the principal and start date came from earlier
+    /// terms' balance, so UpdateDeposit keeps them fixed and never rewrites the opening transaction.
+    /// </summary>
+    public int RolloverCount { get; set; }
 }

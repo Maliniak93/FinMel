@@ -91,6 +91,7 @@ export type DepositResponse = {
     fundingAssetName?: null | string;
     paidOutOn?: null | string;
     paidOutToAssetName?: null | string;
+    rolloverCount: number | string;
 };
 
 export type DepositSettlementPreviewResponse = {
@@ -131,6 +132,12 @@ export type RecordTransactionRequest = {
     quantity?: number | string;
     unitPrice: number | string;
     date: string;
+};
+
+export type RollOverDepositRequest = {
+    annualInterestRatePercent: number | string;
+    grossInterest?: null | number | string;
+    tax?: null | number | string;
 };
 
 export type SettleDepositRequest = {
@@ -649,6 +656,25 @@ export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutRespon
 };
 
 export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverData = {
+    body: RollOverDepositRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/rollover';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses = {
+    /**
+     * OK
+     */
+    200: DepositResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses];
 
 export type GetApiPortfolioTransferCandidatesData = {
     body?: never;

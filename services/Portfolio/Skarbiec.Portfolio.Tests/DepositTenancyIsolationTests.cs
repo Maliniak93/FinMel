@@ -137,6 +137,44 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.True(ownSettle.IsSuccessStatusCode, $"The owner's settle answered {(int)ownSettle.StatusCode}.");
     }
 
+    /// <summary>
+    /// deposit-rollover AC-7: a stranger rolling over the owner's Due deposit — via the owner's portfolio
+    /// id or their own — gets 404 every time, and the owner's deposit, its terms and transactions stay
+    /// exactly as they were.
+    /// </summary>
+    [Fact]
+    public async Task RollOver_ForeignDeposit_ReturnsNotFound()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var (ownerPortfolioId, deposit) = await owner.CreatePortfolioWithDepositAsync(cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+        var before = await SnapshotDepositAsync(owner, ownerId, ownerPortfolioId, deposit.AssetId, cancellationToken);
+
+        var viaOwnersPortfolio = await stranger.PostAsJsonAsync(
+            RollOverDepositUri(ownerPortfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+        var viaStrangersPortfolio = await stranger.PostAsJsonAsync(
+            RollOverDepositUri(strangerPortfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        await AssertDepositUnchangedAsync(owner, ownerId, ownerPortfolioId, deposit.AssetId, before, cancellationToken);
+        await using (var dbContext = CreateDbContext(ownerId))
+        {
+            var terms = await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken);
+            Assert.Equal(0, terms.RolloverCount);
+            Assert.Equal(10_000m, terms.Principal);
+        }
+
+        // Control: the owner can still roll it over — the 404s were about the caller, not the deposit.
+        var ownRollOver = await owner.PostAsJsonAsync(
+            RollOverDepositUri(ownerPortfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+        Assert.True(ownRollOver.IsSuccessStatusCode, $"The owner's roll over answered {(int)ownRollOver.StatusCode}.");
+    }
+
     /// <summary>A stranger cannot add a deposit into the owner's portfolio — 404, and no row lands under either user.</summary>
     [Fact]
     public async Task Add_IntoStrangersPortfolio_ReturnsNotFound()

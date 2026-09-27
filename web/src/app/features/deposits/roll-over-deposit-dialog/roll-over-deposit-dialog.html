@@ -1,0 +1,113 @@
+<h2 mat-dialog-title>Roll over</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="roll-over-deposit-dialog__name">{{ deposit.name }}</p>
+
+    <!-- The unchanged terms of the next term, read-only: they stay editable later through Edit. -->
+    <dl class="roll-over-deposit-dialog__summary">
+      <div>
+        <dt>Term</dt>
+        <dd>{{ term }}</dd>
+      </div>
+      <div>
+        <dt>Capitalisation</dt>
+        <dd>{{ capitalization }}</dd>
+      </div>
+      <div>
+        <dt>New start date</dt>
+        <dd>{{ newStartDate | date: 'mediumDate' }}</dd>
+      </div>
+    </dl>
+
+    @if (isDue) {
+      @if (previewResource.error(); as loadError) {
+        <p class="roll-over-deposit-dialog__error" role="alert">{{ loadError.message }}</p>
+      } @else if (previewResource.isLoading()) {
+        <div class="roll-over-deposit-dialog__loading">
+          <mat-spinner diameter="24" />
+        </div>
+      }
+
+      <div class="roll-over-deposit-dialog__row">
+        <mat-form-field appearance="outline" class="roll-over-deposit-dialog__field">
+          <mat-label>Gross interest</mat-label>
+          <input matInput type="number" step="0.01" formControlName="grossInterest" />
+          @if (form.controls.grossInterest.hasError('required')) {
+            <mat-error>Gross interest is required.</mat-error>
+          } @else if (form.controls.grossInterest.hasError('min')) {
+            <mat-error>Gross interest can't be negative.</mat-error>
+          } @else if (form.controls.grossInterest.hasError('server')) {
+            <mat-error>{{ form.controls.grossInterest.getError('server') }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="roll-over-deposit-dialog__field">
+          <mat-label>Tax</mat-label>
+          <input matInput type="number" step="0.01" formControlName="tax" />
+          @if (form.controls.tax.hasError('required')) {
+            <mat-error>Tax is required.</mat-error>
+          } @else if (form.controls.tax.hasError('min')) {
+            <mat-error>Tax can't be negative.</mat-error>
+          } @else if (form.controls.tax.hasError('taxOverGross')) {
+            <mat-error>Tax can't exceed the gross interest.</mat-error>
+          } @else if (form.controls.tax.hasError('server')) {
+            <mat-error>{{ form.controls.tax.getError('server') }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+    }
+
+    <mat-form-field appearance="outline" class="roll-over-deposit-dialog__field">
+      <mat-label>Interest rate (%)</mat-label>
+      <input matInput type="number" step="0.01" formControlName="annualInterestRatePercent" />
+      @if (form.controls.annualInterestRatePercent.hasError('required')) {
+        <mat-error>Interest rate is required.</mat-error>
+      } @else if (
+        form.controls.annualInterestRatePercent.hasError('min') ||
+        form.controls.annualInterestRatePercent.hasError('max')
+      ) {
+        <mat-error>Interest rate must be between 0 and 100.</mat-error>
+      } @else if (form.controls.annualInterestRatePercent.hasError('server')) {
+        <mat-error>{{ form.controls.annualInterestRatePercent.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <dl class="roll-over-deposit-dialog__summary">
+      <div>
+        <dt>New principal</dt>
+        <dd>
+          @if (newPrincipal(); as principal) {
+            <strong>{{ formatMoney(principal, deposit.currency) }}</strong>
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Matures on</dt>
+        <dd>{{ newMaturityDate | date: 'mediumDate' }}</dd>
+      </div>
+    </dl>
+
+    @if (formError()) {
+      <p class="roll-over-deposit-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      [disabled]="submitting() || (isDue && !previewResource.hasValue())"
+    >
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        Roll over
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

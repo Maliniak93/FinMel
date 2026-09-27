@@ -261,6 +261,129 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_000m, (await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken)).Principal);
     }
 
+    /// <summary>
+    /// deposit-rollover AC-6: a rolled-over Active deposit (10 119.83 from 2026-04-15) keeps every term
+    /// but its principal and start date editable — a new name, bank, rate, term and capitalisation with
+    /// the same principal and start date change the terms and recompute the maturity date, while its two
+    /// transactions (the opening one and the first term's net-interest credit) stay untouched.
+    /// </summary>
+    [Fact]
+    public async Task Update_RolledOverDeposit_EditsTermsOnly()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var rolled = await client.RollOverDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(DepositStatus.Active, rolled.Status);
+        var before = await SnapshotDepositAsync(client, userId, portfolioId, deposit.AssetId, cancellationToken);
+        var request = NewDepositRequest(
+            name: "Renamed deposit",
+            bankName: "Other bank",
+            principal: 10_119.83m,
+            startDate: new DateOnly(2026, 4, 15),
+            termLength: 6,
+            termUnit: DepositTermUnit.Months,
+            annualInterestRatePercent: 4.5m,
+            capitalization: DepositCapitalization.Quarterly,
+            taxExempt: true,
+            earlyBreakInterestLossPercent: 50m).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(DepositUri(portfolioId, deposit.AssetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal("Renamed deposit", body.Name);
+        Assert.Equal("Other bank", body.BankName);
+        Assert.Equal(10_119.83m, body.Principal);
+        Assert.Equal(new DateOnly(2026, 4, 15), body.StartDate);
+        Assert.Equal(6, body.TermLength);
+        Assert.Equal(new DateOnly(2026, 10, 15), body.MaturityDate);
+        Assert.Equal(4.5m, body.AnnualInterestRatePercent);
+        Assert.Equal(DepositCapitalization.Quarterly, body.Capitalization);
+        Assert.True(body.TaxExempt);
+        Assert.Equal(50m, body.EarlyBreakInterestLossPercent);
+        Assert.Equal(1, body.RolloverCount);
+        Assert.Equal(DepositStatus.Active, body.Status);
+
+        var after = await SnapshotDepositAsync(client, userId, portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(before.Rows, after.Rows);
+        Assert.Equal(before.Transactions, after.Transactions);
+        var asset = await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(10_119.83m, asset.Quantity);
+        Assert.Equal(2, asset.TransactionCount);
+        Assert.Equal("Renamed deposit", asset.Name);
+        Assert.Equal(new DateOnly(2026, 10, 15), asset.DepositMaturityDate);
+
+        await using var dbContext = CreateDbContext(userId);
+        var terms = await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken);
+        Assert.Equal(1, terms.RolloverCount);
+        Assert.Equal(new DateOnly(2026, 10, 15), terms.MaturityDate);
+    }
+
+    /// <summary>
+    /// deposit-rollover AC-6: once rolled over, a principal or start date that differs from the stored
+    /// one is 409 <c>Conflict.DepositRolledOver</c> — the balance of earlier terms produced them — and
+    /// nothing changes, not even the name sent alongside.
+    /// </summary>
+    [Theory]
+    [InlineData("principal")]
+    [InlineData("start-date")]
+    [InlineData("both")]
+    public async Task Update_RolledOverDepositPrincipalOrStart_ReturnsConflict(string changedField)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.RollOverDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var before = await SnapshotDepositAsync(client, userId, portfolioId, deposit.AssetId, cancellationToken);
+        var request = changedField switch
+        {
+            "principal" => NewDepositRequest(name: "Renamed", principal: 10_000m, startDate: new DateOnly(2026, 4, 15)),
+            "start-date" => NewDepositRequest(name: "Renamed", principal: 10_119.83m, startDate: new DateOnly(2026, 4, 16)),
+            "both" => NewDepositRequest(name: "Renamed", principal: 12_000m, startDate: new DateOnly(2026, 1, 15)),
+            _ => throw new ArgumentOutOfRangeException(nameof(changedField), changedField, null)
+        };
+
+        var response = await client.PutAsJsonAsync(DepositUri(portfolioId, deposit.AssetId), request.ToUpdateRequest(), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositRolledOverErrorCode, cancellationToken);
+        await AssertDepositUnchangedAsync(client, userId, portfolioId, deposit.AssetId, before, cancellationToken);
+        Assert.Equal("Term deposit", before.Deposit.Name);
+        Assert.Equal(1, before.Deposit.RolloverCount);
+    }
+
+    /// <summary>deposit-rollover: a rolled-over deposit whose next term is settled is still 409 <c>Conflict.DepositSettled</c>, as any settled deposit.</summary>
+    [Fact]
+    public async Task Update_SettledRolledOverDeposit_ReturnsSettledConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.RollOverDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        // Warsaw 2026-07-20 — past the rolled-over term's 2026-07-15 maturity.
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 7, 20, 10, 0, 0, TimeSpan.Zero));
+        var preview = await client.GetSettlementPreviewAsync(portfolioId, deposit.AssetId, cancellationToken);
+        await client.SettleDepositAsync(
+            portfolioId,
+            deposit.AssetId,
+            cancellationToken,
+            NewSettleRequest(settledOn: new DateOnly(2026, 7, 15), grossInterest: preview.GrossInterest, tax: preview.Tax));
+        var before = await SnapshotDepositAsync(client, userId, portfolioId, deposit.AssetId, cancellationToken);
+        var request = NewDepositRequest(name: "After settlement", principal: 10_119.83m, startDate: new DateOnly(2026, 4, 15)).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(DepositUri(portfolioId, deposit.AssetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositSettledErrorCode, cancellationToken);
+        await AssertDepositUnchangedAsync(client, userId, portfolioId, deposit.AssetId, before, cancellationToken);
+    }
+
     /// <summary>The same validation as AddDeposit applies; a rejected update leaves every row as it was.</summary>
     [Theory]
     [InlineData("principal-zero", nameof(UpdateDepositRequest.Principal))]

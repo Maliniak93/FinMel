@@ -69,6 +69,8 @@ export function depositResponse(overrides: Partial<DepositResponse> = {}): Depos
       netProfitPercent: 1.1983,
     },
     status: DEPOSIT_STATUS.Active,
+    // deposit-rollover: never rolled over, so the principal and start date stay editable.
+    rolloverCount: 0,
     ...overrides,
   } as DepositResponse;
 }
@@ -153,6 +155,20 @@ export const paidOutDepositWithRemovedDestination: DepositResponse = depositResp
   settledTax: 28.5,
   paidOutOn: '2026-04-20',
   paidOutToAssetName: null,
+} as Partial<DepositResponse>);
+
+// deposit-rollover: `dueDeposit` rolled over once with its previewed settlement (net 119.83) at a new
+// rate of 5.5 % — the whole 10 119.83 balance runs from the old 2026-04-15 maturity to 2026-07-15.
+export const rolledOverDeposit: DepositResponse = depositResponse({
+  assetId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+  name: 'Rolled-over deposit',
+  bankName: 'Bank G',
+  principal: 10119.83,
+  startDate: '2026-04-15',
+  maturityDate: '2026-07-15',
+  annualInterestRatePercent: 5.5,
+  status: DEPOSIT_STATUS.Active,
+  rolloverCount: 1,
 } as Partial<DepositResponse>);
 
 // asset-transfers-deposit-funding: one row of GET /api/portfolio/transfer-candidates — a Cash asset
