@@ -242,11 +242,12 @@ export function transferCandidateRequests(fetchSpy: { mock: { calls: unknown[][]
     .map((input) => new URL(requestUrl(input)));
 }
 
-// Opens the <mat-select> bound to `controlName` the way a user does and returns its option labels.
-export async function selectOptionLabels(
+// Opens the <mat-select> bound to `controlName` the way a user does (clicking its trigger) and
+// returns the rendered `<mat-option>` elements from the CDK overlay.
+async function openSelectOptions(
   fixture: ComponentFixture<unknown>,
   controlName: string,
-): Promise<string[]> {
+): Promise<HTMLElement[]> {
   const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
     `mat-select[formcontrolname="${controlName}"] .mat-mdc-select-trigger`,
   );
@@ -257,7 +258,55 @@ export async function selectOptionLabels(
   fixture.detectChanges();
   await fixture.whenStable();
   return Array.from(
-    TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-option'),
-    (option) => (option.textContent ?? '').trim(),
+    TestBed.inject(OverlayContainer)
+      .getContainerElement()
+      .querySelectorAll<HTMLElement>('mat-option'),
   );
+}
+
+// Opens the <mat-select> bound to `controlName` the way a user does and returns its option labels.
+export async function selectOptionLabels(
+  fixture: ComponentFixture<unknown>,
+  controlName: string,
+): Promise<string[]> {
+  const options = await openSelectOptions(fixture, controlName);
+  return options.map((option) => (option.textContent ?? '').trim());
+}
+
+// Opens the <mat-select> bound to `controlName` and clicks the option whose text includes
+// `labelSubstring`, the way a user does.
+export async function pickSelectOption(
+  fixture: ComponentFixture<unknown>,
+  controlName: string,
+  labelSubstring: string,
+): Promise<void> {
+  const options = await openSelectOptions(fixture, controlName);
+  const option = options.find((candidate) =>
+    (candidate.textContent ?? '').includes(labelSubstring),
+  );
+  if (!option) {
+    throw new Error(`No option matching "${labelSubstring}" in ${controlName}.`);
+  }
+  option.click();
+  fixture.detectChanges();
+  await fixture.whenStable();
+}
+
+// A <mat-select>'s trigger text and whether it shows as empty (`mat-mdc-select-empty` — no value
+// chosen, its label sitting as a placeholder instead of floating) — read without opening it.
+export function selectTriggerState(
+  fixture: ComponentFixture<unknown>,
+  controlName: string,
+): { triggerText: string; empty: boolean } {
+  const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+    `mat-select[formcontrolname="${controlName}"]`,
+  );
+  if (!select) {
+    throw new Error(`No ${controlName} select rendered.`);
+  }
+  const trigger = select.querySelector<HTMLElement>('.mat-mdc-select-trigger');
+  return {
+    triggerText: (trigger?.textContent ?? '').trim(),
+    empty: select.classList.contains('mat-mdc-select-empty'),
+  };
 }

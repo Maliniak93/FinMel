@@ -81,7 +81,7 @@
 
     <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
       <mat-label>Move to</mat-label>
-      <mat-select formControlName="destinationAssetId">
+      <mat-select formControlName="destinationAssetId" canSelectNullableOptions>
         <mat-option [value]="null">Keep in the deposit</mat-option>
         @if (destinationCandidatesResource.hasValue()) {
           @for (candidate of destinationCandidatesResource.value(); track candidate.assetId) {

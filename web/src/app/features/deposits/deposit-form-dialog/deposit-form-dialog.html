@@ -60,7 +60,7 @@
 
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
         <mat-label>Source of funds</mat-label>
-        <mat-select formControlName="fundingAssetId">
+        <mat-select formControlName="fundingAssetId" canSelectNullableOptions>
           <mat-option [value]="null">New money (from outside)</mat-option>
           @if (fundingCandidatesResource.hasValue()) {
             @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
