@@ -18,12 +18,14 @@ import {
   CAPITALIZATION,
   depositResponse,
   eurCashCandidate,
+  pickSelectOption,
   plnCashCandidate,
   reservePortfolio,
   reservePortfolioId,
   savingsPortfolio,
   savingsPortfolioId,
   selectOptionLabels,
+  selectTriggerState,
   TERM_UNIT,
   transferCandidatesByCurrency,
 } from '../testing/deposit-fixtures';
@@ -506,6 +508,32 @@ describe('DepositFormDialog', () => {
       const element = fixture.nativeElement as HTMLElement;
       expect(element.querySelector('mat-select[formcontrolname="fundingAssetId"]')).toBeNull();
       expect(renderedText(fixture)).toContain('New money');
+    });
+
+    // null-option-select-display AC-1. `[value]="null"` is Material's reset option by default —
+    // picking it (or leaving the select untouched) must still show its label in the trigger, not
+    // leave it looking empty.
+    it('sourceOfFunds_NewMoneyChosen_ShowsNewMoneyInTrigger', async () => {
+      await setup({ portfolioId: savingsPortfolioId });
+
+      expect(selectTriggerState(fixture, 'fundingAssetId')).toEqual({
+        triggerText: 'New money (from outside)',
+        empty: false,
+      });
+      expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
+
+      await pickSelectOption(fixture, 'fundingAssetId', plnCashCandidate.name);
+      expect(selectTriggerState(fixture, 'fundingAssetId').triggerText).toContain(
+        plnCashCandidate.name,
+      );
+
+      await pickSelectOption(fixture, 'fundingAssetId', 'New money');
+
+      expect(selectTriggerState(fixture, 'fundingAssetId')).toEqual({
+        triggerText: 'New money (from outside)',
+        empty: false,
+      });
+      expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
     });
   });
 });

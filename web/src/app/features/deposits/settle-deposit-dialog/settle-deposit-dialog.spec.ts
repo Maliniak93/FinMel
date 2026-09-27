@@ -18,8 +18,10 @@ import {
   dueDeposit,
   dueDepositSettlementPreview,
   eurCashCandidate,
+  pickSelectOption,
   plnCashCandidate,
   selectOptionLabels,
+  selectTriggerState,
   settledDeposit,
   transferCandidateRequests,
   transferCandidatesByCurrency,
@@ -331,6 +333,32 @@ describe('SettleDepositDialog', () => {
 
       await fill({ grossInterest: 150, tax: 28.5 });
       expect(hintText()).toContain(formatMoney(10121.5, 'PLN'));
+    });
+
+    // null-option-select-display AC-2. `[value]="null"` is Material's reset option by default —
+    // picking it (or leaving the select untouched) must still show its label in the trigger, not
+    // leave it looking empty.
+    it('moveTo_KeepInDepositChosen_ShowsKeepInDepositInTrigger', async () => {
+      await setup();
+
+      expect(selectTriggerState(fixture, 'destinationAssetId')).toEqual({
+        triggerText: 'Keep in the deposit',
+        empty: false,
+      });
+      expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
+
+      await pickSelectOption(fixture, 'destinationAssetId', plnCashCandidate.name);
+      expect(selectTriggerState(fixture, 'destinationAssetId').triggerText).toContain(
+        plnCashCandidate.name,
+      );
+
+      await pickSelectOption(fixture, 'destinationAssetId', 'Keep in the deposit');
+
+      expect(selectTriggerState(fixture, 'destinationAssetId')).toEqual({
+        triggerText: 'Keep in the deposit',
+        empty: false,
+      });
+      expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
     });
   });
 });
