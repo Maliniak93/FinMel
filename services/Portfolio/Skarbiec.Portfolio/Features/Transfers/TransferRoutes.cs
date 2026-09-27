@@ -14,7 +14,8 @@ public static class TransferRoutes
         // Funding a term deposit from cash — entered through AddDeposit's fundingAssetId.
         (AssetClass.Cash, AssetClass.Deposit),
 
-        // Paying a matured deposit out to cash — registered for term-deposits part 4, no entry point yet.
+        // Paying a settled deposit out to cash — entered through SettleDeposit's destinationAssetId and
+        // PayOutDeposit (deposit-payout-to-cash).
         (AssetClass.Deposit, AssetClass.Cash),
     ];
 

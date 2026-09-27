@@ -23,7 +23,9 @@ public sealed class GetDepositHandler(PortfolioDbContext dbContext, TimeProvider
         }
 
         var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+        var payout = await dbContext.LoadPayoutAsync(assetId, cancellationToken);
 
-        return row.Terms.ToResponse(row.Asset, row.PortfolioName, row.PortfolioIsArchived, WarsawCalendar.Today(timeProvider), funding);
+        return row.Terms.ToResponse(
+            row.Asset, row.PortfolioName, row.PortfolioIsArchived, WarsawCalendar.Today(timeProvider), funding, payout);
     }
 }

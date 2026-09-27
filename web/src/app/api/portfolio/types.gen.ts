@@ -89,6 +89,8 @@ export type DepositResponse = {
     settledTax?: null | number | string;
     fundingAssetId?: null | string;
     fundingAssetName?: null | string;
+    paidOutOn?: null | string;
+    paidOutToAssetName?: null | string;
 };
 
 export type DepositSettlementPreviewResponse = {
@@ -108,6 +110,11 @@ export type PagedResponseOfTransactionResponse = {
     page: number | string;
     pageSize: number | string;
     totalCount: number | string;
+};
+
+export type PayOutDepositRequest = {
+    destinationAssetId: string;
+    date: string;
 };
 
 export type PortfolioResponse = {
@@ -130,6 +137,7 @@ export type SettleDepositRequest = {
     settledOn: string;
     grossInterest: number | string;
     tax: number | string;
+    destinationAssetId?: null | string;
 };
 
 export type TransactionResponse = {
@@ -622,6 +630,25 @@ export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleRespon
 };
 
 export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutData = {
+    body: PayOutDepositRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/payout';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses = {
+    /**
+     * OK
+     */
+    200: DepositResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses];
 
 export type GetApiPortfolioTransferCandidatesData = {
     body?: never;

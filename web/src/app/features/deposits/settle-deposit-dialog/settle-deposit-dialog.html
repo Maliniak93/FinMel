@@ -79,6 +79,28 @@
       </mat-form-field>
     </div>
 
+    <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
+      <mat-label>Move to</mat-label>
+      <mat-select formControlName="destinationAssetId">
+        <mat-option [value]="null">Keep in the deposit</mat-option>
+        @if (destinationCandidatesResource.hasValue()) {
+          @for (candidate of destinationCandidatesResource.value(); track candidate.assetId) {
+            <mat-option [value]="candidate.assetId">
+              {{ candidate.name }} — {{ candidate.portfolioName }}
+            </mat-option>
+          }
+        }
+      </mat-select>
+      @if (destinationCandidatesResource.error(); as loadError) {
+        <mat-hint>{{ loadError.message }}</mat-hint>
+      } @else if (movedAmount(); as moved) {
+        <mat-hint>{{ formatMoney(moved, deposit.currency) }} moves out of the deposit.</mat-hint>
+      }
+      @if (form.controls.destinationAssetId.hasError('server')) {
+        <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
     <dl class="settle-deposit-dialog__summary">
       <div>
         <dt>Net interest</dt>

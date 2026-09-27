@@ -13,11 +13,15 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { DepositFormDialog } from './deposit-form-dialog/deposit-form-dialog';
 import { Deposits } from './deposits';
+import { PayOutDepositDialog } from './pay-out-deposit-dialog/pay-out-deposit-dialog';
 import { SettleDepositDialog } from './settle-deposit-dialog/settle-deposit-dialog';
 import {
   activeDeposit,
   archivedPortfolioDeposit,
   dueDeposit,
+  paidOutDeposit,
+  paidOutDepositDestinationName,
+  paidOutDepositWithRemovedDestination,
   settledDeposit,
   settledDepositFinalAmount,
 } from './testing/deposit-fixtures';
@@ -283,6 +287,89 @@ describe('Deposits', () => {
 
     expect(dialog.open).toHaveBeenCalledWith(SettleDepositDialog, expect.anything());
     expect(depositListCalls()).toBe(listCallsBefore);
+  });
+
+  // deposit-payout-to-cash AC-9. A Settled row carries a "Transfer to cash" icon button that opens
+  // the payout dialog; a PaidOut row carries none, but shows a "Paid out" chip, the payout date and
+  // the destination's name ("—" once that asset was removed), and still offers Delete.
+  describe('payout', () => {
+    // Recognised by its "Transfer to cash" tooltip (or an aria-label saying the same).
+    function transferButton(row: HTMLElement): HTMLButtonElement | undefined {
+      return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) =>
+          /transfer to cash/i.test(button.getAttribute('mattooltip') ?? '') ||
+          /transfer to cash/i.test(button.getAttribute('aria-label') ?? ''),
+      );
+    }
+
+    const allStatuses = [activeDeposit, dueDeposit, settledDeposit, paidOutDeposit];
+
+    it('only the Settled row carries the "Transfer to cash" button', async () => {
+      await setup(allStatuses);
+
+      expect(transferButton(rowFor('Settled deposit'))).toBeDefined();
+      expect(transferButton(rowFor('Paid-out deposit'))).toBeUndefined();
+      expect(transferButton(rowFor('Matured deposit'))).toBeUndefined();
+      expect(transferButton(rowFor('Running deposit'))).toBeUndefined();
+    });
+
+    it('the PaidOut row shows the "Paid out" chip, the payout date and the destination', async () => {
+      await setup(allStatuses);
+
+      const row = rowFor('Paid-out deposit');
+      const chip = row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip');
+      expect(chip?.textContent).toContain('Paid out');
+      expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
+      expect(row.textContent).toContain(paidOutDepositDestinationName);
+      expect(settleButton(row)).toBeUndefined();
+    });
+
+    it('a PaidOut row whose destination was removed shows "—" for it', async () => {
+      await setup([paidOutDepositWithRemovedDestination]);
+
+      const row = rowFor('Orphaned payout');
+      expect(row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip')?.textContent).toContain(
+        'Paid out',
+      );
+      expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
+      expect(row.textContent).toContain('—');
+    });
+
+    it('the PaidOut row still offers Delete, but not Edit', async () => {
+      await setup([paidOutDeposit]);
+
+      const labels = await menuItemLabels(rowFor('Paid-out deposit'));
+
+      expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+      expect(labels.some((label) => /edit/i.test(label))).toBe(false);
+    });
+
+    it('Transfer to cash opens the payout dialog with that deposit and reloads after a payout', async () => {
+      await setup(allStatuses);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = depositListCalls();
+
+      transferButton(rowFor('Settled deposit'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(
+        PayOutDepositDialog,
+        expect.objectContaining({ data: expect.objectContaining({ deposit: settledDeposit }) }),
+      );
+      await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('a cancelled payout does not reload the list', async () => {
+      await setup([settledDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const listCallsBefore = depositListCalls();
+
+      transferButton(rowFor('Settled deposit'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(PayOutDepositDialog, expect.anything());
+      expect(depositListCalls()).toBe(listCallsBefore);
+    });
   });
 
   it('shows an empty state with an Add button when there are no deposits', async () => {

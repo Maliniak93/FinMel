@@ -129,7 +129,7 @@ public sealed class AddDepositHandler(
 
         var fundingSource = funding is null ? null : new DepositFundingSource(funding.Source.Id, funding.Source.Name);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), fundingSource);
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), fundingSource, payout: null);
     }
 
     /// <summary>

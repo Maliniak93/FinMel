@@ -169,4 +169,54 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         await using var ownerDb = CreateDbContext(ownerId);
         Assert.True(await ownerDb.Set<TermDeposit>().AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
     }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-6: a stranger paying out the owner's settled deposit — via the
+    /// owner's portfolio id or their own, into their own Cash — gets 404 every time; the owner paying
+    /// out into the stranger's Cash gets 400 <c>Validation.InvalidTransferCounterpart</c> (the same
+    /// answer as any other invalid counterpart, so nothing leaks). Neither side changes.
+    /// </summary>
+    [Fact]
+    public async Task PayOut_ForeignDepositOrDestination_IsRejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var (ownerPortfolioId, deposit) = await owner.CreatePortfolioWithDepositAsync(cancellationToken);
+        await owner.SettleDepositAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
+        var ownerWalletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var ownerCashId = await owner.AddCashAssetAsync(ownerWalletId, cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+        var strangerCashId = await stranger.AddCashAssetAsync(strangerPortfolioId, cancellationToken);
+
+        var viaOwnersPortfolio = await stranger.PostAsJsonAsync(
+            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.PostAsJsonAsync(
+            PayOutDepositUri(strangerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
+        var intoStrangersCash = await owner.PostAsJsonAsync(
+            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        await intoStrangersCash.AssertInvalidTransferCounterpartAsync(cancellationToken);
+
+        var unchanged = await owner.GetDepositAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(DepositStatus.Settled, unchanged.Status);
+        Assert.Null(unchanged.PaidOutOn);
+        Assert.Equal(10_119.83m, (await owner.GetAssetAsync(ownerPortfolioId, deposit.AssetId, cancellationToken)).Quantity);
+        var strangerCash = await stranger.GetAssetAsync(strangerPortfolioId, strangerCashId, cancellationToken);
+        Assert.Equal(0m, strangerCash.Quantity);
+        Assert.Equal(0, strangerCash.TransactionCount);
+        await using (var dbContext = CreateDbContext(ownerId))
+        {
+            Assert.False(await dbContext.Transactions.IgnoreQueryFilters().AnyAsync(t => t.TransferId != null, cancellationToken));
+        }
+
+        // Control: the owner can still pay out into their own Cash — the rejections were about the caller and the destination.
+        var ownPayOut = await owner.PostAsJsonAsync(
+            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(ownerCashId), cancellationToken);
+        Assert.True(ownPayOut.IsSuccessStatusCode, $"The owner's payout answered {(int)ownPayOut.StatusCode}.");
+    }
 }

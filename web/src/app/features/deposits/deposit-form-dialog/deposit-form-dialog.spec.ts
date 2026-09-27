@@ -1,4 +1,3 @@
-import { OverlayContainer } from '@angular/cdk/overlay';
 import { formatDate } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import type { FormGroup } from '@angular/forms';
@@ -24,6 +23,7 @@ import {
   reservePortfolioId,
   savingsPortfolio,
   savingsPortfolioId,
+  selectOptionLabels,
   TERM_UNIT,
   transferCandidatesByCurrency,
 } from '../testing/deposit-fixtures';
@@ -122,20 +122,8 @@ describe('DepositFormDialog', () => {
       .filter((input: unknown) => method(input) !== 'GET') as Request[];
   }
 
-  async function optionLabels(controlName: string): Promise<string[]> {
-    const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-      `mat-select[formcontrolname="${controlName}"] .mat-mdc-select-trigger`,
-    );
-    if (!trigger) {
-      throw new Error(`No ${controlName} select rendered.`);
-    }
-    trigger.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    return Array.from(
-      TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-option'),
-      (option) => (option.textContent ?? '').trim(),
-    );
+  function optionLabels(controlName: string): Promise<string[]> {
+    return selectOptionLabels(fixture, controlName);
   }
 
   function mediumDate(year: number, month: number, day: number): string {

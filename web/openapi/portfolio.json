@@ -865,6 +865,55 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/payout": {
+      "post": {
+        "tags": [
+          "PayOutDepositEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayOutDepositRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/transfer-candidates": {
       "get": {
         "tags": [
@@ -1359,6 +1408,19 @@
               "null",
               "string"
             ]
+          },
+          "paidOutOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "paidOutToAssetName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1454,6 +1516,23 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "PayOutDepositRequest": {
+        "required": [
+          "destinationAssetId",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "destinationAssetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
           }
         }
       },
@@ -1562,6 +1641,13 @@
               "string"
             ],
             "format": "double"
+          },
+          "destinationAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -1951,6 +2037,9 @@
     },
     {
       "name": "SettleDepositEndpoint"
+    },
+    {
+      "name": "PayOutDepositEndpoint"
     },
     {
       "name": "ListTransferCandidatesEndpoint"

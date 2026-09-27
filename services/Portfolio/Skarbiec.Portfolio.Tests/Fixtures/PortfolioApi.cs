@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
@@ -73,12 +74,58 @@ internal static class PortfolioApi
     public static SettleDepositRequest NewSettleRequest(
         DateOnly? settledOn = null,
         decimal grossInterest = 147.95m,
-        decimal tax = 28.12m) => new()
+        decimal tax = 28.12m,
+        Guid? destinationAssetId = null) => new()
         {
             SettledOn = settledOn ?? new DateOnly(2026, 4, 15),
             GrossInterest = grossInterest,
-            Tax = tax
+            Tax = tax,
+            DestinationAssetId = destinationAssetId
         };
+
+    /// <summary>deposit-payout-to-cash: pays a settled deposit's whole balance out to a Cash asset.</summary>
+    public static string PayOutDepositUri(Guid portfolioId, Guid assetId) =>
+        $"{DepositUri(portfolioId, assetId)}/payout";
+
+    /// <summary>
+    /// deposit-payout-to-cash: a <see cref="PayOutDepositRequest"/> into <paramref name="destinationAssetId"/>,
+    /// by default on 2026-04-18 — after <see cref="NewSettleRequest"/>'s 2026-04-15 settlement and
+    /// before <see cref="AfterDefaultMaturityUtc"/>'s 2026-04-20 "today".
+    /// </summary>
+    public static PayOutDepositRequest NewPayOutRequest(Guid destinationAssetId, DateOnly? date = null) => new()
+    {
+        DestinationAssetId = destinationAssetId,
+        Date = date ?? new DateOnly(2026, 4, 18)
+    };
+
+    /// <summary>deposit-payout-to-cash: pays <paramref name="assetId"/> out (arrange only). Defaults to <see cref="NewPayOutRequest"/>.</summary>
+    public static async Task PayOutDepositAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken, DateOnly? date = null)
+    {
+        var response = await client.PostAsJsonAsync(
+            PayOutDepositUri(portfolioId, assetId), NewPayOutRequest(destinationAssetId, date), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>deposit-payout-to-cash: what <see cref="CreatePaidOutDepositAsync"/> arranged.</summary>
+    public sealed record PaidOutDeposit(Guid DepositPortfolioId, DepositResponse Deposit, Guid CashPortfolioId, Guid CashAssetId);
+
+    /// <summary>
+    /// deposit-payout-to-cash: the spec's AC-1 end state — the default deposit in a "Savings" portfolio,
+    /// settled on 2026-04-15 with the previewed values (final 10 119.83) and paid out at settlement into
+    /// a PLN "Cash account" in a "Wallet" portfolio that held 0, so the deposit holds 0 and the Cash
+    /// 10 119.83. The fact must have pinned a clock past the maturity (<see cref="AfterDefaultMaturityUtc"/>).
+    /// </summary>
+    public static async Task<PaidOutDeposit> CreatePaidOutDepositAsync(this HttpClient client, CancellationToken cancellationToken)
+    {
+        var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetAsync(cashPortfolioId, cancellationToken);
+        await client.SettleDepositAsync(
+            depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: cashId));
+
+        return new PaidOutDeposit(depositPortfolioId, deposit, cashPortfolioId, cashId);
+    }
 
     /// <summary>
     /// term-deposits-settlement: settles <paramref name="assetId"/> (arrange only — the fact must have

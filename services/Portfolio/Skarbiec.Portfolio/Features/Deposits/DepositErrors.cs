@@ -12,7 +12,7 @@ internal static class DepositErrors
     public static readonly Error UseDepositEndpoints =
         new("Validation.UseDepositEndpoints", "A Deposit asset is a term deposit — create and edit it through the deposit endpoints.");
 
-    /// <summary>A term deposit's transactions — the opening one, rewritten by UpdateDeposit, and SettleDeposit's net-interest credit — are never written by hand.</summary>
+    /// <summary>A term deposit's transactions — the opening one, rewritten by UpdateDeposit, SettleDeposit's net-interest credit and the payout's Withdraw leg — are never written by hand.</summary>
     public static readonly Error TransactionsManaged =
         new("Conflict.DepositTransactionsManaged", "A term deposit's transactions are managed by the deposit itself — edit the deposit instead.");
 
@@ -33,4 +33,18 @@ internal static class DepositErrors
 
     public static readonly Error SettledOnInFuture =
         new("Validation.SettledOnInFuture", "The settlement date can't be in the future.");
+
+    /// <summary>PayOutDeposit on an Active or Due deposit — an early break is not supported (deposit-payout-to-cash).</summary>
+    public static readonly Error NotSettled =
+        new("Conflict.DepositNotSettled", "This deposit is not settled yet — settle it before paying it out.");
+
+    /// <summary>PayOutDeposit on a deposit that already holds 0 — a payout always moves the whole balance.</summary>
+    public static readonly Error AlreadyPaidOut =
+        new("Conflict.DepositAlreadyPaidOut", "This deposit is already paid out.");
+
+    public static readonly Error PayoutDateBeforeSettlement =
+        new("Validation.PayoutDateBeforeSettlement", "The payout date can't be before the deposit's settlement date.");
+
+    public static readonly Error PayoutDateInFuture =
+        new("Validation.PayoutDateInFuture", "The payout date can't be in the future.");
 }

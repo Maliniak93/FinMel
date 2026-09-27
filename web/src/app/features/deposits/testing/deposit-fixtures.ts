@@ -1,4 +1,8 @@
+import { OverlayContainer } from '@angular/cdk/overlay';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
+
 import type { DepositResponse, PortfolioResponse } from '../../../api/portfolio';
+import { requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
 
 // Shared arrange data for the deposit specs (form dialog, Deposits page, and the asset list /
 // type-picker specs that hand off to the deposit form). Test-only: nothing in the app imports this
@@ -34,7 +38,7 @@ export const archivedPortfolio: PortfolioResponse = {
 // Features.Deposits.DepositStatus), in C# declaration order.
 export const TERM_UNIT = { Days: 0, Months: 1 } as const;
 export const CAPITALIZATION = { AtMaturity: 0, Monthly: 1, Quarterly: 2, Yearly: 3 } as const;
-export const DEPOSIT_STATUS = { Active: 0, Due: 1, Settled: 2 } as const;
+export const DEPOSIT_STATUS = { Active: 0, Due: 1, Settled: 2, PaidOut: 3 } as const;
 
 // Builds a DepositResponse from the spec's AC-1 deposit (10 000.00 PLN at 6 % from 2026-01-15 for
 // 3 months, capitalised at maturity, taxed → net 119.83, final 10 119.83), overriding what a fact
@@ -122,6 +126,35 @@ export const settledDeposit: DepositResponse = depositResponse({
 
 export const settledDepositFinalAmount = 10121.5;
 
+// deposit-payout-to-cash: `settledDeposit` after its whole balance (10 121.50) was paid out on
+// 2026-04-20 to the "Current account" Cash asset — the deposit now holds 0.
+export const paidOutDepositDestinationName = 'Current account';
+
+export const paidOutDeposit: DepositResponse = depositResponse({
+  assetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  name: 'Paid-out deposit',
+  bankName: 'Bank E',
+  status: DEPOSIT_STATUS.PaidOut,
+  settledOn: '2026-04-17',
+  settledGrossInterest: 150,
+  settledTax: 28.5,
+  paidOutOn: '2026-04-20',
+  paidOutToAssetName: paidOutDepositDestinationName,
+} as Partial<DepositResponse>);
+
+// The same payout after the destination Cash was removed: its leg was detached, so the name is null.
+export const paidOutDepositWithRemovedDestination: DepositResponse = depositResponse({
+  assetId: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+  name: 'Orphaned payout',
+  bankName: 'Bank F',
+  status: DEPOSIT_STATUS.PaidOut,
+  settledOn: '2026-04-17',
+  settledGrossInterest: 150,
+  settledTax: 28.5,
+  paidOutOn: '2026-04-20',
+  paidOutToAssetName: null,
+} as Partial<DepositResponse>);
+
 // asset-transfers-deposit-funding: one row of GET /api/portfolio/transfer-candidates — a Cash asset
 // the deposit form offers as its source of funds. Declared here (not imported from the generated
 // client) so the fixtures do not depend on when `gen:api` picks the endpoint up.
@@ -167,3 +200,48 @@ export const dueDepositSettlementPreview = {
   netInterest: 119.83,
   finalAmount: 10119.83,
 };
+
+// The HTTP method of what a spec's `fetch` stub received: the generated client passes a Request,
+// a bare URL string is a GET.
+export function requestMethod(input: unknown): string {
+  return typeof input === 'string' ? 'GET' : (input as Request).method;
+}
+
+// Every non-GET request a `fetch` spy has seen, in call order.
+export function writeRequests(fetchSpy: { mock: { calls: unknown[][] } }): Request[] {
+  return fetchSpy.mock.calls
+    .map((call) => call[0])
+    .filter((input) => requestMethod(input) !== 'GET') as Request[];
+}
+
+// The URLs of every GET /api/portfolio/transfer-candidates a `fetch` spy has seen, in call order.
+export function transferCandidateRequests(fetchSpy: { mock: { calls: unknown[][] } }): URL[] {
+  return fetchSpy.mock.calls
+    .map((call) => call[0])
+    .filter(
+      (input) =>
+        requestMethod(input) === 'GET' &&
+        requestUrl(input).includes('/api/portfolio/transfer-candidates'),
+    )
+    .map((input) => new URL(requestUrl(input)));
+}
+
+// Opens the <mat-select> bound to `controlName` the way a user does and returns its option labels.
+export async function selectOptionLabels(
+  fixture: ComponentFixture<unknown>,
+  controlName: string,
+): Promise<string[]> {
+  const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+    `mat-select[formcontrolname="${controlName}"] .mat-mdc-select-trigger`,
+  );
+  if (!trigger) {
+    throw new Error(`No ${controlName} select rendered.`);
+  }
+  trigger.click();
+  fixture.detectChanges();
+  await fixture.whenStable();
+  return Array.from(
+    TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-option'),
+    (option) => (option.textContent ?? '').trim(),
+  );
+}

@@ -12,6 +12,12 @@ public enum DepositStatus
 
     /// <summary>The deposit has been settled (term-deposits-settlement) — wins over Due and Active.</summary>
     Settled,
+
+    /// <summary>
+    /// A settled deposit whose whole balance was paid out to cash (deposit-payout-to-cash) — wins over
+    /// Settled. Derived from its Withdraw leg, which only a payout creates.
+    /// </summary>
+    PaidOut,
 }
 
 /// <summary>The totals of <see cref="DepositProjection"/> — the per-period breakdown stays server-side.</summary>
@@ -58,6 +64,15 @@ public sealed record DepositResponse
     public Guid? FundingAssetId { get; init; }
 
     public string? FundingAssetName { get; init; }
+
+    /// <summary>The payout date (deposit-payout-to-cash) — <see langword="null"/> until the deposit is paid out.</summary>
+    public DateOnly? PaidOutOn { get; init; }
+
+    /// <summary>
+    /// The Cash asset the payout went to — <see langword="null"/> until the deposit is paid out, and again
+    /// once that asset was removed (its leg detached).
+    /// </summary>
+    public string? PaidOutToAssetName { get; init; }
 }
 
 public static class DepositMappingExtensions
@@ -65,7 +80,8 @@ public static class DepositMappingExtensions
     /// <summary>
     /// The projection is computed here, at read time, from the stored terms — never stored itself.
     /// <paramref name="today"/> is the Europe/Warsaw date (<see cref="WarsawCalendar.Today"/>);
-    /// <paramref name="funding"/> the deposit's funding source (<see cref="DepositFunding"/>), if any.
+    /// <paramref name="funding"/> the deposit's funding source (<see cref="DepositFunding"/>), if any;
+    /// <paramref name="payout"/> its payout (<see cref="DepositPayout"/>), if any.
     /// </summary>
     public static DepositResponse ToResponse(
         this TermDeposit terms,
@@ -73,7 +89,8 @@ public static class DepositMappingExtensions
         string portfolioName,
         bool portfolioIsArchived,
         DateOnly today,
-        DepositFundingSource? funding)
+        DepositFundingSource? funding,
+        DepositPayoutInfo? payout)
     {
         var projection = DepositInterestMath.Project(new DepositTerms
         {
@@ -113,13 +130,15 @@ public static class DepositMappingExtensions
                 NetProfitPercent = projection.NetProfitPercent
             },
             Status = terms.SettledOn is not null
-                ? DepositStatus.Settled
+                ? payout is not null ? DepositStatus.PaidOut : DepositStatus.Settled
                 : terms.MaturityDate <= today ? DepositStatus.Due : DepositStatus.Active,
             SettledOn = terms.SettledOn,
             SettledGrossInterest = terms.SettledGrossInterest,
             SettledTax = terms.SettledTax,
             FundingAssetId = funding?.AssetId,
-            FundingAssetName = funding?.AssetName
+            FundingAssetName = funding?.AssetName,
+            PaidOutOn = payout?.PaidOutOn,
+            PaidOutToAssetName = payout?.DestinationAssetName
         };
     }
 }
