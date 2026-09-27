@@ -20,7 +20,10 @@ internal static class DepositErrors
     public static readonly Error NotDue =
         new("Conflict.DepositNotDue", "This deposit has not matured yet — it can be settled from its maturity date on.");
 
-    /// <summary>Preview/settle of a deposit that is already settled — undoing a settlement is not supported.</summary>
+    /// <summary>
+    /// Preview/settle of a deposit that is already settled — undoing a settlement is not supported — and a
+    /// rollover of a settled deposit sent settlement amounts (deposit-rollover).
+    /// </summary>
     public static readonly Error AlreadySettled =
         new("Conflict.DepositAlreadySettled", "This deposit is already settled.");
 
@@ -47,4 +50,12 @@ internal static class DepositErrors
 
     public static readonly Error PayoutDateInFuture =
         new("Validation.PayoutDateInFuture", "The payout date can't be in the future.");
+
+    /// <summary>RollOverDeposit on a Due deposit without <c>grossInterest</c> or <c>tax</c> — it settles and rolls over in one save (deposit-rollover).</summary>
+    public static readonly Error SettlementAmountsRequired =
+        new("Validation.SettlementAmountsRequired", "The gross interest and the tax are required to roll over a deposit that is not settled yet.");
+
+    /// <summary>UpdateDeposit changing a rolled-over deposit's principal or start date — earlier terms' balance produced them (deposit-rollover).</summary>
+    public static readonly Error RolledOver =
+        new("Conflict.DepositRolledOver", "A rolled-over deposit's principal and start date can't be changed.");
 }

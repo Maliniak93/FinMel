@@ -12,6 +12,7 @@ using Skarbiec.Portfolio.Features.DeletePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
 using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
+using Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
@@ -65,6 +66,7 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
             services.AddScoped<UpdateDepositHandler>();
             services.AddScoped<SettleDepositHandler>();
             services.AddScoped<PayOutDepositHandler>();
+            services.AddScoped<RollOverDepositHandler>();
             services.AddScoped<ArchivePortfolioHandler>();
             services.AddScoped<RestorePortfolioHandler>();
             services.AddScoped<DeletePortfolioHandler>();
@@ -1381,6 +1383,126 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         var finalDb = final.ServiceProvider.GetRequiredService<PortfolioDbContext>();
         Assert.Equal(outboxRowsAfterPayOut, await finalDb.Set<OutboxMessage>().CountAsync(cancellationToken));
         Assert.Equal(15_119.83m, (await finalDb.Assets.SingleAsync(a => a.Id == cashId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
+    /// deposit-rollover AC-1 (outbox half): rolling a Due deposit over settles it and starts the next
+    /// term in a single save — the net-interest credit, the new terms and exactly one further
+    /// <see cref="AssetPositionChanged"/> for the deposit, carrying 10 119.83. The host clock is the real
+    /// one (today is well past the 2026-04-15 maturity).
+    /// </summary>
+    [Fact]
+    public async Task RollOverDueDeposit_PublishesPosition()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Rollover outbox portfolio", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            assetId = added.Value.AssetId;
+        }
+
+        IReadOnlyList<AssetPositionChanged> eventsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            eventsBefore = await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<RollOverDepositHandler>()
+                .HandleAsync(portfolioId, assetId, PortfolioApi.NewRollOverRequest(), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore.Count).ToList();
+        var evt = Assert.Single(events);
+        Assert.Equal(assetId, evt.AssetId);
+        Assert.Equal(10_119.83m, evt.Quantity);
+        Assert.Equal(AssetClass.Deposit, evt.AssetClass);
+        Assert.Equal(UserId, evt.UserId);
+        Assert.True(evt.Version > eventsBefore.Where(e => e.AssetId == assetId).Max(e => e.Version));
+
+        Assert.Equal(10_119.83m, (await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken)).Quantity);
+        var credit = await verifyDb.Transactions.SingleAsync(t => t.AssetId == assetId && t.Quantity == 119.83m, cancellationToken);
+        Assert.Equal(TransactionType.Deposit, credit.Type);
+        Assert.Equal(new DateOnly(2026, 4, 15), credit.Date);
+        var terms = await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        Assert.Equal(1, terms.RolloverCount);
+        Assert.Equal(10_119.83m, terms.Principal);
+        Assert.Equal(new DateOnly(2026, 4, 15), terms.StartDate);
+        Assert.Equal(new DateOnly(2026, 7, 15), terms.MaturityDate);
+        Assert.Equal(5.5m, terms.AnnualInterestRatePercent);
+        Assert.Null(terms.SettledOn);
+        Assert.Null(terms.SettledGrossInterest);
+        Assert.Null(terms.SettledTax);
+    }
+
+    /// <summary>
+    /// deposit-rollover AC-2 (outbox half): rolling a Settled deposit over changes only its terms — the
+    /// quantity stays, so the save writes no outbox row at all.
+    /// </summary>
+    [Fact]
+    public async Task RollOverSettledDeposit_PublishesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Rollover outbox portfolio", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            assetId = added.Value.AssetId;
+            var settled = await arrange.ServiceProvider.GetRequiredService<SettleDepositHandler>()
+                .HandleAsync(portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
+            Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
+        }
+
+        int outboxRowsBefore;
+        int transactionsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            var beforeDb = before.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+            outboxRowsBefore = await beforeDb.Set<OutboxMessage>().CountAsync(cancellationToken);
+            transactionsBefore = await beforeDb.Transactions.CountAsync(cancellationToken);
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<RollOverDepositHandler>()
+                .HandleAsync(portfolioId, assetId, PortfolioApi.NewRollOverRequest(grossInterest: null, tax: null), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
+        Assert.Equal(transactionsBefore, await verifyDb.Transactions.CountAsync(cancellationToken));
+        Assert.Equal(10_119.83m, (await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken)).Quantity);
+        var terms = await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        Assert.Equal(1, terms.RolloverCount);
+        Assert.Equal(10_119.83m, terms.Principal);
+        Assert.Equal(new DateOnly(2026, 4, 15), terms.StartDate);
+        Assert.Null(terms.SettledOn);
     }
 
     private static async Task<Guid> CreatePortfolioAsync(IServiceProvider services, string name, CancellationToken cancellationToken)

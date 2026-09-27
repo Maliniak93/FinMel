@@ -14,6 +14,7 @@ import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-for
 import { DepositFormDialog } from './deposit-form-dialog/deposit-form-dialog';
 import { Deposits } from './deposits';
 import { PayOutDepositDialog } from './pay-out-deposit-dialog/pay-out-deposit-dialog';
+import { RollOverDepositDialog } from './roll-over-deposit-dialog/roll-over-deposit-dialog';
 import { SettleDepositDialog } from './settle-deposit-dialog/settle-deposit-dialog';
 import {
   activeDeposit,
@@ -368,6 +369,73 @@ describe('Deposits', () => {
       await fixture.whenStable();
 
       expect(dialog.open).toHaveBeenCalledWith(PayOutDepositDialog, expect.anything());
+      expect(depositListCalls()).toBe(listCallsBefore);
+    });
+  });
+
+  // deposit-rollover AC-9. Due and Settled rows carry an `autorenew` icon button with the tooltip
+  // "Roll over" next to their existing button; it opens the roll-over dialog with that deposit and
+  // reloads the list after a successful rollover. Active and PaidOut rows carry none.
+  describe('roll over', () => {
+    // Recognised by its "Roll over" tooltip (or an aria-label saying the same).
+    function rollOverButton(row: HTMLElement): HTMLButtonElement | undefined {
+      return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) =>
+          /roll over/i.test(button.getAttribute('mattooltip') ?? '') ||
+          /roll over/i.test(button.getAttribute('aria-label') ?? ''),
+      );
+    }
+
+    const allStatuses = [activeDeposit, dueDeposit, settledDeposit, paidOutDeposit];
+
+    it('only the Due and Settled rows carry the "Roll over" button', async () => {
+      await setup(allStatuses);
+
+      expect(rollOverButton(rowFor('Matured deposit'))).toBeDefined();
+      expect(rollOverButton(rowFor('Settled deposit'))).toBeDefined();
+      expect(rollOverButton(rowFor('Running deposit'))).toBeUndefined();
+      expect(rollOverButton(rowFor('Paid-out deposit'))).toBeUndefined();
+      // Next to, not instead of, the row's existing action.
+      expect(settleButton(rowFor('Matured deposit'))).toBeDefined();
+    });
+
+    it('the button shows the autorenew icon', async () => {
+      await setup([dueDeposit]);
+
+      const button = rollOverButton(rowFor('Matured deposit'));
+      expect(button?.querySelector('mat-icon')?.textContent?.trim()).toBe('autorenew');
+    });
+
+    it.each([
+      ['Due', 'Matured deposit', dueDeposit],
+      ['Settled', 'Settled deposit', settledDeposit],
+    ])(
+      'on a %s row it opens the roll-over dialog with that deposit and reloads after a rollover',
+      async (_status, name, deposit) => {
+        await setup(allStatuses);
+        dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+        const listCallsBefore = depositListCalls();
+
+        rollOverButton(rowFor(name))!.click();
+        await fixture.whenStable();
+
+        expect(dialog.open).toHaveBeenCalledWith(
+          RollOverDepositDialog,
+          expect.objectContaining({ data: expect.objectContaining({ deposit }) }),
+        );
+        await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
+      },
+    );
+
+    it('a cancelled rollover does not reload the list', async () => {
+      await setup([dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const listCallsBefore = depositListCalls();
+
+      rollOverButton(rowFor('Matured deposit'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(RollOverDepositDialog, expect.anything());
       expect(depositListCalls()).toBe(listCallsBefore);
     });
   });

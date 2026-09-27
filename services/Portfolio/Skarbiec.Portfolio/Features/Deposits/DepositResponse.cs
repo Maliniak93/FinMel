@@ -73,6 +73,9 @@ public sealed record DepositResponse
     /// once that asset was removed (its leg detached).
     /// </summary>
     public string? PaidOutToAssetName { get; init; }
+
+    /// <summary>How many times the deposit was rolled over (deposit-rollover) — above 0, its principal and start date are fixed.</summary>
+    public required int RolloverCount { get; init; }
 }
 
 public static class DepositMappingExtensions
@@ -138,7 +141,8 @@ public static class DepositMappingExtensions
             FundingAssetId = funding?.AssetId,
             FundingAssetName = funding?.AssetName,
             PaidOutOn = payout?.PaidOutOn,
-            PaidOutToAssetName = payout?.DestinationAssetName
+            PaidOutToAssetName = payout?.DestinationAssetName,
+            RolloverCount = terms.RolloverCount
         };
     }
 }

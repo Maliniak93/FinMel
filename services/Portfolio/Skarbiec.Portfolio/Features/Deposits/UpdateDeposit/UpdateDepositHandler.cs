@@ -45,18 +45,28 @@ public sealed class UpdateDepositHandler(
             return DepositErrors.Settled;
         }
 
-        // An unsettled term deposit holds exactly one transaction — the system-managed opening Deposit —
-        // and it is rewritten in place, never corrected by a second one.
-        var opening = await dbContext.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        // A rolled-over deposit's principal and start date came from earlier terms' balance
+        // (deposit-rollover): they are fixed, and its transactions are never rewritten.
+        if (terms.RolloverCount > 0 && (request.Principal != terms.Principal || request.StartDate != terms.StartDate))
+        {
+            return DepositErrors.RolledOver;
+        }
+
+        // An unsettled, never rolled-over term deposit holds exactly one transaction — the system-managed
+        // opening Deposit — and it is rewritten in place, never corrected by a second one.
+        var opening = terms.RolloverCount == 0
+            ? await dbContext.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken)
+            : null;
 
         // A funded deposit's opening transaction is the In leg of a Cash → Deposit transfer
         // (asset-transfers-deposit-funding). Its legs move together, and only when the principal or the
         // start date changes — any other edit (name, interest terms) leaves both untouched, whatever the
         // state of the Cash side.
-        var fundingLeg = opening.TransferId is { } transferId
+        var fundingLeg = opening?.TransferId is { } transferId
             ? await dbContext.Transactions.FirstOrDefaultAsync(t => t.TransferId == transferId && t.Id != opening.Id, cancellationToken)
             : null;
-        var rewritesOpening = fundingLeg is null || opening.Quantity != request.Principal || opening.Date != request.StartDate;
+        var rewritesOpening = opening is not null
+            && (fundingLeg is null || opening.Quantity != request.Principal || opening.Date != request.StartDate);
 
         Asset? fundingAsset = null;
         var fundingQuantity = 0m;
@@ -95,7 +105,7 @@ public sealed class UpdateDepositHandler(
             fundingQuantity = fundingRecomputed.Value;
         }
 
-        if (rewritesOpening)
+        if (rewritesOpening && opening is not null)
         {
             var candidate = new Transaction
             {

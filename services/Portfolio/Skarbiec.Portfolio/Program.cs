@@ -12,6 +12,7 @@ using Skarbiec.Portfolio.Features.Deposits.GetDeposit;
 using Skarbiec.Portfolio.Features.Deposits.GetSettlementPreview;
 using Skarbiec.Portfolio.Features.Deposits.ListDeposits;
 using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
+using Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.GetAsset;
@@ -96,6 +97,7 @@ builder.Services.AddScoped<ListDepositsHandler>();
 builder.Services.AddScoped<GetSettlementPreviewHandler>();
 builder.Services.AddScoped<SettleDepositHandler>();
 builder.Services.AddScoped<PayOutDepositHandler>();
+builder.Services.AddScoped<RollOverDepositHandler>();
 builder.Services.AddScoped<ListTransferCandidatesHandler>();
 
 var app = builder.Build();
@@ -127,6 +129,7 @@ app.MapListDepositsEndpoint();
 app.MapGetSettlementPreviewEndpoint();
 app.MapSettleDepositEndpoint();
 app.MapPayOutDepositEndpoint();
+app.MapRollOverDepositEndpoint();
 app.MapListTransferCandidatesEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton

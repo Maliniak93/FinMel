@@ -6,7 +6,9 @@ using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.GetSettlementPreview;
 using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
+using Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
@@ -105,6 +107,55 @@ internal static class PortfolioApi
         var response = await client.PostAsJsonAsync(
             PayOutDepositUri(portfolioId, assetId), NewPayOutRequest(destinationAssetId, date), cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>term-deposits-settlement: the settlement preview of a Due deposit (arrange only).</summary>
+    public static async Task<DepositSettlementPreviewResponse> GetSettlementPreviewAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(DepositSettlementPreviewUri(portfolioId, assetId), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<DepositSettlementPreviewResponse>(cancellationToken))!;
+    }
+
+    /// <summary>deposit-rollover: rolls a Due or Settled deposit over into its next term on the same asset.</summary>
+    public static string RollOverDepositUri(Guid portfolioId, Guid assetId) =>
+        $"{DepositUri(portfolioId, assetId)}/rollover";
+
+    /// <summary>
+    /// deposit-rollover: a <see cref="RollOverDepositRequest"/> for a <b>Due</b> deposit — by default
+    /// <see cref="NewDepositRequest"/>'s previewed settlement (gross 147.95, tax 28.12 → net 119.83)
+    /// and a new rate of 5.5 %. Pass <see langword="null"/> for an amount to leave it out.
+    /// </summary>
+    public static RollOverDepositRequest NewRollOverRequest(
+        decimal annualInterestRatePercent = 5.5m,
+        decimal? grossInterest = 147.95m,
+        decimal? tax = 28.12m) => new()
+        {
+            AnnualInterestRatePercent = annualInterestRatePercent,
+            GrossInterest = grossInterest,
+            Tax = tax
+        };
+
+    /// <summary>
+    /// deposit-rollover: the body the Roll over dialog sends for a <b>Settled</b> deposit — the rate
+    /// alone, with <c>grossInterest</c> and <c>tax</c> absent from the JSON (not <c>null</c>).
+    /// </summary>
+    public static object SettledRollOverBody(decimal annualInterestRatePercent = 5.5m) =>
+        new { annualInterestRatePercent };
+
+    /// <summary>
+    /// deposit-rollover: rolls <paramref name="assetId"/> over (arrange only — the fact must have pinned
+    /// a clock past its maturity). Defaults to <see cref="NewRollOverRequest"/>, i.e. a Due deposit.
+    /// </summary>
+    public static async Task<DepositResponse> RollOverDepositAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, object? body = null)
+    {
+        var response = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, assetId), body ?? NewRollOverRequest(), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await client.GetDepositAsync(portfolioId, assetId, cancellationToken);
     }
 
     /// <summary>deposit-payout-to-cash: what <see cref="CreatePaidOutDepositAsync"/> arranged.</summary>

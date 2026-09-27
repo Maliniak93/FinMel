@@ -381,3 +381,80 @@ Content-Type: application/json
   "tax": {{fundedSettlementPreview.response.body.tax}},
   "destinationAssetId": "{{addFundingCash.response.body.id}}"
 }
+
+### Add a matured deposit to roll over
+# 10 000 PLN at 6 % for 3 months from 2026-01-15 — Due since its 2026-04-15 maturity.
+# @name addRenewableDeposit
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Renewable deposit",
+  "bankName": "Example bank",
+  "currency": "PLN",
+  "principal": 10000.00,
+  "startDate": "2026-01-15",
+  "termLength": 3,
+  "termUnit": 1,
+  "annualInterestRatePercent": 6,
+  "capitalization": 0,
+  "taxExempt": false,
+  "earlyBreakInterestLossPercent": 100
+}
+
+### Preview the settlement of the renewable deposit
+# @name renewablePreview
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/settlement-preview
+Authorization: Bearer {{authToken}}
+
+### Roll the Due deposit over
+# Settles it and starts the next term on the same asset in one save (deposit-rollover): the net
+# interest (gross - tax, none when 0) is credited on the old maturity date with that date's PLN rate
+# frozen, the new principal is the whole balance (principal + net), the new start date the old
+# maturity date, the maturity date is recomputed from the unchanged term, and only the rate changes.
+# The settlement fields are cleared, rolloverCount goes up by 1 and AssetPositionChanged is
+# published. 200 with the deposit — Active, or Due at once when the new maturity date is already past.
+# grossInterest and tax are required here (400 Validation.SettlementAmountsRequired), with the settle
+# rules; 409 Conflict.DepositNotDue before the maturity date, 409 Conflict.DepositAlreadyPaidOut once
+# paid out, 409 Conflict.PortfolioArchived. Once rolled over, PUT .../deposits/{id} with another
+# principal or start date is 409 Conflict.DepositRolledOver; every other term stays editable.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "annualInterestRatePercent": 5.5,
+  "grossInterest": {{renewablePreview.response.body.grossInterest}},
+  "tax": {{renewablePreview.response.body.tax}}
+}
+
+### Preview the settlement of the rolled-over term
+# The next term runs 2026-04-15 → 2026-07-15 on the whole balance, so it is Due again once that passes.
+# @name renewedPreview
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/settlement-preview
+Authorization: Bearer {{authToken}}
+
+### Settle the rolled-over term, keeping the money in the deposit
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/settle
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "settledOn": "{{renewedPreview.response.body.settledOn}}",
+  "grossInterest": {{renewedPreview.response.body.grossInterest}},
+  "tax": {{renewedPreview.response.body.tax}}
+}
+
+### Roll the Settled deposit over
+# A Settled deposit that was not paid out reuses its stored settlement: send the rate alone —
+# grossInterest or tax is 409 Conflict.DepositAlreadySettled. The new principal is principal + the
+# settled net and the new start date the old maturity date (not the settlement date); no transaction
+# is written and no event is published, as the quantity is unchanged. rolloverCount becomes 2.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "annualInterestRatePercent": 5
+}

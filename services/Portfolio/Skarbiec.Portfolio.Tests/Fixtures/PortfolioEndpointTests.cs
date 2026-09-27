@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
@@ -53,6 +54,47 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         Assert.All(legs, leg => Assert.Equal(new DateOnly(2026, 1, 15), leg.Date));
         Assert.Equal(1_000m, (await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == funded.Deposit.AssetId, cancellationToken)).Principal);
     }
+
+    /// <summary>
+    /// deposit-rollover: everything a rejected deposit write must leave alone — the deposit as
+    /// <c>GET .../deposits/{assetId}</c> returns it, <see cref="SnapshotUserRowsAsync"/>, and every
+    /// transaction of <paramref name="userId"/> (id, type, quantity, date, frozen rate).
+    /// </summary>
+    private protected async Task<DepositSnapshot> SnapshotDepositAsync(
+        HttpClient client, Guid userId, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var deposit = await client.GetDepositAsync(portfolioId, assetId, cancellationToken);
+        var rows = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        await using var dbContext = CreateDbContext(userId);
+        var transactions = await dbContext.Transactions
+            .AsNoTracking()
+            .OrderBy(t => t.Id)
+            .ToListAsync(cancellationToken);
+
+        return new DepositSnapshot(
+            deposit,
+            rows,
+            string.Join(
+                Environment.NewLine,
+                transactions.Select(t => $"{t.Id}|{t.AssetId}|{t.Type}|{t.Quantity}|{t.Date:O}|{t.FxRateToPln}|{t.TransferId}")));
+    }
+
+    /// <summary>deposit-rollover: asserts the deposit, the row counts and every transaction are exactly as <paramref name="before"/>.</summary>
+    private protected async Task AssertDepositUnchangedAsync(
+        HttpClient client, Guid userId, Guid portfolioId, Guid assetId, DepositSnapshot before, CancellationToken cancellationToken)
+    {
+        var after = await SnapshotDepositAsync(client, userId, portfolioId, assetId, cancellationToken);
+        Assert.Equal(before.Deposit, after.Deposit);
+        Assert.Equal(before.Rows, after.Rows);
+        Assert.Equal(before.Transactions, after.Transactions);
+    }
+
+    /// <summary>What <see cref="SnapshotDepositAsync"/> captured.</summary>
+    private protected sealed record DepositSnapshot(
+        DepositResponse Deposit,
+        (int Assets, int Transactions, int Terms, decimal TotalQuantity) Rows,
+        string Transactions);
 
     /// <summary>
     /// A snapshot of everything <paramref name="userId"/> owns — asset, transaction and term-deposit

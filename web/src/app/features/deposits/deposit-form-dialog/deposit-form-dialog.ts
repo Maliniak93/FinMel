@@ -90,6 +90,9 @@ export class DepositFormDialog {
 
   private readonly deposit = this.data.deposit;
   protected readonly isEdit = !!this.deposit;
+  // Once rolled over (deposit-rollover) the principal and start date came from earlier terms' balance:
+  // they are shown disabled and still sent unchanged (getRawValue), as the server requires.
+  private readonly isRolledOver = Number(this.deposit?.rolloverCount ?? 0) > 0;
   // The portfolio is chosen here only on a plain create; the type picker presets it, edit fixes it.
   protected readonly choosesPortfolio = !this.deposit && !this.data.portfolioId;
   protected readonly submitting = signal(false);
@@ -130,11 +133,17 @@ export class DepositFormDialog {
       [Validators.required],
     ],
     principal: [
-      this.deposit ? Number(this.deposit.principal) : (null as number | null),
+      {
+        value: this.deposit ? Number(this.deposit.principal) : (null as number | null),
+        disabled: this.isRolledOver,
+      },
       [Validators.required, Validators.min(0.01), this.principalWithinBalance],
     ],
     startDate: [
-      this.deposit ? fromDateOnly(this.deposit.startDate) : (new Date() as Date | null),
+      {
+        value: this.deposit ? fromDateOnly(this.deposit.startDate) : (new Date() as Date | null),
+        disabled: this.isRolledOver,
+      },
       [Validators.required],
     ],
     termLength: [
