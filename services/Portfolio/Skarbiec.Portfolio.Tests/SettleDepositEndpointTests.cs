@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
+using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
@@ -261,5 +262,119 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(0m, cash.Quantity);
         Assert.Equal(0, cash.TransactionCount);
         Assert.Null(cash.DepositSettled);
+    }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-1 (HTTP half): settling with a destination pays the whole balance
+    /// (principal + net) out in the same request — a Withdraw of 10 119.83 on the deposit linked to a
+    /// Deposit of 10 119.83 on the Cash, both on <c>settledOn</c>. The deposit holds 0, the Cash the
+    /// final amount, and the deposit is PaidOut. The per-asset <c>AssetPositionChanged</c> is proven by
+    /// <see cref="PortfolioOutboxTests.SettleDepositWithDestination_PublishesBothPositions"/>.
+    /// </summary>
+    [Fact]
+    public async Task Settle_WithDestination_PaysOutWholeBalance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetAsync(walletId, cancellationToken);
+        var settledOn = new DateOnly(2026, 4, 15);
+
+        var response = await client.PostAsJsonAsync(
+            SettleDepositUri(portfolioId, deposit.AssetId), NewSettleRequest(destinationAssetId: cashId), cancellationToken);
+
+        Assert.True(response.IsSuccessStatusCode, $"Settle answered {(int)response.StatusCode}.");
+
+        var depositTransactions = (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items;
+        Assert.Equal(3, depositTransactions.Count);
+        var credit = Assert.Single(depositTransactions, t => t.Type == TransactionType.Deposit && t.Date == settledOn);
+        Assert.Equal(119.83m, credit.Quantity);
+        Assert.Null(credit.Transfer);
+        var withdraw = Assert.Single(depositTransactions, t => t.Type == TransactionType.Withdraw);
+        Assert.Equal(10_119.83m, withdraw.Quantity);
+        Assert.Equal(settledOn, withdraw.Date);
+        Assert.NotNull(withdraw.Transfer);
+        Assert.Equal(cashId, withdraw.Transfer.CounterpartAssetId);
+        Assert.Equal(TransferDirection.Out, withdraw.Transfer.Direction);
+
+        var cashLeg = Assert.Single((await client.ListTransactionsAsync(walletId, cashId, cancellationToken)).Items);
+        Assert.Equal(TransactionType.Deposit, cashLeg.Type);
+        Assert.Equal(10_119.83m, cashLeg.Quantity);
+        Assert.Equal(settledOn, cashLeg.Date);
+        Assert.NotNull(cashLeg.Transfer);
+        Assert.Equal(deposit.AssetId, cashLeg.Transfer.CounterpartAssetId);
+        Assert.Equal(TransferDirection.In, cashLeg.Transfer.Direction);
+
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+            Assert.Equal(2, legs.Count);
+            Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        }
+
+        Assert.Equal(0m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(walletId, cashId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, deposit.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(walletId, cashId, cancellationToken);
+
+        var paidOut = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(DepositStatus.PaidOut, paidOut.Status);
+        Assert.Equal(settledOn, paidOut.SettledOn);
+        Assert.Equal(147.95m, paidOut.SettledGrossInterest);
+        Assert.Equal(28.12m, paidOut.SettledTax);
+        Assert.Equal(settledOn, paidOut.PaidOutOn);
+        Assert.Equal("Cash account", paidOut.PaidOutToAssetName);
+    }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-2: a destination that breaks the transfer rules — another currency,
+    /// a non-Cash class, an archived portfolio or another user's Cash — rejects the whole request with
+    /// 400 <c>Validation.InvalidTransferCounterpart</c>: the deposit is not settled either, and the
+    /// destination is untouched.
+    /// </summary>
+    [Theory]
+    [InlineData("eur-cash")]
+    [InlineData("stock")]
+    [InlineData("archived-portfolio-cash")]
+    [InlineData("strangers-cash")]
+    public async Task Settle_InvalidDestination_ReturnsBadRequestAndSettlesNothing(string invalidCase)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var (destinationClient, destinationPortfolioId, destinationId) = invalidCase switch
+        {
+            "eur-cash" => await ArrangeOwnAsync(client, (c, p) => c.AddCashAssetAsync(p, cancellationToken, currency: "EUR", name: "EUR account")),
+            "stock" => await ArrangeOwnAsync(client, (c, p) => c.AddAssetAsync(p, cancellationToken, name: "Some stock")),
+            "archived-portfolio-cash" => await ArrangeArchivedAsync(client),
+            "strangers-cash" => await ArrangeOwnAsync(stranger, (c, p) => c.AddCashAssetAsync(p, cancellationToken)),
+            _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
+        };
+
+        var response = await client.PostAsJsonAsync(
+            SettleDepositUri(portfolioId, deposit.AssetId), NewSettleRequest(destinationAssetId: destinationId), cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        await client.AssertDepositUnsettledAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var destination = await destinationClient.GetAssetAsync(destinationPortfolioId, destinationId, cancellationToken);
+        Assert.Equal(invalidCase == "archived-portfolio-cash" ? 5_000m : 0m, destination.Quantity);
+        Assert.Equal(invalidCase == "archived-portfolio-cash" ? 1 : 0, destination.TransactionCount);
+
+        async Task<(HttpClient, Guid, Guid)> ArrangeOwnAsync(HttpClient owner, Func<HttpClient, Guid, Task<Guid>> addAsset)
+        {
+            var walletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+            return (owner, walletId, await addAsset(owner, walletId));
+        }
+
+        async Task<(HttpClient, Guid, Guid)> ArrangeArchivedAsync(HttpClient owner)
+        {
+            var (archivedId, cashId) = await owner.AddArchivedCashAssetAsync(cancellationToken);
+            return (owner, archivedId, cashId);
+        }
     }
 }

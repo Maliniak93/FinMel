@@ -11,6 +11,7 @@ using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.DeletePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
@@ -63,6 +64,7 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
             services.AddScoped<AddDepositHandler>();
             services.AddScoped<UpdateDepositHandler>();
             services.AddScoped<SettleDepositHandler>();
+            services.AddScoped<PayOutDepositHandler>();
             services.AddScoped<ArchivePortfolioHandler>();
             services.AddScoped<RestorePortfolioHandler>();
             services.AddScoped<DeletePortfolioHandler>();
@@ -1175,6 +1177,210 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         var cashLeg = await verifyDb.Transactions.SingleAsync(t => t.AssetId == cashId && t.Type == TransactionType.Withdraw, cancellationToken);
         Assert.Null(cashLeg.TransferId);
         Assert.Equal(4_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == cashId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-1 (outbox half): settling with a destination stores the settlement,
+    /// the net-interest credit and both transfer legs, and writes exactly one further
+    /// <see cref="AssetPositionChanged"/> per asset carrying its final quantity — the deposit at 0, the
+    /// Cash at 5 000 + 10 119.83 — all in a single save. The host clock is the real one (today is well
+    /// past the 2026-04-15 maturity).
+    /// </summary>
+    [Fact]
+    public async Task SettleDepositWithDestination_PublishesBothPositions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid savingsId;
+        Guid walletId;
+        Guid cashId;
+        Guid depositId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
+            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(savingsId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            depositId = added.Value.AssetId;
+        }
+
+        IReadOnlyList<AssetPositionChanged> eventsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            eventsBefore = await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
+                .HandleAsync(savingsId, depositId, PortfolioApi.NewSettleRequest(destinationAssetId: cashId), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore.Count).ToList();
+        Assert.Equal(2, events.Count);
+        var depositEvent = Assert.Single(events, e => e.AssetId == depositId);
+        Assert.Equal(0m, depositEvent.Quantity);
+        Assert.Equal(savingsId, depositEvent.PortfolioId);
+        Assert.Equal(AssetClass.Deposit, depositEvent.AssetClass);
+        Assert.Equal(UserId, depositEvent.UserId);
+        Assert.True(depositEvent.Version > eventsBefore.Where(e => e.AssetId == depositId).Max(e => e.Version));
+        var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
+        Assert.Equal(15_119.83m, cashEvent.Quantity);
+        Assert.Equal(walletId, cashEvent.PortfolioId);
+        Assert.Equal(AssetClass.Cash, cashEvent.AssetClass);
+        Assert.True(cashEvent.Version > eventsBefore.Where(e => e.AssetId == cashId).Max(e => e.Version));
+
+        Assert.Equal(0m, (await verifyDb.Assets.SingleAsync(a => a.Id == depositId, cancellationToken)).Quantity);
+        Assert.Equal(15_119.83m, (await verifyDb.Assets.SingleAsync(a => a.Id == cashId, cancellationToken)).Quantity);
+        var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        Assert.All(legs, leg => Assert.Equal(10_119.83m, leg.Quantity));
+        Assert.All(legs, leg => Assert.Equal(new DateOnly(2026, 4, 15), leg.Date));
+        var terms = await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == depositId, cancellationToken);
+        Assert.Equal(new DateOnly(2026, 4, 15), terms.SettledOn);
+    }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-2 (outbox half): settle and payout are atomic — an invalid destination
+    /// (here a Stock) fails with <c>Validation.InvalidTransferCounterpart</c> before anything is saved:
+    /// no outbox row, no settlement, no transaction.
+    /// </summary>
+    [Fact]
+    public async Task SettleDepositWithInvalidDestination_WritesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid savingsId;
+        Guid stockId;
+        Guid depositId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            var brokerId = await CreatePortfolioAsync(arrange.ServiceProvider, "Broker", cancellationToken);
+            stockId = await AddAssetWithBuyAsync(arrange.ServiceProvider, brokerId, "Some stock", cancellationToken);
+            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(savingsId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            depositId = added.Value.AssetId;
+        }
+
+        int outboxRowsBefore;
+        int transactionsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            var beforeDb = before.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+            outboxRowsBefore = await beforeDb.Set<OutboxMessage>().CountAsync(cancellationToken);
+            transactionsBefore = await beforeDb.Transactions.CountAsync(cancellationToken);
+        }
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
+                .HandleAsync(savingsId, depositId, PortfolioApi.NewSettleRequest(destinationAssetId: stockId), cancellationToken);
+            Assert.True(result.IsFailure);
+            Assert.Equal(PortfolioAssertions.InvalidTransferCounterpartErrorCode, result.Error.Code);
+        }
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
+        Assert.Equal(transactionsBefore, await verifyDb.Transactions.CountAsync(cancellationToken));
+        Assert.Null((await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == depositId, cancellationToken)).SettledOn);
+        Assert.Equal(10_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == depositId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-3 (outbox half): paying a settled deposit out later writes both legs
+    /// and exactly one further <see cref="AssetPositionChanged"/> per asset — the deposit at 0, the Cash
+    /// at 5 000 + 10 119.83 — in a single save; a second payout of the now paid-out deposit fails with
+    /// <c>Conflict.DepositAlreadyPaidOut</c> and writes no further outbox row.
+    /// </summary>
+    [Fact]
+    public async Task PayOutDeposit_PublishesBothPositions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid savingsId;
+        Guid walletId;
+        Guid cashId;
+        Guid depositId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
+            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(savingsId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            depositId = added.Value.AssetId;
+            var settled = await arrange.ServiceProvider.GetRequiredService<SettleDepositHandler>()
+                .HandleAsync(savingsId, depositId, PortfolioApi.NewSettleRequest(), cancellationToken);
+            Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
+        }
+
+        IReadOnlyList<AssetPositionChanged> eventsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            eventsBefore = await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        }
+
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<PayOutDepositHandler>()
+                .HandleAsync(savingsId, depositId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        int outboxRowsAfterPayOut;
+        await using (var verify = _provider.CreateAsyncScope())
+        {
+            var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+            var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore.Count).ToList();
+            Assert.Equal(2, events.Count);
+            var depositEvent = Assert.Single(events, e => e.AssetId == depositId);
+            Assert.Equal(0m, depositEvent.Quantity);
+            Assert.Equal(AssetClass.Deposit, depositEvent.AssetClass);
+            Assert.True(depositEvent.Version > eventsBefore.Where(e => e.AssetId == depositId).Max(e => e.Version));
+            var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
+            Assert.Equal(15_119.83m, cashEvent.Quantity);
+            Assert.Equal(walletId, cashEvent.PortfolioId);
+            Assert.True(cashEvent.Version > eventsBefore.Where(e => e.AssetId == cashId).Max(e => e.Version));
+
+            var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+            Assert.Equal(2, legs.Count);
+            Assert.All(legs, leg => Assert.Equal(10_119.83m, leg.Quantity));
+            Assert.All(legs, leg => Assert.Equal(new DateOnly(2026, 4, 18), leg.Date));
+            outboxRowsAfterPayOut = await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken);
+        }
+
+        await using (var again = _provider.CreateAsyncScope())
+        {
+            var second = await again.ServiceProvider.GetRequiredService<PayOutDepositHandler>()
+                .HandleAsync(savingsId, depositId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
+            Assert.True(second.IsFailure);
+            Assert.Equal(PortfolioAssertions.DepositAlreadyPaidOutErrorCode, second.Error.Code);
+        }
+
+        await using var final = _provider.CreateAsyncScope();
+        var finalDb = final.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(outboxRowsAfterPayOut, await finalDb.Set<OutboxMessage>().CountAsync(cancellationToken));
+        Assert.Equal(15_119.83m, (await finalDb.Assets.SingleAsync(a => a.Id == cashId, cancellationToken)).Quantity);
     }
 
     private static async Task<Guid> CreatePortfolioAsync(IServiceProvider services, string name, CancellationToken cancellationToken)

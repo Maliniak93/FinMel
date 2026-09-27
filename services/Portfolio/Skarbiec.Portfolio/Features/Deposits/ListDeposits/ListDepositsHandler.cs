@@ -17,11 +17,18 @@ public sealed class ListDepositsHandler(PortfolioDbContext dbContext, TimeProvid
             .ToListAsync(cancellationToken);
 
         var today = WarsawCalendar.Today(timeProvider);
-        var funding = await dbContext.LoadFundingSourcesAsync([.. rows.Select(r => r.Asset.Id)], cancellationToken);
+        var depositIds = rows.Select(r => r.Asset.Id).ToList();
+        var funding = await dbContext.LoadFundingSourcesAsync(depositIds, cancellationToken);
+        var payouts = await dbContext.LoadPayoutsAsync(depositIds, cancellationToken);
 
         return rows
             .Select(r => r.Terms.ToResponse(
-                r.Asset, r.PortfolioName, r.PortfolioIsArchived, today, funding.GetValueOrDefault(r.Asset.Id)))
+                r.Asset,
+                r.PortfolioName,
+                r.PortfolioIsArchived,
+                today,
+                funding.GetValueOrDefault(r.Asset.Id),
+                payouts.GetValueOrDefault(r.Asset.Id)))
             .ToList();
     }
 }

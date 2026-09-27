@@ -8,6 +8,8 @@ namespace Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 /// <summary>
 /// Settles a Due term deposit (term-deposits-settlement): stores what the bank actually paid and
 /// credits the net interest to the deposit itself — the money stays in it until a payout moves it.
+/// With a destination (deposit-payout-to-cash) the same save also pays the whole balance out to that
+/// Cash asset on the settlement date; an invalid destination rejects the settlement too.
 /// </summary>
 public sealed class SettleDepositHandler(
     PortfolioDbContext dbContext,
@@ -85,33 +87,64 @@ public sealed class SettleDepositHandler(
             .Where(t => t.AssetId == assetId)
             .ToListAsync(cancellationToken);
 
-        var recomputed = TransactionQuantityCalculator.Recompute(
-            credit is null ? existingTransactions : [.. existingTransactions, credit]);
+        List<Transaction> history = credit is null ? existingTransactions : [.. existingTransactions, credit];
+        var recomputed = TransactionQuantityCalculator.Recompute(history);
         if (recomputed.IsFailure)
         {
             return recomputed.Error;
         }
 
-        if (credit is not null)
+        // The payout moves principal + net on the settlement date; checked before anything is staged,
+        // so an invalid destination leaves the deposit unsettled (deposit-payout-to-cash).
+        PayoutTransfer? payout = null;
+        if (request.DestinationAssetId is { } destinationAssetId)
         {
-            // Last check before the write: the credit freezes the PLN rate of its own date (ADR-026).
-            var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.SettledOn, cancellationToken);
-            if (fxRateToPln.IsFailure)
+            var planned = await dbContext.PlanPayoutAsync(asset, history, destinationAssetId, request.SettledOn, cancellationToken);
+            if (planned.IsFailure)
             {
-                return fxRateToPln.Error;
+                return planned.Error;
             }
 
-            credit.FxRateToPln = fxRateToPln.Value;
+            payout = planned.Value;
+        }
+
+        decimal? fxRateToPln = null;
+        if (credit is not null || payout is not null)
+        {
+            // Last check before the write: the credit and both legs freeze the PLN rate of their one
+            // date and currency (ADR-026).
+            var resolved = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.SettledOn, cancellationToken);
+            if (resolved.IsFailure)
+            {
+                return resolved.Error;
+            }
+
+            fxRateToPln = resolved.Value;
+        }
+
+        if (credit is not null)
+        {
+            credit.FxRateToPln = fxRateToPln;
             dbContext.Transactions.Add(credit);
         }
 
         asset.Quantity = recomputed.Value;
+
+        // Empties the deposit: its quantity becomes 0 and the destination's rises by the whole balance.
+        payout?.Stage(dbContext, asset, fxRateToPln);
+
         terms.SettledOn = request.SettledOn;
         terms.SettledGrossInterest = request.GrossInterest;
         terms.SettledTax = request.Tax;
 
-        // Published before SaveChangesAsync so the outbox row commits with the settlement (ADR-012).
+        // Published before SaveChangesAsync so the outbox rows commit with the settlement (ADR-012) —
+        // one per asset, each with its final quantity.
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
+
+        if (payout is not null)
+        {
+            await positionEventPublisher.PublishChangedAsync(payout.Destination, cancellationToken);
+        }
 
         try
         {
@@ -125,6 +158,6 @@ public sealed class SettleDepositHandler(
 
         var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, today, funding);
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, today, funding, payout?.ToInfo());
     }
 }

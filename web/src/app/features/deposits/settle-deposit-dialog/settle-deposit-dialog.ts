@@ -14,10 +14,12 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { map } from 'rxjs';
 
 import {
   getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview,
+  getApiPortfolioTransferCandidates,
   postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettle,
   type DepositResponse,
 } from '../../../api/portfolio';
@@ -28,6 +30,7 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format-money';
+import { ASSET_CLASS } from '../../assets/asset-class';
 import { settlementAmounts } from '../deposit-terms';
 
 export interface SettleDepositDialogData {
@@ -54,8 +57,10 @@ function isAmount(value: number | string | null): value is number | string {
 }
 
 // Settles a Due term deposit (term-deposits-settlement): pre-filled from the server's settlement
-// preview, with what the bank actually paid editable. Control names follow the SettleDepositRequest
-// properties, so a server 400 keyed on a field lands on it.
+// preview, with what the bank actually paid editable. "Move to" (deposit-payout-to-cash) keeps the
+// money in the deposit by default, or pays the whole final amount out to a Cash asset in the same
+// request. Control names follow the SettleDepositRequest properties, so a server 400 keyed on a field
+// lands on it.
 @Component({
   selector: 'app-settle-deposit-dialog',
   imports: [
@@ -67,6 +72,7 @@ function isAmount(value: number | string | null): value is number | string {
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
   ],
   templateUrl: './settle-deposit-dialog.html',
   styleUrl: './settle-deposit-dialog.scss',
@@ -97,6 +103,8 @@ export class SettleDepositDialog {
     ],
     grossInterest: [null as number | null, [Validators.required, Validators.min(0)]],
     tax: [null as number | null, [Validators.required, Validators.min(0), taxWithinGross]],
+    // null keeps the money in the deposit; otherwise one of the Cash transfer candidates.
+    destinationAssetId: [null as string | null],
   });
 
   // Signal mirror of the form, so net interest and the final amount follow the edits live.
@@ -111,6 +119,27 @@ export class SettleDepositDialog {
       return null;
     }
     return settlementAmounts(this.deposit.principal, grossInterest, tax);
+  });
+
+  // The final amount the payout moves — only when a destination is chosen.
+  protected readonly movedAmount = computed(() =>
+    this.formValue().destinationAssetId ? (this.amounts()?.finalAmount ?? null) : null,
+  );
+
+  // Where the money can move to: the Cash transfer candidates in the deposit's currency.
+  protected readonly destinationCandidatesResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioTransferCandidates({
+        query: { currency: this.deposit.currency, assetClass: ASSET_CLASS.Cash },
+        signal: abortSignal,
+      });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? 'Failed to load the Cash accounts.',
+        );
+      }
+      return result.data ?? [];
+    },
   });
 
   protected readonly previewResource = resource({
@@ -141,7 +170,7 @@ export class SettleDepositDialog {
       // Untracked: whatever the form reads while updating must not make this effect re-run and
       // overwrite the user's edits.
       untracked(() =>
-        this.form.setValue({
+        this.form.patchValue({
           settledOn: fromDateOnly(preview.settledOn),
           grossInterest: Number(preview.grossInterest),
           tax: Number(preview.tax),
@@ -176,6 +205,8 @@ export class SettleDepositDialog {
         settledOn: toDateOnly(values.settledOn!),
         grossInterest: Number(values.grossInterest),
         tax: Number(values.tax),
+        // Left out, not null, when the money stays in the deposit.
+        destinationAssetId: values.destinationAssetId ?? undefined,
       },
     });
 

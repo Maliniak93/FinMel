@@ -17,7 +17,12 @@ import {
 import {
   dueDeposit,
   dueDepositSettlementPreview,
+  eurCashCandidate,
+  plnCashCandidate,
+  selectOptionLabels,
   settledDeposit,
+  transferCandidateRequests,
+  transferCandidatesByCurrency,
 } from '../testing/deposit-fixtures';
 import { SettleDepositDialog } from './settle-deposit-dialog';
 
@@ -46,14 +51,19 @@ describe('SettleDepositDialog', () => {
     return typeof input === 'string' ? 'GET' : (input as Request).method;
   }
 
-  // The preview GET always answers with `dueDepositSettlementPreview`; every write answers with
-  // `writeResponse`.
+  // The preview GET always answers with `dueDepositSettlementPreview`; the transfer candidates
+  // (GET /api/portfolio/transfer-candidates) answer per the `currency` query parameter from
+  // `transferCandidatesByCurrency`; every write answers with `writeResponse`.
   async function setup(
     writeResponse: () => Response = () => jsonResponse(settledDeposit),
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (method(input) === 'GET') {
+        if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
+          const currency = new URL(requestUrl(input)).searchParams.get('currency') ?? '';
+          return jsonResponse(transferCandidatesByCurrency[currency] ?? []);
+        }
         return requestUrl(input).includes('/settlement-preview')
           ? jsonResponse(dueDepositSettlementPreview)
           : jsonResponse({ detail: 'Not found.' }, 404);
@@ -250,5 +260,77 @@ describe('SettleDepositDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  // deposit-payout-to-cash AC-7. A "Move to" select (control `destinationAssetId`, named after the
+  // SettleDepositRequest property) defaults to "Keep in the deposit" and otherwise lists the Cash
+  // transfer candidates in the deposit's currency; a hint states the final amount that will move.
+  // Picking one sends it as `destinationAssetId`; keeping the money in the deposit sends none.
+  describe('move to', () => {
+    function hintText(): string {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          'mat-hint, .mat-mdc-form-field-hint',
+        ),
+        (hint) => hint.textContent ?? '',
+      ).join(' ');
+    }
+
+    it('defaults to keeping the money in the deposit and lists the Cash candidates in its currency', async () => {
+      await setup();
+
+      expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
+      const requests = transferCandidateRequests(fetchSpy);
+      expect(requests.length).toBeGreaterThan(0);
+      const last = requests[requests.length - 1];
+      expect(last.searchParams.get('currency')).toBe(dueDeposit.currency);
+      expect(['Cash', '0']).toContain(last.searchParams.get('assetClass'));
+
+      const labels = await selectOptionLabels(fixture, 'destinationAssetId');
+      expect(labels[0]).toMatch(/keep in the deposit/i);
+      expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
+      expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
+    });
+
+    it('picking a Cash destination POSTs it as destinationAssetId', async () => {
+      await setup();
+      await fill({ destinationAssetId: plnCashCandidate.assetId });
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/deposits/${dueDeposit.assetId}/settle`,
+      );
+      expect(await request.json()).toEqual({
+        settledOn: '2026-04-15',
+        grossInterest: 147.95,
+        tax: 28.12,
+        destinationAssetId: plnCashCandidate.assetId,
+      });
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
+    });
+
+    it('keeping the money in the deposit sends no destination', async () => {
+      await setup();
+      await fill({ destinationAssetId: plnCashCandidate.assetId });
+      await fill({ destinationAssetId: null });
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect((await request.json()).destinationAssetId ?? null).toBeNull();
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
+    });
+
+    it('a hint states the final amount that will move, following the edits', async () => {
+      await setup();
+
+      await fill({ destinationAssetId: plnCashCandidate.assetId });
+      expect(hintText()).toContain(formatMoney(10119.83, 'PLN'));
+
+      await fill({ grossInterest: 150, tax: 28.5 });
+      expect(hintText()).toContain(formatMoney(10121.5, 'PLN'));
+    });
   });
 });

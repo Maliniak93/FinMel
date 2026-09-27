@@ -17,6 +17,13 @@ public sealed record SettleDepositRequest : IValidatableObject
     [Range(typeof(decimal), "0", "79228162514264337593543950335")]
     public required decimal Tax { get; init; }
 
+    /// <summary>
+    /// The Cash asset to pay the whole balance (principal + net) out to on <see cref="SettledOn"/>
+    /// (deposit-payout-to-cash) — one of the user's same-currency Cash assets in an active portfolio
+    /// (<c>transfer-candidates</c>). Omitted: the money stays in the deposit until PayOutDeposit moves it.
+    /// </summary>
+    public Guid? DestinationAssetId { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         // Both are stored as numeric(18,2): a finer value would be rounded silently by the database

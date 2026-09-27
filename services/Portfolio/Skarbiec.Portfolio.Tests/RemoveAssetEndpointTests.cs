@@ -199,4 +199,36 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
         Assert.False(await dbContext.Set<TermDeposit>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
     }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-5 (remove half): removing a paid-out deposit detaches — never
+    /// reverses — its payout. The Cash keeps its 10 119.83 through the leg, now an ordinary Deposit
+    /// with no transfer link.
+    /// </summary>
+    [Fact]
+    public async Task Remove_PaidOutDeposit_KeepsCashBalance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
+        var leg = Assert.Single((await client.ListTransactionsAsync(paidOut.CashPortfolioId, paidOut.CashAssetId, cancellationToken)).Items);
+
+        var response = await client.DeleteAsync(AssetUri(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync(DepositUri(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId), cancellationToken)).StatusCode);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(paidOut.CashPortfolioId, paidOut.CashAssetId, cancellationToken)).Quantity);
+        var kept = Assert.Single((await client.ListTransactionsAsync(paidOut.CashPortfolioId, paidOut.CashAssetId, cancellationToken)).Items);
+        Assert.Equal(leg.Id, kept.Id);
+        Assert.Equal(TransactionType.Deposit, kept.Type);
+        Assert.Equal(10_119.83m, kept.Quantity);
+        Assert.Null(kept.Transfer);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Null((await dbContext.Transactions.SingleAsync(t => t.Id == leg.Id, cancellationToken)).TransferId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == paidOut.Deposit.AssetId, cancellationToken));
+    }
 }

@@ -25,6 +25,12 @@
   opacity: 0.7;
 }
 
+.deposits-page__payout {
+  margin-top: 4px;
+  font-size: 0.875em;
+  opacity: 0.7;
+}
+
 // "Due" in warning colour: the deposit has matured and waits for the user.
 .deposits-page__chip--due {
   --mat-chip-elevated-container-color: var(--mat-sys-error-container);

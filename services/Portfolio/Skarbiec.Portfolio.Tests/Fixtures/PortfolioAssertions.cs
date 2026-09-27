@@ -38,6 +38,12 @@ internal static class PortfolioAssertions
     /// <summary>term-deposits-settlement: the 409 UpdateDeposit answer for a settled deposit — its terms are immutable.</summary>
     public const string DepositSettledErrorCode = "Conflict.DepositSettled";
 
+    /// <summary>deposit-payout-to-cash: the 409 payout answer for a deposit that is not settled yet (Active or Due).</summary>
+    public const string DepositNotSettledErrorCode = "Conflict.DepositNotSettled";
+
+    /// <summary>deposit-payout-to-cash: the 409 payout answer for a deposit that is already paid out.</summary>
+    public const string DepositAlreadyPaidOutErrorCode = "Conflict.DepositAlreadyPaidOut";
+
     /// <summary>
     /// term-deposits-settlement: a rejected preview/settle "changes nothing" — the deposit is still
     /// unsettled with no settlement data, its quantity is still <paramref name="principal"/> and it

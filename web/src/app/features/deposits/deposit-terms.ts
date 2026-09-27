@@ -20,10 +20,12 @@ export const DEPOSIT_CAPITALIZATIONS: readonly { value: DepositCapitalization; l
   { value: 3, label: 'Yearly' },
 ];
 
-export const DEPOSIT_STATUS = { Active: 0, Due: 1, Settled: 2 } as const satisfies Record<
-  string,
-  DepositStatus
->;
+export const DEPOSIT_STATUS = {
+  Active: 0,
+  Due: 1,
+  Settled: 2,
+  PaidOut: 3,
+} as const satisfies Record<string, DepositStatus>;
 
 // The same caps AddDepositRequest/UpdateDepositRequest enforce (the API is the source of truth).
 export const MAX_TERM_DAYS = 3650;
@@ -35,6 +37,8 @@ export function maxTermLength(termUnit: DepositTermUnit): number {
 
 export function depositStatusLabel(status: DepositStatus): string {
   switch (Number(status)) {
+    case DEPOSIT_STATUS.PaidOut:
+      return 'Paid out';
     case DEPOSIT_STATUS.Settled:
       return 'Settled';
     case DEPOSIT_STATUS.Due:
@@ -45,8 +49,9 @@ export function depositStatusLabel(status: DepositStatus): string {
 }
 
 // A settlement's net interest (gross − tax) and final amount (principal + net), for the settle
-// dialog's live preview and a Settled row — the server stores only the three inputs. Summed in whole
-// grosze so the display never shows a floating-point artefact; the server's decimals stay the truth.
+// dialog's live preview, a Settled or PaidOut row and the payout dialog's amount (a settled deposit's
+// whole balance) — the server stores only the three inputs. Summed in whole grosze so the display
+// never shows a floating-point artefact; the server's decimals stay the truth.
 export function settlementAmounts(
   principal: number | string,
   grossInterest: number | string,

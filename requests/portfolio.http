@@ -192,7 +192,8 @@ Authorization: Bearer {{authToken}}
 # (principal, start date, unit price 1, start-date PLN rate frozen) and its terms in one save, and
 # publishes AssetPositionChanged with quantity = principal. 201 with the maturity date, projection
 # and status (term-deposits). Enums are ints: termUnit 0 = Days, 1 = Months; capitalization
-# 0 = AtMaturity, 1 = Monthly, 2 = Quarterly, 3 = Yearly; status 0 = Active, 1 = Due, 2 = Settled.
+# 0 = AtMaturity, 1 = Monthly, 2 = Quarterly, 3 = Yearly; status 0 = Active, 1 = Due, 2 = Settled,
+# 3 = PaidOut.
 # @name addDeposit
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
 Authorization: Bearer {{authToken}}
@@ -341,4 +342,42 @@ Content-Type: application/json
   "settledOn": "{{settlementPreview.response.body.settledOn}}",
   "grossInterest": {{settlementPreview.response.body.grossInterest}},
   "tax": {{settlementPreview.response.body.tax}}
+}
+
+### Pay the settled deposit out to cash
+# Moves the deposit's whole balance (principal + net) to a Cash asset as one Deposit → Cash transfer on
+# date: a Withdraw on the deposit linked to a Deposit on the Cash, the deposit's quantity becomes 0,
+# and both assets publish AssetPositionChanged in one save (deposit-payout-to-cash). 200 with the
+# deposit, now PaidOut, with paidOutOn and paidOutToAssetName. 400 unless settledOn <= date <= today
+# (Europe/Warsaw); 400 Validation.InvalidTransferCounterpart for a destination that is not the user's
+# same-currency Cash in an active portfolio; 409 Conflict.DepositNotSettled for an Active or Due
+# deposit, 409 Conflict.DepositAlreadyPaidOut once paid out, 409 Conflict.PortfolioArchived.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/payout
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "destinationAssetId": "{{addFundingCash.response.body.id}}",
+  "date": "{{settlementPreview.response.body.settledOn}}"
+}
+
+### Preview the settlement of the funded deposit
+# The funded deposit above matures on 2026-04-15.
+# @name fundedSettlementPreview
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addFundedDeposit.response.body.assetId}}/settlement-preview
+Authorization: Bearer {{authToken}}
+
+### Settle the funded deposit and pay it out at once
+# destinationAssetId pays the whole balance out in the same save as the settlement, on settledOn:
+# the deposit holds 0 and is PaidOut, the Cash rises by principal + net. A destination that breaks the
+# transfer rules is 400 Validation.InvalidTransferCounterpart and the deposit is not settled either.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addFundedDeposit.response.body.assetId}}/settle
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "settledOn": "{{fundedSettlementPreview.response.body.settledOn}}",
+  "grossInterest": {{fundedSettlementPreview.response.body.grossInterest}},
+  "tax": {{fundedSettlementPreview.response.body.tax}},
+  "destinationAssetId": "{{addFundingCash.response.body.id}}"
 }

@@ -221,4 +221,60 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(funded.CashAssetId, single.FundingAssetId);
         Assert.Equal("Cash account", single.FundingAssetName);
     }
+
+    /// <summary>
+    /// deposit-payout-to-cash AC-5 (list half): a paid-out deposit lists as <c>PaidOut</c> with the
+    /// payout date and the destination's name, while a deposit only settled beside it carries neither.
+    /// Once the destination Cash is removed its leg is detached: the deposit still lists as PaidOut on
+    /// the same date, with a null name, and still holds 0.
+    /// </summary>
+    [Fact]
+    public async Task List_PaidOutDeposit_ReturnsPayoutAndToleratesRemovedDestination()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
+        var settledOnly = await client.AddDepositAsync(
+            paidOut.DepositPortfolioId, cancellationToken, NewDepositRequest(name: "Settled deposit"));
+        await client.SettleDepositAsync(paidOut.DepositPortfolioId, settledOnly.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(AllDepositsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var deposits = await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken);
+        Assert.NotNull(deposits);
+        Assert.Equal(2, deposits.Count);
+        var listed = Assert.Single(deposits, d => d.AssetId == paidOut.Deposit.AssetId);
+        Assert.Equal(DepositStatus.PaidOut, listed.Status);
+        Assert.Equal(new DateOnly(2026, 4, 15), listed.PaidOutOn);
+        Assert.Equal("Cash account", listed.PaidOutToAssetName);
+        var settled = Assert.Single(deposits, d => d.AssetId == settledOnly.AssetId);
+        Assert.Equal(DepositStatus.Settled, settled.Status);
+        Assert.Null(settled.PaidOutOn);
+        Assert.Null(settled.PaidOutToAssetName);
+
+        // GetDeposit carries the same payout.
+        var single = await client.GetDepositAsync(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId, cancellationToken);
+        Assert.Equal(DepositStatus.PaidOut, single.Status);
+        Assert.Equal(new DateOnly(2026, 4, 15), single.PaidOutOn);
+        Assert.Equal("Cash account", single.PaidOutToAssetName);
+
+        var removeCash = await client.DeleteAsync(AssetUri(paidOut.CashPortfolioId, paidOut.CashAssetId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, removeCash.StatusCode);
+
+        var afterRemoval = await client.GetAsync(AllDepositsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, afterRemoval.StatusCode);
+        var relisted = Assert.Single(
+            (await afterRemoval.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken))!,
+            d => d.AssetId == paidOut.Deposit.AssetId);
+        Assert.Equal(DepositStatus.PaidOut, relisted.Status);
+        Assert.Equal(new DateOnly(2026, 4, 15), relisted.PaidOutOn);
+        Assert.Null(relisted.PaidOutToAssetName);
+        var dangling = await client.GetDepositAsync(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId, cancellationToken);
+        Assert.Equal(DepositStatus.PaidOut, dangling.Status);
+        Assert.Null(dangling.PaidOutToAssetName);
+        Assert.Equal(0m, (await client.GetAssetAsync(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId, cancellationToken)).Quantity);
+    }
 }

@@ -30,12 +30,17 @@ import {
   settlementAmounts,
 } from './deposit-terms';
 import {
+  PayOutDepositDialog,
+  type PayOutDepositDialogData,
+} from './pay-out-deposit-dialog/pay-out-deposit-dialog';
+import {
   SettleDepositDialog,
   type SettleDepositDialogData,
 } from './settle-deposit-dialog/settle-deposit-dialog';
 
 // Every term deposit of the user across portfolios, with the server's projection and Active / Due /
-// Settled status (term-deposits, term-deposits-settlement). MatDialog/MatSnackBar are injected as
+// Settled / Paid out status (term-deposits, term-deposits-settlement, deposit-payout-to-cash).
+// MatDialog/MatSnackBar are injected as
 // services only — see assets.ts for why MatDialogModule/MatSnackBarModule are deliberately not in
 // `imports`.
 @Component({
@@ -97,15 +102,24 @@ export class Deposits {
     return Number(deposit.status) === DEPOSIT_STATUS.Settled;
   }
 
-  // A Settled row shows what the bank actually paid; any other row the server's projection.
+  protected isPaidOut(deposit: DepositResponse): boolean {
+    return Number(deposit.status) === DEPOSIT_STATUS.PaidOut;
+  }
+
+  // Settled or paid out: the terms are immutable and the row shows what the bank actually paid.
+  protected hasSettlement(deposit: DepositResponse): boolean {
+    return this.isSettled(deposit) || this.isPaidOut(deposit);
+  }
+
+  // A Settled or PaidOut row shows what the bank actually paid; any other row the server's projection.
   protected netInterest(deposit: DepositResponse): number | string {
-    return this.isSettled(deposit)
+    return this.hasSettlement(deposit)
       ? this.settledAmounts(deposit).netInterest
       : deposit.projection.netInterest;
   }
 
   protected finalAmount(deposit: DepositResponse): number | string {
-    return this.isSettled(deposit)
+    return this.hasSettlement(deposit)
       ? this.settledAmounts(deposit).finalAmount
       : deposit.projection.finalAmount;
   }
@@ -157,6 +171,16 @@ export class Deposits {
     const ref = this.dialog.open(SettleDepositDialog, { width: '480px', data });
     ref.afterClosed().subscribe((settled: boolean | undefined) => {
       if (settled) {
+        this.depositsResource.reload();
+      }
+    });
+  }
+
+  protected openPayOutDialog(deposit: DepositResponse): void {
+    const data: PayOutDepositDialogData = { deposit };
+    const ref = this.dialog.open(PayOutDepositDialog, { width: '480px', data });
+    ref.afterClosed().subscribe((paidOut: boolean | undefined) => {
+      if (paidOut) {
         this.depositsResource.reload();
       }
     });

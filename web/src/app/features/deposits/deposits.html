@@ -93,11 +93,18 @@
               {{ depositStatusLabel(deposit.status) }}
             </mat-chip>
           </mat-chip-set>
+          <!-- Where the money went; the destination is gone ("—") once that Cash asset was removed. -->
+          @if (isPaidOut(deposit)) {
+            <div class="deposits-page__payout">
+              {{ deposit.paidOutOn | date: 'mediumDate' }} → {{ deposit.paidOutToAssetName ?? '—' }}
+            </div>
+          }
         </td>
       </ng-container>
 
       <!-- A deposit of an archived portfolio is read-only, so its row offers no action. A Due deposit
-           can be settled; a Settled one's terms are immutable, so it offers Delete only. -->
+           can be settled; a Settled one can be transferred to cash. The terms of a Settled or PaidOut
+           one are immutable, so its menu offers Delete only. -->
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let deposit">
@@ -113,6 +120,20 @@
                 <mat-icon>task_alt</mat-icon>
               </button>
             }
+            @if (isSettled(deposit)) {
+              <!-- Like the menu trigger, the name is the description: this label must not mention
+                   settling. -->
+              <button
+                mat-icon-button
+                type="button"
+                matTooltip="Transfer to cash"
+                aria-label="Transfer to cash"
+                [attr.aria-describedby]="nameCellId(deposit)"
+                (click)="openPayOutDialog(deposit)"
+              >
+                <mat-icon>payments</mat-icon>
+              </button>
+            }
             <!-- The name reaches the trigger as its description, not its label: only the settle
                  button's label may mention settling. -->
             <button
@@ -125,7 +146,7 @@
               <mat-icon>more_vert</mat-icon>
             </button>
             <mat-menu #menu="matMenu">
-              @if (!isSettled(deposit)) {
+              @if (!hasSettlement(deposit)) {
                 <button mat-menu-item type="button" (click)="openEditDialog(deposit)">
                   <mat-icon>edit</mat-icon>
                   <span>Edit</span>

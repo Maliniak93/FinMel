@@ -169,6 +169,7 @@ public sealed class UpdateDepositHandler(
 
         var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), funding);
+        // Never paid out: only a settled deposit can be, and its terms are immutable.
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), funding, payout: null);
     }
 }
