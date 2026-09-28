@@ -14,17 +14,19 @@
         <mat-label>Type</mat-label>
         <mat-select formControlName="type">
           @for (transactionType of transactionTypes; track transactionType.value) {
-            <mat-option [value]="transactionType.value">{{ transactionType.label }}</mat-option>
+            <mat-option [value]="transactionType.value">{{
+              transactionType.label | transloco
+            }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
     }
 
     <mat-form-field appearance="outline" class="asset-form__field">
-      <mat-label>{{ quantityLabel(type) }}</mat-label>
+      <mat-label>{{ quantityLabel(type) | transloco }}</mat-label>
       <input matInput type="number" step="any" formControlName="quantity" />
       @if (group().controls.quantity.hasError('min')) {
-        <mat-error>{{ quantityLabel(type) }} must not be negative.</mat-error>
+        <mat-error>{{ quantityLabel(type) | transloco }} must not be negative.</mat-error>
       } @else if (group().controls.quantity.hasError('server')) {
         <mat-error>{{ group().controls.quantity.getError('server') }}</mat-error>
       }

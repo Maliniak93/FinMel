@@ -61,12 +61,12 @@
 
       <ng-container matColumnDef="startDate">
         <th mat-header-cell *matHeaderCellDef>Start</th>
-        <td mat-cell *matCellDef="let deposit">{{ deposit.startDate | date: 'mediumDate' }}</td>
+        <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.startDate) }}</td>
       </ng-container>
 
       <ng-container matColumnDef="maturityDate">
         <th mat-header-cell *matHeaderCellDef>Maturity</th>
-        <td mat-cell *matCellDef="let deposit">{{ deposit.maturityDate | date: 'mediumDate' }}</td>
+        <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.maturityDate) }}</td>
       </ng-container>
 
       <!-- Server-computed projection: after Belka tax unless the deposit is IKE/IKZE. A Settled row
@@ -90,13 +90,13 @@
         <td mat-cell *matCellDef="let deposit">
           <mat-chip-set>
             <mat-chip [class.deposits-page__chip--due]="isDue(deposit)">
-              {{ depositStatusLabel(deposit.status) }}
+              {{ depositStatusLabel(deposit.status) | transloco }}
             </mat-chip>
           </mat-chip-set>
           <!-- Where the money went; the destination is gone ("—") once that Cash asset was removed. -->
           @if (isPaidOut(deposit)) {
             <div class="deposits-page__payout">
-              {{ deposit.paidOutOn | date: 'mediumDate' }} → {{ deposit.paidOutToAssetName ?? '—' }}
+              {{ formatDate(deposit.paidOutOn) }} → {{ deposit.paidOutToAssetName ?? '—' }}
             </div>
           }
         </td>

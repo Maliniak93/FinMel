@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
@@ -29,7 +28,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
-import { formatMoney } from '../../../shared/format-money';
+import { formatDate, formatMoney } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { settlementAmounts } from '../deposit-terms';
 
@@ -64,7 +63,6 @@ function isAmount(value: number | string | null): value is number | string {
 @Component({
   selector: 'app-settle-deposit-dialog',
   imports: [
-    DatePipe,
     ReactiveFormsModule,
     MatButtonModule,
     MatDatepickerModule,
@@ -83,6 +81,7 @@ export class SettleDepositDialog {
   protected readonly deposit = inject<SettleDepositDialogData>(MAT_DIALOG_DATA).deposit;
 
   protected readonly formatMoney = formatMoney;
+  protected readonly formatDate = formatDate;
   protected readonly maturityDate = fromDateOnly(this.deposit.maturityDate);
   // The settlement date lies between the start date and today (Europe/Warsaw on the server; the
   // viewer's local date here).

@@ -7,11 +7,14 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import { textOf } from '../../../testing/i18n';
 import { client as marketDataClient } from '../../api/marketdata/client.gen';
 import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetResponse, PortfolioResponse } from '../../api/portfolio';
-import { formatMoney } from '../../shared/format-money';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
+import { provideI18nTesting } from '../../core/i18n/testing';
+import { formatMoney } from '../../shared/format';
 import { toDateOnly } from '../../shared/date-only';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
 import { depositResponse } from '../deposits/testing/deposit-fixtures';
@@ -119,8 +122,11 @@ describe('Assets', () => {
     marketDataClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await TestBed.inject(LanguageService).setLanguage('en');
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
 
   async function setup(
@@ -148,6 +154,7 @@ describe('Assets', () => {
       imports: [Assets],
       providers: [
         provideRouter([]),
+        provideI18nTesting(),
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: snackBar },
       ],
@@ -341,7 +348,7 @@ describe('Assets', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain(
-      new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'USD' }).format(2120),
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(2120),
     );
     expect(text).not.toContain('Stale');
   });
@@ -393,7 +400,9 @@ describe('Assets', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain(formatMoney(1000, 'PLN'));
-    expect(text).not.toContain('0,00 zł');
+    expect(text).not.toContain(
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PLN' }).format(0),
+    );
   });
 
   // spec fix-currency-valued-asset-value AC-2: no valuation date exists for a currency-valued asset,
@@ -589,5 +598,41 @@ describe('Assets', () => {
     expect(maturedRow?.textContent).toContain('Due');
     expect(settledRow).toBeDefined();
     expect(settledRow?.textContent).not.toContain('Due');
+  });
+
+  // i18n foundation (#131) AC-7: money, quantity and date cells follow the language live — a
+  // switch re-renders them in pl-PL without reloading the page or its resources.
+  it('reformats values when the language changes', async () => {
+    const valuedAsset: AssetResponse = {
+      ...asset,
+      quantity: 12345.5,
+      manualValue: 1234.56,
+      manualValueDate: '2026-09-27',
+    };
+    await setup(jsonResponse([valuedAsset]));
+    const element = fixture.nativeElement as HTMLElement;
+    const cell = (column: string) => textOf(element.querySelector(`td.mat-column-${column}`));
+    const money = (locale: string) =>
+      new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' })
+        .format(1234.56)
+        .replace(/\s+/g, ' ');
+    const quantity = (locale: string) =>
+      new Intl.NumberFormat(locale, { maximumFractionDigits: 8 })
+        .format(12345.5)
+        .replace(/\s+/g, ' ');
+
+    expect(cell('value')).toContain(money('en-US'));
+    expect(cell('quantity')).toContain(quantity('en-US'));
+    expect(cell('manualValueDate')).toContain('Sep 27, 2026');
+    const fetchesBefore = fetchSpy.mock.calls.length;
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    expect(cell('value')).toContain(money('pl-PL'));
+    expect(cell('quantity')).toContain(quantity('pl-PL'));
+    expect(cell('manualValueDate')).toContain('27 wrz 2026');
+    expect(cell('manualValueDate')).not.toContain('Sep 27, 2026');
+    expect(fetchSpy.mock.calls.length).toBe(fetchesBefore);
   });
 });

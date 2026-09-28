@@ -6,11 +6,18 @@
   }
 
   .auth-page {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     height: 100%;
     padding: 24px;
+  }
+
+  .auth-page__language {
+    position: absolute;
+    top: 8px;
+    right: 8px;
   }
 
   .auth-page__card {

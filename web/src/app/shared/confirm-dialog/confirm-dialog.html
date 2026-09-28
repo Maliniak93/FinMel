@@ -5,13 +5,15 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="cancel()">{{ data.cancelLabel ?? 'Cancel' }}</button>
+  <button mat-button type="button" (click)="cancel()">
+    {{ data.cancelLabel ?? ('common.cancel' | transloco) }}
+  </button>
   <button
     mat-flat-button
     type="button"
     [color]="data.destructive ? 'warn' : 'primary'"
     (click)="confirm()"
   >
-    {{ data.confirmLabel ?? 'Confirm' }}
+    {{ data.confirmLabel ?? ('common.confirm' | transloco) }}
   </button>
 </mat-dialog-actions>

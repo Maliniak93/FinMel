@@ -1,0 +1,137 @@
+{
+  "common": {
+    "cancel": "Anuluj",
+    "confirm": "Potwierdź"
+  },
+  "errors": {
+    "generic": "Coś poszło nie tak. Spróbuj ponownie."
+  },
+  "language": {
+    "switch": "Język"
+  },
+  "shell": {
+    "nav": {
+      "dashboard": "Pulpit",
+      "portfolios": "Portfele",
+      "deposits": "Lokaty",
+      "settings": "Ustawienia"
+    },
+    "toggleNavigation": "Pokaż lub ukryj nawigację",
+    "logOut": "Wyloguj",
+    "theme": {
+      "system": "Motyw: systemowy (zgodny z urządzeniem) — kliknij, aby wybrać jasny",
+      "light": "Motyw: jasny — kliknij, aby wybrać ciemny",
+      "dark": "Motyw: ciemny — kliknij, aby wybrać systemowy"
+    }
+  },
+  "auth": {
+    "email": "E-mail",
+    "password": "Hasło",
+    "displayName": "Nazwa wyświetlana",
+    "validation": {
+      "emailRequired": "Adres e-mail jest wymagany.",
+      "emailInvalid": "Podaj prawidłowy adres e-mail.",
+      "passwordRequired": "Hasło jest wymagane.",
+      "passwordTooShort": "Hasło musi mieć co najmniej 6 znaków.",
+      "displayNameRequired": "Nazwa wyświetlana jest wymagana.",
+      "displayNameTooLong": "Nazwa wyświetlana jest za długa."
+    },
+    "login": {
+      "title": "Logowanie",
+      "submit": "Zaloguj się",
+      "noAccount": "Nie masz jeszcze konta?",
+      "register": "Zarejestruj się",
+      "failed": "Nieprawidłowy e-mail lub hasło."
+    },
+    "register": {
+      "title": "Rejestracja",
+      "submit": "Zarejestruj się",
+      "haveAccount": "Masz już konto?",
+      "logIn": "Zaloguj się",
+      "duplicateEmail": "Ten adres e-mail jest już zarejestrowany.",
+      "weakPassword": "Hasło nie spełnia wymagań."
+    }
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "marketDataSync": "Synchronizacja danych rynkowych",
+    "syncNow": "Synchronizuj teraz",
+    "noSyncYet": "Synchronizacja jeszcze się nie odbyła.",
+    "notRunYet": "Jeszcze nie uruchomiono.",
+    "runStarted": "Rozpoczęto {{ date }}",
+    "runFinished": "zakończono {{ date }}",
+    "runCounts": "zsynchronizowano: {{ synced }}, brak danych: {{ noData }}, błędy: {{ failed }}",
+    "loadFailed": "Nie udało się wczytać stanu synchronizacji.",
+    "triggerFailed": "Nie udało się uruchomić synchronizacji."
+  },
+  "notFound": {
+    "message": "Nie znaleziono strony."
+  },
+  "pieChart": {
+    "ariaLabel": "Podział majątku według klas aktywów",
+    "empty": "Brak danych do wykresu."
+  },
+  "enums": {
+    "assetClass": {
+      "cash": "Gotówka",
+      "deposit": "Lokata",
+      "stock": "Akcje",
+      "etf": "ETF",
+      "bond": "Obligacje",
+      "crypto": "Kryptowaluty",
+      "preciousMetal": "Metale szlachetne",
+      "realEstate": "Nieruchomości",
+      "other": "Inne",
+      "unknown": "Nieznana"
+    },
+    "transactionType": {
+      "buy": "Kupno",
+      "sell": "Sprzedaż",
+      "deposit": "Wpłata",
+      "withdraw": "Wypłata",
+      "dividend": "Dywidenda",
+      "interest": "Odsetki",
+      "unknown": "Nieznany"
+    },
+    "quantityField": {
+      "quantity": "Ilość",
+      "amount": "Kwota"
+    },
+    "depositTermUnit": {
+      "days": "Dni",
+      "months": "Miesiące"
+    },
+    "depositCapitalization": {
+      "atMaturity": "Na koniec okresu",
+      "monthly": "Miesięczna",
+      "quarterly": "Kwartalna",
+      "yearly": "Roczna"
+    },
+    "depositStatus": {
+      "active": "Aktywna",
+      "due": "Zapadła",
+      "settled": "Rozliczona",
+      "paidOut": "Wypłacona"
+    },
+    "transferDirection": {
+      "out": "Przeniesienie do {{ asset }} ({{ portfolio }})",
+      "in": "Przeniesienie z {{ asset }} ({{ portfolio }})"
+    },
+    "syncRunStatus": {
+      "running": "W toku",
+      "completed": "Zakończona",
+      "partial": "Częściowa",
+      "failed": "Nieudana",
+      "unknown": "Nieznany"
+    },
+    "syncRunKind": {
+      "prices": "Ceny",
+      "fx": "Kursy walut"
+    },
+    "currency": {
+      "pln": "PLN — złoty polski",
+      "eur": "EUR — euro",
+      "usd": "USD — dolar amerykański"
+    }
+  }
+}

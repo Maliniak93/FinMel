@@ -3,14 +3,15 @@ import { ASSET_CLASS } from '../assets/asset-class';
 
 // Backend enum (Skarbiec.Contracts.TransactionType) serializes as its underlying int, so the
 // generated client types it as a bare `number` — labels for the UI have to be maintained here, in
-// the same declaration order as the C# enum. Mirrors asset-class.ts's precedent (T1.11).
+// the same declaration order as the C# enum. Mirrors asset-class.ts's precedent (T1.11). A label is a
+// translation key: templates render it through the `transloco` pipe.
 export const TRANSACTION_TYPES: readonly { value: TransactionType; label: string }[] = [
-  { value: 0, label: 'Buy' },
-  { value: 1, label: 'Sell' },
-  { value: 2, label: 'Deposit' },
-  { value: 3, label: 'Withdraw' },
-  { value: 4, label: 'Dividend' },
-  { value: 5, label: 'Interest' },
+  { value: 0, label: 'enums.transactionType.buy' },
+  { value: 1, label: 'enums.transactionType.sell' },
+  { value: 2, label: 'enums.transactionType.deposit' },
+  { value: 3, label: 'enums.transactionType.withdraw' },
+  { value: 4, label: 'enums.transactionType.dividend' },
+  { value: 5, label: 'enums.transactionType.interest' },
 ];
 
 const BUY = 0;
@@ -37,7 +38,10 @@ export function allowedTransactionTypes(
 }
 
 export function transactionTypeLabel(value: TransactionType): string {
-  return TRANSACTION_TYPES.find((t) => t.value === Number(value))?.label ?? 'Unknown';
+  return (
+    TRANSACTION_TYPES.find((t) => t.value === Number(value))?.label ??
+    'enums.transactionType.unknown'
+  );
 }
 
 // Only Buy/Sell are priced trades against a unit price (TransactionQuantityCalculator treats every
@@ -50,5 +54,7 @@ export function isPricedTransactionType(value: TransactionType): boolean {
 }
 
 export function quantityFieldLabel(value: TransactionType): string {
-  return isPricedTransactionType(value) ? 'Quantity' : 'Amount';
+  return isPricedTransactionType(value)
+    ? 'enums.quantityField.quantity'
+    : 'enums.quantityField.amount';
 }

@@ -31,7 +31,7 @@
           </mat-option>
         }
         @for (currency of currencies; track currency.code) {
-          <mat-option [value]="currency.code">{{ currency.label }}</mat-option>
+          <mat-option [value]="currency.code">{{ currency.label | transloco }}</mat-option>
         }
       </mat-select>
       @if (legacyCurrency) {

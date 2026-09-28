@@ -35,9 +35,22 @@ Reactive Forms (typed, `FormBuilder.nonNullable`), with errors rendered in `mat-
 - Lazy routes with `loadComponent`/`loadChildren`; guards and interceptors as functions, never classes.
 - Route params reach components through `withComponentInputBinding()` + `input()` — do not inject `ActivatedRoute` for a plain param.
 
+## Languages (i18n)
+
+The UI runs on **Transloco** (`@jsverse/transloco`), English by default, Polish as a runtime choice (persisted per browser in `skarbiec-lang`). Setup lives in `src/app/core/i18n/`; translations in `src/i18n/en.json` and `src/i18n/pl.json` (the only place Polish text lives). How to add a key: `web/README.md` → Languages.
+
+- **No hardcoded user-facing text** in templates or TS: every string is a key in both JSON files. `en.json` and `pl.json` always hold the same keys (`core/i18n/translations.spec.ts` enforces it).
+- **Key naming:** nested by area — `shell.nav.dashboard`, `settings.syncNow`, `enums.assetClass.cash`; shared words under `common.*`, frontend error fallbacks under `errors.*`. Parameters use `{{ name }}` interpolation, never string concatenation.
+- **No plurals:** phrase a count as "label: N" (`zsynchronizowano: 3`) — there is no ICU/messageformat plugin.
+- **Templates translate only through the `transloco` pipe or directive**, so a language switch re-renders without a reload (the app is zoneless). `translate()` from `@jsverse/transloco` is for one-shot text built at the moment of an action (a snackbar, a fallback error message, a dialog opened after the switch).
+- **Label maps return keys, not text** (`assetClassLabel`, `TRANSACTION_TYPES`, `SUPPORTED_CURRENCIES`, …); the template pipes them. A label with parameters returns `{ key, params }` (`transferLabel`).
+- **Formatting goes through the locale-aware helpers** in `shared/format.ts` — `formatMoney`, `formatQuantity`, `formatPercent`, `formatDate`, `formatDateTime` — never `DatePipe`, `CurrencyPipe` or a hardcoded `Intl` locale. Locale mapping: `en` → `en-US`, `pl` → `pl-PL`, for numbers, money, dates and the Material `DateAdapter`.
+- **Backend text is shown as-is:** a ProblemDetails `detail` stays English; only the frontend's own fallbacks are translated.
+- **Specs** that render translated text add `provideI18nTesting()` (`core/i18n/testing.ts`, English active). A spec that switches to Polish switches back to English in `afterEach` — specs share one worker.
+
 ## Domain rules in the UI
 
-- The server does all money math (`decimal`); the client only formats — `Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' })` via `shared/format-money.ts`. No floating-point arithmetic on amounts. The one exception is a display-only sum a spec asks for from stored inputs (a deposit settlement's net interest and final amount — `settlementAmounts` in `features/deposits/deposit-terms.ts`), done in whole grosze; the server's values stay the truth.
+- The server does all money math (`decimal`); the client only formats, through `shared/format.ts` (see Languages). No floating-point arithmetic on amounts. The one exception is a display-only sum a spec asks for from stored inputs (a deposit settlement's net interest and final amount — `settlementAmounts` in `features/deposits/deposit-terms.ts`), done in whole grosze; the server's values stay the truth.
 - A price older than 7 days is stale: show the marker with its date and source.
 - Manual-valuation assets: remind the user to refresh when `ManualValueDate` is old.
 - Allocation, rebalancing and goal views always carry the "information, not investment advice" disclaimer.

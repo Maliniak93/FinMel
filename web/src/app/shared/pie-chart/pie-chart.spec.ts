@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { PieChart, type PieChartSegment } from './pie-chart';
+import { provideI18nTesting } from '../../core/i18n/testing';
 
 describe('PieChart', () => {
   let fixture: ComponentFixture<PieChart>;
@@ -9,6 +10,7 @@ describe('PieChart', () => {
   async function setup(segments: readonly PieChartSegment[]): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [PieChart],
+      providers: [provideI18nTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(PieChart);

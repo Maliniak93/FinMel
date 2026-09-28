@@ -4,6 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { PortfolioResponse } from '../../../api/portfolio';
 import { PortfolioFormDialog, type PortfolioFormDialogData } from './portfolio-form-dialog';
+import { provideI18nTesting } from '../../../core/i18n/testing';
 
 // See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
 // generated client ultimately calls) instead of mocking the SDK module.
@@ -44,6 +45,7 @@ describe('PortfolioFormDialog', () => {
     await TestBed.configureTestingModule({
       imports: [PortfolioFormDialog],
       providers: [
+        provideI18nTesting(),
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },
       ],

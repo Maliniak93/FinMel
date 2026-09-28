@@ -2,11 +2,13 @@ import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { TranslocoService } from '@jsverse/transloco';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { TransactionResponse } from '../../../api/portfolio';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { TransactionFormDialog, type TransactionFormDialogData } from './transaction-form-dialog';
+import { provideI18nTesting } from '../../../core/i18n/testing';
 
 // See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
 // generated client ultimately calls) instead of mocking the SDK module.
@@ -55,6 +57,7 @@ describe('TransactionFormDialog', () => {
     await TestBed.configureTestingModule({
       imports: [TransactionFormDialog],
       providers: [
+        provideI18nTesting(),
         provideNativeDateAdapter(),
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },
@@ -132,7 +135,7 @@ describe('TransactionFormDialog', () => {
     component['form'].controls.quantity.setValue(500);
 
     expect(component['isPriced']()).toBe(false);
-    expect(component['quantityLabel']()).toBe('Amount');
+    expect(TestBed.inject(TranslocoService).translate(component['quantityLabel']())).toBe('Amount');
 
     await component['onSubmit']();
 

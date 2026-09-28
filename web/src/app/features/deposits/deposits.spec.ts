@@ -8,7 +8,7 @@ import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { DepositResponse } from '../../api/portfolio';
-import { formatMoney } from '../../shared/format-money';
+import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { DepositFormDialog } from './deposit-form-dialog/deposit-form-dialog';
@@ -26,6 +26,7 @@ import {
   settledDeposit,
   settledDepositFinalAmount,
 } from './testing/deposit-fixtures';
+import { provideI18nTesting } from '../../core/i18n/testing';
 
 // term-deposits AC-15. The Deposits page (route `deposits`) lists every deposit of the user across
 // portfolios from GET /api/portfolio/deposits, with its projection and an Active / Due status chip.
@@ -62,6 +63,7 @@ describe('Deposits', () => {
     await TestBed.configureTestingModule({
       imports: [Deposits],
       providers: [
+        provideI18nTesting(),
         provideRouter([]),
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: snackBar },

@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { isTranslationIn, looksLikeTranslationKey, textOf } from '../../../testing/i18n';
 import { client as marketdataClient } from '../../api/marketdata/client.gen';
 import type { SyncStatusResponse } from '../../api/marketdata';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
+import { provideI18nTesting } from '../../core/i18n/testing';
 import { Settings } from './settings';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -42,8 +45,11 @@ describe('Settings', () => {
     marketdataClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await TestBed.inject(LanguageService).setLanguage('en');
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
 
   async function setup(
@@ -58,6 +64,7 @@ describe('Settings', () => {
 
     await TestBed.configureTestingModule({
       imports: [Settings],
+      providers: [provideI18nTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Settings);
@@ -143,5 +150,51 @@ describe('Settings', () => {
     await fixture.whenStable();
 
     expect(component['triggerError']()).toBe('A price sync is already running.');
+  });
+
+  // i18n foundation (#131) AC-10: headings, the button, the run kind and status labels follow the
+  // language, and so does the run's date.
+  it('renders in Polish', async () => {
+    await setup(jsonResponse(completedRun));
+    const element = fixture.nativeElement as HTMLElement;
+    const heading = () => textOf(element.querySelector('h1'));
+    const section = () => textOf(element.querySelector('h2'));
+    const button = () => textOf(element.querySelector('button'));
+    const kind = () => textOf(element.querySelector('.settings-page__run-label'));
+    const status = () => textOf(element.querySelector('mat-chip'));
+
+    const english = [heading(), section(), button(), kind(), status()];
+    expect(english).toEqual(['Settings', 'Market data sync', 'Sync now', 'Prices', 'Completed']);
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const polish = [heading(), section(), button(), kind(), status()];
+    polish.forEach((text, index) => {
+      expect(text).not.toBe(english[index]);
+      expect(looksLikeTranslationKey(text)).toBe(false);
+      expect(isTranslationIn('pl', text), `"${text}" is not a pl.json value`).toBe(true);
+    });
+
+    const startedAt = new Date('2026-08-10T18:30:00Z');
+    const text = element.textContent ?? '';
+    expect(text).toContain(
+      new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium' }).format(startedAt),
+    );
+    expect(text).not.toContain(
+      new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(startedAt),
+    );
+  });
+
+  it('renders "no sync has run yet" in Polish', async () => {
+    await setup(jsonResponse(noRunYet));
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const status = textOf(
+      (fixture.nativeElement as HTMLElement).querySelector('.settings-page__status-text'),
+    );
+    expect(status).not.toBe('No sync has run yet.');
+    expect(isTranslationIn('pl', status)).toBe(true);
   });
 });

@@ -25,7 +25,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
-import { formatMoney } from '../../../shared/format-money';
+import { formatMoney } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { settlementAmounts } from '../deposit-terms';
 

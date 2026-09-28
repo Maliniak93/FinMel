@@ -38,7 +38,7 @@
       />
     </svg>
     @if (asOf(); as date) {
-      <p class="net-worth-chart__as-of">As of {{ date | date: 'mediumDate' }}</p>
+      <p class="net-worth-chart__as-of">As of {{ formatDate(date) }}</p>
     }
   }
 </div>

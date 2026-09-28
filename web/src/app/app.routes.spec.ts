@@ -13,6 +13,7 @@ import { NotFound } from './features/not-found/not-found';
 import { Portfolios } from './features/portfolios/portfolios';
 import { Settings } from './features/settings/settings';
 import { Shell } from './layout/shell/shell';
+import { provideI18nTesting } from './core/i18n/testing';
 
 // The protected area is a nested route (Shell wraps dashboard/portfolios/settings/**), so
 // RouterTestingHarness.navigateByUrl only ever verifies the *top-level* outlet's component
@@ -25,6 +26,7 @@ describe('app routing (authenticated)', () => {
       imports: [App],
       providers: [
         provideRouter(routes),
+        provideI18nTesting(),
         { provide: AuthService, useValue: { isAuthenticated: () => true } },
       ],
     });
@@ -71,6 +73,7 @@ describe('app routing (unauthenticated)', () => {
       imports: [App],
       providers: [
         provideRouter(routes),
+        provideI18nTesting(),
         { provide: AuthService, useValue: { isAuthenticated: () => false } },
       ],
     });

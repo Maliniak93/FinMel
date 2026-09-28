@@ -31,6 +31,7 @@ import {
   transferCandidatesByCurrency,
 } from '../testing/deposit-fixtures';
 import { DepositFormDialog, type DepositFormDialogData } from './deposit-form-dialog';
+import { provideI18nTesting } from '../../../core/i18n/testing';
 
 // term-deposits AC-14. The create/edit dialog for a term deposit: its controls are named after the
 // AddDepositRequest/UpdateDepositRequest properties (camelCase) so a server 400 keyed on a field
@@ -80,6 +81,7 @@ describe('DepositFormDialog', () => {
     await TestBed.configureTestingModule({
       imports: [DepositFormDialog],
       providers: [
+        provideI18nTesting(),
         provideNativeDateAdapter(),
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },

@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -9,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -20,7 +20,7 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatMoney } from '../../shared/format-money';
+import { formatDate, formatMoney, formatQuantity } from '../../shared/format';
 import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
 import {
   TransactionFormDialog,
@@ -37,7 +37,6 @@ const DEFAULT_PAGE_SIZE = 20;
 @Component({
   selector: 'app-transactions',
   imports: [
-    DatePipe,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
@@ -45,6 +44,7 @@ const DEFAULT_PAGE_SIZE = 20;
     MatProgressSpinnerModule,
     MatTableModule,
     RouterLink,
+    TranslocoPipe,
   ],
   templateUrl: './transactions.html',
   styleUrl: './transactions.scss',
@@ -142,10 +142,8 @@ export class Transactions {
   protected readonly transactionTypeLabel = transactionTypeLabel;
   protected readonly transferLabel = transferLabel;
   protected readonly formatMoney = formatMoney;
-
-  protected formatQuantity(quantity: number | string): string {
-    return new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 8 }).format(Number(quantity));
-  }
+  protected readonly formatQuantity = formatQuantity;
+  protected readonly formatDate = formatDate;
 
   // PagedResponse.TotalCount is a server-side int, but the generated client types every numeric
   // DTO property as `number | string` (same as Asset.Quantity/ManualValue) — coerce for
@@ -214,7 +212,7 @@ export class Transactions {
         .open(ConfirmDialog, {
           data: {
             title: 'Delete this transaction?',
-            message: `This ${transactionTypeLabel(transaction.type)} of ${this.formatQuantity(transaction.quantity)} will be permanently deleted. This can't be undone.`,
+            message: `This ${translate(transactionTypeLabel(transaction.type))} of ${formatQuantity(transaction.quantity)} will be permanently deleted. This can't be undone.`,
             confirmLabel: 'Delete',
             destructive: true,
           },

@@ -11,12 +11,15 @@ import { routes } from './app.routes';
 import { apiClients } from './core/api-clients';
 import { AuthService } from './core/auth/auth';
 import { configureAuthInterceptors } from './core/auth/auth-interceptors';
+import { provideI18n } from './core/i18n/i18n';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
     provideNativeDateAdapter(),
+    // Transloco + restoring the stored language, awaited before the first route renders.
+    provideI18n(),
     provideAppInitializer(() => {
       const authService = inject(AuthService);
       configureAuthInterceptors(authService, apiClients);

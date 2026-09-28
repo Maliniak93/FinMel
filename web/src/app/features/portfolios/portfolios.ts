@@ -21,7 +21,7 @@ import {
 } from '../../api/portfolio';
 import { getApiReportingDashboard, type DashboardPortfolioValue } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
-import { formatMoney } from '../../shared/format-money';
+import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { PortfolioFormDialog } from './portfolio-form-dialog/portfolio-form-dialog';
 

@@ -1,14 +1,14 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { getApiReportingDashboard } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
-import { formatMoney } from '../../shared/format-money';
+import { formatDate, formatMoney } from '../../shared/format';
 import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
 import { assetClassLabel } from '../assets/asset-class';
 import { NetWorthChart } from './net-worth-chart/net-worth-chart';
@@ -30,12 +30,12 @@ const ASSET_CLASS_COLORS: readonly string[] = [
 @Component({
   selector: 'app-dashboard',
   imports: [
-    DatePipe,
     MatButtonModule,
     MatChipsModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
     RouterLink,
+    TranslocoPipe,
     NetWorthChart,
     PieChart,
   ],
@@ -55,6 +55,7 @@ export class Dashboard {
 
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly formatMoney = formatMoney;
+  protected readonly formatDate = formatDate;
 
   protected readonly pieSegments = computed<PieChartSegment[]>(() => {
     const dashboard = this.dashboardResource.value();

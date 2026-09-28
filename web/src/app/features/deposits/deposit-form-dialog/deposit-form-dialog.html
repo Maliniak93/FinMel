@@ -48,7 +48,7 @@
         <mat-label>Currency</mat-label>
         <mat-select formControlName="currency">
           @for (currency of currencies; track currency.code) {
-            <mat-option [value]="currency.code">{{ currency.label }}</mat-option>
+            <mat-option [value]="currency.code">{{ currency.label | transloco }}</mat-option>
           }
         </mat-select>
         @if (form.controls.currency.hasError('required')) {
@@ -137,7 +137,7 @@
         <mat-label>Unit</mat-label>
         <mat-select formControlName="termUnit">
           @for (unit of termUnits; track unit.value) {
-            <mat-option [value]="unit.value">{{ unit.label }}</mat-option>
+            <mat-option [value]="unit.value">{{ unit.label | transloco }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
@@ -147,7 +147,7 @@
       Matures on
       <strong>
         @if (maturityDate(); as maturity) {
-          {{ maturity | date: 'mediumDate' }}
+          {{ formatDate(maturity) }}
         } @else {
           —
         }
@@ -173,7 +173,9 @@
       <mat-label>Capitalisation</mat-label>
       <mat-select formControlName="capitalization">
         @for (capitalization of capitalizations; track capitalization.value) {
-          <mat-option [value]="capitalization.value">{{ capitalization.label }}</mat-option>
+          <mat-option [value]="capitalization.value">{{
+            capitalization.label | transloco
+          }}</mat-option>
         }
       </mat-select>
     </mat-form-field>

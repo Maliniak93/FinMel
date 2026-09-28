@@ -1,4 +1,5 @@
 import type { FormGroup } from '@angular/forms';
+import { translate } from '@jsverse/transloco';
 
 // ASP.NET Core's ProblemDetails shape (RFC 7807) plus the extensions ServiceDefaults/ADR-017
 // always add: `errorCode` (handler Result failures) and, for the built-in Minimal API validation
@@ -14,12 +15,14 @@ export interface ApiProblemDetails {
 }
 
 // The generated client (throwOnError: false) resolves failed calls to `{ error }` where `error`
-// is the parsed JSON body when the response was JSON, otherwise raw response text.
+// is the parsed JSON body when the response was JSON, otherwise raw response text. A backend
+// `detail` is shown as-is (backend messages stay English); only the frontend's own fallback is
+// translated, at the moment the error is read.
 export function readProblemDetails(error: unknown): ApiProblemDetails {
   if (error && typeof error === 'object') {
     return error as ApiProblemDetails;
   }
-  return { detail: typeof error === 'string' ? error : 'Something went wrong. Please try again.' };
+  return { detail: typeof error === 'string' ? error : translate('errors.generic') };
 }
 
 // Field names in `errors` come from the C# request record's property names (PascalCase) and

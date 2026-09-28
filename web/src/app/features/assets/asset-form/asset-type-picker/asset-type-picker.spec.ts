@@ -1,12 +1,17 @@
 import { TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
 
 import type { AssetClass } from '../../../../api/portfolio';
 import { ASSET_CLASS, ASSET_CLASSES } from '../../asset-class';
 import { AssetTypePicker } from './asset-type-picker';
+import { provideI18nTesting } from '../../../../core/i18n/testing';
 
 describe('AssetTypePicker', () => {
   it('renders one tile per asset class and emits the chosen class', async () => {
-    await TestBed.configureTestingModule({ imports: [AssetTypePicker] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [AssetTypePicker],
+      providers: [provideI18nTesting()],
+    }).compileComponents();
     const fixture = TestBed.createComponent(AssetTypePicker);
     const emitted: AssetClass[] = [];
     fixture.componentInstance.picked.subscribe((assetClass) => emitted.push(assetClass));
@@ -18,7 +23,9 @@ describe('AssetTypePicker', () => {
 
     expect(tiles).toHaveLength(9);
     tiles.forEach((tile, index) => {
-      expect(tile.textContent).toContain(ASSET_CLASSES[index].label);
+      expect(tile.textContent).toContain(
+        TestBed.inject(TranslocoService).translate(ASSET_CLASSES[index].label),
+      );
       expect(tile.querySelector('mat-icon')).not.toBeNull();
     });
 
