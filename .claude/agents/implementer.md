@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Makes a spec's failing tests pass with the smallest correct change - backend slices, Angular, migrations, generated client - and reports what it touched.
-tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7, mcp__plugin_playwright_playwright
+tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
 disallowedTools: Agent
 model: sonnet
 effort: high
@@ -55,9 +55,6 @@ you are not certain of:
   ASP.NET Core Minimal APIs, EF Core 10, Quartz hosting.
 - **context7** (`resolve-library-id`, then `query-docs`) — Angular 22, Angular Material, MassTransit v8,
   hey-api. One concept per query.
-- **Playwright** — only when the spec's Verification names a browser step **and** the stack is already
-  running (`dotnet run --project Skarbiec.AppHost` + `npm start`). Never start the stack yourself, and
-  never use a browser check in place of a test the spec asked for.
 
 A server being unreachable is not a reason to guess: copy the nearest existing usage in the repo
 instead, and say in `notes` that you could not verify the API.
