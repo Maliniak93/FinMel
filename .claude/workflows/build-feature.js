@@ -5,7 +5,7 @@ export const meta = {
   phases: [
     { title: 'Branch', detail: 'ops cuts the issue branch (feat/<slug> or fix/<slug>) from master before a single file is written', model: 'haiku' },
     { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; sonnet/medium on every tier (skippable)' },
-    { title: 'Implement', detail: 'implementer does the work; sonnet/high on tier 1, opus/high on tier 2, opus/xhigh after a tier-1 escalation' },
+    { title: 'Implement', detail: 'implementer does the work; opus/medium on tier 1, opus/high on tier 2, opus/high after a tier-1 escalation' },
     { title: 'Verify', detail: 'verifier runs scripts/verify.mjs; failures loop back to Implement', model: 'haiku' },
     { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'claude-opus-5-5' },
     { title: 'Ship', detail: 'ops commits, pushes and opens the PR - merging is yours', model: 'haiku' },
@@ -51,6 +51,19 @@ const IMPL = {
     commandsRun: { type: 'array', items: { type: 'string' } },
     notes: { type: 'array', items: { type: 'string' } },
     openQuestions: { type: 'array', items: { type: 'string' } },
+    deviations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          kind: { type: 'string', enum: ['test', 'design'] },
+          file: { type: 'string' },
+          what: { type: 'string' },
+          why: { type: 'string' },
+        },
+        required: ['kind', 'what', 'why'],
+      },
+    },
   },
   required: ['status', 'filesTouched', 'projects'],
 }
@@ -137,13 +150,15 @@ const OPUS = 'claude-opus-5-5'
 // Mechanical ops phases (cut, stage, finish) need no judgment.
 const MECHANICAL = { model: 'haiku', effort: 'low' }
 
-let model = tier >= 2 ? OPUS : 'sonnet'
-let effort = 'high'
+let model = OPUS
+let effort = tier >= 2 ? 'high' : 'medium'
 
 let rounds = 0
 let escalated = false
 let tests = { tests: [], projects: [], notes: [] }
 let impl = null
+// Every test or design change the implementer made, across all its rounds.
+const deviations = []
 let review = null
 
 const RESERVE = 40000
@@ -159,6 +174,7 @@ const compact = () => ({
   tests: tests.tests.map((t) => t.name),
   filesTouched: impl ? impl.filesTouched.length : 0,
   openQuestions: (impl && impl.openQuestions) || [],
+  deviations: deviations.map((d) => ({ kind: d.kind, file: d.file, what: clip(d.what, 200), why: clip(d.why, 300) })),
 })
 
 // The run report is built here, as data, and formatted and posted by `gh-project.mjs report`: no
@@ -187,6 +203,7 @@ async function stop(stage, extra) {
         reason: clip(result.reason, 300),
         failures: (result.failures || []).map((f) => ({ step: f.step, summary: clip(f.summary, 300), file: f.file })),
         blocking: findingsOf(result.findings),
+        deviations: result.deviations,
       }),
       ['Report the branch you are on, and the command output in notes.'],
     ),
@@ -196,8 +213,13 @@ async function stop(stage, extra) {
   return result
 }
 
-const implement = (label, lines) =>
-  step('implementer', label, [`Work on the spec at \`${spec}\`. You are already on its branch.`].concat(lines), IMPL, { model, effort })
+const OWN =
+  'You own the design and the tests: a wrong test or a wrong design decision is yours to fix - list each change in `deviations` with why. Every acceptance criterion must still be proven by a test.'
+async function implement(label, lines) {
+  const result = await step('implementer', label, [`Work on the spec at \`${spec}\`. You are already on its branch.`].concat(lines, [OWN]), IMPL, { model, effort })
+  if (result && result.deviations) deviations.push(...result.deviations)
+  return result
+}
 
 const verify = (label) =>
   step(
@@ -330,12 +352,12 @@ for (let round = 0; ; round++) {
   rounds = round + 1
   log(`verify failed (${verified.failures.map((f) => f.step).join(', ') || 'unspecified'})`)
 
-  // Tier 1 gets one extra round on opus after escalating; tier 2 gets exactly maxRounds.
+  // Tier 1 gets one extra round at high effort after escalating; tier 2 gets exactly maxRounds.
   if (round === maxRounds && tier === 1 && !escalated) {
     escalated = true
     model = OPUS
-    effort = 'xhigh'
-    log('tier 1 exhausted its fix rounds - escalating the implementer to opus/xhigh for one final round')
+    effort = 'high'
+    log('tier 1 exhausted its fix rounds - escalating the implementer to opus/high for one final round')
   }
   if (round >= (escalated ? maxRounds + 1 : maxRounds)) {
     log('verify still red after the final round - stopping')
@@ -348,7 +370,7 @@ for (let round = 0; ; round++) {
   impl = await implement(`fix verify failures (round ${round + 1})`, [
     `Fix exactly these verification failures: ${JSON.stringify(verified.failures)}`,
     `tests: ${JSON.stringify(tests)}`,
-    'Do not refactor around them and do not weaken or delete a test.',
+    'Do not refactor around them. A failure caused by a wrong test is fixed in the test and recorded in `deviations`.',
   ])
 
   if (!impl) return await stop('implement', { reason: 'implementer returned no result on a fix round' })
@@ -376,6 +398,7 @@ if (skipped.has('review')) {
         `It is staged - not committed - on \`${ready.branch}\`, so \`git diff --cached\` is the diff under review (it shows new files; a bare \`git diff\` does not). Also run \`git status --porcelain\`: anything still unstaged belongs to this change too.`,
         `tests claimed: ${JSON.stringify(tests.tests)}`,
         `implementer report: ${JSON.stringify(impl)}`,
+        deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
         tests.tests.length ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
         'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',
       ],
@@ -456,6 +479,7 @@ const shipped = await step(
       rounds,
       reviewRan: Boolean(review),
       minor: findingsOf(minor),
+      deviations: compact().deviations,
     }),
     ['Report the branch, the commit sha (`git rev-parse --short HEAD`), the PR URL as `prUrl`, and the report command output in notes.'],
   ),

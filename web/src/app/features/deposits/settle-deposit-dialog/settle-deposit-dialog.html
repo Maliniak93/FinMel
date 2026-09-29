@@ -1,4 +1,4 @@
-<h2 mat-dialog-title>Settle deposit</h2>
+<h2 mat-dialog-title>{{ 'deposits.settle.title' | transloco }}</h2>
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
@@ -6,11 +6,11 @@
 
     <dl class="settle-deposit-dialog__summary">
       <div>
-        <dt>Principal</dt>
+        <dt>{{ 'deposits.principal' | transloco }}</dt>
         <dd>{{ formatMoney(deposit.principal, deposit.currency) }}</dd>
       </div>
       <div>
-        <dt>Maturity</dt>
+        <dt>{{ 'deposits.maturity' | transloco }}</dt>
         <dd>{{ formatDate(maturityDate) }}</dd>
       </div>
     </dl>
@@ -24,7 +24,7 @@
     }
 
     <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
-      <mat-label>Settlement date</mat-label>
+      <mat-label>{{ 'deposits.settle.settlementDate' | transloco }}</mat-label>
       <input
         matInput
         [matDatepicker]="settledOnPicker"
@@ -35,17 +35,17 @@
       <mat-datepicker-toggle matIconSuffix [for]="settledOnPicker"></mat-datepicker-toggle>
       <mat-datepicker #settledOnPicker></mat-datepicker>
       @if (form.controls.settledOn.hasError('required')) {
-        <mat-error>Settlement date is required.</mat-error>
+        <mat-error>{{ 'deposits.settle.settlementDateRequired' | transloco }}</mat-error>
       } @else if (
         form.controls.settledOn.hasError('settledOnBeforeStart') ||
         form.controls.settledOn.hasError('matDatepickerMin')
       ) {
-        <mat-error>Settlement date can't be before the start date.</mat-error>
+        <mat-error>{{ 'deposits.settle.beforeStart' | transloco }}</mat-error>
       } @else if (
         form.controls.settledOn.hasError('settledOnInFuture') ||
         form.controls.settledOn.hasError('matDatepickerMax')
       ) {
-        <mat-error>Settlement date can't be in the future.</mat-error>
+        <mat-error>{{ 'deposits.settle.inFuture' | transloco }}</mat-error>
       } @else if (form.controls.settledOn.hasError('server')) {
         <mat-error>{{ form.controls.settledOn.getError('server') }}</mat-error>
       }
@@ -53,26 +53,26 @@
 
     <div class="settle-deposit-dialog__row">
       <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
-        <mat-label>Gross interest</mat-label>
+        <mat-label>{{ 'deposits.fields.grossInterest' | transloco }}</mat-label>
         <input matInput type="number" step="0.01" formControlName="grossInterest" />
         @if (form.controls.grossInterest.hasError('required')) {
-          <mat-error>Gross interest is required.</mat-error>
+          <mat-error>{{ 'deposits.errors.grossInterestRequired' | transloco }}</mat-error>
         } @else if (form.controls.grossInterest.hasError('min')) {
-          <mat-error>Gross interest can't be negative.</mat-error>
+          <mat-error>{{ 'deposits.errors.grossInterestNegative' | transloco }}</mat-error>
         } @else if (form.controls.grossInterest.hasError('server')) {
           <mat-error>{{ form.controls.grossInterest.getError('server') }}</mat-error>
         }
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
-        <mat-label>Tax</mat-label>
+        <mat-label>{{ 'deposits.fields.tax' | transloco }}</mat-label>
         <input matInput type="number" step="0.01" formControlName="tax" />
         @if (form.controls.tax.hasError('required')) {
-          <mat-error>Tax is required.</mat-error>
+          <mat-error>{{ 'deposits.errors.taxRequired' | transloco }}</mat-error>
         } @else if (form.controls.tax.hasError('min')) {
-          <mat-error>Tax can't be negative.</mat-error>
+          <mat-error>{{ 'deposits.errors.taxNegative' | transloco }}</mat-error>
         } @else if (form.controls.tax.hasError('taxOverGross')) {
-          <mat-error>Tax can't exceed the gross interest.</mat-error>
+          <mat-error>{{ 'deposits.errors.taxOverGross' | transloco }}</mat-error>
         } @else if (form.controls.tax.hasError('server')) {
           <mat-error>{{ form.controls.tax.getError('server') }}</mat-error>
         }
@@ -80,9 +80,9 @@
     </div>
 
     <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
-      <mat-label>Move to</mat-label>
+      <mat-label>{{ 'deposits.fields.moveTo' | transloco }}</mat-label>
       <mat-select formControlName="destinationAssetId" canSelectNullableOptions>
-        <mat-option [value]="null">Keep in the deposit</mat-option>
+        <mat-option [value]="null">{{ 'deposits.settle.keepInDeposit' | transloco }}</mat-option>
         @if (destinationCandidatesResource.hasValue()) {
           @for (candidate of destinationCandidatesResource.value(); track candidate.assetId) {
             <mat-option [value]="candidate.assetId">
@@ -94,7 +94,9 @@
       @if (destinationCandidatesResource.error(); as loadError) {
         <mat-hint>{{ loadError.message }}</mat-hint>
       } @else if (movedAmount(); as moved) {
-        <mat-hint>{{ formatMoney(moved, deposit.currency) }} moves out of the deposit.</mat-hint>
+        <mat-hint>{{
+          'deposits.settle.movesOut' | transloco: { amount: formatMoney(moved, deposit.currency) }
+        }}</mat-hint>
       }
       @if (form.controls.destinationAssetId.hasError('server')) {
         <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
@@ -103,7 +105,7 @@
 
     <dl class="settle-deposit-dialog__summary">
       <div>
-        <dt>Net interest</dt>
+        <dt>{{ 'deposits.settle.netInterest' | transloco }}</dt>
         <dd>
           @if (amounts(); as settled) {
             {{ formatMoney(settled.netInterest, deposit.currency) }}
@@ -113,7 +115,7 @@
         </dd>
       </div>
       <div>
-        <dt>Final amount</dt>
+        <dt>{{ 'deposits.finalAmount' | transloco }}</dt>
         <dd>
           @if (amounts(); as settled) {
             <strong>{{ formatMoney(settled.finalAmount, deposit.currency) }}</strong>
@@ -130,7 +132,9 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
     <button
       mat-flat-button
       color="primary"
@@ -140,7 +144,7 @@
       @if (submitting()) {
         <mat-spinner diameter="20" />
       } @else {
-        Settle
+        {{ 'deposits.settle.submit' | transloco }}
       }
     </button>
   </mat-dialog-actions>

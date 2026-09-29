@@ -1,5 +1,6 @@
 import { Component, computed, forwardRef, inject, input, type OnInit } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
+import { translate } from '@jsverse/transloco';
 
 import type { AssetClass, AssetResponse } from '../../../../../api/portfolio';
 import { ASSET_FORM, assetFormBody, type AssetForm, type AssetFormBody } from '../../asset-form';
@@ -49,7 +50,7 @@ export class SecurityAssetForm implements AssetForm, OnInit {
   }
 
   submitBlockedReason(): string | null {
-    return this.form.controls.instrument.value ? null : INSTRUMENT_REQUIRED_MESSAGE;
+    return this.form.controls.instrument.value ? null : translate(INSTRUMENT_REQUIRED_MESSAGE);
   }
 
   toBody(): AssetFormBody {

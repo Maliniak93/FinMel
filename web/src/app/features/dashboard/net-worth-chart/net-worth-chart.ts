@@ -2,6 +2,7 @@ import { Component, computed, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import { getApiReportingNetWorthHistory } from '../../../api/reporting';
 import { readProblemDetails } from '../../../core/auth/problem-details';
@@ -22,7 +23,7 @@ interface ChartPoint {
 
 @Component({
   selector: 'app-net-worth-chart',
-  imports: [MatButtonModule, MatButtonToggleModule, MatProgressSpinnerModule],
+  imports: [MatButtonModule, MatButtonToggleModule, MatProgressSpinnerModule, TranslocoPipe],
   templateUrl: './net-worth-chart.html',
   styleUrl: './net-worth-chart.scss',
 })
@@ -42,7 +43,7 @@ export class NetWorthChart {
       });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? 'Failed to load net-worth history.',
+          readProblemDetails(result.error).detail ?? translate('netWorthChart.loadFailed'),
         );
       }
       return result.data;

@@ -3,18 +3,26 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
-import { textOf } from '../../../testing/i18n';
+import {
+  attributesOf,
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  switchLanguage,
+  textOf,
+} from '../../../testing/i18n';
 import { client as marketDataClient } from '../../api/marketdata/client.gen';
 import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetResponse, PortfolioResponse } from '../../api/portfolio';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatMoney } from '../../shared/format';
+import { formatDate, formatMoney } from '../../shared/format';
 import { toDateOnly } from '../../shared/date-only';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
 import { depositResponse } from '../deposits/testing/deposit-fixtures';
@@ -634,5 +642,236 @@ describe('Assets', () => {
     expect(cell('manualValueDate')).toContain('27 wrz 2026');
     expect(cell('manualValueDate')).not.toContain('Sep 27, 2026');
     expect(fetchSpy.mock.calls.length).toBe(fetchesBefore);
+  });
+
+  // i18n screens (#132) AC-3: the list's headings, table headers, chips and their tooltips, row menu,
+  // empty state, delete confirmation and failure snackbar fallback follow the language.
+  describe('in Polish', () => {
+    const maturity = daysFromToday(-1);
+
+    function tooltipOf(selector: string): string {
+      return fixture.debugElement.query(By.css(selector)).injector.get(MatTooltip).message;
+    }
+
+    async function menuItems(): Promise<string[]> {
+      const trigger = fixture.debugElement
+        .query(By.directive(MatMenuTrigger))
+        .injector.get(MatMenuTrigger);
+      trigger.openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const items = labelsOf(
+        TestBed.inject(OverlayContainer).getContainerElement(),
+        '.mat-mdc-menu-item',
+      );
+      trigger.closeMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return items;
+    }
+
+    it('renders in Polish', async () => {
+      const deposit = { ...depositAsset(maturity), name: 'Matured deposit' };
+      await setup(jsonResponse([asset, deposit]));
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = async () => [
+        ...labelsOf(element, 'a.assets-page__back'),
+        ...labelsOf(element, '.assets-page__header > button'),
+        ...labelsOf(element, 'th:not(:empty)'),
+        ...labelsOf(element, 'mat-chip'),
+        tooltipOf('.mat-column-manualValueDate mat-chip'),
+        ...(await menuItems()),
+      ];
+      const heading = () => textOf(element.querySelector('h1'));
+      const maturedTooltip = () => tooltipOf('.assets-page__chip--due');
+
+      const english = await texts();
+      expect(english).toEqual([
+        'Portfolios',
+        'New asset',
+        'Class',
+        'Name',
+        'Quantity',
+        'Currency',
+        'Value',
+        'Valued on',
+        'Stale — refresh me',
+        'Due',
+        'This valuation is more than 6 months old — consider refreshing it.',
+        'Edit',
+        'Delete',
+      ]);
+      expect(heading()).toBe('Assets — Retirement');
+      expect(maturedTooltip()).toMatch(/^Matured on /);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, await texts())).toEqual([]);
+      expect(heading()).not.toContain('Assets');
+      expect(heading()).toContain('Retirement');
+      // "Matured on {date}": the parameterised key, with the date in the active locale.
+      expect(maturedTooltip()).not.toMatch(/^Matured on /);
+      expect(maturedTooltip()).toContain(formatDate(maturity));
+      expect(
+        matchesTranslation('pl', maturedTooltip()),
+        `"${maturedTooltip()}" is not a pl.json value`,
+      ).toBe(true);
+    });
+
+    it('labels the row actions button with the asset name in Polish', async () => {
+      await setup(jsonResponse([asset]));
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(attributesOf(element, 'td button', 'aria-label')).toEqual(['Actions for Apple']);
+
+      await switchLanguage(fixture, 'pl');
+
+      const [label] = attributesOf(element, 'td button', 'aria-label');
+      expect(label).not.toContain('Actions for');
+      expect(label).toContain('Apple');
+      expect(matchesTranslation('pl', label), `"${label}" is not a pl.json value`).toBe(true);
+    });
+
+    it("renders a market asset's price cells in Polish", async () => {
+      const staleDate = new Date();
+      staleDate.setDate(staleDate.getDate() - 10);
+      const staleInstrument: InstrumentDetailsResponse = {
+        id: instrumentId,
+        ticker: 'AAPL.US',
+        name: 'Apple Inc.',
+        assetClass: 2,
+        quoteCurrency: 'USD',
+        source: 1,
+        verificationStatus: 0,
+        lastPrice: 212,
+        lastPriceDate: staleDate.toISOString().slice(0, 10),
+      };
+      await setup(jsonResponse([marketAsset]), undefined, jsonResponse(staleInstrument));
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'mat-chip'),
+        tooltipOf('.mat-column-manualValueDate mat-chip'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual(['Stale', "This instrument's price is more than 7 days old."]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it("renders 'No price yet' in Polish", async () => {
+      const noQuotes: InstrumentDetailsResponse = {
+        id: instrumentId,
+        ticker: 'NEW.US',
+        name: 'Brand New Co.',
+        assetClass: 2,
+        quoteCurrency: 'USD',
+        source: 1,
+        verificationStatus: 1,
+        lastPrice: null,
+        lastPriceDate: null,
+      };
+      await setup(jsonResponse([marketAsset]), undefined, jsonResponse(noQuotes));
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const cell = () => [textOf(element.querySelector('td.mat-column-value'))];
+
+      expect(cell()).toEqual(['No price yet']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['No price yet'], cell())).toEqual([]);
+    });
+
+    it('renders the empty state in Polish', async () => {
+      await setup(jsonResponse([]));
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, '.assets-page__state p'),
+        ...labelsOf(element, '.assets-page__state button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        "This portfolio doesn't have any assets yet.",
+        'Add your first asset',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the archived notice in Polish', async () => {
+      await setup(jsonResponse([asset]), jsonResponse({ ...portfolio, isArchived: true }));
+      const element = fixture.nativeElement as HTMLElement;
+      const notice = () => labelsOf(element, '.assets-page__archived-notice');
+
+      const english = notice();
+      expect(english).toHaveLength(1);
+      expect(english[0]).toMatch(/^This portfolio is archived/);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, notice())).toEqual([]);
+    });
+
+    it('renders the load-failure retry button in Polish', async () => {
+      await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(labelsOf(element, '.assets-page__state button')).toEqual(['Retry']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['Retry'], labelsOf(element, '.assets-page__state button'))).toEqual(
+        [],
+      );
+      // The backend's own message stays as it arrived.
+      expect(textOf(element.querySelector('.assets-page__state p'))).toBe('Service unavailable.');
+    });
+
+    it('asks to delete in Polish, with the asset name and transaction count in the message', async () => {
+      const withTransactions: AssetResponse = { ...asset, transactionCount: 3 };
+      await setup(jsonResponse([withTransactions]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const confirmation = () =>
+        (
+          dialog.open.mock.calls[0][1] as {
+            data: { title: string; message: string; confirmLabel: string };
+          }
+        ).data;
+      await component['remove'](withTransactions);
+      const english = confirmation();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](withTransactions);
+      const polish = confirmation();
+
+      expect(english.title).toBe('Delete this asset?');
+      expect(
+        polishProblems([english.title, english.confirmLabel], [polish.title, polish.confirmLabel]),
+      ).toEqual([]);
+      expect(polish.message).toContain('"Apple"');
+      expect(polish.message).toContain('3');
+      expect(polish.message).not.toContain('permanently deleted');
+    });
+
+    it('shows the failure snackbar fallback in Polish', async () => {
+      await setup(jsonResponse([asset]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      fetchSpy.mockImplementationOnce(async () => jsonResponse({ title: 'Boom' }, 500));
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](asset);
+
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      const [message, action] = snackBar.open.mock.calls[0] as [string, string];
+      expect(polishProblems(['Failed to delete asset.', 'Dismiss'], [message, action])).toEqual([]);
+    });
   });
 });

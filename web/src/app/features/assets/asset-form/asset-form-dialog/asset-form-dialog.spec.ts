@@ -5,6 +5,13 @@ import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dial
 import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 
+import {
+  attributesOf,
+  labelsOf,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+} from '../../../../../testing/i18n';
 import { client as marketDataClient } from '../../../../api/marketdata/client.gen';
 import { client as portfolioClient } from '../../../../api/portfolio/client.gen';
 import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
@@ -25,8 +32,10 @@ import {
   portfolioId,
   renderedText,
   requestUrl,
+  showValidationErrors,
   toggleFirstTransaction,
 } from '../testing/asset-form-fixtures';
+import { INSTRUMENT_REQUIRED_MESSAGE } from '../blocks/instrument-picker/instrument-picker';
 import { AssetFormDialog, type AssetFormDialogData } from './asset-form-dialog';
 import { provideI18nTesting } from '../../../../core/i18n/testing';
 
@@ -66,8 +75,10 @@ describe('AssetFormDialog', () => {
     marketDataClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   async function setup(
@@ -386,5 +397,89 @@ describe('AssetFormDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  // i18n screens (#132) AC-4: the dialog's title, the back button's accessible name, the buttons and
+  // the messages the shell itself raises follow the language.
+  describe('in Polish', () => {
+    it('renders the type picker step in Polish', async () => {
+      await setup({ portfolioId });
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual(['New asset', 'Cancel']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the form step in Polish', async () => {
+      await setup({ portfolioId });
+      await pickTile(ASSET_CLASS.Cash);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...attributesOf(element, 'h2 button', 'aria-label'),
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual(['New asset', 'Back to asset types', 'Cancel', 'Create']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the edit title and save button in Polish', async () => {
+      await setup({ portfolioId, asset: cashAsset });
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual(['Edit asset', 'Cancel', 'Save']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('shows the missing-instrument message in Polish', async () => {
+      await setup({ portfolioId });
+      await pickTile(ASSET_CLASS.Stock);
+      findControl(activeForm().form, 'name').setValue('Apple');
+      await switchLanguage(fixture, 'pl');
+
+      await component['onSubmit']();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const banner = labelsOf(fixture.nativeElement as HTMLElement, '[role="alert"]');
+      expect(banner).toHaveLength(1);
+      expect(polishProblems([INSTRUMENT_REQUIRED_MESSAGE], banner)).toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('shows a client-side validation message from a form step in Polish', async () => {
+      await setup({ portfolioId });
+      await pickTile(ASSET_CLASS.Other);
+      await showValidationErrors(fixture, activeForm().form);
+      const errors = () => labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+
+      const english = errors();
+      expect(english).toEqual(['Name is required.']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, errors())).toEqual([]);
+    });
   });
 });

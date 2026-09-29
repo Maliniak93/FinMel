@@ -15,7 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
@@ -194,7 +194,10 @@ export class DepositFormDialog {
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioPortfolios({ signal: abortSignal });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load portfolios.');
+        throw new Error(
+          readProblemDetails(result.error).detail ??
+            translate('deposits.form.portfoliosLoadFailed'),
+        );
       }
       return (result.data ?? []).filter((portfolio) => !portfolio.isArchived);
     },
@@ -213,7 +216,7 @@ export class DepositFormDialog {
       });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? 'Failed to load the sources of funds.',
+          readProblemDetails(result.error).detail ?? translate('deposits.form.fundingLoadFailed'),
         );
       }
       return result.data ?? [];
@@ -316,7 +319,7 @@ export class DepositFormDialog {
     // The source of funds can't cover the principal on the start date — a principal error.
     if (problem.errorCode === 'Validation.InsufficientFunds') {
       this.form.controls.principal.setErrors({
-        server: problem.detail ?? 'The source of funds cannot cover this principal.',
+        server: problem.detail ?? translate('deposits.form.insufficientFunds'),
       });
       this.form.controls.principal.markAsTouched();
       return;
@@ -326,6 +329,6 @@ export class DepositFormDialog {
       return;
     }
 
-    this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+    this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 }

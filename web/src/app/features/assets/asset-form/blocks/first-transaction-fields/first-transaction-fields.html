@@ -3,7 +3,10 @@
   [checked]="group().enabled"
   (change)="toggle($event.checked)"
 >
-  {{ openingDeposit() ? 'Add opening deposit' : 'Add first transaction' }}
+  {{
+    (openingDeposit() ? 'assets.form.addOpeningDeposit' : 'assets.form.addFirstTransaction')
+      | transloco
+  }}
 </mat-checkbox>
 
 @if (group().enabled) {
@@ -11,7 +14,7 @@
   <div class="asset-form__initial-transaction" [formGroup]="group()">
     @if (!openingDeposit()) {
       <mat-form-field appearance="outline" class="asset-form__field">
-        <mat-label>Type</mat-label>
+        <mat-label>{{ 'common.type' | transloco }}</mat-label>
         <mat-select formControlName="type">
           @for (transactionType of transactionTypes; track transactionType.value) {
             <mat-option [value]="transactionType.value">{{
@@ -26,7 +29,9 @@
       <mat-label>{{ quantityLabel(type) | transloco }}</mat-label>
       <input matInput type="number" step="any" formControlName="quantity" />
       @if (group().controls.quantity.hasError('min')) {
-        <mat-error>{{ quantityLabel(type) | transloco }} must not be negative.</mat-error>
+        <mat-error>{{
+          'assets.form.mustNotBeNegative' | transloco: { field: (quantityLabel(type) | transloco) }
+        }}</mat-error>
       } @else if (group().controls.quantity.hasError('server')) {
         <mat-error>{{ group().controls.quantity.getError('server') }}</mat-error>
       }
@@ -34,10 +39,12 @@
 
     @if (!openingDeposit() && isPriced(type)) {
       <mat-form-field appearance="outline" class="asset-form__field">
-        <mat-label>Unit price</mat-label>
+        <mat-label>{{ 'common.unitPrice' | transloco }}</mat-label>
         <input matInput type="number" step="0.01" formControlName="unitPrice" />
         @if (group().controls.unitPrice.hasError('min')) {
-          <mat-error>Unit price must not be negative.</mat-error>
+          <mat-error>{{
+            'assets.form.mustNotBeNegative' | transloco: { field: ('common.unitPrice' | transloco) }
+          }}</mat-error>
         } @else if (group().controls.unitPrice.hasError('server')) {
           <mat-error>{{ group().controls.unitPrice.getError('server') }}</mat-error>
         }
@@ -45,12 +52,12 @@
     }
 
     <mat-form-field appearance="outline" class="asset-form__field">
-      <mat-label>Date</mat-label>
+      <mat-label>{{ 'common.date' | transloco }}</mat-label>
       <input matInput [matDatepicker]="transactionDatePicker" formControlName="date" />
       <mat-datepicker-toggle matIconSuffix [for]="transactionDatePicker"></mat-datepicker-toggle>
       <mat-datepicker #transactionDatePicker></mat-datepicker>
       @if (group().controls.date.hasError('required')) {
-        <mat-error>Date is required.</mat-error>
+        <mat-error>{{ 'assets.form.dateRequired' | transloco }}</mat-error>
       }
     </mat-form-field>
   </div>

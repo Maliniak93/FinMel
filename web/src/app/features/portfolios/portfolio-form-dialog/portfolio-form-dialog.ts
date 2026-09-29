@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   postApiPortfolioPortfolios,
@@ -115,11 +115,11 @@ export class PortfolioFormDialog {
 
     if (problem.errorCode === 'Conflict.DuplicatePortfolioName') {
       this.form.controls.name.setErrors({
-        server: problem.detail ?? 'A portfolio with this name already exists.',
+        server: problem.detail ?? translate('portfolios.form.duplicateName'),
       });
       return;
     }
 
-    this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+    this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 }

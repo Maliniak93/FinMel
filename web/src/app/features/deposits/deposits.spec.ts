@@ -2,10 +2,22 @@ import { OverlayContainer } from '@angular/cdk/overlay';
 import { formatDate } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import {
+  attributesOf,
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  textOf,
+} from '../../../testing/i18n';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { DepositResponse } from '../../api/portfolio';
 import { formatMoney } from '../../shared/format';
@@ -41,8 +53,10 @@ describe('Deposits', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   async function setup(
@@ -451,5 +465,198 @@ describe('Deposits', () => {
       (button) => button.textContent ?? '',
     );
     expect(buttons.some((text) => /add/i.test(text))).toBe(true);
+  });
+
+  // i18n screens (#132) AC-6: headings, table headers, the row actions' tooltips and accessible
+  // names, the row menu, empty state, delete confirmation and failure snackbar fallback follow the
+  // language.
+  describe('in Polish', () => {
+    // Words spelled the same in Polish.
+    const cognates = ['Bank', 'Start', 'Status'];
+
+    // What a row's icon buttons offer: their tooltip (when they have one) and accessible name.
+    function actionTooltips(): string[] {
+      return fixture.debugElement
+        .queryAll(By.css('td.mat-column-actions button'))
+        .map((button) => button.injector.get(MatTooltip, null)?.message ?? '')
+        .filter((message) => message !== '');
+    }
+
+    async function menuItems(): Promise<string[]> {
+      const trigger = fixture.debugElement
+        .query(By.directive(MatMenuTrigger))
+        .injector.get(MatMenuTrigger);
+      trigger.openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const items = labelsOf(
+        TestBed.inject(OverlayContainer).getContainerElement(),
+        '.mat-mdc-menu-item',
+      );
+      trigger.closeMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return items;
+    }
+
+    it('renders in Polish', async () => {
+      await setup([dueDeposit, settledDeposit, archivedPortfolioDeposit]);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = async () => [
+        ...labelsOf(element, 'h1'),
+        ...labelsOf(element, '.deposits-page__header > button'),
+        ...labelsOf(element, 'th:not(:empty)'),
+        ...actionTooltips(),
+        ...(await menuItems()),
+      ];
+
+      const english = await texts();
+      expect(english).toEqual([
+        'Deposits',
+        'Add deposit',
+        'Name',
+        'Bank',
+        'Portfolio',
+        'Principal',
+        'Rate',
+        'Start',
+        'Maturity',
+        'Net profit',
+        'Final amount',
+        'Status',
+        'Settle maturity',
+        'Roll over',
+        'Transfer to cash',
+        'Roll over',
+        'Edit',
+        'Delete',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, await texts(), cognates)).toEqual([]);
+    });
+
+    it("renders the rows' accessible names in Polish", async () => {
+      await setup([dueDeposit, settledDeposit]);
+      const element = fixture.nativeElement as HTMLElement;
+      const labels = () => attributesOf(element, 'td.mat-column-actions button', 'aria-label');
+
+      const english = labels();
+      expect(english).toEqual([
+        'Settle maturity of Matured deposit',
+        'Roll over',
+        'Actions for this deposit',
+        'Transfer to cash',
+        'Roll over',
+        'Actions for this deposit',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, labels())).toEqual([]);
+      expect(labels()[0]).toContain('Matured deposit');
+    });
+
+    it('renders the archived-portfolio marker in Polish', async () => {
+      await setup([archivedPortfolioDeposit]);
+      const element = fixture.nativeElement as HTMLElement;
+      const marker = () => textOf(element.querySelector('.deposits-page__muted'));
+
+      expect(marker()).toBe('(archived)');
+
+      await switchLanguage(fixture, 'pl');
+
+      // The parentheses may sit in the template or in the translation.
+      const text = marker();
+      expect(text).not.toBe('(archived)');
+      expect(
+        matchesTranslation('pl', text) || matchesTranslation('pl', text.replace(/^\(|\)$/g, '')),
+        `"${text}" is not a pl.json value`,
+      ).toBe(true);
+    });
+
+    it('renders the empty state in Polish', async () => {
+      await setup([]);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, '.deposits-page__state p'),
+        ...labelsOf(element, '.deposits-page__state button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual(["You don't have any term deposits yet.", 'Add your first deposit']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the load-failure retry button in Polish', async () => {
+      await setup([]);
+      fetchSpy.mockImplementation(async () =>
+        jsonResponse({ detail: 'Service unavailable.' }, 503),
+      );
+      component['depositsResource'].reload();
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const retry = () => labelsOf(element, '.deposits-page__state button');
+
+      expect(retry()).toEqual(['Retry']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['Retry'], retry())).toEqual([]);
+      // The backend's own message stays as it arrived.
+      expect(textOf(element.querySelector('.deposits-page__state p'))).toBe('Service unavailable.');
+    });
+
+    it('asks to delete in Polish, with the deposit name in the message', async () => {
+      await setup([dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const confirmation = () =>
+        (
+          dialog.open.mock.calls[0][1] as {
+            data: { title: string; message: string; confirmLabel: string };
+          }
+        ).data;
+      await component['remove'](dueDeposit);
+      const english = confirmation();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](dueDeposit);
+      const polish = confirmation();
+
+      expect(english.title).toBe('Delete this deposit?');
+      expect(
+        polishProblems([english.title, english.confirmLabel], [polish.title, polish.confirmLabel]),
+      ).toEqual([]);
+      expect(polish.message).toContain('"Matured deposit"');
+      expect(polish.message).not.toContain('permanently deleted');
+      expect(
+        matchesTranslation('pl', polish.message),
+        `"${polish.message}" is not a pl.json value`,
+      ).toBe(true);
+    });
+
+    it('shows the failure snackbar fallback in Polish', async () => {
+      await setup([dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      fetchSpy.mockImplementation(async (input: unknown) =>
+        (input as Request).method === 'DELETE'
+          ? jsonResponse({ title: 'Boom' }, 500)
+          : jsonResponse([dueDeposit]),
+      );
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](dueDeposit);
+
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      const [message, action] = snackBar.open.mock.calls[0] as [string, string];
+      expect(polishProblems(['Failed to delete deposit.', 'Dismiss'], [message, action])).toEqual(
+        [],
+      );
+    });
   });
 });

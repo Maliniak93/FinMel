@@ -1,7 +1,27 @@
 {
   "common": {
     "cancel": "Anuluj",
-    "confirm": "Potwierdź"
+    "confirm": "Potwierdź",
+    "retry": "Ponów",
+    "dismiss": "Zamknij",
+    "save": "Zapisz",
+    "create": "Utwórz",
+    "edit": "Edytuj",
+    "delete": "Usuń",
+    "restore": "Przywróć",
+    "archive": "Archiwizuj",
+    "archived": "Zarchiwizowany",
+    "name": "Nazwa",
+    "currency": "Waluta",
+    "status": "Status",
+    "description": "Opis",
+    "stale": "Nieaktualna",
+    "actionsFor": "Akcje dla: {{ name }}",
+    "type": "Typ",
+    "unitPrice": "Cena jednostkowa",
+    "date": "Data",
+    "amount": "Kwota",
+    "dateRequired": "Data jest wymagana."
   },
   "errors": {
     "generic": "Coś poszło nie tak. Spróbuj ponownie."
@@ -132,6 +152,242 @@
       "pln": "PLN — złoty polski",
       "eur": "EUR — euro",
       "usd": "USD — dolar amerykański"
+    }
+  },
+  "dashboard": {
+    "title": "Pulpit",
+    "empty": "Nie wprowadzono jeszcze żadnego majątku.",
+    "goToPortfolios": "Przejdź do portfeli",
+    "stale": "Nieaktualne",
+    "staleTooltip": "Wycena co najmniej jednego portfela od dawna się nie odświeżyła — ta suma może być nieaktualna.",
+    "asOf": "Stan na {{ date }}",
+    "netWorthHistory": "Historia wartości majątku",
+    "loadFailed": "Nie udało się wczytać pulpitu."
+  },
+  "netWorthChart": {
+    "rangeLabel": "Zakres wykresu",
+    "chartLabel": "Wykres historii wartości majątku",
+    "notEnoughHistory": "Za mało historii, aby narysować wykres.",
+    "asOf": "Stan na {{ date }}",
+    "loadFailed": "Nie udało się wczytać historii wartości majątku."
+  },
+  "portfolios": {
+    "title": "Portfele",
+    "showArchived": "Pokaż zarchiwizowane",
+    "newPortfolio": "Nowy portfel",
+    "empty": "Nie masz jeszcze żadnych portfeli.",
+    "createFirst": "Utwórz pierwszy portfel",
+    "totalValue": "Wartość łączna",
+    "noValuationYet": "Brak wyceny",
+    "actionsFor": "Akcje dla: {{ name }}",
+    "loadFailed": "Nie udało się wczytać portfeli.",
+    "valuesLoadFailed": "Nie udało się wczytać wartości portfeli.",
+    "archive": {
+      "title": "Zarchiwizować ten portfel?",
+      "message": "\"{{ name }}\" zniknie z domyślnej listy — nic nie zostanie usunięte, a zarchiwizowane portfele zobaczysz po włączeniu opcji \"Pokaż zarchiwizowane\".",
+      "failed": "Nie udało się zarchiwizować portfela."
+    },
+    "restore": {
+      "title": "Przywrócić ten portfel?",
+      "message": "\"{{ name }}\" wróci na domyślną listę.",
+      "failed": "Nie udało się przywrócić portfela."
+    },
+    "delete": {
+      "title": "Usunąć ten portfel?",
+      "message": "\"{{ name }}\" zostanie trwale usunięty. Tej operacji nie można cofnąć.",
+      "messageWithAssets": "\"{{ name }}\" wraz ze wszystkimi aktywami (liczba: {{ count }}) i ich transakcjami zostanie trwale usunięty. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć portfela."
+    },
+    "form": {
+      "editTitle": "Edytuj portfel",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameTooLong": "Nazwa jest za długa.",
+      "descriptionTooLong": "Opis jest za długi.",
+      "currencyRequired": "Waluta jest wymagana.",
+      "legacyCurrency": "{{ currency }} — spoza obsługiwanego zestawu, zostanie zachowana, dopóki nie wybierzesz innej poniżej",
+      "legacyCurrencyHint": "Waluta tego portfela nie jest PLN, EUR ani USD. Zapis bez jej zmiany zostanie odrzucony — wybierz obsługiwaną walutę, aby ją zaktualizować.",
+      "duplicateName": "Portfel o tej nazwie już istnieje."
+    }
+  },
+  "assets": {
+    "title": "Aktywa",
+    "titleWithName": "Aktywa — {{ name }}",
+    "newAsset": "Nowe aktywo",
+    "archivedNotice": "Ten portfel jest zarchiwizowany — przywróć go, aby wprowadzać zmiany.",
+    "empty": "Ten portfel nie ma jeszcze żadnych aktywów.",
+    "addFirst": "Dodaj pierwsze aktywo",
+    "class": "Klasa",
+    "quantity": "Ilość",
+    "value": "Wartość",
+    "valuedOn": "Wycena z dnia",
+    "maturedOn": "Zapadła dnia {{ date }}",
+    "due": "Zapadła",
+    "noPriceYet": "Brak ceny",
+    "priceStaleTooltip": "Cena tego instrumentu jest starsza niż 7 dni.",
+    "valuationStaleTooltip": "Ta wycena jest starsza niż 6 miesięcy — rozważ jej odświeżenie.",
+    "staleRefresh": "Nieaktualna — odśwież",
+    "portfolioLoadFailed": "Nie udało się wczytać portfela.",
+    "loadFailed": "Nie udało się wczytać aktywów.",
+    "depositLoadFailed": "Nie udało się wczytać lokaty.",
+    "delete": {
+      "title": "Usunąć to aktywo?",
+      "message": "\"{{ name }}\" zostanie trwale usunięte. Tej operacji nie można cofnąć.",
+      "messageWithTransactions": "\"{{ name }}\" wraz ze wszystkimi transakcjami (liczba: {{ count }}) zostanie trwale usunięte. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć aktywa."
+    },
+    "form": {
+      "backToTypes": "Wróć do typów aktywów",
+      "editTitle": "Edytuj aktywo",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameTooLong": "Nazwa jest za długa.",
+      "currencyRequired": "Waluta jest wymagana.",
+      "addOpeningDeposit": "Dodaj wpłatę początkową",
+      "addFirstTransaction": "Dodaj pierwszą transakcję",
+      "mustNotBeNegative": "{{ field }} nie może być ujemna.",
+      "dateRequired": "Data jest wymagana.",
+      "valueRequired": "Wartość jest wymagana.",
+      "valuationDateRequired": "Data wyceny jest wymagana.",
+      "cashHint": "Wyceniane automatycznie według kursu waluty {{ currency }} — nic więcej nie trzeba wypełniać. Użyj opcji \"Dodaj wpłatę początkową\" poniżej, aby wpłacić kwotę początkową.",
+      "goldHint": "Metale szlachetne nie mają własnego wyszukiwania tickera — gotowy instrument złota jest już na liście powyżej.",
+      "instrument": "Instrument finansowy",
+      "searchPlaceholder": "Szukaj po tickerze lub nazwie",
+      "verified": "Zweryfikowano: {{ ticker }} — {{ name }} ({{ currency }})",
+      "pickHint": "Wybierz istniejący instrument powyżej lub zweryfikuj nowy ticker poniżej — tworzenie jest zablokowane, dopóki żaden nie zostanie wybrany.",
+      "cantFindIt": "Nie możesz go znaleźć? Zweryfikuj nowy ticker",
+      "tickerLabel": "Ticker / identyfikator",
+      "quoteCurrency": "Waluta notowania",
+      "quoteCurrencyHint": "Kod 3-literowy, np. USD",
+      "addAnyway": "Dodaj mimo to",
+      "tryAnother": "Spróbuj zamiast tego wyszukać go powyżej.",
+      "verifyAndAdd": "Zweryfikuj i dodaj",
+      "instrumentRequired": "Zweryfikuj ticker lub wybierz jeden z wyników wyszukiwania, zanim utworzysz to aktywo.",
+      "addInstrumentFailed": "Nie udało się dodać instrumentu."
+    }
+  },
+  "transactions": {
+    "title": "Transakcje",
+    "titleWithName": "Transakcje — {{ name }}",
+    "newTransaction": "Nowa transakcja",
+    "termDepositNotice": "Transakcjami lokaty terminowej zarządza sama lokata — edytuj lokatę, aby je zmienić.",
+    "empty": "Nie zapisano jeszcze żadnych transakcji dla tego aktywa.",
+    "recordFirst": "Zapisz pierwszą transakcję",
+    "valuePln": "Wartość (PLN)",
+    "actionsFor": "Akcje dla: {{ type }} z dnia {{ date }}",
+    "assetLoadFailed": "Nie udało się wczytać aktywa.",
+    "portfolioLoadFailed": "Nie udało się wczytać portfela.",
+    "loadFailed": "Nie udało się wczytać transakcji.",
+    "delete": {
+      "title": "Usunąć tę transakcję?",
+      "message": "Ta transakcja ({{ type }}, {{ quantity }}) zostanie trwale usunięta. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć transakcji."
+    },
+    "form": {
+      "editTitle": "Edytuj transakcję",
+      "record": "Zapisz",
+      "mustNotBeNegative": "{{ field }} nie może być ujemna.",
+      "dateRequired": "Data jest wymagana."
+    }
+  },
+  "deposits": {
+    "title": "Lokaty",
+    "add": "Dodaj lokatę",
+    "empty": "Nie masz jeszcze żadnych lokat terminowych.",
+    "addFirst": "Dodaj pierwszą lokatę",
+    "bank": "Bank",
+    "portfolio": "Portfel",
+    "principal": "Kapitał",
+    "rate": "Oprocentowanie",
+    "start": "Start",
+    "maturity": "Zapadalność",
+    "netProfit": "Zysk netto",
+    "finalAmount": "Kwota końcowa",
+    "archivedMarker": "(zarchiwizowany)",
+    "settleMaturity": "Rozlicz zapadalność",
+    "settleMaturityOf": "Rozlicz zapadalność lokaty {{ name }}",
+    "transferToCash": "Przenieś na gotówkę",
+    "rollOver": "Przedłuż lokatę",
+    "actionsForThis": "Akcje dla tej lokaty",
+    "loadFailed": "Nie udało się wczytać lokat.",
+    "delete": {
+      "title": "Usunąć tę lokatę?",
+      "message": "\"{{ name }}\" wraz z warunkami zostanie trwale usunięta. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć lokaty."
+    },
+    "fields": {
+      "term": "Okres",
+      "maturesOn": "Zapada dnia",
+      "capitalisation": "Kapitalizacja",
+      "grossInterest": "Odsetki brutto",
+      "tax": "Podatek",
+      "moveTo": "Przenieś do"
+    },
+    "errors": {
+      "grossInterestRequired": "Odsetki brutto są wymagane.",
+      "grossInterestNegative": "Odsetki brutto nie mogą być ujemne.",
+      "taxRequired": "Podatek jest wymagany.",
+      "taxNegative": "Podatek nie może być ujemny.",
+      "taxOverGross": "Podatek nie może przekraczać odsetek brutto.",
+      "interestRateRequired": "Oprocentowanie jest wymagane.",
+      "interestRateRange": "Oprocentowanie musi mieścić się w przedziale od 0 do 100.",
+      "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych.",
+      "previewLoadFailed": "Nie udało się wczytać podglądu rozliczenia."
+    },
+    "form": {
+      "newTitle": "Nowa lokata",
+      "editTitle": "Edytuj lokatę",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameTooLong": "Nazwa jest za długa.",
+      "bankNameTooLong": "Nazwa banku jest za długa.",
+      "portfolioRequired": "Portfel jest wymagany.",
+      "currencyRequired": "Waluta jest wymagana.",
+      "sourceOfFunds": "Źródło środków",
+      "newMoney": "Nowe środki (z zewnątrz)",
+      "principalRequired": "Kapitał jest wymagany.",
+      "principalPositive": "Kapitał musi być większy od 0.",
+      "exceedsBalance": "Kapitał przekracza saldo źródła ({{ balance }}).",
+      "startDate": "Data rozpoczęcia",
+      "startDateRequired": "Data rozpoczęcia jest wymagana.",
+      "termRequired": "Okres jest wymagany.",
+      "termMin": "Okres musi wynosić co najmniej 1.",
+      "termMax": "Okres wynosi co najwyżej {{ max }}.",
+      "unit": "Jednostka",
+      "annualInterestRate": "Roczne oprocentowanie (%)",
+      "taxExempt": "IKE/IKZE — bez podatku Belki",
+      "earlyBreakLoss": "Odsetki tracone przy zerwaniu lokaty (%)",
+      "earlyBreakRequired": "Strata przy zerwaniu jest wymagana.",
+      "earlyBreakRange": "Strata przy zerwaniu musi mieścić się w przedziale od 0 do 100.",
+      "portfoliosLoadFailed": "Nie udało się wczytać portfeli.",
+      "fundingLoadFailed": "Nie udało się wczytać źródeł środków.",
+      "insufficientFunds": "Źródło środków nie pokrywa tego kapitału."
+    },
+    "payOut": {
+      "noCashAccount": "Nie masz konta gotówkowego w walucie {{ currency }}, na które można przenieść pieniądze.",
+      "destinationRequired": "Wybierz, dokąd trafią pieniądze.",
+      "dateBeforeSettlement": "Data nie może być wcześniejsza niż data rozliczenia.",
+      "dateInFuture": "Data nie może być z przyszłości.",
+      "submit": "Przenieś"
+    },
+    "settle": {
+      "title": "Rozlicz lokatę",
+      "settlementDate": "Data rozliczenia",
+      "settlementDateRequired": "Data rozliczenia jest wymagana.",
+      "beforeStart": "Data rozliczenia nie może być wcześniejsza niż data rozpoczęcia.",
+      "inFuture": "Data rozliczenia nie może być z przyszłości.",
+      "keepInDeposit": "Zostaw w lokacie",
+      "movesOut": "Kwota {{ amount }} opuszcza lokatę.",
+      "netInterest": "Odsetki netto",
+      "submit": "Rozlicz"
+    },
+    "rollOverDialog": {
+      "newStartDate": "Nowa data rozpoczęcia",
+      "newPrincipal": "Nowy kapitał",
+      "interestRate": "Oprocentowanie (%)",
+      "term": {
+        "day": "{{ count }} dzień",
+        "days": "dni: {{ count }}",
+        "month": "{{ count }} miesiąc",
+        "months": "miesięcy: {{ count }}"
+      }
     }
   }
 }

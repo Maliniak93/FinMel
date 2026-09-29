@@ -12,7 +12,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
@@ -50,10 +50,12 @@ function taxWithinGross(control: AbstractControl): ValidationErrors | null {
   return Number(control.value) > Number(gross) ? { taxOverGross: true } : null;
 }
 
-// "3 months", "1 day" — the unchanged term, shown read-only.
+// "3 months", "1 day" — the unchanged term, shown read-only. One key per unit and count form, as
+// there are no plurals (the Polish count comes after its label).
 function termLabel(termLength: number, termUnit: DepositResponse['termUnit']): string {
   const unit = Number(termUnit) === DEPOSIT_TERM_UNIT.Days ? 'day' : 'month';
-  return `${termLength} ${unit}${termLength === 1 ? '' : 's'}`;
+  const key = termLength === 1 ? unit : `${unit}s`;
+  return translate(`deposits.rollOverDialog.term.${key}`, { count: termLength });
 }
 
 function isAmount(value: number | string | null): value is number | string {
@@ -158,7 +160,7 @@ export class RollOverDepositDialog {
       );
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? 'Failed to load the settlement preview.',
+          readProblemDetails(result.error).detail ?? translate('deposits.errors.previewLoadFailed'),
         );
       }
       return result.data ?? null;
@@ -237,6 +239,6 @@ export class RollOverDepositDialog {
       return;
     }
 
-    this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+    this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 }

@@ -2,11 +2,20 @@ import type { ComponentFixture } from '@angular/core/testing';
 
 import { client as marketDataClient } from '../../../../../api/marketdata/client.gen';
 import {
+  attributesOf,
+  labelsOf,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+} from '../../../../../../testing/i18n';
+import {
   findControl,
   goldSearchResult,
   mountAssetForm,
   pickInstrument,
   renderedText,
+  showValidationErrors,
+  toggleFirstTransaction,
 } from '../../testing/asset-form-fixtures';
 import { GoldAssetForm } from './gold-asset-form';
 
@@ -21,8 +30,10 @@ describe('GoldAssetForm', () => {
     marketDataClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   async function setup(): Promise<void> {
@@ -58,6 +69,65 @@ describe('GoldAssetForm', () => {
       currency: 'PLN',
       instrumentId: goldSearchResult.id,
       initialTransaction: null,
+    });
+  });
+  // i18n screens (#132) AC-4: field labels, the instrument search placeholder, the hints, the
+  // first-transaction toggle and the client-side validation messages follow the language.
+  describe('in Polish', () => {
+    it('renders in Polish', async () => {
+      await setup();
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'mat-label'),
+        ...attributesOf(element, 'input[placeholder]', 'placeholder'),
+        ...labelsOf(element, '.asset-form__hint'),
+        ...labelsOf(element, 'mat-checkbox'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Name',
+        'Currency',
+        'Instrument',
+        'Search by ticker or name',
+        'Pick an existing instrument above, or verify a new ticker below — creation is blocked until one is selected.',
+        'Precious metal has no custom-ticker lookup — the seeded gold instrument is already in the dictionary above.',
+        'Add first transaction',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('shows the picked instrument and the first-transaction fields in Polish', async () => {
+      await setup();
+      await pickInstrument(fixture, goldSearchResult);
+      await toggleFirstTransaction(fixture);
+      findControl(component.form, 'quantity').setValue(-1);
+      findControl(component.form, 'unitPrice').setValue(-1);
+      findControl(component.form, 'date').setValue(null);
+      await showValidationErrors(fixture, component.form);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, '.asset-form__initial-transaction mat-label'),
+        ...labelsOf(element, 'mat-error'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Type',
+        'Quantity',
+        'Unit price',
+        'Date',
+        'Quantity must not be negative.',
+        'Unit price must not be negative.',
+        'Date is required.',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
     });
   });
 });

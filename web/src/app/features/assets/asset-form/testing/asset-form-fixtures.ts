@@ -111,6 +111,17 @@ export async function pickInstrument(
   await fixture.whenStable();
 }
 
+// Marks every control of the form touched, the way a blocked submit does, so its error messages
+// render — then lets the view settle.
+export async function showValidationErrors(
+  fixture: ComponentFixture<unknown>,
+  form: AbstractControl,
+): Promise<void> {
+  form.markAllAsTouched();
+  fixture.detectChanges();
+  await fixture.whenStable();
+}
+
 export function renderedText(fixture: ComponentFixture<unknown>): string {
   return (fixture.nativeElement as HTMLElement).textContent ?? '';
 }

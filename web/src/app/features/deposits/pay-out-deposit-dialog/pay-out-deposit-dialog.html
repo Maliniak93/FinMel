@@ -1,4 +1,4 @@
-<h2 mat-dialog-title>Transfer to cash</h2>
+<h2 mat-dialog-title>{{ 'deposits.transferToCash' | transloco }}</h2>
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
@@ -6,7 +6,7 @@
 
     <dl class="pay-out-deposit-dialog__summary">
       <div>
-        <dt>Amount</dt>
+        <dt>{{ 'common.amount' | transloco }}</dt>
         <dd>
           <strong>{{ formatMoney(amount, deposit.currency) }}</strong>
         </dd>
@@ -14,7 +14,7 @@
     </dl>
 
     <mat-form-field appearance="outline" class="pay-out-deposit-dialog__field">
-      <mat-label>Move to</mat-label>
+      <mat-label>{{ 'deposits.fields.moveTo' | transloco }}</mat-label>
       <mat-select formControlName="destinationAssetId">
         @if (destinationCandidatesResource.hasValue()) {
           @for (candidate of destinationCandidatesResource.value(); track candidate.assetId) {
@@ -30,19 +30,19 @@
         destinationCandidatesResource.hasValue() &&
         destinationCandidatesResource.value().length === 0
       ) {
-        <mat-hint
-          >You have no Cash account in {{ deposit.currency }} to move the money to.</mat-hint
-        >
+        <mat-hint>{{
+          'deposits.payOut.noCashAccount' | transloco: { currency: deposit.currency }
+        }}</mat-hint>
       }
       @if (form.controls.destinationAssetId.hasError('required')) {
-        <mat-error>Pick where the money goes.</mat-error>
+        <mat-error>{{ 'deposits.payOut.destinationRequired' | transloco }}</mat-error>
       } @else if (form.controls.destinationAssetId.hasError('server')) {
         <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
       }
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="pay-out-deposit-dialog__field">
-      <mat-label>Date</mat-label>
+      <mat-label>{{ 'common.date' | transloco }}</mat-label>
       <input
         matInput
         [matDatepicker]="datePicker"
@@ -53,17 +53,17 @@
       <mat-datepicker-toggle matIconSuffix [for]="datePicker"></mat-datepicker-toggle>
       <mat-datepicker #datePicker></mat-datepicker>
       @if (form.controls.date.hasError('required')) {
-        <mat-error>Date is required.</mat-error>
+        <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
       } @else if (
         form.controls.date.hasError('dateBeforeSettlement') ||
         form.controls.date.hasError('matDatepickerMin')
       ) {
-        <mat-error>Date can't be before the settlement date.</mat-error>
+        <mat-error>{{ 'deposits.payOut.dateBeforeSettlement' | transloco }}</mat-error>
       } @else if (
         form.controls.date.hasError('dateInFuture') ||
         form.controls.date.hasError('matDatepickerMax')
       ) {
-        <mat-error>Date can't be in the future.</mat-error>
+        <mat-error>{{ 'deposits.payOut.dateInFuture' | transloco }}</mat-error>
       } @else if (form.controls.date.hasError('server')) {
         <mat-error>{{ form.controls.date.getError('server') }}</mat-error>
       }
@@ -75,12 +75,14 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
     <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
       @if (submitting()) {
         <mat-spinner diameter="20" />
       } @else {
-        Transfer
+        {{ 'deposits.payOut.submit' | transloco }}
       }
     </button>
   </mat-dialog-actions>

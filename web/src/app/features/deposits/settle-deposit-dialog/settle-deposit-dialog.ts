@@ -15,6 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { map } from 'rxjs';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview,
@@ -71,6 +72,7 @@ function isAmount(value: number | string | null): value is number | string {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    TranslocoPipe,
   ],
   templateUrl: './settle-deposit-dialog.html',
   styleUrl: './settle-deposit-dialog.scss',
@@ -134,7 +136,8 @@ export class SettleDepositDialog {
       });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? 'Failed to load the Cash accounts.',
+          readProblemDetails(result.error).detail ??
+            translate('deposits.errors.cashAccountsLoadFailed'),
         );
       }
       return result.data ?? [];
@@ -151,7 +154,7 @@ export class SettleDepositDialog {
       );
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? 'Failed to load the settlement preview.',
+          readProblemDetails(result.error).detail ?? translate('deposits.errors.previewLoadFailed'),
         );
       }
       return result.data ?? null;
@@ -238,6 +241,6 @@ export class SettleDepositDialog {
       return;
     }
 
-    this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+    this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 }

@@ -8,7 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
@@ -88,7 +88,9 @@ export class Assets {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load portfolio.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('assets.portfolioLoadFailed'),
+        );
       }
       return result.data;
     },
@@ -120,7 +122,7 @@ export class Assets {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load assets.');
+        throw new Error(readProblemDetails(result.error).detail ?? translate('assets.loadFailed'));
       }
       return result.data ?? [];
     },
@@ -223,8 +225,8 @@ export class Assets {
     });
     if (result.error || !result.data) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to load the deposit.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('assets.depositLoadFailed'),
+        translate('common.dismiss'),
       );
       return;
     }
@@ -246,15 +248,18 @@ export class Assets {
     const transactionCount = Number(asset.transactionCount);
     const message =
       transactionCount > 0
-        ? `"${asset.name}" and its ${transactionCount} ${transactionCount === 1 ? 'transaction' : 'transactions'} will be permanently deleted. This can't be undone.`
-        : `"${asset.name}" will be permanently deleted. This can't be undone.`;
+        ? translate('assets.delete.messageWithTransactions', {
+            name: asset.name,
+            count: transactionCount,
+          })
+        : translate('assets.delete.message', { name: asset.name });
     const confirmed = await firstValueFrom(
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Delete this asset?',
+            title: translate('assets.delete.title'),
             message,
-            confirmLabel: 'Delete',
+            confirmLabel: translate('common.delete'),
             destructive: true,
           },
         })
@@ -270,8 +275,8 @@ export class Assets {
     });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to delete asset.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('assets.delete.failed'),
+        translate('common.dismiss'),
       );
       return;
     }

@@ -1,10 +1,15 @@
 <h2 mat-dialog-title class="asset-form-dialog__title">
   @if (!isEdit && selection()) {
-    <button mat-icon-button type="button" aria-label="Back to asset types" (click)="back()">
+    <button
+      mat-icon-button
+      type="button"
+      [attr.aria-label]="'assets.form.backToTypes' | transloco"
+      (click)="back()"
+    >
       <mat-icon>arrow_back</mat-icon>
     </button>
   }
-  {{ isEdit ? 'Edit asset' : 'New asset' }}
+  {{ (isEdit ? 'assets.form.editTitle' : 'assets.newAsset') | transloco }}
 </h2>
 
 <form (submit)="submit($event)" novalidate>
@@ -34,13 +39,15 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
     @if (selection()) {
       <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
         @if (submitting()) {
           <mat-spinner diameter="20" />
         } @else {
-          {{ isEdit ? 'Save' : 'Create' }}
+          {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
         }
       </button>
     }

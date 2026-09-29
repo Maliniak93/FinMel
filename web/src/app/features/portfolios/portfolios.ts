@@ -11,6 +11,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   deleteApiPortfolioPortfoliosById,
@@ -41,6 +42,7 @@ import { PortfolioFormDialog } from './portfolio-form-dialog/portfolio-form-dial
     MatTableModule,
     MatTooltipModule,
     RouterLink,
+    TranslocoPipe,
   ],
   templateUrl: './portfolios.html',
   styleUrl: './portfolios.scss',
@@ -67,7 +69,9 @@ export class Portfolios {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load portfolios.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('portfolios.loadFailed'),
+        );
       }
       return result.data ?? [];
     },
@@ -85,7 +89,7 @@ export class Portfolios {
       const result = await getApiReportingDashboard({ signal: abortSignal });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? 'Failed to load portfolio values.',
+          readProblemDetails(result.error).detail ?? translate('portfolios.valuesLoadFailed'),
         );
       }
       return result.data;
@@ -142,9 +146,9 @@ export class Portfolios {
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Archive this portfolio?',
-            message: `"${portfolio.name}" will be hidden from your default list — nothing is deleted, and you can still see it by toggling "Show archived".`,
-            confirmLabel: 'Archive',
+            title: translate('portfolios.archive.title'),
+            message: translate('portfolios.archive.message', { name: portfolio.name }),
+            confirmLabel: translate('common.archive'),
           },
         })
         .afterClosed(),
@@ -157,8 +161,8 @@ export class Portfolios {
     const result = await postApiPortfolioPortfoliosByIdArchive({ path: { id: portfolio.id } });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to archive portfolio.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('portfolios.archive.failed'),
+        translate('common.dismiss'),
       );
       return;
     }
@@ -172,9 +176,9 @@ export class Portfolios {
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Restore this portfolio?',
-            message: `"${portfolio.name}" will return to your default list.`,
-            confirmLabel: 'Restore',
+            title: translate('portfolios.restore.title'),
+            message: translate('portfolios.restore.message', { name: portfolio.name }),
+            confirmLabel: translate('common.restore'),
           },
         })
         .afterClosed(),
@@ -187,8 +191,8 @@ export class Portfolios {
     const result = await postApiPortfolioPortfoliosByIdRestore({ path: { id: portfolio.id } });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to restore portfolio.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('portfolios.restore.failed'),
+        translate('common.dismiss'),
       );
       return;
     }
@@ -202,15 +206,18 @@ export class Portfolios {
     const assetCount = Number(portfolio.assetCount);
     const message =
       assetCount > 0
-        ? `"${portfolio.name}" and its ${assetCount} ${assetCount === 1 ? 'asset' : 'assets'}, with all their transactions, will be permanently deleted. This can't be undone.`
-        : `"${portfolio.name}" will be permanently deleted. This can't be undone.`;
+        ? translate('portfolios.delete.messageWithAssets', {
+            name: portfolio.name,
+            count: assetCount,
+          })
+        : translate('portfolios.delete.message', { name: portfolio.name });
     const confirmed = await firstValueFrom(
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Delete this portfolio?',
+            title: translate('portfolios.delete.title'),
             message,
-            confirmLabel: 'Delete',
+            confirmLabel: translate('common.delete'),
             destructive: true,
           },
         })
@@ -224,8 +231,8 @@ export class Portfolios {
     const result = await deleteApiPortfolioPortfoliosById({ path: { id: portfolio.id } });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to delete portfolio.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('portfolios.delete.failed'),
+        translate('common.dismiss'),
       );
       return;
     }

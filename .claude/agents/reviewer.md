@@ -49,6 +49,10 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   verified command whose output you saw. An AC covered only by prose is a blocking finding.
 - **Tests are honest**: no assertion-free tests, no test weakened or deleted to pass, no `Skip`,
   no mock that asserts on the mock.
+- **Deviations**: the implementer may change tests and the spec's design decisions, listing each in
+  `deviations`. Judge each on its `why`: justified -> fine (minor at most); unjustified, or one that
+  leaves an acceptance criterion unproven -> blocking. A changed test or design decision missing from
+  `deviations` is blocking.
 - **Hard rules** (ADRs, `.claude/rules/*`): tenancy `UserId` from JWT claims only + global query
   filter, `Result`/`Result<T>` instead of throwing on expected paths, no cross-service DB access,
   events only via the MassTransit outbox and consumers idempotent, `decimal`/`Money`, external price

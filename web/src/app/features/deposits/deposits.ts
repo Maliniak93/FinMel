@@ -8,7 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -80,7 +80,9 @@ export class Deposits {
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioDeposits({ signal: abortSignal });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load deposits.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('deposits.loadFailed'),
+        );
       }
       return result.data ?? [];
     },
@@ -145,9 +147,9 @@ export class Deposits {
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Delete this deposit?',
-            message: `"${deposit.name}" and its terms will be permanently deleted. This can't be undone.`,
-            confirmLabel: 'Delete',
+            title: translate('deposits.delete.title'),
+            message: translate('deposits.delete.message', { name: deposit.name }),
+            confirmLabel: translate('common.delete'),
             destructive: true,
           },
         })
@@ -163,8 +165,8 @@ export class Deposits {
     });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to delete deposit.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('deposits.delete.failed'),
+        translate('common.dismiss'),
       );
       return;
     }

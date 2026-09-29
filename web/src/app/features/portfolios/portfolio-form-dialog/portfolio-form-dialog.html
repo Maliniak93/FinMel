@@ -1,33 +1,35 @@
-<h2 mat-dialog-title>{{ isEdit ? 'Edit portfolio' : 'New portfolio' }}</h2>
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'portfolios.form.editTitle' : 'portfolios.newPortfolio') | transloco }}
+</h2>
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
     <mat-form-field appearance="outline" class="portfolio-form-dialog__field">
-      <mat-label>Name</mat-label>
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
       <input matInput type="text" formControlName="name" autocomplete="off" />
       @if (form.controls.name.hasError('required')) {
-        <mat-error>Name is required.</mat-error>
+        <mat-error>{{ 'portfolios.form.nameRequired' | transloco }}</mat-error>
       } @else if (form.controls.name.hasError('maxlength')) {
-        <mat-error>Name is too long.</mat-error>
+        <mat-error>{{ 'portfolios.form.nameTooLong' | transloco }}</mat-error>
       } @else if (form.controls.name.hasError('server')) {
         <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
       }
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="portfolio-form-dialog__field">
-      <mat-label>Description</mat-label>
+      <mat-label>{{ 'common.description' | transloco }}</mat-label>
       <textarea matInput formControlName="description" rows="2"></textarea>
       @if (form.controls.description.hasError('maxlength')) {
-        <mat-error>Description is too long.</mat-error>
+        <mat-error>{{ 'portfolios.form.descriptionTooLong' | transloco }}</mat-error>
       }
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="portfolio-form-dialog__field">
-      <mat-label>Currency</mat-label>
+      <mat-label>{{ 'common.currency' | transloco }}</mat-label>
       <mat-select formControlName="currency">
         @if (legacyCurrency) {
           <mat-option [value]="legacyCurrency">
-            {{ legacyCurrency }} — outside the supported set, kept until you choose one below
+            {{ 'portfolios.form.legacyCurrency' | transloco: { currency: legacyCurrency } }}
           </mat-option>
         }
         @for (currency of currencies; track currency.code) {
@@ -35,13 +37,10 @@
         }
       </mat-select>
       @if (legacyCurrency) {
-        <mat-hint
-          >This portfolio's currency isn't PLN, EUR or USD. Saving without changing it will be
-          rejected — pick a supported currency to update it.</mat-hint
-        >
+        <mat-hint>{{ 'portfolios.form.legacyCurrencyHint' | transloco }}</mat-hint>
       }
       @if (form.controls.currency.hasError('required')) {
-        <mat-error>Currency is required.</mat-error>
+        <mat-error>{{ 'portfolios.form.currencyRequired' | transloco }}</mat-error>
       } @else if (form.controls.currency.hasError('server')) {
         <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
       }
@@ -53,12 +52,14 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
     <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
       @if (submitting()) {
         <mat-spinner diameter="20" />
       } @else {
-        {{ isEdit ? 'Save' : 'Create' }}
+        {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
       }
     </button>
   </mat-dialog-actions>

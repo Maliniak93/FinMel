@@ -25,6 +25,7 @@ import {
   writeRequests,
 } from '../testing/deposit-fixtures';
 import { RollOverDepositDialog } from './roll-over-deposit-dialog';
+import { labelsOf, polishProblems, restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 
 // deposit-rollover AC-8. The "Roll over" dialog opens on a Due or a Settled (not paid-out) deposit
@@ -46,8 +47,10 @@ describe('RollOverDepositDialog', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   // The settlement preview answers with `dueDepositSettlementPreview` for a Due deposit and, as the
@@ -332,5 +335,113 @@ describe('RollOverDepositDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  // i18n screens (#132) AC-6: the dialog's title, summary labels, field labels, validation messages
+  // and buttons follow the language. (The read-only term, e.g. "3 months", is not asserted here.)
+  describe('in Polish', () => {
+    function errors(): string[] {
+      return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+    }
+
+    async function read(values: Record<string, unknown>): Promise<string[]> {
+      await fill(values);
+      await component['onSubmit']();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return errors();
+    }
+
+    it('renders in Polish', async () => {
+      await setup(dueDeposit);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...labelsOf(element, 'dt'),
+        ...labelsOf(element, 'mat-label'),
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Roll over',
+        'Term',
+        'Capitalisation',
+        'New start date',
+        'New principal',
+        'Matures on',
+        'Gross interest',
+        'Tax',
+        'Interest rate (%)',
+        'Cancel',
+        'Roll over',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders a Settled deposit in Polish', async () => {
+      await setup(settledDeposit);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...labelsOf(element, 'dt'),
+        ...labelsOf(element, 'mat-label'),
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Roll over',
+        'Term',
+        'Capitalisation',
+        'New start date',
+        'New principal',
+        'Matures on',
+        'Interest rate (%)',
+        'Cancel',
+        'Roll over',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('shows validation in Polish', async () => {
+      await setup(dueDeposit);
+      const scenarios: [string[], Record<string, unknown>][] = [
+        [
+          ['Gross interest is required.', 'Tax is required.', 'Interest rate is required.'],
+          { grossInterest: null, tax: null, annualInterestRatePercent: null },
+        ],
+        [
+          [
+            "Gross interest can't be negative.",
+            "Tax can't be negative.",
+            'Interest rate must be between 0 and 100.',
+          ],
+          { grossInterest: -1, tax: -1, annualInterestRatePercent: 101 },
+        ],
+        [
+          ["Tax can't exceed the gross interest."],
+          { grossInterest: 10, tax: 20, annualInterestRatePercent: 5 },
+        ],
+      ];
+
+      const english: string[][] = [];
+      for (const [expected, values] of scenarios) {
+        english.push(await read(values));
+        expect(english.at(-1)).toEqual(expected);
+      }
+
+      await switchLanguage(fixture, 'pl');
+
+      for (const [index, [, values]] of scenarios.entries()) {
+        expect(polishProblems(english[index], await read(values))).toEqual([]);
+      }
+    });
   });
 });
