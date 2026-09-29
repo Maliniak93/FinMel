@@ -9,6 +9,7 @@ import {
 } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   postApiPortfolioPortfoliosByPortfolioIdAssets,
@@ -70,6 +71,7 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
     GoldAssetForm,
     ManualAssetForm,
     SecurityAssetForm,
+    TranslocoPipe,
   ],
   templateUrl: './asset-form-dialog.html',
   styleUrl: './asset-form-dialog.scss',
@@ -177,7 +179,7 @@ export class AssetFormDialog {
       return;
     }
 
-    this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+    this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 
   // A form nests each block's group (basics, manual value, …), so a top-level key like "Name" is

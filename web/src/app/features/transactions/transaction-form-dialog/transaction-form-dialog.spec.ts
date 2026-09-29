@@ -9,6 +9,13 @@ import type { TransactionResponse } from '../../../api/portfolio';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { TransactionFormDialog, type TransactionFormDialogData } from './transaction-form-dialog';
 import { provideI18nTesting } from '../../../core/i18n/testing';
+import {
+  labelsOf,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  TRANSLATIONS,
+} from '../../../../testing/i18n';
 
 // See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
 // generated client ultimately calls) instead of mocking the SDK module.
@@ -46,8 +53,10 @@ describe('TransactionFormDialog', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   async function setup(data: TransactionFormDialogData): Promise<void> {
@@ -285,5 +294,76 @@ describe('TransactionFormDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  // i18n screens (#132) AC-5: title, field labels, validation messages and buttons follow the
+  // language.
+  it('shows labels and validation in Polish', async () => {
+    await setup({ portfolioId, assetId, assetClass });
+    const element = fixture.nativeElement as HTMLElement;
+    component['form'].controls.quantity.setValue(-1);
+    component['form'].controls.unitPrice.setValue(-1);
+    component['form'].controls.date.setValue(null as unknown as Date);
+    await component['onSubmit']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const texts = () => [
+      ...labelsOf(element, 'h2'),
+      ...labelsOf(element, 'mat-label'),
+      ...labelsOf(element, 'mat-error'),
+      ...labelsOf(element, 'mat-dialog-actions button'),
+    ];
+
+    const english = texts();
+    expect(english).toEqual([
+      'New transaction',
+      'Type',
+      'Quantity',
+      'Unit price',
+      'Date',
+      'Quantity must not be negative.',
+      'Unit price must not be negative.',
+      'Date is required.',
+      'Cancel',
+      'Record',
+    ]);
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(polishProblems(english, texts())).toEqual([]);
+  });
+
+  it('names the amount field in the Polish validation message of a non-priced type', async () => {
+    await setup({ portfolioId, assetId, assetClass });
+    const element = fixture.nativeElement as HTMLElement;
+    component['form'].controls.type.setValue(2); // Deposit: an amount, no unit price
+    component['form'].controls.quantity.setValue(-1);
+    await component['onSubmit']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(labelsOf(element, 'mat-error')).toEqual(['Amount must not be negative.']);
+
+    await switchLanguage(fixture, 'pl');
+
+    const [message] = labelsOf(element, 'mat-error');
+    expect(polishProblems(['Amount must not be negative.'], [message])).toEqual([]);
+    expect(message).toContain(TRANSLATIONS.pl['enums.quantityField.amount'] as string);
+  });
+
+  it('shows the edit title and save button in Polish', async () => {
+    await setup({ portfolioId, assetId, assetClass, transaction: existingTransaction });
+    const element = fixture.nativeElement as HTMLElement;
+    const texts = () => [
+      ...labelsOf(element, 'h2'),
+      ...labelsOf(element, 'mat-dialog-actions button'),
+    ];
+
+    const english = texts();
+    expect(english).toEqual(['Edit transaction', 'Cancel', 'Save']);
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(polishProblems(english, texts())).toEqual([]);
   });
 });

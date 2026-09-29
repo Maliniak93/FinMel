@@ -1,11 +1,19 @@
 import type { ComponentFixture } from '@angular/core/testing';
 
 import {
+  labelsOf,
+  polishProblems,
+  matchesTranslation,
+  restoreEnglish,
+  switchLanguage,
+} from '../../../../../../testing/i18n';
+import {
   cashAsset,
   findControl,
   hasControl,
   mountAssetForm,
   renderedText,
+  showValidationErrors,
   toggleFirstTransaction,
 } from '../../testing/asset-form-fixtures';
 import { CashAssetForm } from './cash-asset-form';
@@ -15,6 +23,11 @@ import { CashAssetForm } from './cash-asset-form';
 describe('CashAssetForm', () => {
   let fixture: ComponentFixture<CashAssetForm>;
   let component: CashAssetForm;
+
+  afterEach(async () => {
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
+  });
 
   async function setup(assetClass: number, asset?: typeof cashAsset): Promise<void> {
     fixture = await mountAssetForm(CashAssetForm, assetClass, asset);
@@ -117,6 +130,49 @@ describe('CashAssetForm', () => {
       const wire = JSON.parse(JSON.stringify(component.toBody()));
       expect(wire).not.toHaveProperty('initialTransaction');
       expect(wire).toEqual({ assetClass: 0, name: 'Checking account', currency: 'PLN' });
+    });
+  });
+  // i18n screens (#132) AC-4: field labels, the valuation hint, the opening-deposit toggle and the
+  // client-side validation messages follow the language.
+  describe('in Polish', () => {
+    it('renders in Polish', async () => {
+      await setup(0);
+      await toggleFirstTransaction(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [...labelsOf(element, 'mat-label'), ...labelsOf(element, 'mat-checkbox')];
+      const hint = () => labelsOf(element, '.asset-form__hint')[0];
+
+      const english = texts();
+      expect(english).toEqual(['Name', 'Currency', 'Amount', 'Date', 'Add opening deposit']);
+      expect(hint()).toMatch(/^Valued automatically from PLN/);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+      // The hint carries the chosen currency.
+      expect(hint()).toContain('PLN');
+      expect(hint()).not.toMatch(/^Valued automatically/);
+      expect(matchesTranslation('pl', hint()), `"${hint()}" is not a pl.json value`).toBe(true);
+    });
+
+    it('shows client-side validation in Polish', async () => {
+      await setup(0);
+      await toggleFirstTransaction(fixture);
+      findControl(component.form, 'quantity').setValue(-5);
+      findControl(component.form, 'date').setValue(null);
+      await showValidationErrors(fixture, component.form);
+      const errors = () => labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+
+      const english = errors();
+      expect(english).toEqual([
+        'Name is required.',
+        'Amount must not be negative.',
+        'Date is required.',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, errors())).toEqual([]);
     });
   });
 });

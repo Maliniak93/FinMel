@@ -1,11 +1,11 @@
 <mat-form-field appearance="outline" class="asset-form__field">
-  <mat-label>Instrument</mat-label>
+  <mat-label>{{ 'assets.form.instrument' | transloco }}</mat-label>
   <input
     matInput
     type="text"
     [formControl]="instrumentControl"
     [matAutocomplete]="instrumentAuto"
-    placeholder="Search by ticker or name"
+    [placeholder]="'assets.form.searchPlaceholder' | transloco"
   />
   <mat-autocomplete
     #instrumentAuto="matAutocomplete"
@@ -30,12 +30,19 @@
 
 @if (selectedInstrument(); as instrument) {
   <p class="asset-form__selected-instrument">
-    Verified: {{ instrument.ticker }} — {{ instrument.name }} ({{ instrument.quoteCurrency }})
+    {{
+      'assets.form.verified'
+        | transloco
+          : {
+              ticker: instrument.ticker,
+              name: instrument.name,
+              currency: instrument.quoteCurrency,
+            }
+    }}
   </p>
 } @else {
   <p class="asset-form__hint">
-    Pick an existing instrument above, or verify a new ticker below — creation is blocked until one
-    is selected.
+    {{ 'assets.form.pickHint' | transloco }}
   </p>
 }
 
@@ -46,23 +53,23 @@
     class="asset-form__custom-instrument-link"
     (click)="toggleCustomInstrumentForm()"
   >
-    {{ showCustomInstrumentForm() ? 'Cancel' : "Can't find it? Verify a new ticker" }}
+    {{ (showCustomInstrumentForm() ? 'common.cancel' : 'assets.form.cantFindIt') | transloco }}
   </button>
 
   @if (showCustomInstrumentForm()) {
     <div class="asset-form__custom-instrument" [formGroup]="customInstrumentForm">
       <mat-form-field appearance="outline" class="asset-form__field">
-        <mat-label>Ticker / id</mat-label>
+        <mat-label>{{ 'assets.form.tickerLabel' | transloco }}</mat-label>
         <input matInput type="text" formControlName="ticker" autocomplete="off" />
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="asset-form__field">
-        <mat-label>Name</mat-label>
+        <mat-label>{{ 'common.name' | transloco }}</mat-label>
         <input matInput type="text" formControlName="name" autocomplete="off" />
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="asset-form__field">
-        <mat-label>Quote currency</mat-label>
+        <mat-label>{{ 'assets.form.quoteCurrency' | transloco }}</mat-label>
         <input
           matInput
           type="text"
@@ -70,7 +77,7 @@
           maxlength="3"
           autocomplete="off"
         />
-        <mat-hint>3-letter code, e.g. USD</mat-hint>
+        <mat-hint>{{ 'assets.form.quoteCurrencyHint' | transloco }}</mat-hint>
       </mat-form-field>
 
       @if (customInstrumentOutcome() === 'notFound') {
@@ -84,12 +91,12 @@
             [disabled]="customInstrumentSubmitting()"
             (click)="addInstrumentAnyway()"
           >
-            Add anyway
+            {{ 'assets.form.addAnyway' | transloco }}
           </button>
         </div>
       } @else if (customInstrumentOutcome() === 'conflict') {
         <p class="asset-form__error" role="alert">
-          {{ customInstrumentMessage() }} Try searching for it above instead.
+          {{ customInstrumentMessage() }} {{ 'assets.form.tryAnother' | transloco }}
         </p>
       } @else if (customInstrumentOutcome() === 'error') {
         <p class="asset-form__error" role="alert">{{ customInstrumentMessage() }}</p>
@@ -105,7 +112,7 @@
         @if (customInstrumentSubmitting()) {
           <mat-spinner diameter="20" />
         } @else {
-          Verify and add
+          {{ 'assets.form.verifyAndAdd' | transloco }}
         }
       </button>
     </div>

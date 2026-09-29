@@ -67,7 +67,9 @@ export class Transactions {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load asset.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('transactions.assetLoadFailed'),
+        );
       }
       return result.data;
     },
@@ -83,7 +85,9 @@ export class Transactions {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load portfolio.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('transactions.portfolioLoadFailed'),
+        );
       }
       return result.data;
     },
@@ -132,7 +136,9 @@ export class Transactions {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load transactions.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('transactions.loadFailed'),
+        );
       }
       return result.data;
     },
@@ -211,9 +217,12 @@ export class Transactions {
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Delete this transaction?',
-            message: `This ${translate(transactionTypeLabel(transaction.type))} of ${formatQuantity(transaction.quantity)} will be permanently deleted. This can't be undone.`,
-            confirmLabel: 'Delete',
+            title: translate('transactions.delete.title'),
+            message: translate('transactions.delete.message', {
+              type: translate(transactionTypeLabel(transaction.type)),
+              quantity: formatQuantity(transaction.quantity),
+            }),
+            confirmLabel: translate('common.delete'),
             destructive: true,
           },
         })
@@ -229,8 +238,8 @@ export class Transactions {
     });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to delete transaction.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('transactions.delete.failed'),
+        translate('common.dismiss'),
       );
       return;
     }

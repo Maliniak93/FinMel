@@ -8,6 +8,16 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import {
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  textOf,
+  textsOf,
+} from '../../../testing/i18n';
+import { provideI18nTesting } from '../../core/i18n/testing';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { PortfolioResponse } from '../../api/portfolio';
 import { client as reportingClient } from '../../api/reporting/client.gen';
@@ -60,8 +70,10 @@ describe('Portfolios', () => {
     reportingClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   // Routes the two concurrent initial GETs (portfolios list, Reporting dashboard) to distinct
@@ -87,6 +99,7 @@ describe('Portfolios', () => {
       imports: [Portfolios],
       providers: [
         provideRouter([]),
+        provideI18nTesting(),
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: snackBar },
       ],
@@ -502,6 +515,201 @@ describe('Portfolios', () => {
       const exactTooltip = tooltipOn(1);
       expect(exactTooltip.message).toBe('b'.repeat(200));
       expect(exactTooltip.disabled).toBe(false);
+    });
+  });
+
+  // i18n screens (#132) AC-2: the list, its row menu, the archive / restore / delete confirmations
+  // and the failure snackbar fallback follow the language.
+  describe('in Polish', () => {
+    const archived: PortfolioResponse = { ...portfolio, isArchived: true };
+
+    // The row menu's items, opened and closed again so the next read starts clean.
+    async function menuItems(): Promise<string[]> {
+      const trigger = fixture.debugElement
+        .query(By.directive(MatMenuTrigger))
+        .injector.get(MatMenuTrigger);
+      trigger.openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const items = labelsOf(
+        TestBed.inject(OverlayContainer).getContainerElement(),
+        '.mat-mdc-menu-item',
+      );
+      trigger.closeMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return items;
+    }
+
+    function confirmationData(): { title: string; message: string; confirmLabel: string } {
+      return (dialog.open.mock.calls[0][1] as { data: never }).data;
+    }
+
+    function confirmationTexts(data: { title: string; confirmLabel: string }): string[] {
+      return [data.title, data.confirmLabel];
+    }
+
+    it('renders in Polish', async () => {
+      await setup(jsonResponse([archived]));
+      component['includeArchived'].set(true);
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const placeholderTooltip = () =>
+        fixture.debugElement
+          .query(By.css('.portfolios-page__value-placeholder'))
+          .injector.get(MatTooltip).message;
+      const texts = async () => [
+        ...labelsOf(element, 'h1'),
+        ...labelsOf(element, 'mat-slide-toggle'),
+        ...labelsOf(element, '.portfolios-page__header-actions > button'),
+        ...labelsOf(element, 'th:not(:empty)'),
+        ...labelsOf(element, 'mat-chip'),
+        placeholderTooltip(),
+        ...(await menuItems()),
+      ];
+
+      const english = await texts();
+      expect(english).toEqual([
+        'Portfolios',
+        'Show archived',
+        'New portfolio',
+        'Name',
+        'Currency',
+        'Total value',
+        'Status',
+        'Archived',
+        'No valuation yet',
+        'Edit',
+        'Restore',
+        'Delete',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, await texts(), ['Status'])).toEqual([]);
+    });
+
+    it('labels the row actions button with the portfolio name in Polish', async () => {
+      await setup(jsonResponse([portfolio]));
+      const element = fixture.nativeElement as HTMLElement;
+      const label = () => element.querySelector('td button')?.getAttribute('aria-label') ?? '';
+
+      expect(label()).toBe('Actions for Retirement');
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(label()).not.toContain('Actions for');
+      expect(label()).toContain('Retirement');
+      expect(matchesTranslation('pl', label()), `"${label()}" is not a pl.json value`).toBe(true);
+    });
+
+    it('renders the empty state in Polish', async () => {
+      await setup(jsonResponse([]));
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...textsOf(element, '.portfolios-page__state p'),
+        ...textsOf(element, '.portfolios-page__state button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        "You don't have any portfolios yet.",
+        'Create your first portfolio',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the load-failure retry button in Polish', async () => {
+      await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(textsOf(element, '.portfolios-page__state button')).toEqual(['Retry']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['Retry'], textsOf(element, '.portfolios-page__state button'))).toEqual(
+        [],
+      );
+      // The backend's own message stays as it arrived.
+      expect(textOf(element.querySelector('.portfolios-page__state p'))).toBe(
+        'Service unavailable.',
+      );
+    });
+
+    it('asks to archive in Polish, with the portfolio name in the message', async () => {
+      await setup(jsonResponse([portfolio]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      await component['archive'](portfolio);
+      const english = confirmationData();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['archive'](portfolio);
+      const polish = confirmationData();
+
+      expect(english.title).toBe('Archive this portfolio?');
+      expect(polishProblems(confirmationTexts(english), confirmationTexts(polish))).toEqual([]);
+      expect(polish.message).not.toBe(english.message);
+      expect(polish.message).toContain('"Retirement"');
+      expect(polish.message).not.toContain('will be hidden');
+      expect(
+        matchesTranslation('pl', polish.message),
+        `"${polish.message}" is not a pl.json value`,
+      ).toBe(true);
+    });
+
+    it('asks to restore in Polish', async () => {
+      await setup(jsonResponse([archived]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      await component['restore'](archived);
+      const english = confirmationData();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['restore'](archived);
+      const polish = confirmationData();
+
+      expect(english.title).toBe('Restore this portfolio?');
+      expect(polishProblems(confirmationTexts(english), confirmationTexts(polish))).toEqual([]);
+      expect(polish.message).toContain('"Retirement"');
+      expect(polish.message).not.toContain('will return');
+    });
+
+    it('asks to delete in Polish, with the portfolio name and asset count in the message', async () => {
+      const withAssets: PortfolioResponse = { ...portfolio, assetCount: 2 };
+      await setup(jsonResponse([withAssets]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      await component['remove'](withAssets);
+      const english = confirmationData();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](withAssets);
+      const polish = confirmationData();
+
+      expect(english.title).toBe('Delete this portfolio?');
+      expect(polishProblems(confirmationTexts(english), confirmationTexts(polish))).toEqual([]);
+      expect(polish.message).toContain('"Retirement"');
+      expect(polish.message).toContain('2');
+      expect(polish.message).not.toContain('permanently deleted');
+    });
+
+    it('shows the failure snackbar fallback in Polish', async () => {
+      await setup(jsonResponse([portfolio]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      fetchSpy.mockResolvedValueOnce(jsonResponse({ title: 'Boom' }, 500));
+
+      await switchLanguage(fixture, 'pl');
+      await component['archive'](portfolio);
+
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      const [message, action] = snackBar.open.mock.calls[0] as [string, string];
+      expect(
+        polishProblems(['Failed to archive portfolio.', 'Dismiss'], [message, action]),
+      ).toEqual([]);
     });
   });
 });

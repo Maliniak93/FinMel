@@ -2,7 +2,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
 import { provideNativeDateAdapter } from '@angular/material/core';
 
-import { findControl, hasControl, toggleFirstTransaction } from '../../testing/asset-form-fixtures';
+import {
+  labelsOf,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  TRANSLATIONS,
+} from '../../../../../../testing/i18n';
+import {
+  findControl,
+  hasControl,
+  showValidationErrors,
+  toggleFirstTransaction,
+} from '../../testing/asset-form-fixtures';
 import {
   buildInitialTransaction,
   createFirstTransactionGroup,
@@ -15,6 +27,11 @@ import { provideI18nTesting } from '../../../../../core/i18n/testing';
 describe('FirstTransactionFields', () => {
   let fixture: ComponentFixture<FirstTransactionFields>;
   let group: ReturnType<typeof createFirstTransactionGroup>;
+
+  afterEach(async () => {
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
+  });
 
   // `openingDeposit` mirrors how cash-asset-form renders the block (cash-transaction-types): its
   // group is the currency-valued one and the block is told to show an opening deposit.
@@ -138,5 +155,76 @@ describe('FirstTransactionFields', () => {
     expect(
       (fixture.nativeElement as HTMLElement).querySelector('[formcontrolname="fee"]'),
     ).toBeNull();
+  });
+  // i18n screens (#132) AC-4: the toggle, the field labels and the "… must not be negative."
+  // messages (with the quantity or amount label interpolated) follow the language.
+  describe('in Polish', () => {
+    it('renders in Polish', async () => {
+      await setup();
+      await toggleFirstTransaction(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [...labelsOf(element, 'mat-checkbox'), ...labelsOf(element, 'mat-label')];
+
+      const english = texts();
+      expect(english).toEqual(['Add first transaction', 'Type', 'Quantity', 'Unit price', 'Date']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the opening-deposit variant in Polish', async () => {
+      await setup({ openingDeposit: true });
+      await toggleFirstTransaction(fixture);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [...labelsOf(element, 'mat-checkbox'), ...labelsOf(element, 'mat-label')];
+
+      const english = texts();
+      expect(english).toEqual(['Add opening deposit', 'Amount', 'Date']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('shows the validation messages in Polish, naming the field', async () => {
+      await setup();
+      await toggleFirstTransaction(fixture);
+      findControl(group, 'quantity').setValue(-1);
+      findControl(group, 'unitPrice').setValue(-1);
+      findControl(group, 'date').setValue(null);
+      await showValidationErrors(fixture, group);
+      const errors = () => labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+
+      const english = errors();
+      expect(english).toEqual([
+        'Quantity must not be negative.',
+        'Unit price must not be negative.',
+        'Date is required.',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      const polish = errors();
+      expect(polishProblems(english, polish)).toEqual([]);
+      expect(polish[0]).toContain(TRANSLATIONS.pl['enums.quantityField.quantity'] as string);
+    });
+
+    it('names the amount in the Polish validation message of a non-priced type', async () => {
+      await setup();
+      await toggleFirstTransaction(fixture);
+      findControl(group, 'type').setValue(2); // Deposit: an amount, no unit price
+      findControl(group, 'quantity').setValue(-1);
+      await showValidationErrors(fixture, group);
+      const errors = () => labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+
+      expect(errors()).toEqual(['Amount must not be negative.']);
+
+      await switchLanguage(fixture, 'pl');
+
+      const [message] = errors();
+      expect(polishProblems(['Amount must not be negative.'], [message])).toEqual([]);
+      expect(message).toContain(TRANSLATIONS.pl['enums.quantityField.amount'] as string);
+    });
   });
 });

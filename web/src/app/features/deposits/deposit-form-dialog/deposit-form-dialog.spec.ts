@@ -32,6 +32,15 @@ import {
 } from '../testing/deposit-fixtures';
 import { DepositFormDialog, type DepositFormDialogData } from './deposit-form-dialog';
 import { provideI18nTesting } from '../../../core/i18n/testing';
+import { formatMoney } from '../../../shared/format';
+import {
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  textOf,
+} from '../../../../testing/i18n';
 
 // term-deposits AC-14. The create/edit dialog for a term deposit: its controls are named after the
 // AddDepositRequest/UpdateDepositRequest properties (camelCase) so a server 400 keyed on a field
@@ -47,8 +56,10 @@ describe('DepositFormDialog', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   function method(input: unknown): string {
@@ -588,6 +599,167 @@ describe('DepositFormDialog', () => {
         empty: false,
       });
       expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
+    });
+  });
+
+  // i18n screens (#132) AC-6: the dialog's title, field labels, hints, validation messages and
+  // buttons follow the language.
+  describe('in Polish', () => {
+    // An element's text without what `removed` matches inside it ("Matures on <strong>date</strong>").
+    function textWithout(selector: string, removed: string): string {
+      const clone = (fixture.nativeElement as HTMLElement)
+        .querySelector(selector)!
+        .cloneNode(true) as Element;
+      clone.querySelectorAll(removed).forEach((node) => node.remove());
+      return textOf(clone);
+    }
+
+    function errors(): string[] {
+      return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+    }
+
+    async function touchAll(): Promise<void> {
+      await component['onSubmit']();
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    it('renders in Polish', async () => {
+      await setup({});
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...labelsOf(element, 'mat-label'),
+        ...labelsOf(element, 'mat-slide-toggle'),
+        textWithout('.deposit-form-dialog__maturity', 'strong'),
+        selectTriggerState(fixture, 'fundingAssetId').triggerText,
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'New deposit',
+        'Name',
+        'Bank',
+        'Portfolio',
+        'Currency',
+        'Source of funds',
+        'Principal',
+        'Start date',
+        'Term',
+        'Unit',
+        'Annual interest rate (%)',
+        'Capitalisation',
+        'Interest lost on early break (%)',
+        'IKE/IKZE — no Belka tax',
+        'Matures on',
+        'New money (from outside)',
+        'Cancel',
+        'Create',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts(), ['Bank'])).toEqual([]);
+    });
+
+    it('shows required-field validation in Polish', async () => {
+      await setup({});
+      await touchAll();
+
+      const english = errors();
+      expect(english).toEqual([
+        'Name is required.',
+        'Portfolio is required.',
+        'Principal is required.',
+        'Term is required.',
+        'Interest rate is required.',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, errors())).toEqual([]);
+    });
+
+    it('shows range and length validation in Polish', async () => {
+      await setup({});
+      await fill({
+        name: 'a'.repeat(201),
+        bankName: 'a'.repeat(101),
+        principal: 0,
+        startDate: null,
+        termLength: 121,
+        annualInterestRatePercent: 101,
+        earlyBreakInterestLossPercent: 101,
+      });
+      await touchAll();
+
+      const english = errors();
+      expect(english).toEqual([
+        'Name is too long.',
+        'Bank name is too long.',
+        'Portfolio is required.',
+        'Principal must be greater than 0.',
+        'Start date is required.',
+        'Term is at most 120.',
+        'Interest rate must be between 0 and 100.',
+        'Early-break loss must be between 0 and 100.',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      const polish = errors();
+      expect(polishProblems(english, polish)).toEqual([]);
+      // "Term is at most {{ max }}." keeps its number.
+      expect(polish[5]).toContain('120');
+    });
+
+    it('shows the source-balance validation in Polish, with the balance in the active format', async () => {
+      await setup({ portfolioId: savingsPortfolioId });
+      await fill({ fundingAssetId: plnCashCandidate.assetId, principal: 6000 });
+      await touchAll();
+
+      const english = errors().filter((text) => text.startsWith('Principal is above'));
+      expect(english).toHaveLength(1);
+
+      await switchLanguage(fixture, 'pl');
+
+      const messages = errors();
+      const polish = messages.find((text) =>
+        text.includes(formatMoney(5000, 'PLN').replace(/\s+/g, ' ')),
+      )!;
+      expect(
+        polish,
+        `no message with the balance in the active format among: ${messages.join(' | ')}`,
+      ).toBeDefined();
+      expect(polish).not.toMatch(/^Principal is above/);
+      expect(matchesTranslation('pl', polish), `"${polish}" is not a pl.json value`).toBe(true);
+    });
+
+    it('renders the edit dialog in Polish', async () => {
+      await setup({
+        deposit: depositResponse({ fundingAssetName: null } as Partial<DepositResponse>),
+      });
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        textWithout('.deposit-form-dialog__funding', 'strong'),
+        labelsOf(element, '.deposit-form-dialog__funding strong')[0],
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Edit deposit',
+        'Source of funds',
+        'New money (from outside)',
+        'Cancel',
+        'Save',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
     });
   });
 });

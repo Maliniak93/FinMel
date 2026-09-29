@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { debounceTime, distinctUntilChanged, map } from 'rxjs';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiMarketdataInstrumentsById,
@@ -36,8 +37,8 @@ export function createInstrumentControl(): FormControl<InstrumentOption | null> 
 }
 
 // The banner the shell shows when a market asset is submitted with no instrument selected.
-export const INSTRUMENT_REQUIRED_MESSAGE =
-  'Verify a ticker, or pick one from search, before creating this asset.';
+// A translation key: the forms translate it when the submit is blocked.
+export const INSTRUMENT_REQUIRED_MESSAGE = 'assets.form.instrumentRequired';
 
 // ITickerVerifier's three outcomes (ADR-018) plus 'conflict' (409 already-in-dictionary) and a
 // generic 'error' fallback — mirrored in instrument-picker.html's @if/@else-if chain.
@@ -55,6 +56,7 @@ type CustomInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'conflict' 
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    TranslocoPipe,
   ],
   templateUrl: './instrument-picker.html',
   styleUrl: './instrument-picker.scss',
@@ -201,7 +203,9 @@ export class InstrumentPicker {
 
     if (result.error) {
       const problem = readProblemDetails(result.error);
-      this.customInstrumentMessage.set(problem.detail ?? 'Failed to add instrument.');
+      this.customInstrumentMessage.set(
+        problem.detail ?? translate('assets.form.addInstrumentFailed'),
+      );
       this.customInstrumentOutcome.set(this.classifyCustomInstrumentError(problem));
       return;
     }

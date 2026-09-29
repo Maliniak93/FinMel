@@ -1,5 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { MatTooltip } from '@angular/material/tooltip';
 import { provideRouter } from '@angular/router';
+
+import {
+  matchesTranslation,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  textOf,
+  textsOf,
+} from '../../../testing/i18n';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
@@ -7,6 +18,7 @@ import type { DashboardResponse } from '../../api/reporting';
 import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
+import { formatDate } from '../../shared/format';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -47,8 +59,10 @@ describe('Dashboard', () => {
     reportingClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   async function setup(
@@ -122,5 +136,75 @@ describe('Dashboard', () => {
   it('surfaces a load failure through the resource error', async () => {
     await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
     expect(component['dashboardResource'].error()?.message).toBe('Service unavailable.');
+  });
+  // i18n screens (#132) AC-1: headings, the stale chip and its tooltip, the "as of" line and the
+  // chart's own texts follow the language.
+  it('renders in Polish', async () => {
+    await setup(jsonResponse({ ...dashboard, isStale: true } satisfies DashboardResponse));
+    const element = fixture.nativeElement as HTMLElement;
+    const tooltip = () =>
+      fixture.debugElement.query(By.css('mat-chip')).injector.get(MatTooltip).message;
+    const texts = () => [
+      ...textsOf(element, 'h1, h2'),
+      textOf(element.querySelector('mat-chip')),
+      tooltip(),
+      textOf(element.querySelector('.net-worth-chart__empty')),
+    ];
+    const asOf = () => textOf(element.querySelector('.dashboard-page__as-of'));
+
+    const english = texts();
+    expect(english.slice(0, 3)).toEqual(['Dashboard', 'Net worth history', 'Stale']);
+    expect(asOf()).toMatch(/^As of /);
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(polishProblems(english, texts())).toEqual([]);
+    expect(asOf()).not.toMatch(/^As of /);
+    expect(asOf()).toContain(formatDate('2026-08-09'));
+    expect(matchesTranslation('pl', asOf()), `"${asOf()}" is not a pl.json value`).toBe(true);
+  });
+
+  it('renders the empty state in Polish', async () => {
+    await setup(
+      jsonResponse({
+        netWorthPln: 0,
+        asOf: null,
+        isStale: false,
+        byAssetClass: [],
+        byPortfolio: [],
+      } satisfies DashboardResponse),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    const texts = () => [
+      textOf(element.querySelector('h1')),
+      textOf(element.querySelector('.dashboard-page__state p')),
+      textOf(element.querySelector('.dashboard-page__state a')),
+    ];
+
+    const english = texts();
+    expect(english).toEqual([
+      'Dashboard',
+      "You haven't entered any wealth yet.",
+      'Go to portfolios',
+    ]);
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(polishProblems(english, texts())).toEqual([]);
+  });
+
+  it('renders the load-failure retry button in Polish', async () => {
+    await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(textsOf(element, '.dashboard-page__state button')).toEqual(['Retry']);
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(polishProblems(['Retry'], textsOf(element, '.dashboard-page__state button'))).toEqual(
+      [],
+    );
+    // The backend's own message stays as it arrived.
+    expect(textOf(element.querySelector('.dashboard-page__state p'))).toBe('Service unavailable.');
   });
 });

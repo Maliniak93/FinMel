@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioTransferCandidates,
@@ -53,6 +54,7 @@ function today(): Date {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    TranslocoPipe,
   ],
   templateUrl: './pay-out-deposit-dialog.html',
   styleUrl: './pay-out-deposit-dialog.scss',
@@ -97,7 +99,8 @@ export class PayOutDepositDialog {
       });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? 'Failed to load the Cash accounts.',
+          readProblemDetails(result.error).detail ??
+            translate('deposits.errors.cashAccountsLoadFailed'),
         );
       }
       return result.data ?? [];
@@ -155,6 +158,6 @@ export class PayOutDepositDialog {
       return;
     }
 
-    this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+    this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 }

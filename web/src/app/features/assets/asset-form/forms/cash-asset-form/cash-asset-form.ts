@@ -1,5 +1,6 @@
 import { Component, computed, forwardRef, inject, input, type OnInit } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import type { AssetClass, AssetResponse } from '../../../../../api/portfolio';
 import { ASSET_FORM, assetFormBody, type AssetForm, type AssetFormBody } from '../../asset-form';
@@ -17,7 +18,7 @@ import {
 // value — the body is just the basics, plus an opening Deposit when the first transaction is added.
 @Component({
   selector: 'app-cash-asset-form',
-  imports: [AssetBasicsFields, FirstTransactionFields],
+  imports: [AssetBasicsFields, FirstTransactionFields, TranslocoPipe],
   templateUrl: './cash-asset-form.html',
   styleUrl: './cash-asset-form.scss',
   providers: [{ provide: ASSET_FORM, useExisting: forwardRef(() => CashAssetForm) }],
