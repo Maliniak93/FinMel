@@ -53,6 +53,7 @@ public sealed class AssetPositionChangedConsumer(
                 ManualValueAmount = message.ManualValueAmount,
                 ManualValueDate = message.ManualValueDate,
                 PortfolioIsArchived = message.PortfolioIsArchived,
+                IsArchived = message.IsArchived,
                 Version = message.Version,
                 UpdatedAt = DateTimeOffset.UtcNow,
             });
@@ -76,6 +77,7 @@ public sealed class AssetPositionChangedConsumer(
             position.ManualValueAmount = message.ManualValueAmount;
             position.ManualValueDate = message.ManualValueDate;
             position.PortfolioIsArchived = message.PortfolioIsArchived;
+            position.IsArchived = message.IsArchived;
             position.Version = message.Version;
             position.UpdatedAt = DateTimeOffset.UtcNow;
         }
@@ -84,6 +86,8 @@ public sealed class AssetPositionChangedConsumer(
         // inside the inbox transaction, so both commit or neither does (ADR-012).
         await db.SaveChangesAsync(cancellationToken);
 
+        // Only an archived portfolio skips the revaluation. An asset archive or restore revalues today,
+        // so its line leaves or rejoins today's snapshot — earlier dates stay (asset-archive).
         if (message.PortfolioIsArchived)
         {
             return;

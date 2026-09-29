@@ -75,7 +75,8 @@ export class Transactions {
     },
   });
 
-  // AssetResponse carries no archived flag, so the owning portfolio is loaded for it alone. Loaded
+  // AssetResponse carries only the asset's own archived flag, not its portfolio's, so the owning
+  // portfolio is loaded for that alone. Loaded
   // once: nothing on this page can archive or restore it, so reload() leaves it alone.
   protected readonly portfolioResource = resource({
     params: () => ({ portfolioId: this.portfolioId() }),
@@ -109,8 +110,15 @@ export class Transactions {
       Number(this.assetResource.value().assetClass) === ASSET_CLASS.Deposit,
   );
 
+  // An asset archived on its own is read-only the same way (asset-archive): 409 on every write.
+  protected readonly isAssetArchived = computed(
+    () => this.assetResource.hasValue() && this.assetResource.value().isArchived,
+  );
+
   // No record / edit / delete action where none would be accepted.
-  protected readonly isReadOnly = computed(() => this.isArchived() || this.isTermDeposit());
+  protected readonly isReadOnly = computed(
+    () => this.isArchived() || this.isAssetArchived() || this.isTermDeposit(),
+  );
 
   // The actions column holds only Edit / Delete, so a read-only view drops it entirely.
   protected readonly displayedColumns = computed(() => [

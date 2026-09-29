@@ -229,6 +229,43 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(28.12m, settled.SettledTax);
     }
 
+    /// <summary>asset-archive AC-5: settling an archived Due deposit is a 409 <c>Conflict.AssetArchived</c> and nothing changes.</summary>
+    [Fact]
+    public async Task Settle_ArchivedDeposit_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.ArchiveAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(SettleDepositUri(portfolioId, deposit.AssetId), NewSettleRequest(), cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        await client.AssertDepositUnsettledAsync(portfolioId, deposit.AssetId, cancellationToken);
+    }
+
+    /// <summary>asset-archive AC-6: an archived Cash as the destination is a 400 <c>Validation.InvalidTransferCounterpart</c>; nothing is written.</summary>
+    [Fact]
+    public async Task Settle_ToArchivedCash_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var (cashPortfolioId, cashId) = await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            SettleDepositUri(portfolioId, deposit.AssetId), NewSettleRequest(destinationAssetId: cashId), cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+        await client.AssertDepositUnsettledAsync(portfolioId, deposit.AssetId, cancellationToken);
+        await client.AssertCashUntouchedAsync(cashPortfolioId, cashId, cancellationToken);
+    }
+
     /// <summary>A deposit of an archived portfolio is read-only: settling it is a 409 and nothing changes.</summary>
     [Fact]
     public async Task Settle_ArchivedPortfolio_ReturnsConflict()

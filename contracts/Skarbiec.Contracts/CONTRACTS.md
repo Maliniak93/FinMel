@@ -14,19 +14,9 @@ over time is suspended while ADR-019 (greenfield mode) holds — see the rules b
 
 ## Rules
 
-<<<<<<< Updated upstream
 These wire-versioning rules govern the **event/DTO records** (e.g. `UserRegistered`), not the
-<<<<<<< Updated upstream
 shared primitives (`Money`, `AssetClass`, `AssetValuationMode`, `SupportedCurrencies`,
 `Result`/`Result<T>`/`Error`) — those never go on the wire and version like any other C# type.
-=======
-shared primitives (`Money`, `AssetClass`, `SupportedCurrencies`, `Result`/`Result<T>`/`Error`) —
-=======
-These rules govern the **event/DTO records** (e.g. `UserRegistered`), not the shared primitives
-(`Money`, `AssetClass`, `AssetValuationMode`, `SupportedCurrencies`, `Result`/`Result<T>`/`Error`) —
->>>>>>> Stashed changes
-those never go on the wire and version like any other C# type.
->>>>>>> Stashed changes
 
 1. **Edit the record in place** (ADR-019 — greenfield mode). The system has one user and no real
    data, so there is no old shape to stay compatible with: rename, retype or remove a field
@@ -39,6 +29,9 @@ those never go on the wire and version like any other C# type.
    fields must deserialize without error, so an in-flight message from a not-yet-restarted service
    never poisons a queue. This is the one wire rule ADR-019 keeps; the deserialization tests in
    `Skarbiec.Contracts.Tests` (fixtures `*-with-extra-fields.json`) guard it.
+4. **A `required` member must be in every payload.** System.Text.Json rejects a message missing a
+   `required` property, so adding one (e.g. `AssetPositionChanged.IsArchived`, asset-archive) means
+   updating the `*-with-extra-fields.json` fixture in the same change.
 
 When ADR-019 is revoked (real data in production), the classic discipline comes back: additive
 only, never rename or remove, breaking change → a new `V2` record published alongside the old one.

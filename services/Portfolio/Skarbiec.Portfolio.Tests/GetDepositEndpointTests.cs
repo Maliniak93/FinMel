@@ -14,6 +14,23 @@ namespace Skarbiec.Portfolio.Tests;
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    /// <summary>asset-archive AC-7: <c>GET</c> of an archived deposit returns it with <c>isArchived</c> true.</summary>
+    [Fact]
+    public async Task Get_ArchivedDeposit_ReturnsFlag()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        Assert.False((await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken)).IsArchived);
+        await client.ArchiveAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(DepositUri(portfolioId, deposit.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.True(body!.IsArchived);
+    }
+
     [Fact]
     public async Task Get_ExistingDeposit_ReturnsTermsProjectionAndStatus()
     {

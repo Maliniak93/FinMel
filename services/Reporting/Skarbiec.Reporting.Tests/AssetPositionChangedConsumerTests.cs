@@ -54,6 +54,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 ManualValueAmount = null,
                 ManualValueDate = null,
                 PortfolioIsArchived = false,
+                IsArchived = false,
                 Version = 0,
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
@@ -277,6 +278,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Currency = "PLN",
                 Quantity = 10m,
                 PortfolioIsArchived = false,
+                IsArchived = false,
                 Version = 0,
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
@@ -375,6 +377,80 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// asset-archive AC-9: an event with <c>IsArchived = true</c> revalues today without that asset —
+    /// today's snapshot totals only B and A has no line today — while yesterday's snapshot and line are
+    /// never touched.
+    /// </summary>
+    [Fact]
+    public async Task Consume_ArchivedAsset_DropsOutOfToday()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var yesterday = today.AddDays(-1);
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var assetAId = Guid.NewGuid();
+        var assetBId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedValuationLineAsync(userId, portfolioId, assetAId, yesterday, 111m, cancellationToken, quantity: 111m);
+            await db.SeedValuationLineAsync(userId, portfolioId, assetBId, yesterday, 222m, cancellationToken, quantity: 222m);
+            await db.SeedSnapshotAsync(userId, portfolioId, yesterday, 333m, cancellationToken);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 0), cancellationToken);
+            await bus.Publish(Event(assetBId, portfolioId, userId, quantity: 200m, version: 0), cancellationToken);
+            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 300m);
+
+            await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 1, isArchived: true), cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 200m);
+            Assert.Equal(200m, snapshot.TotalPln);
+            var line = Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
+            Assert.Equal(assetBId, line.AssetId);
+            Assert.True((await WaitForPositionAsync(provider, assetAId, cancellationToken)).IsArchived);
+
+            var yesterdaySnapshot = await GetSnapshotAsync(containers, portfolioId, yesterday, cancellationToken);
+            Assert.Equal(333m, yesterdaySnapshot!.TotalPln);
+            Assert.Equal(2, (await GetLinesAsync(containers, portfolioId, yesterday, cancellationToken)).Count);
+        }, cancellationToken);
+    }
+
+    /// <summary>asset-archive AC-9: a later event with <c>IsArchived = false</c> brings the asset's line back — today totals A + B again.</summary>
+    [Fact]
+    public async Task Consume_RestoredAsset_RejoinsToday()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var assetAId = Guid.NewGuid();
+        var assetBId = Guid.NewGuid();
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 0), cancellationToken);
+            await bus.Publish(Event(assetBId, portfolioId, userId, quantity: 200m, version: 0), cancellationToken);
+            await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 1, isArchived: true), cancellationToken);
+            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 200m);
+
+            await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 2, isArchived: false), cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 300m);
+            Assert.Equal(300m, snapshot.TotalPln);
+            var lines = await GetLinesAsync(containers, portfolioId, today, cancellationToken);
+            Assert.Equal(2, lines.Count);
+            Assert.Contains(lines, l => l.AssetId == assetAId && l.ValuePln == 100m);
+            Assert.False((await WaitForPositionAsync(provider, assetAId, cancellationToken)).IsArchived);
+        }, cancellationToken);
+    }
+
     private static AssetPositionChanged Event(
         Guid assetId,
         Guid portfolioId,
@@ -382,8 +458,10 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         decimal quantity,
         long version,
         string currency = "PLN",
-        bool portfolioIsArchived = false) => new()
+        bool portfolioIsArchived = false,
+        bool isArchived = false) => new()
         {
+            IsArchived = isArchived,
             AssetId = assetId,
             PortfolioId = portfolioId,
             UserId = userId,

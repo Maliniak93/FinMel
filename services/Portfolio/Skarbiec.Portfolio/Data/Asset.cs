@@ -44,4 +44,11 @@ public sealed class Asset : IUserOwned
     /// (spec-02 design decision 1).
     /// </summary>
     public long Version { get; set; }
+
+    /// <summary>
+    /// The asset's own archive flag (asset-archive), independent of its portfolio's: an archived asset
+    /// is read-only (409 <c>Conflict.AssetArchived</c>) and out of net worth until restored, yet keeps
+    /// every transaction and term. Only ArchiveAsset/RestoreAsset write it; removal stays allowed.
+    /// </summary>
+    public bool IsArchived { get; set; }
 }

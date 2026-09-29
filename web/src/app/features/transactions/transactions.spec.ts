@@ -50,6 +50,7 @@ const asset: AssetResponse = {
   manualValue: 1000,
   manualValueDate: '2020-01-01',
   transactionCount: 1,
+  isArchived: false,
 };
 
 const portfolio: PortfolioResponse = {
@@ -380,6 +381,64 @@ describe('Transactions', () => {
       const menuText = await rowMenuText();
       expect(menuText).toContain('Edit');
       expect(menuText).toContain('Delete');
+    });
+  });
+
+  // asset-archive AC-11: an archived asset's transactions are a 409 on the backend, so the view is
+  // read-only as for an archived portfolio — no record button, no Edit / Delete — with its own notice.
+  describe('archived asset is read-only', () => {
+    const archivedAsset = { ...asset, isArchived: true } as AssetResponse;
+    const assetNotice = /This asset is archived\W+restore it to make changes/;
+
+    function pageText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function pageButtonTexts(): string[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+        (button) => button.textContent?.trim() ?? '',
+      );
+    }
+
+    async function rowMenuText(): Promise<string> {
+      const overlayContainer = TestBed.inject(OverlayContainer);
+      for (const triggerElement of fixture.debugElement.queryAll(By.directive(MatMenuTrigger))) {
+        triggerElement.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        await fixture.whenStable();
+      }
+      return overlayContainer.getContainerElement().textContent ?? '';
+    }
+
+    it('is read-only for an archived asset', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(archivedAsset));
+
+      // The history itself is still listed — archived is read-only, not hidden.
+      expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
+      expect(pageText()).toMatch(assetNotice);
+      expect(pageText()).not.toMatch(/This portfolio is archived/);
+      expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(false);
+
+      const menuText = await rowMenuText();
+      expect(menuText).not.toContain('Edit');
+      expect(menuText).not.toContain('Delete');
+    });
+
+    it('is read-only for an archived asset: the empty state offers no record button', async () => {
+      await setup(jsonResponse(pagedResponse([])), jsonResponse(archivedAsset));
+
+      expect(pageText()).toMatch(assetNotice);
+      const buttons = pageButtonTexts();
+      expect(buttons.some((text) => text.includes('New transaction'))).toBe(false);
+      expect(buttons.some((text) => text.includes('Record your first transaction'))).toBe(false);
+    });
+
+    it('a live asset keeps its actions and shows no asset notice', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])));
+
+      expect(pageText()).not.toMatch(assetNotice);
+      expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(true);
     });
   });
 

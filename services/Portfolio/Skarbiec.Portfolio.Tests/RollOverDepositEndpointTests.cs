@@ -198,13 +198,15 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
 
     /// <summary>
     /// AC-4 (409s): every state the rollover refuses — an Active, a paid-out, an archived-portfolio
-    /// deposit, and a Settled one sent settlement amounts — answers with its conflict code and leaves
+    /// deposit, one archived on its own (asset-archive: the one read-only guard covers the rollover too),
+    /// and a Settled one sent settlement amounts — answers with its conflict code and leaves
     /// the deposit, its transactions and every other row exactly as they were.
     /// </summary>
     [Theory]
     [InlineData("active", PortfolioAssertions.DepositNotDueErrorCode)]
     [InlineData("paid-out", PortfolioAssertions.DepositAlreadyPaidOutErrorCode)]
     [InlineData("archived-portfolio", PortfolioAssertions.PortfolioArchivedErrorCode)]
+    [InlineData("archived-asset", PortfolioAssertions.AssetArchivedErrorCode)]
     [InlineData("settled-with-amounts", PortfolioAssertions.DepositAlreadySettledErrorCode)]
     [InlineData("settled-with-gross-only", PortfolioAssertions.DepositAlreadySettledErrorCode)]
     [InlineData("settled-with-tax-only", PortfolioAssertions.DepositAlreadySettledErrorCode)]
@@ -233,6 +235,12 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
                 (portfolioId, var archived) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
                 assetId = archived.AssetId;
                 await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+                body = NewRollOverRequest();
+                break;
+            case "archived-asset":
+                (portfolioId, var shelved) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+                assetId = shelved.AssetId;
+                await client.ArchiveAssetAsync(portfolioId, assetId, cancellationToken);
                 body = NewRollOverRequest();
                 break;
             case "settled-with-amounts":

@@ -21,6 +21,16 @@
   width: 100%;
 }
 
+// Pushes the toggle next to the Add button, away from the heading.
+.deposits-page__show-archived {
+  margin-left: auto;
+}
+
+.deposits-page__no-data {
+  padding: 16px;
+  opacity: 0.7;
+}
+
 .deposits-page__muted {
   opacity: 0.7;
 }

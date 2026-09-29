@@ -38,6 +38,51 @@ internal static class PortfolioApi
     public static string AssetUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/assets/{assetId}";
 
+    /// <summary>asset-archive: <c>POST .../assets/{id}/archive</c>.</summary>
+    public static string ArchiveAssetUri(Guid portfolioId, Guid assetId) =>
+        $"{AssetUri(portfolioId, assetId)}/archive";
+
+    /// <summary>asset-archive: <c>POST .../assets/{id}/restore</c>.</summary>
+    public static string RestoreAssetUri(Guid portfolioId, Guid assetId) =>
+        $"{AssetUri(portfolioId, assetId)}/restore";
+
+    /// <summary>
+    /// asset-archive: archives one asset (arrange only). From then on every write to it is a 409
+    /// <c>Conflict.AssetArchived</c> except removal — arrange any content the fact needs first.
+    /// </summary>
+    public static async Task ArchiveAssetAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(ArchiveAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>asset-archive: restores one archived asset (arrange only).</summary>
+    public static async Task RestoreAssetAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(RestoreAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// asset-archive: a PLN Cash asset holding <paramref name="balance"/> (one top-up transaction) that
+    /// is then archived on its own, in a live portfolio of its own. Returns both ids.
+    /// </summary>
+    public static async Task<(Guid PortfolioId, Guid CashId)> AddArchivedCashAssetInLivePortfolioAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal balance = 5_000m,
+        string portfolioName = "Wallet",
+        string name = "Archived cash")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name);
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+
+        return (portfolioId, cashId);
+    }
+
     public static string TransactionsUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/assets/{assetId}/transactions";
 

@@ -28,8 +28,8 @@ public sealed class PositionEventPublisher(
         => PublishAsync(asset, portfolio.IsArchived, cancellationToken);
 
     /// <summary>
-    /// An existing asset whose position moved (edited, or a transaction recorded/edited/deleted
-    /// against it). Bumps <see cref="Asset.Version"/> first, so successive events for one asset carry
+    /// An existing asset whose position moved (edited, archived or restored, or a transaction
+    /// recorded/edited/deleted against it). Bumps <see cref="Asset.Version"/> first, so successive events for one asset carry
     /// strictly increasing versions (spec-02 AC-7).
     /// </summary>
     public async Task PublishChangedAsync(Asset asset, CancellationToken cancellationToken)
@@ -79,6 +79,9 @@ public sealed class PositionEventPublisher(
             ManualValueAmount = asset.ManualValueAmount,
             ManualValueDate = asset.ManualValueDate,
             PortfolioIsArchived = portfolioIsArchived,
+            // The asset's own flag, carried as it stands on every event — the portfolio fan-out never
+            // changes it (asset-archive).
+            IsArchived = asset.IsArchived,
             Version = asset.Version,
             OccurredAtUtc = timeProvider.GetUtcNow()
         }, cancellationToken);

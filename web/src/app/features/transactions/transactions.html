@@ -32,6 +32,11 @@
       <mat-icon>inventory_2</mat-icon>
       {{ 'assets.archivedNotice' | transloco }}
     </p>
+  } @else if (isAssetArchived()) {
+    <p class="transactions-page__archived-notice" role="status">
+      <mat-icon>inventory_2</mat-icon>
+      {{ 'transactions.assetArchivedNotice' | transloco }}
+    </p>
   } @else if (isTermDeposit()) {
     <p class="transactions-page__archived-notice" role="status">
       <mat-icon>savings</mat-icon>

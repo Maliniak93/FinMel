@@ -49,6 +49,8 @@ export function depositResponse(overrides: Partial<DepositResponse> = {}): Depos
     portfolioId: savingsPortfolioId,
     portfolioName: 'Savings',
     portfolioIsArchived: false,
+    // asset-archive: the deposit's own flag, independent of its portfolio's.
+    isArchived: false,
     name: 'Term deposit',
     bankName: 'Test bank',
     currency: 'PLN',
@@ -112,6 +114,27 @@ export const archivedPortfolioDeposit: DepositResponse = depositResponse({
   name: 'Archived deposit',
   bankName: 'Bank C',
 });
+
+// asset-archive: deposits archived on their own, in a live portfolio — a Due one (its settle action
+// must go) and a Settled one (its transfer-to-cash action must go).
+export const archivedDueDeposit: DepositResponse = depositResponse({
+  assetId: 'f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1',
+  name: 'Shelved due deposit',
+  bankName: 'Bank H',
+  status: DEPOSIT_STATUS.Due,
+  isArchived: true,
+} as Partial<DepositResponse>);
+
+export const archivedSettledDeposit: DepositResponse = depositResponse({
+  assetId: 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2',
+  name: 'Shelved settled deposit',
+  bankName: 'Bank I',
+  status: DEPOSIT_STATUS.Settled,
+  settledOn: '2026-04-17',
+  settledGrossInterest: 150,
+  settledTax: 28.5,
+  isArchived: true,
+} as Partial<DepositResponse>);
 
 // term-deposits-settlement: a deposit settled on 2026-04-17 with what the bank actually paid (gross
 // 150.00, tax 28.50 → net 121.50), which differs from its projection (net 119.83) — so a spec can

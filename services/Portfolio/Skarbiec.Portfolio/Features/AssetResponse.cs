@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 
@@ -24,6 +25,9 @@ public sealed record AssetResponse
 
     /// <summary>Whether a Deposit-class asset's term deposit is settled, so the asset list drops its "Due" chip; <see langword="null"/> for every other asset (term-deposits-settlement).</summary>
     public bool? DepositSettled { get; init; }
+
+    /// <summary>The asset's own archive flag (asset-archive) — the lists still return archived assets and the client filters them.</summary>
+    public required bool IsArchived { get; init; }
 }
 
 public static class AssetMappingExtensions
@@ -50,6 +54,24 @@ public static class AssetMappingExtensions
             InstrumentId = asset.InstrumentId,
             TransactionCount = transactionCount,
             DepositMaturityDate = depositMaturityDate,
-            DepositSettled = depositSettled
+            DepositSettled = depositSettled,
+            IsArchived = asset.IsArchived
         };
+
+    /// <summary>
+    /// The body GetAsset returns for <paramref name="asset"/> — transaction count and deposit terms read
+    /// beside it — for a slice that holds the tracked entity rather than a projection (asset-archive).
+    /// </summary>
+    internal static async Task<AssetResponse> ToFullResponseAsync(
+        this PortfolioDbContext dbContext, Asset asset, CancellationToken cancellationToken)
+    {
+        var transactionCount = await dbContext.Transactions.CountAsync(t => t.AssetId == asset.Id, cancellationToken);
+        var terms = await dbContext.TermDeposits
+            .AsNoTracking()
+            .Where(t => t.AssetId == asset.Id)
+            .Select(t => new { t.MaturityDate, Settled = t.SettledOn != null })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return asset.ToResponse(transactionCount, terms?.MaturityDate, terms?.Settled);
+    }
 }

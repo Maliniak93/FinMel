@@ -8,8 +8,9 @@ public sealed class ListTransferCandidatesHandler(PortfolioDbContext dbContext)
 {
     /// <summary>
     /// The pick list of a transfer's counterpart (asset-transfers-deposit-funding): the current user's
-    /// assets of <paramref name="assetClass"/> in <paramref name="currency"/>, in non-archived portfolios
-    /// only — an archived one is read-only — ordered by portfolio name, then asset name.
+    /// assets of <paramref name="assetClass"/> in <paramref name="currency"/>, neither archived themselves
+    /// (asset-archive) nor in an archived portfolio — both are read-only — ordered by portfolio name,
+    /// then asset name.
     /// </summary>
     public async Task<Result<IReadOnlyList<TransferCandidateResponse>>> HandleAsync(
         string currency, AssetClass assetClass, CancellationToken cancellationToken)
@@ -23,7 +24,7 @@ public sealed class ListTransferCandidatesHandler(PortfolioDbContext dbContext)
         IReadOnlyList<TransferCandidateResponse> candidates = await (
                 from asset in dbContext.Assets.AsNoTracking()
                 join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
-                where asset.AssetClass == assetClass && asset.Currency == currency && !portfolio.IsArchived
+                where asset.AssetClass == assetClass && asset.Currency == currency && !asset.IsArchived && !portfolio.IsArchived
                 orderby portfolio.Name, asset.Name
                 select new TransferCandidateResponse
                 {

@@ -45,6 +45,7 @@ export type AssetResponse = {
     transactionCount: number | string;
     depositMaturityDate?: null | string;
     depositSettled?: null | boolean;
+    isArchived: boolean;
 };
 
 export type AssetValuationMode = number;
@@ -70,6 +71,7 @@ export type DepositResponse = {
     portfolioId: string;
     portfolioName: string;
     portfolioIsArchived: boolean;
+    isArchived: boolean;
     name: string;
     bankName?: null | string;
     currency: string;
@@ -446,6 +448,44 @@ export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses = {
 };
 
 export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/archive';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses = {
+    /**
+     * OK
+     */
+    200: AssetResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/restore';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses = {
+    /**
+     * OK
+     */
+    200: AssetResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses];
 
 export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData = {
     body?: never;

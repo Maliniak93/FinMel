@@ -20,9 +20,9 @@ public sealed class UpdateAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
-            return PortfolioErrors.Archived(portfolioId);
+            return readOnly;
         }
 
         // A term deposit is edited only through UpdateDeposit, and no asset becomes or stops being one

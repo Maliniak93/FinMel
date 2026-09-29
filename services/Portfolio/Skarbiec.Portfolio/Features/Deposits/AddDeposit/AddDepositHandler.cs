@@ -134,8 +134,8 @@ public sealed class AddDepositHandler(
 
     /// <summary>
     /// Loads the funding source through the tenancy filter and checks it against the transfer rules —
-    /// anything that is not one of the user's same-currency assets on an allowed route, in an active
-    /// portfolio, is <see cref="TransferErrors.InvalidCounterpart"/> (a stranger's id gets the same
+    /// anything that is not one of the user's same-currency, non-archived assets on an allowed route, in
+    /// an active portfolio, is <see cref="TransferErrors.InvalidCounterpart"/> (a stranger's id gets the same
     /// answer) — then builds both legs and replays the source's whole history with its Out leg, so its
     /// balance must cover the transfer everywhere, not just at the end.
     /// </summary>
@@ -147,6 +147,7 @@ public sealed class AddDepositHandler(
         if (source is null
             || !TransferRoutes.IsAllowed(source.AssetClass, deposit.AssetClass)
             || source.Currency != deposit.Currency
+            || source.IsArchived
             || await dbContext.IsPortfolioArchivedAsync(source.PortfolioId, cancellationToken))
         {
             return TransferErrors.InvalidCounterpart;

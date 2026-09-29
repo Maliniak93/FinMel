@@ -61,6 +61,26 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    /// <summary>asset-archive AC-4: removing an archived asset stays allowed — it and its transactions are gone (the <c>AssetRemoved</c> event is in the outbox tests).</summary>
+    [Fact]
+    public async Task RemoveAsset_ArchivedAsset_Deletes()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m);
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(portfolioId, cashId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(portfolioId, cashId), cancellationToken)).StatusCode);
+        var rows = await SnapshotUserRowsAsync(userId, cancellationToken);
+        Assert.Equal(0, rows.Assets);
+        Assert.Equal(0, rows.Transactions);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC6: removing an asset of an archived portfolio
     /// is a 409 <c>Conflict.PortfolioArchived</c>; the asset and its transactions stay.</summary>
     [Fact]

@@ -1,10 +1,11 @@
-import { Component, inject, resource } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -17,6 +18,7 @@ import {
   type DepositResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { confirmSetAssetArchived } from '../../shared/asset-archive';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import {
@@ -51,6 +53,7 @@ import {
     MatIconModule,
     MatMenuModule,
     MatProgressSpinnerModule,
+    MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
     TranslocoPipe,
@@ -87,6 +90,18 @@ export class Deposits {
       return result.data ?? [];
     },
   });
+
+  // asset-archive: a deposit archived on its own is hidden until "Show archived" is on — filtered here,
+  // since the list endpoint returns every deposit with its flag.
+  protected readonly showArchived = signal(false);
+
+  protected readonly visibleDeposits = computed(() =>
+    this.depositsResource.hasValue()
+      ? this.depositsResource
+          .value()
+          .filter((deposit) => this.showArchived() || !deposit.isArchived)
+      : [],
+  );
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatPercent = formatPercent;
@@ -172,6 +187,19 @@ export class Deposits {
     }
 
     this.depositsResource.reload();
+  }
+
+  // asset-archive: Archive / Restore sit in the row menu, behind a confirmation, and reload the list.
+  protected async setArchived(deposit: DepositResponse, archive: boolean): Promise<void> {
+    const done = await confirmSetAssetArchived(
+      this.dialog,
+      this.snackBar,
+      { portfolioId: deposit.portfolioId, assetId: deposit.assetId, name: deposit.name },
+      archive,
+    );
+    if (done) {
+      this.depositsResource.reload();
+    }
   }
 
   protected openSettleDialog(deposit: DepositResponse): void {
