@@ -4,8 +4,8 @@ export const meta = {
   whenToUse: 'Invoked by /build and /fix on an open spec issue from the FinMel project (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
     { title: 'Branch', detail: 'ops cuts the issue branch (feat/<slug> or fix/<slug>) from master before a single file is written', model: 'haiku' },
-    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; sonnet/high on tier 1, opus/high on tier 2 (skippable)' },
-    { title: 'Implement', detail: 'implementer does the work; sonnet/high on tier 1, opus/xhigh on tier 2' },
+    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; sonnet/medium on every tier (skippable)' },
+    { title: 'Implement', detail: 'implementer does the work; sonnet/high on tier 1, opus/high on tier 2, opus/xhigh after a tier-1 escalation' },
     { title: 'Verify', detail: 'verifier runs scripts/verify.mjs; failures loop back to Implement', model: 'haiku' },
     { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'claude-opus-5-5' },
     { title: 'Ship', detail: 'ops commits, pushes and opens the PR - merging is yours', model: 'haiku' },
@@ -138,7 +138,7 @@ const OPUS = 'claude-opus-5-5'
 const MECHANICAL = { model: 'haiku', effort: 'low' }
 
 let model = tier >= 2 ? OPUS : 'sonnet'
-let effort = tier >= 2 ? 'xhigh' : 'high'
+let effort = 'high'
 
 let rounds = 0
 let escalated = false
@@ -274,7 +274,7 @@ if (skipped.has('tests')) {
       'Run them and confirm they are red for the right reason. Write no production code.',
     ],
     TESTS,
-    tier >= 2 ? { model: OPUS, effort: 'high' } : { model: 'sonnet', effort: 'high' },
+    { model: 'sonnet', effort: 'medium' },
   )
 
   if (!tests) return await stop('tests', { reason: 'test-writer returned no result' })
