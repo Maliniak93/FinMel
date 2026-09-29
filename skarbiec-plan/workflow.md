@@ -20,7 +20,7 @@ Every board operation goes through `scripts/gh-project.mjs` (`init`, `check`, `c
 
 | Agent | Model / effort | Tools | Preloaded skill | Job | Returns |
 |---|---|---|---|---|---|
-| `implementer` | sonnet/high (Tier 1); opus/high (Tier 2); opus/xhigh after a Tier-1 escalation | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7 — no `Agent` | `backend-playbook`, `frontend-playbook` | drives tests to green per the spec, owning the design and the tests: fixes a wrong test or a wrong design decision itself and lists each in `deviations` (the reviewer judges each, the run report lists them); updates `requests/*.http`, the TS client, and any rule/ADR it changes the convention of. Runs **only** `dotnet test --filter` on its own tests (+ `gen:api`/`typecheck` after an API change, `dotnet format` after a migration) — every suite belongs to the verifier | `{filesTouched[], projects[], commandsRun[], notes[], deviations[]}` |
+| `implementer` | opus/medium (Tier 1); opus/high (Tier 2); opus/high after a Tier-1 escalation | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7 — no `Agent` | `backend-playbook`, `frontend-playbook` | drives tests to green per the spec, owning the design and the tests: fixes a wrong test or a wrong design decision itself and lists each in `deviations` (the reviewer judges each, the run report lists them); updates `requests/*.http`, the TS client, and any rule/ADR it changes the convention of. Runs **only** `dotnet test --filter` on its own tests (+ `gen:api`/`typecheck` after an API change, `dotnet format` after a migration) — every suite belongs to the verifier | `{filesTouched[], projects[], commandsRun[], notes[], deviations[]}` |
 | `test-writer` | sonnet/medium (every tier) | Read, Edit, Write, Glob, Grep, Bash + microsoft-docs, context7 | `testing-playbook` | writes failing tests from the spec's acceptance criteria (slice/unit/tenancy/outbox), runs them **filtered** to confirm red | `{tests[{name,file,ac}], projects[]}` |
 | `verifier` | haiku/low | Bash, Read | — | runs `node scripts/verify.mjs --projects …` (re-runs it once after `stop-stack.mjs` when a running stack blocked it), parses the result | `{ok, failures[{step,summary,file?}]}` |
 | `reviewer` | opus/high | Read, Grep, Glob, Bash + microsoft-docs, context7 — no Edit/Write | `review-checklist` | fresh context; diffs the staged change (`git diff --cached`) against the spec and the hard rules; flags only what breaks correctness or an acceptance criterion | `{findings[{severity: blocking\|minor, file, line, claim, evidence}]}` |
@@ -49,7 +49,7 @@ flowchart LR
 - **Stage before review (D2).** After a green verify, `ops` runs `git add -A` so the reviewer diffs `git diff --cached`. A bare `git diff` never shows a brand-new file, and most of a new slice is new files — the index does show them, so staging is enough and no commit is needed before the review.
 - **The pipeline ships, the user merges (D3).** Once the review is clean, the Ship step commits (the spec's title, `Spec: #<n>`, the co-author trailer), pushes the branch and opens the PR against `master`, then comments the run report with the PR link on the issue. The workflow builds every command; `ops` runs them verbatim, one Bash call each, so `git-guard` sees each one. A failure there stops the run at `stage: ship` with the remaining commands for the user. No agent merges, ever.
 - **A running stack never blocks a run (D4).** The local stack (Aspire AppHost, services, `ng serve`) locks build outputs and `node_modules` binaries. `verify.mjs` stops it itself on MSB3021/3026/3027 and retries the build; any agent blocked by it (locked file, port in use) runs `node scripts/stop-stack.mjs` and retries once. Nothing restarts the stack — that is the user's.
-- **Verify fails:** up to `maxRounds` (default 2) fix/verify cycles. On Tier 1, the model escalates to opus/xhigh after 2 failed rounds for one final attempt; past that, the run stops with `status: blocked` and the failures.
+- **Verify fails:** up to `maxRounds` (default 2) fix/verify cycles. On Tier 1, the implementer escalates from opus/medium to opus/high after 2 failed rounds for one final attempt; past that, the run stops with `status: blocked` and the failures.
 - **Review has `blocking` findings:** implementer addresses them, verify re-runs; up to `maxRounds` rounds, else `status: blocked`. `minor` findings never block the run — they come back in the workflow's report, and `/build` prints them and posts them on the issue.
 - **Skippable phases.** `Tests` and `Review` can be skipped; `Verify` never — it is the definition of green. A spec issue carries the `skip-tests` label when it adds and alters no behaviour (deletion, config, docs, a pure move); every acceptance criterion must then be provable by a command, a grep or an existing test class. `/build --skip tests,review` overrides the label for one run. A spec **without** the flag whose test-writer produces nothing still stops the run — that means its criteria were not testable as written, which is worth knowing.
 - `/build` is a skill with `disable-model-invocation: true` that calls `Workflow({name: 'build-feature', args})`: control flow is a script (`.claude/workflows/build-feature.js`), not model tokens. `/build` first writes the issue body to a gitignored local copy (`skarbiec-plan/issues/<n>.md`, via `gh-project.mjs get --out`); each agent receives that path, the branch and title, and the prior phase's structured output — never the conversation history or a raw diff.
@@ -79,7 +79,7 @@ flowchart LR
 
 | Tier | When | Starting model |
 |---|---|---|
-| 1 | well-scoped and mechanical, low ambiguity (e.g. spec-00, spec-01, spec-05, spec-06) | sonnet/high — escalates to opus/xhigh only after 2 failed verify rounds |
+| 1 | well-scoped and mechanical, low ambiguity (e.g. spec-00, spec-01, spec-05, spec-06) | opus/medium — escalates to opus/high only after 2 failed verify rounds |
 | 2 | changes the data model or event contracts; acceptance criteria must close a real behavioral gap (e.g. spec-02, spec-03, spec-04) | implementer opus/high from the start (tests stay on sonnet/medium) |
 
 `/design` sets the tier when it writes the spec; `/build --tier` overrides it if the estimate was wrong.
@@ -116,7 +116,7 @@ What can be a script or a hook is not a prompt (cheaper, deterministic, no drift
 | `/design` | Opus, xhigh (main session) | 30–80k | $0.3–0.8 |
 | ops — branch + stage (×1–3 per run) | Haiku | 5–15k each | < $0.1 |
 | test-writer (skipped on a no-behaviour spec) | Sonnet | 40–100k | $0.1–0.3 |
-| implementer (Tier 1 / Tier 2) | Sonnet / Opus | 100–300k | $0.3–0.8 / $0.8–2.5 |
+| implementer (Tier 1 / Tier 2) | Opus medium / Opus high | 100–300k | $0.3–0.8 / $0.8–2.5 |
 | verifier (×2–3 per run) | Haiku | 10–30k | < $0.1 |
 | reviewer (skippable with `--skip review`) | Opus | 40–100k | $0.3–0.8 |
 | ops — ship (commit, push, PR, report) | Haiku | 5–15k | < $0.1 |

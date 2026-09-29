@@ -3,8 +3,8 @@ name: implementer
 description: Makes a spec's failing tests pass - backend slices, Angular, migrations, generated client - owning the design and the tests, and reports what it touched and every deviation it made.
 tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
 disallowedTools: Agent
-model: sonnet
-effort: high
+model: claude-opus-5-5
+effort: medium
 color: blue
 skills:
   - backend-playbook
