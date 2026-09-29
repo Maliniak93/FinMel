@@ -34,9 +34,9 @@ public sealed class UpdateDepositHandler(
             .Select(p => new { p.Name, p.IsArchived })
             .FirstAsync(cancellationToken);
 
-        if (portfolio.IsArchived)
+        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
         {
-            return PortfolioErrors.Archived(portfolioId);
+            return readOnly;
         }
 
         // A settled deposit's terms are immutable (term-deposits-settlement) — delete it instead.
@@ -74,10 +74,11 @@ public sealed class UpdateDepositHandler(
         {
             fundingAsset = await dbContext.Assets.FirstAsync(a => a.Id == fundingLeg.AssetId, cancellationToken);
 
-            // The Cash side is read-only while its portfolio is archived, like any of its transactions.
-            if (await dbContext.IsPortfolioArchivedAsync(fundingAsset.PortfolioId, cancellationToken))
+            // The Cash side is read-only while it or its portfolio is archived, like any of its
+            // transactions (asset-archive) — rewriting its leg would change an archived asset.
+            if (await dbContext.ReadOnlyErrorAsync(fundingAsset, cancellationToken) is { } fundingReadOnly)
             {
-                return PortfolioErrors.Archived(fundingAsset.PortfolioId);
+                return fundingReadOnly;
             }
 
             // The rewritten Out leg must be covered everywhere in the Cash history, not just at the end.

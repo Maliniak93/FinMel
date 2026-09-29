@@ -420,6 +420,84 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/assets/{id}/archive": {
+      "post": {
+        "tags": [
+          "ArchiveAssetEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/assets/{id}/restore": {
+      "post": {
+        "tags": [
+          "RestoreAssetEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions": {
       "post": {
         "tags": [
@@ -1159,7 +1237,8 @@
           "name",
           "currency",
           "quantity",
-          "transactionCount"
+          "transactionCount",
+          "isArchived"
         ],
         "type": "object",
         "properties": {
@@ -1234,6 +1313,9 @@
               "null",
               "boolean"
             ]
+          },
+          "isArchived": {
+            "type": "boolean"
           }
         }
       },
@@ -1323,6 +1405,7 @@
           "portfolioId",
           "portfolioName",
           "portfolioIsArchived",
+          "isArchived",
           "name",
           "currency",
           "principal",
@@ -1352,6 +1435,9 @@
             "type": "string"
           },
           "portfolioIsArchived": {
+            "type": "boolean"
+          },
+          "isArchived": {
             "type": "boolean"
           },
           "name": {
@@ -2105,6 +2191,12 @@
     },
     {
       "name": "RemoveAssetEndpoint"
+    },
+    {
+      "name": "ArchiveAssetEndpoint"
+    },
+    {
+      "name": "RestoreAssetEndpoint"
     },
     {
       "name": "RecordTransactionEndpoint"

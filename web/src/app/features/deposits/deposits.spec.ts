@@ -18,6 +18,11 @@ import {
   switchLanguage,
   textOf,
 } from '../../../testing/i18n';
+import {
+  clickRowMenuItem,
+  menuItemLabel,
+  showArchived as showArchivedToggle,
+} from '../../../testing/archive';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { DepositResponse } from '../../api/portfolio';
 import { formatMoney } from '../../shared/format';
@@ -30,7 +35,9 @@ import { RollOverDepositDialog } from './roll-over-deposit-dialog/roll-over-depo
 import { SettleDepositDialog } from './settle-deposit-dialog/settle-deposit-dialog';
 import {
   activeDeposit,
+  archivedDueDeposit,
   archivedPortfolioDeposit,
+  archivedSettledDeposit,
   dueDeposit,
   paidOutDeposit,
   paidOutDepositDestinationName,
@@ -66,6 +73,10 @@ describe('Deposits', () => {
       const request = input as Request;
       if (request.method === 'DELETE') {
         return new Response(null, { status: 204 });
+      }
+      // asset-archive: the archive / restore endpoints answer 200 with the asset.
+      if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
+        return jsonResponse({});
       }
       return requestUrl(input).includes('/api/portfolio/deposits')
         ? jsonResponse(deposits)
@@ -119,7 +130,7 @@ describe('Deposits', () => {
     );
   }
 
-  // Opens a row's actions menu and returns the labels of the items it offers.
+  // Opens a row's actions menu and returns the labels of the items it offers, icons left out.
   async function menuItemLabels(row: HTMLElement): Promise<string[]> {
     const trigger = row.querySelector<HTMLButtonElement>('button[aria-label^="Actions for"]');
     if (!trigger) {
@@ -132,7 +143,7 @@ describe('Deposits', () => {
       TestBed.inject(OverlayContainer)
         .getContainerElement()
         .querySelectorAll('[mat-menu-item], .mat-mdc-menu-item'),
-      (item) => (item.textContent ?? '').trim(),
+      menuItemLabel,
     );
   }
 
@@ -456,6 +467,138 @@ describe('Deposits', () => {
     });
   });
 
+  // asset-archive AC-10. A deposit can be archived on its own: "Show archived" (off by default)
+  // reveals it with an "Archived" chip, the row menu gains Archive / Restore behind a ConfirmDialog,
+  // and an archived row keeps only Restore and Delete.
+  describe('archive', () => {
+    const archiveMessage =
+      'It drops out of net worth from today. Its transactions and history are kept, and you can restore it at any time.';
+
+    const showArchived = () => showArchivedToggle(fixture);
+    const clickMenuItem = (row: HTMLElement, label: RegExp) =>
+      clickRowMenuItem(fixture, row, label);
+
+    function writes(): Request[] {
+      return fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method !== 'GET');
+    }
+
+    it('hides archived deposits until Show archived is on', async () => {
+      await setup([activeDeposit, archivedDueDeposit]);
+
+      expect(rows()).toHaveLength(1);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain(
+        archivedDueDeposit.name,
+      );
+
+      await showArchived();
+
+      expect(rows()).toHaveLength(2);
+      const chip = rowFor(archivedDueDeposit.name).querySelector(
+        'mat-chip, mat-chip-option, .mat-mdc-chip',
+      );
+      expect(rowFor(archivedDueDeposit.name).textContent).toContain('Archived');
+      expect(chip).not.toBeNull();
+      expect(rowFor('Running deposit').textContent).not.toContain('Archived');
+    });
+
+    it('archives a deposit after confirmation', async () => {
+      await setup([activeDeposit, dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = depositListCalls();
+
+      await clickMenuItem(rowFor('Matured deposit'), /\barchive\b/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(
+        ConfirmDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({ message: archiveMessage }),
+        }),
+      );
+      await vi.waitFor(() => expect(writes()).toHaveLength(1));
+      const [request] = writes();
+      expect(request.method).toBe('POST');
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/assets/${dueDeposit.assetId}/archive`,
+      );
+      await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('does not archive when the confirmation is cancelled', async () => {
+      await setup([dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      await clickMenuItem(rowFor('Matured deposit'), /\barchive\b/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      expect(writes()).toHaveLength(0);
+    });
+
+    it('restores an archived deposit', async () => {
+      await setup([archivedDueDeposit]);
+      await showArchived();
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = depositListCalls();
+
+      await clickMenuItem(rowFor(archivedDueDeposit.name), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      await vi.waitFor(() => expect(writes()).toHaveLength(1));
+      const [request] = writes();
+      expect(request.method).toBe('POST');
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${archivedDueDeposit.portfolioId}/assets/${archivedDueDeposit.assetId}/restore`,
+      );
+      await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('does not restore when the confirmation is cancelled', async () => {
+      await setup([archivedDueDeposit]);
+      await showArchived();
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      await clickMenuItem(rowFor(archivedDueDeposit.name), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      expect(writes()).toHaveLength(0);
+    });
+
+    it('shows only Restore and Delete for an archived deposit', async () => {
+      await setup([archivedDueDeposit, archivedSettledDeposit]);
+      await showArchived();
+
+      for (const deposit of [archivedDueDeposit, archivedSettledDeposit]) {
+        const row = rowFor(deposit.name);
+        const labels = await menuItemLabels(row);
+
+        expect(labels.some((label) => /restore/i.test(label))).toBe(true);
+        expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+        expect(labels.some((label) => /edit/i.test(label))).toBe(false);
+        expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(false);
+        // Not one of the row's own action buttons: no settle, no transfer to cash.
+        expect(settleButton(row)).toBeUndefined();
+        expect(
+          Array.from(row.querySelectorAll<HTMLButtonElement>('button')).some(
+            (button) =>
+              /transfer to cash/i.test(button.getAttribute('mattooltip') ?? '') ||
+              /transfer to cash/i.test(button.getAttribute('aria-label') ?? ''),
+          ),
+        ).toBe(false);
+        TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+      }
+    });
+
+    it('offers Archive, not Restore, for an active deposit', async () => {
+      await setup([dueDeposit]);
+
+      const labels = await menuItemLabels(rowFor('Matured deposit'));
+
+      expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(true);
+      expect(labels.some((label) => /restore/i.test(label))).toBe(false);
+    });
+  });
+
   it('shows an empty state with an Add button when there are no deposits', async () => {
     await setup([]);
 
@@ -529,6 +672,7 @@ describe('Deposits', () => {
         'Transfer to cash',
         'Roll over',
         'Edit',
+        'Archive',
         'Delete',
       ]);
 

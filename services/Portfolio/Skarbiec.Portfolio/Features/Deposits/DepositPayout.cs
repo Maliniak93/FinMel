@@ -22,8 +22,8 @@ internal static class DepositPayout
 {
     /// <summary>
     /// Loads the destination through the tenancy filter and checks it against the transfer rules —
-    /// anything that is not one of the user's same-currency assets on an allowed route, in an active
-    /// portfolio, is <see cref="TransferErrors.InvalidCounterpart"/> (a stranger's id and the deposit
+    /// anything that is not one of the user's same-currency, non-archived assets on an allowed route, in
+    /// an active portfolio, is <see cref="TransferErrors.InvalidCounterpart"/> (a stranger's id and the deposit
     /// itself get the same answer). Then builds both legs for the deposit's whole balance, as replayed
     /// from <paramref name="depositHistory"/>, and recomputes both assets with them. Stages nothing.
     /// </summary>
@@ -40,6 +40,7 @@ internal static class DepositPayout
         if (destination is null
             || !TransferRoutes.IsAllowed(deposit.AssetClass, destination.AssetClass)
             || destination.Currency != deposit.Currency
+            || destination.IsArchived
             || await dbContext.IsPortfolioArchivedAsync(destination.PortfolioId, cancellationToken))
         {
             return TransferErrors.InvalidCounterpart;

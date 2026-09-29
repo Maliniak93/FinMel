@@ -173,6 +173,26 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(new DateOnly(2026, 3, 2), unchanged.Date);
     }
 
+    /// <summary>asset-archive AC-4: editing a transaction of an archived asset is a 409 <c>Conflict.AssetArchived</c>; the transaction stays.</summary>
+    [Fact]
+    public async Task Update_ArchivedAsset_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var depositId = await client.RecordTransactionAsync(
+            portfolioId, cashId, TransactionType.Deposit, 100m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 150m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 1) };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(portfolioId, cashId, depositId), update, cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        Assert.Equal(100m, (await client.GetAssetAsync(portfolioId, cashId, cancellationToken)).Quantity);
+        Assert.Equal(100m, (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items.Single(t => t.Id == depositId).Quantity);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC7: editing a transaction of an archived
     /// portfolio's asset is a 409 <c>Conflict.PortfolioArchived</c>; transaction and quantity stay.</summary>
     [Fact]

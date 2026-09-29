@@ -36,6 +36,10 @@ public sealed record DepositResponse
     public required Guid PortfolioId { get; init; }
     public required string PortfolioName { get; init; }
     public required bool PortfolioIsArchived { get; init; }
+
+    /// <summary>The deposit asset's own archive flag (asset-archive), independent of <see cref="PortfolioIsArchived"/>.</summary>
+    public required bool IsArchived { get; init; }
+
     public required string Name { get; init; }
     public string? BankName { get; init; }
     public required string Currency { get; init; }
@@ -112,6 +116,7 @@ public static class DepositMappingExtensions
             PortfolioId = asset.PortfolioId,
             PortfolioName = portfolioName,
             PortfolioIsArchived = portfolioIsArchived,
+            IsArchived = asset.IsArchived,
             Name = asset.Name,
             BankName = terms.BankName,
             Currency = asset.Currency,

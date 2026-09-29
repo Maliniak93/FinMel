@@ -439,6 +439,42 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal("EUR", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
     }
 
+    /// <summary>asset-archive AC-4: updating an archived asset is a 409 <c>Conflict.AssetArchived</c> and it keeps its state.</summary>
+    [Fact]
+    public async Task Update_ArchivedAsset_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m, name: "Before archive");
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "After archive", Currency = "PLN" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, cashId), request, cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, cashId, cancellationToken);
+        Assert.Equal("Before archive", unchanged.Name);
+        Assert.Equal(100m, unchanged.Quantity);
+        Assert.True(unchanged.IsArchived);
+    }
+
+    /// <summary>asset-archive design: the portfolio check runs before the asset check — an archived asset in an archived portfolio answers <c>Conflict.PortfolioArchived</c>.</summary>
+    [Fact]
+    public async Task Update_ArchivedAssetInArchivedPortfolio_ReturnsPortfolioArchivedConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        await client.ArchiveAssetAsync(portfolioId, assetId, cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", ManualValue = 1m, ManualValueDate = new DateOnly(2026, 1, 1) };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC6: updating an asset of an archived portfolio
     /// is a 409 <c>Conflict.PortfolioArchived</c> and the asset keeps its previous state.</summary>
     [Fact]

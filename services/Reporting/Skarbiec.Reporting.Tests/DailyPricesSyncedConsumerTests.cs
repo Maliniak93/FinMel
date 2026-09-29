@@ -109,6 +109,42 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// asset-archive AC-9: a daily price sync skips an archived position — no line for it, and the
+    /// portfolio's snapshot totals only the live one (the live position is the positive control).
+    /// </summary>
+    [Fact]
+    public async Task Consume_SkipsArchivedAssets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 10);
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var archivedAssetId = Guid.NewGuid();
+        var liveAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(archivedAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 1_000m, isArchived: true);
+            await db.SeedPositionAsync(liveAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 50m);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+
+            Assert.Equal(50m, snapshot.TotalPln);
+            var line = Assert.Single(await GetLinesAsync(containers, portfolioId, snapshotDate, cancellationToken));
+            Assert.Equal(liveAssetId, line.AssetId);
+        }, cancellationToken);
+    }
+
     [Fact]
     public async Task Consume_DailyPricesSynced_WritesOneLinePerPositionSummingToTheSnapshot()
     {

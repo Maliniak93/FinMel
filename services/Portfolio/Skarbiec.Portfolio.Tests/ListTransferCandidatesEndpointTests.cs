@@ -46,6 +46,24 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(5_000m, candidate.GetProperty("balance").GetDecimal());
     }
 
+    /// <summary>asset-archive AC-6: of an archived and a live PLN Cash in a live portfolio, only the live one is a candidate.</summary>
+    [Fact]
+    public async Task List_ExcludesArchivedAssets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var liveId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Live cash");
+        var archivedId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Archived cash");
+        await client.ArchiveAssetAsync(walletId, archivedId, cancellationToken);
+
+        var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var candidate = Assert.Single((await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList());
+        Assert.Equal(liveId, candidate.GetProperty("assetId").GetGuid());
+    }
+
     /// <summary>The balance is the asset's current quantity — after a funding transfer took 1 000 out of 5 000, 4 000.</summary>
     [Fact]
     public async Task List_AfterFundingTransfer_ReturnsRemainingBalance()

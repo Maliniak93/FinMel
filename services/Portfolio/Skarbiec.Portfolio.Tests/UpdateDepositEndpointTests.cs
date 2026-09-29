@@ -211,6 +211,47 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal("Renamed deposit", (await client.GetDepositAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Name);
     }
 
+    /// <summary>asset-archive AC-5: updating an archived Active deposit is a 409 <c>Conflict.AssetArchived</c> and it keeps its terms.</summary>
+    [Fact]
+    public async Task Update_ArchivedDeposit_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.ArchiveAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var request = NewDepositRequest(principal: 99_999m, name: "After archive").ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(DepositUri(portfolioId, deposit.AssetId), request, cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        var unchanged = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal("Term deposit", unchanged.Name);
+        Assert.Equal(10_000m, unchanged.Principal);
+        Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
+    /// asset-archive AC-5: an active deposit funded from a Cash asset that is then archived — changing the
+    /// principal would rewrite the Cash leg, so it is a 409 <c>Conflict.AssetArchived</c> and neither leg changes.
+    /// </summary>
+    [Fact]
+    public async Task Update_ArchivedFundingAsset_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedDepositAsync(cancellationToken);
+        await client.ArchiveAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+
+        var response = await client.PutAsJsonAsync(
+            DepositUri(funded.DepositPortfolioId, funded.Deposit.AssetId),
+            NewDepositRequest(principal: 1_500m).ToUpdateRequest(),
+            cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
+    }
+
     /// <summary>AC-7: updating a deposit of an archived portfolio is a 409 and the deposit keeps its terms.</summary>
     [Fact]
     public async Task Update_ArchivedPortfolio_ReturnsConflict()

@@ -127,6 +127,32 @@ Content-Type: application/json
   "manualValueDate": "2026-08-18"
 }
 
+### Archive an asset
+# asset-archive: 200 with isArchived=true. The asset is read-only from now on (409 Conflict.AssetArchived
+# on every edit, transaction and deposit write; removal still works) and drops out of net worth from
+# today. Repeating it is 200 with the unchanged body. In an archived portfolio: 409 Conflict.PortfolioArchived.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/archive
+Authorization: Bearer {{authToken}}
+
+### Update the archived asset (409)
+# Run right after the archive above: 409 with errorCode Conflict.AssetArchived.
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Cash",
+  "name": "Renamed while archived",
+  "currency": "PLN",
+  "manualValue": 5200,
+  "manualValueDate": "2026-08-18"
+}
+
+### Restore an archived asset
+# Mirror of archive: 200 with isArchived=false, and the asset counts toward net worth again from today.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/restore
+Authorization: Bearer {{authToken}}
+
 ### Remove an asset
 # Cascades: the asset's transactions are deleted too, and AssetRemoved is published (spec-08). 204.
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}

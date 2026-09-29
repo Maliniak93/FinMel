@@ -16,6 +16,12 @@ import {
   switchLanguage,
   textOf,
 } from '../../../testing/i18n';
+import {
+  clickRowMenuItem,
+  menuItemLabel,
+  rowMenuItems,
+  showArchived,
+} from '../../../testing/archive';
 import { client as marketDataClient } from '../../api/marketdata/client.gen';
 import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
@@ -62,6 +68,7 @@ const asset: AssetResponse = {
   manualValue: 1000,
   manualValueDate: '2020-01-01',
   transactionCount: 0,
+  isArchived: false,
 };
 
 const marketAsset: AssetResponse = {
@@ -74,6 +81,7 @@ const marketAsset: AssetResponse = {
   quantity: 10,
   instrumentId,
   transactionCount: 0,
+  isArchived: false,
 };
 
 const currencyValuedAsset: AssetResponse = {
@@ -87,6 +95,7 @@ const currencyValuedAsset: AssetResponse = {
   manualValue: null,
   manualValueDate: null,
   transactionCount: 1,
+  isArchived: false,
 };
 
 // term-deposits: a Deposit-class asset carries its maturity date on AssetResponse.
@@ -526,6 +535,154 @@ describe('Assets', () => {
     });
   });
 
+  // asset-archive AC-11: any asset can be archived on its own. "Show archived" (off by default)
+  // reveals it with an "Archived" chip; the row menu gains Archive / Restore behind a ConfirmDialog;
+  // an archived row has no Edit and no "Due" chip but keeps Restore and Delete.
+  describe('archive', () => {
+    const archivedCash = {
+      ...currencyValuedAsset,
+      name: 'Old cash',
+      isArchived: true,
+    } as AssetResponse;
+    const archivedDueDepositAsset = {
+      ...depositAsset(daysFromToday(-1)),
+      name: 'Shelved matured deposit',
+      isArchived: true,
+    } as AssetResponse;
+
+    function rows(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'tbody tr.mat-mdc-row',
+        ),
+      );
+    }
+
+    function rowFor(name: string): HTMLElement {
+      const row = rows().find((r) => (r.textContent ?? '').includes(name));
+      if (!row) {
+        throw new Error(`No row for '${name}'.`);
+      }
+      return row;
+    }
+
+    function writes(): Request[] {
+      return fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method !== 'GET');
+    }
+
+    async function menuLabels(row: HTMLElement): Promise<string[]> {
+      const items = await rowMenuItems(fixture, row);
+      const labels = items.map(menuItemLabel);
+      TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+      return labels;
+    }
+
+    it('hides archived assets until Show archived is on', async () => {
+      await setup(jsonResponse([asset, archivedCash]));
+
+      expect(rows()).toHaveLength(1);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Old cash');
+
+      await showArchived(fixture);
+
+      expect(rows()).toHaveLength(2);
+      const archivedRow = rowFor('Old cash');
+      expect(archivedRow.querySelector('mat-chip, .mat-mdc-chip')?.textContent).toContain(
+        'Archived',
+      );
+      expect(rowFor('Apple').textContent).not.toContain('Archived');
+    });
+
+    it('an archived row has no Edit and no Due chip but keeps Restore and Delete', async () => {
+      await setup(jsonResponse([archivedCash, archivedDueDepositAsset]));
+      await showArchived(fixture);
+
+      expect(rowFor('Shelved matured deposit').textContent).not.toContain('Due');
+      for (const name of ['Old cash', 'Shelved matured deposit']) {
+        const labels = await menuLabels(rowFor(name));
+
+        expect(labels.some((label) => /restore/i.test(label))).toBe(true);
+        expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+        expect(labels.some((label) => /edit/i.test(label))).toBe(false);
+        expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(false);
+      }
+    });
+
+    it('a live row offers Archive, Edit and Delete but not Restore', async () => {
+      await setup(jsonResponse([asset]));
+
+      const labels = await menuLabels(rowFor('Apple'));
+
+      expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(true);
+      expect(labels.some((label) => /edit/i.test(label))).toBe(true);
+      expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+      expect(labels.some((label) => /restore/i.test(label))).toBe(false);
+    });
+
+    it('archives and restores an asset after confirmation', async () => {
+      await setup(jsonResponse([asset, archivedCash]));
+      await showArchived(fixture);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      // Each reload reads a fresh list body: setup() hands back one Response, readable only once.
+      fetchSpy.mockImplementation(async (input: unknown) =>
+        requestUrl(input).includes('/assets')
+          ? jsonResponse([asset, archivedCash])
+          : jsonResponse(portfolio),
+      );
+
+      // Archive the live asset.
+      let callsBefore = fetchSpy.mock.calls.length;
+      fetchSpy.mockImplementationOnce(async () => jsonResponse({ ...asset, isArchived: true }));
+      await clickRowMenuItem(fixture, rowFor('Apple'), /\barchive\b/i);
+
+      expect(dialog.open).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
+      const archiveCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+      expect(archiveCall.method).toBe('POST');
+      expect(archiveCall.url).toContain(`/portfolios/${portfolioId}/assets/${asset.id}/archive`);
+      expect((fetchSpy.mock.calls[callsBefore + 1][0] as Request).method).toBe('GET');
+
+      // Restore the archived one.
+      callsBefore = fetchSpy.mock.calls.length;
+      fetchSpy.mockImplementationOnce(async () =>
+        jsonResponse({ ...archivedCash, isArchived: false }),
+      );
+      await clickRowMenuItem(fixture, rowFor('Old cash'), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledTimes(2);
+      await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
+      const restoreCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+      expect(restoreCall.method).toBe('POST');
+      expect(restoreCall.url).toContain(
+        `/portfolios/${portfolioId}/assets/${archivedCash.id}/restore`,
+      );
+      expect((fetchSpy.mock.calls[callsBefore + 1][0] as Request).method).toBe('GET');
+    });
+
+    it('does not archive or restore when the confirmation is cancelled', async () => {
+      await setup(jsonResponse([asset, archivedCash]));
+      await showArchived(fixture);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      await clickRowMenuItem(fixture, rowFor('Apple'), /\barchive\b/i);
+      await clickRowMenuItem(fixture, rowFor('Old cash'), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledTimes(2);
+      expect(writes()).toHaveLength(0);
+    });
+
+    it('an archived portfolio still offers no actions, whatever the asset flags', async () => {
+      await setup(
+        jsonResponse([asset, archivedCash]),
+        jsonResponse({ ...portfolio, isArchived: true }),
+      );
+
+      expect((fixture.nativeElement as HTMLElement).querySelectorAll('td button')).toHaveLength(0);
+    });
+  });
+
   // term-deposits AC-16: a Deposit row is edited through DepositFormDialog (its terms live on the
   // deposit endpoints), never the generic asset form.
   it('Edit on a Deposit row opens DepositFormDialog, not the asset form', async () => {
@@ -699,6 +856,7 @@ describe('Assets', () => {
         'Due',
         'This valuation is more than 6 months old — consider refreshing it.',
         'Edit',
+        'Archive',
         'Delete',
       ]);
       expect(heading()).toBe('Assets — Retirement');

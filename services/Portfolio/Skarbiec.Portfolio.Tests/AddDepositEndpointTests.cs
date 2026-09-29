@@ -328,6 +328,30 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
     }
 
     /// <summary>
+    /// asset-archive AC-6: an archived Cash asset (in a live portfolio) as <c>fundingAssetId</c> is a 400
+    /// <c>Validation.InvalidTransferCounterpart</c>; nothing is written and the Cash keeps its balance.
+    /// </summary>
+    [Fact]
+    public async Task Add_ArchivedFundingAsset_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var (walletId, cashId) = await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            DepositsUri(savingsId), NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+        await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
+    }
+
+    /// <summary>
     /// asset-transfers-deposit-funding AC-4: a principal above the Cash balance is a 400
     /// <c>Validation.InsufficientFunds</c>; no deposit is created and the Cash keeps its balance.
     /// </summary>

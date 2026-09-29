@@ -166,6 +166,27 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.True(listed.PortfolioIsArchived);
     }
 
+    /// <summary>asset-archive AC-7: an archived deposit is still listed, with <c>isArchived</c> true next to a live one's false.</summary>
+    [Fact]
+    public async Task List_ArchivedDeposit_ListedWithFlag()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var live = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Live deposit"));
+        var archived = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Archived deposit"));
+        await client.ArchiveAssetAsync(portfolioId, archived.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(AllDepositsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var listed = (await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken))!;
+        Assert.Equal(2, listed.Count);
+        Assert.False(listed.Single(d => d.AssetId == live.AssetId).IsArchived);
+        Assert.True(listed.Single(d => d.AssetId == archived.AssetId).IsArchived);
+        Assert.False(listed.Single(d => d.AssetId == archived.AssetId).PortfolioIsArchived);
+    }
+
     [Fact]
     public async Task List_NoDeposits_ReturnsEmpty()
     {

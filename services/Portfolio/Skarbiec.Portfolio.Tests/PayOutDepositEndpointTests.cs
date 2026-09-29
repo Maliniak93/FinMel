@@ -145,6 +145,52 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
     }
 
+    /// <summary>asset-archive AC-5: paying out an archived Settled deposit is a 409 <c>Conflict.AssetArchived</c> and nothing changes.</summary>
+    [Fact]
+    public async Task PayOut_ArchivedDeposit_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Current accounts");
+        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Current account");
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.SettleDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        await client.ArchiveAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            PayOutDepositUri(portfolioId, deposit.AssetId), NewPayOutRequest(cashId), cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+        await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>asset-archive AC-6: an archived Cash as the payout destination is a 400 <c>Validation.InvalidTransferCounterpart</c>; nothing is written.</summary>
+    [Fact]
+    public async Task PayOut_ToArchivedCash_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.SettleDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var (cashPortfolioId, cashId) = await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            PayOutDepositUri(portfolioId, deposit.AssetId), NewPayOutRequest(cashId), cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+        await client.AssertCashUntouchedAsync(cashPortfolioId, cashId, cancellationToken);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+    }
+
     /// <summary>
     /// AC-4 (input half): a date before <c>settledOn</c> or after today (Europe/Warsaw), or a
     /// destination outside the transfer rules — another currency, a non-Cash class, Cash in an

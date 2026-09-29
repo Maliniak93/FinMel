@@ -81,7 +81,8 @@ internal static class ReportingApi
         decimal? manualValueAmount = null,
         DateOnly? manualValueDate = null,
         bool portfolioIsArchived = false,
-        long version = 0)
+        long version = 0,
+        bool isArchived = false)
     {
         db.Positions.Add(new Data.Position
         {
@@ -96,6 +97,7 @@ internal static class ReportingApi
             ManualValueAmount = manualValueAmount,
             ManualValueDate = manualValueDate,
             PortfolioIsArchived = portfolioIsArchived,
+            IsArchived = isArchived,
             Version = version,
             UpdatedAt = DateTimeOffset.UtcNow,
         });

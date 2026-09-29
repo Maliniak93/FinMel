@@ -60,7 +60,7 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => p.PortfolioId == portfolioId && !p.PortfolioIsArchived)
+            .Where(p => p.PortfolioId == portfolioId && !p.PortfolioIsArchived && !p.IsArchived)
             .ToListAsync(cancellationToken);
 
         var pricesByInstrument = await LoadLatestPricesAsync(positions, cancellationToken);

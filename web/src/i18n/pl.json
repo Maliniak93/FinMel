@@ -286,7 +286,8 @@
       "record": "Zapisz",
       "mustNotBeNegative": "{{ field }} nie może być ujemna.",
       "dateRequired": "Data jest wymagana."
-    }
+    },
+    "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany."
   },
   "deposits": {
     "title": "Lokaty",
@@ -388,6 +389,20 @@
         "month": "{{ count }} miesiąc",
         "months": "miesięcy: {{ count }}"
       }
+    }
+  },
+  "assetArchive": {
+    "showArchived": "Pokaż zarchiwizowane",
+    "allArchived": "Wszystko tutaj jest zarchiwizowane — włącz \"Pokaż zarchiwizowane\", aby to zobaczyć.",
+    "archive": {
+      "title": "Zarchiwizować \"{{ name }}\"?",
+      "message": "Od dziś przestaje się liczyć do wartości majątku. Jego transakcje i historia zostają zachowane, a przywrócić je możesz w każdej chwili.",
+      "failed": "Nie udało się zarchiwizować."
+    },
+    "restore": {
+      "title": "Przywrócić \"{{ name }}\"?",
+      "message": "Od dziś znów liczy się do wartości majątku.",
+      "failed": "Nie udało się przywrócić."
     }
   }
 }

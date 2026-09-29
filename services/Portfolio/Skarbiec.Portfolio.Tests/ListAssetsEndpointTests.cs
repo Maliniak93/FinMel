@@ -32,6 +32,26 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal("Asset in A", asset.Name);
     }
 
+    /// <summary>asset-archive AC-7: an archived asset is still listed (the client filters), with the right flag on each.</summary>
+    [Fact]
+    public async Task List_IncludesArchivedAssetWithFlag()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var liveId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Live");
+        var archivedId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Archived");
+        await client.ArchiveAssetAsync(portfolioId, archivedId, cancellationToken);
+
+        var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var assets = await response.Content.ReadFromJsonAsync<List<AssetResponse>>(cancellationToken);
+        Assert.Equal(2, assets!.Count);
+        Assert.False(assets.Single(a => a.Id == liveId).IsArchived);
+        Assert.True(assets.Single(a => a.Id == archivedId).IsArchived);
+    }
+
     [Fact]
     public async Task List_PortfolioWithNoAssets_ReturnsEmptyList()
     {

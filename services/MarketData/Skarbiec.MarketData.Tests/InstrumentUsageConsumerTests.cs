@@ -221,6 +221,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         Currency = "USD",
         Quantity = 1m,
         PortfolioIsArchived = false,
+        IsArchived = false,
         Version = version,
         OccurredAtUtc = DateTimeOffset.UtcNow,
     };

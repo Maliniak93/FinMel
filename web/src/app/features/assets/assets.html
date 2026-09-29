@@ -13,6 +13,13 @@
         }
       </h1>
     </div>
+    <mat-slide-toggle
+      class="assets-page__show-archived"
+      [checked]="showArchived()"
+      (change)="showArchived.set($event.checked)"
+    >
+      {{ 'assetArchive.showArchived' | transloco }}
+    </mat-slide-toggle>
     @if (!isArchived()) {
       <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
@@ -56,7 +63,7 @@
       }
     </div>
   } @else if (assetsResource.hasValue()) {
-    <table mat-table [dataSource]="assetsResource.value()" class="assets-page__table">
+    <table mat-table [dataSource]="visibleAssets()" class="assets-page__table">
       <ng-container matColumnDef="assetClass">
         <th mat-header-cell *matHeaderCellDef>{{ 'assets.class' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">
@@ -68,6 +75,11 @@
         <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">
           <a [routerLink]="[asset.id, 'transactions']">{{ asset.name }}</a>
+          @if (asset.isArchived) {
+            <mat-chip-set class="assets-page__due">
+              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
+            </mat-chip-set>
+          }
           @if (isDepositDue(asset)) {
             <mat-chip-set class="assets-page__due">
               <mat-chip
@@ -158,11 +170,23 @@
           >
             <mat-icon>more_vert</mat-icon>
           </button>
+          <!-- asset-archive: an archived asset is read-only — Restore and Delete only. -->
           <mat-menu #menu="matMenu">
-            <button mat-menu-item type="button" (click)="openEditDialog(asset)">
-              <mat-icon>edit</mat-icon>
-              <span>{{ 'common.edit' | transloco }}</span>
-            </button>
+            @if (asset.isArchived) {
+              <button mat-menu-item type="button" (click)="setArchived(asset, false)">
+                <mat-icon>unarchive</mat-icon>
+                <span>{{ 'common.restore' | transloco }}</span>
+              </button>
+            } @else {
+              <button mat-menu-item type="button" (click)="openEditDialog(asset)">
+                <mat-icon>edit</mat-icon>
+                <span>{{ 'common.edit' | transloco }}</span>
+              </button>
+              <button mat-menu-item type="button" (click)="setArchived(asset, true)">
+                <mat-icon>archive</mat-icon>
+                <span>{{ 'common.archive' | transloco }}</span>
+              </button>
+            }
             <button mat-menu-item type="button" (click)="remove(asset)">
               <mat-icon>delete</mat-icon>
               <span>{{ 'common.delete' | transloco }}</span>
@@ -173,6 +197,11 @@
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
+      <tr *matNoDataRow>
+        <td class="assets-page__no-data" [attr.colspan]="displayedColumns().length">
+          {{ 'assetArchive.allArchived' | transloco }}
+        </td>
+      </tr>
     </table>
   }
 </div>

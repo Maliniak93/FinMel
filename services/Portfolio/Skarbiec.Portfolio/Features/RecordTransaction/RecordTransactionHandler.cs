@@ -20,9 +20,9 @@ public sealed class RecordTransactionHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
-            return PortfolioErrors.Archived(portfolioId);
+            return readOnly;
         }
 
         // A term deposit's transactions are system-managed by the deposit slices (term-deposits).

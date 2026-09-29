@@ -286,7 +286,8 @@
       "record": "Record",
       "mustNotBeNegative": "{{ field }} must not be negative.",
       "dateRequired": "Date is required."
-    }
+    },
+    "assetArchivedNotice": "This asset is archived — restore it to make changes."
   },
   "deposits": {
     "title": "Deposits",
@@ -388,6 +389,20 @@
         "month": "{{ count }} month",
         "months": "{{ count }} months"
       }
+    }
+  },
+  "assetArchive": {
+    "showArchived": "Show archived",
+    "allArchived": "Everything here is archived — turn on \"Show archived\" to see it.",
+    "archive": {
+      "title": "Archive \"{{ name }}\"?",
+      "message": "It drops out of net worth from today. Its transactions and history are kept, and you can restore it at any time.",
+      "failed": "Failed to archive."
+    },
+    "restore": {
+      "title": "Restore \"{{ name }}\"?",
+      "message": "It counts toward net worth again from today.",
+      "failed": "Failed to restore."
     }
   }
 }

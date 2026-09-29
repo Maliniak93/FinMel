@@ -138,6 +138,7 @@ export const cashAsset: AssetResponse = {
   currency: 'PLN',
   quantity: 0,
   transactionCount: 0,
+  isArchived: false,
 };
 
 export const realEstateAsset: AssetResponse = {
@@ -151,6 +152,7 @@ export const realEstateAsset: AssetResponse = {
   manualValue: 650000,
   manualValueDate: '2020-06-15',
   transactionCount: 0,
+  isArchived: false,
 };
 
 export const cryptoAsset: AssetResponse = {
@@ -163,6 +165,7 @@ export const cryptoAsset: AssetResponse = {
   quantity: 0.5,
   instrumentId,
   transactionCount: 0,
+  isArchived: false,
 };
 
 export const cryptoInstrumentDetails: InstrumentDetailsResponse = {

@@ -299,6 +299,9 @@ namespace Skarbiec.Reporting.Migrations
                     b.Property<Guid?>("InstrumentId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal?>("ManualValueAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
