@@ -8,6 +8,7 @@ import { By } from '@angular/platform-browser';
 import type { InstrumentDetailsResponse, InstrumentSearchResult } from '../../../../api/marketdata';
 import type { AssetClass, AssetResponse } from '../../../../api/portfolio';
 import { InstrumentPicker } from '../blocks/instrument-picker/instrument-picker';
+import { provideI18nTesting } from '../../../../core/i18n/testing';
 
 // Shared arrange helpers for the asset-form specs (shell, picker, per-kind forms, blocks). Test-only:
 // nothing in the app imports this file. Kept free of Vitest globals so it also type-checks under
@@ -80,7 +81,7 @@ export async function mountAssetForm<T>(
 ): Promise<ComponentFixture<T>> {
   await TestBed.configureTestingModule({
     imports: [component],
-    providers: [provideNativeDateAdapter()],
+    providers: [provideNativeDateAdapter(), provideI18nTesting()],
   }).compileComponents();
 
   const fixture = TestBed.createComponent(component);

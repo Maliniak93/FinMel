@@ -24,7 +24,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../../../core/auth/problem-details';
-import { formatMoney } from '../../../../../shared/format-money';
+import { formatMoney } from '../../../../../shared/format';
 
 export type InstrumentOption =
   InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;

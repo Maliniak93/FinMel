@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
   postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
@@ -46,6 +47,7 @@ export interface TransactionFormDialogData {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    TranslocoPipe,
   ],
   templateUrl: './transaction-form-dialog.html',
   styleUrl: './transaction-form-dialog.scss',

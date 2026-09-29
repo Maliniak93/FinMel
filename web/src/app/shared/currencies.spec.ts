@@ -1,3 +1,4 @@
+import { TRANSLATIONS } from '../../testing/i18n';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from './currencies';
 
 describe('supported currencies', () => {
@@ -10,10 +11,14 @@ describe('supported currencies', () => {
     expect(SUPPORTED_CURRENCIES.some((c) => c.code === DEFAULT_CURRENCY)).toBe(true);
   });
 
+  // A label is a translation key (i18n foundation, #131); its text in every language starts with the
+  // code.
   it('labels every code and starts each label with the code the server stores', () => {
     for (const { code, label } of SUPPORTED_CURRENCIES) {
       expect(code).toMatch(/^[A-Z]{3}$/);
-      expect(label.startsWith(code)).toBe(true);
+      for (const lang of ['en', 'pl'] as const) {
+        expect(String(TRANSLATIONS[lang][label]).startsWith(code)).toBe(true);
+      }
     }
   });
 });

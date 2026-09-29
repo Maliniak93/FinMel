@@ -5,7 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { toDateOnly } from '../../../shared/date-only';
-import { formatMoney } from '../../../shared/format-money';
+import { formatMoney } from '../../../shared/format';
 import {
   findControl,
   hasControl,

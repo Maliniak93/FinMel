@@ -4,7 +4,9 @@ import { provideRouter } from '@angular/router';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import type { DashboardResponse } from '../../api/reporting';
+import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
+import { provideI18nTesting } from '../../core/i18n/testing';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -60,7 +62,7 @@ describe('Dashboard', () => {
 
     await TestBed.configureTestingModule({
       imports: [Dashboard],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), provideI18nTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Dashboard);
@@ -81,7 +83,7 @@ describe('Dashboard', () => {
   it('shows the formatted net worth and the as-of date', async () => {
     await setup(jsonResponse(dashboard));
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    const expectedNetWorth = new Intl.NumberFormat('pl-PL', {
+    const expectedNetWorth = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'PLN',
     }).format(15000);
@@ -98,8 +100,8 @@ describe('Dashboard', () => {
   it('builds pie segments from the asset-class breakdown', async () => {
     await setup(jsonResponse(dashboard));
     expect(component['pieSegments']()).toEqual([
-      { label: 'Cash', percentage: 33.33, color: '#4C6EF5' },
-      { label: 'Stock', percentage: 66.67, color: '#12B886' },
+      { label: assetClassLabel(ASSET_CLASS.Cash), percentage: 33.33, color: '#4C6EF5' },
+      { label: assetClassLabel(ASSET_CLASS.Stock), percentage: 66.67, color: '#12B886' },
     ]);
   });
 

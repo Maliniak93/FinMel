@@ -11,10 +11,8 @@ describe('transaction-type', () => {
       const allowed = allowedTransactionTypes(assetClass);
 
       if (cashLike.includes(assetClass)) {
-        expect(allowed).toEqual([
-          { value: 2, label: 'Deposit' },
-          { value: 3, label: 'Withdraw' },
-        ]);
+        expect(allowed).toEqual([TRANSACTION_TYPES[2], TRANSACTION_TYPES[3]]);
+        expect(allowed.map((t) => t.value)).toEqual([2, 3]); // Deposit, Withdraw
       } else {
         expect(allowed).toEqual(TRANSACTION_TYPES);
       }

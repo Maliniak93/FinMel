@@ -55,7 +55,9 @@
     <table mat-table [dataSource]="assetsResource.value()" class="assets-page__table">
       <ng-container matColumnDef="assetClass">
         <th mat-header-cell *matHeaderCellDef>Class</th>
-        <td mat-cell *matCellDef="let asset">{{ assetClassLabel(asset.assetClass) }}</td>
+        <td mat-cell *matCellDef="let asset">
+          {{ assetClassLabel(asset.assetClass) | transloco }}
+        </td>
       </ng-container>
 
       <ng-container matColumnDef="name">
@@ -66,7 +68,7 @@
             <mat-chip-set class="assets-page__due">
               <mat-chip
                 class="assets-page__chip--due"
-                [matTooltip]="'Matured on ' + (asset.depositMaturityDate | date: 'mediumDate')"
+                [matTooltip]="'Matured on ' + formatDate(asset.depositMaturityDate)"
               >
                 Due
               </mat-chip>
@@ -112,7 +114,7 @@
           @if (asset.valuationMode === VALUATION_MODE.Market) {
             @if (instrumentFor(asset); as instrument) {
               @if (instrument.lastPriceDate) {
-                {{ instrument.lastPriceDate | date: 'mediumDate' }}
+                {{ formatDate(instrument.lastPriceDate) }}
               } @else {
                 No price yet
               }
@@ -127,7 +129,7 @@
           } @else if (asset.valuationMode === VALUATION_MODE.CurrencyValued) {
             —
           } @else {
-            {{ asset.manualValueDate | date: 'mediumDate' }}
+            {{ formatDate(asset.manualValueDate) }}
             @if (isStale(asset.manualValueDate)) {
               <mat-chip-set>
                 <mat-chip

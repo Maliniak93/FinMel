@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, inject, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
@@ -9,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -18,17 +18,12 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatMoney } from '../../shared/format-money';
+import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import {
   DepositFormDialog,
   type DepositFormDialogData,
 } from './deposit-form-dialog/deposit-form-dialog';
-import {
-  DEPOSIT_STATUS,
-  depositStatusLabel,
-  formatPercent,
-  settlementAmounts,
-} from './deposit-terms';
+import { DEPOSIT_STATUS, depositStatusLabel, settlementAmounts } from './deposit-terms';
 import {
   PayOutDepositDialog,
   type PayOutDepositDialogData,
@@ -51,7 +46,6 @@ import {
 @Component({
   selector: 'app-deposits',
   imports: [
-    DatePipe,
     MatButtonModule,
     MatChipsModule,
     MatIconModule,
@@ -59,6 +53,7 @@ import {
     MatProgressSpinnerModule,
     MatTableModule,
     MatTooltipModule,
+    TranslocoPipe,
   ],
   templateUrl: './deposits.html',
   styleUrl: './deposits.scss',
@@ -93,6 +88,7 @@ export class Deposits {
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatPercent = formatPercent;
+  protected readonly formatDate = formatDate;
   protected readonly depositStatusLabel = depositStatusLabel;
 
   protected isDue(deposit: DepositResponse): boolean {

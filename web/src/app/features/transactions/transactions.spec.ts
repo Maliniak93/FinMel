@@ -15,6 +15,7 @@ import type {
   TransactionResponse,
 } from '../../api/portfolio';
 import { Transactions } from './transactions';
+import { provideI18nTesting } from '../../core/i18n/testing';
 
 // See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
 // generated client ultimately calls) instead of mocking the SDK module.
@@ -107,6 +108,7 @@ describe('Transactions', () => {
     await TestBed.configureTestingModule({
       imports: [Transactions],
       providers: [
+        provideI18nTesting(),
         provideRouter([]),
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: snackBar },
@@ -284,14 +286,14 @@ describe('Transactions', () => {
 
     const rows = Array.from(element.querySelectorAll('tbody tr.mat-mdc-row'));
     expect(rows.length).toBe(2);
-    // Whitespace is stripped because pl-PL separates the currency (and any digit groups) with
-    // non-breaking spaces.
+    // Whitespace is stripped because Intl separates the currency code from the amount with a
+    // non-breaking space.
     const cellTexts = (row: Element) =>
       Array.from(row.querySelectorAll('td'), (td) => (td.textContent ?? '').replace(/\s/g, ''));
 
     const pricedCells = cellTexts(rows[0]);
     expect(pricedCells[3]).toBe('EUR');
-    expect(pricedCells[4]).toBe('4300,00zł');
+    expect(pricedCells[4]).toBe('PLN4,300.00');
 
     const unpricedCells = cellTexts(rows[1]);
     expect(unpricedCells[3]).toBe('EUR');

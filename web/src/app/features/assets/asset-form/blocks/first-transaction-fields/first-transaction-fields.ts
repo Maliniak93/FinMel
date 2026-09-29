@@ -5,6 +5,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import type { RecordTransactionRequest } from '../../../../../api/portfolio';
 import { toDateOnly } from '../../../../../shared/date-only';
@@ -64,6 +65,7 @@ export function buildInitialTransaction(
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    TranslocoPipe,
   ],
   templateUrl: './first-transaction-fields.html',
   styleUrl: './first-transaction-fields.scss',

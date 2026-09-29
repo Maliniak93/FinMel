@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import type { AssetResponse } from '../../../../../api/portfolio';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../../../shared/currencies';
@@ -25,7 +26,13 @@ export function fillAssetBasics(group: AssetBasicsGroup, asset: AssetResponse): 
 
 @Component({
   selector: 'app-asset-basics-fields',
-  imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    TranslocoPipe,
+  ],
   templateUrl: './asset-basics-fields.html',
   styleUrl: './asset-basics-fields.scss',
 })

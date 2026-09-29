@@ -1,5 +1,6 @@
 import { Component, output } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import type { AssetClass } from '../../../../api/portfolio';
 import { ASSET_CLASS, ASSET_CLASSES } from '../../asset-class';
@@ -20,7 +21,7 @@ const ASSET_CLASS_ICONS: Record<AssetClass, string> = {
 // asset's class cannot change in the UI.
 @Component({
   selector: 'app-asset-type-picker',
-  imports: [MatIconModule],
+  imports: [MatIconModule, TranslocoPipe],
   templateUrl: './asset-type-picker.html',
   styleUrl: './asset-type-picker.scss',
 })

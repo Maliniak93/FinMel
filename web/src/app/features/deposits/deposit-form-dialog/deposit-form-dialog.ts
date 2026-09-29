@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
@@ -16,6 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
@@ -36,7 +36,7 @@ import {
 } from '../../../core/auth/problem-details';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
-import { formatMoney } from '../../../shared/format-money';
+import { formatDate, formatMoney } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import {
   DEPOSIT_CAPITALIZATIONS,
@@ -69,7 +69,6 @@ function termLengthWithinCap(control: AbstractControl): ValidationErrors | null 
 @Component({
   selector: 'app-deposit-form-dialog',
   imports: [
-    DatePipe,
     ReactiveFormsModule,
     MatButtonModule,
     MatDatepickerModule,
@@ -79,6 +78,7 @@ function termLengthWithinCap(control: AbstractControl): ValidationErrors | null 
     MatProgressSpinnerModule,
     MatSelectModule,
     MatSlideToggleModule,
+    TranslocoPipe,
   ],
   templateUrl: './deposit-form-dialog.html',
   styleUrl: './deposit-form-dialog.scss',
@@ -102,6 +102,7 @@ export class DepositFormDialog {
   protected readonly termUnits = DEPOSIT_TERM_UNITS;
   protected readonly capitalizations = DEPOSIT_CAPITALIZATIONS;
   protected readonly formatMoney = formatMoney;
+  protected readonly formatDate = formatDate;
 
   // A principal funded from Cash can't exceed that Cash's balance (asset-transfers-deposit-funding);
   // new money has no cap. Reads its sibling `fundingAssetId`, so it is re-run whenever the source or

@@ -1,6 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import {
+  isTranslationIn,
+  looksLikeTranslationKey,
+  openLanguageMenu,
+  pickLanguageFromMenu,
+  textOf,
+} from '../../../testing/i18n';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
+import { provideI18nTesting } from '../../core/i18n/testing';
 import { THEME_STORAGE_KEY, ThemeService } from '../../core/theme/theme';
 import { Shell } from './shell';
 
@@ -16,7 +25,7 @@ describe('Shell', () => {
 
     await TestBed.configureTestingModule({
       imports: [Shell],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), provideI18nTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Shell);
@@ -25,8 +34,11 @@ describe('Shell', () => {
     await fixture.whenStable();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.clear();
+    document.documentElement.lang = 'en';
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.style.removeProperty('color-scheme');
   });
@@ -57,5 +69,59 @@ describe('Shell', () => {
 
     expect(link).toBeDefined();
     expect(link!.getAttribute('href')).toBe('/deposits');
+  });
+
+  // i18n foundation (#131) AC-4: the toolbar language menu switches the running app — no reload.
+  it('switches the navigation to Polish without a reload', async () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const navLabels = () =>
+      Array.from(element.querySelectorAll('mat-nav-list a [matListItemTitle]'), textOf);
+
+    const englishLabels = navLabels();
+    expect(englishLabels).toEqual(['Dashboard', 'Portfolios', 'Deposits', 'Settings']);
+
+    // Each language is offered under its own name, whatever the active language.
+    const items = (await openLanguageMenu(fixture)).map(textOf);
+    expect(items.some((item) => item.includes('English'))).toBe(true);
+    expect(items.some((item) => item.includes('Polski'))).toBe(true);
+
+    await pickLanguageFromMenu(fixture, 'Polski');
+
+    const polishLabels = navLabels();
+    expect(polishLabels).toHaveLength(englishLabels.length);
+    polishLabels.forEach((label, index) => {
+      expect(label).not.toBe(englishLabels[index]);
+      expect(looksLikeTranslationKey(label)).toBe(false);
+      expect(isTranslationIn('pl', label), `"${label}" is not a pl.json value`).toBe(true);
+    });
+    expect(document.documentElement.lang).toBe('pl');
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('pl');
+    // Same component instance: the switch re-rendered in place.
+    expect(fixture.componentInstance).toBe(component);
+
+    const itemsInPolish = (await openLanguageMenu(fixture)).map(textOf);
+    expect(itemsInPolish.some((item) => item.includes('English'))).toBe(true);
+    expect(itemsInPolish.some((item) => item.includes('Polski'))).toBe(true);
+  });
+
+  it('translates the theme and log-out button labels', async () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const ariaLabels = () =>
+      Array.from(element.querySelectorAll('mat-toolbar button[aria-label]'), (button) =>
+        button.getAttribute('aria-label'),
+      );
+    const english = ariaLabels();
+    // Toggle navigation, theme, log out (the language switch may add its own).
+    expect(english.length).toBeGreaterThanOrEqual(3);
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const polish = ariaLabels();
+    expect(polish).toHaveLength(english.length);
+    polish.forEach((label, index) => {
+      expect(label).not.toBe(english[index]);
+      expect(looksLikeTranslationKey(label)).toBe(false);
+    });
   });
 });

@@ -4,7 +4,7 @@
       @for (link of navLinks; track link.path) {
         <a mat-list-item [routerLink]="link.path" routerLinkActive="shell__nav-link--active">
           <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
-          <span matListItemTitle>{{ link.label }}</span>
+          <span matListItemTitle>{{ link.label | transloco }}</span>
         </a>
       }
     </mat-nav-list>
@@ -16,7 +16,7 @@
         mat-icon-button
         type="button"
         (click)="drawer.toggle()"
-        aria-label="Toggle navigation"
+        [attr.aria-label]="'shell.toggleNavigation' | transloco"
       >
         <mat-icon>menu</mat-icon>
       </button>
@@ -26,12 +26,18 @@
         mat-icon-button
         type="button"
         (click)="cycleTheme()"
-        [matTooltip]="themeLabel()"
-        [attr.aria-label]="themeLabel()"
+        [matTooltip]="themeLabel() | transloco"
+        [attr.aria-label]="themeLabel() | transloco"
       >
         <mat-icon>{{ themeIcon() }}</mat-icon>
       </button>
-      <button mat-icon-button type="button" (click)="logout()" aria-label="Log out">
+      <app-language-switch />
+      <button
+        mat-icon-button
+        type="button"
+        (click)="logout()"
+        [attr.aria-label]="'shell.logOut' | transloco"
+      >
         <mat-icon>logout</mat-icon>
       </button>
     </mat-toolbar>

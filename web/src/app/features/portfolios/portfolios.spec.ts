@@ -362,7 +362,9 @@ describe('Portfolios', () => {
 
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
       expect(text).toContain('—');
-      expect(text).not.toContain('0,00 zł');
+      expect(text).not.toContain(
+        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PLN' }).format(0),
+      );
     });
 
     it('renders the formatted PLN total value when a dashboard snapshot exists', async () => {
@@ -381,7 +383,7 @@ describe('Portfolios', () => {
       };
       await setup(jsonResponse([portfolio]), jsonResponse(dashboard));
 
-      const expectedValue = new Intl.NumberFormat('pl-PL', {
+      const expectedValue = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'PLN',
       }).format(12345.67);

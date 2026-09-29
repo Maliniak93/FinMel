@@ -6,7 +6,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import type { DepositResponse } from '../../../api/portfolio';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
-import { formatMoney } from '../../../shared/format-money';
+import { formatMoney } from '../../../shared/format';
 import {
   findControl,
   hasControl,
@@ -25,6 +25,7 @@ import {
   writeRequests,
 } from '../testing/deposit-fixtures';
 import { RollOverDepositDialog } from './roll-over-deposit-dialog';
+import { provideI18nTesting } from '../../../core/i18n/testing';
 
 // deposit-rollover AC-8. The "Roll over" dialog opens on a Due or a Settled (not paid-out) deposit
 // and starts its next term on the same asset: the term, capitalisation and the new start date (= the
@@ -77,6 +78,7 @@ describe('RollOverDepositDialog', () => {
     await TestBed.configureTestingModule({
       imports: [RollOverDepositDialog],
       providers: [
+        provideI18nTesting(),
         provideNativeDateAdapter(),
         { provide: MAT_DIALOG_DATA, useValue: { deposit } },
         { provide: MatDialogRef, useValue: dialogRef },

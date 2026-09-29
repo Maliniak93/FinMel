@@ -39,6 +39,24 @@ npm run format        # prettier --write .
 npm run format:check  # prettier --check .
 ```
 
+## Languages
+
+The UI runs on [Transloco](https://jsverse.gitbook.io/transloco) (`@jsverse/transloco`): English by
+default, Polish picked at runtime from the language menu (shell toolbar, login and register pages)
+and stored per browser in `localStorage` (`skarbiec-lang`).
+
+- Translations: `src/i18n/en.json` and `src/i18n/pl.json`, each loaded as its own lazy chunk.
+- Setup: `src/app/core/i18n/` — `i18n.ts` (Transloco config, loader, the initializer that restores
+  the stored language before the first route renders), `language.ts` (`LanguageService`, the active
+  locale), `testing.ts` (`provideI18nTesting()` for specs).
+- Numbers, money and dates are formatted by `src/app/shared/format.ts`, which follows the active
+  language (`en-US` / `pl-PL`).
+
+To add a text: pick a key nested by area (`settings.syncNow`, `enums.assetClass.cash`, shared words
+under `common.*`), add it to **both** JSON files, and render it with the `transloco` pipe
+(`{{ 'settings.syncNow' | transloco }}`, parameters as `{{ name }}` in the value). `npm test` fails
+when the two files drift apart. Conventions: `.claude/rules/angular.md` → Languages.
+
 ## Regenerating the API clients
 
 ```bash

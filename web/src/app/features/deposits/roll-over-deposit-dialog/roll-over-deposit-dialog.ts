@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
@@ -13,6 +12,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
@@ -27,7 +27,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly } from '../../../shared/date-only';
-import { formatMoney } from '../../../shared/format-money';
+import { formatDate, formatMoney } from '../../../shared/format';
 import {
   DEPOSIT_CAPITALIZATIONS,
   DEPOSIT_STATUS,
@@ -69,13 +69,13 @@ function isAmount(value: number | string | null): value is number | string {
 @Component({
   selector: 'app-roll-over-deposit-dialog',
   imports: [
-    DatePipe,
     ReactiveFormsModule,
     MatButtonModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    TranslocoPipe,
   ],
   templateUrl: './roll-over-deposit-dialog.html',
   styleUrl: './roll-over-deposit-dialog.scss',
@@ -89,11 +89,13 @@ export class RollOverDepositDialog {
   protected readonly isDue = Number(this.deposit.status) === DEPOSIT_STATUS.Due;
 
   protected readonly formatMoney = formatMoney;
+  protected readonly formatDate = formatDate;
   protected readonly term = termLabel(Number(this.deposit.termLength), this.deposit.termUnit);
+  // A translation key, or null for a value outside the known set.
   protected readonly capitalization =
     DEPOSIT_CAPITALIZATIONS.find(
       (option) => Number(option.value) === Number(this.deposit.capitalization),
-    )?.label ?? '—';
+    )?.label ?? null;
   // The bank renews on the maturity day, so the next term starts then, however late the rollover.
   protected readonly newStartDate = fromDateOnly(this.deposit.maturityDate);
   protected readonly newMaturityDate = depositMaturityDate(

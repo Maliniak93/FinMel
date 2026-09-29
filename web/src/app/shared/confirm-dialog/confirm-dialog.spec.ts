@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
+import { isTranslationIn, looksLikeTranslationKey, textOf } from '../../../testing/i18n';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
+import { provideI18nTesting } from '../../core/i18n/testing';
 import { ConfirmDialog, type ConfirmDialogData } from './confirm-dialog';
 
 describe('ConfirmDialog', () => {
@@ -20,12 +23,19 @@ describe('ConfirmDialog', () => {
       providers: [
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },
+        provideI18nTesting(),
       ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ConfirmDialog);
     component = fixture.componentInstance;
     await fixture.whenStable();
+  });
+
+  afterEach(async () => {
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await TestBed.inject(LanguageService).setLanguage('en');
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
 
   it('should create', () => {
@@ -40,5 +50,28 @@ describe('ConfirmDialog', () => {
   it('closes with false on cancel', () => {
     component['cancel']();
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  // i18n foundation (#131) AC-10: the default Cancel/Confirm labels are the dialog's own text and
+  // follow the language; the caller's title and message are shown as given.
+  it('default buttons follow the language', async () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const buttons = () => Array.from(element.querySelectorAll('button'), textOf);
+    expect(buttons()).toEqual(['Cancel', 'Confirm']);
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const [cancel, confirm] = buttons();
+    for (const [english, polish] of [
+      ['Cancel', cancel],
+      ['Confirm', confirm],
+    ]) {
+      expect(polish).not.toBe(english);
+      expect(looksLikeTranslationKey(polish)).toBe(false);
+      expect(isTranslationIn('pl', polish), `"${polish}" is not a pl.json value`).toBe(true);
+    }
+    expect(textOf(element.querySelector('h2'))).toBe('Archive portfolio?');
+    expect(element.textContent).toContain('This hides it from the list.');
   });
 });

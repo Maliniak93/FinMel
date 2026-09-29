@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -6,6 +5,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { getApiReportingNetWorthHistory } from '../../../api/reporting';
 import { readProblemDetails } from '../../../core/auth/problem-details';
+import { formatDate } from '../../../shared/format';
 
 type Range = '1M' | '1Y' | 'YTD' | 'MAX';
 
@@ -22,7 +22,7 @@ interface ChartPoint {
 
 @Component({
   selector: 'app-net-worth-chart',
-  imports: [DatePipe, MatButtonModule, MatButtonToggleModule, MatProgressSpinnerModule],
+  imports: [MatButtonModule, MatButtonToggleModule, MatProgressSpinnerModule],
   templateUrl: './net-worth-chart.html',
   styleUrl: './net-worth-chart.scss',
 })
@@ -31,6 +31,7 @@ export class NetWorthChart {
   protected readonly range = signal<Range>('1Y');
   protected readonly chartWidth = CHART_WIDTH;
   protected readonly chartHeight = CHART_HEIGHT;
+  protected readonly formatDate = formatDate;
 
   protected readonly historyResource = resource({
     params: () => ({ range: this.range() }),

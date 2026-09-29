@@ -31,7 +31,7 @@
           </mat-chip-set>
         }
       </div>
-      <p class="dashboard-page__as-of">As of {{ dashboard.asOf | date: 'mediumDate' }}</p>
+      <p class="dashboard-page__as-of">As of {{ formatDate(dashboard.asOf) }}</p>
 
       <div class="dashboard-page__breakdown">
         <app-pie-chart [segments]="pieSegments()" class="dashboard-page__chart" />
@@ -43,9 +43,8 @@
                 class="dashboard-page__swatch"
                 [style.background]="assetClassColor(entry.assetClass)"
               ></span>
-              {{ assetClassLabel(entry.assetClass) }} — {{ formatMoney(entry.valuePln) }} ({{
-                entry.percentage
-              }}%)
+              {{ assetClassLabel(entry.assetClass) | transloco }} —
+              {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
             </li>
           }
         </ul>

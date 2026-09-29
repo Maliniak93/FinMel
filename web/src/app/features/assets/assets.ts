@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
@@ -9,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
@@ -25,7 +25,7 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { toDateOnly } from '../../shared/date-only';
-import { formatMoney } from '../../shared/format-money';
+import { formatDate, formatMoney, formatQuantity } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
 import { ASSET_CLASS, assetClassLabel } from './asset-class';
@@ -61,7 +61,6 @@ function isPriceStale(lastPriceDate: string | null | undefined): boolean {
 @Component({
   selector: 'app-assets',
   imports: [
-    DatePipe,
     MatButtonModule,
     MatChipsModule,
     MatIconModule,
@@ -70,6 +69,7 @@ function isPriceStale(lastPriceDate: string | null | undefined): boolean {
     MatTableModule,
     MatTooltipModule,
     RouterLink,
+    TranslocoPipe,
   ],
   templateUrl: './assets.html',
   styleUrl: './assets.scss',
@@ -161,6 +161,8 @@ export class Assets {
   protected readonly isStale = isStale;
   protected readonly isPriceStale = isPriceStale;
   protected readonly formatMoney = formatMoney;
+  protected readonly formatQuantity = formatQuantity;
+  protected readonly formatDate = formatDate;
   protected readonly VALUATION_MODE = VALUATION_MODE;
 
   protected instrumentFor(asset: AssetResponse): InstrumentDetailsResponse | undefined {
@@ -182,10 +184,6 @@ export class Assets {
       !!asset.depositMaturityDate &&
       asset.depositMaturityDate <= toDateOnly(new Date())
     );
-  }
-
-  protected formatQuantity(quantity: number | string): string {
-    return new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 8 }).format(Number(quantity));
   }
 
   protected openCreateDialog(): void {

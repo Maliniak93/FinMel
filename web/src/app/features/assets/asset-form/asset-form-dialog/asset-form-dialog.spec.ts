@@ -28,6 +28,7 @@ import {
   toggleFirstTransaction,
 } from '../testing/asset-form-fixtures';
 import { AssetFormDialog, type AssetFormDialogData } from './asset-form-dialog';
+import { provideI18nTesting } from '../../../../core/i18n/testing';
 
 type AssetFormComponent = CashAssetForm | SecurityAssetForm | GoldAssetForm | ManualAssetForm;
 
@@ -82,6 +83,7 @@ describe('AssetFormDialog', () => {
     await TestBed.configureTestingModule({
       imports: [AssetFormDialog],
       providers: [
+        provideI18nTesting(),
         provideNativeDateAdapter(),
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },

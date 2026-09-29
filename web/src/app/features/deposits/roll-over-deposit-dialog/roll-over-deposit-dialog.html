@@ -12,11 +12,11 @@
       </div>
       <div>
         <dt>Capitalisation</dt>
-        <dd>{{ capitalization }}</dd>
+        <dd>{{ capitalization ? (capitalization | transloco) : '—' }}</dd>
       </div>
       <div>
         <dt>New start date</dt>
-        <dd>{{ newStartDate | date: 'mediumDate' }}</dd>
+        <dd>{{ formatDate(newStartDate) }}</dd>
       </div>
     </dl>
 
@@ -86,7 +86,7 @@
       </div>
       <div>
         <dt>Matures on</dt>
-        <dd>{{ newMaturityDate | date: 'mediumDate' }}</dd>
+        <dd>{{ formatDate(newMaturityDate) }}</dd>
       </div>
     </dl>
 

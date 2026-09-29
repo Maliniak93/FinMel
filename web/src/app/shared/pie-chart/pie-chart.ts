@@ -1,4 +1,5 @@
 import { Component, computed, input } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 export interface PieChartSegment {
   readonly label: string;
@@ -19,7 +20,7 @@ const CIRCUMFERENCE = 100;
 
 @Component({
   selector: 'app-pie-chart',
-  imports: [],
+  imports: [TranslocoPipe],
   templateUrl: './pie-chart.html',
   styleUrl: './pie-chart.scss',
 })

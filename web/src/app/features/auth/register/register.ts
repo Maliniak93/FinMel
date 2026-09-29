@@ -6,9 +6,11 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import { AuthService } from '../../../core/auth/auth';
 import { applyFieldErrors, type ApiProblemDetails } from '../../../core/auth/problem-details';
+import { LanguageSwitch } from '../../../shared/language-switch/language-switch';
 
 @Component({
   selector: 'app-register',
@@ -20,6 +22,8 @@ import { applyFieldErrors, type ApiProblemDetails } from '../../../core/auth/pro
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    TranslocoPipe,
+    LanguageSwitch,
   ],
   templateUrl: './register.html',
   styleUrl: './register.scss',
@@ -70,18 +74,18 @@ export class Register {
 
     if (problem.errorCode === 'Conflict.DuplicateEmail') {
       this.form.controls.email.setErrors({
-        server: problem.detail ?? 'This email is already registered.',
+        server: problem.detail ?? translate('auth.register.duplicateEmail'),
       });
       return;
     }
 
     if (problem.errorCode === 'Validation.Register') {
       this.form.controls.password.setErrors({
-        server: problem.detail ?? 'Password does not meet requirements.',
+        server: problem.detail ?? translate('auth.register.weakPassword'),
       });
       return;
     }
 
-    this.formError.set(problem.detail ?? 'Something went wrong. Please try again.');
+    this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 }

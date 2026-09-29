@@ -2,22 +2,23 @@ import type { DepositCapitalization, DepositStatus, DepositTermUnit } from '../.
 
 // Backend enums (Skarbiec.Portfolio.Data.DepositTermUnit / DepositCapitalization,
 // Features.Deposits.DepositStatus) serialize as their underlying ints, so the generated client types
-// them as bare `number`s — labels live here, in the same declaration order as the C# enums.
+// them as bare `number`s — labels live here, in the same declaration order as the C# enums. A label
+// is a translation key: templates render it through the `transloco` pipe.
 export const DEPOSIT_TERM_UNIT = { Days: 0, Months: 1 } as const satisfies Record<
   string,
   DepositTermUnit
 >;
 
 export const DEPOSIT_TERM_UNITS: readonly { value: DepositTermUnit; label: string }[] = [
-  { value: DEPOSIT_TERM_UNIT.Days, label: 'Days' },
-  { value: DEPOSIT_TERM_UNIT.Months, label: 'Months' },
+  { value: DEPOSIT_TERM_UNIT.Days, label: 'enums.depositTermUnit.days' },
+  { value: DEPOSIT_TERM_UNIT.Months, label: 'enums.depositTermUnit.months' },
 ];
 
 export const DEPOSIT_CAPITALIZATIONS: readonly { value: DepositCapitalization; label: string }[] = [
-  { value: 0, label: 'At maturity' },
-  { value: 1, label: 'Monthly' },
-  { value: 2, label: 'Quarterly' },
-  { value: 3, label: 'Yearly' },
+  { value: 0, label: 'enums.depositCapitalization.atMaturity' },
+  { value: 1, label: 'enums.depositCapitalization.monthly' },
+  { value: 2, label: 'enums.depositCapitalization.quarterly' },
+  { value: 3, label: 'enums.depositCapitalization.yearly' },
 ];
 
 export const DEPOSIT_STATUS = {
@@ -38,13 +39,13 @@ export function maxTermLength(termUnit: DepositTermUnit): number {
 export function depositStatusLabel(status: DepositStatus): string {
   switch (Number(status)) {
     case DEPOSIT_STATUS.PaidOut:
-      return 'Paid out';
+      return 'enums.depositStatus.paidOut';
     case DEPOSIT_STATUS.Settled:
-      return 'Settled';
+      return 'enums.depositStatus.settled';
     case DEPOSIT_STATUS.Due:
-      return 'Due';
+      return 'enums.depositStatus.due';
     default:
-      return 'Active';
+      return 'enums.depositStatus.active';
   }
 }
 
@@ -83,8 +84,4 @@ export function depositMaturityDate(
 
   const lastDayOfTargetMonth = new Date(year, month + termLength + 1, 0).getDate();
   return new Date(year, month + termLength, Math.min(day, lastDayOfTargetMonth));
-}
-
-export function formatPercent(value: number | string): string {
-  return `${new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 4 }).format(Number(value))} %`;
 }

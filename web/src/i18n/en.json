@@ -1,0 +1,137 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again."
+  },
+  "language": {
+    "switch": "Language"
+  },
+  "shell": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "portfolios": "Portfolios",
+      "deposits": "Deposits",
+      "settings": "Settings"
+    },
+    "toggleNavigation": "Toggle navigation",
+    "logOut": "Log out",
+    "theme": {
+      "system": "Theme: System (following device) — click for Light",
+      "light": "Theme: Light — click for Dark",
+      "dark": "Theme: Dark — click for System"
+    }
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display name",
+    "validation": {
+      "emailRequired": "Email is required.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordRequired": "Password is required.",
+      "passwordTooShort": "Password must be at least 6 characters.",
+      "displayNameRequired": "Display name is required.",
+      "displayNameTooLong": "Display name is too long."
+    },
+    "login": {
+      "title": "Log in",
+      "submit": "Log in",
+      "noAccount": "No account yet?",
+      "register": "Register",
+      "failed": "Invalid email or password."
+    },
+    "register": {
+      "title": "Register",
+      "submit": "Register",
+      "haveAccount": "Already have an account?",
+      "logIn": "Log in",
+      "duplicateEmail": "This email is already registered.",
+      "weakPassword": "Password does not meet requirements."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "marketDataSync": "Market data sync",
+    "syncNow": "Sync now",
+    "noSyncYet": "No sync has run yet.",
+    "notRunYet": "Not run yet.",
+    "runStarted": "Started {{ date }}",
+    "runFinished": "finished {{ date }}",
+    "runCounts": "synced {{ synced }}, no data {{ noData }}, failed {{ failed }}",
+    "loadFailed": "Failed to load sync status.",
+    "triggerFailed": "Failed to trigger sync."
+  },
+  "notFound": {
+    "message": "Page not found."
+  },
+  "pieChart": {
+    "ariaLabel": "Net worth breakdown by asset class",
+    "empty": "No data to chart yet."
+  },
+  "enums": {
+    "assetClass": {
+      "cash": "Cash",
+      "deposit": "Deposit",
+      "stock": "Stock",
+      "etf": "ETF",
+      "bond": "Bond",
+      "crypto": "Crypto",
+      "preciousMetal": "Precious metal",
+      "realEstate": "Real estate",
+      "other": "Other",
+      "unknown": "Unknown"
+    },
+    "transactionType": {
+      "buy": "Buy",
+      "sell": "Sell",
+      "deposit": "Deposit",
+      "withdraw": "Withdraw",
+      "dividend": "Dividend",
+      "interest": "Interest",
+      "unknown": "Unknown"
+    },
+    "quantityField": {
+      "quantity": "Quantity",
+      "amount": "Amount"
+    },
+    "depositTermUnit": {
+      "days": "Days",
+      "months": "Months"
+    },
+    "depositCapitalization": {
+      "atMaturity": "At maturity",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "yearly": "Yearly"
+    },
+    "depositStatus": {
+      "active": "Active",
+      "due": "Due",
+      "settled": "Settled",
+      "paidOut": "Paid out"
+    },
+    "transferDirection": {
+      "out": "Transfer to {{ asset }} ({{ portfolio }})",
+      "in": "Transfer from {{ asset }} ({{ portfolio }})"
+    },
+    "syncRunStatus": {
+      "running": "Running",
+      "completed": "Completed",
+      "partial": "Partial",
+      "failed": "Failed",
+      "unknown": "Unknown"
+    },
+    "syncRunKind": {
+      "prices": "Prices",
+      "fx": "FX"
+    },
+    "currency": {
+      "pln": "PLN — Polish złoty",
+      "eur": "EUR — Euro",
+      "usd": "USD — US dollar"
+    }
+  }
+}

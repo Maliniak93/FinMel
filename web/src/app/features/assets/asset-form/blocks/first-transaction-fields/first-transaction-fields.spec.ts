@@ -8,6 +8,7 @@ import {
   createFirstTransactionGroup,
   FirstTransactionFields,
 } from './first-transaction-fields';
+import { provideI18nTesting } from '../../../../../core/i18n/testing';
 
 // AC-8: the "Add first transaction" block on its own — a checkbox plus the type/quantity/unit
 // price/date sub-form, and buildInitialTransaction() turning it into AddAssetRequest.InitialTransaction.
@@ -20,7 +21,7 @@ describe('FirstTransactionFields', () => {
   async function setup(options: { openingDeposit?: boolean } = {}): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [FirstTransactionFields],
-      providers: [provideNativeDateAdapter()],
+      providers: [provideNativeDateAdapter(), provideI18nTesting()],
     }).compileComponents();
 
     group = createFirstTransactionGroup(

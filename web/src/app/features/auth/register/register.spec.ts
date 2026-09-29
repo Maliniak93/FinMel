@@ -1,7 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
+import {
+  isTranslationIn,
+  looksLikeTranslationKey,
+  pickLanguageFromMenu,
+  textOf,
+} from '../../../../testing/i18n';
 import { AuthService } from '../../../core/auth/auth';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../../core/i18n/language';
+import { provideI18nTesting } from '../../../core/i18n/testing';
 import { Register } from './register';
 
 describe('Register', () => {
@@ -15,7 +23,11 @@ describe('Register', () => {
 
     await TestBed.configureTestingModule({
       imports: [Register],
-      providers: [provideRouter([]), { provide: AuthService, useValue: authService }],
+      providers: [
+        provideRouter([]),
+        provideI18nTesting(),
+        { provide: AuthService, useValue: authService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Register);
@@ -23,6 +35,13 @@ describe('Register', () => {
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     await fixture.whenStable();
+  });
+
+  afterEach(async () => {
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await TestBed.inject(LanguageService).setLanguage('en');
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    document.documentElement.lang = 'en';
   });
 
   it('should create', () => {
@@ -106,5 +125,57 @@ describe('Register', () => {
     await component['onSubmit']();
 
     expect(component['formError']()).toBe('Something went wrong. Please try again.');
+  });
+
+  // i18n foundation (#131) AC-5: Polish picked on /login carries over (the choice is global and
+  // persisted); the register page's own client-side validation follows it.
+  it('shows validation messages in Polish', async () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const errors = () => Array.from(element.querySelectorAll('mat-error'), textOf);
+    const english = [
+      'Display name is required.',
+      'Display name is too long.',
+      'Email is required.',
+      'Enter a valid email address.',
+      'Password is required.',
+      'Password must be at least 6 characters.',
+    ];
+    const expectPolish = (messages: string[], count: number) => {
+      expect(messages).toHaveLength(count);
+      for (const message of messages) {
+        expect(english).not.toContain(message);
+        expect(message).not.toBe('');
+        expect(looksLikeTranslationKey(message)).toBe(false);
+      }
+    };
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+
+    // Every field empty: the three "required" messages.
+    await component['onSubmit']();
+    await fixture.whenStable();
+    expectPolish(errors(), 3);
+    for (const message of errors()) {
+      expect(isTranslationIn('pl', message), `"${message}" is not a pl.json value`).toBe(true);
+    }
+
+    // Malformed email, too-long name, too-short password: the format messages.
+    component['form'].setValue({
+      email: 'not-an-email',
+      displayName: 'x'.repeat(201),
+      password: 'abc',
+    });
+    component['form'].markAllAsTouched();
+    await fixture.whenStable();
+    expectPolish(errors(), 3);
+  });
+
+  it('offers the language menu on the register page', async () => {
+    await pickLanguageFromMenu(fixture, 'Polski');
+
+    const title = textOf((fixture.nativeElement as HTMLElement).querySelector('mat-card-title'));
+    expect(title).not.toBe('Register');
+    expect(isTranslationIn('pl', title)).toBe(true);
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('pl');
   });
 });

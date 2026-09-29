@@ -30,7 +30,13 @@ instead of constructor injection, native control flow (`@if`/`@for` with `track`
 - **`MatDialogModule`/`MatSnackBarModule` in a component's `imports`**, when that component only injects `MatDialog`/`MatSnackBar` (no `<mat-dialog-*>` markup of its own), shadows the TestBed provider override in specs. Only import them where the directives are actually used in the template.
 - **Enums arrive over the wire as raw ints** (e.g. `AssetClass`) — never assume a string. Keep one label map per enum, next to where it's displayed.
 - **`DateOnly` round-trips as a `"YYYY-MM-DD"` string** — never construct it with `new Date(isoString)` (parses as UTC midnight, can render as the previous day depending on the viewer's offset). Use explicit local-midnight construction/formatting helpers (`toDateOnly`/`fromDateOnly` in `shared/date-only.ts` — import them, never copy them), built from `getFullYear()`/`getMonth()`/`getDate()`, not string slicing of a `Date`'s ISO output.
-- Money: the server computes every monetary value as `decimal` — the client only formats, via `Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' })` (see `shared/format-money.ts`). Never do arithmetic on a formatted or floating-point amount client-side.
+- Money: the server computes every monetary value as `decimal` — the client only formats, via the locale-aware helpers in `shared/format.ts` (`formatMoney`, `formatQuantity`, `formatPercent`, `formatDate`, `formatDateTime`; `en` → `en-US`, `pl` → `pl-PL`). Never `DatePipe` or a hardcoded `Intl` locale, and never arithmetic on a formatted or floating-point amount client-side.
+
+## Languages (i18n)
+- Transloco, English by default, Polish at runtime; files in `src/i18n/{en,pl}.json`, setup in `core/i18n/`. Full rules: `.claude/rules/angular.md` → Languages.
+- No hardcoded user-facing text: add the key to **both** JSON files (nested by area, e.g. `settings.syncNow`; shared words under `common.*`; `{{ param }}` interpolation, no plurals — "label: N").
+- Templates translate only through the `transloco` pipe or directive; `translate()` only for one-shot text built at the moment of an action. Label maps return keys, templates pipe them.
+- Specs rendering translated text add `provideI18nTesting()` (`core/i18n/testing.ts`); a spec that switches to Polish switches back to English in `afterEach`.
 
 ## API changes
 1. `npm run gen:api` (`openapi-ts`) regenerates `src/app/api/<service>/` from each service's OpenAPI document. Once build-time OpenAPI files exist under `web/openapi/`, this reads those directly; until then it needs the Aspire stack running (`dotnet run --project Skarbiec.AppHost`) so it can fetch `/api/<service>/openapi/v1.json` through the Gateway.
