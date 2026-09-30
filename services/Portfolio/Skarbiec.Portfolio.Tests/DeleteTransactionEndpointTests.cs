@@ -173,4 +173,23 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
         Assert.Contains((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items, t => t.Id == openingId);
     }
+
+    /// <summary>savings-accounts AC-7: deleting a savings account's Withdraw gives the money back to the balance.</summary>
+    [Fact]
+    public async Task Delete_SavingsAccountTransaction_MovesBalance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var withdrawId = await client.RecordTransactionAsync(
+            portfolioId, account.AssetId, TransactionType.Withdraw, 4_000m, SavingsToday, cancellationToken, unitPrice: 1m);
+        Assert.Equal(6_000m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+
+        var response = await client.DeleteAsync(TransactionUri(portfolioId, account.AssetId, withdrawId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(10_000m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, account.AssetId, cancellationToken);
+    }
 }

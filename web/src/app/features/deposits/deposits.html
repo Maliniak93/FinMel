@@ -1,213 +1,229 @@
 <div class="deposits-page">
-  <div class="deposits-page__header">
-    <h1>{{ 'deposits.title' | transloco }}</h1>
-    <mat-slide-toggle
-      class="deposits-page__show-archived"
-      [checked]="showArchived()"
-      (change)="showArchived.set($event.checked)"
-    >
-      {{ 'assetArchive.showArchived' | transloco }}
-    </mat-slide-toggle>
-    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-      <mat-icon>add</mat-icon>
-      {{ 'deposits.add' | transloco }}
-    </button>
-  </div>
+  <h1>{{ 'deposits.title' | transloco }}</h1>
 
-  @if (depositsResource.error(); as loadError) {
-    <div class="deposits-page__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="depositsResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
-  } @else if (depositsResource.isLoading() && !depositsResource.hasValue()) {
-    <div class="deposits-page__state">
-      <mat-spinner diameter="32" />
-    </div>
-  } @else if (depositsResource.hasValue() && depositsResource.value().length === 0) {
-    <div class="deposits-page__state">
-      <p>{{ 'deposits.empty' | transloco }}</p>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        {{ 'deposits.addFirst' | transloco }}
-      </button>
-    </div>
-  } @else if (depositsResource.hasValue()) {
-    <table mat-table [dataSource]="visibleDeposits()" class="deposits-page__table">
-      <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit" [id]="nameCellId(deposit)">{{ deposit.name }}</td>
-      </ng-container>
+  <!-- savings-accounts: term deposits and savings accounts each on a tab of their own. -->
+  <mat-tab-group>
+    <mat-tab [label]="'deposits.tabs.termDeposits' | transloco">
+      <div class="deposits-page__header">
+        <mat-slide-toggle
+          class="deposits-page__show-archived"
+          [checked]="showArchived()"
+          (change)="showArchived.set($event.checked)"
+        >
+          {{ 'assetArchive.showArchived' | transloco }}
+        </mat-slide-toggle>
+        <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+          <mat-icon>add</mat-icon>
+          {{ 'deposits.add' | transloco }}
+        </button>
+      </div>
 
-      <ng-container matColumnDef="bankName">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.bank' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">{{ deposit.bankName ?? '—' }}</td>
-      </ng-container>
+      @if (depositsResource.error(); as loadError) {
+        <div class="deposits-page__state" role="alert">
+          <p>{{ loadError.message }}</p>
+          <button mat-button type="button" (click)="depositsResource.reload()">
+            {{ 'common.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (depositsResource.isLoading() && !depositsResource.hasValue()) {
+        <div class="deposits-page__state">
+          <mat-spinner diameter="32" />
+        </div>
+      } @else if (depositsResource.hasValue() && depositsResource.value().length === 0) {
+        <div class="deposits-page__state">
+          <p>{{ 'deposits.empty' | transloco }}</p>
+          <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+            {{ 'deposits.addFirst' | transloco }}
+          </button>
+        </div>
+      } @else if (depositsResource.hasValue()) {
+        <table mat-table [dataSource]="visibleDeposits()" class="deposits-page__table">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit" [id]="nameCellId(deposit)">
+              {{ deposit.name }}
+            </td>
+          </ng-container>
 
-      <ng-container matColumnDef="portfolio">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.portfolio' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">
-          {{ deposit.portfolioName }}
-          @if (deposit.portfolioIsArchived) {
-            <span class="deposits-page__muted">{{ 'deposits.archivedMarker' | transloco }}</span>
-          }
-        </td>
-      </ng-container>
+          <ng-container matColumnDef="bankName">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.bank' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">{{ deposit.bankName ?? '—' }}</td>
+          </ng-container>
 
-      <ng-container matColumnDef="principal">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.principal' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">
-          {{ formatMoney(deposit.principal, deposit.currency) }}
-        </td>
-      </ng-container>
+          <ng-container matColumnDef="portfolio">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.portfolio' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              {{ deposit.portfolioName }}
+              @if (deposit.portfolioIsArchived) {
+                <span class="deposits-page__muted">{{
+                  'deposits.archivedMarker' | transloco
+                }}</span>
+              }
+            </td>
+          </ng-container>
 
-      <ng-container matColumnDef="rate">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.rate' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">
-          {{ formatPercent(deposit.annualInterestRatePercent) }}
-        </td>
-      </ng-container>
+          <ng-container matColumnDef="principal">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.principal' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              {{ formatMoney(deposit.principal, deposit.currency) }}
+            </td>
+          </ng-container>
 
-      <ng-container matColumnDef="startDate">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.start' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.startDate) }}</td>
-      </ng-container>
+          <ng-container matColumnDef="rate">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.rate' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              {{ formatPercent(deposit.annualInterestRatePercent) }}
+            </td>
+          </ng-container>
 
-      <ng-container matColumnDef="maturityDate">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.maturity' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.maturityDate) }}</td>
-      </ng-container>
+          <ng-container matColumnDef="startDate">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.start' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.startDate) }}</td>
+          </ng-container>
 
-      <!-- Server-computed projection: after Belka tax unless the deposit is IKE/IKZE. A Settled row
+          <ng-container matColumnDef="maturityDate">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.maturity' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.maturityDate) }}</td>
+          </ng-container>
+
+          <!-- Server-computed projection: after Belka tax unless the deposit is IKE/IKZE. A Settled row
            shows what the bank actually paid instead. -->
-      <ng-container matColumnDef="netInterest">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.netProfit' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">
-          {{ formatMoney(netInterest(deposit), deposit.currency) }}
-        </td>
-      </ng-container>
+          <ng-container matColumnDef="netInterest">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.netProfit' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              {{ formatMoney(netInterest(deposit), deposit.currency) }}
+            </td>
+          </ng-container>
 
-      <ng-container matColumnDef="finalAmount">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.finalAmount' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">
-          {{ formatMoney(finalAmount(deposit), deposit.currency) }}
-        </td>
-      </ng-container>
+          <ng-container matColumnDef="finalAmount">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.finalAmount' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              {{ formatMoney(finalAmount(deposit), deposit.currency) }}
+            </td>
+          </ng-container>
 
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
-        <td mat-cell *matCellDef="let deposit">
-          <mat-chip-set>
-            <mat-chip [class.deposits-page__chip--due]="isDue(deposit)">
-              {{ depositStatusLabel(deposit.status) | transloco }}
-            </mat-chip>
-            @if (deposit.isArchived) {
-              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
-            }
-          </mat-chip-set>
-          <!-- Where the money went; the destination is gone ("—") once that Cash asset was removed. -->
-          @if (isPaidOut(deposit)) {
-            <div class="deposits-page__payout">
-              {{ formatDate(deposit.paidOutOn) }} → {{ deposit.paidOutToAssetName ?? '—' }}
-            </div>
-          }
-        </td>
-      </ng-container>
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              <mat-chip-set>
+                <mat-chip [class.deposits-page__chip--due]="isDue(deposit)">
+                  {{ depositStatusLabel(deposit.status) | transloco }}
+                </mat-chip>
+                @if (deposit.isArchived) {
+                  <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
+                }
+              </mat-chip-set>
+              <!-- Where the money went; the destination is gone ("—") once that Cash asset was removed. -->
+              @if (isPaidOut(deposit)) {
+                <div class="deposits-page__payout">
+                  {{ formatDate(deposit.paidOutOn) }} → {{ deposit.paidOutToAssetName ?? '—' }}
+                </div>
+              }
+            </td>
+          </ng-container>
 
-      <!-- A deposit of an archived portfolio is read-only, so its row offers no action. A deposit
+          <!-- A deposit of an archived portfolio is read-only, so its row offers no action. A deposit
            archived on its own (asset-archive) is read-only too: its menu offers Restore and Delete
            only. Otherwise a Due deposit can be settled; a Settled one can be transferred to cash;
            either can be rolled over. The terms of a Settled or PaidOut one are immutable, so its menu
            offers Archive and Delete only. -->
-      <ng-container matColumnDef="actions">
-        <th mat-header-cell *matHeaderCellDef></th>
-        <td mat-cell *matCellDef="let deposit">
-          @if (!deposit.portfolioIsArchived) {
-            @if (!deposit.isArchived && isDue(deposit)) {
-              <button
-                mat-icon-button
-                type="button"
-                [matTooltip]="'deposits.settleMaturity' | transloco"
-                [attr.aria-label]="'deposits.settleMaturityOf' | transloco: { name: deposit.name }"
-                (click)="openSettleDialog(deposit)"
-              >
-                <mat-icon>task_alt</mat-icon>
-              </button>
-            }
-            @if (!deposit.isArchived && isSettled(deposit)) {
-              <!-- Like the menu trigger, the name is the description: this label must not mention
-                   settling. -->
-              <button
-                mat-icon-button
-                type="button"
-                [matTooltip]="'deposits.transferToCash' | transloco"
-                [attr.aria-label]="'deposits.transferToCash' | transloco"
-                [attr.aria-describedby]="nameCellId(deposit)"
-                (click)="openPayOutDialog(deposit)"
-              >
-                <mat-icon>payments</mat-icon>
-              </button>
-            }
-            @if (!deposit.isArchived && canRollOver(deposit)) {
-              <!-- deposit-rollover: a Due or Settled (not paid-out) deposit starts its next term on the
-                   same asset. As above, the name is the description, and the label must not mention
-                   settling. -->
-              <button
-                mat-icon-button
-                type="button"
-                [matTooltip]="'deposits.rollOver' | transloco"
-                [attr.aria-label]="'deposits.rollOver' | transloco"
-                [attr.aria-describedby]="nameCellId(deposit)"
-                (click)="openRollOverDialog(deposit)"
-              >
-                <mat-icon>autorenew</mat-icon>
-              </button>
-            }
-            <!-- The name reaches the trigger as its description, not its label: only the settle
-                 button's label may mention settling. -->
-            <button
-              mat-icon-button
-              type="button"
-              [matMenuTriggerFor]="menu"
-              [attr.aria-label]="'deposits.actionsForThis' | transloco"
-              [attr.aria-describedby]="nameCellId(deposit)"
-            >
-              <mat-icon>more_vert</mat-icon>
-            </button>
-            <mat-menu #menu="matMenu">
-              @if (deposit.isArchived) {
-                <button mat-menu-item type="button" (click)="setArchived(deposit, false)">
-                  <mat-icon>unarchive</mat-icon>
-                  <span>{{ 'common.restore' | transloco }}</span>
-                </button>
-              } @else {
-                @if (!hasSettlement(deposit)) {
-                  <button mat-menu-item type="button" (click)="openEditDialog(deposit)">
-                    <mat-icon>edit</mat-icon>
-                    <span>{{ 'common.edit' | transloco }}</span>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let deposit">
+              @if (!deposit.portfolioIsArchived) {
+                @if (!deposit.isArchived && isDue(deposit)) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [matTooltip]="'deposits.settleMaturity' | transloco"
+                    [attr.aria-label]="
+                      'deposits.settleMaturityOf' | transloco: { name: deposit.name }
+                    "
+                    (click)="openSettleDialog(deposit)"
+                  >
+                    <mat-icon>task_alt</mat-icon>
                   </button>
                 }
-                <button mat-menu-item type="button" (click)="setArchived(deposit, true)">
-                  <mat-icon>archive</mat-icon>
-                  <span>{{ 'common.archive' | transloco }}</span>
+                @if (!deposit.isArchived && isSettled(deposit)) {
+                  <!-- Like the menu trigger, the name is the description: this label must not mention
+                   settling. -->
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [matTooltip]="'deposits.transferToCash' | transloco"
+                    [attr.aria-label]="'deposits.transferToCash' | transloco"
+                    [attr.aria-describedby]="nameCellId(deposit)"
+                    (click)="openPayOutDialog(deposit)"
+                  >
+                    <mat-icon>payments</mat-icon>
+                  </button>
+                }
+                @if (!deposit.isArchived && canRollOver(deposit)) {
+                  <!-- deposit-rollover: a Due or Settled (not paid-out) deposit starts its next term on the
+                   same asset. As above, the name is the description, and the label must not mention
+                   settling. -->
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [matTooltip]="'deposits.rollOver' | transloco"
+                    [attr.aria-label]="'deposits.rollOver' | transloco"
+                    [attr.aria-describedby]="nameCellId(deposit)"
+                    (click)="openRollOverDialog(deposit)"
+                  >
+                    <mat-icon>autorenew</mat-icon>
+                  </button>
+                }
+                <!-- The name reaches the trigger as its description, not its label: only the settle
+                 button's label may mention settling. -->
+                <button
+                  mat-icon-button
+                  type="button"
+                  [matMenuTriggerFor]="menu"
+                  [attr.aria-label]="'deposits.actionsForThis' | transloco"
+                  [attr.aria-describedby]="nameCellId(deposit)"
+                >
+                  <mat-icon>more_vert</mat-icon>
                 </button>
+                <mat-menu #menu="matMenu">
+                  @if (deposit.isArchived) {
+                    <button mat-menu-item type="button" (click)="setArchived(deposit, false)">
+                      <mat-icon>unarchive</mat-icon>
+                      <span>{{ 'common.restore' | transloco }}</span>
+                    </button>
+                  } @else {
+                    @if (!hasSettlement(deposit)) {
+                      <button mat-menu-item type="button" (click)="openEditDialog(deposit)">
+                        <mat-icon>edit</mat-icon>
+                        <span>{{ 'common.edit' | transloco }}</span>
+                      </button>
+                    }
+                    <button mat-menu-item type="button" (click)="setArchived(deposit, true)">
+                      <mat-icon>archive</mat-icon>
+                      <span>{{ 'common.archive' | transloco }}</span>
+                    </button>
+                  }
+                  <button mat-menu-item type="button" (click)="remove(deposit)">
+                    <mat-icon>delete</mat-icon>
+                    <span>{{ 'common.delete' | transloco }}</span>
+                  </button>
+                </mat-menu>
               }
-              <button mat-menu-item type="button" (click)="remove(deposit)">
-                <mat-icon>delete</mat-icon>
-                <span>{{ 'common.delete' | transloco }}</span>
-              </button>
-            </mat-menu>
-          }
-        </td>
-      </ng-container>
+            </td>
+          </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-      <tr *matNoDataRow>
-        <td class="deposits-page__no-data" [attr.colspan]="displayedColumns.length">
-          {{ 'assetArchive.allArchived' | transloco }}
-        </td>
-      </tr>
-    </table>
-  }
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+          <tr *matNoDataRow>
+            <td class="deposits-page__no-data" [attr.colspan]="displayedColumns.length">
+              {{ 'assetArchive.allArchived' | transloco }}
+            </td>
+          </tr>
+        </table>
+      }
+    </mat-tab>
+
+    <mat-tab [label]="'deposits.tabs.savingsAccounts' | transloco">
+      <app-savings-accounts />
+    </mat-tab>
+  </mat-tab-group>
 </div>

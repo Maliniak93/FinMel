@@ -129,6 +129,34 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     /// <summary>
+    /// savings-accounts AC-8: removing a savings account through the ordinary asset endpoint takes the
+    /// asset, its transactions and its <c>SavingsAccount</c> row with it; another account stays.
+    /// </summary>
+    [Fact]
+    public async Task Remove_SavingsAccount_DeletesTerms()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        await client.RecordTransactionAsync(
+            portfolioId, account.AssetId, TransactionType.Withdraw, 100m, SavingsToday, cancellationToken, unitPrice: 1m);
+        var kept = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewSavingsAccountRequest(name: "Kept"));
+
+        var response = await client.DeleteAsync(AssetUri(portfolioId, account.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(portfolioId, account.AssetId), cancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(SavingsAccountUri(portfolioId, account.AssetId), cancellationToken)).StatusCode);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.Id == account.AssetId, cancellationToken));
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
+        Assert.False(await dbContext.Set<SavingsAccount>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
+        Assert.True(await dbContext.Set<SavingsAccount>().AnyAsync(t => t.AssetId == kept.AssetId, cancellationToken));
+    }
+
+    /// <summary>
     /// asset-transfers-deposit-funding AC-7: removing a funded deposit detaches — never reverses —
     /// its transfer. The Cash Withdraw stays with <c>TransferId</c> null and Cash stays at 4 000; the
     /// leg is now an ordinary transaction, so deleting it afterwards returns Cash to 5 000.

@@ -1041,6 +1041,154 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/savings-accounts": {
+      "post": {
+        "tags": [
+          "AddSavingsAccountEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSavingsAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavingsAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}": {
+      "put": {
+        "tags": [
+          "UpdateSavingsAccountEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSavingsAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavingsAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "GetSavingsAccountEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavingsAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/savings-accounts": {
+      "get": {
+        "tags": [
+          "ListSavingsAccountsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavingsAccountResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/transfer-candidates": {
       "get": {
         "tags": [
@@ -1222,6 +1370,53 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "AddSavingsAccountRequest": {
+        "required": [
+          "name",
+          "currency",
+          "annualInterestRatePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "bankName": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "annualInterestRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "taxExempt": {
+            "type": "boolean"
+          },
+          "openingDeposit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OpeningDepositRequest"
+              }
+            ]
           }
         }
       },
@@ -1622,6 +1817,29 @@
       "DepositTermUnit": {
         "type": "integer"
       },
+      "OpeningDepositRequest": {
+        "required": [
+          "amount",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
       "PagedResponseOfTransactionResponse": {
         "required": [
           "items",
@@ -1791,6 +2009,71 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "SavingsAccountResponse": {
+        "required": [
+          "assetId",
+          "portfolioId",
+          "portfolioName",
+          "portfolioIsArchived",
+          "isArchived",
+          "name",
+          "currency",
+          "balance",
+          "annualInterestRatePercent",
+          "taxExempt"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioName": {
+            "type": "string"
+          },
+          "portfolioIsArchived": {
+            "type": "boolean"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bankName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "balance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "annualInterestRatePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "taxExempt": {
+            "type": "boolean"
           }
         }
       },
@@ -2115,6 +2398,39 @@
           }
         }
       },
+      "UpdateSavingsAccountRequest": {
+        "required": [
+          "name",
+          "annualInterestRatePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "bankName": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "annualInterestRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "taxExempt": {
+            "type": "boolean"
+          }
+        }
+      },
       "UpdateTransactionRequest": {
         "required": [
           "type",
@@ -2233,6 +2549,18 @@
     },
     {
       "name": "RollOverDepositEndpoint"
+    },
+    {
+      "name": "AddSavingsAccountEndpoint"
+    },
+    {
+      "name": "UpdateSavingsAccountEndpoint"
+    },
+    {
+      "name": "GetSavingsAccountEndpoint"
+    },
+    {
+      "name": "ListSavingsAccountsEndpoint"
     },
     {
       "name": "ListTransferCandidatesEndpoint"

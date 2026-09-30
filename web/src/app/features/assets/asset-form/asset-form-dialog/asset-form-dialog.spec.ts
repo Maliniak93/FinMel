@@ -15,6 +15,7 @@ import {
 import { client as marketDataClient } from '../../../../api/marketdata/client.gen';
 import { client as portfolioClient } from '../../../../api/portfolio/client.gen';
 import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
+import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { ASSET_CLASS, ASSET_CLASSES } from '../../asset-class';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
 import { CashAssetForm } from '../forms/cash-asset-form/cash-asset-form';
@@ -146,10 +147,12 @@ describe('AssetFormDialog', () => {
       await setup({ portfolioId });
 
       expect(picker()).not.toBeNull();
-      expect(picker()!.querySelectorAll('button')).toHaveLength(9);
+      expect(picker()!.querySelectorAll('button')).toHaveLength(10);
       expect(renderedForms()).toEqual([]);
 
-      for (const { value } of ASSET_CLASSES.filter((c) => c.value !== ASSET_CLASS.Deposit)) {
+      for (const { value } of ASSET_CLASSES.filter(
+        (c) => c.value !== ASSET_CLASS.Deposit && c.value !== ASSET_CLASS.Savings,
+      )) {
         await pickTile(value);
 
         expect(picker()).toBeNull();
@@ -178,6 +181,28 @@ describe('AssetFormDialog', () => {
       expect(fixture.debugElement.query(By.directive(CashAssetForm))).toBeNull();
       expect(open).toHaveBeenCalledWith(
         DepositFormDialog,
+        expect.objectContaining({ data: expect.objectContaining({ portfolioId }) }),
+      );
+      await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    // savings-accounts AC-11: a Savings account carries terms and is created only through the
+    // savings-account endpoint — its tile opens SavingsAccountFormDialog preset to this portfolio,
+    // never the cash form, and this dialog closes with that dialog's result so the list reloads.
+    it('the Savings account tile opens SavingsAccountFormDialog preset to the current portfolio', async () => {
+      await setup({ portfolioId });
+      const matDialog = fixture.debugElement.injector.get(MatDialog);
+      const open = vi
+        .spyOn(matDialog, 'open')
+        .mockReturnValue({ afterClosed: () => of(true) } as unknown as MatDialogRef<unknown>);
+
+      await pickTile(ASSET_CLASS.Savings);
+
+      expect(renderedForms()).toEqual([]);
+      expect(fixture.debugElement.query(By.directive(CashAssetForm))).toBeNull();
+      expect(open).toHaveBeenCalledWith(
+        SavingsAccountFormDialog,
         expect.objectContaining({ data: expect.objectContaining({ portfolioId }) }),
       );
       await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));

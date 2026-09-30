@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateAsset;
@@ -30,6 +31,12 @@ public sealed class UpdateAssetHandler(
         if (asset.AssetClass == AssetClass.Deposit || request.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.UseDepositEndpoints;
+        }
+
+        // The same for a savings account and its terms (savings-accounts).
+        if (asset.AssetClass == AssetClass.Savings || request.AssetClass == AssetClass.Savings)
+        {
+            return SavingsAccountErrors.UseSavingsAccountEndpoints;
         }
 
         // Each transaction's frozen PLN rate belongs to the asset's currency (ADR-026), so the

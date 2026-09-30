@@ -24,9 +24,13 @@ export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
 export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
 
 // cash-transaction-types: the mirror of Portfolio's AssetTransactionTypes rule (the API is the source
-// of truth and answers 400 to anything else) — a cash-like class (Cash, Deposit) accepts only
+// of truth and answers 400 to anything else) — a cash-like class (Cash, Deposit, Savings) accepts only
 // Deposit/Withdraw, every other class all six types, in TRANSACTION_TYPES order.
-const CASH_LIKE_CLASSES: readonly number[] = [ASSET_CLASS.Cash, ASSET_CLASS.Deposit];
+const CASH_LIKE_CLASSES: readonly number[] = [
+  ASSET_CLASS.Cash,
+  ASSET_CLASS.Deposit,
+  ASSET_CLASS.Savings,
+];
 const CASH_LIKE_TYPES: readonly number[] = [TRANSACTION_TYPE_DEPOSIT, WITHDRAW];
 
 export function allowedTransactionTypes(

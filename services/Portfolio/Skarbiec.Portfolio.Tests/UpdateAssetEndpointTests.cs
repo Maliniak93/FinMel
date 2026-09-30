@@ -545,4 +545,46 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(originalName, unchanged.Name);
         Assert.Equal(originalQuantity, unchanged.Quantity);
     }
+
+    /// <summary>
+    /// savings-accounts AC-6: the asset endpoint never produces or edits a Savings-class asset — turning
+    /// a Cash asset into Savings, or a savings account into Cash, is a 400
+    /// <c>Validation.UseSavingsAccountEndpoints</c>, and the asset keeps its class, name and quantity.
+    /// </summary>
+    [Theory]
+    [InlineData("cash-to-savings")]
+    [InlineData("savings-to-cash")]
+    public async Task Update_ToOrFromSavings_ReturnsUseSavingsAccountEndpoints(string change)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        Guid assetId;
+        AssetClass originalClass;
+        string originalName;
+        decimal originalQuantity;
+        AssetClass requestedClass;
+        if (change == "cash-to-savings")
+        {
+            assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken, name: "Wallet");
+            await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Cash, "Wallet", 300m, AssetClass.Savings);
+        }
+        else
+        {
+            assetId = (await client.AddSavingsAccountAsync(portfolioId, cancellationToken)).AssetId;
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Savings, "Savings account", 10_000m, AssetClass.Cash);
+        }
+
+        var request = new UpdateAssetRequest { AssetClass = requestedClass, Name = "Edited through assets", Currency = "PLN" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertUseSavingsAccountEndpointsAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(originalClass, unchanged.AssetClass);
+        Assert.Equal(originalName, unchanged.Name);
+        Assert.Equal(originalQuantity, unchanged.Quantity);
+    }
 }

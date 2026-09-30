@@ -14,6 +14,7 @@ export const ASSET_CLASSES: readonly { value: AssetClass; label: string }[] = [
   { value: 6, label: 'enums.assetClass.preciousMetal' },
   { value: 7, label: 'enums.assetClass.realEstate' },
   { value: 8, label: 'enums.assetClass.other' },
+  { value: 9, label: 'enums.assetClass.savings' },
 ];
 
 // Named constants for the same values, so callers that branch on a specific class (the asset-form
@@ -28,6 +29,7 @@ export const ASSET_CLASS = {
   PreciousMetal: 6,
   RealEstate: 7,
   Other: 8,
+  Savings: 9,
 } as const satisfies Record<string, AssetClass>;
 
 // A translation key.

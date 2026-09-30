@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
@@ -102,6 +103,28 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         await using var dbContext = CreateDbContext(userId);
         Assert.False(await dbContext.Transactions.AnyAsync(cancellationToken));
         Assert.False(await dbContext.Assets.AnyAsync(a => a.Id == deposit.AssetId || a.Id == cashId, cancellationToken));
+    }
+
+    /// <summary>savings-accounts AC-8: deleting a portfolio takes its savings accounts, their terms and their transactions with it.</summary>
+    [Fact]
+    public async Task Delete_PortfolioWithSavingsAccount_DeletesTerms()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var (_, kept) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(name: "Kept"), portfolioName: "Other");
+
+        var response = await client.DeleteAsync(PortfolioUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.Id == account.AssetId, cancellationToken));
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
+        Assert.False(await dbContext.Set<SavingsAccount>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
+        Assert.True(await dbContext.Set<SavingsAccount>().AnyAsync(t => t.AssetId == kept.AssetId, cancellationToken));
     }
 
     [Fact]

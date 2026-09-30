@@ -22,6 +22,7 @@ import {
   getApiPortfolioPortfoliosById,
   getApiPortfolioPortfoliosByPortfolioIdAssets,
   getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId,
+  getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId,
   type AssetResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
@@ -30,6 +31,7 @@ import { toDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatQuantity } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
+import { SavingsAccountFormDialog } from '../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { ASSET_CLASS, assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
@@ -222,6 +224,11 @@ export class Assets {
       return;
     }
 
+    if (Number(asset.assetClass) === ASSET_CLASS.Savings) {
+      void this.openSavingsAccountEditDialog(asset);
+      return;
+    }
+
     const ref = this.dialog.open(AssetFormDialog, {
       width: '560px',
       data: { portfolioId: this.portfolioId(), asset },
@@ -250,6 +257,30 @@ export class Assets {
     const ref = this.dialog.open(DepositFormDialog, {
       width: '560px',
       data: { deposit: result.data },
+    });
+    ref.afterClosed().subscribe((saved: boolean | undefined) => {
+      if (saved) {
+        this.assetsResource.reload();
+      }
+    });
+  }
+
+  // Likewise a savings account's terms live on the savings-account endpoints (savings-accounts).
+  private async openSavingsAccountEditDialog(asset: AssetResponse): Promise<void> {
+    const result = await getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId({
+      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    });
+    if (result.error || !result.data) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('assets.savingsAccountLoadFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    const ref = this.dialog.open(SavingsAccountFormDialog, {
+      width: '560px',
+      data: { account: result.data },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.AddAsset;
@@ -29,6 +30,12 @@ public sealed class AddAssetHandler(
         if (request.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.UseDepositEndpoints;
+        }
+
+        // Likewise a Savings-class asset is a savings account: only AddSavingsAccount creates one (savings-accounts).
+        if (request.AssetClass == AssetClass.Savings)
+        {
+            return SavingsAccountErrors.UseSavingsAccountEndpoints;
         }
 
         // Before the instrument and FX lookups: a disallowed opening type calls nothing and creates nothing.

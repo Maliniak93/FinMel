@@ -20,6 +20,8 @@ using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
 using Skarbiec.Portfolio.Features.RestoreAsset;
 using Skarbiec.Portfolio.Features.RestorePortfolio;
+using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
+using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.MarketData;
@@ -65,6 +67,8 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
             services.AddScoped<DeleteTransactionHandler>();
             services.AddScoped<RemoveAssetHandler>();
             services.AddScoped<AddDepositHandler>();
+            services.AddScoped<AddSavingsAccountHandler>();
+            services.AddScoped<UpdateSavingsAccountHandler>();
             services.AddScoped<UpdateDepositHandler>();
             services.AddScoped<SettleDepositHandler>();
             services.AddScoped<PayOutDepositHandler>();
@@ -799,6 +803,118 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
         Assert.Null(evt.InstrumentId);
         Assert.Null(evt.ManualValueAmount);
         Assert.False(evt.PortfolioIsArchived);
+    }
+
+    /// <summary>
+    /// savings-accounts AC-2 (outbox half): AddSavingsAccount writes the Savings-class asset, its
+    /// ordinary opening Deposit, its <see cref="SavingsAccount"/> terms and one
+    /// <see cref="AssetPositionChanged"/> carrying the opening amount as the quantity — all in a single save.
+    /// </summary>
+    [Fact]
+    public async Task AddSavingsAccount_PublishesPositionChanged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = _provider.CreateAsyncScope();
+        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Savings outbox portfolio" }, cancellationToken)).Value.Id;
+
+        _saveChanges.Reset();
+
+        var result = await scope.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
+            .HandleAsync(portfolioId, PortfolioApi.NewSavingsAccountRequest(), cancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, _saveChanges.Count);
+        var assetId = result.Value.AssetId;
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var asset = await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken);
+        Assert.Equal(AssetClass.Savings, asset.AssetClass);
+        Assert.Equal(10_000m, asset.Quantity);
+        var opening = await verifyDb.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        Assert.Equal(TransactionType.Deposit, opening.Type);
+        Assert.True(await verifyDb.Set<SavingsAccount>().AnyAsync(t => t.AssetId == assetId, cancellationToken));
+
+        var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        Assert.Equal(assetId, evt.AssetId);
+        Assert.Equal(portfolioId, evt.PortfolioId);
+        Assert.Equal(UserId, evt.UserId);
+        Assert.Equal(AssetClass.Savings, evt.AssetClass);
+        Assert.Equal(AssetValuationMode.CurrencyValued, evt.ValuationMode);
+        Assert.Equal("PLN", evt.Currency);
+        Assert.Equal(10_000m, evt.Quantity);
+        Assert.Null(evt.InstrumentId);
+        Assert.Null(evt.ManualValueAmount);
+        Assert.False(evt.PortfolioIsArchived);
+    }
+
+    /// <summary>
+    /// savings-accounts AC-2: without an opening deposit the account still publishes its position
+    /// (quantity 0) once, and writes no transaction.
+    /// </summary>
+    [Fact]
+    public async Task AddSavingsAccount_WithoutOpeningDeposit_PublishesPositionChangedWithZero()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = _provider.CreateAsyncScope();
+        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Empty savings outbox portfolio" }, cancellationToken)).Value.Id;
+
+        var result = await scope.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
+            .HandleAsync(portfolioId, PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
+
+        Assert.True(result.IsSuccess);
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.False(await verifyDb.Transactions.AnyAsync(t => t.AssetId == result.Value.AssetId, cancellationToken));
+        var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        Assert.Equal(AssetClass.Savings, evt.AssetClass);
+        Assert.Equal(0m, evt.Quantity);
+    }
+
+    /// <summary>
+    /// savings-accounts AC-4: UpdateSavingsAccount changes only terms nothing downstream carries, so it
+    /// writes no event beyond the one AddSavingsAccount wrote.
+    /// </summary>
+    [Fact]
+    public async Task UpdateSavingsAccount_PublishesNoEvent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Update savings outbox portfolio" }, cancellationToken)).Value.Id;
+            var added = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewSavingsAccountRequest(), cancellationToken);
+            Assert.True(added.IsSuccess);
+            assetId = added.Value.AssetId;
+        }
+
+        int outboxRowsBefore;
+        await using (var before = _provider.CreateAsyncScope())
+        {
+            outboxRowsBefore = await before.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .Set<OutboxMessage>().CountAsync(cancellationToken);
+        }
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<UpdateSavingsAccountHandler>()
+                .HandleAsync(portfolioId, assetId, PortfolioApi.NewUpdateSavingsAccountRequest(), cancellationToken);
+            Assert.True(result.IsSuccess);
+        }
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
+        var terms = await verifyDb.Set<SavingsAccount>().SingleAsync(t => t.AssetId == assetId, cancellationToken);
+        Assert.Equal(3m, terms.AnnualInterestRatePercent);
     }
 
     /// <summary>

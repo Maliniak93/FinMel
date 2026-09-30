@@ -8,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
@@ -34,14 +35,16 @@ import {
   RollOverDepositDialog,
   type RollOverDepositDialogData,
 } from './roll-over-deposit-dialog/roll-over-deposit-dialog';
+import { SavingsAccounts } from './savings-accounts/savings-accounts';
 import {
   SettleDepositDialog,
   type SettleDepositDialogData,
 } from './settle-deposit-dialog/settle-deposit-dialog';
 
-// Every term deposit of the user across portfolios, with the server's projection and Active / Due /
-// Settled / Paid out status (term-deposits, term-deposits-settlement, deposit-payout-to-cash,
-// deposit-rollover).
+// The Deposits & savings page. Its "Term deposits" tab lists every term deposit of the user across
+// portfolios, with the server's projection and Active / Due / Settled / Paid out status
+// (term-deposits, term-deposits-settlement, deposit-payout-to-cash, deposit-rollover); its "Savings
+// accounts" tab is the SavingsAccounts component (savings-accounts).
 // MatDialog/MatSnackBar are injected as
 // services only — see assets.ts for why MatDialogModule/MatSnackBarModule are deliberately not in
 // `imports`.
@@ -55,7 +58,9 @@ import {
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
+    MatTabsModule,
     MatTooltipModule,
+    SavingsAccounts,
     TranslocoPipe,
   ],
   templateUrl: './deposits.html',
