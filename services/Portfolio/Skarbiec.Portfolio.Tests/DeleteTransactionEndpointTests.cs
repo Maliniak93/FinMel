@@ -192,4 +192,48 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10_000m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, account.AssetId, cancellationToken);
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-9: the credit a settlement created is removed only by undoing
+    /// the settlement - deleting it here is a 409 <c>Conflict.SavingsInterestManaged</c>, and the
+    /// credit, the settlement and the balance stay.
+    /// </summary>
+    [Fact]
+    public async Task Delete_SavingsInterestCredit_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        var credit = Assert.Single(
+            (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items,
+            t => t.SavingsInterestPeriodEnd is not null);
+
+        var response = await client.DeleteAsync(TransactionUri(portfolioId, account.AssetId, credit.Id), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsInterestManagedErrorCode, cancellationToken);
+        Assert.Equal(10_033.29m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
+        Assert.Contains((await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items, t => t.Id == credit.Id);
+        Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
+    }
+
+    /// <summary>savings-interest-settlement AC-9: an ordinary savings Withdraw stays deletable even after a settlement.</summary>
+    [Fact]
+    public async Task Delete_OrdinarySavingsWithdrawAfterSettlement_StaysAllowed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        var withdrawId = await client.RecordTransactionAsync(
+            portfolioId, account.AssetId, TransactionType.Withdraw, 500m, new DateOnly(2026, 10, 1), cancellationToken, unitPrice: 1m);
+
+        var response = await client.DeleteAsync(TransactionUri(portfolioId, account.AssetId, withdrawId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(10_033.29m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
+    }
 }

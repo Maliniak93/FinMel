@@ -47,7 +47,7 @@ public static class TransactionQuantityCalculator
     }
 
     /// <summary>Buy/Deposit increase quantity, Sell/Withdraw decrease it; Dividend/Interest are value-only and don't affect quantity.</summary>
-    private static decimal QuantityDelta(Transaction transaction) => transaction.Type switch
+    public static decimal QuantityDelta(Transaction transaction) => transaction.Type switch
     {
         TransactionType.Buy or TransactionType.Deposit => transaction.Quantity,
         TransactionType.Sell or TransactionType.Withdraw => -transaction.Quantity,

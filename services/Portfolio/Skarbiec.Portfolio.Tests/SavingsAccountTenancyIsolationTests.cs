@@ -111,4 +111,57 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         await using var ownerDb = CreateDbContext(ownerId);
         Assert.True(await ownerDb.Set<SavingsAccount>().AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-11: a stranger previews, settles or undoes on the owner's account
+    /// through the owner's portfolio id and through their own - 404 every time, and nothing changes.
+    /// </summary>
+    [Fact]
+    public async Task Interest_ForeignAccount_IsRejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(OctoberEndedUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var (ownerPortfolioId, account) = await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await owner.SettlePreviewedSavingsInterestAsync(ownerPortfolioId, account.AssetId, cancellationToken);
+        var settlementId = await owner.GetLastSettlementIdAsync(ownerPortfolioId, account.AssetId, cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+
+        foreach (var portfolioId in new[] { ownerPortfolioId, strangerPortfolioId })
+        {
+            var preview = await stranger.GetAsync(SavingsInterestPreviewUri(portfolioId, account.AssetId), cancellationToken);
+            var settle = await stranger.PostAsJsonAsync(
+                SavingsInterestSettlementsUri(portfolioId, account.AssetId),
+                NewSettleInterestBody(OctoberEnd, 42.61m, 8.10m),
+                cancellationToken);
+            var undo = await stranger.DeleteAsync(
+                SavingsInterestSettlementUri(portfolioId, account.AssetId, settlementId), cancellationToken);
+
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, settle.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, undo.StatusCode);
+        }
+
+        Assert.Equal(1, await CountSavingsSettlementsAsync(ownerId, cancellationToken, account.AssetId));
+        var unchanged = await owner.GetSavingsAccountAsync(ownerPortfolioId, account.AssetId, cancellationToken);
+        Assert.Equal(10_033.29m, unchanged.Balance);
+        Assert.Equal(settlementId, unchanged.LastSettlement!.SettlementId);
+    }
+
+    /// <summary>The settlement row is tenant-filtered: another user's context never sees it.</summary>
+    [Fact]
+    public async Task InterestSettlement_QueriedAsStranger_IsFilteredOut()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var (portfolioId, account) = await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await owner.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+
+        Assert.Equal(0, await CountSavingsSettlementsAsync(Guid.NewGuid(), cancellationToken));
+        Assert.Equal(1, await CountSavingsSettlementsAsync(ownerId, cancellationToken));
+    }
 }

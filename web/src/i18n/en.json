@@ -222,6 +222,7 @@
     "value": "Value",
     "valuedOn": "Valued on",
     "maturedOn": "Matured on {{ date }}",
+    "interestToSettle": "Interest to settle",
     "due": "Due",
     "noPriceYet": "No price yet",
     "priceStaleTooltip": "This instrument's price is more than 7 days old.",
@@ -267,6 +268,7 @@
     }
   },
   "transactions": {
+    "savingsInterest": "Interest · {{ month }}",
     "title": "Transactions",
     "titleWithName": "Transactions — {{ name }}",
     "newTransaction": "New transaction",
@@ -398,6 +400,22 @@
     }
   },
   "savings": {
+    "lastInterest": "Last interest",
+    "interest": {
+      "settle": "Settle interest",
+      "settleMonths": "Settle interest ({{ count }} months due)",
+      "settleOf": "Settle interest of {{ name }}",
+      "undo": "Undo last settlement",
+      "undoOf": "Undo last settlement of {{ name }}",
+      "undoTitle": "Undo the last interest settlement?",
+      "undoMessage": "The {{ month }} settlement of \"{{ name }}\" and its interest credit will be removed, and the month becomes due again.",
+      "undoConfirm": "Undo",
+      "undoFailed": "Failed to undo the settlement.",
+      "title": "Settle interest",
+      "period": "Period",
+      "averageDailyBalance": "Average daily balance",
+      "previewLoadFailed": "Failed to load the interest preview."
+    },
     "add": "Add savings account",
     "empty": "You don't have any savings accounts yet.",
     "addFirst": "Add your first savings account",

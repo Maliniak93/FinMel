@@ -8,27 +8,35 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
+  deleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementId,
   getApiPortfolioSavingsAccounts,
   type SavingsAccountResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { confirmSetAssetArchived } from '../../../shared/asset-archive';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
-import { formatMoney, formatPercent } from '../../../shared/format';
+import { formatMoney, formatMonth, formatPercent } from '../../../shared/format';
 import {
   SavingsAccountFormDialog,
   type SavingsAccountFormDialogData,
 } from '../savings-account-form-dialog/savings-account-form-dialog';
+import {
+  SettleSavingsInterestDialog,
+  type SettleSavingsInterestDialogData,
+} from '../settle-savings-interest-dialog/settle-savings-interest-dialog';
 
 // The "Savings accounts" tab of the Deposits & savings page (savings-accounts): every savings account
 // of the user across portfolios, its balance in its own currency. Money moves in and out through the
-// asset's ordinary transactions, which the account name links to.
+// asset's ordinary transactions, which the account name links to. Interest is settled one calendar
+// month at a time (savings-interest-settlement): a Due row offers "Settle interest", and the latest
+// settlement, shown under "Last interest", can be undone.
 // MatDialog/MatSnackBar are injected as services only — see assets.ts for why
 // MatDialogModule/MatSnackBarModule are deliberately not in `imports`.
 @Component({
@@ -41,6 +49,7 @@ import {
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
+    MatTooltipModule,
     RouterLink,
     TranslocoPipe,
   ],
@@ -57,6 +66,7 @@ export class SavingsAccounts {
     'portfolio',
     'balance',
     'rate',
+    'lastInterest',
     'status',
     'actions',
   ];
@@ -85,6 +95,75 @@ export class SavingsAccounts {
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatPercent = formatPercent;
+  protected readonly formatMonth = formatMonth;
+
+  // An account of an archived portfolio, or archived on its own, is read-only: no settle, no undo.
+  protected isWritable(account: SavingsAccountResponse): boolean {
+    return !account.portfolioIsArchived && !account.isArchived;
+  }
+
+  // The generated client types the server's int as `number | string`.
+  protected monthsDue(account: SavingsAccountResponse): number {
+    return Number(account.duePeriodCount);
+  }
+
+  protected openSettleDialog(account: SavingsAccountResponse): void {
+    const data: SettleSavingsInterestDialogData = { account };
+    const ref = this.dialog.open(SettleSavingsInterestDialog, { width: '520px', data });
+    ref.afterClosed().subscribe((settled: boolean | undefined) => {
+      if (settled) {
+        this.accountsResource.reload();
+      }
+    });
+  }
+
+  // Undoes the latest settlement — the only one that can be — behind the same confirmation as Delete.
+  protected async undoLastSettlement(account: SavingsAccountResponse): Promise<void> {
+    const settlement = account.lastSettlement;
+    if (!settlement) {
+      return;
+    }
+
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('savings.interest.undoTitle'),
+            message: translate('savings.interest.undoMessage', {
+              month: formatMonth(settlement.periodEnd),
+              name: account.name,
+            }),
+            confirmLabel: translate('savings.interest.undoConfirm'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const result =
+      await deleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementId(
+        {
+          path: {
+            portfolioId: account.portfolioId,
+            assetId: account.assetId,
+            settlementId: settlement.settlementId,
+          },
+        },
+      );
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('savings.interest.undoFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.accountsResource.reload();
+  }
 
   protected transactionsLink(account: SavingsAccountResponse): string[] {
     return ['/portfolios', account.portfolioId, 'assets', account.assetId, 'transactions'];

@@ -20,7 +20,7 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatDate, formatMoney, formatQuantity } from '../../shared/format';
+import { formatDate, formatMoney, formatMonth, formatQuantity } from '../../shared/format';
 import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
 import {
   TransactionFormDialog,
@@ -158,6 +158,7 @@ export class Transactions {
   protected readonly formatMoney = formatMoney;
   protected readonly formatQuantity = formatQuantity;
   protected readonly formatDate = formatDate;
+  protected readonly formatMonth = formatMonth;
 
   // PagedResponse.TotalCount is a server-side int, but the generated client types every numeric
   // DTO property as `number | string` (same as Asset.Quantity/ManualValue) — coerce for

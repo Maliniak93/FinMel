@@ -297,4 +297,62 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(openingId, opening.Id);
         Assert.Equal(10_000m, opening.Quantity);
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-9: the credit a settlement created is system-managed - editing
+    /// it is a 409 <c>Conflict.SavingsInterestManaged</c> and nothing changes - while an ordinary
+    /// savings Deposit beside it stays editable.
+    /// </summary>
+    [Fact]
+    public async Task Update_SavingsInterestCredit_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        var transactions = (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items;
+        var credit = Assert.Single(transactions, t => t.SavingsInterestPeriodEnd is not null);
+        var opening = Assert.Single(transactions, t => t.SavingsInterestPeriodEnd is null);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 99m, UnitPrice = 1m, Date = credit.Date };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(portfolioId, account.AssetId, credit.Id), update, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsInterestManagedErrorCode, cancellationToken);
+        var unchanged = Assert.Single(
+            (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items, t => t.Id == credit.Id);
+        Assert.Equal(33.29m, unchanged.Quantity);
+        Assert.Equal(10_033.29m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
+
+        // Control: the ordinary opening Deposit is still editable.
+        var openingUpdate = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 12_000m, UnitPrice = 1m, Date = opening.Date };
+        var openingResponse = await client.PutAsJsonAsync(TransactionUri(portfolioId, account.AssetId, opening.Id), openingUpdate, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, openingResponse.StatusCode);
+        Assert.Equal(12_033.29m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>savings-interest-settlement: an edit inside an already-settled period leaves that settlement as it was.</summary>
+    [Fact]
+    public async Task Update_TransactionInSettledPeriod_LeavesSettlementAsItIs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        var settlementId = await client.GetLastSettlementIdAsync(portfolioId, account.AssetId, cancellationToken);
+        var opening = Assert.Single(
+            (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items,
+            t => t.SavingsInterestPeriodEnd is null);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 12_000m, UnitPrice = 1m, Date = opening.Date };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(portfolioId, account.AssetId, opening.Id), update, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var last = (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).LastSettlement!;
+        Assert.Equal(settlementId, last.SettlementId);
+        Assert.Equal(41.10m, last.GrossInterest);
+        Assert.Equal(7.81m, last.Tax);
+        Assert.Equal(33.29m, last.NetInterest);
+    }
 }

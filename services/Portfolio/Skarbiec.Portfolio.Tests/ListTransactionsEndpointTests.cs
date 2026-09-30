@@ -160,4 +160,28 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-9: an interest credit carries <c>savingsInterestPeriodEnd</c> (the
+    /// settled month's last day) on the wire; every other transaction carries null.
+    /// </summary>
+    [Fact]
+    public async Task List_SavingsInterestCredit_ReturnsPeriodEnd()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(TransactionsUri(portfolioId, account.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(2, items.Count);
+        var credit = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 33.29m);
+        Assert.Equal("2026-09-30", credit.GetProperty("savingsInterestPeriodEnd").GetString());
+        var opening = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 10_000m);
+        Assert.True(!opening.TryGetProperty("savingsInterestPeriodEnd", out var value) || value.ValueKind == JsonValueKind.Null);
+    }
 }

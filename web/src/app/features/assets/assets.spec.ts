@@ -807,6 +807,45 @@ describe('Assets', () => {
     expect(settledRow?.textContent).not.toContain('Due');
   });
 
+  // savings-interest-settlement AC-13: a Savings account with an ended, unsettled month
+  // (`savingsInterestDue` on AssetResponse) shows the same "Due" chip, with the tooltip "Interest to
+  // settle"; a settled-up account (false) and a Cash asset (null) show none.
+  it('a savings account with interest to settle shows the "Due" chip', async () => {
+    const savings = (overrides: Partial<AssetResponse>): AssetResponse =>
+      ({
+        ...currencyValuedAsset,
+        assetClass: 9, // Savings
+        quantity: 10000,
+        ...overrides,
+      }) as AssetResponse;
+    const due = savings({
+      id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+      name: 'Ripe savings',
+      savingsInterestDue: true,
+    } as Partial<AssetResponse>);
+    const settledUp = savings({
+      id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+      name: 'Settled savings',
+      savingsInterestDue: false,
+    } as Partial<AssetResponse>);
+    const cash = { ...currencyValuedAsset, name: 'Plain cash' };
+    await setup(jsonResponse([due, settledUp, cash]));
+
+    const rows = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('tbody tr.mat-mdc-row'),
+    );
+    const rowFor = (name: string) => rows.find((row) => (row.textContent ?? '').includes(name));
+    const dueRow = rowFor('Ripe savings');
+    expect(dueRow?.textContent).toContain('Due');
+    expect(rowFor('Settled savings')?.textContent).not.toContain('Due');
+    expect(rowFor('Plain cash')?.textContent).not.toContain('Due');
+
+    const chip = fixture.debugElement
+      .queryAll(By.css('.assets-page__chip--due'))
+      .find((debugElement) => dueRow?.contains(debugElement.nativeElement));
+    expect(chip?.injector.get(MatTooltip).message).toBe('Interest to settle');
+  });
+
   // i18n foundation (#131) AC-7: money, quantity and date cells follow the language live — a
   // switch re-renders them in pl-PL without reloading the page or its resources.
   it('reformats values when the language changes', async () => {

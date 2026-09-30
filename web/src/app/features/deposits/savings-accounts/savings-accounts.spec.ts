@@ -2,6 +2,8 @@ import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
@@ -18,10 +20,15 @@ import {
 import { restoreEnglish } from '../../../../testing/i18n';
 import { jsonResponse, requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
 import { SavingsAccountFormDialog } from '../savings-account-form-dialog/savings-account-form-dialog';
+import { SettleSavingsInterestDialog } from '../settle-savings-interest-dialog/settle-savings-interest-dialog';
 import {
   activeSavingsAccount,
   archivedPortfolioSavingsAccount,
+  archivedPortfolioDueSavingsAccount,
   archivedSavingsAccount,
+  dueSavingsAccount,
+  manyMonthsDueSavingsAccount,
+  settledSavingsAccount,
   savingsAccountResponse,
   taxFreeEurSavingsAccount,
 } from '../testing/savings-account-fixtures';
@@ -355,6 +362,139 @@ describe('SavingsAccounts', () => {
       expect(labels.some((label) => /restore/i.test(label))).toBe(false);
       expect(labels.some((label) => /edit/i.test(label))).toBe(true);
       expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+    });
+  });
+
+  // savings-interest-settlement AC-13. A Due row (`interestDue`) carries a `task_alt` icon button with
+  // the tooltip "Settle interest" — "Settle interest (n months due)" when `duePeriodCount` is above 1 —
+  // that opens the settle dialog and reloads the list after a success. A "Last interest" column shows
+  // the latest settled month and its net ("—" when none); that latest settlement has an undo icon
+  // ("Undo last settlement") behind the same ConfirmDialog as Delete. A row of an archived portfolio
+  // has neither icon.
+  describe('interest settlement', () => {
+    function iconButton(row: HTMLElement, pattern: RegExp): HTMLButtonElement | undefined {
+      return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) =>
+          pattern.test(button.getAttribute('mattooltip') ?? '') ||
+          pattern.test(button.getAttribute('aria-label') ?? ''),
+      );
+    }
+
+    const settleButton = (row: HTMLElement) => iconButton(row, /settle interest/i);
+    const undoButton = (row: HTMLElement) => iconButton(row, /undo last settlement/i);
+
+    // The tooltip's message as the MatTooltip directive on the row's button holds it.
+    function tooltipMessages(row: HTMLElement): string[] {
+      return fixture.debugElement
+        .queryAll(By.directive(MatTooltip))
+        .filter((debugElement) => row.contains(debugElement.nativeElement))
+        .map((debugElement) => debugElement.injector.get(MatTooltip).message);
+    }
+
+    it('only a Due row carries the settle icon', async () => {
+      await setup([dueSavingsAccount, settledSavingsAccount, activeSavingsAccount]);
+
+      expect(settleButton(rowFor('Interest due account'))).toBeDefined();
+      expect(settleButton(rowFor('Settled account'))).toBeUndefined();
+      expect(settleButton(rowFor('Emergency fund'))).toBeUndefined();
+      expect(rowFor('Interest due account').textContent).toContain('task_alt');
+    });
+
+    it('the settle tooltip says "Settle interest", plus the months due when there are several', async () => {
+      await setup([dueSavingsAccount, manyMonthsDueSavingsAccount]);
+
+      expect(tooltipMessages(rowFor('Interest due account'))).toContain('Settle interest');
+      expect(tooltipMessages(rowFor('Three months due'))).toContain(
+        'Settle interest (3 months due)',
+      );
+    });
+
+    it('Settle opens the settle dialog with that account and reloads after a successful settle', async () => {
+      await setup([dueSavingsAccount, activeSavingsAccount]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = listCalls();
+
+      settleButton(rowFor('Interest due account'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(
+        SettleSavingsInterestDialog,
+        expect.objectContaining({ data: expect.objectContaining({ account: dueSavingsAccount }) }),
+      );
+      await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('a cancelled settle does not reload the list', async () => {
+      await setup([dueSavingsAccount]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const listCallsBefore = listCalls();
+
+      settleButton(rowFor('Interest due account'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(SettleSavingsInterestDialog, expect.anything());
+      expect(listCalls()).toBe(listCallsBefore);
+    });
+
+    it('the "Last interest" column shows the latest settled month and its net, or a dash', async () => {
+      await setup([settledSavingsAccount, dueSavingsAccount]);
+
+      const headers = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('th'),
+        (header) => header.textContent?.trim() ?? '',
+      );
+      expect(headers).toContain('Last interest');
+
+      const settled = (rowFor('Settled account').textContent ?? '').replace(/\s+/g, ' ');
+      expect(settled).toMatch(/Sep(tember)? 2026/);
+      expect(settled).toContain(formatMoney(33.29, 'PLN').replace(/\s+/g, ' '));
+      expect(rowFor('Interest due account').textContent).toContain('—');
+    });
+
+    it('the latest settlement has an undo icon, and only it does', async () => {
+      await setup([settledSavingsAccount, dueSavingsAccount, activeSavingsAccount]);
+
+      expect(undoButton(rowFor('Settled account'))).toBeDefined();
+      expect(tooltipMessages(rowFor('Settled account'))).toContain('Undo last settlement');
+      expect(undoButton(rowFor('Interest due account'))).toBeUndefined();
+      expect(undoButton(rowFor('Emergency fund'))).toBeUndefined();
+    });
+
+    it('Undo asks for confirmation, then deletes the settlement and reloads', async () => {
+      await setup([settledSavingsAccount]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = listCalls();
+
+      undoButton(rowFor('Settled account'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      await vi.waitFor(() => expect(writes()).toHaveLength(1));
+      const [request] = writes();
+      expect(request.method).toBe('DELETE');
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${settledSavingsAccount.portfolioId}/savings-accounts/${settledSavingsAccount.assetId}/interest-settlements/${settledSavingsAccount.lastSettlement!.settlementId}`,
+      );
+      await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('does not undo when the confirmation is cancelled', async () => {
+      await setup([settledSavingsAccount]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      undoButton(rowFor('Settled account'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      expect(writes()).toHaveLength(0);
+    });
+
+    it('a row of an archived portfolio has neither the settle nor the undo icon', async () => {
+      await setup([archivedPortfolioDueSavingsAccount]);
+
+      const row = rowFor('Frozen due account');
+      expect(settleButton(row)).toBeUndefined();
+      expect(undoButton(row)).toBeUndefined();
     });
   });
 });

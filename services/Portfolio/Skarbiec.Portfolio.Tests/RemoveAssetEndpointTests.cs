@@ -279,4 +279,29 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Null((await dbContext.Transactions.SingleAsync(t => t.Id == leg.Id, cancellationToken)).TransferId);
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == paidOut.Deposit.AssetId, cancellationToken));
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-10: removing a savings account deletes its interest settlements
+    /// with it, while another account's settlement stays.
+    /// </summary>
+    [Fact]
+    public async Task Remove_SavingsAccount_DeletesSettlements()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var kept = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewInterestAccountRequest(name: "Kept"));
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, kept.AssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(portfolioId, account.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(0, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
+        Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, kept.AssetId));
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Set<SavingsInterestSettlement>().IgnoreQueryFilters().AnyAsync(s => s.AssetId == account.AssetId, cancellationToken));
+    }
 }

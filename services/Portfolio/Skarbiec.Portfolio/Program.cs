@@ -27,7 +27,10 @@ using Skarbiec.Portfolio.Features.RestoreAsset;
 using Skarbiec.Portfolio.Features.RestorePortfolio;
 using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.SavingsAccounts.GetSavingsAccount;
+using Skarbiec.Portfolio.Features.SavingsAccounts.GetSavingsInterestPreview;
 using Skarbiec.Portfolio.Features.SavingsAccounts.ListSavingsAccounts;
+using Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
+using Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlement;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 using Skarbiec.Portfolio.Features.Transfers.ListTransferCandidates;
 using Skarbiec.Portfolio.Features.UpdateAsset;
@@ -110,6 +113,9 @@ builder.Services.AddScoped<AddSavingsAccountHandler>();
 builder.Services.AddScoped<UpdateSavingsAccountHandler>();
 builder.Services.AddScoped<GetSavingsAccountHandler>();
 builder.Services.AddScoped<ListSavingsAccountsHandler>();
+builder.Services.AddScoped<GetSavingsInterestPreviewHandler>();
+builder.Services.AddScoped<SettleSavingsInterestHandler>();
+builder.Services.AddScoped<UndoSavingsInterestSettlementHandler>();
 builder.Services.AddScoped<ListTransferCandidatesHandler>();
 
 var app = builder.Build();
@@ -148,6 +154,9 @@ app.MapAddSavingsAccountEndpoint();
 app.MapUpdateSavingsAccountEndpoint();
 app.MapGetSavingsAccountEndpoint();
 app.MapListSavingsAccountsEndpoint();
+app.MapGetSavingsInterestPreviewEndpoint();
+app.MapSettleSavingsInterestEndpoint();
+app.MapUndoSavingsInterestSettlementEndpoint();
 app.MapListTransferCandidatesEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton

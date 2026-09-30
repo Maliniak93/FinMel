@@ -83,6 +83,21 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, DepositTransactionsManagedErrorCode, cancellationToken);
 
+    /// <summary>savings-interest-settlement: the 409 preview/settle answer while no month of the account is due.</summary>
+    public const string SavingsInterestNotDueErrorCode = "Conflict.SavingsInterestNotDue";
+
+    /// <summary>savings-interest-settlement: the 409 settle answer when <c>periodEnd</c> is not the next due period's end.</summary>
+    public const string SavingsInterestPeriodMismatchErrorCode = "Conflict.SavingsInterestPeriodMismatch";
+
+    /// <summary>savings-interest-settlement: the 409 undo answer for a settlement that is not the latest.</summary>
+    public const string SavingsSettlementNotLatestErrorCode = "Conflict.SavingsSettlementNotLatest";
+
+    /// <summary>savings-interest-settlement: the 409 Update/DeleteTransaction answer for an interest credit.</summary>
+    public const string SavingsInterestManagedErrorCode = "Conflict.SavingsInterestManaged";
+
+    /// <summary>The 409 an undo (or a transaction delete) answers when the removal would leave a later Withdraw with nothing to spend.</summary>
+    public const string OversellsPositionErrorCode = "Conflict.OversellsPosition";
+
     /// <summary>savings-accounts: the 400 AddAsset/UpdateAsset answer when class Savings is asked for, or an asset's class would change to or from Savings.</summary>
     public const string UseSavingsAccountEndpointsErrorCode = "Validation.UseSavingsAccountEndpoints";
 

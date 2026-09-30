@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.ArchiveAsset;
 
@@ -8,7 +9,8 @@ namespace Skarbiec.Portfolio.Features.ArchiveAsset;
 /// Archives one asset of any class, at any balance and in any deposit status (asset-archive): it
 /// becomes read-only and drops out of net worth from today, keeping every transaction and term.
 /// </summary>
-public sealed class ArchiveAssetHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
+public sealed class ArchiveAssetHandler(
+    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, TimeProvider timeProvider)
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -41,6 +43,6 @@ public sealed class ArchiveAssetHandler(PortfolioDbContext dbContext, PositionEv
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return await dbContext.ToFullResponseAsync(asset, cancellationToken);
+        return await dbContext.ToFullResponseAsync(asset, WarsawCalendar.Today(timeProvider), cancellationToken);
     }
 }

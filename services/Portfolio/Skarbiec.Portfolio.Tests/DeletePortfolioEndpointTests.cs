@@ -156,4 +156,25 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         var getAsset = await client.GetAsync(AssetUri(portfolioId, assetIds[0]), cancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, getAsset.StatusCode);
     }
+
+    /// <summary>savings-interest-settlement: deleting a portfolio deletes the interest settlements of the accounts in it.</summary>
+    [Fact]
+    public async Task Delete_PortfolioWithSavingsSettlements_DeletesSettlements()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var (_, kept) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewInterestAccountRequest(name: "Kept"), portfolioName: "Other");
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(kept.PortfolioId, kept.AssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(PortfolioUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(0, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
+        Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, kept.AssetId));
+    }
 }

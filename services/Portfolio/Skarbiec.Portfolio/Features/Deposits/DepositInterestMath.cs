@@ -43,13 +43,10 @@ public sealed record DepositProjection
 /// <summary>
 /// Pure term-deposit arithmetic (term-deposits) — no I/O, no clock. Day count is actual/365 and the
 /// rate is fixed for the whole term. Each capitalisation period's gross interest is rounded
-/// half-away-from-zero to grosze (bank-style); its Belka tax is 19 % of that gross, rounded up to
-/// grosze (art. 63 § 1a OP); the net compounds into the next period's balance.
+/// half-away-from-zero to grosze (bank-style); its Belka tax is <see cref="BelkaTax"/> of that gross; the net compounds into the next period's balance.
 /// </summary>
 public static class DepositInterestMath
 {
-    private const decimal BelkaTaxRate = 0.19m;
-
     /// <summary><see cref="DepositTermUnit.Days"/>: <c>start + n</c> days; <see cref="DepositTermUnit.Months"/>: <c>start.AddMonths(n)</c>, clamped to the month's end.</summary>
     public static DateOnly MaturityDate(DateOnly startDate, int termLength, DepositTermUnit termUnit) => termUnit switch
     {
@@ -85,7 +82,7 @@ public static class DepositInterestMath
 
             var gross = Math.Round(
                 balance * terms.AnnualInterestRatePercent / 100m * days / 365m, 2, MidpointRounding.AwayFromZero);
-            var tax = terms.TaxExempt ? 0m : Math.Ceiling(gross * BelkaTaxRate * 100m) / 100m;
+            var tax = BelkaTax.On(gross, terms.TaxExempt);
             var net = gross - tax;
             balance += net;
 
