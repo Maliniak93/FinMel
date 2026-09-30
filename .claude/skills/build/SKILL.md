@@ -9,12 +9,15 @@ effort: low
 
 You relay; scripts and the `build-feature` workflow do all the work. Decide nothing yourself.
 
-1. Run `node scripts/gh-project.mjs prepare <issue> [--tier …] [--skip …]` with the issue number and any
+1. No issue number in `$ARGUMENTS` → run `node scripts/plan-status.mjs` instead, print its **Next up** line
+   and stop. Otherwise run `node scripts/preflight.mjs` and read its last stdout line, `PREFLIGHT_RESULT: <json>`.
+   `"ok": false` → print each failed check as `name — detail → fix` and stop (the card is not moved). Checks with
+   `"status": "fixed"` → one line saying what was started, stopped or installed, then continue.
+2. Run `node scripts/gh-project.mjs prepare <issue> [--tier …] [--skip …]` with the issue number and any
    `--tier`/`--skip` from `$ARGUMENTS`. Never pass a `+Nk` token to it — that is the turn's budget
-   directive and the workflow reads it itself. No issue number in `$ARGUMENTS` → run
-   `node scripts/plan-status.mjs` instead, print its **Next up** line and stop.
-2. `"ok": false` → print `reason` and `next`, and stop.
-3. `"ok": true` → call the `Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`
+   directive and the workflow reads it itself.
+3. `"ok": false` → print `reason` and `next`, and stop.
+4. `"ok": true` → call the `Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`
    and wait. (`prepare` already moved the card to In progress; `resumed: true` means a previous run
    left its branch — say so in one line.) The workflow posts its own run report on the issue.
 

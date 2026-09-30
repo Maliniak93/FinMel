@@ -12,6 +12,9 @@ updates:
       # ADR-012 pins MassTransit v8
       - dependency-name: "MassTransit*"
         update-types: ["version-update:semver-major"]
+      # Quartz 4 rewrites scheduler configuration and the job API — upgraded by its own spec, not a bump
+      - dependency-name: "Quartz*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/web"
