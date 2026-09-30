@@ -15,6 +15,7 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | Test — **Docker must be running** (Testcontainers) | `dotnet test` |
 | Format check | `dotnet format Skarbiec.slnx --verify-no-changes` |
 | One-shot verification: format → build → tests → web → API client | `node scripts/verify.mjs [--quick\|--all\|--projects A,B]` |
+| Preflight for /build: checks node/dotnet/gh/git, starts Docker, stops the stack, installs web deps | `node scripts/preflight.mjs [--dry-run] [--no-web]` |
 | Live plan status (spec issues on the GitHub project vs. git vs. open PRs); `--write` refreshes the block in `skarbiec-plan/README.md` | `node scripts/plan-status.mjs [--write] [--no-gh]` |
 | Spec issues on the FinMel project: read, list, move a card, comment, tick ACs | `node scripts/gh-project.mjs get\|list\|set\|comment\|tick` |
 | Frontend dev server | `cd web && npm start` |

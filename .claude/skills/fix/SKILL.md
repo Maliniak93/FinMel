@@ -17,7 +17,8 @@ already covers the bug → say so and ask whether to build that one (`/build #<n
 
 ## 1. Reproduce before anything else
 
-Pick the cheapest reproduction that actually shows the bug, in this order:
+Pick the cheapest reproduction that actually shows the bug, in this order (when it needs tests or the stack, run
+`node scripts/preflight.mjs --no-web` first — it starts Docker and stops a stale stack):
 
 - A test name → `dotnet test <project> --filter "FullyQualifiedName~<Name>"` (or `cd web && npm test -- --watch=false`).
 - A red `verify.mjs` → re-run it for the named projects only: `node scripts/verify.mjs --projects <A,B|web>`.
@@ -90,7 +91,8 @@ instead of creating a duplicate. For a split: the umbrella first (`--epic`), the
 with `--parent <umbrella number>`.
 
 Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the
-previous one has merged. Build exactly as `/build` does: `node scripts/gh-project.mjs prepare <number>`, then the
+previous one has merged. Build exactly as `/build` does: `node scripts/preflight.mjs` first (`"ok": false` → print each failed check as
+`name — detail → fix` and stop, as `/build` does), then `node scripts/gh-project.mjs prepare <number>`, then the
 `Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`. The workflow posts
 its own report on the issue and ships the fix as a PR; report to the user as `/build` does (at most
 10 lines, leading with the `prUrl` — the merge is the user's).
