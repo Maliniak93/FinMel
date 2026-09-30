@@ -1,14 +1,16 @@
-import { Component, inject, resource } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -17,6 +19,7 @@ import {
   type DepositResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { confirmSetAssetArchived } from '../../shared/asset-archive';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import {
@@ -32,14 +35,16 @@ import {
   RollOverDepositDialog,
   type RollOverDepositDialogData,
 } from './roll-over-deposit-dialog/roll-over-deposit-dialog';
+import { SavingsAccounts } from './savings-accounts/savings-accounts';
 import {
   SettleDepositDialog,
   type SettleDepositDialogData,
 } from './settle-deposit-dialog/settle-deposit-dialog';
 
-// Every term deposit of the user across portfolios, with the server's projection and Active / Due /
-// Settled / Paid out status (term-deposits, term-deposits-settlement, deposit-payout-to-cash,
-// deposit-rollover).
+// The Deposits & savings page. Its "Term deposits" tab lists every term deposit of the user across
+// portfolios, with the server's projection and Active / Due / Settled / Paid out status
+// (term-deposits, term-deposits-settlement, deposit-payout-to-cash, deposit-rollover); its "Savings
+// accounts" tab is the SavingsAccounts component (savings-accounts).
 // MatDialog/MatSnackBar are injected as
 // services only — see assets.ts for why MatDialogModule/MatSnackBarModule are deliberately not in
 // `imports`.
@@ -51,8 +56,11 @@ import {
     MatIconModule,
     MatMenuModule,
     MatProgressSpinnerModule,
+    MatSlideToggleModule,
     MatTableModule,
+    MatTabsModule,
     MatTooltipModule,
+    SavingsAccounts,
     TranslocoPipe,
   ],
   templateUrl: './deposits.html',
@@ -80,11 +88,25 @@ export class Deposits {
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioDeposits({ signal: abortSignal });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load deposits.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('deposits.loadFailed'),
+        );
       }
       return result.data ?? [];
     },
   });
+
+  // asset-archive: a deposit archived on its own is hidden until "Show archived" is on — filtered here,
+  // since the list endpoint returns every deposit with its flag.
+  protected readonly showArchived = signal(false);
+
+  protected readonly visibleDeposits = computed(() =>
+    this.depositsResource.hasValue()
+      ? this.depositsResource
+          .value()
+          .filter((deposit) => this.showArchived() || !deposit.isArchived)
+      : [],
+  );
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatPercent = formatPercent;
@@ -145,9 +167,9 @@ export class Deposits {
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Delete this deposit?',
-            message: `"${deposit.name}" and its terms will be permanently deleted. This can't be undone.`,
-            confirmLabel: 'Delete',
+            title: translate('deposits.delete.title'),
+            message: translate('deposits.delete.message', { name: deposit.name }),
+            confirmLabel: translate('common.delete'),
             destructive: true,
           },
         })
@@ -163,13 +185,26 @@ export class Deposits {
     });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to delete deposit.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('deposits.delete.failed'),
+        translate('common.dismiss'),
       );
       return;
     }
 
     this.depositsResource.reload();
+  }
+
+  // asset-archive: Archive / Restore sit in the row menu, behind a confirmation, and reload the list.
+  protected async setArchived(deposit: DepositResponse, archive: boolean): Promise<void> {
+    const done = await confirmSetAssetArchived(
+      this.dialog,
+      this.snackBar,
+      { portfolioId: deposit.portfolioId, assetId: deposit.assetId, name: deposit.name },
+      archive,
+    );
+    if (done) {
+      this.depositsResource.reload();
+    }
   }
 
   protected openSettleDialog(deposit: DepositResponse): void {

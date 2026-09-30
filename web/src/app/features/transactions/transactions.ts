@@ -67,13 +67,16 @@ export class Transactions {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load asset.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('transactions.assetLoadFailed'),
+        );
       }
       return result.data;
     },
   });
 
-  // AssetResponse carries no archived flag, so the owning portfolio is loaded for it alone. Loaded
+  // AssetResponse carries only the asset's own archived flag, not its portfolio's, so the owning
+  // portfolio is loaded for that alone. Loaded
   // once: nothing on this page can archive or restore it, so reload() leaves it alone.
   protected readonly portfolioResource = resource({
     params: () => ({ portfolioId: this.portfolioId() }),
@@ -83,7 +86,9 @@ export class Transactions {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load portfolio.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('transactions.portfolioLoadFailed'),
+        );
       }
       return result.data;
     },
@@ -105,8 +110,15 @@ export class Transactions {
       Number(this.assetResource.value().assetClass) === ASSET_CLASS.Deposit,
   );
 
+  // An asset archived on its own is read-only the same way (asset-archive): 409 on every write.
+  protected readonly isAssetArchived = computed(
+    () => this.assetResource.hasValue() && this.assetResource.value().isArchived,
+  );
+
   // No record / edit / delete action where none would be accepted.
-  protected readonly isReadOnly = computed(() => this.isArchived() || this.isTermDeposit());
+  protected readonly isReadOnly = computed(
+    () => this.isArchived() || this.isAssetArchived() || this.isTermDeposit(),
+  );
 
   // The actions column holds only Edit / Delete, so a read-only view drops it entirely.
   protected readonly displayedColumns = computed(() => [
@@ -132,7 +144,9 @@ export class Transactions {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load transactions.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('transactions.loadFailed'),
+        );
       }
       return result.data;
     },
@@ -211,9 +225,12 @@ export class Transactions {
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Delete this transaction?',
-            message: `This ${translate(transactionTypeLabel(transaction.type))} of ${formatQuantity(transaction.quantity)} will be permanently deleted. This can't be undone.`,
-            confirmLabel: 'Delete',
+            title: translate('transactions.delete.title'),
+            message: translate('transactions.delete.message', {
+              type: translate(transactionTypeLabel(transaction.type)),
+              quantity: formatQuantity(transaction.quantity),
+            }),
+            confirmLabel: translate('common.delete'),
             destructive: true,
           },
         })
@@ -229,8 +246,8 @@ export class Transactions {
     });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to delete transaction.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('transactions.delete.failed'),
+        translate('common.dismiss'),
       );
       return;
     }

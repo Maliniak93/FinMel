@@ -7,6 +7,16 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import {
+  attributesOf,
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  textOf,
+  TRANSLATIONS,
+} from '../../../testing/i18n';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type {
   AssetResponse,
@@ -40,6 +50,7 @@ const asset: AssetResponse = {
   manualValue: 1000,
   manualValueDate: '2020-01-01',
   transactionCount: 1,
+  isArchived: false,
 };
 
 const portfolio: PortfolioResponse = {
@@ -84,8 +95,10 @@ describe('Transactions', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   // The owning portfolio (GET /portfolios/{id}, no "/assets" in the URL) is what tells the page
@@ -371,6 +384,64 @@ describe('Transactions', () => {
     });
   });
 
+  // asset-archive AC-11: an archived asset's transactions are a 409 on the backend, so the view is
+  // read-only as for an archived portfolio — no record button, no Edit / Delete — with its own notice.
+  describe('archived asset is read-only', () => {
+    const archivedAsset = { ...asset, isArchived: true } as AssetResponse;
+    const assetNotice = /This asset is archived\W+restore it to make changes/;
+
+    function pageText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function pageButtonTexts(): string[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+        (button) => button.textContent?.trim() ?? '',
+      );
+    }
+
+    async function rowMenuText(): Promise<string> {
+      const overlayContainer = TestBed.inject(OverlayContainer);
+      for (const triggerElement of fixture.debugElement.queryAll(By.directive(MatMenuTrigger))) {
+        triggerElement.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        await fixture.whenStable();
+      }
+      return overlayContainer.getContainerElement().textContent ?? '';
+    }
+
+    it('is read-only for an archived asset', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(archivedAsset));
+
+      // The history itself is still listed — archived is read-only, not hidden.
+      expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
+      expect(pageText()).toMatch(assetNotice);
+      expect(pageText()).not.toMatch(/This portfolio is archived/);
+      expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(false);
+
+      const menuText = await rowMenuText();
+      expect(menuText).not.toContain('Edit');
+      expect(menuText).not.toContain('Delete');
+    });
+
+    it('is read-only for an archived asset: the empty state offers no record button', async () => {
+      await setup(jsonResponse(pagedResponse([])), jsonResponse(archivedAsset));
+
+      expect(pageText()).toMatch(assetNotice);
+      const buttons = pageButtonTexts();
+      expect(buttons.some((text) => text.includes('New transaction'))).toBe(false);
+      expect(buttons.some((text) => text.includes('Record your first transaction'))).toBe(false);
+    });
+
+    it('a live asset keeps its actions and shows no asset notice', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])));
+
+      expect(pageText()).not.toMatch(assetNotice);
+      expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(true);
+    });
+  });
+
   // asset-transfers-deposit-funding AC-12: a transfer leg (`transfer` set on the TransactionResponse)
   // is labelled beside its type — "Transfer to <asset> (<portfolio>)" on the Out leg, "Transfer from
   // …" on the In leg — and offers no Edit/Delete (the backend answers 409
@@ -534,6 +605,244 @@ describe('Transactions', () => {
       const buttons = pageButtonTexts();
       expect(buttons.some((text) => text.includes('New transaction'))).toBe(false);
       expect(buttons.some((text) => text.includes('Record your first transaction'))).toBe(false);
+    });
+  });
+
+  // i18n screens (#132) AC-5: headings, table headers, the transfer label (direction, asset and
+  // portfolio interpolated), the row menu, empty state, notices, delete confirmation and failure
+  // snackbar fallback follow the language.
+  describe('in Polish', () => {
+    const outLeg = {
+      ...transaction,
+      id: '66666666-6666-6666-6666-666666666666',
+      type: 3, // Withdraw
+      quantity: 1000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 1000,
+      date: '2026-01-15',
+      transfer: {
+        counterpartAssetId: '77777777-7777-7777-7777-777777777777',
+        counterpartAssetName: 'Term deposit',
+        counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
+        counterpartPortfolioName: 'Savings',
+        direction: 0, // Out
+      },
+    } as TransactionResponse;
+    const inLeg = {
+      ...outLeg,
+      id: '99999999-9999-9999-9999-999999999999',
+      type: 2, // Deposit
+      transfer: { ...outLeg.transfer!, direction: 1 }, // In
+    } as TransactionResponse;
+
+    async function menuItems(): Promise<string[]> {
+      const trigger = fixture.debugElement
+        .query(By.directive(MatMenuTrigger))
+        .injector.get(MatMenuTrigger);
+      trigger.openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const items = labelsOf(
+        TestBed.inject(OverlayContainer).getContainerElement(),
+        '.mat-mdc-menu-item',
+      );
+      trigger.closeMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return items;
+    }
+
+    it('renders in Polish', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])));
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = async () => [
+        ...labelsOf(element, 'a.transactions-page__back'),
+        ...labelsOf(element, '.transactions-page__header > button'),
+        ...labelsOf(element, 'th:not(:empty)'),
+        ...labelsOf(element, 'td.mat-column-type'),
+        ...(await menuItems()),
+      ];
+      const heading = () => textOf(element.querySelector('h1'));
+      const summary = () => textOf(element.querySelector('.transactions-page__summary'));
+
+      const english = await texts();
+      expect(english).toEqual([
+        'Assets',
+        'New transaction',
+        'Date',
+        'Type',
+        'Quantity',
+        'Currency',
+        'Value (PLN)',
+        'Buy',
+        'Edit',
+        'Delete',
+      ]);
+      expect(heading()).toBe('Transactions — Apple');
+      expect(summary()).toContain('Quantity');
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, await texts())).toEqual([]);
+      expect(heading()).not.toContain('Transactions');
+      expect(heading()).toContain('Apple');
+      expect(summary()).not.toContain('Quantity');
+    });
+
+    it('labels the row actions button with the type and date in Polish', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])));
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(attributesOf(element, 'td button', 'aria-label')).toEqual([
+        'Actions for Buy on 2024-01-15',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      const [label] = attributesOf(element, 'td button', 'aria-label');
+      expect(label).not.toContain('Actions for');
+      expect(label).toContain('2024-01-15');
+      expect(matchesTranslation('pl', label), `"${label}" is not a pl.json value`).toBe(true);
+    });
+
+    it('renders the transfer label in Polish, with direction, asset and portfolio', async () => {
+      await setup(jsonResponse(pagedResponse([outLeg, inLeg])));
+      const element = fixture.nativeElement as HTMLElement;
+      const transfers = () => labelsOf(element, '.transactions-page__transfer');
+
+      expect(transfers()).toEqual([
+        'Transfer to Term deposit (Savings)',
+        'Transfer from Term deposit (Savings)',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      const [out, into] = transfers();
+      for (const label of [out, into]) {
+        expect(label).toContain('Term deposit');
+        expect(label).toContain('(Savings)');
+        expect(matchesTranslation('pl', label), `"${label}" is not a pl.json value`).toBe(true);
+      }
+      expect(out).not.toMatch(/^Transfer (to|from)/);
+      expect(into).not.toMatch(/^Transfer (to|from)/);
+      expect(out).not.toBe(into);
+    });
+
+    it('renders the empty state in Polish', async () => {
+      await setup(jsonResponse(pagedResponse([])));
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, '.transactions-page__state p'),
+        ...labelsOf(element, '.transactions-page__state button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'No transactions recorded for this asset yet.',
+        'Record your first transaction',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the archived notice in Polish', async () => {
+      await setup(
+        jsonResponse(pagedResponse([transaction])),
+        jsonResponse(asset),
+        jsonResponse({ ...portfolio, isArchived: true }),
+      );
+      const element = fixture.nativeElement as HTMLElement;
+      const notice = () => labelsOf(element, '.transactions-page__archived-notice');
+
+      const english = notice();
+      expect(english).toHaveLength(1);
+      expect(english[0]).toMatch(/^This portfolio is archived/);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, notice())).toEqual([]);
+    });
+
+    it('renders the term-deposit notice in Polish', async () => {
+      const deposit: AssetResponse = {
+        ...asset,
+        assetClass: 1, // Deposit
+        valuationMode: 2, // CurrencyValued
+        name: 'Term deposit',
+        currency: 'PLN',
+        manualValue: null,
+        manualValueDate: null,
+      };
+      await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(deposit));
+      const element = fixture.nativeElement as HTMLElement;
+      const notice = () => labelsOf(element, '.transactions-page__archived-notice');
+
+      const english = notice();
+      expect(english).toHaveLength(1);
+      expect(english[0]).toMatch(/^A term deposit's transactions are managed by the deposit/);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, notice())).toEqual([]);
+    });
+
+    it('renders the load-failure retry button in Polish', async () => {
+      await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
+      const element = fixture.nativeElement as HTMLElement;
+      const retry = () => labelsOf(element, '.transactions-page__state button');
+
+      expect(retry()).toEqual(['Retry']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['Retry'], retry())).toEqual([]);
+      // The backend's own message stays as it arrived.
+      expect(textOf(element.querySelector('.transactions-page__state p'))).toBe(
+        'Service unavailable.',
+      );
+    });
+
+    it('asks to delete in Polish, naming the type and quantity in the message', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])));
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const confirmation = () =>
+        (
+          dialog.open.mock.calls[0][1] as {
+            data: { title: string; message: string; confirmLabel: string };
+          }
+        ).data;
+      await component['remove'](transaction);
+      const english = confirmation();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](transaction);
+      const polish = confirmation();
+
+      expect(english.title).toBe('Delete this transaction?');
+      expect(
+        polishProblems([english.title, english.confirmLabel], [polish.title, polish.confirmLabel]),
+      ).toEqual([]);
+      expect(polish.message).toContain(TRANSLATIONS.pl['enums.transactionType.buy'] as string);
+      expect(polish.message).not.toContain('will be permanently deleted');
+    });
+
+    it('shows the failure snackbar fallback in Polish', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])));
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      fetchSpy.mockImplementationOnce(async () => jsonResponse({ title: 'Boom' }, 500));
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](transaction);
+
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      const [message, action] = snackBar.open.mock.calls[0] as [string, string];
+      expect(
+        polishProblems(['Failed to delete transaction.', 'Dismiss'], [message, action]),
+      ).toEqual([]);
     });
   });
 });

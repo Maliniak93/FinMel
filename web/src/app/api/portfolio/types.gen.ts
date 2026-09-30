@@ -29,6 +29,15 @@ export type AddDepositRequest = {
     fundingAssetId?: null | string;
 };
 
+export type AddSavingsAccountRequest = {
+    name: string;
+    bankName?: null | string;
+    currency: string;
+    annualInterestRatePercent: number | string;
+    taxExempt?: boolean;
+    openingDeposit?: null | OpeningDepositRequest;
+};
+
 export type AssetClass = number;
 
 export type AssetResponse = {
@@ -45,6 +54,7 @@ export type AssetResponse = {
     transactionCount: number | string;
     depositMaturityDate?: null | string;
     depositSettled?: null | boolean;
+    isArchived: boolean;
 };
 
 export type AssetValuationMode = number;
@@ -70,6 +80,7 @@ export type DepositResponse = {
     portfolioId: string;
     portfolioName: string;
     portfolioIsArchived: boolean;
+    isArchived: boolean;
     name: string;
     bankName?: null | string;
     currency: string;
@@ -106,6 +117,11 @@ export type DepositStatus = number;
 
 export type DepositTermUnit = number;
 
+export type OpeningDepositRequest = {
+    amount: number | string;
+    date: string;
+};
+
 export type PagedResponseOfTransactionResponse = {
     items: Array<TransactionResponse>;
     page: number | string;
@@ -138,6 +154,20 @@ export type RollOverDepositRequest = {
     annualInterestRatePercent: number | string;
     grossInterest?: null | number | string;
     tax?: null | number | string;
+};
+
+export type SavingsAccountResponse = {
+    assetId: string;
+    portfolioId: string;
+    portfolioName: string;
+    portfolioIsArchived: boolean;
+    isArchived: boolean;
+    name: string;
+    bankName?: null | string;
+    currency: string;
+    balance: number | string;
+    annualInterestRatePercent: number | string;
+    taxExempt: boolean;
 };
 
 export type SettleDepositRequest = {
@@ -205,6 +235,13 @@ export type UpdatePortfolioRequest = {
     name: string;
     description?: null | string;
     currency: string;
+};
+
+export type UpdateSavingsAccountRequest = {
+    name: string;
+    bankName?: null | string;
+    annualInterestRatePercent: number | string;
+    taxExempt?: boolean;
 };
 
 export type UpdateTransactionRequest = {
@@ -447,6 +484,44 @@ export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses = {
 
 export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses];
 
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/archive';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses = {
+    /**
+     * OK
+     */
+    200: AssetResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/restore';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses = {
+    /**
+     * OK
+     */
+    200: AssetResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses];
+
 export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData = {
     body?: never;
     path: {
@@ -675,6 +750,78 @@ export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResp
 };
 
 export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData = {
+    body: AddSavingsAccountRequest;
+    path: {
+        portfolioId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses = {
+    /**
+     * Created
+     */
+    201: SavingsAccountResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponse = PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses];
+
+export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: SavingsAccountResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses];
+
+export type PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData = {
+    body: UpdateSavingsAccountRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}';
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: SavingsAccountResponse;
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses];
+
+export type GetApiPortfolioSavingsAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/savings-accounts';
+};
+
+export type GetApiPortfolioSavingsAccountsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SavingsAccountResponse>;
+};
+
+export type GetApiPortfolioSavingsAccountsResponse = GetApiPortfolioSavingsAccountsResponses[keyof GetApiPortfolioSavingsAccountsResponses];
 
 export type GetApiPortfolioTransferCandidatesData = {
     body?: never;

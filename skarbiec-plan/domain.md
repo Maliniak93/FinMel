@@ -4,7 +4,7 @@ Target state (Część II.3). Items that don't exist on `master` yet are marked 
 
 ## Asset classes and valuation modes
 
-`AssetClass`: `Cash`, `Deposit`, `Stock`, `Etf`, `Bond`, `Crypto`, `PreciousMetal`, `RealEstate`, `Other`.
+`AssetClass`: `Cash`, `Deposit`, `Stock`, `Etf`, `Bond`, `Crypto`, `PreciousMetal`, `RealEstate`, `Other`, `Savings` (appended, so the stored ints stay stable).
 
 `AssetValuationMode` — three modes, explicit on `Asset.ValuationMode` (M1.4; before that, market-vs-manual was inferred from `InstrumentId is not null`, which had no way to express the third mode):
 
@@ -12,7 +12,7 @@ Target state (Część II.3). Items that don't exist on `master` yet are marked 
 |---|---|---|
 | **Market** | points at an `Instrument` (ticker + source); value = quantity × last price × FX rate | Stock, Etf, Bond, Crypto, PreciousMetal |
 | **Manual** | `ManualValueAmount` + `ManualValueDate`, refreshed by hand | RealEstate, Other |
-| **Currency-valued** | no instrument, no manual value; value = quantity × FX rate for the asset's own currency (rate = 1 for PLN, so no lookup at all) | Cash, Deposit |
+| **Currency-valued** | no instrument, no manual value; value = quantity × FX rate for the asset's own currency (rate = 1 for PLN, so no lookup at all) | Cash, Deposit, Savings |
 
 The class → default-mode mapping is a default, not a hard constraint — Market and Manual stay available to every class; only "neither instrument nor manual value" is gated by class, since that combination was always a validation error before Currency-valued existed.
 
@@ -28,15 +28,20 @@ The class → default-mode mapping is a default, not a hard constraint — Marke
 | Entity | Fields | Changes vs today |
 |---|---|---|
 | `Portfolio` | `Id, UserId, Name, Description?, Currency, IsArchived` | `AssetCount` removed (spec-02); delete cascades to its assets and their transactions in the handler (spec-08) |
-| `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out) |
+| `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, IsArchived, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out); `IsArchived` is the asset's own archive flag, independent of its portfolio's (asset-archive) |
 | `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, TransferId?, xmin` | `FeeAmount` removed; `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when MarketData has none that early (ADR-026); `TransferId` (indexed, asset-transfers-deposit-funding) links the two legs of a transfer, `null` on an ordinary or detached transaction |
 | `TermDeposit` | `AssetId (PK, FK → Asset), UserId, BankName?, Principal, StartDate, TermLength, TermUnit (Days \| Months), MaturityDate, AnnualInterestRatePercent, Capitalization (AtMaturity \| Monthly \| Quarterly \| Yearly), TaxExempt, EarlyBreakInterestLossPercent, SettledOn?, SettledGrossInterest?, SettledTax?, RolloverCount` | new (term-deposits): the terms of a Deposit-class asset, 1:1 with it and the one real FK in `portfolio_db` (cascade delete); `MaturityDate` is derived on every write; the projection (`DepositInterestMath`: actual/365, gross per capitalisation period rounded half-away-from-zero to grosze, 19 % Belka tax per period rounded up, net compounded) and the `Active \| Due \| Settled \| PaidOut` status (Europe/Warsaw date; Settled wins over Due, PaidOut over Settled — a settled deposit with a `Withdraw` is paid out, deposit-payout-to-cash) are computed at read time, never stored; the three `Settled*` fields (term-deposits-settlement) record what the bank actually paid, set together by `SettleDeposit` and null until then; `RolloverCount` (deposit-rollover, default 0) counts the terms `RollOverDeposit` started, stored rather than derived from the transactions |
+| `SavingsAccount` | `AssetId (PK, FK → Asset), UserId, BankName?, AnnualInterestRatePercent, TaxExempt` | new (savings-accounts): the terms of a Savings-class asset, 1:1 with it and FK-cascaded like `TermDeposit`; `AnnualInterestRatePercent` is the current rate (no history); the balance is `Asset.Quantity`, moved only by the asset's ordinary transactions |
 
 Every slice that mutates a position publishes `AssetPositionChanged` in the same transaction as the write (spec-02); removal publishes `AssetRemoved` (deleting its transactions with it), deleting a portfolio publishes `PortfolioDeleted` plus one `AssetRemoved { CascadedFromPortfolio = true }` per asset (spec-08), and archive/restore publish `PortfolioArchived`/`PortfolioRestored` plus one `AssetPositionChanged` per asset carrying the new archived flag. An archived portfolio is read-only: adding, updating or removing its assets, and recording, updating or deleting their transactions, returns 409 `Conflict.PortfolioArchived` until it is restored. Renaming or deleting the portfolio itself stays allowed.
 
+A single asset of any class can be archived and restored the same way (asset-archive): `POST .../assets/{id}/archive` and `.../restore` flip `Asset.IsArchived` and publish one `AssetPositionChanged` carrying it (no new event type), idempotently — a call finding the asset already in the target state returns 200 and publishes nothing. An archived asset is read-only: updating it, recording, updating or deleting its transactions, and updating, settling or paying out a deposit — or updating a deposit whose funding Cash is archived — returns 409 `Conflict.AssetArchived`. The portfolio check runs first (an archived asset inside an archived portfolio answers `Conflict.PortfolioArchived`, and so do archive and restore there), both after the tenancy lookup. Removing an archived asset stays allowed. It keeps its transactions and terms, is not a transfer candidate or counterpart, and drops out of net worth from the archive date — earlier snapshots stay, and a restore brings it back. The two flags are independent: restoring a portfolio leaves an asset archived on its own archived. The lists still return archived assets with `isArchived`; the client hides them behind "Show archived".
+
 A Deposit-class asset is a term deposit, created and edited only through the deposit slices (`AddDeposit`, `UpdateDeposit`): they write the `Asset`, its `TermDeposit` and a system-managed opening `Deposit` transaction (principal, start date, unit price 1) together. `UpdateDeposit` rewrites that opening transaction instead of adding a correction; `RemoveAsset` deletes the `TermDeposit` with the asset. `SettleDeposit` (term-deposits-settlement) settles a Due deposit: it stores the settlement fields and, when the net interest (gross − tax) is above 0, adds a second system-managed `Deposit` transaction of it on the settlement date, so the quantity becomes principal + net and the money stays in the deposit. A payout (deposit-payout-to-cash) moves that whole balance to a Cash asset as a Deposit → Cash transfer — at settlement through `SettleDeposit`'s `destinationAssetId` (on `settledOn`, in the same save; an invalid destination rejects the settlement too), or later through `PayOutDeposit` (`settledOn ≤ date ≤ today`) — and the deposit is `PaidOut`, with `paidOutOn` and `paidOutToAssetName` (null once the destination was removed and its leg detached) on `GetDeposit`/`ListDeposits`. `RollOverDeposit` (deposit-rollover) starts a Due or Settled (not paid-out) deposit's next term on the same asset: from Due it settles it in the same save, crediting the net interest on the old maturity date; from Settled it reuses the stored settlement and writes no transaction. Either way the new principal is the whole balance (old principal + that term's net), the new start date the old maturity date — however late the rollover — and the maturity date is recomputed from the unchanged term; only the rate changes. It clears the three `Settled*` fields and increments `RolloverCount`, so the next term is `Active`, or `Due` at once when its maturity date is already past. Each rollover overwrites the previous term; its net interest stays as its credit transaction. Once rolled over, `UpdateDeposit` keeps the principal and start date fixed (409 `Conflict.DepositRolledOver`) and never rewrites a transaction; every other term stays editable.
 
-A transfer (asset-transfers-deposit-funding) moves money between two of one user's assets — across portfolios too — as two linked transactions sharing a `TransferId`: a `Withdraw` on the source and a `Deposit` on the target, the same amount and date, unit price 1, each with its PLN rate frozen (ADR-026). The allowed routes live in `TransferRoutes` (Cash → Deposit; Deposit → Cash for the payout), and each route enters through its own slice: `AddDeposit` with `fundingAssetId` makes the opening transaction the In leg of a Cash → Deposit transfer, and `UpdateDeposit` rewrites both legs when the principal or start date changes; `SettleDeposit` with `destinationAssetId` and `PayOutDeposit` write the deposit's Withdraw as the Out leg of a Deposit → Cash transfer. The entry point recomputes and publishes `AssetPositionChanged` for both assets in one save; a counterpart that is not the user's, the same asset, off-route, in another currency or in an archived portfolio is 400 `Validation.InvalidTransferCounterpart`, and a source whose running balance would drop below 0 is 400 `Validation.InsufficientFunds`. `ListTransactions` returns a leg's counterpart (asset, portfolio, direction), `GetDeposit`/`ListDeposits` the funding asset, and `GET /api/portfolio/transfer-candidates` the pick list. Replay orders same-day transactions inflows first, so a same-day top-up and transfer out never fail on the Guid order.
+A Savings-class asset is a savings account (savings-accounts), created and edited only through the savings-account slices (`AddSavingsAccount`, `UpdateSavingsAccount`); `GetSavingsAccount` and `ListSavingsAccounts` (across portfolios, by portfolio name, then account name) read it with its balance. `AddSavingsAccount` writes the `Asset`, its `SavingsAccount` and — when an opening deposit is sent — an ordinary `Deposit` transaction (unit price 1, FX frozen per ADR-026), and publishes `AssetPositionChanged`, in one save. `UpdateSavingsAccount` changes the name, bank, rate and tax status only and publishes nothing. Unlike a term deposit's, its transactions are ordinary: recorded, edited and deleted through the transaction endpoints. `RemoveAsset` and `DeletePortfolio` delete the `SavingsAccount` through the FK cascade.
+
+A transfer (asset-transfers-deposit-funding) moves money between two of one user's assets — across portfolios too — as two linked transactions sharing a `TransferId`: a `Withdraw` on the source and a `Deposit` on the target, the same amount and date, unit price 1, each with its PLN rate frozen (ADR-026). The allowed routes live in `TransferRoutes` (Cash → Deposit; Deposit → Cash for the payout), and each route enters through its own slice: `AddDeposit` with `fundingAssetId` makes the opening transaction the In leg of a Cash → Deposit transfer, and `UpdateDeposit` rewrites both legs when the principal or start date changes; `SettleDeposit` with `destinationAssetId` and `PayOutDeposit` write the deposit's Withdraw as the Out leg of a Deposit → Cash transfer. The entry point recomputes and publishes `AssetPositionChanged` for both assets in one save; a counterpart that is not the user's, the same asset, off-route, in another currency, archived itself or in an archived portfolio is 400 `Validation.InvalidTransferCounterpart`, and a source whose running balance would drop below 0 is 400 `Validation.InsufficientFunds`. `ListTransactions` returns a leg's counterpart (asset, portfolio, direction), `GetDeposit`/`ListDeposits` the funding asset, and `GET /api/portfolio/transfer-candidates` the pick list. Replay orders same-day transactions inflows first, so a same-day top-up and transfer out never fail on the Guid order.
 
 ```mermaid
 erDiagram
@@ -44,6 +49,7 @@ erDiagram
     ASSET ||--o{ TRANSACTION : records
     TRANSACTION |o--o| TRANSACTION : "transfer legs (shared transfer_id)"
     ASSET ||--o| TERM_DEPOSIT : "Deposit class only"
+    ASSET ||--o| SAVINGS_ACCOUNT : "Savings class only"
     ASSET }o--o| INSTRUMENT : "valued by (ref, no FK)"
     PORTFOLIO {
         uuid id PK
@@ -64,6 +70,7 @@ erDiagram
         date manual_value_date "Manual only"
         uuid instrument_id "Market only"
         bigint version "AssetPositionChanged ordering"
+        bool is_archived "asset's own flag"
         xid xmin "concurrency token"
     }
     TRANSACTION {
@@ -92,6 +99,13 @@ erDiagram
         bool tax_exempt "IKE/IKZE"
         numeric early_break_interest_loss_percent
         int rollover_count "deposit-rollover"
+    }
+    SAVINGS_ACCOUNT {
+        uuid asset_id PK, FK
+        uuid user_id
+        string bank_name
+        numeric annual_interest_rate_percent "current rate"
+        bool tax_exempt "IKE/IKZE"
     }
 ```
 
@@ -157,7 +171,7 @@ erDiagram
 
 | Entity | Fields | Role |
 |---|---|---|
-| `Position` | copy of the `AssetPositionChanged` payload + `UpdatedAt`; `AssetId` is the primary key | upserted from the inbox; `PortfolioIsArchived` kept current from `Portfolio*` events |
+| `Position` | copy of the `AssetPositionChanged` payload + `UpdatedAt`; `AssetId` is the primary key | upserted from the inbox; `PortfolioIsArchived` kept current from `Portfolio*` events; `IsArchived` (asset-archive) from the event — valued only when neither flag is set, and an asset archive/restore event revalues today, so its line leaves or rejoins today's snapshot |
 | `ValuationSnapshot` | `Id, UserId, PortfolioId, Date, TotalPln, IsStale` | breakdown is a `GROUP BY AssetClass` over `AssetValuation` lines, not a stored JSON blob; written by the daily sync, and for today also by every position event from the `Latest*` tables (ADR-025); `PortfolioArchived` zeroes today's snapshot, so an archived portfolio drops out of net worth while its earlier snapshots stay |
 | `AssetValuation` | `Id, UserId, PortfolioId, AssetId, Date, AssetClass, Quantity, PriceUsed?, PriceDate?, FxRateUsed?, ValuePln, IsStale`; unique `(AssetId, Date)` | the basis for P/L per asset, emergency fund and goal math, and TWR — nothing needs recomputing from scratch |
 | `LatestInstrumentPrice` | `InstrumentId` (PK), `QuoteCurrency, Date, Close` | last close seen in the daily batch — global reference data, no `UserId` (ADR-025) |
@@ -181,6 +195,7 @@ erDiagram
         uuid instrument_id
         numeric quantity
         bool portfolio_is_archived
+        bool is_archived
         datetime updated_at
     }
     VALUATION_SNAPSHOT {
@@ -259,6 +274,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 - An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
 - A Cash/Deposit asset's transactions are only Deposit/Withdraw.
 - A Deposit-class asset has exactly one `TermDeposit`; its transactions are system-managed — record/update/delete on it is 409 `Conflict.DepositTransactionsManaged`, and `AddAsset`/`UpdateAsset` reject class Deposit (or a change to or from it) with 400 `Validation.UseDepositEndpoints`.
+- A Savings asset has exactly one `SavingsAccount`, created and edited only through the savings-account slices; its transactions are ordinary Deposit/Withdraw — `AddAsset`/`UpdateAsset` reject class Savings (or a change to or from it) with 400 `Validation.UseSavingsAccountEndpoints`.
 - A transfer is exactly two legs sharing a `TransferId`, changed only by their entry point — updating or deleting a leg through the transaction endpoints is 409 `Conflict.TransferLegManaged`; removing an asset (or deleting its portfolio) detaches its counterpart legs (`TransferId = null`, the other asset's quantity unchanged, no event), never reverses them.
 - A settled deposit's terms are immutable — `UpdateDeposit` on it is 409 `Conflict.DepositSettled`. It is settled at most once (409 `Conflict.DepositAlreadySettled`) and never before its maturity date (409 `Conflict.DepositNotDue`); deleting it stays allowed.
 - A paid-out deposit holds 0; a payout always moves the whole balance. Only a settled deposit is paid out (409 `Conflict.DepositNotSettled`), at most once (409 `Conflict.DepositAlreadyPaidOut`); removing it detaches the Cash leg, so the Cash keeps the money.

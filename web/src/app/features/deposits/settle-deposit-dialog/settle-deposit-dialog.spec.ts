@@ -4,6 +4,8 @@ import type { FormGroup } from '@angular/forms';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
+import { labelsOf, polishProblems, restoreEnglish, switchLanguage } from '../../../../testing/i18n';
+import { provideI18nTesting } from '../../../core/i18n/testing';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
@@ -45,8 +47,10 @@ describe('SettleDepositDialog', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   function method(input: unknown): string {
@@ -76,6 +80,7 @@ describe('SettleDepositDialog', () => {
     await TestBed.configureTestingModule({
       imports: [SettleDepositDialog],
       providers: [
+        provideI18nTesting(),
         provideNativeDateAdapter(),
         { provide: MAT_DIALOG_DATA, useValue: { deposit: dueDeposit } },
         { provide: MatDialogRef, useValue: dialogRef },
@@ -359,6 +364,110 @@ describe('SettleDepositDialog', () => {
         empty: false,
       });
       expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
+    });
+  });
+
+  // i18n screens (#132) AC-6: the dialog's title, summary, field labels, hints, validation messages
+  // and buttons follow the language.
+  describe('in Polish', () => {
+    function errors(): string[] {
+      return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+    }
+
+    async function read(values: Record<string, unknown>): Promise<string[]> {
+      await fill(values);
+      await component['onSubmit']();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return errors();
+    }
+
+    it('renders in Polish', async () => {
+      await setup();
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...labelsOf(element, 'dt'),
+        ...labelsOf(element, 'mat-label'),
+        selectTriggerState(fixture, 'destinationAssetId').triggerText,
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Settle deposit',
+        'Principal',
+        'Maturity',
+        'Net interest',
+        'Final amount',
+        'Settlement date',
+        'Gross interest',
+        'Tax',
+        'Move to',
+        'Keep in the deposit',
+        'Cancel',
+        'Settle',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('shows the amount that moves out in Polish', async () => {
+      await setup();
+      await fill({ destinationAssetId: plnCashCandidate.assetId });
+      const element = fixture.nativeElement as HTMLElement;
+      const hint = () => labelsOf(element, 'mat-hint');
+
+      const english = hint();
+      expect(english).toHaveLength(1);
+      expect(english[0]).toContain('moves out of the deposit');
+
+      await switchLanguage(fixture, 'pl');
+
+      const [polish] = hint();
+      expect(polishProblems(english, [polish])).toEqual([]);
+      expect(polish.replace(/\s+/g, ' ')).toContain(
+        formatMoney(10119.83, 'PLN').replace(/\s+/g, ' '),
+      );
+    });
+
+    it('shows validation in Polish', async () => {
+      await setup();
+      const scenarios: [string[], Record<string, unknown>][] = [
+        [
+          ['Settlement date is required.', 'Gross interest is required.', 'Tax is required.'],
+          { settledOn: null, grossInterest: null, tax: null },
+        ],
+        [
+          [
+            "Settlement date can't be in the future.",
+            "Gross interest can't be negative.",
+            "Tax can't be negative.",
+          ],
+          { settledOn: daysFromToday(1), grossInterest: -1, tax: -1 },
+        ],
+        [
+          [
+            "Settlement date can't be before the start date.",
+            "Tax can't exceed the gross interest.",
+          ],
+          { settledOn: new Date(2026, 0, 1), grossInterest: 10, tax: 20 },
+        ],
+      ];
+
+      const english: string[][] = [];
+      for (const [expected, values] of scenarios) {
+        english.push(await read(values));
+        expect(english.at(-1)).toEqual(expected);
+      }
+
+      await switchLanguage(fixture, 'pl');
+
+      for (const [index, [, values]] of scenarios.entries()) {
+        expect(polishProblems(english[index], await read(values))).toEqual([]);
+      }
     });
   });
 });

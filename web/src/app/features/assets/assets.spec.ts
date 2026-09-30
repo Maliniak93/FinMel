@@ -3,20 +3,36 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
-import { textOf } from '../../../testing/i18n';
+import {
+  attributesOf,
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  switchLanguage,
+  textOf,
+} from '../../../testing/i18n';
+import {
+  clickRowMenuItem,
+  menuItemLabel,
+  rowMenuItems,
+  showArchived,
+} from '../../../testing/archive';
 import { client as marketDataClient } from '../../api/marketdata/client.gen';
 import type { InstrumentDetailsResponse } from '../../api/marketdata';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetResponse, PortfolioResponse } from '../../api/portfolio';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatMoney } from '../../shared/format';
+import { formatDate, formatMoney } from '../../shared/format';
 import { toDateOnly } from '../../shared/date-only';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
+import { SavingsAccountFormDialog } from '../deposits/savings-account-form-dialog/savings-account-form-dialog';
+import { savingsAccountResponse } from '../deposits/testing/savings-account-fixtures';
 import { depositResponse } from '../deposits/testing/deposit-fixtures';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
@@ -54,6 +70,7 @@ const asset: AssetResponse = {
   manualValue: 1000,
   manualValueDate: '2020-01-01',
   transactionCount: 0,
+  isArchived: false,
 };
 
 const marketAsset: AssetResponse = {
@@ -66,6 +83,7 @@ const marketAsset: AssetResponse = {
   quantity: 10,
   instrumentId,
   transactionCount: 0,
+  isArchived: false,
 };
 
 const currencyValuedAsset: AssetResponse = {
@@ -79,6 +97,7 @@ const currencyValuedAsset: AssetResponse = {
   manualValue: null,
   manualValueDate: null,
   transactionCount: 1,
+  isArchived: false,
 };
 
 // term-deposits: a Deposit-class asset carries its maturity date on AssetResponse.
@@ -134,11 +153,17 @@ describe('Assets', () => {
     portfolioResponse = jsonResponse(portfolio),
     instrumentResponse?: Response,
     depositResponseBody?: unknown,
+    savingsAccountBody?: unknown,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
       if (url.includes('/instruments/')) {
         return instrumentResponse ?? jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (url.includes('/savings-accounts')) {
+        return savingsAccountBody
+          ? jsonResponse(savingsAccountBody)
+          : jsonResponse({ detail: 'Not found.' }, 404);
       }
       if (url.includes('/deposits')) {
         return depositResponseBody
@@ -518,6 +543,154 @@ describe('Assets', () => {
     });
   });
 
+  // asset-archive AC-11: any asset can be archived on its own. "Show archived" (off by default)
+  // reveals it with an "Archived" chip; the row menu gains Archive / Restore behind a ConfirmDialog;
+  // an archived row has no Edit and no "Due" chip but keeps Restore and Delete.
+  describe('archive', () => {
+    const archivedCash = {
+      ...currencyValuedAsset,
+      name: 'Old cash',
+      isArchived: true,
+    } as AssetResponse;
+    const archivedDueDepositAsset = {
+      ...depositAsset(daysFromToday(-1)),
+      name: 'Shelved matured deposit',
+      isArchived: true,
+    } as AssetResponse;
+
+    function rows(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'tbody tr.mat-mdc-row',
+        ),
+      );
+    }
+
+    function rowFor(name: string): HTMLElement {
+      const row = rows().find((r) => (r.textContent ?? '').includes(name));
+      if (!row) {
+        throw new Error(`No row for '${name}'.`);
+      }
+      return row;
+    }
+
+    function writes(): Request[] {
+      return fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method !== 'GET');
+    }
+
+    async function menuLabels(row: HTMLElement): Promise<string[]> {
+      const items = await rowMenuItems(fixture, row);
+      const labels = items.map(menuItemLabel);
+      TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+      return labels;
+    }
+
+    it('hides archived assets until Show archived is on', async () => {
+      await setup(jsonResponse([asset, archivedCash]));
+
+      expect(rows()).toHaveLength(1);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Old cash');
+
+      await showArchived(fixture);
+
+      expect(rows()).toHaveLength(2);
+      const archivedRow = rowFor('Old cash');
+      expect(archivedRow.querySelector('mat-chip, .mat-mdc-chip')?.textContent).toContain(
+        'Archived',
+      );
+      expect(rowFor('Apple').textContent).not.toContain('Archived');
+    });
+
+    it('an archived row has no Edit and no Due chip but keeps Restore and Delete', async () => {
+      await setup(jsonResponse([archivedCash, archivedDueDepositAsset]));
+      await showArchived(fixture);
+
+      expect(rowFor('Shelved matured deposit').textContent).not.toContain('Due');
+      for (const name of ['Old cash', 'Shelved matured deposit']) {
+        const labels = await menuLabels(rowFor(name));
+
+        expect(labels.some((label) => /restore/i.test(label))).toBe(true);
+        expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+        expect(labels.some((label) => /edit/i.test(label))).toBe(false);
+        expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(false);
+      }
+    });
+
+    it('a live row offers Archive, Edit and Delete but not Restore', async () => {
+      await setup(jsonResponse([asset]));
+
+      const labels = await menuLabels(rowFor('Apple'));
+
+      expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(true);
+      expect(labels.some((label) => /edit/i.test(label))).toBe(true);
+      expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+      expect(labels.some((label) => /restore/i.test(label))).toBe(false);
+    });
+
+    it('archives and restores an asset after confirmation', async () => {
+      await setup(jsonResponse([asset, archivedCash]));
+      await showArchived(fixture);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      // Each reload reads a fresh list body: setup() hands back one Response, readable only once.
+      fetchSpy.mockImplementation(async (input: unknown) =>
+        requestUrl(input).includes('/assets')
+          ? jsonResponse([asset, archivedCash])
+          : jsonResponse(portfolio),
+      );
+
+      // Archive the live asset.
+      let callsBefore = fetchSpy.mock.calls.length;
+      fetchSpy.mockImplementationOnce(async () => jsonResponse({ ...asset, isArchived: true }));
+      await clickRowMenuItem(fixture, rowFor('Apple'), /\barchive\b/i);
+
+      expect(dialog.open).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
+      const archiveCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+      expect(archiveCall.method).toBe('POST');
+      expect(archiveCall.url).toContain(`/portfolios/${portfolioId}/assets/${asset.id}/archive`);
+      expect((fetchSpy.mock.calls[callsBefore + 1][0] as Request).method).toBe('GET');
+
+      // Restore the archived one.
+      callsBefore = fetchSpy.mock.calls.length;
+      fetchSpy.mockImplementationOnce(async () =>
+        jsonResponse({ ...archivedCash, isArchived: false }),
+      );
+      await clickRowMenuItem(fixture, rowFor('Old cash'), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledTimes(2);
+      await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
+      const restoreCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+      expect(restoreCall.method).toBe('POST');
+      expect(restoreCall.url).toContain(
+        `/portfolios/${portfolioId}/assets/${archivedCash.id}/restore`,
+      );
+      expect((fetchSpy.mock.calls[callsBefore + 1][0] as Request).method).toBe('GET');
+    });
+
+    it('does not archive or restore when the confirmation is cancelled', async () => {
+      await setup(jsonResponse([asset, archivedCash]));
+      await showArchived(fixture);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      await clickRowMenuItem(fixture, rowFor('Apple'), /\barchive\b/i);
+      await clickRowMenuItem(fixture, rowFor('Old cash'), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledTimes(2);
+      expect(writes()).toHaveLength(0);
+    });
+
+    it('an archived portfolio still offers no actions, whatever the asset flags', async () => {
+      await setup(
+        jsonResponse([asset, archivedCash]),
+        jsonResponse({ ...portfolio, isArchived: true }),
+      );
+
+      expect((fixture.nativeElement as HTMLElement).querySelectorAll('td button')).toHaveLength(0);
+    });
+  });
+
   // term-deposits AC-16: a Deposit row is edited through DepositFormDialog (its terms live on the
   // deposit endpoints), never the generic asset form.
   it('Edit on a Deposit row opens DepositFormDialog, not the asset form', async () => {
@@ -535,6 +708,40 @@ describe('Assets', () => {
     expect(dialogType).not.toBe(AssetFormDialog);
     // Addresses this deposit — whether the page hands over the loaded terms or just the ids.
     expect(JSON.stringify(config?.data)).toContain(deposit.id);
+    // A save reloads the asset list.
+    await vi.waitFor(() =>
+      expect(
+        fetchSpy.mock.calls
+          .slice(callsBefore)
+          .some((call: unknown[]) =>
+            requestUrl(call[0]).endsWith(`/portfolios/${portfolioId}/assets`),
+          ),
+      ).toBe(true),
+    );
+  });
+
+  // savings-accounts: a Savings-class row is edited through SavingsAccountFormDialog (its terms live
+  // on the savings-account endpoints), never the generic asset form.
+  it('Edit on a Savings row opens SavingsAccountFormDialog, not the asset form', async () => {
+    const savings: AssetResponse = {
+      ...currencyValuedAsset,
+      id: '88888888-aaaa-8888-aaaa-888888888888',
+      assetClass: 9, // Savings
+      name: 'Savings account',
+      quantity: 10000,
+    };
+    const terms = savingsAccountResponse({ assetId: savings.id, portfolioId });
+    await setup(jsonResponse([savings]), undefined, undefined, undefined, terms);
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = fetchSpy.mock.calls.length;
+
+    component['openEditDialog'](savings);
+
+    await vi.waitFor(() => expect(dialog.open).toHaveBeenCalled());
+    const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data?: unknown }];
+    expect(dialogType).toBe(SavingsAccountFormDialog);
+    expect(dialogType).not.toBe(AssetFormDialog);
+    expect(JSON.stringify(config?.data)).toContain(savings.id);
     // A save reloads the asset list.
     await vi.waitFor(() =>
       expect(
@@ -634,5 +841,237 @@ describe('Assets', () => {
     expect(cell('manualValueDate')).toContain('27 wrz 2026');
     expect(cell('manualValueDate')).not.toContain('Sep 27, 2026');
     expect(fetchSpy.mock.calls.length).toBe(fetchesBefore);
+  });
+
+  // i18n screens (#132) AC-3: the list's headings, table headers, chips and their tooltips, row menu,
+  // empty state, delete confirmation and failure snackbar fallback follow the language.
+  describe('in Polish', () => {
+    const maturity = daysFromToday(-1);
+
+    function tooltipOf(selector: string): string {
+      return fixture.debugElement.query(By.css(selector)).injector.get(MatTooltip).message;
+    }
+
+    async function menuItems(): Promise<string[]> {
+      const trigger = fixture.debugElement
+        .query(By.directive(MatMenuTrigger))
+        .injector.get(MatMenuTrigger);
+      trigger.openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const items = labelsOf(
+        TestBed.inject(OverlayContainer).getContainerElement(),
+        '.mat-mdc-menu-item',
+      );
+      trigger.closeMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return items;
+    }
+
+    it('renders in Polish', async () => {
+      const deposit = { ...depositAsset(maturity), name: 'Matured deposit' };
+      await setup(jsonResponse([asset, deposit]));
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = async () => [
+        ...labelsOf(element, 'a.assets-page__back'),
+        ...labelsOf(element, '.assets-page__header > button'),
+        ...labelsOf(element, 'th:not(:empty)'),
+        ...labelsOf(element, 'mat-chip'),
+        tooltipOf('.mat-column-manualValueDate mat-chip'),
+        ...(await menuItems()),
+      ];
+      const heading = () => textOf(element.querySelector('h1'));
+      const maturedTooltip = () => tooltipOf('.assets-page__chip--due');
+
+      const english = await texts();
+      expect(english).toEqual([
+        'Portfolios',
+        'New asset',
+        'Class',
+        'Name',
+        'Quantity',
+        'Currency',
+        'Value',
+        'Valued on',
+        'Stale — refresh me',
+        'Due',
+        'This valuation is more than 6 months old — consider refreshing it.',
+        'Edit',
+        'Archive',
+        'Delete',
+      ]);
+      expect(heading()).toBe('Assets — Retirement');
+      expect(maturedTooltip()).toMatch(/^Matured on /);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, await texts())).toEqual([]);
+      expect(heading()).not.toContain('Assets');
+      expect(heading()).toContain('Retirement');
+      // "Matured on {date}": the parameterised key, with the date in the active locale.
+      expect(maturedTooltip()).not.toMatch(/^Matured on /);
+      expect(maturedTooltip()).toContain(formatDate(maturity));
+      expect(
+        matchesTranslation('pl', maturedTooltip()),
+        `"${maturedTooltip()}" is not a pl.json value`,
+      ).toBe(true);
+    });
+
+    it('labels the row actions button with the asset name in Polish', async () => {
+      await setup(jsonResponse([asset]));
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(attributesOf(element, 'td button', 'aria-label')).toEqual(['Actions for Apple']);
+
+      await switchLanguage(fixture, 'pl');
+
+      const [label] = attributesOf(element, 'td button', 'aria-label');
+      expect(label).not.toContain('Actions for');
+      expect(label).toContain('Apple');
+      expect(matchesTranslation('pl', label), `"${label}" is not a pl.json value`).toBe(true);
+    });
+
+    it("renders a market asset's price cells in Polish", async () => {
+      const staleDate = new Date();
+      staleDate.setDate(staleDate.getDate() - 10);
+      const staleInstrument: InstrumentDetailsResponse = {
+        id: instrumentId,
+        ticker: 'AAPL.US',
+        name: 'Apple Inc.',
+        assetClass: 2,
+        quoteCurrency: 'USD',
+        source: 1,
+        verificationStatus: 0,
+        lastPrice: 212,
+        lastPriceDate: staleDate.toISOString().slice(0, 10),
+      };
+      await setup(jsonResponse([marketAsset]), undefined, jsonResponse(staleInstrument));
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'mat-chip'),
+        tooltipOf('.mat-column-manualValueDate mat-chip'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual(['Stale', "This instrument's price is more than 7 days old."]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it("renders 'No price yet' in Polish", async () => {
+      const noQuotes: InstrumentDetailsResponse = {
+        id: instrumentId,
+        ticker: 'NEW.US',
+        name: 'Brand New Co.',
+        assetClass: 2,
+        quoteCurrency: 'USD',
+        source: 1,
+        verificationStatus: 1,
+        lastPrice: null,
+        lastPriceDate: null,
+      };
+      await setup(jsonResponse([marketAsset]), undefined, jsonResponse(noQuotes));
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const cell = () => [textOf(element.querySelector('td.mat-column-value'))];
+
+      expect(cell()).toEqual(['No price yet']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['No price yet'], cell())).toEqual([]);
+    });
+
+    it('renders the empty state in Polish', async () => {
+      await setup(jsonResponse([]));
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, '.assets-page__state p'),
+        ...labelsOf(element, '.assets-page__state button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        "This portfolio doesn't have any assets yet.",
+        'Add your first asset',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the archived notice in Polish', async () => {
+      await setup(jsonResponse([asset]), jsonResponse({ ...portfolio, isArchived: true }));
+      const element = fixture.nativeElement as HTMLElement;
+      const notice = () => labelsOf(element, '.assets-page__archived-notice');
+
+      const english = notice();
+      expect(english).toHaveLength(1);
+      expect(english[0]).toMatch(/^This portfolio is archived/);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, notice())).toEqual([]);
+    });
+
+    it('renders the load-failure retry button in Polish', async () => {
+      await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(labelsOf(element, '.assets-page__state button')).toEqual(['Retry']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['Retry'], labelsOf(element, '.assets-page__state button'))).toEqual(
+        [],
+      );
+      // The backend's own message stays as it arrived.
+      expect(textOf(element.querySelector('.assets-page__state p'))).toBe('Service unavailable.');
+    });
+
+    it('asks to delete in Polish, with the asset name and transaction count in the message', async () => {
+      const withTransactions: AssetResponse = { ...asset, transactionCount: 3 };
+      await setup(jsonResponse([withTransactions]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const confirmation = () =>
+        (
+          dialog.open.mock.calls[0][1] as {
+            data: { title: string; message: string; confirmLabel: string };
+          }
+        ).data;
+      await component['remove'](withTransactions);
+      const english = confirmation();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](withTransactions);
+      const polish = confirmation();
+
+      expect(english.title).toBe('Delete this asset?');
+      expect(
+        polishProblems([english.title, english.confirmLabel], [polish.title, polish.confirmLabel]),
+      ).toEqual([]);
+      expect(polish.message).toContain('"Apple"');
+      expect(polish.message).toContain('3');
+      expect(polish.message).not.toContain('permanently deleted');
+    });
+
+    it('shows the failure snackbar fallback in Polish', async () => {
+      await setup(jsonResponse([asset]));
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      fetchSpy.mockImplementationOnce(async () => jsonResponse({ title: 'Boom' }, 500));
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](asset);
+
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      const [message, action] = snackBar.open.mock.calls[0] as [string, string];
+      expect(polishProblems(['Failed to delete asset.', 'Dismiss'], [message, action])).toEqual([]);
+    });
   });
 });

@@ -696,4 +696,45 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
+
+    /// <summary>
+    /// savings-accounts AC-6: a Savings-class asset is created only through
+    /// <c>POST .../savings-accounts</c> — every valuation shape of class Savings sent here is a 400
+    /// <c>Validation.UseSavingsAccountEndpoints</c>, and nothing is written.
+    /// </summary>
+    [Theory]
+    [InlineData("currency-valued")]
+    [InlineData("currency-valued-with-opening-deposit")]
+    [InlineData("manual")]
+    public async Task Add_SavingsClass_ReturnsUseSavingsAccountEndpoints(string shape)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest { AssetClass = AssetClass.Savings, Name = "Savings account", Currency = "PLN" };
+        request = shape switch
+        {
+            "currency-valued" => request,
+            "currency-valued-with-opening-deposit" => request with
+            {
+                InitialTransaction = new RecordTransactionRequest
+                {
+                    Type = TransactionType.Deposit,
+                    Quantity = 1_000m,
+                    UnitPrice = 1m,
+                    Date = new DateOnly(2026, 1, 1)
+                }
+            },
+            "manual" => request with { ManualValue = 1_000m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        await response.AssertUseSavingsAccountEndpointsAsync(cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+    }
 }

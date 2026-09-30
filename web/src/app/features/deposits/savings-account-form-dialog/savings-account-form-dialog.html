@@ -1,0 +1,123 @@
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'savings.form.editTitle' : 'savings.form.newTitle') | transloco }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" class="savings-account-form-dialog__field">
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
+      <input matInput type="text" formControlName="name" autocomplete="off" />
+      @if (hasError('name', 'required')) {
+        <mat-error>{{ 'deposits.form.nameRequired' | transloco }}</mat-error>
+      } @else if (hasError('name', 'maxlength')) {
+        <mat-error>{{ 'deposits.form.nameTooLong' | transloco }}</mat-error>
+      } @else if (serverError('name')) {
+        <mat-error>{{ serverError('name') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="savings-account-form-dialog__field">
+      <mat-label>{{ 'deposits.bank' | transloco }}</mat-label>
+      <input matInput type="text" formControlName="bankName" autocomplete="off" />
+      @if (hasError('bankName', 'maxlength')) {
+        <mat-error>{{ 'deposits.form.bankNameTooLong' | transloco }}</mat-error>
+      } @else if (serverError('bankName')) {
+        <mat-error>{{ serverError('bankName') }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (choosesPortfolio) {
+      <mat-form-field appearance="outline" class="savings-account-form-dialog__field">
+        <mat-label>{{ 'deposits.portfolio' | transloco }}</mat-label>
+        <mat-select formControlName="portfolioId">
+          @if (portfoliosResource.hasValue()) {
+            @for (portfolio of portfoliosResource.value(); track portfolio.id) {
+              <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
+            }
+          }
+        </mat-select>
+        @if (portfoliosResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        }
+        @if (hasError('portfolioId', 'required')) {
+          <mat-error>{{ 'deposits.form.portfolioRequired' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (!isEdit) {
+      <mat-form-field appearance="outline" class="savings-account-form-dialog__field">
+        <mat-label>{{ 'common.currency' | transloco }}</mat-label>
+        <mat-select formControlName="currency">
+          @for (currency of currencies; track currency.code) {
+            <mat-option [value]="currency.code">{{ currency.label | transloco }}</mat-option>
+          }
+        </mat-select>
+        @if (hasError('currency', 'required')) {
+          <mat-error>{{ 'deposits.form.currencyRequired' | transloco }}</mat-error>
+        } @else if (serverError('currency')) {
+          <mat-error>{{ serverError('currency') }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" class="savings-account-form-dialog__field">
+      <mat-label>{{ 'deposits.form.annualInterestRate' | transloco }}</mat-label>
+      <input matInput type="number" step="0.01" formControlName="annualInterestRatePercent" />
+      @if (hasError('annualInterestRatePercent', 'required')) {
+        <mat-error>{{ 'deposits.errors.interestRateRequired' | transloco }}</mat-error>
+      } @else if (
+        hasError('annualInterestRatePercent', 'min') || hasError('annualInterestRatePercent', 'max')
+      ) {
+        <mat-error>{{ 'deposits.errors.interestRateRange' | transloco }}</mat-error>
+      } @else if (serverError('annualInterestRatePercent')) {
+        <mat-error>{{ serverError('annualInterestRatePercent') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-slide-toggle formControlName="taxExempt" class="savings-account-form-dialog__toggle">
+      {{ 'deposits.form.taxExempt' | transloco }}
+    </mat-slide-toggle>
+
+    @if (!isEdit) {
+      <div class="savings-account-form-dialog__row">
+        <mat-form-field appearance="outline" class="savings-account-form-dialog__field">
+          <mat-label>{{ 'savings.form.openingAmount' | transloco }}</mat-label>
+          <input matInput type="number" step="0.01" formControlName="openingAmount" />
+          @if (hasError('openingAmount', 'positive')) {
+            <mat-error>{{ 'savings.form.openingAmountPositive' | transloco }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="savings-account-form-dialog__field">
+          <mat-label>{{ 'savings.form.openingDate' | transloco }}</mat-label>
+          <input matInput [matDatepicker]="openingDatePicker" formControlName="openingDate" />
+          <mat-datepicker-toggle matIconSuffix [for]="openingDatePicker"></mat-datepicker-toggle>
+          <mat-datepicker #openingDatePicker></mat-datepicker>
+          @if (hasError('openingDate', 'required')) {
+            <mat-error>{{ 'savings.form.openingDateRequired' | transloco }}</mat-error>
+          } @else if (hasError('openingDate', 'future')) {
+            <mat-error>{{ 'savings.form.openingDateInFuture' | transloco }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+    }
+
+    @if (formError()) {
+      <p class="savings-account-form-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

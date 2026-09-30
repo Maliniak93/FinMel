@@ -2,10 +2,27 @@ import { OverlayContainer } from '@angular/cdk/overlay';
 import { formatDate } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import {
+  attributesOf,
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+  textOf,
+} from '../../../testing/i18n';
+import {
+  clickRowMenuItem,
+  menuItemLabel,
+  showArchived as showArchivedToggle,
+} from '../../../testing/archive';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { DepositResponse } from '../../api/portfolio';
 import { formatMoney } from '../../shared/format';
@@ -18,7 +35,9 @@ import { RollOverDepositDialog } from './roll-over-deposit-dialog/roll-over-depo
 import { SettleDepositDialog } from './settle-deposit-dialog/settle-deposit-dialog';
 import {
   activeDeposit,
+  archivedDueDeposit,
   archivedPortfolioDeposit,
+  archivedSettledDeposit,
   dueDeposit,
   paidOutDeposit,
   paidOutDepositDestinationName,
@@ -26,6 +45,7 @@ import {
   settledDeposit,
   settledDepositFinalAmount,
 } from './testing/deposit-fixtures';
+import { activeSavingsAccount, taxFreeEurSavingsAccount } from './testing/savings-account-fixtures';
 import { provideI18nTesting } from '../../core/i18n/testing';
 
 // term-deposits AC-15. The Deposits page (route `deposits`) lists every deposit of the user across
@@ -41,8 +61,10 @@ describe('Deposits', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   async function setup(
@@ -52,6 +74,13 @@ describe('Deposits', () => {
       const request = input as Request;
       if (request.method === 'DELETE') {
         return new Response(null, { status: 204 });
+      }
+      // asset-archive: the archive / restore endpoints answer 200 with the asset.
+      if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
+        return jsonResponse({});
+      }
+      if (requestUrl(input).includes('/api/portfolio/savings-accounts')) {
+        return jsonResponse([activeSavingsAccount, taxFreeEurSavingsAccount]);
       }
       return requestUrl(input).includes('/api/portfolio/deposits')
         ? jsonResponse(deposits)
@@ -105,7 +134,7 @@ describe('Deposits', () => {
     );
   }
 
-  // Opens a row's actions menu and returns the labels of the items it offers.
+  // Opens a row's actions menu and returns the labels of the items it offers, icons left out.
   async function menuItemLabels(row: HTMLElement): Promise<string[]> {
     const trigger = row.querySelector<HTMLButtonElement>('button[aria-label^="Actions for"]');
     if (!trigger) {
@@ -118,9 +147,74 @@ describe('Deposits', () => {
       TestBed.inject(OverlayContainer)
         .getContainerElement()
         .querySelectorAll('[mat-menu-item], .mat-mdc-menu-item'),
-      (item) => (item.textContent ?? '').trim(),
+      menuItemLabel,
     );
   }
+
+  // savings-accounts AC-11. The page is titled "Deposits & savings" and is a tab group: "Term deposits"
+  // holds the term-deposit table (everything below), "Savings accounts" the savings accounts.
+  describe('tabs', () => {
+    function tabs(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
+      );
+    }
+
+    function tabFor(label: RegExp): HTMLElement {
+      const tab = tabs().find((candidate) => label.test(candidate.textContent ?? ''));
+      if (!tab) {
+        throw new Error(`No tab matching ${label}.`);
+      }
+      return tab;
+    }
+
+    it('is titled "Deposits & savings"', async () => {
+      await setup();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('h1')?.textContent).toContain(
+        'Deposits & savings',
+      );
+    });
+
+    it('renders the Term deposits and Savings accounts tabs', async () => {
+      await setup();
+
+      expect(tabs()).toHaveLength(2);
+      expect(tabFor(/term deposits/i)).toBeDefined();
+      expect(tabFor(/savings accounts/i)).toBeDefined();
+    });
+
+    it('opens on Term deposits, which lists the term deposits', async () => {
+      await setup();
+
+      expect(tabFor(/term deposits/i).getAttribute('aria-selected')).toBe('true');
+      expect(tabFor(/savings accounts/i).getAttribute('aria-selected')).toBe('false');
+      expect(rows()).toHaveLength(3);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain(
+        activeSavingsAccount.name,
+      );
+    });
+
+    it('the Savings accounts tab lists the savings accounts', async () => {
+      await setup();
+
+      tabFor(/savings accounts/i).click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      await vi.waitFor(() => {
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain(activeSavingsAccount.name);
+        expect(text).toContain(taxFreeEurSavingsAccount.name);
+      });
+      expect(tabFor(/savings accounts/i).getAttribute('aria-selected')).toBe('true');
+      expect(
+        fetchSpy.mock.calls.some((call: unknown[]) =>
+          requestUrl(call[0]).includes('/api/portfolio/savings-accounts'),
+        ),
+      ).toBe(true);
+    });
+  });
 
   it('lists every deposit with its terms and projection columns', async () => {
     await setup();
@@ -442,6 +536,138 @@ describe('Deposits', () => {
     });
   });
 
+  // asset-archive AC-10. A deposit can be archived on its own: "Show archived" (off by default)
+  // reveals it with an "Archived" chip, the row menu gains Archive / Restore behind a ConfirmDialog,
+  // and an archived row keeps only Restore and Delete.
+  describe('archive', () => {
+    const archiveMessage =
+      'It drops out of net worth from today. Its transactions and history are kept, and you can restore it at any time.';
+
+    const showArchived = () => showArchivedToggle(fixture);
+    const clickMenuItem = (row: HTMLElement, label: RegExp) =>
+      clickRowMenuItem(fixture, row, label);
+
+    function writes(): Request[] {
+      return fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method !== 'GET');
+    }
+
+    it('hides archived deposits until Show archived is on', async () => {
+      await setup([activeDeposit, archivedDueDeposit]);
+
+      expect(rows()).toHaveLength(1);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain(
+        archivedDueDeposit.name,
+      );
+
+      await showArchived();
+
+      expect(rows()).toHaveLength(2);
+      const chip = rowFor(archivedDueDeposit.name).querySelector(
+        'mat-chip, mat-chip-option, .mat-mdc-chip',
+      );
+      expect(rowFor(archivedDueDeposit.name).textContent).toContain('Archived');
+      expect(chip).not.toBeNull();
+      expect(rowFor('Running deposit').textContent).not.toContain('Archived');
+    });
+
+    it('archives a deposit after confirmation', async () => {
+      await setup([activeDeposit, dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = depositListCalls();
+
+      await clickMenuItem(rowFor('Matured deposit'), /\barchive\b/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(
+        ConfirmDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({ message: archiveMessage }),
+        }),
+      );
+      await vi.waitFor(() => expect(writes()).toHaveLength(1));
+      const [request] = writes();
+      expect(request.method).toBe('POST');
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/assets/${dueDeposit.assetId}/archive`,
+      );
+      await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('does not archive when the confirmation is cancelled', async () => {
+      await setup([dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      await clickMenuItem(rowFor('Matured deposit'), /\barchive\b/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      expect(writes()).toHaveLength(0);
+    });
+
+    it('restores an archived deposit', async () => {
+      await setup([archivedDueDeposit]);
+      await showArchived();
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = depositListCalls();
+
+      await clickMenuItem(rowFor(archivedDueDeposit.name), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      await vi.waitFor(() => expect(writes()).toHaveLength(1));
+      const [request] = writes();
+      expect(request.method).toBe('POST');
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${archivedDueDeposit.portfolioId}/assets/${archivedDueDeposit.assetId}/restore`,
+      );
+      await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('does not restore when the confirmation is cancelled', async () => {
+      await setup([archivedDueDeposit]);
+      await showArchived();
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      await clickMenuItem(rowFor(archivedDueDeposit.name), /restore/i);
+
+      expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+      expect(writes()).toHaveLength(0);
+    });
+
+    it('shows only Restore and Delete for an archived deposit', async () => {
+      await setup([archivedDueDeposit, archivedSettledDeposit]);
+      await showArchived();
+
+      for (const deposit of [archivedDueDeposit, archivedSettledDeposit]) {
+        const row = rowFor(deposit.name);
+        const labels = await menuItemLabels(row);
+
+        expect(labels.some((label) => /restore/i.test(label))).toBe(true);
+        expect(labels.some((label) => /delete/i.test(label))).toBe(true);
+        expect(labels.some((label) => /edit/i.test(label))).toBe(false);
+        expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(false);
+        // Not one of the row's own action buttons: no settle, no transfer to cash.
+        expect(settleButton(row)).toBeUndefined();
+        expect(
+          Array.from(row.querySelectorAll<HTMLButtonElement>('button')).some(
+            (button) =>
+              /transfer to cash/i.test(button.getAttribute('mattooltip') ?? '') ||
+              /transfer to cash/i.test(button.getAttribute('aria-label') ?? ''),
+          ),
+        ).toBe(false);
+        TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+      }
+    });
+
+    it('offers Archive, not Restore, for an active deposit', async () => {
+      await setup([dueDeposit]);
+
+      const labels = await menuItemLabels(rowFor('Matured deposit'));
+
+      expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(true);
+      expect(labels.some((label) => /restore/i.test(label))).toBe(false);
+    });
+  });
+
   it('shows an empty state with an Add button when there are no deposits', async () => {
     await setup([]);
 
@@ -451,5 +677,199 @@ describe('Deposits', () => {
       (button) => button.textContent ?? '',
     );
     expect(buttons.some((text) => /add/i.test(text))).toBe(true);
+  });
+
+  // i18n screens (#132) AC-6: headings, table headers, the row actions' tooltips and accessible
+  // names, the row menu, empty state, delete confirmation and failure snackbar fallback follow the
+  // language.
+  describe('in Polish', () => {
+    // Words spelled the same in Polish.
+    const cognates = ['Bank', 'Start', 'Status'];
+
+    // What a row's icon buttons offer: their tooltip (when they have one) and accessible name.
+    function actionTooltips(): string[] {
+      return fixture.debugElement
+        .queryAll(By.css('td.mat-column-actions button'))
+        .map((button) => button.injector.get(MatTooltip, null)?.message ?? '')
+        .filter((message) => message !== '');
+    }
+
+    async function menuItems(): Promise<string[]> {
+      const trigger = fixture.debugElement
+        .query(By.directive(MatMenuTrigger))
+        .injector.get(MatMenuTrigger);
+      trigger.openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const items = labelsOf(
+        TestBed.inject(OverlayContainer).getContainerElement(),
+        '.mat-mdc-menu-item',
+      );
+      trigger.closeMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return items;
+    }
+
+    it('renders in Polish', async () => {
+      await setup([dueDeposit, settledDeposit, archivedPortfolioDeposit]);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = async () => [
+        ...labelsOf(element, 'h1'),
+        ...labelsOf(element, '.deposits-page__header > button'),
+        ...labelsOf(element, 'th:not(:empty)'),
+        ...actionTooltips(),
+        ...(await menuItems()),
+      ];
+
+      const english = await texts();
+      expect(english).toEqual([
+        'Deposits & savings',
+        'Add deposit',
+        'Name',
+        'Bank',
+        'Portfolio',
+        'Principal',
+        'Rate',
+        'Start',
+        'Maturity',
+        'Net profit',
+        'Final amount',
+        'Status',
+        'Settle maturity',
+        'Roll over',
+        'Transfer to cash',
+        'Roll over',
+        'Edit',
+        'Archive',
+        'Delete',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, await texts(), cognates)).toEqual([]);
+    });
+
+    it("renders the rows' accessible names in Polish", async () => {
+      await setup([dueDeposit, settledDeposit]);
+      const element = fixture.nativeElement as HTMLElement;
+      const labels = () => attributesOf(element, 'td.mat-column-actions button', 'aria-label');
+
+      const english = labels();
+      expect(english).toEqual([
+        'Settle maturity of Matured deposit',
+        'Roll over',
+        'Actions for this deposit',
+        'Transfer to cash',
+        'Roll over',
+        'Actions for this deposit',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, labels())).toEqual([]);
+      expect(labels()[0]).toContain('Matured deposit');
+    });
+
+    it('renders the archived-portfolio marker in Polish', async () => {
+      await setup([archivedPortfolioDeposit]);
+      const element = fixture.nativeElement as HTMLElement;
+      const marker = () => textOf(element.querySelector('.deposits-page__muted'));
+
+      expect(marker()).toBe('(archived)');
+
+      await switchLanguage(fixture, 'pl');
+
+      // The parentheses may sit in the template or in the translation.
+      const text = marker();
+      expect(text).not.toBe('(archived)');
+      expect(
+        matchesTranslation('pl', text) || matchesTranslation('pl', text.replace(/^\(|\)$/g, '')),
+        `"${text}" is not a pl.json value`,
+      ).toBe(true);
+    });
+
+    it('renders the empty state in Polish', async () => {
+      await setup([]);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, '.deposits-page__state p'),
+        ...labelsOf(element, '.deposits-page__state button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual(["You don't have any term deposits yet.", 'Add your first deposit']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('renders the load-failure retry button in Polish', async () => {
+      await setup([]);
+      fetchSpy.mockImplementation(async () =>
+        jsonResponse({ detail: 'Service unavailable.' }, 503),
+      );
+      component['depositsResource'].reload();
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const retry = () => labelsOf(element, '.deposits-page__state button');
+
+      expect(retry()).toEqual(['Retry']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(['Retry'], retry())).toEqual([]);
+      // The backend's own message stays as it arrived.
+      expect(textOf(element.querySelector('.deposits-page__state p'))).toBe('Service unavailable.');
+    });
+
+    it('asks to delete in Polish, with the deposit name in the message', async () => {
+      await setup([dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const confirmation = () =>
+        (
+          dialog.open.mock.calls[0][1] as {
+            data: { title: string; message: string; confirmLabel: string };
+          }
+        ).data;
+      await component['remove'](dueDeposit);
+      const english = confirmation();
+      dialog.open.mockClear();
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](dueDeposit);
+      const polish = confirmation();
+
+      expect(english.title).toBe('Delete this deposit?');
+      expect(
+        polishProblems([english.title, english.confirmLabel], [polish.title, polish.confirmLabel]),
+      ).toEqual([]);
+      expect(polish.message).toContain('"Matured deposit"');
+      expect(polish.message).not.toContain('permanently deleted');
+      expect(
+        matchesTranslation('pl', polish.message),
+        `"${polish.message}" is not a pl.json value`,
+      ).toBe(true);
+    });
+
+    it('shows the failure snackbar fallback in Polish', async () => {
+      await setup([dueDeposit]);
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      fetchSpy.mockImplementation(async (input: unknown) =>
+        (input as Request).method === 'DELETE'
+          ? jsonResponse({ title: 'Boom' }, 500)
+          : jsonResponse([dueDeposit]),
+      );
+
+      await switchLanguage(fixture, 'pl');
+      await component['remove'](dueDeposit);
+
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      const [message, action] = snackBar.open.mock.calls[0] as [string, string];
+      expect(polishProblems(['Failed to delete deposit.', 'Dismiss'], [message, action])).toEqual(
+        [],
+      );
+    });
   });
 });

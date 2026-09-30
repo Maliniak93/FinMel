@@ -354,6 +354,24 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(800m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
     }
 
+    /// <summary>asset-archive AC-4: recording on an archived asset is a 409 <c>Conflict.AssetArchived</c>; quantity and history stay.</summary>
+    [Fact]
+    public async Task Record_ArchivedAsset_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m);
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+        var request = new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = 50m, UnitPrice = 1m, Date = new DateOnly(2026, 2, 1) };
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, cashId), request, cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        Assert.Equal(100m, (await client.GetAssetAsync(portfolioId, cashId, cancellationToken)).Quantity);
+        Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).TotalCount);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC7: recording a transaction on an asset of an
     /// archived portfolio is a 409 <c>Conflict.PortfolioArchived</c> and the quantity is unchanged.</summary>
     [Fact]
@@ -390,5 +408,59 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         await response.AssertDepositTransactionsManagedAsync(cancellationToken);
         Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
         Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).TotalCount);
+    }
+
+    /// <summary>
+    /// savings-accounts AC-7: a savings account's transactions are ordinary but limited to
+    /// Deposit/Withdraw — those two answer 201 and move the balance, every other type is a 400
+    /// <c>Validation.TransactionTypeNotAllowed</c> and nothing changes.
+    /// </summary>
+    [Theory]
+    [InlineData(TransactionType.Deposit, true)]
+    [InlineData(TransactionType.Withdraw, true)]
+    [InlineData(TransactionType.Buy, false)]
+    [InlineData(TransactionType.Sell, false)]
+    [InlineData(TransactionType.Dividend, false)]
+    [InlineData(TransactionType.Interest, false)]
+    public async Task Record_OnSavingsAccount_AcceptsDepositAndWithdrawOnly(TransactionType type, bool accepted)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var request = new RecordTransactionRequest { Type = type, Quantity = 100m, UnitPrice = 1m, Date = SavingsToday };
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, account.AssetId), request, cancellationToken);
+
+        var asset = await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken);
+        if (accepted)
+        {
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            Assert.Equal(type == TransactionType.Deposit ? 10_100m : 9_900m, asset.Quantity);
+            Assert.Equal(2, asset.TransactionCount);
+            Assert.Equal(asset.Quantity, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+        }
+        else
+        {
+            await response.AssertTransactionTypeNotAllowedAsync(cancellationToken);
+            Assert.Equal(10_000m, asset.Quantity);
+            Assert.Equal(1, asset.TransactionCount);
+        }
+    }
+
+    /// <summary>savings-accounts AC-7: a Withdraw beyond the balance is the existing oversell 400, and the balance stays.</summary>
+    [Fact]
+    public async Task Record_OnSavingsAccount_WithdrawBeyondBalance_ReturnsOversell()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var request = new RecordTransactionRequest { Type = TransactionType.Withdraw, Quantity = 10_000.01m, UnitPrice = 1m, Date = SavingsToday };
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, account.AssetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, "Validation.OversellsPosition", cancellationToken);
+        Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
     }
 }

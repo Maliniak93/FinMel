@@ -1,7 +1,27 @@
 {
   "common": {
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "retry": "Retry",
+    "dismiss": "Dismiss",
+    "save": "Save",
+    "create": "Create",
+    "edit": "Edit",
+    "delete": "Delete",
+    "restore": "Restore",
+    "archive": "Archive",
+    "archived": "Archived",
+    "name": "Name",
+    "currency": "Currency",
+    "status": "Status",
+    "description": "Description",
+    "stale": "Stale",
+    "actionsFor": "Actions for {{ name }}",
+    "type": "Type",
+    "unitPrice": "Unit price",
+    "date": "Date",
+    "amount": "Amount",
+    "dateRequired": "Date is required."
   },
   "errors": {
     "generic": "Something went wrong. Please try again."
@@ -13,7 +33,7 @@
     "nav": {
       "dashboard": "Dashboard",
       "portfolios": "Portfolios",
-      "deposits": "Deposits",
+      "deposits": "Deposits & savings",
       "settings": "Settings"
     },
     "toggleNavigation": "Toggle navigation",
@@ -82,6 +102,7 @@
       "preciousMetal": "Precious metal",
       "realEstate": "Real estate",
       "other": "Other",
+      "savings": "Savings account",
       "unknown": "Unknown"
     },
     "transactionType": {
@@ -132,6 +153,284 @@
       "pln": "PLN — Polish złoty",
       "eur": "EUR — Euro",
       "usd": "USD — US dollar"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "empty": "You haven't entered any wealth yet.",
+    "goToPortfolios": "Go to portfolios",
+    "stale": "Stale",
+    "staleTooltip": "At least one portfolio's valuation hasn't refreshed in a while — this total may be out of date.",
+    "asOf": "As of {{ date }}",
+    "netWorthHistory": "Net worth history",
+    "loadFailed": "Failed to load dashboard."
+  },
+  "netWorthChart": {
+    "rangeLabel": "Chart range",
+    "chartLabel": "Net worth history chart",
+    "notEnoughHistory": "Not enough history to chart yet.",
+    "asOf": "As of {{ date }}",
+    "loadFailed": "Failed to load net-worth history."
+  },
+  "portfolios": {
+    "title": "Portfolios",
+    "showArchived": "Show archived",
+    "newPortfolio": "New portfolio",
+    "empty": "You don't have any portfolios yet.",
+    "createFirst": "Create your first portfolio",
+    "totalValue": "Total value",
+    "noValuationYet": "No valuation yet",
+    "actionsFor": "Actions for {{ name }}",
+    "loadFailed": "Failed to load portfolios.",
+    "valuesLoadFailed": "Failed to load portfolio values.",
+    "archive": {
+      "title": "Archive this portfolio?",
+      "message": "\"{{ name }}\" will be hidden from your default list — nothing is deleted, and you can still see it by toggling \"Show archived\".",
+      "failed": "Failed to archive portfolio."
+    },
+    "restore": {
+      "title": "Restore this portfolio?",
+      "message": "\"{{ name }}\" will return to your default list.",
+      "failed": "Failed to restore portfolio."
+    },
+    "delete": {
+      "title": "Delete this portfolio?",
+      "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
+      "messageWithAssets": "\"{{ name }}\" and its {{ count }} asset(s), with all their transactions, will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete portfolio."
+    },
+    "form": {
+      "editTitle": "Edit portfolio",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name is too long.",
+      "descriptionTooLong": "Description is too long.",
+      "currencyRequired": "Currency is required.",
+      "legacyCurrency": "{{ currency }} — outside the supported set, kept until you choose one below",
+      "legacyCurrencyHint": "This portfolio's currency isn't PLN, EUR or USD. Saving without changing it will be rejected — pick a supported currency to update it.",
+      "duplicateName": "A portfolio with this name already exists."
+    }
+  },
+  "assets": {
+    "title": "Assets",
+    "titleWithName": "Assets — {{ name }}",
+    "newAsset": "New asset",
+    "archivedNotice": "This portfolio is archived — restore it to make changes.",
+    "empty": "This portfolio doesn't have any assets yet.",
+    "addFirst": "Add your first asset",
+    "class": "Class",
+    "quantity": "Quantity",
+    "value": "Value",
+    "valuedOn": "Valued on",
+    "maturedOn": "Matured on {{ date }}",
+    "due": "Due",
+    "noPriceYet": "No price yet",
+    "priceStaleTooltip": "This instrument's price is more than 7 days old.",
+    "valuationStaleTooltip": "This valuation is more than 6 months old — consider refreshing it.",
+    "staleRefresh": "Stale — refresh me",
+    "portfolioLoadFailed": "Failed to load portfolio.",
+    "loadFailed": "Failed to load assets.",
+    "depositLoadFailed": "Failed to load the deposit.",
+    "savingsAccountLoadFailed": "Failed to load the savings account.",
+    "delete": {
+      "title": "Delete this asset?",
+      "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
+      "messageWithTransactions": "\"{{ name }}\" and its {{ count }} transaction(s) will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete asset."
+    },
+    "form": {
+      "backToTypes": "Back to asset types",
+      "editTitle": "Edit asset",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name is too long.",
+      "currencyRequired": "Currency is required.",
+      "addOpeningDeposit": "Add opening deposit",
+      "addFirstTransaction": "Add first transaction",
+      "mustNotBeNegative": "{{ field }} must not be negative.",
+      "dateRequired": "Date is required.",
+      "valueRequired": "Value is required.",
+      "valuationDateRequired": "Valuation date is required.",
+      "cashHint": "Valued automatically from {{ currency }}'s exchange rate — nothing else to fill in. Use \"Add opening deposit\" below to deposit an opening amount.",
+      "goldHint": "Precious metal has no custom-ticker lookup — the seeded gold instrument is already in the dictionary above.",
+      "instrument": "Instrument",
+      "searchPlaceholder": "Search by ticker or name",
+      "verified": "Verified: {{ ticker }} — {{ name }} ({{ currency }})",
+      "pickHint": "Pick an existing instrument above, or verify a new ticker below — creation is blocked until one is selected.",
+      "cantFindIt": "Can't find it? Verify a new ticker",
+      "tickerLabel": "Ticker / id",
+      "quoteCurrency": "Quote currency",
+      "quoteCurrencyHint": "3-letter code, e.g. USD",
+      "addAnyway": "Add anyway",
+      "tryAnother": "Try searching for it above instead.",
+      "verifyAndAdd": "Verify and add",
+      "instrumentRequired": "Verify a ticker, or pick one from search, before creating this asset.",
+      "addInstrumentFailed": "Failed to add instrument."
+    }
+  },
+  "transactions": {
+    "title": "Transactions",
+    "titleWithName": "Transactions — {{ name }}",
+    "newTransaction": "New transaction",
+    "termDepositNotice": "A term deposit's transactions are managed by the deposit — edit the deposit to change them.",
+    "empty": "No transactions recorded for this asset yet.",
+    "recordFirst": "Record your first transaction",
+    "valuePln": "Value (PLN)",
+    "actionsFor": "Actions for {{ type }} on {{ date }}",
+    "assetLoadFailed": "Failed to load asset.",
+    "portfolioLoadFailed": "Failed to load portfolio.",
+    "loadFailed": "Failed to load transactions.",
+    "delete": {
+      "title": "Delete this transaction?",
+      "message": "This {{ type }} of {{ quantity }} will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete transaction."
+    },
+    "form": {
+      "editTitle": "Edit transaction",
+      "record": "Record",
+      "mustNotBeNegative": "{{ field }} must not be negative.",
+      "dateRequired": "Date is required."
+    },
+    "assetArchivedNotice": "This asset is archived — restore it to make changes."
+  },
+  "deposits": {
+    "title": "Deposits & savings",
+    "tabs": {
+      "termDeposits": "Term deposits",
+      "savingsAccounts": "Savings accounts"
+    },
+    "add": "Add deposit",
+    "empty": "You don't have any term deposits yet.",
+    "addFirst": "Add your first deposit",
+    "bank": "Bank",
+    "portfolio": "Portfolio",
+    "principal": "Principal",
+    "rate": "Rate",
+    "start": "Start",
+    "maturity": "Maturity",
+    "netProfit": "Net profit",
+    "finalAmount": "Final amount",
+    "archivedMarker": "(archived)",
+    "settleMaturity": "Settle maturity",
+    "settleMaturityOf": "Settle maturity of {{ name }}",
+    "transferToCash": "Transfer to cash",
+    "rollOver": "Roll over",
+    "actionsForThis": "Actions for this deposit",
+    "loadFailed": "Failed to load deposits.",
+    "delete": {
+      "title": "Delete this deposit?",
+      "message": "\"{{ name }}\" and its terms will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete deposit."
+    },
+    "fields": {
+      "term": "Term",
+      "maturesOn": "Matures on",
+      "capitalisation": "Capitalisation",
+      "grossInterest": "Gross interest",
+      "tax": "Tax",
+      "moveTo": "Move to"
+    },
+    "errors": {
+      "grossInterestRequired": "Gross interest is required.",
+      "grossInterestNegative": "Gross interest can't be negative.",
+      "taxRequired": "Tax is required.",
+      "taxNegative": "Tax can't be negative.",
+      "taxOverGross": "Tax can't exceed the gross interest.",
+      "interestRateRequired": "Interest rate is required.",
+      "interestRateRange": "Interest rate must be between 0 and 100.",
+      "cashAccountsLoadFailed": "Failed to load the Cash accounts.",
+      "previewLoadFailed": "Failed to load the settlement preview."
+    },
+    "form": {
+      "newTitle": "New deposit",
+      "editTitle": "Edit deposit",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name is too long.",
+      "bankNameTooLong": "Bank name is too long.",
+      "portfolioRequired": "Portfolio is required.",
+      "currencyRequired": "Currency is required.",
+      "sourceOfFunds": "Source of funds",
+      "newMoney": "New money (from outside)",
+      "principalRequired": "Principal is required.",
+      "principalPositive": "Principal must be greater than 0.",
+      "exceedsBalance": "Principal is above the source's balance ({{ balance }}).",
+      "startDate": "Start date",
+      "startDateRequired": "Start date is required.",
+      "termRequired": "Term is required.",
+      "termMin": "Term must be at least 1.",
+      "termMax": "Term is at most {{ max }}.",
+      "unit": "Unit",
+      "annualInterestRate": "Annual interest rate (%)",
+      "taxExempt": "IKE/IKZE — no Belka tax",
+      "earlyBreakLoss": "Interest lost on early break (%)",
+      "earlyBreakRequired": "Early-break loss is required.",
+      "earlyBreakRange": "Early-break loss must be between 0 and 100.",
+      "portfoliosLoadFailed": "Failed to load portfolios.",
+      "fundingLoadFailed": "Failed to load the sources of funds.",
+      "insufficientFunds": "The source of funds cannot cover this principal."
+    },
+    "payOut": {
+      "noCashAccount": "You have no Cash account in {{ currency }} to move the money to.",
+      "destinationRequired": "Pick where the money goes.",
+      "dateBeforeSettlement": "Date can't be before the settlement date.",
+      "dateInFuture": "Date can't be in the future.",
+      "submit": "Transfer"
+    },
+    "settle": {
+      "title": "Settle deposit",
+      "settlementDate": "Settlement date",
+      "settlementDateRequired": "Settlement date is required.",
+      "beforeStart": "Settlement date can't be before the start date.",
+      "inFuture": "Settlement date can't be in the future.",
+      "keepInDeposit": "Keep in the deposit",
+      "movesOut": "{{ amount }} moves out of the deposit.",
+      "netInterest": "Net interest",
+      "submit": "Settle"
+    },
+    "rollOverDialog": {
+      "newStartDate": "New start date",
+      "newPrincipal": "New principal",
+      "interestRate": "Interest rate (%)",
+      "term": {
+        "day": "{{ count }} day",
+        "days": "{{ count }} days",
+        "month": "{{ count }} month",
+        "months": "{{ count }} months"
+      }
+    }
+  },
+  "savings": {
+    "add": "Add savings account",
+    "empty": "You don't have any savings accounts yet.",
+    "addFirst": "Add your first savings account",
+    "balance": "Balance",
+    "taxFree": "Tax-free",
+    "loadFailed": "Failed to load savings accounts.",
+    "delete": {
+      "title": "Delete this savings account?",
+      "message": "\"{{ name }}\", its terms and its transactions will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete the savings account."
+    },
+    "form": {
+      "newTitle": "New savings account",
+      "editTitle": "Edit savings account",
+      "openingAmount": "Opening deposit (optional)",
+      "openingAmountPositive": "The opening deposit must be greater than 0.",
+      "openingDate": "Opening deposit date",
+      "openingDateRequired": "Date is required.",
+      "openingDateInFuture": "Date can't be in the future."
+    }
+  },
+  "assetArchive": {
+    "showArchived": "Show archived",
+    "allArchived": "Everything here is archived — turn on \"Show archived\" to see it.",
+    "archive": {
+      "title": "Archive \"{{ name }}\"?",
+      "message": "It drops out of net worth from today. Its transactions and history are kept, and you can restore it at any time.",
+      "failed": "Failed to archive."
+    },
+    "restore": {
+      "title": "Restore \"{{ name }}\"?",
+      "message": "It counts toward net worth again from today.",
+      "failed": "Failed to restore."
     }
   }
 }

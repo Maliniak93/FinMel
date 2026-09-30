@@ -3,20 +3,27 @@
     <div>
       <a routerLink="/portfolios" class="assets-page__back">
         <mat-icon>arrow_back</mat-icon>
-        Portfolios
+        {{ 'portfolios.title' | transloco }}
       </a>
       <h1>
         @if (portfolioResource.hasValue()) {
-          Assets — {{ portfolioResource.value().name }}
+          {{ 'assets.titleWithName' | transloco: { name: portfolioResource.value().name } }}
         } @else {
-          Assets
+          {{ 'assets.title' | transloco }}
         }
       </h1>
     </div>
+    <mat-slide-toggle
+      class="assets-page__show-archived"
+      [checked]="showArchived()"
+      (change)="showArchived.set($event.checked)"
+    >
+      {{ 'assetArchive.showArchived' | transloco }}
+    </mat-slide-toggle>
     @if (!isArchived()) {
       <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
-        New asset
+        {{ 'assets.newAsset' | transloco }}
       </button>
     }
   </div>
@@ -24,19 +31,23 @@
   @if (isArchived()) {
     <p class="assets-page__archived-notice" role="status">
       <mat-icon>inventory_2</mat-icon>
-      This portfolio is archived — restore it to make changes.
+      {{ 'assets.archivedNotice' | transloco }}
     </p>
   }
 
   @if (portfolioResource.error(); as portfolioError) {
     <div class="assets-page__state" role="alert">
       <p>{{ portfolioError.message }}</p>
-      <button mat-button type="button" (click)="portfolioResource.reload()">Retry</button>
+      <button mat-button type="button" (click)="portfolioResource.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
     </div>
   } @else if (assetsResource.error(); as loadError) {
     <div class="assets-page__state" role="alert">
       <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="assetsResource.reload()">Retry</button>
+      <button mat-button type="button" (click)="assetsResource.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
     </div>
   } @else if (assetsResource.isLoading() && !assetsResource.hasValue()) {
     <div class="assets-page__state">
@@ -44,33 +55,40 @@
     </div>
   } @else if (assetsResource.hasValue() && assetsResource.value().length === 0) {
     <div class="assets-page__state">
-      <p>This portfolio doesn't have any assets yet.</p>
+      <p>{{ 'assets.empty' | transloco }}</p>
       @if (!isArchived()) {
         <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-          Add your first asset
+          {{ 'assets.addFirst' | transloco }}
         </button>
       }
     </div>
   } @else if (assetsResource.hasValue()) {
-    <table mat-table [dataSource]="assetsResource.value()" class="assets-page__table">
+    <table mat-table [dataSource]="visibleAssets()" class="assets-page__table">
       <ng-container matColumnDef="assetClass">
-        <th mat-header-cell *matHeaderCellDef>Class</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'assets.class' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">
           {{ assetClassLabel(asset.assetClass) | transloco }}
         </td>
       </ng-container>
 
       <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">
           <a [routerLink]="[asset.id, 'transactions']">{{ asset.name }}</a>
+          @if (asset.isArchived) {
+            <mat-chip-set class="assets-page__due">
+              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
+            </mat-chip-set>
+          }
           @if (isDepositDue(asset)) {
             <mat-chip-set class="assets-page__due">
               <mat-chip
                 class="assets-page__chip--due"
-                [matTooltip]="'Matured on ' + formatDate(asset.depositMaturityDate)"
+                [matTooltip]="
+                  'assets.maturedOn' | transloco: { date: formatDate(asset.depositMaturityDate) }
+                "
               >
-                Due
+                {{ 'assets.due' | transloco }}
               </mat-chip>
             </mat-chip-set>
           }
@@ -78,24 +96,24 @@
       </ng-container>
 
       <ng-container matColumnDef="quantity">
-        <th mat-header-cell *matHeaderCellDef>Quantity</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'assets.quantity' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">{{ formatQuantity(asset.quantity) }}</td>
       </ng-container>
 
       <ng-container matColumnDef="currency">
-        <th mat-header-cell *matHeaderCellDef>Currency</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.currency' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">{{ asset.currency }}</td>
       </ng-container>
 
       <ng-container matColumnDef="value">
-        <th mat-header-cell *matHeaderCellDef>Value</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'assets.value' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">
           @if (asset.valuationMode === VALUATION_MODE.Market) {
             @if (instrumentFor(asset); as instrument) {
               @if (instrument.lastPrice !== null) {
                 {{ formatMoney(marketValue(asset, instrument), instrument.quoteCurrency) }}
               } @else {
-                No price yet
+                {{ 'assets.noPriceYet' | transloco }}
               }
             } @else {
               <mat-spinner diameter="16" />
@@ -109,19 +127,19 @@
       </ng-container>
 
       <ng-container matColumnDef="manualValueDate">
-        <th mat-header-cell *matHeaderCellDef>Valued on</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'assets.valuedOn' | transloco }}</th>
         <td mat-cell *matCellDef="let asset">
           @if (asset.valuationMode === VALUATION_MODE.Market) {
             @if (instrumentFor(asset); as instrument) {
               @if (instrument.lastPriceDate) {
                 {{ formatDate(instrument.lastPriceDate) }}
               } @else {
-                No price yet
+                {{ 'assets.noPriceYet' | transloco }}
               }
               @if (isPriceStale(instrument.lastPriceDate)) {
                 <mat-chip-set>
-                  <mat-chip matTooltip="This instrument's price is more than 7 days old.">
-                    Stale
+                  <mat-chip [matTooltip]="'assets.priceStaleTooltip' | transloco">
+                    {{ 'common.stale' | transloco }}
                   </mat-chip>
                 </mat-chip-set>
               }
@@ -132,10 +150,8 @@
             {{ formatDate(asset.manualValueDate) }}
             @if (isStale(asset.manualValueDate)) {
               <mat-chip-set>
-                <mat-chip
-                  matTooltip="This valuation is more than 6 months old — consider refreshing it."
-                >
-                  Stale — refresh me
+                <mat-chip [matTooltip]="'assets.valuationStaleTooltip' | transloco">
+                  {{ 'assets.staleRefresh' | transloco }}
                 </mat-chip>
               </mat-chip-set>
             }
@@ -150,18 +166,30 @@
             mat-icon-button
             type="button"
             [matMenuTriggerFor]="menu"
-            [attr.aria-label]="'Actions for ' + asset.name"
+            [attr.aria-label]="'common.actionsFor' | transloco: { name: asset.name }"
           >
             <mat-icon>more_vert</mat-icon>
           </button>
+          <!-- asset-archive: an archived asset is read-only — Restore and Delete only. -->
           <mat-menu #menu="matMenu">
-            <button mat-menu-item type="button" (click)="openEditDialog(asset)">
-              <mat-icon>edit</mat-icon>
-              <span>Edit</span>
-            </button>
+            @if (asset.isArchived) {
+              <button mat-menu-item type="button" (click)="setArchived(asset, false)">
+                <mat-icon>unarchive</mat-icon>
+                <span>{{ 'common.restore' | transloco }}</span>
+              </button>
+            } @else {
+              <button mat-menu-item type="button" (click)="openEditDialog(asset)">
+                <mat-icon>edit</mat-icon>
+                <span>{{ 'common.edit' | transloco }}</span>
+              </button>
+              <button mat-menu-item type="button" (click)="setArchived(asset, true)">
+                <mat-icon>archive</mat-icon>
+                <span>{{ 'common.archive' | transloco }}</span>
+              </button>
+            }
             <button mat-menu-item type="button" (click)="remove(asset)">
               <mat-icon>delete</mat-icon>
-              <span>Delete</span>
+              <span>{{ 'common.delete' | transloco }}</span>
             </button>
           </mat-menu>
         </td>
@@ -169,6 +197,11 @@
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
+      <tr *matNoDataRow>
+        <td class="assets-page__no-data" [attr.colspan]="displayedColumns().length">
+          {{ 'assetArchive.allArchived' | transloco }}
+        </td>
+      </tr>
     </table>
   }
 </div>

@@ -399,7 +399,7 @@ function prepare([number, ...rest]) {
 
 // The run report the build-feature workflow sends: {status: "shipped"|"blocked", stage?, reason?,
 // branch?, tests?: string[], rounds?, reviewRan?, minor?: [{file,line,claim}],
-// failures?: [{step,summary,file}], blocking?: [{file,line,claim}]}.
+// failures?: [{step,summary,file}], blocking?: [{file,line,claim}], deviations?: [{kind,file,what,why}]}.
 function report([number, ...rest]) {
   if (!number) throw new Error("usage: report <issue number> [--json '<report>']   (else JSON on stdin)");
   const flags = parseFlags(rest);
@@ -424,6 +424,11 @@ function report([number, ...rest]) {
         ? "Verified and reviewed, but not shipped: finish the commit, push and PR by hand — a re-run of `/build` would repeat the whole pipeline."
         : `Fix the spec or the named problem, then re-run \`/build #${number}\` — the work stays on its branch.`,
     );
+  }
+
+  if (run.deviations?.length) {
+    lines.push("", "**Deviations** from the spec or the tests, made by the implementer:");
+    for (const d of run.deviations) lines.push(`- ${d.kind}${d.file ? ` \`${d.file}\`` : ""} — ${d.what} (why: ${d.why})`);
   }
 
   gh(["issue", "comment", String(number), "--repo", REPO, "--body-file", "-"], lines.join("\n"));

@@ -1,24 +1,26 @@
-<h2 mat-dialog-title>{{ isEdit ? 'Edit deposit' : 'New deposit' }}</h2>
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'deposits.form.editTitle' : 'deposits.form.newTitle') | transloco }}
+</h2>
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-      <mat-label>Name</mat-label>
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
       <input matInput type="text" formControlName="name" autocomplete="off" />
       @if (form.controls.name.hasError('required')) {
-        <mat-error>Name is required.</mat-error>
+        <mat-error>{{ 'deposits.form.nameRequired' | transloco }}</mat-error>
       } @else if (form.controls.name.hasError('maxlength')) {
-        <mat-error>Name is too long.</mat-error>
+        <mat-error>{{ 'deposits.form.nameTooLong' | transloco }}</mat-error>
       } @else if (form.controls.name.hasError('server')) {
         <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
       }
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-      <mat-label>Bank</mat-label>
+      <mat-label>{{ 'deposits.bank' | transloco }}</mat-label>
       <input matInput type="text" formControlName="bankName" autocomplete="off" />
       @if (form.controls.bankName.hasError('maxlength')) {
-        <mat-error>Bank name is too long.</mat-error>
+        <mat-error>{{ 'deposits.form.bankNameTooLong' | transloco }}</mat-error>
       } @else if (form.controls.bankName.hasError('server')) {
         <mat-error>{{ form.controls.bankName.getError('server') }}</mat-error>
       }
@@ -26,7 +28,7 @@
 
     @if (choosesPortfolio) {
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>Portfolio</mat-label>
+        <mat-label>{{ 'deposits.portfolio' | transloco }}</mat-label>
         <mat-select formControlName="portfolioId">
           @if (portfoliosResource.hasValue()) {
             @for (portfolio of portfoliosResource.value(); track portfolio.id) {
@@ -38,30 +40,30 @@
           <mat-hint>{{ loadError.message }}</mat-hint>
         }
         @if (form.controls.portfolioId.hasError('required')) {
-          <mat-error>Portfolio is required.</mat-error>
+          <mat-error>{{ 'deposits.form.portfolioRequired' | transloco }}</mat-error>
         }
       </mat-form-field>
     }
 
     @if (!isEdit) {
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>Currency</mat-label>
+        <mat-label>{{ 'common.currency' | transloco }}</mat-label>
         <mat-select formControlName="currency">
           @for (currency of currencies; track currency.code) {
             <mat-option [value]="currency.code">{{ currency.label | transloco }}</mat-option>
           }
         </mat-select>
         @if (form.controls.currency.hasError('required')) {
-          <mat-error>Currency is required.</mat-error>
+          <mat-error>{{ 'deposits.form.currencyRequired' | transloco }}</mat-error>
         } @else if (form.controls.currency.hasError('server')) {
           <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
         }
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>Source of funds</mat-label>
+        <mat-label>{{ 'deposits.form.sourceOfFunds' | transloco }}</mat-label>
         <mat-select formControlName="fundingAssetId" canSelectNullableOptions>
-          <mat-option [value]="null">New money (from outside)</mat-option>
+          <mat-option [value]="null">{{ 'deposits.form.newMoney' | transloco }}</mat-option>
           @if (fundingCandidatesResource.hasValue()) {
             @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
               <mat-option [value]="candidate.assetId">
@@ -78,39 +80,41 @@
       </mat-form-field>
     } @else if (data.deposit; as deposit) {
       <p class="deposit-form-dialog__funding">
-        Source of funds
-        <strong>{{ deposit.fundingAssetName ?? 'New money (from outside)' }}</strong>
+        {{ 'deposits.form.sourceOfFunds' | transloco }}
+        <strong>{{ deposit.fundingAssetName ?? ('deposits.form.newMoney' | transloco) }}</strong>
       </p>
     }
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-      <mat-label>Principal</mat-label>
+      <mat-label>{{ 'deposits.principal' | transloco }}</mat-label>
       <input matInput type="number" step="0.01" formControlName="principal" />
       @if (form.controls.principal.hasError('required')) {
-        <mat-error>Principal is required.</mat-error>
+        <mat-error>{{ 'deposits.form.principalRequired' | transloco }}</mat-error>
       } @else if (form.controls.principal.hasError('min')) {
-        <mat-error>Principal must be greater than 0.</mat-error>
+        <mat-error>{{ 'deposits.form.principalPositive' | transloco }}</mat-error>
       } @else if (form.controls.principal.hasError('exceedsBalance')) {
-        <mat-error>
-          Principal is above the source's balance ({{
-            formatMoney(
-              form.controls.principal.getError('exceedsBalance').balance,
-              form.controls.currency.value
-            )
-          }}).
-        </mat-error>
+        <mat-error>{{
+          'deposits.form.exceedsBalance'
+            | transloco
+              : {
+                  balance: formatMoney(
+                    form.controls.principal.getError('exceedsBalance').balance,
+                    form.controls.currency.value
+                  ),
+                }
+        }}</mat-error>
       } @else if (form.controls.principal.hasError('server')) {
         <mat-error>{{ form.controls.principal.getError('server') }}</mat-error>
       }
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-      <mat-label>Start date</mat-label>
+      <mat-label>{{ 'deposits.form.startDate' | transloco }}</mat-label>
       <input matInput [matDatepicker]="startDatePicker" formControlName="startDate" />
       <mat-datepicker-toggle matIconSuffix [for]="startDatePicker"></mat-datepicker-toggle>
       <mat-datepicker #startDatePicker></mat-datepicker>
       @if (form.controls.startDate.hasError('required')) {
-        <mat-error>Start date is required.</mat-error>
+        <mat-error>{{ 'deposits.form.startDateRequired' | transloco }}</mat-error>
       } @else if (form.controls.startDate.hasError('server')) {
         <mat-error>{{ form.controls.startDate.getError('server') }}</mat-error>
       }
@@ -118,23 +122,24 @@
 
     <div class="deposit-form-dialog__row">
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>Term</mat-label>
+        <mat-label>{{ 'deposits.fields.term' | transloco }}</mat-label>
         <input matInput type="number" step="1" formControlName="termLength" />
         @if (form.controls.termLength.hasError('required')) {
-          <mat-error>Term is required.</mat-error>
+          <mat-error>{{ 'deposits.form.termRequired' | transloco }}</mat-error>
         } @else if (form.controls.termLength.hasError('min')) {
-          <mat-error>Term must be at least 1.</mat-error>
+          <mat-error>{{ 'deposits.form.termMin' | transloco }}</mat-error>
         } @else if (form.controls.termLength.hasError('termMax')) {
-          <mat-error
-            >Term is at most {{ form.controls.termLength.getError('termMax').max }}.</mat-error
-          >
+          <mat-error>{{
+            'deposits.form.termMax'
+              | transloco: { max: form.controls.termLength.getError('termMax').max }
+          }}</mat-error>
         } @else if (form.controls.termLength.hasError('server')) {
           <mat-error>{{ form.controls.termLength.getError('server') }}</mat-error>
         }
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>Unit</mat-label>
+        <mat-label>{{ 'deposits.form.unit' | transloco }}</mat-label>
         <mat-select formControlName="termUnit">
           @for (unit of termUnits; track unit.value) {
             <mat-option [value]="unit.value">{{ unit.label | transloco }}</mat-option>
@@ -144,7 +149,7 @@
     </div>
 
     <p class="deposit-form-dialog__maturity">
-      Matures on
+      {{ 'deposits.fields.maturesOn' | transloco }}
       <strong>
         @if (maturityDate(); as maturity) {
           {{ formatDate(maturity) }}
@@ -155,22 +160,22 @@
     </p>
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-      <mat-label>Annual interest rate (%)</mat-label>
+      <mat-label>{{ 'deposits.form.annualInterestRate' | transloco }}</mat-label>
       <input matInput type="number" step="0.01" formControlName="annualInterestRatePercent" />
       @if (form.controls.annualInterestRatePercent.hasError('required')) {
-        <mat-error>Interest rate is required.</mat-error>
+        <mat-error>{{ 'deposits.errors.interestRateRequired' | transloco }}</mat-error>
       } @else if (
         form.controls.annualInterestRatePercent.hasError('min') ||
         form.controls.annualInterestRatePercent.hasError('max')
       ) {
-        <mat-error>Interest rate must be between 0 and 100.</mat-error>
+        <mat-error>{{ 'deposits.errors.interestRateRange' | transloco }}</mat-error>
       } @else if (form.controls.annualInterestRatePercent.hasError('server')) {
         <mat-error>{{ form.controls.annualInterestRatePercent.getError('server') }}</mat-error>
       }
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-      <mat-label>Capitalisation</mat-label>
+      <mat-label>{{ 'deposits.fields.capitalisation' | transloco }}</mat-label>
       <mat-select formControlName="capitalization">
         @for (capitalization of capitalizations; track capitalization.value) {
           <mat-option [value]="capitalization.value">{{
@@ -181,19 +186,19 @@
     </mat-form-field>
 
     <mat-slide-toggle formControlName="taxExempt" class="deposit-form-dialog__toggle">
-      IKE/IKZE — no Belka tax
+      {{ 'deposits.form.taxExempt' | transloco }}
     </mat-slide-toggle>
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-      <mat-label>Interest lost on early break (%)</mat-label>
+      <mat-label>{{ 'deposits.form.earlyBreakLoss' | transloco }}</mat-label>
       <input matInput type="number" step="0.01" formControlName="earlyBreakInterestLossPercent" />
       @if (form.controls.earlyBreakInterestLossPercent.hasError('required')) {
-        <mat-error>Early-break loss is required.</mat-error>
+        <mat-error>{{ 'deposits.form.earlyBreakRequired' | transloco }}</mat-error>
       } @else if (
         form.controls.earlyBreakInterestLossPercent.hasError('min') ||
         form.controls.earlyBreakInterestLossPercent.hasError('max')
       ) {
-        <mat-error>Early-break loss must be between 0 and 100.</mat-error>
+        <mat-error>{{ 'deposits.form.earlyBreakRange' | transloco }}</mat-error>
       } @else if (form.controls.earlyBreakInterestLossPercent.hasError('server')) {
         <mat-error>{{ form.controls.earlyBreakInterestLossPercent.getError('server') }}</mat-error>
       }
@@ -205,12 +210,14 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
     <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
       @if (submitting()) {
         <mat-spinner diameter="20" />
       } @else {
-        {{ isEdit ? 'Save' : 'Create' }}
+        {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
       }
     </button>
   </mat-dialog-actions>

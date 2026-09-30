@@ -39,9 +39,9 @@ public sealed class SettleDepositHandler(
             .Select(p => new { p.Name, p.IsArchived })
             .FirstAsync(cancellationToken);
 
-        if (portfolio.IsArchived)
+        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
         {
-            return PortfolioErrors.Archived(portfolioId);
+            return readOnly;
         }
 
         if (terms.SettledOn is not null)

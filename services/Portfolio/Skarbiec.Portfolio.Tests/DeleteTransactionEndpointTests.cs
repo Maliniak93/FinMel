@@ -118,6 +118,25 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>asset-archive AC-4: deleting a transaction of an archived asset is a 409 <c>Conflict.AssetArchived</c>; the transaction stays.</summary>
+    [Fact]
+    public async Task Delete_ArchivedAsset_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var depositId = await client.RecordTransactionAsync(
+            portfolioId, cashId, TransactionType.Deposit, 100m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+
+        var response = await client.DeleteAsync(TransactionUri(portfolioId, cashId, depositId), cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        Assert.Equal(100m, (await client.GetAssetAsync(portfolioId, cashId, cancellationToken)).Quantity);
+        Assert.Contains((await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items, t => t.Id == depositId);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC7: deleting a transaction of an archived
     /// portfolio's asset is a 409 <c>Conflict.PortfolioArchived</c>; transaction and quantity stay.</summary>
     [Fact]
@@ -153,5 +172,24 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         await response.AssertDepositTransactionsManagedAsync(cancellationToken);
         Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
         Assert.Contains((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items, t => t.Id == openingId);
+    }
+
+    /// <summary>savings-accounts AC-7: deleting a savings account's Withdraw gives the money back to the balance.</summary>
+    [Fact]
+    public async Task Delete_SavingsAccountTransaction_MovesBalance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var withdrawId = await client.RecordTransactionAsync(
+            portfolioId, account.AssetId, TransactionType.Withdraw, 4_000m, SavingsToday, cancellationToken, unitPrice: 1m);
+        Assert.Equal(6_000m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+
+        var response = await client.DeleteAsync(TransactionUri(portfolioId, account.AssetId, withdrawId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(10_000m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, account.AssetId, cancellationToken);
     }
 }

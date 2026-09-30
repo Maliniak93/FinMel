@@ -1,9 +1,11 @@
-<h2 mat-dialog-title>{{ isEdit ? 'Edit transaction' : 'New transaction' }}</h2>
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'transactions.form.editTitle' : 'transactions.newTransaction') | transloco }}
+</h2>
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
     <mat-form-field appearance="outline" class="transaction-form-dialog__field">
-      <mat-label>Type</mat-label>
+      <mat-label>{{ 'common.type' | transloco }}</mat-label>
       <mat-select formControlName="type">
         @for (type of transactionTypes; track type.value) {
           <mat-option [value]="type.value">{{ type.label | transloco }}</mat-option>
@@ -15,16 +17,22 @@
       <mat-label>{{ quantityLabel() | transloco }}</mat-label>
       <input matInput type="number" step="any" formControlName="quantity" />
       @if (form.controls.quantity.hasError('min')) {
-        <mat-error>{{ quantityLabel() | transloco }} must not be negative.</mat-error>
+        <mat-error>{{
+          'transactions.form.mustNotBeNegative'
+            | transloco: { field: (quantityLabel() | transloco) }
+        }}</mat-error>
       }
     </mat-form-field>
 
     @if (isPriced()) {
       <mat-form-field appearance="outline" class="transaction-form-dialog__field">
-        <mat-label>Unit price</mat-label>
+        <mat-label>{{ 'common.unitPrice' | transloco }}</mat-label>
         <input matInput type="number" step="0.01" formControlName="unitPrice" />
         @if (form.controls.unitPrice.hasError('min')) {
-          <mat-error>Unit price must not be negative.</mat-error>
+          <mat-error>{{
+            'transactions.form.mustNotBeNegative'
+              | transloco: { field: ('common.unitPrice' | transloco) }
+          }}</mat-error>
         } @else if (form.controls.unitPrice.hasError('server')) {
           <mat-error>{{ form.controls.unitPrice.getError('server') }}</mat-error>
         }
@@ -32,12 +40,12 @@
     }
 
     <mat-form-field appearance="outline" class="transaction-form-dialog__field">
-      <mat-label>Date</mat-label>
+      <mat-label>{{ 'common.date' | transloco }}</mat-label>
       <input matInput [matDatepicker]="datePicker" formControlName="date" />
       <mat-datepicker-toggle matIconSuffix [for]="datePicker"></mat-datepicker-toggle>
       <mat-datepicker #datePicker></mat-datepicker>
       @if (form.controls.date.hasError('required')) {
-        <mat-error>Date is required.</mat-error>
+        <mat-error>{{ 'transactions.form.dateRequired' | transloco }}</mat-error>
       }
     </mat-form-field>
 
@@ -47,12 +55,14 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
     <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
       @if (submitting()) {
         <mat-spinner diameter="20" />
       } @else {
-        {{ isEdit ? 'Save' : 'Record' }}
+        {{ (isEdit ? 'common.save' : 'transactions.form.record') | transloco }}
       }
     </button>
   </mat-dialog-actions>

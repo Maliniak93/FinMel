@@ -45,11 +45,11 @@ public sealed class DailyPricesSyncedConsumer(
         // Bypasses the tenancy filter deliberately (IgnoreQueryFilters): this consumer has no
         // single current user to filter by, and it values every user's portfolios in one pass by
         // design. Archived portfolios are excluded from valuation, same as before spec-03 — their
-        // last snapshot simply stays where it was.
+        // last snapshot simply stays where it was. So are archived assets (asset-archive).
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => !p.PortfolioIsArchived)
+            .Where(p => !p.PortfolioIsArchived && !p.IsArchived)
             .ToListAsync(cancellationToken);
 
         if (positions.Count == 0)

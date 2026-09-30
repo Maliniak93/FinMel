@@ -49,6 +49,12 @@ public sealed class Position : IUserOwned
     public required bool PortfolioIsArchived { get; set; }
 
     /// <summary>
+    /// The asset's own archived flag (asset-archive), upserted from <c>AssetPositionChanged.IsArchived</c>
+    /// and independent of <see cref="PortfolioIsArchived"/>. A position is valued only when neither is set.
+    /// </summary>
+    public required bool IsArchived { get; set; }
+
+    /// <summary>
     /// The publisher's per-asset ordering counter (<c>AssetPositionChanged.Version</c>). An event
     /// older than this is dropped, so an out-of-order redelivery can never resurrect an older
     /// quantity (spec-03 design decision 4).

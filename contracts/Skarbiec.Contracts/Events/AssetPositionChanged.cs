@@ -2,10 +2,11 @@ namespace Skarbiec.Contracts.Events;
 
 /// <summary>
 /// Published by Portfolio whenever an asset's position changes — created, edited, a transaction
-/// recorded/edited/deleted against it, or its portfolio archived/restored (spec-02, ADR-021).
+/// recorded/edited/deleted against it, the asset itself archived/restored (asset-archive), or its
+/// portfolio archived/restored (spec-02, ADR-021).
 /// Carries the **full** position state, so a consumer never calls Portfolio back to learn what a
 /// change means: everything a valuation needs (mode, instrument, currency, quantity, manual value,
-/// whether the owning portfolio is archived) travels here.
+/// whether the owning portfolio or the asset itself is archived) travels here.
 /// </summary>
 public sealed record AssetPositionChanged
 {
@@ -28,6 +29,13 @@ public sealed record AssetPositionChanged
 
     /// <summary>The owning portfolio's archived flag at publish time — archive/restore fans one event out per asset so a read model stops/resumes valuing it.</summary>
     public required bool PortfolioIsArchived { get; init; }
+
+    /// <summary>
+    /// The asset's own archived flag (asset-archive), independent of <see cref="PortfolioIsArchived"/>:
+    /// an archived asset drops out of net worth from the day it is archived and rejoins on restore. The
+    /// portfolio archive/restore fan-out carries it unchanged.
+    /// </summary>
+    public required bool IsArchived { get; init; }
 
     /// <summary>
     /// Strictly increasing per <see cref="AssetId"/>: a consumer applying events out of order keeps

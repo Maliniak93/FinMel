@@ -1,14 +1,15 @@
-import { Component, computed, inject, input, resource } from '@angular/core';
+import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
@@ -21,13 +22,16 @@ import {
   getApiPortfolioPortfoliosById,
   getApiPortfolioPortfoliosByPortfolioIdAssets,
   getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId,
+  getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId,
   type AssetResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { confirmSetAssetArchived } from '../../shared/asset-archive';
 import { toDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatQuantity } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
+import { SavingsAccountFormDialog } from '../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { ASSET_CLASS, assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
@@ -66,6 +70,7 @@ function isPriceStale(lastPriceDate: string | null | undefined): boolean {
     MatIconModule,
     MatMenuModule,
     MatProgressSpinnerModule,
+    MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
     RouterLink,
@@ -88,7 +93,9 @@ export class Assets {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load portfolio.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('assets.portfolioLoadFailed'),
+        );
       }
       return result.data;
     },
@@ -120,11 +127,22 @@ export class Assets {
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load assets.');
+        throw new Error(readProblemDetails(result.error).detail ?? translate('assets.loadFailed'));
       }
       return result.data ?? [];
     },
   });
+
+  // asset-archive: an asset archived on its own is hidden until "Show archived" is on. Filtered here,
+  // because ListAssets returns every asset — other callers (the transactions view) must still resolve
+  // an archived one.
+  protected readonly showArchived = signal(false);
+
+  protected readonly visibleAssets = computed(() =>
+    this.assetsResource.hasValue()
+      ? this.assetsResource.value().filter((asset) => this.showArchived() || !asset.isArchived)
+      : [],
+  );
 
   // AssetResponse only carries InstrumentId (ADR-003, no FK) — one lookup per distinct instrument
   // used by this portfolio's market assets fills in ticker/last price/date/source for display.
@@ -178,8 +196,10 @@ export class Assets {
 
   // A term deposit is Due once its maturity date is today or earlier — the same rule as the
   // Deposits page's server-side status, on the viewer's local calendar date — until it is settled.
+  // An archived deposit is read-only, so it is never flagged Due.
   protected isDepositDue(asset: AssetResponse): boolean {
     return (
+      !asset.isArchived &&
       !asset.depositSettled &&
       !!asset.depositMaturityDate &&
       asset.depositMaturityDate <= toDateOnly(new Date())
@@ -204,6 +224,11 @@ export class Assets {
       return;
     }
 
+    if (Number(asset.assetClass) === ASSET_CLASS.Savings) {
+      void this.openSavingsAccountEditDialog(asset);
+      return;
+    }
+
     const ref = this.dialog.open(AssetFormDialog, {
       width: '560px',
       data: { portfolioId: this.portfolioId(), asset },
@@ -223,8 +248,8 @@ export class Assets {
     });
     if (result.error || !result.data) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to load the deposit.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('assets.depositLoadFailed'),
+        translate('common.dismiss'),
       );
       return;
     }
@@ -240,21 +265,61 @@ export class Assets {
     });
   }
 
+  // Likewise a savings account's terms live on the savings-account endpoints (savings-accounts).
+  private async openSavingsAccountEditDialog(asset: AssetResponse): Promise<void> {
+    const result = await getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId({
+      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    });
+    if (result.error || !result.data) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('assets.savingsAccountLoadFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    const ref = this.dialog.open(SavingsAccountFormDialog, {
+      width: '560px',
+      data: { account: result.data },
+    });
+    ref.afterClosed().subscribe((saved: boolean | undefined) => {
+      if (saved) {
+        this.assetsResource.reload();
+      }
+    });
+  }
+
+  // asset-archive: Archive / Restore sit in the row menu, behind a confirmation, and reload the list.
+  protected async setArchived(asset: AssetResponse, archive: boolean): Promise<void> {
+    const done = await confirmSetAssetArchived(
+      this.dialog,
+      this.snackBar,
+      { portfolioId: this.portfolioId(), assetId: asset.id, name: asset.name },
+      archive,
+    );
+    if (done) {
+      this.assetsResource.reload();
+    }
+  }
+
   // The delete cascades to the asset's transactions (spec-08), so the confirmation names them
   // whenever there are any.
   protected async remove(asset: AssetResponse): Promise<void> {
     const transactionCount = Number(asset.transactionCount);
     const message =
       transactionCount > 0
-        ? `"${asset.name}" and its ${transactionCount} ${transactionCount === 1 ? 'transaction' : 'transactions'} will be permanently deleted. This can't be undone.`
-        : `"${asset.name}" will be permanently deleted. This can't be undone.`;
+        ? translate('assets.delete.messageWithTransactions', {
+            name: asset.name,
+            count: transactionCount,
+          })
+        : translate('assets.delete.message', { name: asset.name });
     const confirmed = await firstValueFrom(
       this.dialog
         .open(ConfirmDialog, {
           data: {
-            title: 'Delete this asset?',
+            title: translate('assets.delete.title'),
             message,
-            confirmLabel: 'Delete',
+            confirmLabel: translate('common.delete'),
             destructive: true,
           },
         })
@@ -270,8 +335,8 @@ export class Assets {
     });
     if (result.error) {
       this.snackBar.open(
-        readProblemDetails(result.error).detail ?? 'Failed to delete asset.',
-        'Dismiss',
+        readProblemDetails(result.error).detail ?? translate('assets.delete.failed'),
+        translate('common.dismiss'),
       );
       return;
     }

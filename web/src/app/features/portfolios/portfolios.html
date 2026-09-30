@@ -1,16 +1,16 @@
 <div class="portfolios-page">
   <div class="portfolios-page__header">
-    <h1>Portfolios</h1>
+    <h1>{{ 'portfolios.title' | transloco }}</h1>
     <div class="portfolios-page__header-actions">
       <mat-slide-toggle
         [checked]="includeArchived()"
         (change)="includeArchived.set($event.checked)"
       >
-        Show archived
+        {{ 'portfolios.showArchived' | transloco }}
       </mat-slide-toggle>
       <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
         <mat-icon>add</mat-icon>
-        New portfolio
+        {{ 'portfolios.newPortfolio' | transloco }}
       </button>
     </div>
   </div>
@@ -18,7 +18,9 @@
   @if (portfoliosResource.error(); as loadError) {
     <div class="portfolios-page__state" role="alert">
       <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="portfoliosResource.reload()">Retry</button>
+      <button mat-button type="button" (click)="portfoliosResource.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
     </div>
   } @else if (portfoliosResource.isLoading() && !portfoliosResource.hasValue()) {
     <div class="portfolios-page__state">
@@ -26,15 +28,15 @@
     </div>
   } @else if (portfoliosResource.hasValue() && portfoliosResource.value().length === 0) {
     <div class="portfolios-page__state">
-      <p>You don't have any portfolios yet.</p>
+      <p>{{ 'portfolios.empty' | transloco }}</p>
       <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        Create your first portfolio
+        {{ 'portfolios.createFirst' | transloco }}
       </button>
     </div>
   } @else if (portfoliosResource.hasValue()) {
     <table mat-table [dataSource]="portfoliosResource.value()" class="portfolios-page__table">
       <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
         <td mat-cell *matCellDef="let portfolio">
           <a
             [routerLink]="['/portfolios', portfolio.id, 'assets']"
@@ -47,27 +49,31 @@
       </ng-container>
 
       <ng-container matColumnDef="currency">
-        <th mat-header-cell *matHeaderCellDef>Currency</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.currency' | transloco }}</th>
         <td mat-cell *matCellDef="let portfolio">{{ portfolio.currency }}</td>
       </ng-container>
 
       <ng-container matColumnDef="totalValue">
-        <th mat-header-cell *matHeaderCellDef>Total value</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'portfolios.totalValue' | transloco }}</th>
         <td mat-cell *matCellDef="let portfolio">
           @if (valueEntryFor(portfolio.id); as entry) {
             {{ formatMoney(entry.valuePln) }}
           } @else {
-            <span class="portfolios-page__value-placeholder" matTooltip="No valuation yet">—</span>
+            <span
+              class="portfolios-page__value-placeholder"
+              [matTooltip]="'portfolios.noValuationYet' | transloco"
+              >—</span
+            >
           }
         </td>
       </ng-container>
 
       <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
         <td mat-cell *matCellDef="let portfolio">
           @if (portfolio.isArchived) {
             <mat-chip-set>
-              <mat-chip>Archived</mat-chip>
+              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
             </mat-chip-set>
           }
         </td>
@@ -80,29 +86,29 @@
             mat-icon-button
             type="button"
             [matMenuTriggerFor]="menu"
-            [attr.aria-label]="'Actions for ' + portfolio.name"
+            [attr.aria-label]="'common.actionsFor' | transloco: { name: portfolio.name }"
           >
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
             <button mat-menu-item type="button" (click)="openEditDialog(portfolio)">
               <mat-icon>edit</mat-icon>
-              <span>Edit</span>
+              <span>{{ 'common.edit' | transloco }}</span>
             </button>
             @if (portfolio.isArchived) {
               <button mat-menu-item type="button" (click)="restore(portfolio)">
                 <mat-icon>unarchive</mat-icon>
-                <span>Restore</span>
+                <span>{{ 'common.restore' | transloco }}</span>
               </button>
             } @else {
               <button mat-menu-item type="button" (click)="archive(portfolio)">
                 <mat-icon>archive</mat-icon>
-                <span>Archive</span>
+                <span>{{ 'common.archive' | transloco }}</span>
               </button>
             }
             <button mat-menu-item type="button" (click)="remove(portfolio)">
               <mat-icon>delete</mat-icon>
-              <span>Delete</span>
+              <span>{{ 'common.delete' | transloco }}</span>
             </button>
           </mat-menu>
         </td>

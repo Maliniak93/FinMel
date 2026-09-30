@@ -3,7 +3,7 @@
     class="net-worth-chart__ranges"
     [value]="range()"
     (change)="setRange($event.value)"
-    aria-label="Chart range"
+    [attr.aria-label]="'netWorthChart.rangeLabel' | transloco"
   >
     @for (option of ranges; track option) {
       <mat-button-toggle [value]="option">{{ option }}</mat-button-toggle>
@@ -13,20 +13,22 @@
   @if (historyResource.error(); as loadError) {
     <div class="net-worth-chart__state" role="alert">
       <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="historyResource.reload()">Retry</button>
+      <button mat-button type="button" (click)="historyResource.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
     </div>
   } @else if (historyResource.isLoading() && !historyResource.hasValue()) {
     <div class="net-worth-chart__state">
       <mat-spinner diameter="32" />
     </div>
   } @else if (points().length < 2) {
-    <p class="net-worth-chart__empty">Not enough history to chart yet.</p>
+    <p class="net-worth-chart__empty">{{ 'netWorthChart.notEnoughHistory' | transloco }}</p>
   } @else {
     <svg
       [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
       class="net-worth-chart__svg"
       role="img"
-      aria-label="Net worth history chart"
+      [attr.aria-label]="'netWorthChart.chartLabel' | transloco"
       preserveAspectRatio="none"
     >
       <polyline
@@ -38,7 +40,9 @@
       />
     </svg>
     @if (asOf(); as date) {
-      <p class="net-worth-chart__as-of">As of {{ formatDate(date) }}</p>
+      <p class="net-worth-chart__as-of">
+        {{ 'netWorthChart.asOf' | transloco: { date: formatDate(date) } }}
+      </p>
     }
   }
 </div>

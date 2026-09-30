@@ -4,7 +4,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import { getApiReportingDashboard } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
@@ -25,6 +25,7 @@ const ASSET_CLASS_COLORS: readonly string[] = [
   '#F76707', // PreciousMetal
   '#7048E8', // RealEstate
   '#868E96', // Other
+  '#E64980', // Savings
 ];
 
 @Component({
@@ -47,7 +48,9 @@ export class Dashboard {
     loader: async ({ abortSignal }) => {
       const result = await getApiReportingDashboard({ signal: abortSignal });
       if (result.error) {
-        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load dashboard.');
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('dashboard.loadFailed'),
+        );
       }
       return result.data;
     },

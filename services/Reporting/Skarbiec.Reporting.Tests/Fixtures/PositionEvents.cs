@@ -38,6 +38,7 @@ internal static class PositionEvents
             Currency = "PLN",
             Quantity = amount,
             PortfolioIsArchived = portfolioIsArchived,
+            IsArchived = false,
             Version = version,
             OccurredAtUtc = DateTimeOffset.UtcNow,
         }, cancellationToken);

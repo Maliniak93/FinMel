@@ -3,6 +3,14 @@ import type { FormGroup } from '@angular/forms';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
+import {
+  labelsOf,
+  matchesTranslation,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+} from '../../../../testing/i18n';
+import { provideI18nTesting } from '../../../core/i18n/testing';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
@@ -44,21 +52,24 @@ describe('PayOutDepositDialog', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   // The transfer candidates answer per the `currency` query parameter from
   // `transferCandidatesByCurrency`; every write answers with `writeResponse`.
   async function setup(
     writeResponse: () => Response = () => jsonResponse(paidOutDeposit),
+    candidatesByCurrency: typeof transferCandidatesByCurrency = transferCandidatesByCurrency,
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (requestMethod(input) === 'GET') {
         if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
           const currency = new URL(requestUrl(input)).searchParams.get('currency') ?? '';
-          return jsonResponse(transferCandidatesByCurrency[currency] ?? []);
+          return jsonResponse(candidatesByCurrency[currency] ?? []);
         }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -68,6 +79,7 @@ describe('PayOutDepositDialog', () => {
     await TestBed.configureTestingModule({
       imports: [PayOutDepositDialog],
       providers: [
+        provideI18nTesting(),
         provideNativeDateAdapter(),
         { provide: MAT_DIALOG_DATA, useValue: { deposit: settledDeposit } },
         { provide: MatDialogRef, useValue: dialogRef },
@@ -229,5 +241,93 @@ describe('PayOutDepositDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  // i18n screens (#132) AC-6: the dialog's title, summary, field labels, hints, validation messages
+  // and buttons follow the language.
+  describe('in Polish', () => {
+    function errors(): string[] {
+      return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+    }
+
+    async function touchAll(): Promise<void> {
+      await component['onSubmit']();
+      await render();
+    }
+
+    it('renders in Polish', async () => {
+      await setup();
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'h2'),
+        ...labelsOf(element, 'dt'),
+        ...labelsOf(element, 'mat-label'),
+        ...labelsOf(element, 'mat-dialog-actions button'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Transfer to cash',
+        'Amount',
+        'Move to',
+        'Date',
+        'Cancel',
+        'Transfer',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      // "Transfer" may stay as it is in Polish.
+      expect(polishProblems(english, texts(), ['Transfer'])).toEqual([]);
+    });
+
+    it('shows validation in Polish', async () => {
+      await setup();
+      const scenarios: [string, Record<string, unknown>][] = [
+        ['Pick where the money goes.', { destinationAssetId: null, date: daysFromToday(0) }],
+        [
+          "Date can't be before the settlement date.",
+          { destinationAssetId: plnCashCandidate.assetId, date: new Date(2026, 3, 16) },
+        ],
+        [
+          "Date can't be in the future.",
+          { destinationAssetId: plnCashCandidate.assetId, date: daysFromToday(1) },
+        ],
+      ];
+      const read = async (values: Record<string, unknown>) => {
+        await fill(values);
+        await touchAll();
+        return errors();
+      };
+
+      const english: string[][] = [];
+      for (const [message, values] of scenarios) {
+        english.push(await read(values));
+        expect(english.at(-1)).toEqual([message]);
+      }
+
+      await switchLanguage(fixture, 'pl');
+
+      for (const [index, [, values]] of scenarios.entries()) {
+        expect(polishProblems(english[index], await read(values))).toEqual([]);
+      }
+    });
+
+    it('shows the missing-Cash-account hint in Polish', async () => {
+      await setup(undefined, { PLN: [] });
+      const element = fixture.nativeElement as HTMLElement;
+      const hint = () => labelsOf(element, 'mat-hint');
+
+      const english = hint();
+      expect(english).toEqual(['You have no Cash account in PLN to move the money to.']);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, hint())).toEqual([]);
+      expect(hint()[0]).toContain('PLN');
+      expect(matchesTranslation('pl', hint()[0]), `"${hint()[0]}" is not a pl.json value`).toBe(
+        true,
+      );
+    });
   });
 });

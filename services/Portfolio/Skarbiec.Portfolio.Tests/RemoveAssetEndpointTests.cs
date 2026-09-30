@@ -61,6 +61,26 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    /// <summary>asset-archive AC-4: removing an archived asset stays allowed — it and its transactions are gone (the <c>AssetRemoved</c> event is in the outbox tests).</summary>
+    [Fact]
+    public async Task RemoveAsset_ArchivedAsset_Deletes()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m);
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(portfolioId, cashId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(portfolioId, cashId), cancellationToken)).StatusCode);
+        var rows = await SnapshotUserRowsAsync(userId, cancellationToken);
+        Assert.Equal(0, rows.Assets);
+        Assert.Equal(0, rows.Transactions);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC6: removing an asset of an archived portfolio
     /// is a 409 <c>Conflict.PortfolioArchived</c>; the asset and its transactions stay.</summary>
     [Fact]
@@ -106,6 +126,34 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
         Assert.False(await dbContext.Set<TermDeposit>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
         Assert.True(await dbContext.Set<TermDeposit>().AnyAsync(t => t.AssetId == kept.AssetId, cancellationToken));
+    }
+
+    /// <summary>
+    /// savings-accounts AC-8: removing a savings account through the ordinary asset endpoint takes the
+    /// asset, its transactions and its <c>SavingsAccount</c> row with it; another account stays.
+    /// </summary>
+    [Fact]
+    public async Task Remove_SavingsAccount_DeletesTerms()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        await client.RecordTransactionAsync(
+            portfolioId, account.AssetId, TransactionType.Withdraw, 100m, SavingsToday, cancellationToken, unitPrice: 1m);
+        var kept = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewSavingsAccountRequest(name: "Kept"));
+
+        var response = await client.DeleteAsync(AssetUri(portfolioId, account.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(portfolioId, account.AssetId), cancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(SavingsAccountUri(portfolioId, account.AssetId), cancellationToken)).StatusCode);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.Id == account.AssetId, cancellationToken));
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
+        Assert.False(await dbContext.Set<SavingsAccount>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
+        Assert.True(await dbContext.Set<SavingsAccount>().AnyAsync(t => t.AssetId == kept.AssetId, cancellationToken));
     }
 
     /// <summary>

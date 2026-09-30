@@ -439,6 +439,42 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal("EUR", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
     }
 
+    /// <summary>asset-archive AC-4: updating an archived asset is a 409 <c>Conflict.AssetArchived</c> and it keeps its state.</summary>
+    [Fact]
+    public async Task Update_ArchivedAsset_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m, name: "Before archive");
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "After archive", Currency = "PLN" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, cashId), request, cancellationToken);
+
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, cashId, cancellationToken);
+        Assert.Equal("Before archive", unchanged.Name);
+        Assert.Equal(100m, unchanged.Quantity);
+        Assert.True(unchanged.IsArchived);
+    }
+
+    /// <summary>asset-archive design: the portfolio check runs before the asset check — an archived asset in an archived portfolio answers <c>Conflict.PortfolioArchived</c>.</summary>
+    [Fact]
+    public async Task Update_ArchivedAssetInArchivedPortfolio_ReturnsPortfolioArchivedConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        await client.ArchiveAssetAsync(portfolioId, assetId, cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", ManualValue = 1m, ManualValueDate = new DateOnly(2026, 1, 1) };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+    }
+
     /// <summary>archived-portfolio-out-of-net-worth AC6: updating an asset of an archived portfolio
     /// is a 409 <c>Conflict.PortfolioArchived</c> and the asset keeps its previous state.</summary>
     [Fact]
@@ -504,6 +540,48 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
 
         await response.AssertUseDepositEndpointsAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(originalClass, unchanged.AssetClass);
+        Assert.Equal(originalName, unchanged.Name);
+        Assert.Equal(originalQuantity, unchanged.Quantity);
+    }
+
+    /// <summary>
+    /// savings-accounts AC-6: the asset endpoint never produces or edits a Savings-class asset — turning
+    /// a Cash asset into Savings, or a savings account into Cash, is a 400
+    /// <c>Validation.UseSavingsAccountEndpoints</c>, and the asset keeps its class, name and quantity.
+    /// </summary>
+    [Theory]
+    [InlineData("cash-to-savings")]
+    [InlineData("savings-to-cash")]
+    public async Task Update_ToOrFromSavings_ReturnsUseSavingsAccountEndpoints(string change)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        Guid assetId;
+        AssetClass originalClass;
+        string originalName;
+        decimal originalQuantity;
+        AssetClass requestedClass;
+        if (change == "cash-to-savings")
+        {
+            assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken, name: "Wallet");
+            await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Cash, "Wallet", 300m, AssetClass.Savings);
+        }
+        else
+        {
+            assetId = (await client.AddSavingsAccountAsync(portfolioId, cancellationToken)).AssetId;
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Savings, "Savings account", 10_000m, AssetClass.Cash);
+        }
+
+        var request = new UpdateAssetRequest { AssetClass = requestedClass, Name = "Edited through assets", Currency = "PLN" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertUseSavingsAccountEndpointsAsync(cancellationToken);
         var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
         Assert.Equal(originalClass, unchanged.AssetClass);
         Assert.Equal(originalName, unchanged.Name);

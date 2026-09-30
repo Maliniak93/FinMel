@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import type { AssetResponse } from '../../../../../api/portfolio';
 import { fromDateOnly, toDateOnly } from '../../../../../shared/date-only';
@@ -40,7 +41,13 @@ export function buildManualValueFields(group: ManualValueGroup): {
 
 @Component({
   selector: 'app-manual-value-fields',
-  imports: [ReactiveFormsModule, MatDatepickerModule, MatFormFieldModule, MatInputModule],
+  imports: [
+    ReactiveFormsModule,
+    MatDatepickerModule,
+    MatFormFieldModule,
+    MatInputModule,
+    TranslocoPipe,
+  ],
   templateUrl: './manual-value-fields.html',
   styleUrl: './manual-value-fields.scss',
 })

@@ -62,10 +62,10 @@ describe('Shell', () => {
   });
 
   // term-deposits: a "Deposits" nav item leads to the cross-portfolio Deposits page.
-  it('offers a Deposits nav item linking to /deposits', () => {
+  it('offers a "Deposits & savings" nav item linking to /deposits', () => {
     const link = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
-    ).find((a) => (a.textContent ?? '').includes('Deposits'));
+    ).find((a) => (a.textContent ?? '').includes('Deposits & savings'));
 
     expect(link).toBeDefined();
     expect(link!.getAttribute('href')).toBe('/deposits');
@@ -78,7 +78,7 @@ describe('Shell', () => {
       Array.from(element.querySelectorAll('mat-nav-list a [matListItemTitle]'), textOf);
 
     const englishLabels = navLabels();
-    expect(englishLabels).toEqual(['Dashboard', 'Portfolios', 'Deposits', 'Settings']);
+    expect(englishLabels).toEqual(['Dashboard', 'Portfolios', 'Deposits & savings', 'Settings']);
 
     // Each language is offered under its own name, whatever the active language.
     const items = (await openLanguageMenu(fixture)).map(textOf);

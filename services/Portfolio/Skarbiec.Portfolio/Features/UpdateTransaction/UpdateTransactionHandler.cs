@@ -21,9 +21,9 @@ public sealed class UpdateTransactionHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
-            return PortfolioErrors.Archived(portfolioId);
+            return readOnly;
         }
 
         // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit (term-deposits).

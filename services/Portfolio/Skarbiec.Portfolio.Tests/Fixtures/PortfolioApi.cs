@@ -12,6 +12,9 @@ using Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Features.RecordTransaction;
+using Skarbiec.Portfolio.Features.SavingsAccounts;
+using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
+using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
@@ -37,6 +40,51 @@ internal static class PortfolioApi
 
     public static string AssetUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/assets/{assetId}";
+
+    /// <summary>asset-archive: <c>POST .../assets/{id}/archive</c>.</summary>
+    public static string ArchiveAssetUri(Guid portfolioId, Guid assetId) =>
+        $"{AssetUri(portfolioId, assetId)}/archive";
+
+    /// <summary>asset-archive: <c>POST .../assets/{id}/restore</c>.</summary>
+    public static string RestoreAssetUri(Guid portfolioId, Guid assetId) =>
+        $"{AssetUri(portfolioId, assetId)}/restore";
+
+    /// <summary>
+    /// asset-archive: archives one asset (arrange only). From then on every write to it is a 409
+    /// <c>Conflict.AssetArchived</c> except removal — arrange any content the fact needs first.
+    /// </summary>
+    public static async Task ArchiveAssetAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(ArchiveAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>asset-archive: restores one archived asset (arrange only).</summary>
+    public static async Task RestoreAssetAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(RestoreAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// asset-archive: a PLN Cash asset holding <paramref name="balance"/> (one top-up transaction) that
+    /// is then archived on its own, in a live portfolio of its own. Returns both ids.
+    /// </summary>
+    public static async Task<(Guid PortfolioId, Guid CashId)> AddArchivedCashAssetInLivePortfolioAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal balance = 5_000m,
+        string portfolioName = "Wallet",
+        string name = "Archived cash")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name);
+        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+
+        return (portfolioId, cashId);
+    }
 
     public static string TransactionsUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/assets/{assetId}/transactions";
@@ -270,6 +318,87 @@ internal static class PortfolioApi
         var deposit = await client.AddDepositAsync(portfolioId, cancellationToken, request);
 
         return (portfolioId, deposit);
+    }
+
+    /// <summary>savings-accounts: every savings account of the calling user, across all their portfolios.</summary>
+    public const string AllSavingsAccountsUri = "/api/portfolio/savings-accounts";
+
+    public static string SavingsAccountsUri(Guid portfolioId) =>
+        $"{PortfoliosUri}/{portfolioId}/savings-accounts";
+
+    public static string SavingsAccountUri(Guid portfolioId, Guid assetId) =>
+        $"{PortfoliosUri}/{portfolioId}/savings-accounts/{assetId}";
+
+    /// <summary>The fixed "today" (Europe/Warsaw) savings-account facts pin the clock to.</summary>
+    public static readonly DateTimeOffset SavingsTodayUtc = new(2026, 2, 1, 10, 0, 0, TimeSpan.Zero);
+
+    public static readonly DateOnly SavingsToday = new(2026, 2, 1);
+
+    /// <summary>
+    /// savings-accounts: a valid <see cref="AddSavingsAccountRequest"/> — by default a PLN account at
+    /// 5.25 %, taxed, with an opening deposit of 10 000 dated <see cref="SavingsToday"/> (pin the clock
+    /// to <see cref="SavingsTodayUtc"/>). Pass <paramref name="withOpeningDeposit"/> false for none;
+    /// derive an invalid request with a <c>with</c> expression.
+    /// </summary>
+    public static AddSavingsAccountRequest NewSavingsAccountRequest(
+        string name = "Savings account",
+        string? bankName = "Test bank",
+        string currency = "PLN",
+        decimal annualInterestRatePercent = 5.25m,
+        bool taxExempt = false,
+        bool withOpeningDeposit = true,
+        decimal openingAmount = 10_000m,
+        DateOnly? openingDate = null) => new()
+        {
+            Name = name,
+            BankName = bankName,
+            Currency = currency,
+            AnnualInterestRatePercent = annualInterestRatePercent,
+            TaxExempt = taxExempt,
+            OpeningDeposit = withOpeningDeposit
+                ? new OpeningDepositRequest { Amount = openingAmount, Date = openingDate ?? SavingsToday }
+                : null
+        };
+
+    public static UpdateSavingsAccountRequest NewUpdateSavingsAccountRequest(
+        string name = "Renamed savings",
+        string? bankName = "Other bank",
+        decimal annualInterestRatePercent = 3m,
+        bool taxExempt = true) => new()
+        {
+            Name = name,
+            BankName = bankName,
+            AnnualInterestRatePercent = annualInterestRatePercent,
+            TaxExempt = taxExempt
+        };
+
+    /// <summary>savings-accounts: adds a savings account through its endpoint (the only way a Savings-class asset comes to exist) and returns it. Defaults to <see cref="NewSavingsAccountRequest"/>.</summary>
+    public static async Task<SavingsAccountResponse> AddSavingsAccountAsync(
+        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null)
+    {
+        var response = await client.PostAsJsonAsync(SavingsAccountsUri(portfolioId), request ?? NewSavingsAccountRequest(), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
+    }
+
+    /// <summary>The common savings arrange step: a portfolio holding one savings account, both owned by <paramref name="client"/>'s user.</summary>
+    public static async Task<(Guid PortfolioId, SavingsAccountResponse Account)> CreatePortfolioWithSavingsAccountAsync(
+        this HttpClient client, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null, string portfolioName = "Savings")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var account = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, request);
+
+        return (portfolioId, account);
+    }
+
+    public static async Task<SavingsAccountResponse> GetSavingsAccountAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(SavingsAccountUri(portfolioId, assetId), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
     }
 
     /// <summary>

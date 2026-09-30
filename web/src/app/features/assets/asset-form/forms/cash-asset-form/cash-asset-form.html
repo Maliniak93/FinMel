@@ -1,8 +1,9 @@
 <app-asset-basics-fields [group]="form.controls.basics" />
 
 <p class="asset-form__hint">
-  Valued automatically from {{ form.controls.basics.controls.currency.value }}'s exchange rate —
-  nothing else to fill in. Use "Add opening deposit" below to deposit an opening amount.
+  {{
+    'assets.form.cashHint' | transloco: { currency: form.controls.basics.controls.currency.value }
+  }}
 </p>
 
 @if (!isEdit()) {

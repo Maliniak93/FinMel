@@ -40,9 +40,9 @@ public sealed class RollOverDepositHandler(
             .Select(p => new { p.Name, p.IsArchived })
             .FirstAsync(cancellationToken);
 
-        if (portfolio.IsArchived)
+        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
         {
-            return PortfolioErrors.Archived(portfolioId);
+            return readOnly;
         }
 
         // The bank renews on the maturity day: the credit of a Due deposit is dated then, and the next

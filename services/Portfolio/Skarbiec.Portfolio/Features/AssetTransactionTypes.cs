@@ -4,7 +4,7 @@ namespace Skarbiec.Portfolio.Features;
 
 /// <summary>
 /// The single source of which transaction types an asset class accepts (cash-transaction-types): the
-/// cash-like classes in <see cref="AssetValuationModes.CurrencyValuedClasses"/> (Cash, Deposit) accept
+/// cash-like classes in <see cref="AssetValuationModes.CurrencyValuedClasses"/> (Cash, Deposit, Savings) accept
 /// only Deposit/Withdraw, every other class all types. Keyed on the class, not on
 /// <c>Asset.ValuationMode</c>. The frontend mirror is <c>allowedTransactionTypes</c> in
 /// <c>web/src/app/features/transactions/transaction-type.ts</c>.

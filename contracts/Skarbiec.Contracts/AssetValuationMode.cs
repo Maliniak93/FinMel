@@ -37,11 +37,11 @@ public enum AssetValuationMode
 /// </remarks>
 public static class AssetValuationModes
 {
-    /// <summary>The default/suggested mode for a class — Cash/Deposit → currency-valued;
+    /// <summary>The default/suggested mode for a class — Cash/Deposit/Savings → currency-valued;
     /// Stock/Etf/Bond/Crypto/PreciousMetal → market; RealEstate/Other → manual.</summary>
     public static AssetValuationMode Default(AssetClass assetClass) => assetClass switch
     {
-        AssetClass.Cash or AssetClass.Deposit => AssetValuationMode.CurrencyValued,
+        AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings => AssetValuationMode.CurrencyValued,
         AssetClass.Stock or AssetClass.Etf or AssetClass.Bond or AssetClass.Crypto or AssetClass.PreciousMetal => AssetValuationMode.Market,
         AssetClass.RealEstate or AssetClass.Other => AssetValuationMode.Manual,
         _ => throw new ArgumentOutOfRangeException(nameof(assetClass), assetClass, "Unmapped AssetClass — add it to AssetValuationModes.Default."),

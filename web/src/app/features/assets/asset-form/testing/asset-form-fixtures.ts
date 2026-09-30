@@ -111,6 +111,17 @@ export async function pickInstrument(
   await fixture.whenStable();
 }
 
+// Marks every control of the form touched, the way a blocked submit does, so its error messages
+// render — then lets the view settle.
+export async function showValidationErrors(
+  fixture: ComponentFixture<unknown>,
+  form: AbstractControl,
+): Promise<void> {
+  form.markAllAsTouched();
+  fixture.detectChanges();
+  await fixture.whenStable();
+}
+
 export function renderedText(fixture: ComponentFixture<unknown>): string {
   return (fixture.nativeElement as HTMLElement).textContent ?? '';
 }
@@ -127,6 +138,7 @@ export const cashAsset: AssetResponse = {
   currency: 'PLN',
   quantity: 0,
   transactionCount: 0,
+  isArchived: false,
 };
 
 export const realEstateAsset: AssetResponse = {
@@ -140,6 +152,7 @@ export const realEstateAsset: AssetResponse = {
   manualValue: 650000,
   manualValueDate: '2020-06-15',
   transactionCount: 0,
+  isArchived: false,
 };
 
 export const cryptoAsset: AssetResponse = {
@@ -152,6 +165,7 @@ export const cryptoAsset: AssetResponse = {
   quantity: 0.5,
   instrumentId,
   transactionCount: 0,
+  isArchived: false,
 };
 
 export const cryptoInstrumentDetails: InstrumentDetailsResponse = {

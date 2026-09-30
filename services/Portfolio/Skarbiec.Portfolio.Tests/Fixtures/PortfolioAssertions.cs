@@ -23,6 +23,14 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioArchivedErrorCode, cancellationToken);
 
+    /// <summary>asset-archive: the error code every write to an archived asset fails with (removal excepted).</summary>
+    public const string AssetArchivedErrorCode = "Conflict.AssetArchived";
+
+    /// <summary>asset-archive: asserts <paramref name="response"/> is the 409 <see cref="AssetArchivedErrorCode"/> ProblemDetails.</summary>
+    public static async Task AssertAssetArchivedConflictAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, AssetArchivedErrorCode, cancellationToken);
+
     /// <summary>term-deposits: the 400 AddAsset/UpdateAsset answer when class Deposit is asked for, or an asset's class would change to or from Deposit.</summary>
     public const string UseDepositEndpointsErrorCode = "Validation.UseDepositEndpoints";
 
@@ -74,6 +82,14 @@ internal static class PortfolioAssertions
     public static async Task AssertDepositTransactionsManagedAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, DepositTransactionsManagedErrorCode, cancellationToken);
+
+    /// <summary>savings-accounts: the 400 AddAsset/UpdateAsset answer when class Savings is asked for, or an asset's class would change to or from Savings.</summary>
+    public const string UseSavingsAccountEndpointsErrorCode = "Validation.UseSavingsAccountEndpoints";
+
+    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="UseSavingsAccountEndpointsErrorCode"/> ProblemDetails.</summary>
+    public static async Task AssertUseSavingsAccountEndpointsAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseSavingsAccountEndpointsErrorCode, cancellationToken);
 
     /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="UseDepositEndpointsErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertUseDepositEndpointsAsync(

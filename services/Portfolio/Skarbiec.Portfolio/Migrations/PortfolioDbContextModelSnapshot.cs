@@ -207,6 +207,9 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<Guid?>("InstrumentId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal?>("ManualValueAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -282,6 +285,30 @@ namespace Skarbiec.Portfolio.Migrations
                         .IsUnique();
 
                     b.ToTable("Portfolios");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsAccount", b =>
+                {
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AnnualInterestRatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("TaxExempt")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AssetId");
+
+                    b.ToTable("SavingsAccounts");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
@@ -403,6 +430,15 @@ namespace Skarbiec.Portfolio.Migrations
                         .WithMany()
                         .HasForeignKey("InboxMessageId", "InboxConsumerId")
                         .HasPrincipalKey("MessageId", "ConsumerId");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsAccount", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
+                        .WithOne()
+                        .HasForeignKey("Skarbiec.Portfolio.Data.SavingsAccount", "AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>

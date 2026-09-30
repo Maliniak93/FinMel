@@ -55,7 +55,9 @@ and stored per browser in `localStorage` (`skarbiec-lang`).
 To add a text: pick a key nested by area (`settings.syncNow`, `enums.assetClass.cash`, shared words
 under `common.*`), add it to **both** JSON files, and render it with the `transloco` pipe
 (`{{ 'settings.syncNow' | transloco }}`, parameters as `{{ name }}` in the value). `npm test` fails
-when the two files drift apart. Conventions: `.claude/rules/angular.md` → Languages.
+when the two files drift apart, and `src/app/i18n-guard.spec.ts` fails when a template under
+`src/app` gains untranslated text (its allowlist holds only the brand and currency codes).
+Conventions: `.claude/rules/angular.md` → Languages.
 
 ## Regenerating the API clients
 

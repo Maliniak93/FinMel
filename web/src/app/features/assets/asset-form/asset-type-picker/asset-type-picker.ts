@@ -15,6 +15,7 @@ const ASSET_CLASS_ICONS: Record<AssetClass, string> = {
   [ASSET_CLASS.PreciousMetal]: 'diamond',
   [ASSET_CLASS.RealEstate]: 'home',
   [ASSET_CLASS.Other]: 'category',
+  [ASSET_CLASS.Savings]: 'account_balance',
 };
 
 // "New asset" starts here: one tile per AssetClass. The only place a class is chosen — an existing

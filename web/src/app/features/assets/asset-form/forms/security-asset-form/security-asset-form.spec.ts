@@ -2,12 +2,20 @@ import type { ComponentFixture } from '@angular/core/testing';
 
 import { client as marketDataClient } from '../../../../../api/marketdata/client.gen';
 import {
+  attributesOf,
+  labelsOf,
+  polishProblems,
+  restoreEnglish,
+  switchLanguage,
+} from '../../../../../../testing/i18n';
+import {
   etfSearchResult,
   findControl,
   instrumentId,
   mountAssetForm,
   pickInstrument,
   renderedText,
+  showValidationErrors,
   toggleFirstTransaction,
 } from '../../testing/asset-form-fixtures';
 import { SecurityAssetForm } from './security-asset-form';
@@ -24,8 +32,10 @@ describe('SecurityAssetForm', () => {
     marketDataClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
+    await restoreEnglish();
   });
 
   async function setup(assetClass: number): Promise<void> {
@@ -85,5 +95,66 @@ describe('SecurityAssetForm', () => {
     expect(findControl(component.form, 'type').value).toBe(0); // Buy
     expect(findControl(component.form, 'unitPrice').value).toBe(0);
     expect(renderedText(fixture)).toContain('Unit price');
+  });
+  // i18n screens (#132) AC-4: field labels, the instrument search placeholder and hint, the
+  // custom-ticker link and panel, the first-transaction fields and their client-side validation
+  // messages follow the language.
+  describe('in Polish', () => {
+    it('renders in Polish', async () => {
+      await setup(2); // Stock
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, 'mat-label'),
+        ...attributesOf(element, 'input[placeholder]', 'placeholder'),
+        ...labelsOf(element, '.asset-form__hint'),
+        ...labelsOf(element, '.asset-form__custom-instrument-link'),
+        ...labelsOf(element, 'mat-checkbox'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Name',
+        'Currency',
+        'Instrument',
+        'Search by ticker or name',
+        'Pick an existing instrument above, or verify a new ticker below — creation is blocked until one is selected.',
+        "Can't find it? Verify a new ticker",
+        'Add first transaction',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
+
+    it('shows the first-transaction fields and their validation in Polish', async () => {
+      await setup(2);
+      await toggleFirstTransaction(fixture);
+      findControl(component.form, 'quantity').setValue(-1);
+      findControl(component.form, 'unitPrice').setValue(-1);
+      findControl(component.form, 'date').setValue(null);
+      await showValidationErrors(fixture, component.form);
+      const element = fixture.nativeElement as HTMLElement;
+      const texts = () => [
+        ...labelsOf(element, '.asset-form__initial-transaction mat-label'),
+        ...labelsOf(element, 'mat-error'),
+      ];
+
+      const english = texts();
+      expect(english).toEqual([
+        'Type',
+        'Quantity',
+        'Unit price',
+        'Date',
+        'Name is required.',
+        'Quantity must not be negative.',
+        'Unit price must not be negative.',
+        'Date is required.',
+      ]);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(polishProblems(english, texts())).toEqual([]);
+    });
   });
 });
