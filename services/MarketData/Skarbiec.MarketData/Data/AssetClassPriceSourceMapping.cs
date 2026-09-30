@@ -26,7 +26,7 @@ namespace Skarbiec.MarketData.Data;
 public static class AssetClassPriceSourceMapping
 {
     /// <summary>The provider that prices <paramref name="assetClass"/>, or <c>null</c> when the class
-    /// has no market provider at all — Cash/Deposit/RealEstate/Other are currency-valued or manually
+    /// has no market provider at all — Cash/Deposit/Savings/RealEstate/Other are currency-valued or manually
     /// valued by default (<c>AssetValuationModes.Default</c>) and never point at a MarketData
     /// <see cref="Instrument"/>, so there is nothing for a custom-instrument endpoint to verify.</summary>
     public static PriceSource? Resolve(AssetClass assetClass) => assetClass switch
@@ -34,7 +34,7 @@ public static class AssetClassPriceSourceMapping
         AssetClass.Stock or AssetClass.Etf or AssetClass.Bond => PriceSource.Stooq,
         AssetClass.Crypto => PriceSource.CoinGecko,
         AssetClass.PreciousMetal => PriceSource.Nbp,
-        AssetClass.Cash or AssetClass.Deposit or AssetClass.RealEstate or AssetClass.Other => null,
+        AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.RealEstate or AssetClass.Other => null,
         _ => throw new ArgumentOutOfRangeException(nameof(assetClass), assetClass, "Unmapped AssetClass — add it to AssetClassPriceSourceMapping.Resolve."),
     };
 }

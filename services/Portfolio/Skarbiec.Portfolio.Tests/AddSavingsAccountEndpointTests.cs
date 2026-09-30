@@ -1,0 +1,204 @@
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.SavingsAccounts;
+using Skarbiec.Portfolio.Tests.Fixtures;
+using Skarbiec.Testing;
+using Skarbiec.Testing.Auth;
+using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
+
+namespace Skarbiec.Portfolio.Tests;
+
+/// <summary>
+/// savings-accounts: <c>POST /api/portfolio/portfolios/{portfolioId}/savings-accounts</c> creates the
+/// Savings-class asset, its <see cref="SavingsAccount"/> terms and — when an opening deposit is
+/// sent — an ordinary Deposit transaction together.
+/// </summary>
+[Collection(TestingDefaults.CollectionName)]
+public sealed class AddSavingsAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
+{
+    /// <summary>AC-2 (HTTP half; the event is proven by <see cref="PortfolioOutboxTests.AddSavingsAccount_PublishesPositionChanged"/>).</summary>
+    [Fact]
+    public async Task Add_WithOpeningDeposit_CreatesAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+
+        var response = await client.PostAsJsonAsync(SavingsAccountsUri(portfolioId), NewSavingsAccountRequest(), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(SavingsAccountUri(portfolioId, body.AssetId), response.Headers.Location?.OriginalString);
+        Assert.Equal(portfolioId, body.PortfolioId);
+        Assert.Equal("Savings", body.PortfolioName);
+        Assert.False(body.PortfolioIsArchived);
+        Assert.False(body.IsArchived);
+        Assert.Equal("Savings account", body.Name);
+        Assert.Equal("Test bank", body.BankName);
+        Assert.Equal("PLN", body.Currency);
+        Assert.Equal(10_000m, body.Balance);
+        Assert.Equal(5.25m, body.AnnualInterestRatePercent);
+        Assert.False(body.TaxExempt);
+
+        var asset = await client.GetAssetAsync(portfolioId, body.AssetId, cancellationToken);
+        Assert.Equal(AssetClass.Savings, asset.AssetClass);
+        Assert.Equal(AssetValuationMode.CurrencyValued, asset.ValuationMode);
+        Assert.Equal(10_000m, asset.Quantity);
+        Assert.Equal(1, asset.TransactionCount);
+
+        var opening = Assert.Single((await client.ListTransactionsAsync(portfolioId, body.AssetId, cancellationToken)).Items);
+        Assert.Equal(TransactionType.Deposit, opening.Type);
+        Assert.Equal(10_000m, opening.Quantity);
+        Assert.Equal(1m, opening.UnitPrice);
+        Assert.Equal(SavingsToday, opening.Date);
+        Assert.Equal(10_000.00m, opening.ValuePln);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, body.AssetId, cancellationToken);
+
+        await using var dbContext = CreateDbContext(userId);
+        var terms = await dbContext.Set<SavingsAccount>().SingleAsync(t => t.AssetId == body.AssetId, cancellationToken);
+        Assert.Equal(userId, terms.UserId);
+        Assert.Equal("Test bank", terms.BankName);
+        Assert.Equal(5.25m, terms.AnnualInterestRatePercent);
+        Assert.False(terms.TaxExempt);
+    }
+
+    /// <summary>AC-2: without an opening deposit the account starts at 0 with no transaction.</summary>
+    [Fact]
+    public async Task Add_WithoutOpeningDeposit_StartsEmpty()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            SavingsAccountsUri(portfolioId), NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(0m, body.Balance);
+        var asset = await client.GetAssetAsync(portfolioId, body.AssetId, cancellationToken);
+        Assert.Equal(AssetClass.Savings, asset.AssetClass);
+        Assert.Equal(0m, asset.Quantity);
+        Assert.Equal(0, asset.TransactionCount);
+        Assert.Empty((await client.ListTransactionsAsync(portfolioId, body.AssetId, cancellationToken)).Items);
+    }
+
+    /// <summary>The opening deposit freezes the PLN rate of its date like any transaction write (ADR-026).</summary>
+    [Fact]
+    public async Task Add_EurAccountWithOpeningDeposit_FreezesFxRate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", SavingsToday, 4.25m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            SavingsAccountsUri(portfolioId), NewSavingsAccountRequest(currency: "EUR", openingAmount: 1_000m), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken);
+        var opening = Assert.Single((await client.ListTransactionsAsync(portfolioId, body!.AssetId, cancellationToken)).Items);
+        Assert.Equal("EUR", opening.Currency);
+        Assert.Equal(4_250.00m, opening.ValuePln);
+    }
+
+    /// <summary>AC-3: every invalid input is a 400 and nothing is written.</summary>
+    [Theory]
+    [InlineData("name-empty")]
+    [InlineData("rate-negative")]
+    [InlineData("rate-over-100")]
+    [InlineData("currency-unsupported")]
+    [InlineData("opening-amount-zero")]
+    [InlineData("opening-date-tomorrow")]
+    public async Task Add_InvalidInput_ReturnsBadRequest(string invalidCase)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = invalidCase switch
+        {
+            "name-empty" => NewSavingsAccountRequest(name: ""),
+            "rate-negative" => NewSavingsAccountRequest(annualInterestRatePercent: -1m),
+            "rate-over-100" => NewSavingsAccountRequest(annualInterestRatePercent: 101m),
+            "currency-unsupported" => NewSavingsAccountRequest(currency: "XYZ"),
+            "opening-amount-zero" => NewSavingsAccountRequest(openingAmount: 0m),
+            "opening-date-tomorrow" => NewSavingsAccountRequest(openingDate: SavingsToday.AddDays(1)),
+            _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
+        };
+
+        var response = await client.PostAsJsonAsync(SavingsAccountsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Set<SavingsAccount>().CountAsync(cancellationToken));
+    }
+
+    /// <summary>AC-3 boundaries: the edges of every range are themselves valid, and an opening date of today is allowed.</summary>
+    [Theory]
+    [InlineData("rate-zero")]
+    [InlineData("rate-100")]
+    [InlineData("opening-date-today")]
+    public async Task Add_BoundaryInput_ReturnsCreated(string boundaryCase)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = boundaryCase switch
+        {
+            "rate-zero" => NewSavingsAccountRequest(annualInterestRatePercent: 0m),
+            "rate-100" => NewSavingsAccountRequest(annualInterestRatePercent: 100m),
+            "opening-date-today" => NewSavingsAccountRequest(openingDate: SavingsToday),
+            _ => throw new ArgumentOutOfRangeException(nameof(boundaryCase), boundaryCase, null)
+        };
+
+        var response = await client.PostAsJsonAsync(SavingsAccountsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    /// <summary>AC-3: an archived portfolio is read-only — 409 and nothing is written.</summary>
+    [Fact]
+    public async Task Add_ArchivedPortfolio_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(SavingsAccountsUri(portfolioId), NewSavingsAccountRequest(), cancellationToken);
+
+        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Set<SavingsAccount>().CountAsync(cancellationToken));
+    }
+
+    [Fact]
+    public async Task Add_WithoutToken_ReturnsUnauthorized()
+    {
+        using var client = Factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            SavingsAccountsUri(Guid.NewGuid()), NewSavingsAccountRequest(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+}

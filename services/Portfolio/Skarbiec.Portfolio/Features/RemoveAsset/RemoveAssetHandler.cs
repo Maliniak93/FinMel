@@ -38,7 +38,8 @@ public sealed class RemoveAssetHandler(
         // as an ordinary transaction, its asset's quantity unchanged — so nothing is published for it.
         await dbContext.DetachCounterpartsAsync(transactions, cancellationToken);
 
-        // A term deposit's terms go with it (term-deposits).
+        // A term deposit's terms go with it (term-deposits). A savings account's go through the FK
+        // cascade alone (savings-accounts): nothing else references them.
         var termDeposit = await dbContext.TermDeposits.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);
         if (termDeposit is not null)
         {

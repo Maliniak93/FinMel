@@ -33,7 +33,7 @@
     "nav": {
       "dashboard": "Dashboard",
       "portfolios": "Portfolios",
-      "deposits": "Deposits",
+      "deposits": "Deposits & savings",
       "settings": "Settings"
     },
     "toggleNavigation": "Toggle navigation",
@@ -102,6 +102,7 @@
       "preciousMetal": "Precious metal",
       "realEstate": "Real estate",
       "other": "Other",
+      "savings": "Savings account",
       "unknown": "Unknown"
     },
     "transactionType": {
@@ -229,6 +230,7 @@
     "portfolioLoadFailed": "Failed to load portfolio.",
     "loadFailed": "Failed to load assets.",
     "depositLoadFailed": "Failed to load the deposit.",
+    "savingsAccountLoadFailed": "Failed to load the savings account.",
     "delete": {
       "title": "Delete this asset?",
       "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
@@ -290,7 +292,11 @@
     "assetArchivedNotice": "This asset is archived — restore it to make changes."
   },
   "deposits": {
-    "title": "Deposits",
+    "title": "Deposits & savings",
+    "tabs": {
+      "termDeposits": "Term deposits",
+      "savingsAccounts": "Savings accounts"
+    },
     "add": "Add deposit",
     "empty": "You don't have any term deposits yet.",
     "addFirst": "Add your first deposit",
@@ -389,6 +395,28 @@
         "month": "{{ count }} month",
         "months": "{{ count }} months"
       }
+    }
+  },
+  "savings": {
+    "add": "Add savings account",
+    "empty": "You don't have any savings accounts yet.",
+    "addFirst": "Add your first savings account",
+    "balance": "Balance",
+    "taxFree": "Tax-free",
+    "loadFailed": "Failed to load savings accounts.",
+    "delete": {
+      "title": "Delete this savings account?",
+      "message": "\"{{ name }}\", its terms and its transactions will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete the savings account."
+    },
+    "form": {
+      "newTitle": "New savings account",
+      "editTitle": "Edit savings account",
+      "openingAmount": "Opening deposit (optional)",
+      "openingAmountPositive": "The opening deposit must be greater than 0.",
+      "openingDate": "Opening deposit date",
+      "openingDateRequired": "Date is required.",
+      "openingDateInFuture": "Date can't be in the future."
     }
   },
   "assetArchive": {

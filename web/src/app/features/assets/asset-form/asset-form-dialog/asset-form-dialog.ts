@@ -23,6 +23,7 @@ import {
   type ApiProblemDetails,
 } from '../../../../core/auth/problem-details';
 import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
+import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { ASSET_CLASS } from '../../asset-class';
 import { ASSET_FORM, INITIAL_TRANSACTION_KEY } from '../asset-form';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
@@ -39,7 +40,8 @@ export interface AssetFormDialogData {
 type AssetFormKind = 'cash' | 'security' | 'gold' | 'manual';
 
 // Which per-kind form each AssetClass opens. A Deposit is a term deposit with its own dialog
-// (DepositFormDialog), so it never reaches a form here.
+// (DepositFormDialog), and a Savings asset a savings account with its own (SavingsAccountFormDialog),
+// so neither reaches a form here.
 function formKindFor(assetClass: AssetClass): AssetFormKind {
   switch (Number(assetClass)) {
     case ASSET_CLASS.Cash:
@@ -102,6 +104,18 @@ export class AssetFormDialog {
     if (Number(assetClass) === ASSET_CLASS.Deposit) {
       this.dialog
         .open(DepositFormDialog, { width: '560px', data: { portfolioId: this.data.portfolioId } })
+        .afterClosed()
+        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
+      return;
+    }
+
+    // Likewise a savings account is created only through the savings-account endpoint.
+    if (Number(assetClass) === ASSET_CLASS.Savings) {
+      this.dialog
+        .open(SavingsAccountFormDialog, {
+          width: '560px',
+          data: { portfolioId: this.data.portfolioId },
+        })
         .afterClosed()
         .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
       return;

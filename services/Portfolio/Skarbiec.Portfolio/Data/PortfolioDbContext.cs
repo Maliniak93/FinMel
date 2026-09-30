@@ -14,6 +14,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
+    public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -106,6 +107,20 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             termDeposit.Property(t => t.EarlyBreakInterestLossPercent).HasPrecision(5, 2);
             termDeposit.Property(t => t.SettledGrossInterest).HasPrecision(18, 2);
             termDeposit.Property(t => t.SettledTax).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<SavingsAccount>(savingsAccount =>
+        {
+            // 1:1 with its Savings-class asset (savings-accounts), keyed and FK-cascaded exactly like
+            // TermDeposit above: the cascade removes it with its asset on RemoveAsset and DeletePortfolio.
+            savingsAccount.HasKey(s => s.AssetId);
+            savingsAccount.HasOne<Asset>()
+                .WithOne()
+                .HasForeignKey<SavingsAccount>(s => s.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            savingsAccount.Property(s => s.BankName).HasMaxLength(100);
+            savingsAccount.Property(s => s.AnnualInterestRatePercent).HasPrecision(7, 4);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).

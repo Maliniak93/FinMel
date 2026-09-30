@@ -1,0 +1,23 @@
+.savings-account-form-dialog__field {
+  display: block;
+  width: 100%;
+}
+
+.savings-account-form-dialog__row {
+  display: flex;
+  gap: 12px;
+
+  .savings-account-form-dialog__field {
+    flex: 1;
+  }
+}
+
+.savings-account-form-dialog__toggle {
+  display: block;
+  margin: 0 0 16px;
+}
+
+.savings-account-form-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

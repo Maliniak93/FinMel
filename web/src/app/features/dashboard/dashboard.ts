@@ -25,6 +25,7 @@ const ASSET_CLASS_COLORS: readonly string[] = [
   '#F76707', // PreciousMetal
   '#7048E8', // RealEstate
   '#868E96', // Other
+  '#E64980', // Savings
 ];
 
 @Component({

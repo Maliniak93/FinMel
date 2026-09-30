@@ -31,6 +31,8 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../shared/format';
 import { toDateOnly } from '../../shared/date-only';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
+import { SavingsAccountFormDialog } from '../deposits/savings-account-form-dialog/savings-account-form-dialog';
+import { savingsAccountResponse } from '../deposits/testing/savings-account-fixtures';
 import { depositResponse } from '../deposits/testing/deposit-fixtures';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
@@ -151,11 +153,17 @@ describe('Assets', () => {
     portfolioResponse = jsonResponse(portfolio),
     instrumentResponse?: Response,
     depositResponseBody?: unknown,
+    savingsAccountBody?: unknown,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
       if (url.includes('/instruments/')) {
         return instrumentResponse ?? jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (url.includes('/savings-accounts')) {
+        return savingsAccountBody
+          ? jsonResponse(savingsAccountBody)
+          : jsonResponse({ detail: 'Not found.' }, 404);
       }
       if (url.includes('/deposits')) {
         return depositResponseBody
@@ -700,6 +708,40 @@ describe('Assets', () => {
     expect(dialogType).not.toBe(AssetFormDialog);
     // Addresses this deposit — whether the page hands over the loaded terms or just the ids.
     expect(JSON.stringify(config?.data)).toContain(deposit.id);
+    // A save reloads the asset list.
+    await vi.waitFor(() =>
+      expect(
+        fetchSpy.mock.calls
+          .slice(callsBefore)
+          .some((call: unknown[]) =>
+            requestUrl(call[0]).endsWith(`/portfolios/${portfolioId}/assets`),
+          ),
+      ).toBe(true),
+    );
+  });
+
+  // savings-accounts: a Savings-class row is edited through SavingsAccountFormDialog (its terms live
+  // on the savings-account endpoints), never the generic asset form.
+  it('Edit on a Savings row opens SavingsAccountFormDialog, not the asset form', async () => {
+    const savings: AssetResponse = {
+      ...currencyValuedAsset,
+      id: '88888888-aaaa-8888-aaaa-888888888888',
+      assetClass: 9, // Savings
+      name: 'Savings account',
+      quantity: 10000,
+    };
+    const terms = savingsAccountResponse({ assetId: savings.id, portfolioId });
+    await setup(jsonResponse([savings]), undefined, undefined, undefined, terms);
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = fetchSpy.mock.calls.length;
+
+    component['openEditDialog'](savings);
+
+    await vi.waitFor(() => expect(dialog.open).toHaveBeenCalled());
+    const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data?: unknown }];
+    expect(dialogType).toBe(SavingsAccountFormDialog);
+    expect(dialogType).not.toBe(AssetFormDialog);
+    expect(JSON.stringify(config?.data)).toContain(savings.id);
     // A save reloads the asset list.
     await vi.waitFor(() =>
       expect(

@@ -119,6 +119,26 @@ describe('Dashboard', () => {
     ]);
   });
 
+  // savings-accounts AC-11: the colours are indexed by AssetClass, so the appended Savings class
+  // (9) gets a colour of its own instead of wrapping around to Cash's.
+  it('gives the Savings class a colour of its own', async () => {
+    await setup(
+      jsonResponse({
+        ...dashboard,
+        byAssetClass: [
+          { assetClass: ASSET_CLASS.Cash, valuePln: 5000, percentage: 50 },
+          { assetClass: ASSET_CLASS.Savings, valuePln: 5000, percentage: 50 },
+        ],
+      } satisfies DashboardResponse),
+    );
+
+    const [cash, savings] = component['pieSegments']();
+
+    expect(savings.label).toBe(assetClassLabel(ASSET_CLASS.Savings));
+    expect(savings.color).toBeTruthy();
+    expect(savings.color).not.toBe(cash.color);
+  });
+
   it('shows an empty state when no snapshot has ever been computed', async () => {
     await setup(
       jsonResponse({

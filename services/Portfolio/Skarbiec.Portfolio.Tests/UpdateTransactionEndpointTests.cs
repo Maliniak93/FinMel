@@ -81,6 +81,34 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(1_500m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
     }
 
+    /// <summary>
+    /// savings-accounts AC-7: unlike a term deposit's, a savings account's transactions stay editable —
+    /// changing the opening Deposit moves the balance, and turning it into a Buy is refused.
+    /// </summary>
+    [Fact]
+    public async Task Update_SavingsAccountTransaction_MovesBalance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var openingId = Assert.Single((await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items).Id;
+        var edit = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 12_000m, UnitPrice = 1m, Date = SavingsToday };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(portfolioId, account.AssetId, openingId), edit, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(12_000m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(12_000m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, account.AssetId, cancellationToken);
+
+        var toBuy = edit with { Type = TransactionType.Buy };
+        var refused = await client.PutAsJsonAsync(TransactionUri(portfolioId, account.AssetId, openingId), toBuy, cancellationToken);
+
+        await refused.AssertTransactionTypeNotAllowedAsync(cancellationToken);
+        Assert.Equal(12_000m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
+    }
+
     [Fact]
     public async Task Update_ForNonExistentTransaction_ReturnsNotFound()
     {

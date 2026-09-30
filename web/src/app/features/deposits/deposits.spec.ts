@@ -45,6 +45,7 @@ import {
   settledDeposit,
   settledDepositFinalAmount,
 } from './testing/deposit-fixtures';
+import { activeSavingsAccount, taxFreeEurSavingsAccount } from './testing/savings-account-fixtures';
 import { provideI18nTesting } from '../../core/i18n/testing';
 
 // term-deposits AC-15. The Deposits page (route `deposits`) lists every deposit of the user across
@@ -77,6 +78,9 @@ describe('Deposits', () => {
       // asset-archive: the archive / restore endpoints answer 200 with the asset.
       if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
         return jsonResponse({});
+      }
+      if (requestUrl(input).includes('/api/portfolio/savings-accounts')) {
+        return jsonResponse([activeSavingsAccount, taxFreeEurSavingsAccount]);
       }
       return requestUrl(input).includes('/api/portfolio/deposits')
         ? jsonResponse(deposits)
@@ -146,6 +150,71 @@ describe('Deposits', () => {
       menuItemLabel,
     );
   }
+
+  // savings-accounts AC-11. The page is titled "Deposits & savings" and is a tab group: "Term deposits"
+  // holds the term-deposit table (everything below), "Savings accounts" the savings accounts.
+  describe('tabs', () => {
+    function tabs(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
+      );
+    }
+
+    function tabFor(label: RegExp): HTMLElement {
+      const tab = tabs().find((candidate) => label.test(candidate.textContent ?? ''));
+      if (!tab) {
+        throw new Error(`No tab matching ${label}.`);
+      }
+      return tab;
+    }
+
+    it('is titled "Deposits & savings"', async () => {
+      await setup();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('h1')?.textContent).toContain(
+        'Deposits & savings',
+      );
+    });
+
+    it('renders the Term deposits and Savings accounts tabs', async () => {
+      await setup();
+
+      expect(tabs()).toHaveLength(2);
+      expect(tabFor(/term deposits/i)).toBeDefined();
+      expect(tabFor(/savings accounts/i)).toBeDefined();
+    });
+
+    it('opens on Term deposits, which lists the term deposits', async () => {
+      await setup();
+
+      expect(tabFor(/term deposits/i).getAttribute('aria-selected')).toBe('true');
+      expect(tabFor(/savings accounts/i).getAttribute('aria-selected')).toBe('false');
+      expect(rows()).toHaveLength(3);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain(
+        activeSavingsAccount.name,
+      );
+    });
+
+    it('the Savings accounts tab lists the savings accounts', async () => {
+      await setup();
+
+      tabFor(/savings accounts/i).click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      await vi.waitFor(() => {
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain(activeSavingsAccount.name);
+        expect(text).toContain(taxFreeEurSavingsAccount.name);
+      });
+      expect(tabFor(/savings accounts/i).getAttribute('aria-selected')).toBe('true');
+      expect(
+        fetchSpy.mock.calls.some((call: unknown[]) =>
+          requestUrl(call[0]).includes('/api/portfolio/savings-accounts'),
+        ),
+      ).toBe(true);
+    });
+  });
 
   it('lists every deposit with its terms and projection columns', async () => {
     await setup();
@@ -655,7 +724,7 @@ describe('Deposits', () => {
 
       const english = await texts();
       expect(english).toEqual([
-        'Deposits',
+        'Deposits & savings',
         'Add deposit',
         'Name',
         'Bank',

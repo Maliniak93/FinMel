@@ -484,3 +484,67 @@ Content-Type: application/json
 {
   "annualInterestRatePercent": 5
 }
+
+### --- Savings accounts ---
+
+### Add a savings account
+# Creates the Savings-class asset (CurrencyValued), its SavingsAccount terms and — when openingDeposit
+# is sent — an ordinary Deposit transaction (unit price 1, the date's PLN rate frozen), then publishes
+# AssetPositionChanged with the balance, all in one save (savings-accounts). Omit openingDeposit to
+# start at 0. 400 for an empty name, a rate outside 0–100, an unsupported currency, an opening amount
+# of 0 or less, or an opening date after today (Europe/Warsaw); 409 Conflict.PortfolioArchived.
+# @name addSavingsAccount
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Savings account",
+  "bankName": "Example bank",
+  "currency": "PLN",
+  "annualInterestRatePercent": 5.25,
+  "taxExempt": false,
+  "openingDeposit": {
+    "amount": 10000.00,
+    "date": "2026-02-01"
+  }
+}
+
+### Pay into the savings account
+# Money moves through the ordinary transaction endpoints — Deposit/Withdraw only, editable and
+# deletable; a Withdraw beyond the balance is 400 Validation.OversellsPosition.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addSavingsAccount.response.body.assetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 500.00,
+  "unitPrice": 1,
+  "date": "2026-02-10"
+}
+
+### List every savings account across portfolios
+# Ordered by portfolio name, then account name; archived accounts and those of archived portfolios
+# are included with their flags. The balance is the asset's quantity, in the account's currency.
+GET {{baseUrl}}/api/portfolio/savings-accounts
+Authorization: Bearer {{authToken}}
+
+### Get a savings account
+# 404 for another user's asset, or one that is not a savings account.
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+
+### Update a savings account
+# Name, bank, rate and tax status only: the currency is immutable and the balance moves through the
+# transactions. Publishes no event. 409 Conflict.PortfolioArchived / Conflict.AssetArchived.
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Emergency fund",
+  "bankName": "Example bank",
+  "annualInterestRatePercent": 4.75,
+  "taxExempt": true
+}

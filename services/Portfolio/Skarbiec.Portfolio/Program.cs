@@ -25,6 +25,10 @@ using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
 using Skarbiec.Portfolio.Features.RestoreAsset;
 using Skarbiec.Portfolio.Features.RestorePortfolio;
+using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
+using Skarbiec.Portfolio.Features.SavingsAccounts.GetSavingsAccount;
+using Skarbiec.Portfolio.Features.SavingsAccounts.ListSavingsAccounts;
+using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 using Skarbiec.Portfolio.Features.Transfers.ListTransferCandidates;
 using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
@@ -102,6 +106,10 @@ builder.Services.AddScoped<GetSettlementPreviewHandler>();
 builder.Services.AddScoped<SettleDepositHandler>();
 builder.Services.AddScoped<PayOutDepositHandler>();
 builder.Services.AddScoped<RollOverDepositHandler>();
+builder.Services.AddScoped<AddSavingsAccountHandler>();
+builder.Services.AddScoped<UpdateSavingsAccountHandler>();
+builder.Services.AddScoped<GetSavingsAccountHandler>();
+builder.Services.AddScoped<ListSavingsAccountsHandler>();
 builder.Services.AddScoped<ListTransferCandidatesHandler>();
 
 var app = builder.Build();
@@ -136,6 +144,10 @@ app.MapGetSettlementPreviewEndpoint();
 app.MapSettleDepositEndpoint();
 app.MapPayOutDepositEndpoint();
 app.MapRollOverDepositEndpoint();
+app.MapAddSavingsAccountEndpoint();
+app.MapUpdateSavingsAccountEndpoint();
+app.MapGetSavingsAccountEndpoint();
+app.MapListSavingsAccountsEndpoint();
 app.MapListTransferCandidatesEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton

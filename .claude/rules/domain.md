@@ -12,7 +12,7 @@ Target model. Items marked *(target — spec-0x)* are not implemented yet; do no
 
 ## Assets and transactions
 
-- `AssetClass` (`Skarbiec.Contracts`): Cash, Deposit, Stock, Etf, Bond, Crypto, PreciousMetal, RealEstate, Other.
+- `AssetClass` (`Skarbiec.Contracts`): Cash, Deposit, Stock, Etf, Bond, Crypto, PreciousMetal, RealEstate, Other, Savings (appended — never reorder: the ints are stored).
 - `TransactionType`: Buy, Sell, Deposit, Withdraw, Dividend, Interest. **Buy/Deposit increase quantity, Sell/Withdraw decrease it**; Dividend and Interest do not change quantity. Quantity is derived from transactions, never stored as an independent truth (ADR-009).
 - Manual-valuation assets may exist with no transactions at all.
 
@@ -23,7 +23,7 @@ Target model. Items marked *(target — spec-0x)* are not implemented yet; do no
 | Mode | Default for | Value |
 | --- | --- | --- |
 | `Market` | Stock, Etf, Bond, Crypto, PreciousMetal | `Quantity × last PriceQuote(instrument, ≤ date) × FxRate(quoteCurrency→PLN, ≤ date)` |
-| `CurrencyValued` | Cash, Deposit | `Quantity × FxRate(assetCurrency→PLN, ≤ date)` — no instrument, no manual value |
+| `CurrencyValued` | Cash, Deposit, Savings | `Quantity × FxRate(assetCurrency→PLN, ≤ date)` — no instrument, no manual value |
 | `Manual` | RealEstate, Other | `ManualValueAmount × FxRate(assetCurrency→PLN, ≤ date)`, as of `ManualValueDate` |
 
 The default is a starting point the user may override; the mode, not the class, decides how a value is computed. An asset has exactly one mode, and `Market` requires an `InstrumentId`.
@@ -41,7 +41,7 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 
 **Identity** — `User` (`DisplayName`, no `BaseCurrency` — PLN-only, ADR-008), `RefreshToken`.
 
-**Portfolio** — `Portfolio (Id, UserId, Name, Description?, Currency, IsArchived)`; `Asset (Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, IsArchived, xmin)`; `Transaction (Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, xmin)`, where `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when there is none that early (ADR-026); `TermDeposit (AssetId PK+FK, UserId, BankName?, Principal, StartDate, TermLength, TermUnit, MaturityDate, AnnualInterestRatePercent, Capitalization, TaxExempt, EarlyBreakInterestLossPercent, SettledOn?, SettledGrossInterest?, SettledTax?, RolloverCount)`, the terms of a Deposit-class asset (term-deposits), 1:1 with it — its projection and Active/Due/Settled/PaidOut status are computed at read time by `DepositInterestMath` (PaidOut: settled and holding a payout `Withdraw`); the `Settled*` fields are what the bank actually paid, set by `SettleDeposit` once per term; `RollOverDeposit` (deposit-rollover) starts the next term on the same asset — the whole balance as principal, the old maturity date as start date, only the rate changed — clearing them and incrementing the stored `RolloverCount`. Deletes cascade explicitly in the handler, not the database (no FKs inside `portfolio_db` except `TermDeposit → Asset`, which also cascades): deleting a portfolio removes its assets and their transactions, deleting an asset removes its transactions — every removal and outbox event in one `SaveChangesAsync`. No denormalized child counters. `Asset.Version` is the per-asset ordering counter on `AssetPositionChanged`, written only by `PositionEventPublisher`; `xmin` stays the concurrency token and is a separate thing (it doesn't move when only the portfolio's archived flag changes).
+**Portfolio** — `Portfolio (Id, UserId, Name, Description?, Currency, IsArchived)`; `Asset (Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, IsArchived, xmin)`; `Transaction (Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, xmin)`, where `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when there is none that early (ADR-026); `TermDeposit (AssetId PK+FK, UserId, BankName?, Principal, StartDate, TermLength, TermUnit, MaturityDate, AnnualInterestRatePercent, Capitalization, TaxExempt, EarlyBreakInterestLossPercent, SettledOn?, SettledGrossInterest?, SettledTax?, RolloverCount)`, the terms of a Deposit-class asset (term-deposits), 1:1 with it — its projection and Active/Due/Settled/PaidOut status are computed at read time by `DepositInterestMath` (PaidOut: settled and holding a payout `Withdraw`); the `Settled*` fields are what the bank actually paid, set by `SettleDeposit` once per term; `RollOverDeposit` (deposit-rollover) starts the next term on the same asset — the whole balance as principal, the old maturity date as start date, only the rate changed — clearing them and incrementing the stored `RolloverCount`; `SavingsAccount (AssetId PK+FK, UserId, BankName?, AnnualInterestRatePercent, TaxExempt)`, the terms of a Savings-class asset (savings-accounts), 1:1 with it — its balance is `Asset.Quantity`. Deletes cascade explicitly in the handler, not the database (no FKs inside `portfolio_db` except `TermDeposit → Asset` and `SavingsAccount → Asset`, which also cascade): deleting a portfolio removes its assets and their transactions, deleting an asset removes its transactions — every removal and outbox event in one `SaveChangesAsync`. No denormalized child counters. `Asset.Version` is the per-asset ordering counter on `AssetPositionChanged`, written only by `PositionEventPublisher`; `xmin` stays the concurrency token and is a separate thing (it doesn't move when only the portfolio's archived flag changes).
 
 **MarketData** — `Instrument (Id, Ticker, Name, Source, QuoteCurrency, AssetClass, VerificationStatus)`, where `InstrumentVerificationStatus` is `Verified | Unverified | Failed` and records the ADR-018 ticker check made once at creation; it is never re-checked from a valuation path, and `Verified` must stay the 0 member (it is the column's `HasDefaultValue`). `PriceQuote`; `FxRate`; `SyncRun (+ Kind: Prices | Fx | Backfill)`; `Currency`; `InstrumentUsage (InstrumentId PK, AssetCount, FirstUsedAt)`, derived from per-asset `AssetInstrumentLink (AssetId PK, InstrumentId?, Version, IsRemoved)` rows maintained from `AssetPositionChanged`/`AssetRemoved` so `PriceSyncJob` syncs only instruments actually in use and first use triggers a history backfill.
 
@@ -53,8 +53,9 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 - A Sell or Withdraw may never take an asset's quantity below 0 — **at any point in its transaction history**, not just at the end (editing or deleting an older transaction must be re-checked against the whole timeline).
 - Amounts and quantities are ≥ 0.
 - An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).
-- A Cash/Deposit asset's transactions are only Deposit/Withdraw — 400 `Validation.TransactionTypeNotAllowed` on every write (record, edit, opening transaction, class change); the rule lives in Portfolio's `AssetTransactionTypes`, mirrored by `allowedTransactionTypes` in the web client.
+- A Cash/Deposit/Savings asset's transactions are only Deposit/Withdraw — 400 `Validation.TransactionTypeNotAllowed` on every write (record, edit, opening transaction, class change); the rule lives in Portfolio's `AssetTransactionTypes`, mirrored by `allowedTransactionTypes` in the web client.
 - A Deposit-class asset has exactly one `TermDeposit`; its transactions are system-managed (one opening Deposit, rewritten by `UpdateDeposit` only before the first rollover, plus the net-interest Deposit each settled term adds when the net is above 0, and the payout's Withdraw leg) — record/update/delete on it is 409 `Conflict.DepositTransactionsManaged`, and `AddAsset`/`UpdateAsset` reject class Deposit or a change to/from it with 400 `Validation.UseDepositEndpoints`.
+- A Savings asset has exactly one `SavingsAccount`, created and edited only through the savings-account slices; its transactions are ordinary Deposit/Withdraw — `AddAsset`/`UpdateAsset` reject class Savings or a change to/from it with 400 `Validation.UseSavingsAccountEndpoints`.
 - A settled deposit's terms are immutable — `UpdateDeposit` on it is 409 `Conflict.DepositSettled`; deleting it stays allowed.
 - A rolled-over deposit's principal and start date are fixed — `UpdateDeposit` changing either is 409 `Conflict.DepositRolledOver`.
 - A paid-out deposit holds 0; a payout always moves the whole balance, as a Deposit → Cash transfer (deposit-payout-to-cash).
@@ -69,7 +70,7 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 | Service | Owns |
 | --- | --- |
 | Identity | User, RefreshToken |
-| Portfolio | Portfolio, Asset, Transaction, TermDeposit |
+| Portfolio | Portfolio, Asset, Transaction, TermDeposit, SavingsAccount |
 | MarketData | Currency, Instrument, PriceQuote, FxRate, SyncRun, InstrumentUsage |
 | Reporting | Position, AssetValuation, ValuationSnapshot, TargetAllocation(+Line), EmergencyFund(+Asset), SavingsGoal(+Asset) |
 

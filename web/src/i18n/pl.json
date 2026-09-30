@@ -33,7 +33,7 @@
     "nav": {
       "dashboard": "Pulpit",
       "portfolios": "Portfele",
-      "deposits": "Lokaty",
+      "deposits": "Lokaty i oszczędności",
       "settings": "Ustawienia"
     },
     "toggleNavigation": "Pokaż lub ukryj nawigację",
@@ -102,6 +102,7 @@
       "preciousMetal": "Metale szlachetne",
       "realEstate": "Nieruchomości",
       "other": "Inne",
+      "savings": "Konto oszczędnościowe",
       "unknown": "Nieznana"
     },
     "transactionType": {
@@ -229,6 +230,7 @@
     "portfolioLoadFailed": "Nie udało się wczytać portfela.",
     "loadFailed": "Nie udało się wczytać aktywów.",
     "depositLoadFailed": "Nie udało się wczytać lokaty.",
+    "savingsAccountLoadFailed": "Nie udało się wczytać konta oszczędnościowego.",
     "delete": {
       "title": "Usunąć to aktywo?",
       "message": "\"{{ name }}\" zostanie trwale usunięte. Tej operacji nie można cofnąć.",
@@ -290,7 +292,11 @@
     "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany."
   },
   "deposits": {
-    "title": "Lokaty",
+    "title": "Lokaty i oszczędności",
+    "tabs": {
+      "termDeposits": "Lokaty terminowe",
+      "savingsAccounts": "Konta oszczędnościowe"
+    },
     "add": "Dodaj lokatę",
     "empty": "Nie masz jeszcze żadnych lokat terminowych.",
     "addFirst": "Dodaj pierwszą lokatę",
@@ -389,6 +395,28 @@
         "month": "{{ count }} miesiąc",
         "months": "miesięcy: {{ count }}"
       }
+    }
+  },
+  "savings": {
+    "add": "Dodaj konto oszczędnościowe",
+    "empty": "Nie masz jeszcze żadnych kont oszczędnościowych.",
+    "addFirst": "Dodaj pierwsze konto oszczędnościowe",
+    "balance": "Saldo",
+    "taxFree": "Bez podatku",
+    "loadFailed": "Nie udało się wczytać kont oszczędnościowych.",
+    "delete": {
+      "title": "Usunąć to konto oszczędnościowe?",
+      "message": "\"{{ name }}\", jego warunki i transakcje zostaną trwale usunięte. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć konta oszczędnościowego."
+    },
+    "form": {
+      "newTitle": "Nowe konto oszczędnościowe",
+      "editTitle": "Edytuj konto oszczędnościowe",
+      "openingAmount": "Wpłata początkowa (opcjonalnie)",
+      "openingAmountPositive": "Wpłata początkowa musi być większa od 0.",
+      "openingDate": "Data wpłaty początkowej",
+      "openingDateRequired": "Data jest wymagana.",
+      "openingDateInFuture": "Data nie może być z przyszłości."
     }
   },
   "assetArchive": {
