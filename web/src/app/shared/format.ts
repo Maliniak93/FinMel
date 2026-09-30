@@ -50,7 +50,7 @@ export function formatMonth(value: string | Date | null | undefined): string {
       );
 }
 
-// Medium date and time:"Sep 27, 2026, 8:30:00 PM" / "27 wrz 2026, 20:30:00".
+// Medium date and time: "Sep 27, 2026, 8:30:00 PM" / "27 wrz 2026, 20:30:00".
 export function formatDateTime(value: string | Date | null | undefined): string {
   return value === null || value === undefined || value === ''
     ? ''
