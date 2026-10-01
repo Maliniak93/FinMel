@@ -79,29 +79,18 @@
       </mat-form-field>
     </div>
 
-    <mat-form-field appearance="outline" class="settle-deposit-dialog__field">
-      <mat-label>{{ 'deposits.fields.moveTo' | transloco }}</mat-label>
-      <mat-select formControlName="destinationAssetId" canSelectNullableOptions>
-        <mat-option [value]="null">{{ 'deposits.settle.keepInDeposit' | transloco }}</mat-option>
-        @if (destinationCandidatesResource.hasValue()) {
-          @for (candidate of destinationCandidatesResource.value(); track candidate.assetId) {
-            <mat-option [value]="candidate.assetId">
-              {{ candidate.name }} — {{ candidate.portfolioName }}
-            </mat-option>
-          }
-        }
-      </mat-select>
-      @if (destinationCandidatesResource.error(); as loadError) {
-        <mat-hint>{{ loadError.message }}</mat-hint>
-      } @else if (movedAmount(); as moved) {
-        <mat-hint>{{
-          'deposits.settle.movesOut' | transloco: { amount: formatMoney(moved, deposit.currency) }
-        }}</mat-hint>
-      }
-      @if (form.controls.destinationAssetId.hasError('server')) {
-        <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
-      }
-    </mat-form-field>
+    @let moved = movedAmount();
+    <app-payout-destination-field
+      formControlName="destinationAssetId"
+      [currency]="deposit.currency"
+      [portfolioId]="deposit.portfolioId"
+      [offerKeep]="true"
+      [hint]="
+        moved === null
+          ? null
+          : ('deposits.settle.movesOut' | transloco: { amount: formatMoney(moved, deposit.currency) })
+      "
+    />
 
     <dl class="settle-deposit-dialog__summary">
       <div>

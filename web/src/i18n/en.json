@@ -319,7 +319,7 @@
     "archivedMarker": "(archived)",
     "settleMaturity": "Settle maturity",
     "settleMaturityOf": "Settle maturity of {{ name }}",
-    "transferToCash": "Transfer to cash",
+    "payOutAction": "Pay out",
     "rollOver": "Roll over",
     "actionsForThis": "Actions for this deposit",
     "loadFailed": "Failed to load deposits.",
@@ -345,6 +345,7 @@
       "interestRateRequired": "Interest rate is required.",
       "interestRateRange": "Interest rate must be between 0 and 100.",
       "cashAccountsLoadFailed": "Failed to load the Cash accounts.",
+      "payoutDestinationsLoadFailed": "Failed to load the accounts to pay out to.",
       "previewLoadFailed": "Failed to load the settlement preview."
     },
     "form": {
@@ -376,7 +377,10 @@
       "insufficientFunds": "The source of funds cannot cover this principal."
     },
     "payOut": {
-      "noCashAccount": "You have no Cash account in {{ currency }} to move the money to.",
+      "noCashAccount": "You have no Cash or savings account in {{ currency }} to move the money to.",
+      "cashGroup": "Cash",
+      "savingsGroup": "Savings accounts",
+      "newSavingsAccount": "New savings account…",
       "destinationRequired": "Pick where the money goes.",
       "dateBeforeSettlement": "Date can't be before the settlement date.",
       "dateInFuture": "Date can't be in the future.",

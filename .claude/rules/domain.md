@@ -61,7 +61,7 @@ Use the **last known** price and FX rate at or before the snapshot date (weekend
 - Savings interest credits are system-managed — update/delete through the transaction endpoints is 409 `Conflict.SavingsInterestManaged`.
 - A settled deposit's terms are immutable — `UpdateDeposit` on it is 409 `Conflict.DepositSettled`; deleting it stays allowed.
 - A rolled-over deposit's principal and start date are fixed — `UpdateDeposit` changing either is 409 `Conflict.DepositRolledOver`.
-- A paid-out deposit holds 0; a payout always moves the whole balance, as a Deposit → Cash transfer (deposit-payout-to-cash).
+- A paid-out deposit holds 0; a payout always moves the whole balance, as a Deposit → Cash or Deposit → Savings transfer (deposit-payout-to-cash, deposit-payout-to-savings).
 - An archived portfolio is read-only: every asset and transaction write in it is 409 `Conflict.PortfolioArchived`, checked after the tenancy lookup so a stranger still gets 404. Renaming or deleting the portfolio stays allowed.
 - An archived asset (asset-archive, `Asset.IsArchived`, independent of its portfolio's flag) is read-only the same way: every asset, transaction and deposit write on it is 409 `Conflict.AssetArchived`, checked after the portfolio check through `ArchivedPortfolioGuard`; removal stays allowed, and it is never a transfer candidate or counterpart. It drops out of net worth from the archive date; earlier snapshots stay.
 - Unique: one `PriceQuote` per (instrument, date), one `FxRate` per (pair, date), one `AssetValuation` per (asset, date).

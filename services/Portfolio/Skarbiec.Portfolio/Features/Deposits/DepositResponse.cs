@@ -73,7 +73,7 @@ public sealed record DepositResponse
     public DateOnly? PaidOutOn { get; init; }
 
     /// <summary>
-    /// The Cash asset the payout went to — <see langword="null"/> until the deposit is paid out, and again
+    /// The Cash or Savings asset the payout went to — <see langword="null"/> until the deposit is paid out, and again
     /// once that asset was removed (its leg detached).
     /// </summary>
     public string? PaidOutToAssetName { get; init; }

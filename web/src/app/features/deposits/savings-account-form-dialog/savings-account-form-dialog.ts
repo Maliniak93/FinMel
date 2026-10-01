@@ -35,9 +35,13 @@ import { toDateOnly } from '../../../shared/date-only';
 
 // Create: no account — `portfolioId` presets the portfolio (the asset type picker), otherwise the
 // user picks one. Edit: the account being edited; its portfolio, currency and balance are fixed.
+// Payout target (deposit-payout-to-savings): `currency` set — a new account for a deposit payout, in
+// that fixed currency, `portfolioId` only the default portfolio, with no opening deposit; it closes
+// with the created SavingsAccountResponse instead of `true`.
 export interface SavingsAccountFormDialogData {
   portfolioId?: string;
   account?: SavingsAccountResponse;
+  currency?: string;
 }
 
 // The portfolio, the currency and the optional opening deposit exist on create only: edit leaves
@@ -98,8 +102,11 @@ export class SavingsAccountFormDialog {
 
   private readonly account = this.data.account;
   protected readonly isEdit = !!this.account;
-  // The portfolio is chosen here only on a plain create; the type picker presets it, edit fixes it.
-  protected readonly choosesPortfolio = !this.account && !this.data.portfolioId;
+  protected readonly isPayoutTarget = !this.account && !!this.data.currency;
+  // The portfolio is chosen here on a plain create and as a payout target (defaulting to the
+  // deposit's); the type picker presets it, edit fixes it.
+  protected readonly choosesPortfolio =
+    !this.account && (!this.data.portfolioId || this.isPayoutTarget);
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
@@ -126,12 +133,17 @@ export class SavingsAccountFormDialog {
             nonNullable: true,
             validators: [Validators.required],
           }),
-          currency: new FormControl(DEFAULT_CURRENCY, {
-            nonNullable: true,
-            validators: [Validators.required],
-          }),
-          openingAmount: new FormControl<number | null>(null, [positiveWhenEntered]),
-          openingDate: new FormControl<Date | null>(new Date(), [openingDateValid]),
+          currency: new FormControl(
+            { value: this.data.currency ?? DEFAULT_CURRENCY, disabled: this.isPayoutTarget },
+            { nonNullable: true, validators: [Validators.required] },
+          ),
+          // A payout target starts empty: the payout is its first inflow.
+          ...(this.isPayoutTarget
+            ? {}
+            : {
+                openingAmount: new FormControl<number | null>(null, [positiveWhenEntered]),
+                openingDate: new FormControl<Date | null>(new Date(), [openingDateValid]),
+              }),
         }),
   });
 
@@ -214,7 +226,8 @@ export class SavingsAccountFormDialog {
       return;
     }
 
-    this.dialogRef.close(true);
+    // A payout target hands the new account back, so the payout can select it.
+    this.dialogRef.close(this.isPayoutTarget ? result.data : true);
   }
 
   protected cancel(): void {

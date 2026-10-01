@@ -180,6 +180,20 @@ export const paidOutDepositWithRemovedDestination: DepositResponse = depositResp
   paidOutToAssetName: null,
 } as Partial<DepositResponse>);
 
+// deposit-payout-to-savings: a payout whose destination is the savings account named
+// `plnSavingsCandidate.name` ("Emergency fund").
+export const paidOutIntoSavingsDeposit: DepositResponse = depositResponse({
+  assetId: 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1',
+  name: 'Deposit paid into savings',
+  bankName: 'Bank J',
+  status: DEPOSIT_STATUS.PaidOut,
+  settledOn: '2026-04-17',
+  settledGrossInterest: 150,
+  settledTax: 28.5,
+  paidOutOn: '2026-04-20',
+  paidOutToAssetName: 'Emergency fund',
+} as Partial<DepositResponse>);
+
 // deposit-rollover: `dueDeposit` rolled over once with its previewed settlement (net 119.83) at a new
 // rate of 5.5 % — the whole 10 119.83 balance runs from the old 2026-04-15 maturity to 2026-07-15.
 export const rolledOverDeposit: DepositResponse = depositResponse({
@@ -230,6 +244,54 @@ export const transferCandidatesByCurrency: Record<string, TransferCandidateFixtu
   EUR: [eurCashCandidate],
 };
 
+// deposit-payout-to-savings: PLN and EUR savings accounts the payout destination select offers next
+// to Cash, in portfolios of their own.
+export const reserveSavingsPortfolioId = '12121212-1212-1212-1212-121212121212';
+
+export const plnSavingsCandidate: TransferCandidateFixture = {
+  assetId: 'cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd',
+  name: 'Emergency fund',
+  portfolioId: reserveSavingsPortfolioId,
+  portfolioName: 'Reserve savings',
+  balance: 750,
+};
+
+export const eurSavingsCandidate: TransferCandidateFixture = {
+  assetId: 'efefefef-efef-efef-efef-efefefefefef',
+  name: 'EUR savings',
+  portfolioId: reserveSavingsPortfolioId,
+  portfolioName: 'Reserve savings',
+  balance: 300,
+};
+
+export const savingsCandidatesByCurrency: Record<string, TransferCandidateFixture[]> = {
+  PLN: [plnSavingsCandidate],
+  EUR: [eurSavingsCandidate],
+};
+
+// What a `fetch` stub answers GET /api/portfolio/transfer-candidates with: the Cash candidates or the
+// Savings candidates (per the `assetClass` query parameter, by name or by int) of the requested
+// currency. Pass other maps to arrange another state.
+export function transferCandidatesFor(
+  url: URL,
+  cash: Record<string, TransferCandidateFixture[]> = transferCandidatesByCurrency,
+  savings: Record<string, TransferCandidateFixture[]> = savingsCandidatesByCurrency,
+): TransferCandidateFixture[] {
+  const currency = url.searchParams.get('currency') ?? '';
+  const assetClass = url.searchParams.get('assetClass');
+  const bySavings = assetClass === 'Savings' || assetClass === '9';
+  return (bySavings ? savings : cash)[currency] ?? [];
+}
+
+// The `assetClass` query values of every transfer-candidates GET a `fetch` spy has seen, as the
+// class names (the int and the name both count).
+export function requestedCandidateClasses(fetchSpy: { mock: { calls: unknown[][] } }): string[] {
+  return transferCandidateRequests(fetchSpy).map((url) => {
+    const value = url.searchParams.get('assetClass');
+    return value === '0' ? 'Cash' : value === '9' ? 'Savings' : (value ?? '');
+  });
+}
+
 // The settlement preview of `dueDeposit` (GET .../deposits/{assetId}/settlement-preview): the part-1
 // projection, settled on the maturity date.
 export const dueDepositSettlementPreview = {
@@ -272,7 +334,7 @@ async function openSelectOptions(
   controlName: string,
 ): Promise<HTMLElement[]> {
   const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-    `mat-select[formcontrolname="${controlName}"] .mat-mdc-select-trigger`,
+    `mat-select[formcontrolname="${controlName}"] .mat-mdc-select-trigger, [formcontrolname="${controlName}"] mat-select .mat-mdc-select-trigger`,
   );
   if (!trigger) {
     throw new Error(`No ${controlName} select rendered.`);
@@ -315,6 +377,79 @@ export async function pickSelectOption(
   await fixture.whenStable();
 }
 
+// deposit-payout-to-savings: the single <mat-select> of a fixture that has no `formControlName` of its
+// own to find it by (the payout destination field is a form control, not a named control). Opens it
+// the way a user does and returns the rendered `<mat-option>` elements, in panel order.
+async function openOnlySelectOptions(fixture: ComponentFixture<unknown>): Promise<HTMLElement[]> {
+  const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+    'mat-select .mat-mdc-select-trigger',
+  );
+  if (!trigger) {
+    throw new Error('No select rendered.');
+  }
+  trigger.click();
+  fixture.detectChanges();
+  await fixture.whenStable();
+  return Array.from(
+    TestBed.inject(OverlayContainer)
+      .getContainerElement()
+      .querySelectorAll<HTMLElement>('mat-option'),
+  );
+}
+
+// Opens the fixture's only <mat-select> and returns its option labels, in panel order.
+export async function onlySelectOptionLabels(fixture: ComponentFixture<unknown>): Promise<string[]> {
+  const options = await openOnlySelectOptions(fixture);
+  return options.map((option) => (option.textContent ?? '').trim());
+}
+
+// Opens the fixture's only <mat-select> and returns its `<mat-optgroup>`s: the group label and the
+// labels of the options inside it.
+export async function onlySelectOptionGroups(
+  fixture: ComponentFixture<unknown>,
+): Promise<{ label: string; options: string[] }[]> {
+  await openOnlySelectOptions(fixture);
+  return Array.from(
+    TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-optgroup'),
+    (group) => ({
+      label: (
+        group.querySelector('.mat-mdc-optgroup-label')?.textContent ??
+        group.getAttribute('label') ??
+        ''
+      ).trim(),
+      options: Array.from(group.querySelectorAll('mat-option'), (option) =>
+        (option.textContent ?? '').trim(),
+      ),
+    }),
+  );
+}
+
+// Opens the fixture's only <mat-select> and clicks the option whose text includes `labelSubstring`.
+export async function pickOnlySelectOption(
+  fixture: ComponentFixture<unknown>,
+  labelSubstring: string,
+): Promise<void> {
+  const options = await openOnlySelectOptions(fixture);
+  const option = options.find((candidate) =>
+    (candidate.textContent ?? '').includes(labelSubstring),
+  );
+  if (!option) {
+    throw new Error(`No option matching "${labelSubstring}".`);
+  }
+  option.click();
+  fixture.detectChanges();
+  await fixture.whenStable();
+}
+
+// The trigger text of the fixture's only <mat-select>, read without opening it.
+export function onlySelectTriggerText(fixture: ComponentFixture<unknown>): string {
+  return (
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('mat-select .mat-mdc-select-trigger')
+      ?.textContent?.trim() ?? ''
+  );
+}
+
 // A <mat-select>'s trigger text and whether it shows as empty (`mat-mdc-select-empty` — no value
 // chosen, its label sitting as a placeholder instead of floating) — read without opening it.
 export function selectTriggerState(
@@ -322,7 +457,7 @@ export function selectTriggerState(
   controlName: string,
 ): { triggerText: string; empty: boolean } {
   const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-    `mat-select[formcontrolname="${controlName}"]`,
+    `mat-select[formcontrolname="${controlName}"], [formcontrolname="${controlName}"] mat-select`,
   );
   if (!select) {
     throw new Error(`No ${controlName} select rendered.`);

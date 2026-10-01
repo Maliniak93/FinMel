@@ -216,4 +216,26 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.NotEqual(Guid.Empty, fundingLeg.Transfer.TransferId);
         Assert.False(fundingLeg.Transfer.Manual);
     }
+
+    /// <summary>deposit-payout-to-savings AC-5: both legs of a deposit payout into savings carry <c>manual: false</c>.</summary>
+    [Fact]
+    public async Task List_DepositPayoutLegOnSavings_IsNotManual()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
+
+        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+        var depositLeg = Assert.Single(
+            (await client.ListTransactionsAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
+
+        Assert.NotNull(savingsLeg.Transfer);
+        Assert.False(savingsLeg.Transfer.Manual);
+        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
+        Assert.NotNull(depositLeg.Transfer);
+        Assert.False(depositLeg.Transfer.Manual);
+        Assert.Equal(savingsLeg.Transfer.TransferId, depositLeg.Transfer.TransferId);
+    }
 }

@@ -1492,6 +1492,63 @@ public sealed class PortfolioOutboxTests(SkarbiecContainersFixture containers) :
     }
 
     /// <summary>
+    /// deposit-payout-to-savings AC-2 (outbox half): settling into an empty PLN savings account writes
+    /// exactly one further <see cref="AssetPositionChanged"/> per asset carrying its final quantity - the
+    /// deposit at 0, the savings account at 10 119.83 - in a single save.
+    /// </summary>
+    [Fact]
+    public async Task SettleDepositIntoSavings_PublishesBothPositions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid depositPortfolioId;
+        Guid depositId;
+        Guid savingsPortfolioId;
+        Guid savingsId;
+        await using (var arrange = _provider.CreateAsyncScope())
+        {
+            savingsPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            var account = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
+                .HandleAsync(savingsPortfolioId, PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
+            Assert.True(account.IsSuccess, account.IsFailure ? account.Error.Code : null);
+            savingsId = account.Value.AssetId;
+            depositPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Deposits", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(depositPortfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            depositId = added.Value.AssetId;
+        }
+
+        var eventsBefore = await CountPositionEventsAsync(cancellationToken);
+        _saveChanges.Reset();
+
+        await using (var act = _provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
+                .HandleAsync(depositPortfolioId, depositId, PortfolioApi.NewSettleRequest(destinationAssetId: savingsId), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, _saveChanges.Count);
+
+        await using var verify = _provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore).ToList();
+        Assert.Equal(2, events.Count);
+        var depositEvent = Assert.Single(events, e => e.AssetId == depositId);
+        Assert.Equal(0m, depositEvent.Quantity);
+        Assert.Equal(AssetClass.Deposit, depositEvent.AssetClass);
+        var savingsEvent = Assert.Single(events, e => e.AssetId == savingsId);
+        Assert.Equal(10_119.83m, savingsEvent.Quantity);
+        Assert.Equal(savingsPortfolioId, savingsEvent.PortfolioId);
+        Assert.Equal(AssetClass.Savings, savingsEvent.AssetClass);
+        var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        Assert.Equal(10_119.83m, (await verifyDb.Assets.SingleAsync(a => a.Id == savingsId, cancellationToken)).Quantity);
+    }
+
+    /// <summary>
     /// deposit-payout-to-cash AC-2 (outbox half): settle and payout are atomic — an invalid destination
     /// (here a Stock) fails with <c>Validation.InvalidTransferCounterpart</c> before anything is saved:
     /// no outbox row, no settlement, no transaction.

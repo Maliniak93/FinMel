@@ -20,6 +20,10 @@ public static class TransferRoutes
         // PayOutDeposit (deposit-payout-to-cash).
         [(AssetClass.Deposit, AssetClass.Cash)] = false,
 
+        // Paying a settled deposit out into a savings account in its currency — the same two payout
+        // slices (deposit-payout-to-savings).
+        [(AssetClass.Deposit, AssetClass.Savings)] = false,
+
         // Moving money between a current account and a savings account, either way — CreateTransfer /
         // DeleteTransfer (savings-cash-transfers).
         [(AssetClass.Cash, AssetClass.Savings)] = true,

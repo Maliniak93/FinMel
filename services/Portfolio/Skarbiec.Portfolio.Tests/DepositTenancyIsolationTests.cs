@@ -228,6 +228,8 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var strangerCashId = await stranger.AddCashAssetAsync(strangerPortfolioId, cancellationToken);
+        var strangerSavings = await stranger.AddSavingsAccountAsync(
+            strangerPortfolioId, cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false));
 
         var viaOwnersPortfolio = await stranger.PostAsJsonAsync(
             PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
@@ -236,9 +238,13 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var intoStrangersCash = await owner.PostAsJsonAsync(
             PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
 
+        var intoStrangersSavings = await owner.PostAsJsonAsync(
+            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerSavings.AssetId), cancellationToken);
+
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
         await intoStrangersCash.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        await intoStrangersSavings.AssertInvalidTransferCounterpartAsync(cancellationToken);
 
         var unchanged = await owner.GetDepositAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.Settled, unchanged.Status);
@@ -247,6 +253,9 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var strangerCash = await stranger.GetAssetAsync(strangerPortfolioId, strangerCashId, cancellationToken);
         Assert.Equal(0m, strangerCash.Quantity);
         Assert.Equal(0, strangerCash.TransactionCount);
+        var strangerSavingsAfter = await stranger.GetAssetAsync(strangerPortfolioId, strangerSavings.AssetId, cancellationToken);
+        Assert.Equal(0m, strangerSavingsAfter.Quantity);
+        Assert.Equal(0, strangerSavingsAfter.TransactionCount);
         await using (var dbContext = CreateDbContext(ownerId))
         {
             Assert.False(await dbContext.Transactions.IgnoreQueryFilters().AnyAsync(t => t.TransferId != null, cancellationToken));

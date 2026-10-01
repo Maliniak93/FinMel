@@ -1,4 +1,4 @@
-import { Component, inject, resource, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import {
   FormBuilder,
   ReactiveFormsModule,
@@ -12,11 +12,9 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioTransferCandidates,
   postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayout,
   type DepositResponse,
 } from '../../../api/portfolio';
@@ -27,8 +25,8 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
-import { ASSET_CLASS } from '../../assets/asset-class';
 import { settlementAmounts } from '../deposit-terms';
+import { PayoutDestinationField } from '../payout-destination-field/payout-destination-field';
 
 export interface PayOutDepositDialogData {
   deposit: DepositResponse;
@@ -39,9 +37,10 @@ function today(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-// Pays a Settled deposit out to cash (deposit-payout-to-cash): its whole balance — principal + the
-// settled net interest, never a part of it — moves to one of the Cash transfer candidates in its
-// currency, on a date between the settlement date and today. Control names follow the
+// Pays a Settled deposit out (deposit-payout-to-cash, deposit-payout-to-savings): its whole balance —
+// principal + the settled net interest, never a part of it — moves to one of the Cash or Savings
+// transfer candidates in its currency (or a savings account opened from the destination select), on a
+// date between the settlement date and today. Control names follow the
 // PayOutDepositRequest properties, so a server 400 keyed on a field lands on it.
 @Component({
   selector: 'app-pay-out-deposit-dialog',
@@ -53,7 +52,7 @@ function today(): Date {
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatSelectModule,
+    PayoutDestinationField,
     TranslocoPipe,
   ],
   templateUrl: './pay-out-deposit-dialog.html',
@@ -89,22 +88,6 @@ export class PayOutDepositDialog {
           this.dateWithinRange(control.value as Date | null),
       ],
     ],
-  });
-
-  protected readonly destinationCandidatesResource = resource({
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioTransferCandidates({
-        query: { currency: this.deposit.currency, assetClass: ASSET_CLASS.Cash },
-        signal: abortSignal,
-      });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('deposits.errors.cashAccountsLoadFailed'),
-        );
-      }
-      return result.data ?? [];
-    },
   });
 
   protected async onSubmit(): Promise<void> {

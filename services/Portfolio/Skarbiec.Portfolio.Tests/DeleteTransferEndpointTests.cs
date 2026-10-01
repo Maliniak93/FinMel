@@ -110,4 +110,25 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
     }
+
+    /// <summary>deposit-payout-to-savings AC-5: a deposit payout into savings is not a manual transfer.</summary>
+    [Fact]
+    public async Task Delete_DepositPayoutIntoSavings_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
+        var leg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+        Assert.NotNull(leg.Transfer);
+
+        var response = await client.DeleteAsync(TransferUri(leg.Transfer.TransferId), cancellationToken);
+
+        await response.AssertTransferLegManagedAsync(cancellationToken);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(0m, (await client.GetAssetAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken)).Quantity);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(2, await dbContext.Transactions.CountAsync(t => t.TransferId == leg.Transfer.TransferId, cancellationToken));
+    }
 }
