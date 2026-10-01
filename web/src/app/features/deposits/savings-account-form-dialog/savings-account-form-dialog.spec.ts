@@ -402,7 +402,11 @@ describe('SavingsAccountFormDialog', () => {
       const created = savingsAccountResponse({ assetId: 'abababab-abab-abab-abab-abababababab' });
       await setup(payoutData, () => jsonResponse(created, 201));
       await render();
-      await fill({ name: 'Savings account', bankName: 'Test bank', annualInterestRatePercent: 5.25 });
+      await fill({
+        name: 'Savings account',
+        bankName: 'Test bank',
+        annualInterestRatePercent: 5.25,
+      });
 
       await component['onSubmit']();
 

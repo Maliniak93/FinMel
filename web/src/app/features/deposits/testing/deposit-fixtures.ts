@@ -398,7 +398,9 @@ async function openOnlySelectOptions(fixture: ComponentFixture<unknown>): Promis
 }
 
 // Opens the fixture's only <mat-select> and returns its option labels, in panel order.
-export async function onlySelectOptionLabels(fixture: ComponentFixture<unknown>): Promise<string[]> {
+export async function onlySelectOptionLabels(
+  fixture: ComponentFixture<unknown>,
+): Promise<string[]> {
   const options = await openOnlySelectOptions(fixture);
   return options.map((option) => (option.textContent ?? '').trim());
 }

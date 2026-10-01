@@ -306,14 +306,7 @@ describe('PayOutDepositDialog', () => {
       ];
 
       const english = texts();
-      expect(english).toEqual([
-        'Pay out',
-        'Amount',
-        'Move to',
-        'Date',
-        'Cancel',
-        'Transfer',
-      ]);
+      expect(english).toEqual(['Pay out', 'Amount', 'Move to', 'Date', 'Cancel', 'Transfer']);
 
       await switchLanguage(fixture, 'pl');
 

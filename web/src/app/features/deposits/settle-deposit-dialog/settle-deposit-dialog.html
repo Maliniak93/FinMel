@@ -88,7 +88,8 @@
       [hint]="
         moved === null
           ? null
-          : ('deposits.settle.movesOut' | transloco: { amount: formatMoney(moved, deposit.currency) })
+          : ('deposits.settle.movesOut'
+            | transloco: { amount: formatMoney(moved, deposit.currency) })
       "
     />
 
