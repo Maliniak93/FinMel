@@ -28,6 +28,10 @@ import {
   type SavingsAccountFormDialogData,
 } from '../savings-account-form-dialog/savings-account-form-dialog';
 import {
+  SavingsTransferDialog,
+  type SavingsTransferDialogData,
+} from '../savings-transfer-dialog/savings-transfer-dialog';
+import {
   SettleSavingsInterestDialog,
   type SettleSavingsInterestDialogData,
 } from '../settle-savings-interest-dialog/settle-savings-interest-dialog';
@@ -36,7 +40,8 @@ import {
 // of the user across portfolios, its balance in its own currency. Money moves in and out through the
 // asset's ordinary transactions, which the account name links to. Interest is settled one calendar
 // month at a time (savings-interest-settlement): a Due row offers "Settle interest", and the latest
-// settlement, shown under "Last interest", can be undone.
+// settlement, shown under "Last interest", can be undone. Money moves between a Cash asset and the
+// account through "Transfer" (savings-cash-transfers).
 // MatDialog/MatSnackBar are injected as services only — see assets.ts for why
 // MatDialogModule/MatSnackBarModule are deliberately not in `imports`.
 @Component({
@@ -112,6 +117,18 @@ export class SavingsAccounts {
     const ref = this.dialog.open(SettleSavingsInterestDialog, { width: '520px', data });
     ref.afterClosed().subscribe((settled: boolean | undefined) => {
       if (settled) {
+        this.accountsResource.reload();
+      }
+    });
+  }
+
+  // Moves money between a Cash asset and the account (savings-cash-transfers); the new balance shows
+  // after a reload.
+  protected openTransferDialog(account: SavingsAccountResponse): void {
+    const data: SavingsTransferDialogData = { account };
+    const ref = this.dialog.open(SavingsTransferDialog, { width: '520px', data });
+    ref.afterClosed().subscribe((transferred: boolean | undefined) => {
+      if (transferred) {
         this.accountsResource.reload();
       }
     });

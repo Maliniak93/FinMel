@@ -184,4 +184,36 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var opening = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 10_000m);
         Assert.True(!opening.TryGetProperty("savingsInterestPeriodEnd", out var value) || value.ValueKind == JsonValueKind.Null);
     }
+
+    /// <summary>
+    /// savings-cash-transfers AC-5: both legs of a Cash/Savings transfer carry the transfer's id and
+    /// <c>manual: true</c>; the legs of a deposit-funding transfer carry their id and <c>manual: false</c>.
+    /// </summary>
+    [Fact]
+    public async Task List_ManualTransferLeg_IsManual()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
+        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
+
+        var cashLeg = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Items);
+
+        Assert.NotNull(cashLeg.Transfer);
+        Assert.Equal(transferId, cashLeg.Transfer.TransferId);
+        Assert.True(cashLeg.Transfer.Manual);
+        Assert.NotNull(savingsLeg.Transfer);
+        Assert.Equal(transferId, savingsLeg.Transfer.TransferId);
+        Assert.True(savingsLeg.Transfer.Manual);
+        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
+
+        using var fundingClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await fundingClient.CreateFundedDepositAsync(cancellationToken);
+        var fundingLeg = await fundingClient.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        Assert.NotNull(fundingLeg.Transfer);
+        Assert.NotEqual(Guid.Empty, fundingLeg.Transfer.TransferId);
+        Assert.False(fundingLeg.Transfer.Manual);
+    }
 }

@@ -13,6 +13,7 @@ import { firstValueFrom } from 'rxjs';
 
 import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
+  deleteApiPortfolioTransfersByTransferId,
   getApiPortfolioPortfoliosById,
   getApiPortfolioPortfoliosByPortfolioIdAssetsById,
   getApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
@@ -248,6 +249,48 @@ export class Transactions {
     if (result.error) {
       this.snackBar.open(
         readProblemDetails(result.error).detail ?? translate('transactions.delete.failed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.reload();
+  }
+
+  // A manual transfer (savings-cash-transfers) goes as a whole — both legs — behind the same
+  // confirmation as Delete; it is never edited.
+  protected async removeTransfer(transaction: TransactionResponse): Promise<void> {
+    const transfer = transaction.transfer;
+    if (!transfer) {
+      return;
+    }
+
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('transactions.deleteTransfer.title'),
+            message: translate('transactions.deleteTransfer.message', {
+              quantity: formatMoney(transaction.quantity, transaction.currency),
+              counterpart: transfer.counterpartAssetName,
+            }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioTransfersByTransferId({
+      path: { transferId: transfer.transferId },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('transactions.deleteTransfer.failed'),
         translate('common.dismiss'),
       );
       return;

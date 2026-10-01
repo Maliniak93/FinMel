@@ -291,7 +291,13 @@
       "mustNotBeNegative": "{{ field }} nie może być ujemna.",
       "dateRequired": "Data jest wymagana."
     },
-    "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany."
+    "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany.",
+    "deleteTransfer": {
+      "action": "Usuń przelew",
+      "title": "Usunąć ten przelew?",
+      "message": "Obie strony tego przelewu ({{ quantity }}) — tutaj i w \"{{ counterpart }}\" — zostaną trwale usunięte. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć przelewu."
+    }
   },
   "deposits": {
     "title": "Lokaty i oszczędności",
@@ -435,6 +441,23 @@
       "openingDate": "Data wpłaty początkowej",
       "openingDateRequired": "Data jest wymagana.",
       "openingDateInFuture": "Data nie może być z przyszłości."
+    },
+    "transfer": {
+      "action": "Przelew",
+      "actionOf": "Przelej środki na konto {{ name }} lub z niego",
+      "title": "Przelew",
+      "direction": "Kierunek",
+      "into": "Na to konto",
+      "out": "Na gotówkę",
+      "cash": "Konto gotówkowe",
+      "cashRequired": "Wybierz konto gotówkowe.",
+      "noCashAccount": "Nie masz konta gotówkowego w {{ currency }}, z którym można zrobić przelew.",
+      "amountRequired": "Kwota jest wymagana.",
+      "amountPositive": "Kwota musi być większa od 0.",
+      "exceedsBalance": "Kwota przekracza saldo źródła ({{ balance }}).",
+      "insufficientFunds": "Źródło nie pokrywa tej kwoty w tym dniu.",
+      "dateInFuture": "Data nie może być z przyszłości.",
+      "submit": "Przelej"
     }
   },
   "assetArchive": {

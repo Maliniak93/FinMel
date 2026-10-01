@@ -16,16 +16,19 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
         // Every transaction is in its asset's currency, so the lookup doubles as the existence check.
-        var currency = await dbContext.Assets
+        // Its class tells, with the counterpart's, whether a transfer leg is on a manual route.
+        var asset = await dbContext.Assets
             .AsNoTracking()
             .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
-            .Select(a => a.Currency)
+            .Select(a => new { a.Currency, a.AssetClass })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (currency is null)
+        if (asset is null)
         {
             return AssetErrors.NotFound(assetId);
         }
+
+        var currency = asset.Currency;
 
         var query = dbContext.Transactions.AsNoTracking().Where(t => t.AssetId == assetId);
 
@@ -54,6 +57,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                     TransferId = leg.TransferId!.Value,
                     AssetId = counterpartAsset.Id,
                     AssetName = counterpartAsset.Name,
+                    counterpartAsset.AssetClass,
                     PortfolioId = counterpartPortfolio.Id,
                     PortfolioName = counterpartPortfolio.Name
                 })
@@ -75,6 +79,10 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                     t.TransferId is { } transferId && counterparts.TryGetValue(transferId, out var counterpart)
                         ? new TransactionTransferResponse
                         {
+                            TransferId = transferId,
+                            Manual = TransferLegs.DirectionOf(t) == TransferDirection.Out
+                                ? TransferRoutes.IsManual(asset.AssetClass, counterpart.AssetClass)
+                                : TransferRoutes.IsManual(counterpart.AssetClass, asset.AssetClass),
                             CounterpartAssetId = counterpart.AssetId,
                             CounterpartAssetName = counterpart.AssetName,
                             CounterpartPortfolioId = counterpart.PortfolioId,

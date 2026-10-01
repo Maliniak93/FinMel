@@ -20,6 +20,7 @@ import {
 import { restoreEnglish } from '../../../../testing/i18n';
 import { jsonResponse, requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
 import { SavingsAccountFormDialog } from '../savings-account-form-dialog/savings-account-form-dialog';
+import { SavingsTransferDialog } from '../savings-transfer-dialog/savings-transfer-dialog';
 import { SettleSavingsInterestDialog } from '../settle-savings-interest-dialog/settle-savings-interest-dialog';
 import {
   activeSavingsAccount,
@@ -495,6 +496,57 @@ describe('SavingsAccounts', () => {
       const row = rowFor('Frozen due account');
       expect(settleButton(row)).toBeUndefined();
       expect(undoButton(row)).toBeUndefined();
+    });
+  });
+
+  // savings-cash-transfers AC-8: each active savings row has a "Transfer" icon button (`swap_horiz`)
+  // that opens the SavingsTransferDialog with that account and reloads the list after a success; a row
+  // of an archived portfolio has none.
+  describe('transfer', () => {
+    const transferButton = (row: HTMLElement) =>
+      Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) =>
+          /transfer/i.test(button.getAttribute('mattooltip') ?? '') ||
+          /transfer/i.test(button.getAttribute('aria-label') ?? ''),
+      );
+
+    it('every active row carries the Transfer icon, an archived-portfolio row does not', async () => {
+      await setup();
+
+      for (const name of ['Emergency fund', 'IKE savings']) {
+        expect(transferButton(rowFor(name))).toBeDefined();
+        expect(rowFor(name).textContent).toContain('swap_horiz');
+      }
+      expect(transferButton(rowFor('Frozen account'))).toBeUndefined();
+    });
+
+    it('opens the transfer dialog with that account and reloads after a successful transfer', async () => {
+      await setup();
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const listCallsBefore = listCalls();
+
+      transferButton(rowFor('Emergency fund'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(
+        SavingsTransferDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({ account: activeSavingsAccount }),
+        }),
+      );
+      await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listCallsBefore));
+    });
+
+    it('a cancelled transfer does not reload the list', async () => {
+      await setup();
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const listCallsBefore = listCalls();
+
+      transferButton(rowFor('Emergency fund'))!.click();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledWith(SavingsTransferDialog, expect.anything());
+      expect(listCalls()).toBe(listCallsBefore);
     });
   });
 });
