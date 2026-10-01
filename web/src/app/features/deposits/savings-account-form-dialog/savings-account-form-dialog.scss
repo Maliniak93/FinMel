@@ -21,3 +21,16 @@
   color: var(--mat-sys-error);
   margin: 0 0 8px;
 }
+
+.savings-account-form-dialog__fixed {
+  margin: 0 0 16px;
+
+  dt {
+    opacity: 0.7;
+    font-size: 0.875em;
+  }
+
+  dd {
+    margin: 0;
+  }
+}

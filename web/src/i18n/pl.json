@@ -319,7 +319,7 @@
     "archivedMarker": "(zarchiwizowany)",
     "settleMaturity": "Rozlicz zapadalność",
     "settleMaturityOf": "Rozlicz zapadalność lokaty {{ name }}",
-    "transferToCash": "Przenieś na gotówkę",
+    "payOutAction": "Wypłać",
     "rollOver": "Przedłuż lokatę",
     "actionsForThis": "Akcje dla tej lokaty",
     "loadFailed": "Nie udało się wczytać lokat.",
@@ -345,6 +345,7 @@
       "interestRateRequired": "Oprocentowanie jest wymagane.",
       "interestRateRange": "Oprocentowanie musi mieścić się w przedziale od 0 do 100.",
       "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych.",
+      "payoutDestinationsLoadFailed": "Nie udało się wczytać kont, na które można wypłacić pieniądze.",
       "previewLoadFailed": "Nie udało się wczytać podglądu rozliczenia."
     },
     "form": {
@@ -376,7 +377,10 @@
       "insufficientFunds": "Źródło środków nie pokrywa tego kapitału."
     },
     "payOut": {
-      "noCashAccount": "Nie masz konta gotówkowego w walucie {{ currency }}, na które można przenieść pieniądze.",
+      "noCashAccount": "Nie masz konta gotówkowego ani oszczędnościowego w walucie {{ currency }}, na które można przenieść pieniądze.",
+      "cashGroup": "Gotówka",
+      "savingsGroup": "Konta oszczędnościowe",
+      "newSavingsAccount": "Nowe konto oszczędnościowe…",
       "destinationRequired": "Wybierz, dokąd trafią pieniądze.",
       "dateBeforeSettlement": "Data nie może być wcześniejsza niż data rozliczenia.",
       "dateInFuture": "Data nie może być z przyszłości.",

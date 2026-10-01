@@ -1,0 +1,51 @@
+<mat-form-field appearance="outline" class="payout-destination-field">
+  <mat-label>{{ 'deposits.fields.moveTo' | transloco }}</mat-label>
+  <mat-select
+    [value]="value()"
+    [disabled]="disabled()"
+    [errorStateMatcher]="errorStateMatcher"
+    canSelectNullableOptions
+    (selectionChange)="onSelectionChange($event)"
+    (openedChange)="onOpenedChange($event)"
+  >
+    @if (offerKeep()) {
+      <mat-option [value]="null">{{ 'deposits.settle.keepInDeposit' | transloco }}</mat-option>
+    }
+    @if (candidatesResource.hasValue()) {
+      @let candidates = candidatesResource.value();
+      @if (candidates.cash.length > 0) {
+        <mat-optgroup [label]="'deposits.payOut.cashGroup' | transloco">
+          @for (candidate of candidates.cash; track candidate.assetId) {
+            <mat-option [value]="candidate.assetId">{{ optionLabel(candidate) }}</mat-option>
+          }
+        </mat-optgroup>
+      }
+      @if (candidates.savings.length > 0) {
+        <mat-optgroup [label]="'deposits.payOut.savingsGroup' | transloco">
+          @for (candidate of candidates.savings; track candidate.assetId) {
+            <mat-option [value]="candidate.assetId">{{ optionLabel(candidate) }}</mat-option>
+          }
+        </mat-optgroup>
+      }
+    }
+    <mat-option [value]="newSavingsAccount">{{
+      'deposits.payOut.newSavingsAccount' | transloco
+    }}</mat-option>
+  </mat-select>
+  @if (candidatesResource.error(); as loadError) {
+    <mat-hint>{{ loadError.message }}</mat-hint>
+  } @else if (
+    candidatesResource.hasValue() &&
+    candidatesResource.value().cash.length === 0 &&
+    candidatesResource.value().savings.length === 0
+  ) {
+    <mat-hint>{{ 'deposits.payOut.noCashAccount' | transloco: { currency: currency() } }}</mat-hint>
+  } @else if (hint(); as hostHint) {
+    <mat-hint>{{ hostHint }}</mat-hint>
+  }
+  @if (hasError('required')) {
+    <mat-error>{{ 'deposits.payOut.destinationRequired' | transloco }}</mat-error>
+  } @else if (serverError(); as message) {
+    <mat-error>{{ message }}</mat-error>
+  }
+</mat-form-field>

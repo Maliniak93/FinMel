@@ -42,6 +42,8 @@ import {
   paidOutDeposit,
   paidOutDepositDestinationName,
   paidOutDepositWithRemovedDestination,
+  paidOutIntoSavingsDeposit,
+  plnSavingsCandidate,
   settledDeposit,
   settledDepositFinalAmount,
 } from './testing/deposit-fixtures';
@@ -386,28 +388,57 @@ describe('Deposits', () => {
     expect(depositListCalls()).toBe(listCallsBefore);
   });
 
-  // deposit-payout-to-cash AC-9. A Settled row carries a "Transfer to cash" icon button that opens
+  // deposit-payout-to-cash AC-9. A Settled row carries a "Pay out" icon button that opens
   // the payout dialog; a PaidOut row carries none, but shows a "Paid out" chip, the payout date and
   // the destination's name ("—" once that asset was removed), and still offers Delete.
   describe('payout', () => {
-    // Recognised by its "Transfer to cash" tooltip (or an aria-label saying the same).
+    // Recognised by its "Pay out" tooltip (or an aria-label saying the same).
     function transferButton(row: HTMLElement): HTMLButtonElement | undefined {
       return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
         (button) =>
-          /transfer to cash/i.test(button.getAttribute('mattooltip') ?? '') ||
-          /transfer to cash/i.test(button.getAttribute('aria-label') ?? ''),
+          /pay out/i.test(button.getAttribute('mattooltip') ?? '') ||
+          /pay out/i.test(button.getAttribute('aria-label') ?? ''),
       );
     }
 
     const allStatuses = [activeDeposit, dueDeposit, settledDeposit, paidOutDeposit];
 
-    it('only the Settled row carries the "Transfer to cash" button', async () => {
+    it('only the Settled row carries the "Pay out" button', async () => {
       await setup(allStatuses);
 
       expect(transferButton(rowFor('Settled deposit'))).toBeDefined();
       expect(transferButton(rowFor('Paid-out deposit'))).toBeUndefined();
       expect(transferButton(rowFor('Matured deposit'))).toBeUndefined();
       expect(transferButton(rowFor('Running deposit'))).toBeUndefined();
+    });
+
+    // deposit-payout-to-savings AC-10: the payout action is "Pay out", shown with the `output` icon.
+    it('the payout button of a Settled row is labelled "Pay out" and shows the output icon', async () => {
+      await setup(allStatuses);
+
+      const button = transferButton(rowFor('Settled deposit'))!;
+
+      expect(button.getAttribute('aria-label')).toBe('Pay out');
+      expect(button.querySelector('mat-icon')?.textContent?.trim()).toBe('output');
+      expect(
+        Array.from(rowFor('Settled deposit').querySelectorAll('button')).some((candidate) =>
+          /transfer to cash/i.test(candidate.getAttribute('aria-label') ?? ''),
+        ),
+      ).toBe(false);
+    });
+
+    // deposit-payout-to-savings AC-10: a savings account's name shows as the destination, like Cash's.
+    it('a PaidOut row shows the name of a savings destination', async () => {
+      await setup([paidOutIntoSavingsDeposit]);
+
+      const row = rowFor('Deposit paid into savings');
+
+      expect(row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip')?.textContent).toContain(
+        'Paid out',
+      );
+      expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
+      expect(row.textContent).toContain(plnSavingsCandidate.name);
+      expect(transferButton(row)).toBeUndefined();
     });
 
     it('the PaidOut row shows the "Paid out" chip, the payout date and the destination', async () => {
@@ -441,7 +472,7 @@ describe('Deposits', () => {
       expect(labels.some((label) => /edit/i.test(label))).toBe(false);
     });
 
-    it('Transfer to cash opens the payout dialog with that deposit and reloads after a payout', async () => {
+    it('Pay out opens the payout dialog with that deposit and reloads after a payout', async () => {
       await setup(allStatuses);
       dialog.open.mockReturnValue({ afterClosed: () => of(true) });
       const listCallsBefore = depositListCalls();
@@ -645,13 +676,13 @@ describe('Deposits', () => {
         expect(labels.some((label) => /delete/i.test(label))).toBe(true);
         expect(labels.some((label) => /edit/i.test(label))).toBe(false);
         expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(false);
-        // Not one of the row's own action buttons: no settle, no transfer to cash.
+        // Not one of the row's own action buttons: no settle, no pay out.
         expect(settleButton(row)).toBeUndefined();
         expect(
           Array.from(row.querySelectorAll<HTMLButtonElement>('button')).some(
             (button) =>
-              /transfer to cash/i.test(button.getAttribute('mattooltip') ?? '') ||
-              /transfer to cash/i.test(button.getAttribute('aria-label') ?? ''),
+              /pay out/i.test(button.getAttribute('mattooltip') ?? '') ||
+              /pay out/i.test(button.getAttribute('aria-label') ?? ''),
           ),
         ).toBe(false);
         TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
@@ -738,7 +769,7 @@ describe('Deposits', () => {
         'Status',
         'Settle maturity',
         'Roll over',
-        'Transfer to cash',
+        'Pay out',
         'Roll over',
         'Edit',
         'Archive',
@@ -760,7 +791,7 @@ describe('Deposits', () => {
         'Settle maturity of Matured deposit',
         'Roll over',
         'Actions for this deposit',
-        'Transfer to cash',
+        'Pay out',
         'Roll over',
         'Actions for this deposit',
       ]);

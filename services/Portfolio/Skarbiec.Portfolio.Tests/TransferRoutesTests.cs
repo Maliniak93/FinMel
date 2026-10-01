@@ -13,7 +13,8 @@ public sealed class TransferRoutesTests
 {
     private static bool ExpectedAllowed(AssetClass source, AssetClass target) =>
         (source, target) is (AssetClass.Cash, AssetClass.Deposit) or (AssetClass.Deposit, AssetClass.Cash)
-            or (AssetClass.Cash, AssetClass.Savings) or (AssetClass.Savings, AssetClass.Cash);
+            or (AssetClass.Cash, AssetClass.Savings) or (AssetClass.Savings, AssetClass.Cash)
+            or (AssetClass.Deposit, AssetClass.Savings);
 
     private static bool ExpectedManual(AssetClass source, AssetClass target) =>
         (source, target) is (AssetClass.Cash, AssetClass.Savings) or (AssetClass.Savings, AssetClass.Cash);
@@ -34,7 +35,7 @@ public sealed class TransferRoutesTests
 
     [Theory]
     [MemberData(nameof(EveryClassPair))]
-    public void Route_EveryClassPair_OnlyCashSavingsAndCashDepositAreAllowedAndOnlyCashSavingsIsManual(
+    public void Route_EveryClassPair_OnlyTheListedRoutesAreAllowedAndOnlyCashSavingsIsManual(
         AssetClass source, AssetClass target, bool allowed, bool manual)
     {
         Assert.Equal(allowed, TransferRoutes.IsAllowed(source, target));
@@ -48,10 +49,18 @@ public sealed class TransferRoutesTests
     [InlineData(AssetClass.Cash, AssetClass.Stock)]
     [InlineData(AssetClass.Stock, AssetClass.Deposit)]
     [InlineData(AssetClass.Savings, AssetClass.Deposit)]
-    [InlineData(AssetClass.Deposit, AssetClass.Savings)]
     public void IsAllowed_SameClassSecuritiesOrSavingsDepositPair_IsRejected(AssetClass source, AssetClass target)
     {
         Assert.False(TransferRoutes.IsAllowed(source, target));
         Assert.False(TransferRoutes.IsManual(source, target));
+    }
+
+    /// <summary>AC-1: Deposit → Savings is allowed and deposit-owned (not manual); the reverse is not a route.</summary>
+    [Fact]
+    public void Route_DepositToSavings_IsAllowedButNotManual()
+    {
+        Assert.True(TransferRoutes.IsAllowed(AssetClass.Deposit, AssetClass.Savings));
+        Assert.False(TransferRoutes.IsManual(AssetClass.Deposit, AssetClass.Savings));
+        Assert.False(TransferRoutes.IsAllowed(AssetClass.Savings, AssetClass.Deposit));
     }
 }

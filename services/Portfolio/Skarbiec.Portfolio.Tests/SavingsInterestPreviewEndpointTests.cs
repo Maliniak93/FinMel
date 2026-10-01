@@ -144,4 +144,30 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    /// <summary>
+    /// deposit-payout-to-savings AC-7: an empty PLN savings account at 5 % that received a 10 000 deposit
+    /// payout on 16 September accrues on it from that day only (15 days) when September is previewed on 1 October.
+    /// </summary>
+    [Fact]
+    public async Task Preview_CountsDepositPayoutFromItsDate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.SettleDepositAsync(
+            depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(grossInterest: 0m, tax: 0m));
+        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(annualInterestRatePercent: 5m, withOpeningDeposit: false), portfolioName: "Wallet");
+        await client.PayOutDepositAsync(
+            depositPortfolioId, deposit.AssetId, account.AssetId, cancellationToken, new DateOnly(2026, 9, 16));
+
+        var preview = await client.GetSavingsInterestPreviewAsync(savingsPortfolioId, account.AssetId, cancellationToken);
+
+        Assert.Equal("2026-09-16", preview.GetProperty("periodStart").GetString());
+        Assert.Equal("2026-09-30", preview.GetProperty("periodEnd").GetString());
+        Assert.Equal(10_000.00m, preview.GetProperty("averageDailyBalance").GetDecimal());
+        Assert.Equal(20.55m, preview.GetProperty("grossInterest").GetDecimal());
+    }
 }

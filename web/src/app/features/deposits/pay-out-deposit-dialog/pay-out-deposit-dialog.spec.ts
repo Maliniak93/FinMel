@@ -23,14 +23,20 @@ import {
 } from '../../assets/asset-form/testing/asset-form-fixtures';
 import {
   eurCashCandidate,
+  eurSavingsCandidate,
   paidOutDeposit,
+  pickSelectOption,
   plnCashCandidate,
+  plnSavingsCandidate,
+  requestedCandidateClasses,
   requestMethod,
+  savingsCandidatesByCurrency,
   selectOptionLabels,
   settledDeposit,
   settledDepositFinalAmount,
   transferCandidateRequests,
   transferCandidatesByCurrency,
+  transferCandidatesFor,
   writeRequests,
 } from '../testing/deposit-fixtures';
 import { PayOutDepositDialog } from './pay-out-deposit-dialog';
@@ -68,8 +74,17 @@ describe('PayOutDepositDialog', () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (requestMethod(input) === 'GET') {
         if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
-          const currency = new URL(requestUrl(input)).searchParams.get('currency') ?? '';
-          return jsonResponse(candidatesByCurrency[currency] ?? []);
+          // `candidatesByCurrency` arranges the Cash candidates; a spec that overrides it has no
+          // savings accounts either.
+          return jsonResponse(
+            transferCandidatesFor(
+              new URL(requestUrl(input)),
+              candidatesByCurrency,
+              candidatesByCurrency === transferCandidatesByCurrency
+                ? savingsCandidatesByCurrency
+                : {},
+            ),
+          );
         }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -134,19 +149,24 @@ describe('PayOutDepositDialog', () => {
     }
   });
 
-  it('lists the Cash candidates in the deposit currency, with no destination preselected', async () => {
+  it('lists the Cash and savings candidates in the deposit currency, with no destination preselected', async () => {
     await setup();
 
     expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
-    const requests = transferCandidateRequests(fetchSpy);
-    expect(requests.length).toBeGreaterThan(0);
-    const last = requests[requests.length - 1];
-    expect(last.searchParams.get('currency')).toBe(settledDeposit.currency);
-    expect(['Cash', '0']).toContain(last.searchParams.get('assetClass'));
+    const requested = requestedCandidateClasses(fetchSpy);
+    expect(requested).toContain('Cash');
+    expect(requested).toContain('Savings');
+    for (const url of transferCandidateRequests(fetchSpy)) {
+      expect(url.searchParams.get('currency')).toBe(settledDeposit.currency);
+    }
 
     const labels = await selectOptionLabels(fixture, 'destinationAssetId');
     expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
     expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
+    expect(labels.some((label) => label.includes(plnSavingsCandidate.name))).toBe(true);
+    expect(labels.some((label) => label.includes(eurSavingsCandidate.name))).toBe(false);
+    // A payout can't keep the money in the deposit.
+    expect(labels.some((label) => /keep in the deposit/i.test(label))).toBe(false);
   });
 
   it('defaults the date to today', async () => {
@@ -198,6 +218,26 @@ describe('PayOutDepositDialog', () => {
     );
     expect(await request.json()).toEqual({
       destinationAssetId: plnCashCandidate.assetId,
+      date: '2026-04-18',
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  // deposit-payout-to-savings AC-10: a savings account is a destination like a Cash asset.
+  it('submit POSTs a savings account as destinationAssetId', async () => {
+    await setup();
+    await pickSelectOption(fixture, 'destinationAssetId', plnSavingsCandidate.name);
+    await fill({ date: new Date(2026, 3, 18) });
+
+    await component['onSubmit']();
+
+    const [request] = writeRequests(fetchSpy);
+    expect(request.method).toBe('POST');
+    expect(request.url).toContain(
+      `/api/portfolio/portfolios/${settledDeposit.portfolioId}/deposits/${settledDeposit.assetId}/payout`,
+    );
+    expect(await request.json()).toEqual({
+      destinationAssetId: plnSavingsCandidate.assetId,
       date: '2026-04-18',
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
@@ -266,14 +306,7 @@ describe('PayOutDepositDialog', () => {
       ];
 
       const english = texts();
-      expect(english).toEqual([
-        'Transfer to cash',
-        'Amount',
-        'Move to',
-        'Date',
-        'Cancel',
-        'Transfer',
-      ]);
+      expect(english).toEqual(['Pay out', 'Amount', 'Move to', 'Date', 'Cancel', 'Transfer']);
 
       await switchLanguage(fixture, 'pl');
 
@@ -313,13 +346,14 @@ describe('PayOutDepositDialog', () => {
       }
     });
 
-    it('shows the missing-Cash-account hint in Polish', async () => {
+    // deposit-payout-to-savings: the hint shows when there is neither a Cash nor a savings account.
+    it('shows the missing-account hint in Polish', async () => {
       await setup(undefined, { PLN: [] });
       const element = fixture.nativeElement as HTMLElement;
       const hint = () => labelsOf(element, 'mat-hint');
 
       const english = hint();
-      expect(english).toEqual(['You have no Cash account in PLN to move the money to.']);
+      expect(english).toEqual(['You have no Cash or savings account in PLN to move the money to.']);
 
       await switchLanguage(fixture, 'pl');
 

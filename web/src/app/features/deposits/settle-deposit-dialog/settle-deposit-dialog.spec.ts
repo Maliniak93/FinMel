@@ -20,13 +20,16 @@ import {
   dueDeposit,
   dueDepositSettlementPreview,
   eurCashCandidate,
+  eurSavingsCandidate,
   pickSelectOption,
   plnCashCandidate,
+  plnSavingsCandidate,
+  requestedCandidateClasses,
   selectOptionLabels,
   selectTriggerState,
   settledDeposit,
   transferCandidateRequests,
-  transferCandidatesByCurrency,
+  transferCandidatesFor,
 } from '../testing/deposit-fixtures';
 import { SettleDepositDialog } from './settle-deposit-dialog';
 
@@ -67,8 +70,7 @@ describe('SettleDepositDialog', () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (method(input) === 'GET') {
         if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
-          const currency = new URL(requestUrl(input)).searchParams.get('currency') ?? '';
-          return jsonResponse(transferCandidatesByCurrency[currency] ?? []);
+          return jsonResponse(transferCandidatesFor(new URL(requestUrl(input))));
         }
         return requestUrl(input).includes('/settlement-preview')
           ? jsonResponse(dueDepositSettlementPreview)
@@ -287,16 +289,39 @@ describe('SettleDepositDialog', () => {
       await setup();
 
       expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
-      const requests = transferCandidateRequests(fetchSpy);
-      expect(requests.length).toBeGreaterThan(0);
-      const last = requests[requests.length - 1];
-      expect(last.searchParams.get('currency')).toBe(dueDeposit.currency);
-      expect(['Cash', '0']).toContain(last.searchParams.get('assetClass'));
+      const requested = requestedCandidateClasses(fetchSpy);
+      expect(requested).toContain('Cash');
+      expect(requested).toContain('Savings');
+      for (const url of transferCandidateRequests(fetchSpy)) {
+        expect(url.searchParams.get('currency')).toBe(dueDeposit.currency);
+      }
 
       const labels = await selectOptionLabels(fixture, 'destinationAssetId');
       expect(labels[0]).toMatch(/keep in the deposit/i);
       expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
       expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
+      expect(labels.some((label) => label.includes(plnSavingsCandidate.name))).toBe(true);
+      expect(labels.some((label) => label.includes(eurSavingsCandidate.name))).toBe(false);
+    });
+
+    // deposit-payout-to-savings AC-10: a savings account picked in the select is the destination.
+    it('picking a savings account POSTs it as destinationAssetId', async () => {
+      await setup();
+      await pickSelectOption(fixture, 'destinationAssetId', plnSavingsCandidate.name);
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/deposits/${dueDeposit.assetId}/settle`,
+      );
+      expect(await request.json()).toEqual({
+        settledOn: '2026-04-15',
+        grossInterest: 147.95,
+        tax: 28.12,
+        destinationAssetId: plnSavingsCandidate.assetId,
+      });
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
     it('picking a Cash destination POSTs it as destinationAssetId', async () => {

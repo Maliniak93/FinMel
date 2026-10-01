@@ -227,6 +227,42 @@ internal static class PortfolioApi
         return new PaidOutDeposit(depositPortfolioId, deposit, cashPortfolioId, cashId);
     }
 
+    /// <summary>deposit-payout-to-savings: what <see cref="CreateDepositPaidIntoSavingsAsync"/> arranged.</summary>
+    public sealed record DepositPaidIntoSavings(
+        Guid DepositPortfolioId, DepositResponse Deposit, Guid SavingsPortfolioId, SavingsAccountResponse Account);
+
+    /// <summary>
+    /// deposit-payout-to-savings: the default deposit in a "Savings" portfolio, settled on 2026-04-15 with
+    /// the previewed values (final 10 119.83) and paid out at settlement into an empty PLN savings account
+    /// in a separate "Wallet" portfolio. The fact must have pinned a clock past the maturity
+    /// (<see cref="AfterDefaultMaturityUtc"/>).
+    /// </summary>
+    public static async Task<DepositPaidIntoSavings> CreateDepositPaidIntoSavingsAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName: "Wallet");
+        await client.SettleDepositAsync(
+            depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: account.AssetId));
+
+        return new DepositPaidIntoSavings(depositPortfolioId, deposit, savingsPortfolioId, account);
+    }
+
+    /// <summary>
+    /// deposit-payout-to-savings: an empty PLN savings account in a portfolio of its own, which is then
+    /// archived — a destination a payout must refuse. Returns both ids.
+    /// </summary>
+    public static async Task<(Guid PortfolioId, Guid SavingsId)> AddArchivedSavingsAccountAsync(
+        this HttpClient client, CancellationToken cancellationToken, string portfolioName = "Old savings")
+    {
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        return (portfolioId, account.AssetId);
+    }
+
     /// <summary>
     /// term-deposits-settlement: settles <paramref name="assetId"/> (arrange only — the fact must have
     /// pinned a clock past its maturity). Defaults to <see cref="NewSettleRequest"/>.

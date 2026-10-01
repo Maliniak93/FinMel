@@ -150,12 +150,12 @@
                   <button
                     mat-icon-button
                     type="button"
-                    [matTooltip]="'deposits.transferToCash' | transloco"
-                    [attr.aria-label]="'deposits.transferToCash' | transloco"
+                    [matTooltip]="'deposits.payOutAction' | transloco"
+                    [attr.aria-label]="'deposits.payOutAction' | transloco"
                     [attr.aria-describedby]="nameCellId(deposit)"
                     (click)="openPayOutDialog(deposit)"
                   >
-                    <mat-icon>payments</mat-icon>
+                    <mat-icon>output</mat-icon>
                   </button>
                 }
                 @if (!deposit.isArchived && canRollOver(deposit)) {

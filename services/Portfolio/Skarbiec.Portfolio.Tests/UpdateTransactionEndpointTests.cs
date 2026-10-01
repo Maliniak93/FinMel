@@ -378,4 +378,34 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(3_000m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
         Assert.Equal(2_000m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Quantity);
     }
+
+    /// <summary>
+    /// deposit-payout-to-savings AC-5: the savings leg of a deposit payout is changed only by the deposit
+    /// slices - a PUT is a 409 <c>Conflict.TransferLegManaged</c> and nothing changes.
+    /// </summary>
+    [Fact]
+    public async Task Update_DepositPayoutLegOnSavings_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
+        var leg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 200m, UnitPrice = 1m, Date = leg.Date };
+
+        var response = await client.PutAsJsonAsync(
+            TransactionUri(setup.SavingsPortfolioId, setup.Account.AssetId, leg.Id), update, cancellationToken);
+
+        await response.AssertTransferLegManagedAsync(cancellationToken);
+        var unchanged = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+        Assert.Equal(leg.Id, unchanged.Id);
+        Assert.Equal(10_119.83m, unchanged.Quantity);
+        Assert.NotNull(unchanged.Transfer);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(0m, (await client.GetAssetAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken)).Quantity);
+
+        var delete = await client.DeleteAsync(
+            TransactionUri(setup.SavingsPortfolioId, setup.Account.AssetId, leg.Id), cancellationToken);
+        await delete.AssertTransferLegManagedAsync(cancellationToken);
+    }
 }
