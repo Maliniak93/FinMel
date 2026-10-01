@@ -97,6 +97,19 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         string Transactions);
 
     /// <summary>
+    /// savings-interest-settlement: how many interest settlements <paramref name="userId"/> owns, or
+    /// - with <paramref name="assetId"/> - how many belong to that account. Bypasses the tenancy filter
+    /// only in the sense that it reads as the given user.
+    /// </summary>
+    protected async Task<int> CountSavingsSettlementsAsync(
+        Guid userId, CancellationToken cancellationToken, Guid? assetId = null)
+    {
+        await using var dbContext = CreateDbContext(userId);
+        return await dbContext.Set<SavingsInterestSettlement>()
+            .CountAsync(s => assetId == null || s.AssetId == assetId, cancellationToken);
+    }
+
+    /// <summary>
     /// A snapshot of everything <paramref name="userId"/> owns — asset, transaction and term-deposit
     /// row counts plus the summed asset quantity — so a rejected write can prove "nothing was written"
     /// by comparing the snapshot before and after.

@@ -98,4 +98,71 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-10: each account carries <c>interestDue</c>, <c>duePeriodCount</c>
+    /// and <c>lastSettlement</c> - a settled-once account with one more month due, an untouched one with
+    /// two months due, and one opened today with nothing due.
+    /// </summary>
+    [Fact]
+    public async Task List_ReturnsInterestStatusAndLastSettlement()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(OctoberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, settledOnce) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewInterestAccountRequest(name: "Settled once"));
+        var untouched = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewInterestAccountRequest(name: "Untouched"));
+        var fresh = await client.AddSavingsAccountAsync(
+            portfolioId, cancellationToken, NewInterestAccountRequest(name: "Fresh", openingDate: new DateOnly(2026, 11, 1)));
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, settledOnce.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(AllSavingsAccountsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var accounts = (await response.Content.ReadFromJsonAsync<List<SavingsAccountResponse>>(cancellationToken))!;
+
+        var once = accounts.Single(a => a.AssetId == settledOnce.AssetId);
+        Assert.True(once.InterestDue);
+        Assert.Equal(1, once.DuePeriodCount);
+        Assert.NotNull(once.LastSettlement);
+        Assert.NotEqual(Guid.Empty, once.LastSettlement.SettlementId);
+        Assert.Equal(new DateOnly(2026, 9, 1), once.LastSettlement.PeriodStart);
+        Assert.Equal(new DateOnly(2026, 9, 30), once.LastSettlement.PeriodEnd);
+        Assert.Equal(41.10m, once.LastSettlement.GrossInterest);
+        Assert.Equal(7.81m, once.LastSettlement.Tax);
+        Assert.Equal(33.29m, once.LastSettlement.NetInterest);
+
+        var never = accounts.Single(a => a.AssetId == untouched.AssetId);
+        Assert.True(never.InterestDue);
+        Assert.Equal(2, never.DuePeriodCount);
+        Assert.Null(never.LastSettlement);
+
+        var opened = accounts.Single(a => a.AssetId == fresh.AssetId);
+        Assert.False(opened.InterestDue);
+        Assert.Equal(0, opened.DuePeriodCount);
+        Assert.Null(opened.LastSettlement);
+    }
+
+    /// <summary>The single-account read carries the same interest status.</summary>
+    [Fact]
+    public async Task Get_ReturnsInterestStatus()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+
+        var due = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        Assert.True(due.InterestDue);
+        Assert.Equal(1, due.DuePeriodCount);
+        Assert.Null(due.LastSettlement);
+
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+
+        var settled = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        Assert.False(settled.InterestDue);
+        Assert.Equal(0, settled.DuePeriodCount);
+        Assert.Equal(33.29m, settled.LastSettlement!.NetInterest);
+    }
 }

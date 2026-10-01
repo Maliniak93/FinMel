@@ -59,6 +59,13 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                 })
             .ToDictionaryAsync(c => c.TransferId, cancellationToken);
 
+        // The settled month of every interest credit on this page, in one query (savings-interest-settlement).
+        var transactionIds = transactions.Select(t => (Guid?)t.Id).ToList();
+        var creditPeriodEnds = await dbContext.SavingsInterestSettlements
+            .AsNoTracking()
+            .Where(s => transactionIds.Contains(s.TransactionId))
+            .ToDictionaryAsync(s => s.TransactionId!.Value, s => s.PeriodEnd, cancellationToken);
+
         return new PagedResponse<TransactionResponse>
         {
             Items =
@@ -74,7 +81,8 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                             CounterpartPortfolioName = counterpart.PortfolioName,
                             Direction = TransferLegs.DirectionOf(t)
                         }
-                        : null))
+                        : null,
+                    creditPeriodEnds.TryGetValue(t.Id, out var periodEnd) ? periodEnd : null))
             ],
             Page = page,
             PageSize = pageSize,

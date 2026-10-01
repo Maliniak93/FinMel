@@ -222,6 +222,7 @@
     "value": "Wartość",
     "valuedOn": "Wycena z dnia",
     "maturedOn": "Zapadła dnia {{ date }}",
+    "interestToSettle": "Odsetki do rozliczenia",
     "due": "Zapadła",
     "noPriceYet": "Brak ceny",
     "priceStaleTooltip": "Cena tego instrumentu jest starsza niż 7 dni.",
@@ -267,6 +268,7 @@
     }
   },
   "transactions": {
+    "savingsInterest": "Odsetki · {{ month }}",
     "title": "Transakcje",
     "titleWithName": "Transakcje — {{ name }}",
     "newTransaction": "Nowa transakcja",
@@ -398,6 +400,22 @@
     }
   },
   "savings": {
+    "lastInterest": "Ostatnie odsetki",
+    "interest": {
+      "settle": "Rozlicz odsetki",
+      "settleMonths": "Rozlicz odsetki (miesiące do rozliczenia: {{ count }})",
+      "settleOf": "Rozlicz odsetki konta {{ name }}",
+      "undo": "Cofnij ostatnie rozliczenie",
+      "undoOf": "Cofnij ostatnie rozliczenie konta {{ name }}",
+      "undoTitle": "Cofnąć ostatnie rozliczenie odsetek?",
+      "undoMessage": "Rozliczenie za {{ month }} konta \"{{ name }}\" i jego wpłata odsetek zostaną usunięte, a miesiąc znów będzie do rozliczenia.",
+      "undoConfirm": "Cofnij",
+      "undoFailed": "Nie udało się cofnąć rozliczenia.",
+      "title": "Rozlicz odsetki",
+      "period": "Okres",
+      "averageDailyBalance": "Średnie saldo dzienne",
+      "previewLoadFailed": "Nie udało się wczytać podglądu odsetek."
+    },
     "add": "Dodaj konto oszczędnościowe",
     "empty": "Nie masz jeszcze żadnych kont oszczędnościowych.",
     "addFirst": "Dodaj pierwsze konto oszczędnościowe",

@@ -1,0 +1,40 @@
+.settle-savings-interest-dialog__name {
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
+.settle-savings-interest-dialog__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0 0 16px;
+
+  dt {
+    opacity: 0.7;
+    font-size: 0.875em;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.settle-savings-interest-dialog__loading {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 16px;
+}
+
+.settle-savings-interest-dialog__row {
+  display: flex;
+  gap: 12px;
+
+  .settle-savings-interest-dialog__field {
+    flex: 1;
+  }
+}
+
+.settle-savings-interest-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

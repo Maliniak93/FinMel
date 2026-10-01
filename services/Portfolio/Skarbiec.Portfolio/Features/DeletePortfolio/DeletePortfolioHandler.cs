@@ -37,6 +37,10 @@ public sealed class DeletePortfolioHandler(
         // it. A transfer with both legs in here goes with the portfolio.
         await dbContext.DetachCounterpartsAsync(transactions, cancellationToken);
 
+        // Interest settlements carry no FK (savings-interest-settlement), so they go here, with their assets.
+        dbContext.SavingsInterestSettlements.RemoveRange(
+            await dbContext.SavingsInterestSettlements.Where(s => assetIds.Contains(s.AssetId)).ToListAsync(cancellationToken));
+
         dbContext.Assets.RemoveRange(assets);
         dbContext.Portfolios.Remove(portfolio);
 

@@ -649,4 +649,102 @@ internal static class PortfolioApi
 
         return (await response.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken))!;
     }
+
+    // ---- savings-interest-settlement ------------------------------------------------------------
+
+    public static string SavingsInterestPreviewUri(Guid portfolioId, Guid assetId) =>
+        $"{SavingsAccountUri(portfolioId, assetId)}/interest-preview";
+
+    public static string SavingsInterestSettlementsUri(Guid portfolioId, Guid assetId) =>
+        $"{SavingsAccountUri(portfolioId, assetId)}/interest-settlements";
+
+    public static string SavingsInterestSettlementUri(Guid portfolioId, Guid assetId, Guid settlementId) =>
+        $"{SavingsInterestSettlementsUri(portfolioId, assetId)}/{settlementId}";
+
+    /// <summary>The date the interest accounts' opening deposit is dated: the first day of September 2026.</summary>
+    public static readonly DateOnly InterestOpeningDate = new(2026, 9, 1);
+
+    public static readonly DateOnly SeptemberEnd = new(2026, 9, 30);
+
+    public static readonly DateOnly OctoberEnd = new(2026, 10, 31);
+
+    /// <summary>30 September 2026 (Europe/Warsaw): September has not ended yet, so nothing is due.</summary>
+    public static readonly DateTimeOffset SeptemberLastDayUtc = new(2026, 9, 30, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>1 October 2026: September has just ended and is the only due period.</summary>
+    public static readonly DateTimeOffset SeptemberEndedUtc = new(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>1 November 2026: September and October have ended.</summary>
+    public static readonly DateTimeOffset OctoberEndedUtc = new(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>1 December 2026: September, October and November have ended.</summary>
+    public static readonly DateTimeOffset NovemberEndedUtc = new(2026, 12, 1, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// savings-interest-settlement: a savings account at 5 % (taxed unless <paramref name="taxExempt"/>)
+    /// whose only transaction is an opening deposit of 10 000 on <see cref="InterestOpeningDate"/>. Pin
+    /// the clock to one of the dates above before adding it.
+    /// </summary>
+    public static AddSavingsAccountRequest NewInterestAccountRequest(
+        string name = "Interest account", bool taxExempt = false, decimal annualInterestRatePercent = 5m, DateOnly? openingDate = null) =>
+        NewSavingsAccountRequest(
+            name: name,
+            annualInterestRatePercent: annualInterestRatePercent,
+            taxExempt: taxExempt,
+            openingDate: openingDate ?? InterestOpeningDate);
+
+    /// <summary>The JSON body of <c>POST .../interest-settlements</c>.</summary>
+    public static object NewSettleInterestBody(DateOnly periodEnd, decimal grossInterest, decimal tax) =>
+        new { periodEnd, grossInterest, tax };
+
+    /// <summary>Arrange: <c>GET .../interest-preview</c> as a JSON element (the fact must have a period due).</summary>
+    public static async Task<System.Text.Json.JsonElement> GetSavingsInterestPreviewAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(SavingsInterestPreviewUri(portfolioId, assetId), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await response.ReadJsonAsync(cancellationToken);
+    }
+
+    /// <summary>Arrange: settles <paramref name="periodEnd"/> with the given amounts.</summary>
+    public static async Task SettleSavingsInterestAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        DateOnly periodEnd,
+        decimal grossInterest,
+        decimal tax,
+        CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsJsonAsync(
+            SavingsInterestSettlementsUri(portfolioId, assetId), NewSettleInterestBody(periodEnd, grossInterest, tax), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>Arrange: previews the next due period and settles it with exactly the previewed values; returns the period's end.</summary>
+    public static async Task<DateOnly> SettlePreviewedSavingsInterestAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var preview = await client.GetSavingsInterestPreviewAsync(portfolioId, assetId, cancellationToken);
+        var periodEnd = DateOnly.Parse(preview.GetProperty("periodEnd").GetString()!, System.Globalization.CultureInfo.InvariantCulture);
+        await client.SettleSavingsInterestAsync(
+            portfolioId,
+            assetId,
+            periodEnd,
+            preview.GetProperty("grossInterest").GetDecimal(),
+            preview.GetProperty("tax").GetDecimal(),
+            cancellationToken);
+
+        return periodEnd;
+    }
+
+    /// <summary>Arrange: the id of the account's latest settlement, read from <c>lastSettlement</c>.</summary>
+    public static async Task<Guid> GetLastSettlementIdAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var account = await client.GetSavingsAccountAsync(portfolioId, assetId, cancellationToken);
+
+        return account.LastSettlement!.SettlementId;
+    }
 }

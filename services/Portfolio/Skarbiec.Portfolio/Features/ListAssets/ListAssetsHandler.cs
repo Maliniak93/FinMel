@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.SavingsAccounts;
 
 namespace Skarbiec.Portfolio.Features.ListAssets;
 
-public sealed class ListAssetsHandler(PortfolioDbContext dbContext)
+public sealed class ListAssetsHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<IReadOnlyList<AssetResponse>>> HandleAsync(Guid portfolioId, CancellationToken cancellationToken)
     {
@@ -38,8 +40,19 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext)
             })
             .ToListAsync(cancellationToken);
 
+        // The savings accounts' interest status is computed from their daily balances, in memory —
+        // three more queries for the whole page, only when it holds a savings account.
+        var interest = await dbContext.LoadSavingsInterestStatusAsync(
+            [.. rows.Where(r => r.Asset.AssetClass == AssetClass.Savings).Select(r => r.Asset.Id)],
+            WarsawCalendar.Today(timeProvider),
+            cancellationToken);
+
         IReadOnlyList<AssetResponse> response = rows
-            .Select(r => r.Asset.ToResponse(r.TransactionCount, r.DepositMaturityDate, r.DepositSettled))
+            .Select(r => r.Asset.ToResponse(
+                r.TransactionCount,
+                r.DepositMaturityDate,
+                r.DepositSettled,
+                interest.TryGetValue(r.Asset.Id, out var status) ? status.Due is not null : null))
             .ToList();
         return Result<IReadOnlyList<AssetResponse>>.Success(response);
     }

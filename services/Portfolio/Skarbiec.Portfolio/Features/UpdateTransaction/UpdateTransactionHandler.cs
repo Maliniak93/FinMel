@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
@@ -45,6 +46,14 @@ public sealed class UpdateTransactionHandler(
         if (transaction.TransferId is not null)
         {
             return TransferErrors.LegManaged;
+        }
+
+        // A savings interest credit goes only by undoing its settlement (savings-interest-settlement),
+        // so a settlement never loses its credit.
+        if (asset.AssetClass == AssetClass.Savings
+            && await dbContext.SavingsInterestSettlements.AnyAsync(s => s.TransactionId == id, cancellationToken))
+        {
+            return SavingsAccountErrors.InterestManaged;
         }
 
         if (!AssetTransactionTypes.IsAllowed(asset.AssetClass, request.Type))

@@ -41,6 +41,15 @@ export function formatDate(value: string | Date | null | undefined): string {
     : new Intl.DateTimeFormat(activeLocale(), { dateStyle: 'medium' }).format(toDate(value));
 }
 
+// A calendar month: "September 2026" / "wrzesień 2026". Nullish renders as nothing.
+export function formatMonth(value: string | Date | null | undefined): string {
+  return value === null || value === undefined || value === ''
+    ? ''
+    : new Intl.DateTimeFormat(activeLocale(), { month: 'long', year: 'numeric' }).format(
+        toDate(value),
+      );
+}
+
 // Medium date and time: "Sep 27, 2026, 8:30:00 PM" / "27 wrz 2026, 20:30:00".
 export function formatDateTime(value: string | Date | null | undefined): string {
   return value === null || value === undefined || value === ''

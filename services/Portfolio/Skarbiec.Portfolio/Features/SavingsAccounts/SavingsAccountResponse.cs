@@ -21,12 +21,21 @@ public sealed record SavingsAccountResponse
 
     public required decimal AnnualInterestRatePercent { get; init; }
     public required bool TaxExempt { get; init; }
+
+    /// <summary>An ended calendar month with interest is waiting to be settled (savings-interest-settlement).</summary>
+    public required bool InterestDue { get; init; }
+
+    /// <summary>How many ended, unsettled months carry interest — 0 when <see cref="InterestDue"/> is false.</summary>
+    public required int DuePeriodCount { get; init; }
+
+    /// <summary>The latest settlement — the only one that can be undone; <see langword="null"/> before the first.</summary>
+    public SavingsInterestSettlementResponse? LastSettlement { get; init; }
 }
 
 public static class SavingsAccountMappingExtensions
 {
     public static SavingsAccountResponse ToResponse(
-        this SavingsAccount terms, Asset asset, string portfolioName, bool portfolioIsArchived) => new()
+        this SavingsAccount terms, Asset asset, string portfolioName, bool portfolioIsArchived, SavingsInterestStatus interest) => new()
         {
             AssetId = asset.Id,
             PortfolioId = asset.PortfolioId,
@@ -38,6 +47,9 @@ public static class SavingsAccountMappingExtensions
             Currency = asset.Currency,
             Balance = asset.Quantity,
             AnnualInterestRatePercent = terms.AnnualInterestRatePercent,
-            TaxExempt = terms.TaxExempt
+            TaxExempt = terms.TaxExempt,
+            InterestDue = interest.Due is not null,
+            DuePeriodCount = interest.Due?.DuePeriodCount ?? 0,
+            LastSettlement = interest.LastSettlement
         };
 }

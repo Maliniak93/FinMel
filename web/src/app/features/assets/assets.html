@@ -92,6 +92,16 @@
               </mat-chip>
             </mat-chip-set>
           }
+          @if (isSavingsInterestDue(asset)) {
+            <mat-chip-set class="assets-page__due">
+              <mat-chip
+                class="assets-page__chip--due"
+                [matTooltip]="'assets.interestToSettle' | transloco"
+              >
+                {{ 'assets.due' | transloco }}
+              </mat-chip>
+            </mat-chip-set>
+          }
         </td>
       </ng-container>
 

@@ -559,6 +559,84 @@ describe('Transactions', () => {
     });
   });
 
+  // savings-interest-settlement AC-13: the credit a settlement adds to a savings account
+  // (`savingsInterestPeriodEnd` set on the TransactionResponse) reads "Interest · <Month yyyy>" of the
+  // settled month and offers no Edit/Delete (the backend answers 409 Conflict.SavingsInterestManaged),
+  // while an ordinary transaction on the same account keeps both.
+  describe('savings interest credits', () => {
+    const savingsAsset: AssetResponse = {
+      ...asset,
+      assetClass: 9, // Savings
+      valuationMode: 2, // CurrencyValued
+      name: 'Savings account',
+      currency: 'PLN',
+      quantity: 10033.29,
+      manualValue: null,
+      manualValueDate: null,
+    };
+    const opening: TransactionResponse = {
+      ...transaction,
+      id: '55555555-5555-5555-5555-555555555555',
+      type: 2, // Deposit
+      quantity: 10000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 10000,
+      date: '2026-09-01',
+    };
+    const credit = {
+      ...transaction,
+      id: '66666666-6666-6666-6666-666666666666',
+      type: 2, // Deposit
+      quantity: 33.29,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 33.29,
+      date: '2026-09-30',
+      savingsInterestPeriodEnd: '2026-09-30',
+    } as TransactionResponse;
+
+    function rows(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'tbody tr.mat-mdc-row',
+        ),
+      );
+    }
+
+    function rowText(row: HTMLElement): string {
+      return (row.textContent ?? '').replace(/\s+/g, ' ');
+    }
+
+    function rowHasActions(row: HTMLElement): boolean {
+      return fixture.debugElement
+        .queryAll(By.directive(MatMenuTrigger))
+        .some((debugElement) => row.contains(debugElement.nativeElement));
+    }
+
+    it('labels the credit "Interest · <Month yyyy>" and offers it no edit / delete', async () => {
+      await setup(jsonResponse(pagedResponse([credit, opening])), jsonResponse(savingsAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const [creditRow, openingRow] = rows();
+      expect(rowText(creditRow)).toContain('Interest · September 2026');
+      expect(rowHasActions(creditRow)).toBe(false);
+
+      expect(rowText(openingRow)).not.toContain('Interest ·');
+      expect(rowHasActions(openingRow)).toBe(true);
+    });
+
+    it('labels the credit with the settled month, not the month of a later date', async () => {
+      const october = { ...credit, date: '2026-10-31', savingsInterestPeriodEnd: '2026-10-31' };
+      await setup(jsonResponse(pagedResponse([october])), jsonResponse(savingsAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(rowText(rows()[0])).toContain('Interest · October 2026');
+    });
+  });
+
   // term-deposits AC-16: a term deposit's transactions are system-managed (the backend answers 409
   // Conflict.DepositTransactionsManaged to every write), so its view lists them but offers no
   // record / edit / delete action, even in an active portfolio.
