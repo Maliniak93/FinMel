@@ -291,7 +291,13 @@
       "mustNotBeNegative": "{{ field }} must not be negative.",
       "dateRequired": "Date is required."
     },
-    "assetArchivedNotice": "This asset is archived — restore it to make changes."
+    "assetArchivedNotice": "This asset is archived — restore it to make changes.",
+    "deleteTransfer": {
+      "action": "Delete transfer",
+      "title": "Delete this transfer?",
+      "message": "Both sides of this transfer of {{ quantity }} — here and in \"{{ counterpart }}\" — will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete the transfer."
+    }
   },
   "deposits": {
     "title": "Deposits & savings",
@@ -435,6 +441,23 @@
       "openingDate": "Opening deposit date",
       "openingDateRequired": "Date is required.",
       "openingDateInFuture": "Date can't be in the future."
+    },
+    "transfer": {
+      "action": "Transfer",
+      "actionOf": "Transfer money to or from {{ name }}",
+      "title": "Transfer",
+      "direction": "Direction",
+      "into": "Into this account",
+      "out": "Out to cash",
+      "cash": "Cash account",
+      "cashRequired": "Choose a Cash account.",
+      "noCashAccount": "You have no {{ currency }} Cash account to transfer with.",
+      "amountRequired": "Amount is required.",
+      "amountPositive": "The amount must be greater than 0.",
+      "exceedsBalance": "The amount is above the source's balance ({{ balance }}).",
+      "insufficientFunds": "The source can't cover this amount on this date.",
+      "dateInFuture": "Date can't be in the future.",
+      "submit": "Transfer"
     }
   },
   "assetArchive": {

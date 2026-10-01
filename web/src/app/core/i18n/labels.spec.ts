@@ -86,6 +86,8 @@ describe('enum label maps', () => {
 
   it('a transfer leg label is a translated key carrying the counterpart as parameters', () => {
     const base = {
+      transferId: '33333333-3333-3333-3333-333333333333',
+      manual: false,
       counterpartAssetId: '11111111-1111-1111-1111-111111111111',
       counterpartAssetName: 'Term deposit',
       counterpartPortfolioId: '22222222-2222-2222-2222-222222222222',

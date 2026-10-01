@@ -66,6 +66,17 @@ export type CreatePortfolioRequest = {
     currency?: string;
 };
 
+export type CreateTransferRequest = {
+    sourceAssetId: string;
+    targetAssetId: string;
+    amount: number | string;
+    date: string;
+};
+
+export type CreateTransferResponse = {
+    transferId: string;
+};
+
 export type DepositCapitalization = number;
 
 export type DepositProjectionResponse = {
@@ -221,6 +232,8 @@ export type TransactionResponse = {
 };
 
 export type TransactionTransferResponse = {
+    transferId: string;
+    manual: boolean;
     counterpartAssetId: string;
     counterpartAssetName: string;
     counterpartPortfolioId: string;
@@ -930,3 +943,37 @@ export type GetApiPortfolioTransferCandidatesResponses = {
 };
 
 export type GetApiPortfolioTransferCandidatesResponse = GetApiPortfolioTransferCandidatesResponses[keyof GetApiPortfolioTransferCandidatesResponses];
+
+export type PostApiPortfolioTransfersData = {
+    body: CreateTransferRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/transfers';
+};
+
+export type PostApiPortfolioTransfersResponses = {
+    /**
+     * Created
+     */
+    201: CreateTransferResponse;
+};
+
+export type PostApiPortfolioTransfersResponse = PostApiPortfolioTransfersResponses[keyof PostApiPortfolioTransfersResponses];
+
+export type DeleteApiPortfolioTransfersByTransferIdData = {
+    body?: never;
+    path: {
+        transferId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfers/{transferId}';
+};
+
+export type DeleteApiPortfolioTransfersByTransferIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioTransfersByTransferIdResponse = DeleteApiPortfolioTransfersByTransferIdResponses[keyof DeleteApiPortfolioTransfersByTransferIdResponses];

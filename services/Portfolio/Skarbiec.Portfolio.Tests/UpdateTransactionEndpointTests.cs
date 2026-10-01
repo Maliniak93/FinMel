@@ -355,4 +355,27 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(7.81m, last.Tax);
         Assert.Equal(33.29m, last.NetInterest);
     }
+
+    /// <summary>savings-cash-transfers AC-5: a leg of a manual Cash/Savings transfer is changed only through /transfers.</summary>
+    [Fact]
+    public async Task Update_ManualTransferLeg_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
+        await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
+        var leg = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Withdraw, Quantity = 200m, UnitPrice = 1m, Date = leg.Date };
+
+        var response = await client.PutAsJsonAsync(
+            TransactionUri(setup.CashPortfolioId, setup.CashAssetId, leg.Id), update, cancellationToken);
+
+        await response.AssertTransferLegManagedAsync(cancellationToken);
+        var unchanged = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        Assert.Equal(2_000m, unchanged.Quantity);
+        Assert.NotNull(unchanged.Transfer);
+        Assert.Equal(3_000m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2_000m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Quantity);
+    }
 }

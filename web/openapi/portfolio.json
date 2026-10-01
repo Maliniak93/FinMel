@@ -1357,6 +1357,58 @@
           }
         }
       }
+    },
+    "/api/portfolio/transfers": {
+      "post": {
+        "tags": [
+          "CreateTransferEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTransferResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/transfers/{transferId}": {
+      "delete": {
+        "tags": [
+          "DeleteTransferEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "transferId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1671,6 +1723,51 @@
           },
           "currency": {
             "type": "string"
+          }
+        }
+      },
+      "CreateTransferRequest": {
+        "required": [
+          "sourceAssetId",
+          "targetAssetId",
+          "amount",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "sourceAssetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetAssetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CreateTransferResponse": {
+        "required": [
+          "transferId"
+        ],
+        "type": "object",
+        "properties": {
+          "transferId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -2506,6 +2603,8 @@
       },
       "TransactionTransferResponse": {
         "required": [
+          "transferId",
+          "manual",
           "counterpartAssetId",
           "counterpartAssetName",
           "counterpartPortfolioId",
@@ -2514,6 +2613,13 @@
         ],
         "type": "object",
         "properties": {
+          "transferId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manual": {
+            "type": "boolean"
+          },
           "counterpartAssetId": {
             "type": "string",
             "format": "uuid"
@@ -2892,6 +2998,12 @@
     },
     {
       "name": "ListTransferCandidatesEndpoint"
+    },
+    {
+      "name": "CreateTransferEndpoint"
+    },
+    {
+      "name": "DeleteTransferEndpoint"
     }
   ]
 }

@@ -16,7 +16,18 @@ internal static class TransferErrors
     public static readonly Error InsufficientFunds =
         new("Validation.InsufficientFunds", "The source of funds can't cover this amount on this date.");
 
-    /// <summary>UpdateTransaction/DeleteTransaction on a transfer leg — only the transfer's entry point changes it.</summary>
+    /// <summary>A manual transfer (savings-cash-transfers) dated after today's Europe/Warsaw date.</summary>
+    public static readonly Error DateInFuture =
+        new("Validation.TransferDateInFuture", "The transfer date can't be in the future.");
+
+    /// <summary>No transfer of the current user has this id — a stranger's id included, so nothing leaks.</summary>
+    public static Error NotFound(Guid transferId) =>
+        new("NotFound.Transfer", $"Transfer '{transferId}' was not found.");
+
+    /// <summary>
+    /// UpdateTransaction/DeleteTransaction on a transfer leg — only the transfer's entry point changes it;
+    /// also DeleteTransfer on a route that is not manual, whose own slice owns it.
+    /// </summary>
     public static readonly Error LegManaged =
         new("Conflict.TransferLegManaged", "This transaction is one side of a transfer — change it through the transfer instead.");
 }

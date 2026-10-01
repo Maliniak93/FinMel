@@ -15,6 +15,7 @@ using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
+using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
@@ -746,5 +747,57 @@ internal static class PortfolioApi
         var account = await client.GetSavingsAccountAsync(portfolioId, assetId, cancellationToken);
 
         return account.LastSettlement!.SettlementId;
+    }
+
+    // ---- savings-cash-transfers -----------------------------------------------------------------
+
+    public const string TransfersUri = "/api/portfolio/transfers";
+
+    public static string TransferUri(Guid transferId) => $"{TransfersUri}/{transferId}";
+
+    /// <summary>The date a manual transfer is made on by default: after <see cref="DefaultTopUpDate"/>, before <see cref="SavingsToday"/>.</summary>
+    public static readonly DateOnly DefaultTransferDate = new(2026, 1, 20);
+
+    /// <summary>savings-cash-transfers: a valid <see cref="CreateTransferRequest"/> (amount 2 000 on <see cref="DefaultTransferDate"/> unless told otherwise).</summary>
+    public static CreateTransferRequest NewTransferRequest(
+        Guid sourceAssetId, Guid targetAssetId, decimal amount = 2_000m, DateOnly? date = null) => new()
+        {
+            SourceAssetId = sourceAssetId,
+            TargetAssetId = targetAssetId,
+            Amount = amount,
+            Date = date ?? DefaultTransferDate
+        };
+
+    /// <summary>savings-cash-transfers: what <see cref="CreateCashAndSavingsAsync"/> arranged.</summary>
+    public sealed record CashAndSavings(Guid CashPortfolioId, Guid CashAssetId, Guid SavingsPortfolioId, Guid SavingsAssetId);
+
+    /// <summary>
+    /// savings-cash-transfers: a PLN Cash asset holding <paramref name="cashBalance"/> in "Wallet" and an
+    /// empty PLN savings account in a separate "Savings" portfolio. Pin the clock to
+    /// <see cref="SavingsTodayUtc"/> (or later) first.
+    /// </summary>
+    public static async Task<CashAndSavings> CreateCashAndSavingsAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal cashBalance = 5_000m,
+        DateOnly? toppedUpOn = null,
+        AddSavingsAccountRequest? savingsRequest = null)
+    {
+        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance, toppedUpOn: toppedUpOn);
+        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, savingsRequest ?? NewSavingsAccountRequest(withOpeningDeposit: false));
+
+        return new CashAndSavings(cashPortfolioId, cashId, savingsPortfolioId, account.AssetId);
+    }
+
+    /// <summary>savings-cash-transfers: arranges a transfer through <c>POST /transfers</c> and returns its id.</summary>
+    public static async Task<Guid> CreateTransferAsync(
+        this HttpClient client, CancellationToken cancellationToken, CreateTransferRequest request)
+    {
+        var response = await client.PostAsJsonAsync(TransfersUri, request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<CreateTransferResponse>(cancellationToken))!.TransferId;
     }
 }

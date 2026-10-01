@@ -126,7 +126,9 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <!-- A transfer leg changes only through its transfer (asset-transfers-deposit-funding), and a
                savings interest credit only by undoing its settlement (savings-interest-settlement):
-               Portfolio answers 409 to an edit or delete, so the row offers neither. -->
+               Portfolio answers 409 to an edit or delete, so the row offers neither. A manual transfer
+               leg (Cash <-> Savings, savings-cash-transfers) offers only "Delete transfer", which removes
+               both legs; a deposit-route leg offers nothing. -->
           <td mat-cell *matCellDef="let transaction">
             @if (!transaction.transfer && !transaction.savingsInterestPeriodEnd) {
               <button
@@ -152,6 +154,28 @@
                 <button mat-menu-item type="button" (click)="remove(transaction)">
                   <mat-icon>delete</mat-icon>
                   <span>{{ 'common.delete' | transloco }}</span>
+                </button>
+              </mat-menu>
+            } @else if (transaction.transfer?.manual) {
+              <button
+                mat-icon-button
+                type="button"
+                [matMenuTriggerFor]="transferMenu"
+                [attr.aria-label]="
+                  'transactions.actionsFor'
+                    | transloco
+                      : {
+                          type: (transactionTypeLabel(transaction.type) | transloco),
+                          date: transaction.date,
+                        }
+                "
+              >
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #transferMenu="matMenu">
+                <button mat-menu-item type="button" (click)="removeTransfer(transaction)">
+                  <mat-icon>delete</mat-icon>
+                  <span>{{ 'transactions.deleteTransfer.action' | transloco }}</span>
                 </button>
               </mat-menu>
             }

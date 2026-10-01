@@ -585,3 +585,36 @@ Content-Type: application/json
 # Conflict.SavingsInterestManaged).
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements/{{settleSavingsInterest.response.body.settlementId}}
 Authorization: Bearer {{authToken}}
+
+### --- Transfers between cash and savings ---
+
+### Transfer cash into the savings account
+# A manual transfer (savings-cash-transfers): Cash → Savings or Savings → Cash only, between two of the
+# user's same-currency assets, across portfolios too. Writes a Withdraw on the source and a Deposit on
+# the target (same amount and date, unit price 1, PLN rate frozen), linked by a shared TransferId, and
+# publishes AssetPositionChanged for both in one save. 201 with transferId. 400 for an amount of 0 or
+# less or a date after today (Europe/Warsaw); 400 Validation.InvalidTransferCounterpart for an asset
+# that is not the user's, the same asset twice, any other route (the deposit routes keep their own
+# endpoints) or another currency; 400 Validation.InsufficientFunds when the source's balance would drop
+# below 0 anywhere in its history; 409 Conflict.PortfolioArchived when either side's portfolio is
+# archived. Its legs are 409 Conflict.TransferLegManaged on PUT/DELETE .../transactions/{id}.
+# @name createTransfer
+POST {{baseUrl}}/api/portfolio/transfers
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "sourceAssetId": "{{addFundingCash.response.body.id}}",
+  "targetAssetId": "{{addSavingsAccount.response.body.assetId}}",
+  "amount": 500.00,
+  "date": "2026-02-02"
+}
+
+### Delete the transfer
+# Deletes both legs, recomputes both assets and publishes AssetPositionChanged for both in one save. A
+# transfer is never edited — delete it and create it again. 204. 404 for an unknown id or another
+# user's; 409 Conflict.TransferLegManaged for a deposit-route transfer (Cash ↔ Deposit); 409
+# Conflict.PortfolioArchived when either side's portfolio is archived; 409 Conflict.OversellsPosition
+# when removing the inflow would leave a later Withdraw on the target uncovered.
+DELETE {{baseUrl}}/api/portfolio/transfers/{{createTransfer.response.body.transferId}}
+Authorization: Bearer {{authToken}}

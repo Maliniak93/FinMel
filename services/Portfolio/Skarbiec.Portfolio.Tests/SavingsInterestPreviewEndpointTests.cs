@@ -111,6 +111,30 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    /// <summary>
+    /// savings-cash-transfers AC-5: a 5 000 opening deposit on 1 September plus a Cash → Savings transfer
+    /// of 5 000 on 16 September averages 7 500 over September (5 000 for 15 days, 10 000 for 15).
+    /// </summary>
+    [Fact]
+    public async Task Preview_CountsTransferFromItsDate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateCashAndSavingsAsync(
+            cancellationToken,
+            cashBalance: 10_000m,
+            toppedUpOn: InterestOpeningDate,
+            savingsRequest: NewSavingsAccountRequest(annualInterestRatePercent: 5m, openingAmount: 5_000m, openingDate: InterestOpeningDate));
+        await client.CreateTransferAsync(
+            cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 5_000m, new DateOnly(2026, 9, 16)));
+
+        var preview = await client.GetSavingsInterestPreviewAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken);
+
+        Assert.Equal(7_500.00m, preview.GetProperty("averageDailyBalance").GetDecimal());
+        Assert.Equal(30.82m, preview.GetProperty("grossInterest").GetDecimal());
+    }
+
     [Fact]
     public async Task Preview_WithoutToken_ReturnsUnauthorized()
     {
