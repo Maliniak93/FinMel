@@ -14,10 +14,12 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | Build | `dotnet build Skarbiec.slnx` |
 | Test — **Docker must be running** (Testcontainers) | `dotnet test` |
 | Format check | `dotnet format Skarbiec.slnx --verify-no-changes` |
-| One-shot verification: format → build → tests → web → API client | `node scripts/verify.mjs [--quick\|--all\|--projects A,B]` |
+| One-shot verification: format → build → tests → web → API client; `--fix` first reformats the changed files; 60-min deadline | `node scripts/verify.mjs [--quick\|--all\|--projects A,B] [--fix]` |
 | Preflight for /build: checks node/dotnet/gh/git, starts Docker, stops the stack, installs web deps | `node scripts/preflight.mjs [--dry-run] [--no-web]` |
 | Live plan status (spec issues on the GitHub project vs. git vs. open PRs); `--write` refreshes the block in `skarbiec-plan/README.md` | `node scripts/plan-status.mjs [--write] [--no-gh]` |
 | Spec issues on the FinMel project: read, list, move a card, comment, tick ACs | `node scripts/gh-project.mjs get\|list\|set\|comment\|tick` |
+| Token cost of past `/build` runs per agent type and per run — measure before and after changing the flow | `node scripts/run-cost.mjs [--since YYYY-MM-DD] [--issue n]` |
+| Delete local lane branches whose PR is merged (dry run unless `--apply`) | `node scripts/prune-branches.mjs [--apply]` |
 | Frontend dev server | `cd web && npm start` |
 | Frontend unit tests (Vitest) | `cd web && npm test` |
 | Regenerate the TS client after an API change — reads the build-time OpenAPI files once spec-00 lands, until then needs the stack running | `cd web && npm run gen:api` |

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Single definition of "green" for Skarbiec: format -> build -> affected tests -> web -> api.
 //
-// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all]
+// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix]
+//                                [--deadline-min N] [--out <file>]
 //
 //   (no flags)        auto mode — selects affected .NET test projects and web/api checks from
 //                      changed files (git diff master...HEAD, falling back to origin/master...HEAD,
@@ -13,6 +14,19 @@
 //   --web             force the web checks on regardless of what changed.
 //   --api             force the api (generated TS client) check on regardless of what changed.
 //   --all             every test project + web + api.
+//   --fix             before checking, apply the mechanical fixes to the changed files only:
+//                      `dotnet format --include` on changed .cs files, `prettier --write` and
+//                      `eslint --fix` on changed web/ files. Prints what it reformatted. Never fails the
+//                      run by itself — whatever it cannot fix is reported by the checks that follow.
+//   --deadline-min N  wall-clock budget for the whole run (default 60). When it runs out the current
+//                      command and its whole process tree are killed and the run fails with
+//                      step "timeout". Each single command is also capped at 60 min.
+//   --out <file>      also write the result JSON ({ok, failures}) to <file> (atomically, via a temp
+//                      file and rename); a stale <file> is deleted at start. Lets a caller that runs
+//                      this script in the background wait for the file instead of polling output.
+//   --await <file>    do not verify: wait (at most --max-min N, default 9 — one foreground Bash call)
+//                      for a background run's --out file, print its VERIFY_RESULT line and exit 0/2;
+//                      still missing → `VERIFY_PENDING: …` and exit 3, so the caller calls it again.
 //
 // Steps run in order and STOP at the first failure: format, build, test (one dotnet test per
 // affected project), web (typecheck/lint/format/build/test), api (gen:api + diff check).
@@ -27,9 +41,12 @@
 // process is given an explicit `cwd` rather than inheriting the caller's.
 //
 // Windows notes:
-//  - Every command runs via `spawnSync(cmdString, { shell: true, ... })` with a single pre-quoted
+//  - Every check runs via `spawn(cmdString, { shell: true, ... })` with a single pre-quoted
 //    command string (not an argv array) — Node does not itself quote array args for a Windows shell,
 //    so building the string ourselves (see `quoteArg`) keeps `cmd.exe` and POSIX shells consistent.
+//    It is async (not spawnSync) so a timeout can kill the whole tree (`taskkill /T`) while the shell
+//    is still alive — killing only the shell would orphan dotnet/testhost processes that keep build
+//    outputs locked.
 //  - `npm` has no `.exe` on Windows (it's `npm.cmd`); we call `npm.cmd` there and plain `npm` elsewhere.
 //  - Verified empirically on this repo's Angular 22 unit-test builder (`@angular/build:unit-test`,
 //    which wraps Vitest): `npm test -- --watch=false` runs once and exits 0 — that is the invocation
@@ -47,8 +64,9 @@
 //    with MSB3021/MSB3026/MSB3027 (locked file). On one of those codes this script stops the stack
 //    (`scripts/stop-stack.mjs`) and retries the build once; the log says what it stopped.
 
-import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stopStack } from "./stop-stack.mjs";
@@ -57,21 +75,57 @@ const IS_WIN = process.platform === "win32";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WEB_DIR = path.join(REPO_ROOT, "web");
 const NPM = IS_WIN ? "npm.cmd" : "npm";
-const DEFAULT_TIMEOUT_MS = 20 * 60 * 1000; // dotnet test can pull Testcontainers images; be generous
+const NPX = IS_WIN ? "npx.cmd" : "npx";
+const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000; // per command — the suites keep growing; be generous
+const DEFAULT_DEADLINE_MIN = 60; // whole run
+
+// Set in main(); every command's timeout is capped by what is left of it.
+let deadlineAt = Infinity;
+let outFile = null;
 
 // ---------------------------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { quick: false, all: false, web: false, api: false, projects: null };
+  const args = {
+    quick: false,
+    all: false,
+    web: false,
+    api: false,
+    fix: false,
+    projects: null,
+    deadlineMin: DEFAULT_DEADLINE_MIN,
+    out: null,
+    await: null,
+    maxMin: 9,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--quick") args.quick = true;
     else if (a === "--all") args.all = true;
     else if (a === "--web") args.web = true;
     else if (a === "--api") args.api = true;
-    else if (a === "--projects") {
+    else if (a === "--fix") args.fix = true;
+    else if (a === "--deadline-min" || a.startsWith("--deadline-min=")) {
+      const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
+      const n = Number(val);
+      if (!(n > 0)) fatal("--deadline-min requires a positive number of minutes");
+      args.deadlineMin = n;
+    } else if (a === "--out" || a.startsWith("--out=")) {
+      const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
+      if (!val) fatal("--out requires a file path");
+      args.out = path.resolve(val);
+    } else if (a === "--await" || a.startsWith("--await=")) {
+      const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
+      if (!val) fatal("--await requires a file path");
+      args.await = path.resolve(val);
+    } else if (a === "--max-min" || a.startsWith("--max-min=")) {
+      const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
+      const n = Number(val);
+      if (!(n > 0)) fatal("--max-min requires a positive number of minutes");
+      args.maxMin = n;
+    } else if (a === "--projects") {
       const val = argv[++i];
       if (!val) fatal("--projects requires a comma-separated value");
       args.projects = splitList(val);
@@ -158,7 +212,7 @@ function splitNonEmptyLines(text) {
 }
 
 function gitOutput(args) {
-  const res = runCommand("git", args, { cwd: REPO_ROOT, timeoutMs: 15_000 });
+  const res = runSync("git", args, { cwd: REPO_ROOT, timeoutMs: 15_000 });
   return res.ok ? res.stdout : null;
 }
 
@@ -271,7 +325,8 @@ function quoteArg(a) {
   return s;
 }
 
-function runCommand(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+// Short helper commands (git) — synchronous, never subject to the run deadline.
+function runSync(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const cmdStr = [bin, ...args].map(quoteArg).join(" ");
   const startedAt = Date.now();
   const res = spawnSync(cmdStr, {
@@ -296,6 +351,114 @@ function runCommand(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS
   };
 }
 
+function killTree(pid) {
+  if (!pid) return;
+  if (IS_WIN) {
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" });
+    return;
+  }
+  try {
+    process.kill(-pid, "SIGKILL"); // the child leads its own process group (detached below)
+  } catch {
+    /* already gone */
+  }
+}
+
+// A check. Async so a timeout can kill the whole process tree while the shell is still alive. The
+// timeout is the smaller of `timeoutMs` and what is left of the run's deadline; `deadlineHit` says
+// the deadline was the one that ran out.
+function runCommand(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  const cmdStr = [bin, ...args].map(quoteArg).join(" ");
+  const startedAt = Date.now();
+  const left = deadlineAt - startedAt;
+  const budget = Math.min(timeoutMs, left);
+  const base = { cmdStr, signal: null, error: null };
+  if (budget <= 0) {
+    return Promise.resolve({ ...base, ok: false, status: null, timedOut: true, deadlineHit: true, stdout: "", stderr: "", durationMs: 0 });
+  }
+  return new Promise((resolve) => {
+    const out = [];
+    const err = [];
+    let settled = false;
+    let timedOut = false;
+    const child = spawn(cmdStr, { cwd, shell: true, windowsHide: true, detached: !IS_WIN });
+    child.stdout.on("data", (d) => out.push(d));
+    child.stderr.on("data", (d) => err.push(d));
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killTree(child.pid);
+    }, budget);
+    const done = (status, signal, error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({
+        ...base,
+        ok: !error && !timedOut && status === 0,
+        status,
+        signal,
+        error: error ?? null,
+        timedOut,
+        deadlineHit: timedOut && left <= timeoutMs,
+        stdout: Buffer.concat(out).toString("utf8"),
+        stderr: Buffer.concat(err).toString("utf8"),
+        durationMs: Date.now() - startedAt,
+      });
+    };
+    child.on("error", (e) => done(null, null, e));
+    child.on("close", (code, signal) => done(code, signal, null));
+  });
+}
+
+// --fix: hash a file so we can tell which ones a fixer actually rewrote.
+function hashOf(rel) {
+  try {
+    return createHash("sha1")
+      .update(readFileSync(path.join(REPO_ROOT, rel)))
+      .digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+// cmd.exe caps a command line at 8191 characters; pass file lists in chunks well under that.
+function chunks(list, size = 40) {
+  const result = [];
+  for (let i = 0; i < list.length; i += size) result.push(list.slice(i, i + size));
+  return result;
+}
+
+const WEB_GENERATED_RE = /^web\/(node_modules|dist|openapi|src\/app\/api)\//i;
+
+// The mechanical fixes `--fix` applies to the changed files only, before any check runs. A fixer that
+// fails (a syntax error mid-file, ...) is printed and ignored: the check that follows reports it.
+async function applyFixes(changedFiles) {
+  const existing = [...new Set(changedFiles.map(normalizeSlashes))].filter((f) => existsSync(path.join(REPO_ROOT, f)));
+  const cs = existing.filter((f) => f.toLowerCase().endsWith(".cs"));
+  const web = existing.filter((f) => /^web\//i.test(f) && !WEB_GENERATED_RE.test(f)).map((f) => f.slice("web/".length));
+  const lintable = web.filter((f) => /\.(ts|html)$/i.test(f));
+  const prettierable = web.filter((f) => /\.(ts|html|scss|css|json|md|mjs|js)$/i.test(f));
+  const targets = [...cs, ...prettierable.map((f) => `web/${f}`)];
+  const before = new Map(targets.map((f) => [f, hashOf(f)]));
+
+  for (const part of chunks(cs)) {
+    await step(`fix: dotnet format (${part.length} .cs file(s))`, () =>
+      runCommand("dotnet", ["format", "Skarbiec.slnx", "--include", ...part]),
+    );
+  }
+  for (const part of chunks(lintable)) {
+    await step(`fix: eslint --fix (${part.length} file(s))`, () => runCommand(NPX, ["eslint", "--fix", ...part], { cwd: WEB_DIR }));
+  }
+  for (const part of chunks(prettierable)) {
+    await step(`fix: prettier --write (${part.length} file(s))`, () =>
+      runCommand(NPX, ["prettier", "--write", "--ignore-unknown", ...part], { cwd: WEB_DIR }),
+    );
+  }
+
+  const rewritten = targets.filter((f) => hashOf(f) !== before.get(f));
+  console.log(rewritten.length ? `\nfix: reformatted ${rewritten.length} file(s): ${rewritten.join(", ")}` : "\nfix: nothing to reformat");
+}
+
 // ---------------------------------------------------------------------------------------------
 // Output helpers
 // ---------------------------------------------------------------------------------------------
@@ -309,9 +472,9 @@ function formatDuration(ms) {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-function step(label, fn) {
+async function step(label, fn) {
   console.log(`\n==> ${label}`);
-  const result = fn();
+  const result = await fn();
   console.log(`    $ ${result.cmdStr}`);
   if (result.ok) {
     console.log(`    ok (${formatDuration(result.durationMs)})`);
@@ -497,6 +660,13 @@ function extractGenericFailure(stepName, text) {
 }
 
 function buildFailure(stepName, result) {
+  if (result.deadlineHit) {
+    return {
+      step: "timeout",
+      summary: truncate(`run deadline reached during ${stepName} after ${formatDuration(result.durationMs)}: ${result.cmdStr}`),
+      file: null,
+    };
+  }
   if (result.timedOut) {
     return { step: stepName, summary: truncate(`timed out after ${formatDuration(result.durationMs)}: ${result.cmdStr}`), file: null };
   }
@@ -528,7 +698,16 @@ function finish(ok, failures) {
   } else {
     console.log(`\nverify.mjs: FAILED at step "${failures[0]?.step}"`);
   }
-  console.log(`VERIFY_RESULT: ${JSON.stringify({ ok, failures })}`);
+  const json = JSON.stringify({ ok, failures });
+  if (outFile) {
+    try {
+      writeFileSync(`${outFile}.tmp`, json);
+      renameSync(`${outFile}.tmp`, outFile);
+    } catch (e) {
+      process.stderr.write(`verify.mjs: could not write the --out file: ${e.message}\n`);
+    }
+  }
+  console.log(`VERIFY_RESULT: ${json}`);
   if (!ok) {
     const paragraph = failures.map((f) => `[${f.step}] ${f.summary}${f.file ? ` (${f.file})` : ""}`).join(" ");
     process.stderr.write(`verify.mjs failed: ${paragraph}\n`);
@@ -546,8 +725,44 @@ function fatal(message) {
 // Main
 // ---------------------------------------------------------------------------------------------
 
-function main() {
+// --await <file>: block until a background run's --out file appears (at most --max-min, default 9,
+// so it fits one foreground Bash call), then print its VERIFY_RESULT line and exit 0/2 like the run
+// itself. Still missing → prints `VERIFY_PENDING: …` and exits 3; the caller simply calls it again.
+function awaitResult(file, maxMin) {
+  const giveUpAt = Date.now() + maxMin * 60 * 1000;
+  return new Promise((resolve) => {
+    const tick = () => {
+      if (existsSync(file)) {
+        const json = readFileSync(file, "utf8").trim();
+        let ok = false;
+        try {
+          ok = JSON.parse(json).ok === true;
+        } catch {
+          /* a malformed file reads as a failure */
+        }
+        console.log(`VERIFY_RESULT: ${json}`);
+        process.exitCode = ok ? 0 : 2;
+        return resolve();
+      }
+      if (Date.now() >= giveUpAt) {
+        console.log(`VERIFY_PENDING: no result in ${file} after ${maxMin} min — the run is still going; call --await again`);
+        process.exitCode = 3;
+        return resolve();
+      }
+      setTimeout(tick, 2000);
+    };
+    tick();
+  });
+}
+
+async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args.await) return awaitResult(args.await, args.maxMin);
+  deadlineAt = Date.now() + args.deadlineMin * 60 * 1000;
+  if (args.out) {
+    rmSync(args.out, { force: true });
+    outFile = args.out;
+  }
   const serviceNames = discoverServiceNames();
   const projectMap = buildProjectMap(serviceNames);
   const allProjectRels = () => [...projectMap.values()].map((v) => v.rel);
@@ -605,19 +820,27 @@ function main() {
   console.log(`test projects: ${selectedRels.length ? selectedRels.join(", ") : "(none)"}`);
   console.log(`web checks: ${runWeb ? "yes" : "no"}${args.quick && runWeb ? " (skipped by --quick)" : ""}`);
   console.log(`api check: ${runApi ? "yes" : "no"}${args.quick && runApi ? " (skipped by --quick)" : ""}`);
+  console.log(`fix: ${args.fix ? "yes" : "no"} · deadline: ${args.deadlineMin} min`);
+
+  // Step 0: --fix — mechanical fixes on the changed files only
+  if (args.fix) {
+    const { files, treatAsAll } = getChangedFiles();
+    if (treatAsAll) console.log("\nnotice: no master or origin/master ref — --fix skipped");
+    else await applyFixes(files);
+  }
 
   // Step 1: format
-  const formatResult = step("format", () => runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes"]));
+  const formatResult = await step("format", () => runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes"]));
   if (!formatResult.ok) return finish(false, [buildFailure("format", formatResult)]);
 
   // Step 2: build (warnings are errors via Directory.Build.props)
-  let buildResult = step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+  let buildResult = await step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
   if (!buildResult.ok && LOCKED_OUTPUT_RE.test(`${buildResult.stdout}\n${buildResult.stderr}`)) {
     const { stopped, left } = stopStack();
     const names = stopped.map((p) => `${p.name} (${p.what})`).join(", ") || "nothing found";
     console.log(`\nbuild outputs are locked by the running stack; stopped: ${names}`);
     if (left?.length) console.log(`still running: ${left.map((p) => `${p.name} #${p.pid}`).join(", ")}`);
-    buildResult = step("build (retry after stopping the stack)", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+    buildResult = await step("build (retry after stopping the stack)", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
   }
   if (!buildResult.ok) return finish(false, [buildFailure("build", buildResult)]);
 
@@ -625,7 +848,7 @@ function main() {
 
   // Step 3: dotnet test, one per affected project, stop at the first failure
   for (const rel of selectedRels) {
-    const testResult = step(`test: ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]));
+    const testResult = await step(`test: ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]));
     if (!testResult.ok) return finish(false, [buildFailure("test", testResult)]);
   }
 
@@ -644,7 +867,7 @@ function main() {
         ["web-test", ["test", "--", "--watch=false"]],
       ];
       for (const [canonical, npmArgs] of webSteps) {
-        const r = step(canonical, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }));
+        const r = await step(canonical, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }));
         if (!r.ok) return finish(false, [buildFailure(canonical, r)]);
       }
     }
@@ -656,10 +879,10 @@ function main() {
     if (!existsSync(openapiDir)) {
       console.log("\nnotice: build-time OpenAPI not set up yet (spec-00) — skipping api check");
     } else {
-      const genResult = step("api: npm run gen:api", () => runCommand(NPM, ["run", "gen:api"], { cwd: WEB_DIR }));
+      const genResult = await step("api: npm run gen:api", () => runCommand(NPM, ["run", "gen:api"], { cwd: WEB_DIR }));
       if (!genResult.ok) return finish(false, [buildFailure("api", genResult)]);
 
-      const diffResult = step("api: diff web/src/app/api", () =>
+      const diffResult = await step("api: diff web/src/app/api", () =>
         runCommand("git", ["diff", "--exit-code", "--", "web/src/app/api"]),
       );
       if (!diffResult.ok) {
@@ -673,4 +896,4 @@ function main() {
   return finish(true, []);
 }
 
-main();
+main().catch((e) => fatal(`verify.mjs crashed: ${e?.stack ?? e}`));

@@ -8,7 +8,7 @@ color: green
 skills:
   - ops-playbook
 experimental:
-  cacheTtl: 1h
+  cacheTtl: 5m
 ---
 
 You are the only agent that runs git and `gh` mutations. You do repository plumbing, never feature code.
