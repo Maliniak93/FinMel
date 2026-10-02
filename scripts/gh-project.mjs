@@ -22,6 +22,7 @@
 //
 //   node scripts/gh-project.mjs check --body-file <path> [--epic]
 //       Dry run of the cleaning and checking `create` does: prints "publishable" or the problems.
+//       Warnings (no `## Code map`) do not block publishing; they go to stderr.
 //
 //   node scripts/gh-project.mjs edit <issue number> [--body-file <path>] [--tier 1|2] [--parent <epic number>]
 //       Replaces the body of an existing spec issue, cleaned and checked exactly like `create`.
@@ -40,7 +41,8 @@
 //   node scripts/gh-project.mjs prepare <issue number> [--tier 1|2] [--skip tests,review]
 //       Everything /build does before the workflow: fetches the issue, decides whether it is
 //       buildable (an epic never is; a sub-issue is only once every earlier sibling is closed, since
-//       each part's branch is cut from master after the previous part merges), writes the local copy to skarbiec-plan/issues/<n>.md, resolves tier and skipped
+//       each part's branch is cut from master after the previous part merges; every issue listed under
+//       the spec's `## Depends on` section must be closed too), writes the local copy to skarbiec-plan/issues/<n>.md, resolves tier and skipped
 //       phases, and moves the card to In progress. Prints one JSON line — either
 //       {"ok":true,"resumed":bool,"workflowArgs":{...}} to pass to Workflow verbatim, or
 //       {"ok":false,"reason":"...","next":"..."} with what to run instead.
@@ -171,11 +173,35 @@ function cleanBody(text) {
     .trim();
 }
 
+// The body of one `## <name>` section, up to the next `## ` heading ("" when there is none).
+function section(body, name) {
+  const lines = body.split("\n");
+  const start = lines.findIndex((l) => l.trim() === `## ${name}`);
+  if (start === -1) return "";
+  const end = lines.findIndex((l, i) => i > start && /^## /.test(l));
+  return lines
+    .slice(start + 1, end === -1 ? undefined : end)
+    .join("\n")
+    .trim();
+}
+
+// Issue numbers listed under `## Depends on` — prerequisites that must be merged before this builds.
+function dependsOn(body) {
+  return [...new Set([...section(body, "Depends on").matchAll(/#(\d+)/g)].map((m) => Number(m[1])))];
+}
+
+// Not blocking, but a spec without them costs every build agent a rediscovery of the code.
+function lintWarnings(body, { epic }) {
+  if (epic) return [];
+  return section(body, "Code map") ? [] : ["no `## Code map` section — the test-writer, implementer and reviewer will each rediscover the code"];
+}
+
 function lintBody(body, { epic }) {
   const problems = [];
   if (!/^## Goal\s*$/m.test(body)) problems.push("no `## Goal` section (or it is empty)");
   if (epic) return problems;
   if (!/^## Out of scope\s*$/m.test(body)) problems.push("no `## Out of scope` section (or it is empty) — it is not optional");
+  if (section(body, "Depends on") && !dependsOn(body).length) problems.push("`## Depends on` names no issue as `#<number>`");
   // An AC is its checkbox line plus any indented lines under it (a multi-line AC keeps its proof in
   // a sub-bullet); the block ends at the next checkbox, heading or unindented line.
   const acs = [];
@@ -196,6 +222,7 @@ function preparedBody(file, epic) {
   const body = cleanBody(readFileSync(path.resolve(REPO_ROOT, file), "utf8"));
   const problems = lintBody(body, { epic });
   if (problems.length) throw new Error(`the draft is not publishable:\n- ${problems.join("\n- ")}`);
+  for (const w of lintWarnings(body, { epic })) process.stderr.write(`warning: ${w}\n`);
   return body;
 }
 
@@ -372,6 +399,16 @@ function prepare([number, ...rest]) {
       const list = earlier.map((s) => `#${s.number} ${s.title}`).join("; ");
       return refuse(`part of epic #${issue.parent}, whose earlier part(s) are still open: ${list} — parts build in order, each from master after the previous one merged`, `/build #${earlier[0].number}`);
     }
+  }
+  const prerequisites = dependsOn(body)
+    .map((d) => JSON.parse(gh(["issue", "view", String(d), "--repo", REPO, "--json", "number,title,state"])))
+    .filter((d) => d.state === "OPEN");
+  if (prerequisites.length) {
+    const list = prerequisites.map((d) => `#${d.number} ${d.title}`).join("; ");
+    return refuse(
+      `depends on issue(s) still open: ${list} — build and merge them first, every branch is cut from master`,
+      `/build #${prerequisites[0].number}`,
+    );
   }
   const missing = [!issue.labels.includes("spec") && "the `spec` label", !issue.inProject && "a card on the project", !issue.branch && "a Branch field"].filter(Boolean);
   if (missing.length) return refuse(`not a /design or /fix spec: missing ${missing.join(", ")}`, "/design to amend or republish it");

@@ -6,7 +6,7 @@ export const meta = {
     { title: 'Branch', detail: 'ops cuts the issue branch (feat/<slug> or fix/<slug>) from master before a single file is written', model: 'haiku' },
     { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; sonnet/medium on every tier (skippable)' },
     { title: 'Implement', detail: 'implementer does the work; opus/medium on tier 1, opus/high on tier 2, opus/high after a tier-1 escalation' },
-    { title: 'Verify', detail: 'verifier runs scripts/verify.mjs; failures loop back to Implement', model: 'haiku' },
+    { title: 'Verify', detail: 'verifier runs scripts/verify.mjs --fix (formatting fixed by the script, not a model round); failures loop back to Implement', model: 'haiku' },
     { title: 'Review', detail: 'ops stages the tree, reviewer diffs the staged change against the spec (skippable)', model: 'claude-opus-5-5' },
     { title: 'Ship', detail: 'ops commits, pushes and opens the PR - merging is yours', model: 'haiku' },
   ],
@@ -37,6 +37,9 @@ const TESTS = {
       },
     },
     projects: { type: 'array', items: { type: 'string' } },
+    // Existing files the implementer should read first (fixtures, the precedent slice/component, the
+    // code under test) - so the implementer does not rediscover what the test-writer already found.
+    contextFiles: { type: 'array', items: { type: 'string' } },
     notes: { type: 'array', items: { type: 'string' } },
   },
   required: ['tests', 'projects'],
@@ -291,9 +294,10 @@ if (skipped.has('tests')) {
     'failing tests from acceptance criteria',
     [
       `Write the failing tests for the spec at \`${spec}\`.`,
-      'Read that spec first, then only the skarbiec-plan sections it names, then the target test project Fixtures/.',
+      'Read that spec first and start from its Code map section, then only the skarbiec-plan sections it names, then the target test project Fixtures/ helpers the Code map names.',
       'One or more tests per acceptance criterion, named as the spec names them. Include tenancy isolation for any new user-owned resource and outbox/idempotency tests for any new or changed event.',
       'Run them and confirm they are red for the right reason. Write no production code.',
+      'In `contextFiles` list the existing files the implementer should read first - the fixtures you extended, the precedent slice or component, the code under test. Paths only, at most 15.',
     ],
     TESTS,
     { model: 'sonnet', effort: 'medium' },
@@ -321,11 +325,11 @@ impl = await implement(
   tests.tests.length
     ? [
         `Make these failing tests pass: ${JSON.stringify(tests)}`,
-        'Read the spec and only the skarbiec-plan sections it names. Smallest correct change; do not widen scope beyond the spec.',
+        "Start from the spec's Code map and the tests' contextFiles - read those instead of rediscovering the code. Then only the skarbiec-plan sections the spec names. Smallest correct change; do not widen scope beyond the spec.",
       ]
     : [
         'This spec has no new tests - it adds no behaviour. Implement its Scope exactly and leave every existing suite green.',
-        'Read the spec and only the skarbiec-plan sections it names. Smallest correct change; do not widen scope beyond the spec.',
+        "Start from the spec's Code map, then only the skarbiec-plan sections it names. Smallest correct change; do not widen scope beyond the spec.",
         'Run the command each acceptance criterion names as its proof, and report those commands in `commandsRun`.',
       ],
 )

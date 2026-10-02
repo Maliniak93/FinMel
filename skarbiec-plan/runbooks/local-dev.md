@@ -6,6 +6,30 @@
 - .NET 10 SDK.
 - Node 22.22.3+ / 24.15.0+ / 26+ (Angular CLI 22's floor). Anything below these minors fails obscurely — see `troubleshooting.md`.
 
+## Code intelligence for Claude Code (recommended)
+
+Language-server plugins give the build agents (implementer, test-writer, reviewer — they list the
+`LSP` tool) go-to-definition / find-references instead of grep-and-read chains, and report type
+errors right after an edit instead of at the next build. Set up once per machine, by hand:
+
+1. Language servers, on the `PATH` of the shell you start `claude` from:
+   ```
+   dotnet tool install -g csharp-ls
+   npm install -g typescript-language-server typescript
+   ```
+   Check: `csharp-ls --version`, `typescript-language-server --version`.
+2. In a Claude Code session:
+   ```
+   /plugin install csharp-lsp@claude-plugins-official
+   /plugin install typescript-lsp@claude-plugins-official
+   ```
+   then `/reload-plugins` (or a new session).
+3. Confirm: ask Claude to introduce a type error in a `.cs` file and fix it — a
+   `Found N new diagnostic issues` line under the edit means the server runs. Nothing there →
+   `/plugin` → **Errors** tab (`Executable not found in $PATH` names the missing binary).
+
+Without the plugins everything still works; the agents fall back to `Grep` + ranged `Read`.
+
 ## Run the stack
 
 ```bash

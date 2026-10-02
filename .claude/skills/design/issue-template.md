@@ -13,6 +13,10 @@
 
 <!-- The problem or gap this closes. Link the architecture.md "Current vs target" row or ideas.md line this comes from, if any. -->
 
+## Depends on
+
+<!-- Only when this spec cannot build before another open issue merges: one line each, `- #128 — what it needs from it`. `prepare` refuses to build while any listed issue is open. Delete the section otherwise. -->
+
 ## Scope
 
 ### Backend
@@ -22,6 +26,10 @@
 ### Frontend
 
 <!-- Routes, components, gen:api impact. -->
+
+## Code map
+
+<!-- What Explore found, so no build agent has to rediscover it: one line each, `path — why`. Name the precedent slice/component to copy, the test class and the Fixtures/<Service>Api helpers to extend (by member name), and the files expected to change. 5–15 lines; paths that exist today, plus new files marked (new). -->
 
 ## Out of scope
 

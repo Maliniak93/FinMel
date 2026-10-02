@@ -49,6 +49,10 @@ In the session scratchpad as `fix-<slug>.md`, from `.claude/skills/design/issue-
 - Goal = expected behaviour, one sentence. **Current behaviour** = the observed symptom and the
   reproduction you ran. Why = the root cause and its evidence.
 - Scope = the files and slices that must change; Out of scope = the neighbouring refactor you were tempted by.
+- Code map = what your localization already found, as `path — why` lines: the file with the root
+  cause, the test class and `Fixtures/` helpers the reproduction test belongs in, the nearest
+  precedent. The build agents start from it instead of re-localizing the bug.
+- Depends on = an open issue that must merge first, if any (rare for a fix).
 - Design decisions = the fix approach and why it targets the cause.
 - Acceptance criteria: **AC-1 is a reproduction test** that fails today and passes after the fix, named
   `Method_Scenario_Outcome` in the right test project (or `*.spec.ts` for Angular); **AC-2** = the touched
