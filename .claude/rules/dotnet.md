@@ -60,7 +60,7 @@ Messaging lives in `messaging.md`, tests in `testing.md`, domain rules in `domai
 - The callee maps every service-only endpoint through `app.MapInternalGroup("<path>")` (ServiceDefaults), which puts it at `/internal/<path>`, anonymous and excluded from OpenAPI (ADR-027). `/internal` sits outside `/api/`, so the Gateway has no route to it; never add one. Callers send no token — no handler on the typed client, no user or system JWT.
 - `/internal` endpoints serve global data only (no `UserId`): no identity reaches them, so a `UserId`-scoped `/internal` endpoint is forbidden. Anything user-scoped stays on `/api/<service>/...` behind `.RequireAuthorization()`.
 - Data the SPA also reads keeps its public, authorized `/api/<service>/...` route, and the service caller gets an `/internal` twin mapped beside it in the same endpoint file, on the same handler — one extra `MapGet`, no duplicated handler or response (e.g. `GetInstrumentEndpoint`).
-- `IgnoreQueryFilters()` is allowed only in consumers that legitimately write for many users. Every such call needs a comment saying why.
+- `IgnoreQueryFilters()` is allowed only in consumers that legitimately write for many users. Every such call needs a one-line `//` saying why.
 - A transport failure is an expected failure: return a `ServiceUnavailable`-prefixed `Error` so the endpoint maps it to 503 (see `Features/AssetErrors.cs` in Portfolio) — never let the `HttpRequestException` escape.
 
 ## Quartz jobs (MarketData only)
