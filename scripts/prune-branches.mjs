@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Deletes local lane branches (feat/*, fix/*, chore/*) whose pull request has been merged. PRs are
+// Deletes local branches (any name but master/main) whose pull request has been merged. PRs are
 // squash-merged, so git never sees those branches as merged (`git branch -d` refuses them) and they
 // pile up — and every session start lists them as "lane branches with no spec issue and no PR".
 //
@@ -19,7 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const LANE = /^(feat|fix|chore)\//;
+const KEEP = new Set(["master", "main"]);
 
 function run(bin, argv) {
   const res = spawnSync(bin, argv, { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000 });
@@ -42,7 +42,7 @@ function main() {
       const [name, date] = l.split(" ");
       return { name, lastCommit: date };
     })
-    .filter((b) => LANE.test(b.name) && b.name !== current);
+    .filter((b) => !KEEP.has(b.name) && b.name !== current);
 
   const merged = new Map(
     JSON.parse(run("gh", ["pr", "list", "--state", "merged", "--limit", "500", "--json", "number,headRefName,mergedAt"])).map((pr) => [
@@ -62,7 +62,7 @@ function main() {
   }
 
   if (!prune.length && !keep.length) {
-    console.log("nothing to prune — no local lane branch has a merged PR");
+    console.log("nothing to prune — no local branch has a merged PR");
     return;
   }
   for (const b of keep) console.log(`keep    ${b.name} — committed after PR #${b.pr.number} merged`);
