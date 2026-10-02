@@ -18,15 +18,13 @@ public static class PriceSyncJobExtensions
     // appsettings.Development.json overrides this to a short interval for local demoing.
     private const string DefaultProductionCron = "0 30 18 ? * MON-FRI";
 
-    // Schema-qualified to match MarketDataDbContext's modelBuilder.AddQuartz(b => b.UsePostgreSql())
-    // default (schema "quartz", prefix "qrtz_").
-    private const string QuartzTablePrefix = "quartz.qrtz_";
-
     /// <summary>
     /// Registers <see cref="PriceSyncJob"/> on a Postgres-backed, clustered persistent store — the
     /// schedule and in-flight run state survive a service restart, and <c>DisallowConcurrentExecution</c>
     /// plus clustering keep two live instances from ever running the same fire concurrently (T2.6 AC).
-    /// No-ops under <see cref="DisableBackgroundJobsConfigKey"/> so slice tests never race this job.
+    /// The store comes from <see cref="QuartzStore"/>; the scheduler's health check joins
+    /// <c>/health/ready</c> here, on the only path that registers a scheduler. No-ops under
+    /// <see cref="DisableBackgroundJobsConfigKey"/> so slice tests never race this job.
     /// </summary>
     public static TBuilder AddPriceSyncJob<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -45,29 +43,18 @@ public static class PriceSyncJobExtensions
 
         builder.Services.TryAddSingleton(TimeProvider.System);
 
-        builder.Services.AddQuartz(q =>
+        builder.Services.AddMarketDataScheduler(connectionString, q =>
         {
-            q.SchedulerId = "AUTO"; // unique per instance — required for UseClustering() below.
-
-            q.UsePersistentStore(store =>
-            {
-                store.UsePostgres(c =>
-                {
-                    c.ConnectionString = connectionString;
-                    c.TablePrefix = QuartzTablePrefix;
-                });
-                store.UseSystemTextJsonSerializer();
-                store.UseClustering();
-            });
-
-            q.AddJob<PriceSyncJob>(PriceSyncJob.Key, j => j.StoreDurably());
+            q.AddJob<PriceSyncJob>(j => j.WithIdentity(PriceSyncJob.Key).StoreDurably());
             q.AddTrigger(t => t
                 .ForJob(PriceSyncJob.Key)
                 .WithIdentity("price-sync-trigger", "market-data")
                 .WithCronSchedule(cron));
         });
 
-        builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        // Never under DisableBackgroundJobs: with no scheduler registered the check would fail
+        // readiness in every slice test.
+        builder.Services.AddHealthChecks().AddQuartz();
         builder.Services.AddSingleton<ISyncTrigger, QuartzSyncTrigger>();
 
         return builder;

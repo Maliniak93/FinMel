@@ -37,7 +37,7 @@ public static class FxSyncJobExtensions
 
         builder.Services.AddQuartz(q =>
         {
-            q.AddJob<FxSyncJob>(FxSyncJob.Key, j => j.StoreDurably());
+            q.AddJob<FxSyncJob>(j => j.WithIdentity(FxSyncJob.Key).StoreDurably());
             q.AddTrigger(t => t
                 .ForJob(FxSyncJob.Key)
                 .WithIdentity("fx-sync-trigger", "market-data")

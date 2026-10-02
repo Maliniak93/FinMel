@@ -35,10 +35,10 @@ public sealed class HistoryBackfillJob(
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
-    public Task Execute(IJobExecutionContext context)
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         var instrumentId = Guid.Parse(context.MergedJobDataMap.GetString(InstrumentIdDataKey)!);
-        return RunAsync(instrumentId, context.CancellationToken);
+        await RunAsync(instrumentId, cancellationToken);
     }
 
     /// <summary>Quartz-independent entry point — lets tests drive a run directly instead of faking
