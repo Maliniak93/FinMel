@@ -9,9 +9,6 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Quartz" />
-    <PackageReference Include="Quartz.Extensions.Hosting" />
-    <PackageReference Include="Quartz.Serialization.SystemTextJson" />
-    <PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.PostgreSQL" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

@@ -41,6 +41,8 @@ Aspire recreates both volumes — and, for Postgres, every per-service database 
 
 Squashing a service's migration history to a single `InitialCreate` (spec-06, ADR-019) is exactly this "destructive or squashed EF migration" case — drop the volumes above before the next Aspire run so every service migrates cleanly against a fresh, empty database.
 
+After pulling the Quartz 4 upgrade (#149), drop `marketdata_db` the same way: MarketData was squashed to a new `InitialCreate`, and Quartz 4 refuses the old 3.x `quartz.qrtz_*` tables. On the next run Quartz creates its own schema at scheduler start.
+
 ## Manual sync trigger
 
 The Settings page (`web/src/app/features/settings/`) has a button that triggers MarketData's sync jobs on demand, instead of waiting for the daily schedule.

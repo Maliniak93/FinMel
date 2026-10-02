@@ -108,6 +108,12 @@ While ADR-019 (greenfield mode) holds, migrations carry no data: dropping a data
 be recreated from scratch is an acceptable upgrade path, and a service's migration history may be
 squashed to a single `InitialCreate`. Production migration discipline arrives with T0.18.
 
+MarketData's Quartz job store is not part of its migrations: the scheduler provisions its own
+`quartz.qrtz_*` tables at first start (`ProvisionSchema()`, `Sources/QuartzStore.cs`) and creates the
+`quartz` schema itself beforehand. So the MarketData **runtime** DB account — not only the migration
+step — needs `CREATE` on its database (to create schema `quartz`) and on that schema (tables, indexes).
+Locally `marketdata_user` owns `marketdata_db`, which covers both.
+
 ## Production: docker compose on a VPS (T0.18)
 
 Not built yet — see `skarbiec-plan/zadania/phase-0-platform.md` T0.18.

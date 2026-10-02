@@ -28,8 +28,6 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
     // above, so referencing it directly elsewhere in this class would trigger CS9107.
     private readonly SkarbiecContainersFixture _containers = containers;
 
-    private const string TablePrefix = "quartz.qrtz_"; // must match MarketDataDbContext's modelBuilder.AddQuartz schema/prefix.
-
     [Fact]
     public async Task AddPriceSyncJob_OnShortenedDevCron_FiresAutomatically_WithTraceSpan()
     {
@@ -101,9 +99,9 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
             .StartAt(DateTimeOffset.UtcNow.AddMinutes(5)) // far enough out it can't fire during this test.
             .Build();
 
-        await schedulerA.ScheduleJob(jobDetail, trigger, cancellationToken);
+        await schedulerA.ScheduleJob(jobDetail, trigger, cancellationToken: cancellationToken);
         await schedulerA.Start(cancellationToken);
-        var originalNextFireTime = (await schedulerA.GetTrigger(triggerKey, cancellationToken))!.GetNextFireTimeUtc();
+        var originalNextFireTime = (await schedulerA.GetTrigger(triggerKey, cancellationToken))!.NextFireTimeUtc;
 
         // Simulate a process restart: stop this instance without unscheduling anything.
         await schedulerA.Shutdown(waitForJobsToComplete: false, cancellationToken);
@@ -115,7 +113,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
             var survivedTrigger = await schedulerB.GetTrigger(triggerKey, cancellationToken);
 
             Assert.NotNull(survivedTrigger);
-            Assert.Equal(originalNextFireTime, survivedTrigger.GetNextFireTimeUtc());
+            Assert.Equal(originalNextFireTime, survivedTrigger.NextFireTimeUtc);
         }
         finally
         {
@@ -135,13 +133,14 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
 
         var schedulerA = await BuildPersistentSchedulerAsync();
         var schedulerB = await BuildPersistentSchedulerAsync();
+        Assert.NotEqual(schedulerA.SchedulerInstanceId, schedulerB.SchedulerInstanceId); // two cluster nodes, not one scheduler twice.
 
         var jobDetail = JobBuilder.Create<ProbeJob>().WithIdentity(jobKey).StoreDurably()
             .UsingJobData("stateKey", stateKey).Build();
         var trigger = TriggerBuilder.Create().WithIdentity(triggerKey).ForJob(jobKey)
             .StartAt(DateTimeOffset.UtcNow.AddSeconds(2))
             .Build();
-        await schedulerA.ScheduleJob(jobDetail, trigger, cancellationToken);
+        await schedulerA.ScheduleJob(jobDetail, trigger, cancellationToken: cancellationToken);
 
         // Both "instances" live before the fire time — the exact restart/rolling-deploy overlap
         // window DisallowConcurrentExecution + clustering exist to protect (T2.6 AC).
@@ -166,22 +165,19 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
         }
     }
 
+    // Production's store (QuartzStore.UseMarketDataStore) on a standalone scheduler; the shortened
+    // clustering check-in is the only test-specific override on top of it.
     private async Task<IScheduler> BuildPersistentSchedulerAsync()
     {
-        var scheduler = await SchedulerBuilder.Create(id: "AUTO", name: "skarbiec-scheduling-tests")
-            .UsePersistentStore(store =>
-            {
-                store.UsePostgres(c =>
-                {
-                    c.ConnectionString = _containers.PostgresConnectionString;
-                    c.TablePrefix = TablePrefix;
-                });
-                store.UseSystemTextJsonSerializer();
-                store.UseClustering(cluster => cluster.CheckinInterval = TimeSpan.FromMilliseconds(500));
-            })
-            .BuildScheduler();
+        var connectionString = _containers.PostgresConnectionString;
+        await QuartzStore.EnsureSchemaAsync(connectionString, TestContext.Current.CancellationToken);
 
-        return scheduler;
+        return await QuartzSchedulerBuilder.Create(q =>
+            {
+                q.UseMarketDataStore(connectionString, cluster => cluster.CheckinInterval = TimeSpan.FromMilliseconds(500));
+                q.ConfigureScheduler(scheduler => scheduler.InstanceName = "skarbiec-scheduling-tests");
+            })
+            .BuildScheduler(TestContext.Current.CancellationToken);
     }
 }
 
@@ -216,7 +212,7 @@ internal static class ProbeJobRegistry
 [DisallowConcurrentExecution]
 public sealed class ProbeJob : IJob
 {
-    public async Task Execute(IJobExecutionContext context)
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         var state = ProbeJobRegistry.Get(context.MergedJobDataMap.GetString("stateKey")!);
 
@@ -233,7 +229,7 @@ public sealed class ProbeJob : IJob
         {
             if (state.HoldFor > TimeSpan.Zero)
             {
-                await Task.Delay(state.HoldFor, context.CancellationToken);
+                await Task.Delay(state.HoldFor, cancellationToken);
             }
         }
         finally
