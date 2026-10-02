@@ -34,7 +34,7 @@ Before adding a helper to a test class, check `Fixtures/` first — and when a f
 
 ## Fixture helpers are arrange only
 
-They `EnsureSuccessStatusCode`. A test asserting on endpoint X **calls X directly** and inspects the raw `HttpResponseMessage` — routing it through a helper would turn the failure under test into an exception. Say so in a comment at the top of such a class. Give helpers optional parameters with sane defaults (`name`, `assetClass`, `quantity`) so a call site states only what its fact depends on.
+They `EnsureSuccessStatusCode`. A test asserting on endpoint X **calls X directly** and inspects the raw `HttpResponseMessage` — routing it through a helper would turn the failure under test into an exception. Say so in a one-line `//` above such a class. Give helpers optional parameters with sane defaults (`name`, `assetClass`, `quantity`) so a call site states only what its fact depends on.
 
 ## Tenancy isolation
 
