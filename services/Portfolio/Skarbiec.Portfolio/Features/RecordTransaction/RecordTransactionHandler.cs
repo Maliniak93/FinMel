@@ -25,7 +25,7 @@ public sealed class RecordTransactionHandler(
             return readOnly;
         }
 
-        // A term deposit's transactions are system-managed by the deposit slices (term-deposits).
+        // A term deposit's transactions are system-managed by the deposit slices.
         if (asset.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.TransactionsManaged;
@@ -52,8 +52,7 @@ public sealed class RecordTransactionHandler(
             Date = request.Date
         };
 
-        // Recompute over the full history (existing + this candidate) rather than incrementing
-        // in place — the single code path shared with T1.4's edit/delete (ADR-009).
+        // Recompute over the full history rather than incrementing in place: the one path shared with edit and delete.
         var existingTransactions = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => t.AssetId == assetId)
@@ -76,8 +75,7 @@ public sealed class RecordTransactionHandler(
         asset.Quantity = recomputed.Value;
         dbContext.Transactions.Add(transaction);
 
-        // The position, not the transaction, is the fact consumers care about: the event carries the
-        // recomputed quantity (spec-02 AC-3), so nobody has to replay the history to get it.
+        // The event carries the recomputed quantity, so no consumer has to replay the history.
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);

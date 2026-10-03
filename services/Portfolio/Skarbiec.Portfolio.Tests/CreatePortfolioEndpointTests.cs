@@ -12,9 +12,7 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-// Creation is the endpoint under test here, so these facts post to PortfoliosUri directly instead
-// of going through PortfolioApi.CreatePortfolioAsync — that helper asserts success, which is
-// exactly what the conflict/validation cases below need to observe.
+// Creation is under test, so these facts post directly: PortfolioApi.CreatePortfolioAsync asserts success.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class CreatePortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {

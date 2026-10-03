@@ -11,12 +11,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-accounts AC-9: a <see cref="SavingsAccount"/> is user-owned and nested under a portfolio, so
-/// the flat tenancy template does not fit — the same facts are written by hand, for both the owner's
-/// portfolio id and the stranger's own ("sneaky path"), plus the cross-portfolio list. Every
-/// single-resource call is a 404 (never 403), and nothing of the owner's changes.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
@@ -76,7 +70,6 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         Assert.Equal(10_000m, unchanged.Balance);
     }
 
-    /// <summary>A stranger cannot add an account into the owner's portfolio — 404, and no row lands under either user.</summary>
     [Fact]
     public async Task Add_IntoStrangersPortfolio_ReturnsNotFoundAndWritesNothing()
     {
@@ -96,7 +89,6 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         Assert.Equal(0, await dbContext.Transactions.IgnoreQueryFilters().CountAsync(cancellationToken));
     }
 
-    /// <summary>The terms row itself is tenant-filtered: another user's context never sees it.</summary>
     [Fact]
     public async Task SavingsAccount_QueriedAsStranger_IsFilteredOut()
     {
@@ -112,10 +104,6 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         Assert.True(await ownerDb.Set<SavingsAccount>().AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-11: a stranger previews, settles or undoes on the owner's account
-    /// through the owner's portfolio id and through their own - 404 every time, and nothing changes.
-    /// </summary>
     [Fact]
     public async Task Interest_ForeignAccount_IsRejected()
     {
@@ -150,7 +138,6 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         Assert.Equal(settlementId, unchanged.LastSettlement!.SettlementId);
     }
 
-    /// <summary>The settlement row is tenant-filtered: another user's context never sees it.</summary>
     [Fact]
     public async Task InterestSettlement_QueriedAsStranger_IsFilteredOut()
     {

@@ -10,15 +10,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits: <c>GET /api/portfolio/deposits</c> lists every deposit of the user across all their
-/// portfolios, with the portfolio's name and archived flag, the projection and the read-time status
-/// (<c>Due</c> once the maturity date is on or before today's Europe/Warsaw date).
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-12.</summary>
     [Fact]
     public async Task List_AcrossPortfolios_ReturnsProjectionAndStatus()
     {
@@ -65,11 +59,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(DepositStatus.Active, active.Status);
     }
 
-    /// <summary>
-    /// term-deposits-settlement AC-8: a settled deposit is listed as <c>Settled</c> — which wins over
-    /// Due — with its settlement date and the amounts actually paid; an unsettled Due deposit beside
-    /// it carries no settlement data.
-    /// </summary>
     [Fact]
     public async Task List_SettledDeposit_ReturnsSettlement()
     {
@@ -106,10 +95,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Null(due.SettledTax);
     }
 
-    /// <summary>
-    /// "Today" is the Europe/Warsaw date, not the UTC one: at 2026-04-14 22:30 UTC it is already
-    /// 2026-04-15 in Warsaw (CEST, UTC+2), so a deposit maturing 2026-04-15 is Due.
-    /// </summary>
     [Fact]
     public async Task List_MaturityTodayInWarsawWhileUtcIsStillYesterday_IsDue()
     {
@@ -127,7 +112,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(DepositStatus.Due, listed.Status);
     }
 
-    /// <summary>The day before maturity (Warsaw) the deposit is still Active.</summary>
     [Fact]
     public async Task List_DayBeforeMaturityInWarsaw_IsActive()
     {
@@ -143,10 +127,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(DepositStatus.Active, listed.Status);
     }
 
-    /// <summary>
-    /// Only Deposit-class assets are listed, and a deposit whose portfolio has since been archived is
-    /// still listed, flagged as archived.
-    /// </summary>
     [Fact]
     public async Task List_DepositInArchivedPortfolioAndOtherAssets_ListsOnlyDepositsWithArchivedFlag()
     {
@@ -166,7 +146,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.True(listed.PortfolioIsArchived);
     }
 
-    /// <summary>asset-archive AC-7: an archived deposit is still listed, with <c>isArchived</c> true next to a live one's false.</summary>
     [Fact]
     public async Task List_ArchivedDeposit_ListedWithFlag()
     {
@@ -211,10 +190,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-8: the funded deposit carries its funding asset's id and
-    /// name; a deposit of new money beside it carries neither.
-    /// </summary>
     [Fact]
     public async Task List_FundedDeposit_ReturnsFundingAsset()
     {
@@ -243,12 +218,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal("Cash account", single.FundingAssetName);
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-5 (list half): a paid-out deposit lists as <c>PaidOut</c> with the
-    /// payout date and the destination's name, while a deposit only settled beside it carries neither.
-    /// Once the destination Cash is removed its leg is detached: the deposit still lists as PaidOut on
-    /// the same date, with a null name, and still holds 0.
-    /// </summary>
     [Fact]
     public async Task List_PaidOutDeposit_ReturnsPayoutAndToleratesRemovedDestination()
     {

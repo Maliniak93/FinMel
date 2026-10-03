@@ -14,8 +14,7 @@ public static class ListTransactionsEndpoint
         return app;
     }
 
-    // Defaulted params (mirrors ListPortfoliosEndpoint's includeArchived) so omitted query
-    // parameters bind instead of 400ing as missing-required.
+    // Defaulted params, so omitted query parameters bind instead of 400ing as missing.
     private static async Task<Results<Ok<PagedResponse<TransactionResponse>>, ProblemHttpResult>> HandleAsync(
         Guid portfolioId, Guid assetId, ListTransactionsHandler handler, CancellationToken cancellationToken, int page = 1, int pageSize = 20)
         => (await handler.HandleAsync(portfolioId, assetId, page, pageSize, cancellationToken)).ToHttpResult();

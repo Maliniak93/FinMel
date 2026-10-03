@@ -28,7 +28,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.NotFound, getAfterDelete.StatusCode);
     }
 
-    /// <summary>spec-08 AC-3: removing an asset cascades to its transactions — no "delete them first" step.</summary>
     [Fact]
     public async Task Remove_AssetWithTransactions_RemovesAssetAndItsTransactions()
     {
@@ -62,7 +61,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>asset-archive AC-4: removing an archived asset stays allowed — it and its transactions are gone (the <c>AssetRemoved</c> event is in the outbox tests).</summary>
     [Fact]
     public async Task RemoveAsset_ArchivedAsset_Deletes()
     {
@@ -82,8 +80,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(0, rows.Transactions);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC6: removing an asset of an archived portfolio
-    /// is a 409 <c>Conflict.PortfolioArchived</c>; the asset and its transactions stay.</summary>
     [Fact]
     public async Task RemoveAsset_InArchivedPortfolio_Returns409()
     {
@@ -101,13 +97,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).TotalCount);
     }
 
-    /// <summary>
-    /// term-deposits AC-11 (HTTP half): removing a term deposit through the ordinary asset endpoint
-    /// takes the asset, its opening transaction and its <c>TermDeposit</c> row with it. The
-    /// <c>AssetRemoved</c> event written in the same save is proven hostlessly by
-    /// <see cref="PortfolioOutboxTests.RemoveAsset_TermDeposit_WritesAssetRemovedAndDeletesTermsInOneSave"/> —
-    /// this host runs a live bus whose delivery poller would race an outbox read.
-    /// </summary>
     [Fact]
     public async Task Remove_TermDeposit_DeletesTermsAndPublishesAssetRemoved()
     {
@@ -129,10 +118,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.True(await dbContext.Set<TermDeposit>().AnyAsync(t => t.AssetId == kept.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// savings-accounts AC-8: removing a savings account through the ordinary asset endpoint takes the
-    /// asset, its transactions and its <c>SavingsAccount</c> row with it; another account stays.
-    /// </summary>
     [Fact]
     public async Task Remove_SavingsAccount_DeletesTerms()
     {
@@ -157,11 +142,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.True(await dbContext.Set<SavingsAccount>().AnyAsync(t => t.AssetId == kept.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-7: removing a funded deposit detaches — never reverses —
-    /// its transfer. The Cash Withdraw stays with <c>TransferId</c> null and Cash stays at 4 000; the
-    /// leg is now an ordinary transaction, so deleting it afterwards returns Cash to 5 000.
-    /// </summary>
     [Fact]
     public async Task Remove_FundedDeposit_DetachesCashLeg()
     {
@@ -193,11 +173,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(5_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-7: removing the funding Cash asset instead leaves the
-    /// deposit and its opening transaction in place, unlinked, at the same quantity — and the deposit
-    /// no longer reports a funding asset.
-    /// </summary>
     [Fact]
     public async Task Remove_FundingCash_DetachesDepositLeg()
     {
@@ -225,10 +200,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == funded.CashAssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// term-deposits-settlement AC-7 (delete half): settling does not lock the deposit against
-    /// deletion — the asset, both its transactions (opening + net-interest credit) and its terms go.
-    /// </summary>
     [Fact]
     public async Task Remove_SettledDeposit_RemovesItAsInPartOne()
     {
@@ -249,11 +220,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.False(await dbContext.Set<TermDeposit>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-5 (remove half): removing a paid-out deposit detaches — never
-    /// reverses — its payout. The Cash keeps its 10 119.83 through the leg, now an ordinary Deposit
-    /// with no transfer link.
-    /// </summary>
     [Fact]
     public async Task Remove_PaidOutDeposit_KeepsCashBalance()
     {
@@ -281,10 +247,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == paidOut.Deposit.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-10: removing a savings account deletes its interest settlements
-    /// with it, while another account's settlement stays.
-    /// </summary>
     [Fact]
     public async Task Remove_SavingsAccount_DeletesSettlements()
     {
@@ -306,10 +268,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.False(await dbContext.Set<SavingsInterestSettlement>().IgnoreQueryFilters().AnyAsync(s => s.AssetId == account.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings AC-6: removing the savings account a deposit was paid into detaches the
-    /// payout - the deposit stays PaidOut with a null destination name and holds 0.
-    /// </summary>
     [Fact]
     public async Task Remove_SavingsAccountPaidFromDeposit_KeepsDepositPaidOut()
     {
@@ -334,10 +292,6 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings AC-6: removing the deposit detaches the payout - the savings account keeps
-    /// its balance through the leg, now an ordinary Deposit with no transfer link.
-    /// </summary>
     [Fact]
     public async Task Remove_DepositPaidIntoSavings_KeepsSavingsBalance()
     {

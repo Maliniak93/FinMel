@@ -3,11 +3,6 @@ using Skarbiec.Portfolio.Features;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// cash-transaction-types AC-1: the single source of the "which transaction types does a class
-/// accept" rule. Pure — no containers, no host. The expected matrix is written out independently of
-/// the production rule: Cash, Deposit and Savings accept exactly Deposit/Withdraw, every other class all six.
-/// </summary>
 public sealed class AssetTransactionTypesTests
 {
     private static readonly TransactionType[] CashLikeTypes = [TransactionType.Deposit, TransactionType.Withdraw];

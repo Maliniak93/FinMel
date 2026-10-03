@@ -24,8 +24,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
-    <!-- See Skarbiec.Portfolio.csproj: "Portfolio" the type collides with the "Skarbiec.Portfolio"
-         namespace segment outside the Data namespace itself. -->
+    <!-- Same CS0118 namespace collision as in Skarbiec.Portfolio.csproj. -->
     <Using Include="Skarbiec.Portfolio.Data.Portfolio" Alias="PortfolioEntity" />
   </ItemGroup>
 

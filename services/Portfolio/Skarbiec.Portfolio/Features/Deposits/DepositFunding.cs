@@ -4,14 +4,8 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Deposits;
 
-/// <summary>The Cash asset a funded deposit's principal came from (asset-transfers-deposit-funding).</summary>
 public sealed record DepositFundingSource(Guid AssetId, string AssetName);
 
-/// <summary>
-/// Resolves a deposit's funding source from its transfer: the deposit's In leg (its opening Deposit)
-/// and the Out leg sharing its <see cref="Transaction.TransferId"/>. No stored column — a detached
-/// transfer (the Cash asset removed) simply stops resolving.
-/// </summary>
 internal static class DepositFunding
 {
     public static async Task<IReadOnlyDictionary<Guid, DepositFundingSource>> LoadFundingSourcesAsync(

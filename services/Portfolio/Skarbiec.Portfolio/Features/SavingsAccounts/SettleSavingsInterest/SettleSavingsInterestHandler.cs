@@ -6,11 +6,6 @@ using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
 
-/// <summary>
-/// Settles the next due month of a savings account (savings-interest-settlement): stores what the bank
-/// paid and credits the net interest to the account as a system-managed Deposit dated the period's last
-/// day, so the following months accrue on it.
-/// </summary>
 public sealed class SettleSavingsInterestHandler(
     PortfolioDbContext dbContext,
     PositionEventPublisher positionEventPublisher,
@@ -20,8 +15,7 @@ public sealed class SettleSavingsInterestHandler(
     public async Task<Result<SavingsInterestSettlementResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, SettleSavingsInterestRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's account, a non-Savings asset and an account under
-        // the wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's account, a non-Savings asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Savings, cancellationToken);
         var terms = asset is null
@@ -64,9 +58,7 @@ public sealed class SettleSavingsInterestHandler(
             return SavingsAccountErrors.InterestPeriodMismatch(due.PeriodEnd);
         }
 
-        // The net enters as a Deposit, not Interest: Interest has a quantity delta of 0, and the balance
-        // must rise by it (ADR-009). Nothing to credit when it is 0 — the settlement is still stored, so
-        // the next month becomes the due one.
+        // The net enters as a Deposit, not Interest, whose quantity delta is 0; a zero net still stores the settlement.
         var netInterest = request.GrossInterest - request.Tax;
         var credit = netInterest > 0
             ? new Transaction
@@ -88,7 +80,7 @@ public sealed class SettleSavingsInterestHandler(
                 return recomputed.Error;
             }
 
-            // Last check before the write: the credit freezes the PLN rate of its own date (ADR-026).
+            // Last check before the write: the credit freezes the PLN rate of its own date.
             var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, credit.Date, cancellationToken);
             if (fxRateToPln.IsFailure)
             {
@@ -112,8 +104,7 @@ public sealed class SettleSavingsInterestHandler(
         };
         dbContext.SavingsInterestSettlements.Add(settlement);
 
-        // Published before SaveChangesAsync so the outbox row commits with the settlement (ADR-012). It
-        // also bumps the asset's version, so the asset row's xmin guards a racing second settlement.
+        // The version bump makes the asset row's xmin guard a racing second settlement.
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         try

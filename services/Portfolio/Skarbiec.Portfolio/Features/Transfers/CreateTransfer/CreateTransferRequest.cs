@@ -2,11 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 
-/// <summary>
-/// A manual transfer (savings-cash-transfers): <see cref="Amount"/> moves out of the source and into
-/// the target on <see cref="Date"/>. The date must not be after today (Europe/Warsaw) — checked in the
-/// handler, which owns the clock.
-/// </summary>
+/// <summary>The date must not be after today (Europe/Warsaw), which the handler checks.</summary>
 public sealed record CreateTransferRequest
 {
     public required Guid SourceAssetId { get; init; }

@@ -21,18 +21,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Outbox tests for term deposits: add, update, settle, remove, roll over, and the deposit writes an archived portfolio rejects.
-/// The hostless provider and shared arrange helpers live in <see cref="PortfolioOutboxTestBase"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
-    /// <summary>
-    /// term-deposits AC-5 (outbox half): AddDeposit writes the Deposit-class asset, its opening
-    /// transaction, its <see cref="TermDeposit"/> terms and one <see cref="AssetPositionChanged"/>
-    /// carrying the principal as the quantity — all in a single save.
-    /// </summary>
     [Fact]
     public async Task AddDeposit_PublishesPositionChangedWithPrincipal()
     {
@@ -72,11 +63,6 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.False(evt.PortfolioIsArchived);
     }
 
-    /// <summary>
-    /// term-deposits AC-8 (outbox half): UpdateDeposit rewrites the opening transaction and the
-    /// quantity and writes exactly one further <see cref="AssetPositionChanged"/> with the new
-    /// quantity and a higher version, in a single save.
-    /// </summary>
     [Fact]
     public async Task UpdateDeposit_PublishesOnePositionChangedWithNewQuantity()
     {
@@ -123,12 +109,6 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(15_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// term-deposits-settlement AC-3 (outbox half): SettleDeposit stores the settlement, adds the
-    /// net-interest Deposit transaction, raises the quantity to principal + net and writes exactly one
-    /// further <see cref="AssetPositionChanged"/> carrying that final quantity — all in a single save.
-    /// The host clock is the real one (today is well past the 2026-04-15 maturity).
-    /// </summary>
     [Fact]
     public async Task SettleDeposit_PublishesPositionChangedWithFinalAmount()
     {
@@ -178,11 +158,6 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(28.12m, terms.SettledTax);
     }
 
-    /// <summary>
-    /// term-deposits AC-11 (outbox half): RemoveAsset on a term deposit deletes the asset, its
-    /// opening transaction and its <see cref="TermDeposit"/> row and writes one non-cascaded
-    /// <see cref="AssetRemoved"/>, all in one save.
-    /// </summary>
     [Fact]
     public async Task RemoveAsset_TermDeposit_WritesAssetRemovedAndDeletesTermsInOneSave()
     {
@@ -224,11 +199,6 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.False(evt.CascadedFromPortfolio);
     }
 
-    /// <summary>
-    /// term-deposits AC-7 (outbox half): AddDeposit, UpdateDeposit and (term-deposits-settlement)
-    /// SettleDeposit into an archived portfolio
-    /// fail with <c>Conflict.PortfolioArchived</c> before writing anything — no outbox row, no terms change.
-    /// </summary>
     [Fact]
     public async Task DepositWriteToArchivedPortfolio_WritesNoEvent()
     {
@@ -284,12 +254,6 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(10_000m, (await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == assetId, cancellationToken)).Principal);
     }
 
-    /// <summary>
-    /// deposit-rollover AC-1 (outbox half): rolling a Due deposit over settles it and starts the next
-    /// term in a single save — the net-interest credit, the new terms and exactly one further
-    /// <see cref="AssetPositionChanged"/> for the deposit, carrying 10 119.83. The host clock is the real
-    /// one (today is well past the 2026-04-15 maturity).
-    /// </summary>
     [Fact]
     public async Task RollOverDueDeposit_PublishesPosition()
     {
@@ -349,10 +313,6 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Null(terms.SettledTax);
     }
 
-    /// <summary>
-    /// deposit-rollover AC-2 (outbox half): rolling a Settled deposit over changes only its terms — the
-    /// quantity stays, so the save writes no outbox row at all.
-    /// </summary>
     [Fact]
     public async Task RollOverSettledDeposit_PublishesNothing()
     {

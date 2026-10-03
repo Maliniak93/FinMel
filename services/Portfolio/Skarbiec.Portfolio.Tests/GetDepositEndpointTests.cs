@@ -10,11 +10,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>term-deposits: <c>GET .../deposits/{assetId}</c> returns the stored terms plus the read-time projection and status.</summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>asset-archive AC-7: <c>GET</c> of an archived deposit returns it with <c>isArchived</c> true.</summary>
     [Fact]
     public async Task Get_ArchivedDeposit_ReturnsFlag()
     {
@@ -59,7 +57,6 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(DepositStatus.Due, body.Status);
     }
 
-    /// <summary>term-deposits-settlement: <c>GetDeposit</c> returns the settlement data and the Settled status too.</summary>
     [Fact]
     public async Task Get_SettledDeposit_ReturnsSettlement()
     {
@@ -82,7 +79,6 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(10_000m, body.Principal);
     }
 
-    /// <summary>A non-Deposit asset is not a deposit — 404, not its asset data.</summary>
     [Fact]
     public async Task Get_NonDepositAsset_ReturnsNotFound()
     {

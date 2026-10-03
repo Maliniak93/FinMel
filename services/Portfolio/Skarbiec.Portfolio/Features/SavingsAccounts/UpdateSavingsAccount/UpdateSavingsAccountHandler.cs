@@ -10,8 +10,7 @@ public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, Ti
     public async Task<Result<SavingsAccountResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, UpdateSavingsAccountRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's account, a non-Savings asset and an account under
-        // the wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's account, a non-Savings asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Savings, cancellationToken);
         var terms = asset is null
@@ -39,8 +38,7 @@ public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, Ti
         terms.AnnualInterestRatePercent = request.AnnualInterestRatePercent;
         terms.TaxExempt = request.TaxExempt;
 
-        // No AssetPositionChanged: none of these fields is in it, and the balance moves only through
-        // the account's transactions.
+        // No AssetPositionChanged: none of these fields is in it, and only transactions move the balance.
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // The new rate and tax status re-project the unsettled months at once.

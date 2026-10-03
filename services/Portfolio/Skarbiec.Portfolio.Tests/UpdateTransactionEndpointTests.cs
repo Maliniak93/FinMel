@@ -53,9 +53,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10m, untouchedBuy.Quantity);
     }
 
-    /// <summary>cash-transaction-types AC-4: editing a Cash asset's Deposit into a Sell is a 400
-    /// <c>Validation.TransactionTypeNotAllowed</c>, and the stored transaction and the balance are
-    /// exactly as before.</summary>
     [Fact]
     public async Task Update_ToDisallowedTypeOnCashAsset_ReturnsBadRequestAndNothingChanged()
     {
@@ -81,10 +78,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(1_500m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// savings-accounts AC-7: unlike a term deposit's, a savings account's transactions stay editable —
-    /// changing the opening Deposit moves the balance, and turning it into a Buy is refused.
-    /// </summary>
     [Fact]
     public async Task Update_SavingsAccountTransaction_MovesBalance()
     {
@@ -149,8 +142,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC7: an update re-resolves the rate for the
-    /// (new) date — a transaction stored at 4.30 is revalued at 4.50 once moved to that rate's date.</summary>
     [Fact]
     public async Task Update_ChangedDate_ReResolvesRate()
     {
@@ -178,8 +169,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(4500.00m, (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items.Single().ValuePln);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC10: editing a transaction of an archived
-    /// portfolio's asset is a 409 before any rate lookup — MarketData is never asked.</summary>
     [Fact]
     public async Task Update_OnArchivedPortfolio_ReturnsConflictWithoutFxLookup()
     {
@@ -201,7 +190,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(new DateOnly(2026, 3, 2), unchanged.Date);
     }
 
-    /// <summary>asset-archive AC-4: editing a transaction of an archived asset is a 409 <c>Conflict.AssetArchived</c>; the transaction stays.</summary>
     [Fact]
     public async Task Update_ArchivedAsset_Returns409()
     {
@@ -221,8 +209,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(100m, (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items.Single(t => t.Id == depositId).Quantity);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC7: editing a transaction of an archived
-    /// portfolio's asset is a 409 <c>Conflict.PortfolioArchived</c>; transaction and quantity stay.</summary>
     [Fact]
     public async Task Update_InArchivedPortfolio_Returns409()
     {
@@ -241,11 +227,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10m, page.Items.Single(t => t.Id == buyId).Quantity);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-6 (update half): the Cash Withdraw leg of a transfer is
-    /// changed only by its entry point — a PUT here is a 409 <c>Conflict.TransferLegManaged</c> and
-    /// nothing changes, while the ordinary top-up on the same Cash asset stays editable.
-    /// </summary>
     [Fact]
     public async Task Update_TransferLeg_ReturnsConflict()
     {
@@ -277,9 +258,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(5_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>term-deposits AC-10: the opening transaction of a term deposit is rewritten only
-    /// through <c>PUT .../deposits/{id}</c> — editing it here is a 409
-    /// <c>Conflict.DepositTransactionsManaged</c> and nothing changes.</summary>
     [Fact]
     public async Task Update_OnTermDeposit_ReturnsConflict()
     {
@@ -298,11 +276,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10_000m, opening.Quantity);
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-9: the credit a settlement created is system-managed - editing
-    /// it is a 409 <c>Conflict.SavingsInterestManaged</c> and nothing changes - while an ordinary
-    /// savings Deposit beside it stays editable.
-    /// </summary>
     [Fact]
     public async Task Update_SavingsInterestCredit_ReturnsConflict()
     {
@@ -331,7 +304,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(12_033.29m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>savings-interest-settlement: an edit inside an already-settled period leaves that settlement as it was.</summary>
     [Fact]
     public async Task Update_TransactionInSettledPeriod_LeavesSettlementAsItIs()
     {
@@ -356,7 +328,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(33.29m, last.NetInterest);
     }
 
-    /// <summary>savings-cash-transfers AC-5: a leg of a manual Cash/Savings transfer is changed only through /transfers.</summary>
     [Fact]
     public async Task Update_ManualTransferLeg_ReturnsConflict()
     {
@@ -379,10 +350,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(2_000m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings AC-5: the savings leg of a deposit payout is changed only by the deposit
-    /// slices - a PUT is a 409 <c>Conflict.TransferLegManaged</c> and nothing changes.
-    /// </summary>
     [Fact]
     public async Task Update_DepositPayoutLegOnSavings_ReturnsConflict()
     {

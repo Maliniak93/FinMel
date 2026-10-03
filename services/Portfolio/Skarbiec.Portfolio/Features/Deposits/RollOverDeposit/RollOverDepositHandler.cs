@@ -5,13 +5,6 @@ using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 
-/// <summary>
-/// Rolls a matured deposit over into its next term on the same asset (deposit-rollover). A Due deposit
-/// is settled in the same save — its net-interest credit dated on the maturity date, as the bank pays
-/// it then — and a Settled one (not paid out) reuses its stored settlement. Either way the whole
-/// balance becomes the new principal, the old maturity date the new start date, and only the rate
-/// changes; the settlement fields are cleared and <see cref="TermDeposit.RolloverCount"/> goes up.
-/// </summary>
 public sealed class RollOverDepositHandler(
     PortfolioDbContext dbContext,
     PositionEventPublisher positionEventPublisher,
@@ -21,8 +14,7 @@ public sealed class RollOverDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, RollOverDepositRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first, as in SettleDeposit: another user's deposit, a non-deposit asset
-        // and a deposit under the wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Deposit, cancellationToken);
         var terms = asset is null
@@ -45,8 +37,7 @@ public sealed class RollOverDepositHandler(
             return readOnly;
         }
 
-        // The bank renews on the maturity day: the credit of a Due deposit is dated then, and the next
-        // term always starts then, however late the rollover happens.
+        // The bank renews on the maturity day, so the credit and the next term date from it however late the rollover is.
         var endedOn = terms.MaturityDate;
         var today = WarsawCalendar.Today(timeProvider);
         decimal netInterest;
@@ -83,7 +74,7 @@ public sealed class RollOverDepositHandler(
 
             netInterest = grossInterest - tax;
 
-            // As in SettleDeposit: the net interest enters as a Deposit transaction (ADR-009), none when 0.
+            // As in SettleDeposit: the net interest enters as a Deposit transaction, none when 0.
             var credit = netInterest > 0
                 ? new Transaction
                 {
@@ -110,7 +101,7 @@ public sealed class RollOverDepositHandler(
 
             if (credit is not null)
             {
-                // Last check before the write: the credit freezes the PLN rate of its date (ADR-026).
+                // Last check before the write: the credit freezes the PLN rate of its date.
                 var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, endedOn, cancellationToken);
                 if (fxRateToPln.IsFailure)
                 {
@@ -134,8 +125,7 @@ public sealed class RollOverDepositHandler(
         terms.SettledTax = null;
         terms.RolloverCount++;
 
-        // Published before SaveChangesAsync so the outbox row commits with the rollover (ADR-012) — only
-        // when settling now, as the credit moves the quantity; a Settled deposit's quantity stays.
+        // Published only when settling now, as only the credit moves the quantity.
         if (settlesNow)
         {
             await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
@@ -147,7 +137,7 @@ public sealed class RollOverDepositHandler(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // A racing settlement or rollover bumped the asset row first; the loser's xmin no longer matches.
+            // A racing settlement or rollover bumped the asset row first; the loser's xmin is stale.
             return TransactionErrors.ConcurrentModification();
         }
 

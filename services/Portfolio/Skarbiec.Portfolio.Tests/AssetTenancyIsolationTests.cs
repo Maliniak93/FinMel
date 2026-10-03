@@ -11,13 +11,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// T1.6: Asset is nested under Portfolio (<c>.../portfolios/{portfolioId}/assets/{id}</c>), so it
-/// can't plug into the flat T0.14 <see cref="Skarbiec.Testing.Tenancy.TenancyIsolationTests{TProgram}"/>
-/// template directly (its <c>ListUrl</c> has no portfolio to scope under) — the same four facts are
-/// reimplemented here, plus the sneaky-path case the plain template can't express: a stranger
-/// addressing another user's asset underneath the stranger's own, real portfolio id.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
@@ -122,11 +115,6 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>
-    /// spec-08 AC-5: now that DELETE cascades to transactions, a stranger's delete — through the
-    /// owner's portfolio id or the stranger's own — must still stop at the 404 and leave the
-    /// owner's asset and every one of its transactions intact.
-    /// </summary>
     [Fact]
     public async Task Delete_AssetWithTransactionsByStranger_ReturnsNotFoundAndLeavesTransactions()
     {

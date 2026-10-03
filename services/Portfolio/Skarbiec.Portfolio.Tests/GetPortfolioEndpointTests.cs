@@ -36,12 +36,6 @@ public sealed class GetPortfolioEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>
-    /// M1.3: the currency restriction applies to writes only (T1.11's live session already created a
-    /// USD portfolio before USD was even in the set) — a row holding an out-of-set currency must keep
-    /// reading back unchanged, never rewritten and never a validation error, since GET has no request
-    /// body for [SupportedCurrency] to inspect.
-    /// </summary>
     [Fact]
     public async Task Get_PortfolioWithOutOfSetCurrency_ReadsBackUnchanged()
     {

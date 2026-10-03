@@ -6,11 +6,6 @@ using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 
-/// <summary>
-/// The generic entry point of a manual transfer (savings-cash-transfers): only routes
-/// <see cref="TransferRoutes.IsManual"/> marks — Cash ↔ Savings — are accepted; the deposit routes keep
-/// their own slices.
-/// </summary>
 public sealed class CreateTransferHandler(
     PortfolioDbContext dbContext,
     PositionEventPublisher positionEventPublisher,
@@ -24,8 +19,7 @@ public sealed class CreateTransferHandler(
             return TransferErrors.DateInFuture;
         }
 
-        // Both through the tenancy filter: a stranger's id is simply not found, and gets the same 400
-        // as any other unsuitable asset, so nothing leaks.
+        // Both through the tenancy filter: a stranger's id gets the same 400 as any unsuitable asset, so nothing leaks.
         var source = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == request.SourceAssetId, cancellationToken);
         var target = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == request.TargetAssetId, cancellationToken);
 
@@ -38,8 +32,7 @@ public sealed class CreateTransferHandler(
             return TransferErrors.InvalidCounterpart;
         }
 
-        // Neither side is the "entry asset" — both ids are in the body — so both get its read-only
-        // treatment: an archived portfolio (or asset) on either side is a 409.
+        // Both ids come from the body, so both sides get the read-only check.
         if (await dbContext.ReadOnlyErrorAsync(source, cancellationToken) is { } sourceReadOnly)
         {
             return sourceReadOnly;
@@ -52,8 +45,7 @@ public sealed class CreateTransferHandler(
 
         var (outLeg, inLeg) = TransferLegs.Create(source.Id, target.Id, request.Amount, request.Date);
 
-        // The source's whole history is replayed with its Out leg, so its balance must cover the
-        // transfer everywhere, not just at the end.
+        // The source's whole history is replayed with its Out leg, so its balance must cover it everywhere.
         var sourceQuantity = TransactionQuantityCalculator.Recompute(
             [.. await LoadHistoryAsync(source.Id, cancellationToken), outLeg], _ => TransferErrors.InsufficientFunds);
         if (sourceQuantity.IsFailure)
@@ -68,8 +60,7 @@ public sealed class CreateTransferHandler(
             return targetQuantity.Error;
         }
 
-        // Last check before anything is staged: the date's PLN rate is frozen on both legs (ADR-026) —
-        // same currency, so one rate — and MarketData being down leaves nothing half-written.
+        // Last check before staging: both legs freeze the date's one PLN rate, and MarketData being down leaves nothing half-written.
         var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(source.Currency, request.Date, cancellationToken);
         if (fxRateToPln.IsFailure)
         {
@@ -83,7 +74,7 @@ public sealed class CreateTransferHandler(
         dbContext.Transactions.Add(outLeg);
         dbContext.Transactions.Add(inLeg);
 
-        // Both publish before the one SaveChangesAsync, so the outbox rows commit with both legs (ADR-012).
+        // Both publish before the one SaveChangesAsync, so the outbox rows commit with both legs.
         await positionEventPublisher.PublishChangedAsync(source, cancellationToken);
         await positionEventPublisher.PublishChangedAsync(target, cancellationToken);
 

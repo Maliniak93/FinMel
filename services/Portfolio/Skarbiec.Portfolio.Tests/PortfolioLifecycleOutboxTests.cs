@@ -23,14 +23,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Outbox tests for portfolio archive, restore and delete, their per-asset fan-out, and the writes an archived portfolio rejects.
-/// The hostless provider and shared arrange helpers live in <see cref="PortfolioOutboxTestBase"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
-    /// <summary>spec-02 AC-8.</summary>
     [Fact]
     public async Task ArchivePortfolio_WritesPortfolioArchivedAndOnePositionEventPerAsset()
     {
@@ -65,7 +60,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.All(positionEvents, e => Assert.True(e.PortfolioIsArchived));
     }
 
-    /// <summary>spec-02 AC-9 (outbox half — the HTTP half is <see cref="RestorePortfolioEndpointTests"/>).</summary>
     [Fact]
     public async Task RestorePortfolio_WritesPortfolioRestoredAndOnePositionEventPerAsset()
     {
@@ -102,12 +96,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.Equal(4, positionEvents.Count);
     }
 
-    /// <summary>
-    /// spec-02 AC-10 (the "publishes nothing" half — the HTTP half is
-    /// <see cref="RestorePortfolioEndpointTests.Restore_NotArchivedPortfolio_ReturnsOkAndPublishesNothing"/>).
-    /// The 200 body looks identical either way, so only the outbox can tell the no-op early return
-    /// from a fan-out that re-publishes every asset on a repeated click (design decision 2).
-    /// </summary>
     [Fact]
     public async Task RestorePortfolio_NotArchivedPortfolio_WritesNoFurtherEvents()
     {
@@ -135,12 +123,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.Equal(positionEventsBefore.Count, positionEventsAfter.Count);
     }
 
-    /// <summary>
-    /// spec-02 design decision 2, the mirror of
-    /// <see cref="RestorePortfolio_NotArchivedPortfolio_WritesNoFurtherEvents"/>: archiving an
-    /// already-archived portfolio is a no-op, so neither a second <see cref="PortfolioArchived"/>
-    /// nor another per-asset fan-out may be written.
-    /// </summary>
     [Fact]
     public async Task ArchivePortfolio_AlreadyArchivedPortfolio_WritesNoFurtherEvents()
     {
@@ -167,7 +149,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.Equal(positionEventsBefore.Count, positionEventsAfter.Count);
     }
 
-    /// <summary>spec-02 AC-12.</summary>
     [Fact]
     public async Task DeletePortfolio_WritesPortfolioDeletedInSameTransactionAsDeletion()
     {
@@ -192,11 +173,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.Equal(UserId, evt.UserId);
     }
 
-    /// <summary>
-    /// spec-08 AC-2: the portfolio, its assets and their transactions are removed and the outbox
-    /// holds one <see cref="AssetRemoved"/> (cascaded) per asset plus one <see cref="PortfolioDeleted"/>
-    /// — all in a single save, so no consumer can ever see a half-deleted portfolio.
-    /// </summary>
     [Fact]
     public async Task DeletePortfolio_WithAssets_RemovesChildrenAndWritesAssetRemovedPerAssetAndPortfolioDeleted()
     {
@@ -248,13 +224,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.Equal(UserId, deleted.UserId);
     }
 
-    /// <summary>
-    /// archived-portfolio-out-of-net-worth AC6 (outbox half): every one of the six asset/transaction
-    /// writes into an archived portfolio fails with <c>Conflict.PortfolioArchived</c> before it
-    /// writes anything — no business row changes and not a single outbox row is added, so Reporting
-    /// never sees an event it would otherwise silently ignore. Each write runs in its own scope so a
-    /// half-applied change tracked by one handler cannot hide behind another's early return.
-    /// </summary>
     [Fact]
     public async Task WriteToArchivedPortfolio_WritesNoEvent()
     {
@@ -329,7 +298,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.Equal(5m, transaction.Quantity);
     }
 
-    /// <summary>asset-archive AC-8: the portfolio archive fan-out carries <c>PortfolioIsArchived = true</c> and each asset's own flag, unchanged.</summary>
     [Fact]
     public async Task ArchivePortfolio_KeepsAssetArchivedFlag()
     {
@@ -355,7 +323,6 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.False(fanOut.Single(e => e.AssetId == liveAssetId).IsArchived);
     }
 
-    /// <summary>asset-archive AC-8: restoring the portfolio leaves an asset archived on its own archived, on the event and in the row.</summary>
     [Fact]
     public async Task RestorePortfolio_KeepsAssetArchivedFlag()
     {

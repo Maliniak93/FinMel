@@ -32,7 +32,6 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal("Asset in A", asset.Name);
     }
 
-    /// <summary>asset-archive AC-7: an archived asset is still listed (the client filters), with the right flag on each.</summary>
     [Fact]
     public async Task List_IncludesArchivedAssetWithFlag()
     {
@@ -76,7 +75,6 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>M1.3: an out-of-set currency row must not break the list either — reads keep working.</summary>
     [Fact]
     public async Task List_IncludesAssetWithOutOfSetCurrency()
     {
@@ -110,8 +108,6 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal("GBP", asset.Currency);
     }
 
-    /// <summary>term-deposits: a Deposit-class asset carries its maturity date on <c>AssetResponse</c>
-    /// (the asset list shows the "Due" chip from it); every other asset carries none.</summary>
     [Fact]
     public async Task List_WithTermDeposit_CarriesDepositMaturityDateOnlyOnTheDeposit()
     {
@@ -129,10 +125,6 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.Null(assets.Single(a => a.Id == cashId).DepositMaturityDate);
     }
 
-    /// <summary>
-    /// term-deposits-settlement: <c>AssetResponse.DepositSettled</c> tells the asset list to drop the
-    /// "Due" chip — true on a settled deposit, false on an unsettled one, null on every other asset.
-    /// </summary>
     [Fact]
     public async Task List_WithSettledTermDeposit_CarriesDepositSettled()
     {
@@ -154,10 +146,6 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.Null(assets.Single(a => a.Id == cashId).DepositSettled);
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-10: <c>AssetResponse.SavingsInterestDue</c> is true for an account
-    /// with an ended, unsettled month, false once it is settled up, and null for any other class.
-    /// </summary>
     [Fact]
     public async Task List_SavingsAccount_FlagsInterestDue()
     {

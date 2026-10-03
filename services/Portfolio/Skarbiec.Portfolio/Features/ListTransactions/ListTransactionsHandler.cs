@@ -15,8 +15,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        // Every transaction is in its asset's currency, so the lookup doubles as the existence check.
-        // Its class tells, with the counterpart's, whether a transfer leg is on a manual route.
+        // The asset lookup doubles as the existence check, and its class tells whether a transfer leg is on a manual route.
         var asset = await dbContext.Assets
             .AsNoTracking()
             .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
@@ -40,8 +39,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        // The counterpart of every transfer leg on this page, in one query (asset-transfers-deposit-funding).
-        // Both legs of a transfer always sit on different assets, so the counterpart is the other asset's leg.
+        // The counterpart of every transfer leg on this page in one query: the other asset's leg.
         var transferIds = transactions
             .Where(t => t.TransferId is not null)
             .Select(t => t.TransferId!.Value)
@@ -63,7 +61,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                 })
             .ToDictionaryAsync(c => c.TransferId, cancellationToken);
 
-        // The settled month of every interest credit on this page, in one query (savings-interest-settlement).
+        // The settled month of every interest credit on this page, in one query.
         var transactionIds = transactions.Select(t => (Guid?)t.Id).ToList();
         var creditPeriodEnds = await dbContext.SavingsInterestSettlements
             .AsNoTracking()

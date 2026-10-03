@@ -12,16 +12,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-cash-transfers: <c>POST /api/portfolio/transfers</c> moves money between a Cash asset and
-/// a savings account as one linked transfer: a Withdraw leg on the source and a Deposit leg on the
-/// target, same amount, same date, unit price 1 (the position events are proven by
-/// <see cref="PortfolioOutboxTests.CreateTransfer_PublishesPositionChangedForBothAssets"/>).
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-2: 2 000 from a 5 000 Cash into an empty savings account.</summary>
     [Fact]
     public async Task Create_CashToSavings_MovesAmount()
     {
@@ -60,7 +53,6 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken);
     }
 
-    /// <summary>AC-2: 500 back out of the 2 000 leaves the account at 1 500 and Cash at 3 500.</summary>
     [Fact]
     public async Task Create_SavingsToCash_MovesAmount()
     {
@@ -80,7 +72,6 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal(3_500m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>AC-3: every rejection is a 400 and writes nothing.</summary>
     [Theory]
     [InlineData("cash-to-deposit", true)]
     [InlineData("cash-to-stock", true)]
@@ -132,7 +123,6 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
-    /// <summary>AC-3: 5 001 out of a 5 000 Cash.</summary>
     [Fact]
     public async Task Create_ExceedsBalance_ReturnsInsufficientFunds()
     {
@@ -151,7 +141,6 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         await client.AssertCashUntouchedAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
     }
 
-    /// <summary>AC-3: "nothing below zero anywhere in its history" - the Cash is topped up only after the transfer date.</summary>
     [Fact]
     public async Task Create_SourceEmptyOnTransferDate_ReturnsInsufficientFunds()
     {
@@ -169,7 +158,6 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
     }
 
-    /// <summary>AC-3: an archived portfolio on either side is a 409 and nothing is written.</summary>
     [Theory]
     [InlineData("source")]
     [InlineData("target")]

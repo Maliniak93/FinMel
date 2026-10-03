@@ -6,21 +6,10 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
-/// <summary>
-/// Base for Portfolio's HTTP slice tests. Supplies the test host to
-/// <see cref="ServiceEndpointTests{TProgram}"/>, so a test class declares only
-/// <c>[Collection(TestingDefaults.CollectionName)]</c> and its facts.
-/// </summary>
 public abstract class PortfolioEndpointTests(SkarbiecContainersFixture containers) : ServiceEndpointTests<Program>
 {
     protected override PortfolioApiFactory Factory { get; } = new(containers);
 
-    /// <summary>
-    /// A <see cref="PortfolioDbContext"/> scoped to <paramref name="userId"/>, talking to the same
-    /// database as <see cref="ServiceEndpointTests{TProgram}.Factory"/>. For the few facts the HTTP
-    /// surface can't express — seeding a denormalized counter, or forcing a genuine write race that
-    /// a single request handler can never produce.
-    /// </summary>
     protected PortfolioDbContext CreateDbContext(Guid userId)
     {
         var options = new DbContextOptionsBuilder<PortfolioDbContext>()
@@ -30,11 +19,6 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return new PortfolioDbContext(options, new StubCurrentUser(userId));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: a funded deposit is exactly as
-    /// <see cref="PortfolioApi.CreateFundedDepositAsync"/> left it with its defaults — principal 1 000
-    /// from 2026-01-15, Cash at 4 000 of its 5 000, and the two linked legs of 1 000 on the start date.
-    /// </summary>
     private protected async Task AssertFundedDepositUnchangedAsync(
         HttpClient client, Guid userId, PortfolioApi.FundedDeposit funded, CancellationToken cancellationToken)
     {
@@ -55,11 +39,6 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(1_000m, (await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == funded.Deposit.AssetId, cancellationToken)).Principal);
     }
 
-    /// <summary>
-    /// deposit-rollover: everything a rejected deposit write must leave alone — the deposit as
-    /// <c>GET .../deposits/{assetId}</c> returns it, <see cref="SnapshotUserRowsAsync"/>, and every
-    /// transaction of <paramref name="userId"/> (id, type, quantity, date, frozen rate).
-    /// </summary>
     private protected async Task<DepositSnapshot> SnapshotDepositAsync(
         HttpClient client, Guid userId, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -80,7 +59,6 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
                 transactions.Select(t => $"{t.Id}|{t.AssetId}|{t.Type}|{t.Quantity}|{t.Date:O}|{t.FxRateToPln}|{t.TransferId}")));
     }
 
-    /// <summary>deposit-rollover: asserts the deposit, the row counts and every transaction are exactly as <paramref name="before"/>.</summary>
     private protected async Task AssertDepositUnchangedAsync(
         HttpClient client, Guid userId, Guid portfolioId, Guid assetId, DepositSnapshot before, CancellationToken cancellationToken)
     {
@@ -90,17 +68,11 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(before.Transactions, after.Transactions);
     }
 
-    /// <summary>What <see cref="SnapshotDepositAsync"/> captured.</summary>
     private protected sealed record DepositSnapshot(
         DepositResponse Deposit,
         (int Assets, int Transactions, int Terms, decimal TotalQuantity) Rows,
         string Transactions);
 
-    /// <summary>
-    /// savings-interest-settlement: how many interest settlements <paramref name="userId"/> owns, or
-    /// - with <paramref name="assetId"/> - how many belong to that account. Bypasses the tenancy filter
-    /// only in the sense that it reads as the given user.
-    /// </summary>
     protected async Task<int> CountSavingsSettlementsAsync(
         Guid userId, CancellationToken cancellationToken, Guid? assetId = null)
     {
@@ -109,11 +81,6 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
             .CountAsync(s => assetId == null || s.AssetId == assetId, cancellationToken);
     }
 
-    /// <summary>
-    /// A snapshot of everything <paramref name="userId"/> owns — asset, transaction and term-deposit
-    /// row counts plus the summed asset quantity — so a rejected write can prove "nothing was written"
-    /// by comparing the snapshot before and after.
-    /// </summary>
     protected async Task<(int Assets, int Transactions, int Terms, decimal TotalQuantity)> SnapshotUserRowsAsync(
         Guid userId, CancellationToken cancellationToken)
     {

@@ -8,20 +8,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// asset-transfers-deposit-funding: <c>GET /api/portfolio/transfer-candidates?currency=&amp;assetClass=</c>
-/// lists the user's assets of that class and currency in non-archived portfolios — the pick list the
-/// deposit form offers as a source of funds — as <c>{assetId, name, portfolioId, portfolioName,
-/// balance}</c>. The endpoint under test is called directly and asserted on the raw wire shape;
-/// <see cref="PortfolioApi"/> helpers only arrange.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>
-    /// AC-9: of a PLN Cash in an active portfolio, a PLN Cash in an archived one, a EUR Cash, a PLN
-    /// Stock and a PLN term deposit, only the active PLN Cash is a candidate — with its balance.
-    /// </summary>
     [Fact]
     public async Task List_ReturnsSameCurrencyClassAssetsInActivePortfolios()
     {
@@ -46,7 +35,6 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(5_000m, candidate.GetProperty("balance").GetDecimal());
     }
 
-    /// <summary>asset-archive AC-6: of an archived and a live PLN Cash in a live portfolio, only the live one is a candidate.</summary>
     [Fact]
     public async Task List_ExcludesArchivedAssets()
     {
@@ -64,7 +52,6 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(liveId, candidate.GetProperty("assetId").GetGuid());
     }
 
-    /// <summary>The balance is the asset's current quantity — after a funding transfer took 1 000 out of 5 000, 4 000.</summary>
     [Fact]
     public async Task List_AfterFundingTransfer_ReturnsRemainingBalance()
     {
@@ -80,7 +67,6 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(4_000m, candidate.GetProperty("balance").GetDecimal());
     }
 
-    /// <summary>Candidates are ordered by portfolio name, then asset name — not by creation order.</summary>
     [Fact]
     public async Task List_OrdersByPortfolioNameThenAssetName()
     {
@@ -101,7 +87,6 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(["Alpha/B cash", "Alpha/Z cash", "Zulu/A cash"], listed);
     }
 
-    /// <summary>AC-9: an unsupported currency is a 400.</summary>
     [Fact]
     public async Task List_UnsupportedCurrency_ReturnsBadRequest()
     {
@@ -117,7 +102,6 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    /// <summary>A missing asset class — or a missing currency — is a 400.</summary>
     [Theory]
     [InlineData("PLN", null)]
     [InlineData(null, "Cash")]

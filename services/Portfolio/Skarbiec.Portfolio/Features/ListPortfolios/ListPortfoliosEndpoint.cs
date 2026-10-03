@@ -13,8 +13,7 @@ public static class ListPortfoliosEndpoint
         return app;
     }
 
-    // A default value (not just a non-nullable bool) is what makes Minimal API query binding treat
-    // this as optional — without one, an omitted "?includeArchived=" 400s instead of defaulting.
+    // The default value is what makes Minimal API binding treat this as optional instead of a 400.
     private static async Task<Ok<IReadOnlyList<PortfolioResponse>>> HandleAsync(
         ListPortfoliosHandler handler, CancellationToken cancellationToken, bool includeArchived = false)
         => TypedResults.Ok(await handler.HandleAsync(includeArchived, cancellationToken));

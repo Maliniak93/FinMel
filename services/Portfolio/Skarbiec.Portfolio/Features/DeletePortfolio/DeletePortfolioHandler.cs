@@ -18,9 +18,7 @@ public sealed class DeletePortfolioHandler(
             return PortfolioErrors.NotFound(id);
         }
 
-        // The delete cascades to the assets and their transactions explicitly — portfolio_db has no
-        // FKs, so the database cascades nothing (spec-08). Both loads go through the tenancy query
-        // filter, so they only ever see this user's rows.
+        // portfolio_db has no FKs, so the delete cascades to the assets and their transactions explicitly.
         var assets = await dbContext.Assets
             .Where(a => a.PortfolioId == id)
             .ToListAsync(cancellationToken);
@@ -32,12 +30,10 @@ public sealed class DeletePortfolioHandler(
 
         dbContext.Transactions.RemoveRange(transactions);
 
-        // Detach, never reverse (asset-transfers-deposit-funding): a transfer leg outside this portfolio
-        // stays as an ordinary transaction, its asset's quantity unchanged — so nothing is published for
-        // it. A transfer with both legs in here goes with the portfolio.
+        // Detach, never reverse: a leg outside this portfolio stays an ordinary transaction, so nothing is published for it.
         await dbContext.DetachCounterpartsAsync(transactions, cancellationToken);
 
-        // Interest settlements carry no FK (savings-interest-settlement), so they go here, with their assets.
+        // Interest settlements carry no FK, so they go here, with their assets.
         dbContext.SavingsInterestSettlements.RemoveRange(
             await dbContext.SavingsInterestSettlements.Where(s => assetIds.Contains(s.AssetId)).ToListAsync(cancellationToken));
 
@@ -46,9 +42,7 @@ public sealed class DeletePortfolioHandler(
 
         var occurredAtUtc = timeProvider.GetUtcNow();
 
-        // One AssetRemoved per asset: MarketData tracks instrument usage per asset and has no
-        // portfolio mapping. The flag tells Reporting to leave the portfolio's snapshot to the
-        // PortfolioDeleted sweep instead of revaluing it (spec-08 design decisions).
+        // One AssetRemoved per asset: MarketData has no portfolio mapping, and the flag leaves the snapshot to the PortfolioDeleted sweep.
         foreach (var asset in assets)
         {
             await publishEndpoint.Publish(new AssetRemoved
@@ -68,15 +62,14 @@ public sealed class DeletePortfolioHandler(
             OccurredAtUtc = occurredAtUtc
         }, cancellationToken);
 
-        // Every removal and every outbox row commit in this one save (ADR-012).
+        // Every removal and every outbox row commit in this one save.
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
-            // A transaction recorded concurrently moved an asset's xmin: nothing is deleted, so no
-            // orphan transaction is left behind, and the user retries (spec-08).
+            // A concurrent transaction moved an asset's xmin: nothing is deleted, and the user retries.
             return TransactionErrors.ConcurrentModification();
         }
 

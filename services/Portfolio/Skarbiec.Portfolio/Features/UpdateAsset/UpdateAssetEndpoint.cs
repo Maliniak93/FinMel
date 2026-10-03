@@ -30,11 +30,7 @@ public static class UpdateAssetEndpoint
             : result.Error.ToProblem();
     }
 
-    /// <summary>
-    /// The currency lock (ADR-026) answers like DataAnnotations validation does: a 400 whose
-    /// <c>errors</c> dictionary carries the message under <c>Currency</c>, so the asset dialog's
-    /// <c>applyFieldErrors</c> shows it on that control. Still stamped with <c>errorCode</c> (ADR-017).
-    /// </summary>
+    // A field-keyed 400, like DataAnnotations validation, so the asset dialog shows the lock on its Currency control.
     private static ProblemHttpResult ToCurrencyFieldProblem(Error error) =>
         TypedResults.Problem(new HttpValidationProblemDetails(
             new Dictionary<string, string[]> { [nameof(UpdateAssetRequest.Currency)] = [error.Message] })

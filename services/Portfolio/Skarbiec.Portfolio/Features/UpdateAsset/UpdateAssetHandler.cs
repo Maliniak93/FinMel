@@ -26,29 +26,26 @@ public sealed class UpdateAssetHandler(
             return readOnly;
         }
 
-        // A term deposit is edited only through UpdateDeposit, and no asset becomes or stops being one
-        // here — its terms and opening transaction would be left behind or missing (term-deposits).
+        // A term deposit is edited only through UpdateDeposit, so no asset becomes or stops being one here.
         if (asset.AssetClass == AssetClass.Deposit || request.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.UseDepositEndpoints;
         }
 
-        // The same for a savings account and its terms (savings-accounts).
+        // The same for a savings account and its terms.
         if (asset.AssetClass == AssetClass.Savings || request.AssetClass == AssetClass.Savings)
         {
             return SavingsAccountErrors.UseSavingsAccountEndpoints;
         }
 
-        // Each transaction's frozen PLN rate belongs to the asset's currency (ADR-026), so the
-        // currency locks once there is one.
+        // Each transaction's frozen PLN rate belongs to the asset's currency, so the currency locks once there is one.
         if (!string.Equals(request.Currency, asset.Currency, StringComparison.Ordinal)
             && await dbContext.Transactions.AnyAsync(t => t.AssetId == assetId, cancellationToken))
         {
             return AssetErrors.CurrencyLockedByTransactions;
         }
 
-        // A class change must not leave transactions of a type the new class does not accept
-        // (cash-transaction-types): only Deposit/Withdraw may stay on a Cash/Deposit asset.
+        // A class change must not leave transactions of a type the new class does not accept.
         var allowedTypes = AssetTransactionTypes.Allowed(request.AssetClass);
         var disallowed = await dbContext.Transactions
             .Where(t => t.AssetId == assetId && !allowedTypes.Contains(t.Type))
@@ -59,9 +56,7 @@ public sealed class UpdateAssetHandler(
             return TransactionErrors.TypeNotAllowedForClass(disallowedType, request.AssetClass);
         }
 
-        // Switching modes is allowed (T2.9, extended to three modes by M1.4) — transactions are
-        // untouched either way (this handler never writes to the Transaction table), only the
-        // valuation fields below move.
+        // Switching modes leaves the transactions untouched; only the valuation fields below move.
         if (request.InstrumentId is { } instrumentId)
         {
             var lookupStatus = await instrumentLookupClient.CheckAsync(instrumentId, cancellationToken);
@@ -95,9 +90,7 @@ public sealed class UpdateAssetHandler(
         }
         else
         {
-            // Currency-valued (M1.4): neither field — UpdateAssetRequest.Validate already confirmed
-            // this class supports it. Clear both other modes' fields so switching into this mode from
-            // Market/Manual doesn't leave stale data behind.
+            // Currency-valued: clear both other modes' fields so a switch leaves no stale data.
             asset.InstrumentId = null;
             asset.ManualValueAmount = null;
             asset.ManualValueDate = null;
@@ -107,13 +100,7 @@ public sealed class UpdateAssetHandler(
         asset.AssetClass = request.AssetClass;
         asset.Name = request.Name;
         asset.Currency = request.Currency;
-        // M1.5: no Asset.Quantity write here, deliberately — UpdateAssetRequest has no Quantity field
-        // (see its <remarks>). Quantity only ever moves through TransactionQuantityCalculator.Recompute
-        // (ADR-009), driven by RecordTransaction/UpdateTransaction/DeleteTransaction and AddAsset's own
-        // optional initial transaction — never a second, parallel path here.
 
-        // Carries the post-update state — mode, instrument, currency and manual value as they stand
-        // after the assignments above (spec-02 AC-2).
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -12,7 +12,7 @@ public sealed record AddDepositRequest : IValidatableObject
     [MaxLength(100)]
     public string? BankName { get; init; }
 
-    /// <summary>Immutable once the deposit exists — the opening transaction's frozen PLN rate belongs to it (ADR-026).</summary>
+    /// <summary>Immutable once the deposit exists.</summary>
     [Required, SupportedCurrency]
     public required string Currency { get; init; }
 
@@ -21,7 +21,7 @@ public sealed record AddDepositRequest : IValidatableObject
 
     public required DateOnly StartDate { get; init; }
 
-    /// <summary>At most 3650 days or 120 months — the months cap is checked in <see cref="Validate"/>.</summary>
+    /// <summary>At most 3650 days or 120 months.</summary>
     [Range(1, DepositTermsValidation.MaxTermDays)]
     public required int TermLength { get; init; }
 
@@ -32,18 +32,13 @@ public sealed record AddDepositRequest : IValidatableObject
 
     public required DepositCapitalization Capitalization { get; init; }
 
-    /// <summary>IKE/IKZE — no Belka tax.</summary>
+    /// <summary>IKE/IKZE: no Belka tax.</summary>
     public bool TaxExempt { get; init; }
 
     [Range(typeof(decimal), "0", "100")]
     public decimal EarlyBreakInterestLossPercent { get; init; } = 100m;
 
-    /// <summary>
-    /// The Cash asset the principal moves out of (asset-transfers-deposit-funding) — a Cash → Deposit
-    /// transfer on <see cref="StartDate"/>, one of the user's same-currency Cash assets in an active
-    /// portfolio (<c>transfer-candidates</c>). Omitted: new money from outside the app. Fixed at
-    /// creation, like the currency — <c>UpdateDepositRequest</c> has no such field.
-    /// </summary>
+    /// <summary>The Cash asset the principal moves out of; omitted for new money from outside the app.</summary>
     public Guid? FundingAssetId { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>

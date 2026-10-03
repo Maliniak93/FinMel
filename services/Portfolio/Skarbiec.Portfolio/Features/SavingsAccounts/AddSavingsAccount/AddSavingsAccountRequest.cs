@@ -11,21 +11,21 @@ public sealed record AddSavingsAccountRequest
     [MaxLength(100)]
     public string? BankName { get; init; }
 
-    /// <summary>Immutable once the account exists — each transaction's frozen PLN rate belongs to it (ADR-026).</summary>
+    /// <summary>Immutable once the account exists.</summary>
     [Required, SupportedCurrency]
     public required string Currency { get; init; }
 
     [Range(typeof(decimal), "0", "100")]
     public required decimal AnnualInterestRatePercent { get; init; }
 
-    /// <summary>IKE/IKZE — no Belka tax.</summary>
+    /// <summary>IKE/IKZE: no Belka tax.</summary>
     public bool TaxExempt { get; init; }
 
-    /// <summary>New money paid in when the account opens, as an ordinary Deposit transaction. Omitted: the account starts at 0.</summary>
+    /// <summary>Omitted: the account starts at 0.</summary>
     public OpeningDepositRequest? OpeningDeposit { get; init; }
 }
 
-/// <summary>The opening deposit. Its date must not be after today (Europe/Warsaw) — checked in the handler, which owns the clock.</summary>
+/// <summary>Its date must not be after today (Europe/Warsaw), which the handler checks.</summary>
 public sealed record OpeningDepositRequest
 {
     [Range(typeof(decimal), "0", "79228162514264337593543950335", MinimumIsExclusive = true)]

@@ -19,8 +19,7 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext, TimeProvider
             return PortfolioErrors.NotFound(portfolioId);
         }
 
-        // transactionCount as a correlated subquery inside this one query (spec-02) — no N+1, no
-        // second round trip, and no counter column to drift out of sync with the Transactions table.
+        // transactionCount as a correlated subquery: no N+1 and no counter column to drift.
         var rows = await dbContext.Assets
             .AsNoTracking()
             .Where(a => a.PortfolioId == portfolioId)
@@ -40,8 +39,7 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext, TimeProvider
             })
             .ToListAsync(cancellationToken);
 
-        // The savings accounts' interest status is computed from their daily balances, in memory —
-        // three more queries for the whole page, only when it holds a savings account.
+        // Savings interest status is computed in memory, costing three more queries only when the page holds a savings account.
         var interest = await dbContext.LoadSavingsInterestStatusAsync(
             [.. rows.Where(r => r.Asset.AssetClass == AssetClass.Savings).Select(r => r.Asset.Id)],
             WarsawCalendar.Today(timeProvider),

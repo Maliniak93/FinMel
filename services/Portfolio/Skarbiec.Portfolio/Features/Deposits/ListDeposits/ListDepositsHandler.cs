@@ -5,7 +5,6 @@ namespace Skarbiec.Portfolio.Features.Deposits.ListDeposits;
 
 public sealed class ListDepositsHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
-    /// <summary>Every deposit of the current user across all their portfolios, archived ones included (flagged), soonest maturity first.</summary>
     public async Task<IReadOnlyList<DepositResponse>> HandleAsync(CancellationToken cancellationToken)
     {
         var rows = await (

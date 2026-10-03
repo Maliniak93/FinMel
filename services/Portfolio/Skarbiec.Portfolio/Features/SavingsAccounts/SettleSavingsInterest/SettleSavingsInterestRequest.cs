@@ -2,11 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
 
-/// <summary>
-/// What the bank actually paid for one month (savings-interest-settlement). <see cref="PeriodEnd"/>
-/// must be the next due period's end — the handler checks it, which makes a stale dialog or a double
-/// submit a 409 instead of a second settlement.
-/// </summary>
+/// <summary>PeriodEnd must be the next due period's end, which the handler checks.</summary>
 public sealed record SettleSavingsInterestRequest : IValidatableObject
 {
     public required DateOnly PeriodEnd { get; init; }
@@ -19,8 +15,7 @@ public sealed record SettleSavingsInterestRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        // Both are stored as numeric(18,2): a finer value would be rounded silently by the database
-        // while the net-interest transaction kept it, so it is rejected instead.
+        // Stored as numeric(18,2): a finer value is rejected rather than rounded away from the net-interest transaction.
         if (decimal.Round(GrossInterest, 2) != GrossInterest)
         {
             yield return new ValidationResult(

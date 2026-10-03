@@ -35,15 +35,7 @@ using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
-/// <summary>
-/// Proves every position-mutating slice writes its <c>Skarbiec.Contracts.Events</c> row atomically
-/// with the business row it accompanies (spec-02, ADR-012/ADR-021). Deliberately builds its own
-/// <see cref="ServiceProvider"/> instead of using <see cref="PortfolioApiFactory"/>: no
-/// <see cref="IHostedService"/> (MassTransit's bus, the outbox delivery poller) is ever started, so
-/// the row can never be delivered/removed before the assertion runs. Each feature area derives its
-/// own outbox test class from this base, which owns the provider lifetime (one per test class
-/// instance, so one per fact) and the arrange helpers shared by more than one area.
-/// </summary>
+// Builds its own provider so no hosted service starts and the outbox row is never delivered before the assertion reads it.
 [Collection(TestingDefaults.CollectionName)]
 public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -115,7 +107,6 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         return result.Value.Id;
     }
 
-    /// <summary>A PLN Cash asset in <paramref name="portfolioId"/> topped up with <paramref name="balance"/> on 2026-01-01.</summary>
     protected static async Task<Guid> AddCashWithBalanceAsync(
         IServiceProvider services, Guid portfolioId, decimal balance, CancellationToken cancellationToken)
     {

@@ -4,10 +4,6 @@ using Skarbiec.Portfolio.Features;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Pure unit tests on the shared recompute function (T1.3 AC) — no Testcontainers, mirrors
-/// <see cref="ArchitectureTests"/>'s container-free style.
-/// </summary>
 public sealed class TransactionQuantityCalculatorTests
 {
     [Theory]
@@ -102,8 +98,7 @@ public sealed class TransactionQuantityCalculatorTests
     [Fact]
     public void Recompute_ABackdatedSellThatDipsBelowZeroMidHistory_Fails()
     {
-        // Final total (10 - 3 + 8 - 12 = 3) is non-negative, but the backdated Withdraw
-        // (inserted between the Buy and the later Deposit) would dip the running total negative.
+        // The total of 3 is non-negative, but the backdated Withdraw dips the running total below zero.
         Transaction[] transactions =
         [
             NewTransaction(TransactionType.Buy, 10, new DateOnly(2026, 1, 1)),
@@ -141,12 +136,6 @@ public sealed class TransactionQuantityCalculatorTests
         }
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-1: same-day replay puts inflows before outflows, so a
-    /// same-day top-up followed by a transfer out never fails on the Guid order — here the Withdraw
-    /// has the lower Id, which the old Id tie-break replayed first. A Withdraw dated the day before
-    /// the Deposit still fails: the date order wins over the inflow-first rule.
-    /// </summary>
     [Fact]
     public void Recompute_SameDayInflowReplaysBeforeOutflow()
     {
@@ -172,10 +161,6 @@ public sealed class TransactionQuantityCalculatorTests
         Assert.True(dayBeforeResult.IsFailure);
     }
 
-    /// <summary>
-    /// AC-1, the Buy/Sell side of the same rule (both are quantity deltas): a same-day Sell with the
-    /// lower Id still replays after the same-day Buy, whichever order the input lists them in.
-    /// </summary>
     [Fact]
     public void Recompute_SameDayBuyReplaysBeforeSellRegardlessOfIdAndListOrder()
     {

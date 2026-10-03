@@ -1,6 +1,5 @@
 namespace Skarbiec.Portfolio.Features.Transfers.ListTransferCandidates;
 
-/// <summary>One asset a transfer can move money from or to, with its current balance (its quantity).</summary>
 public sealed record TransferCandidateResponse
 {
     public required Guid AssetId { get; init; }

@@ -36,9 +36,7 @@ public sealed class AddDepositHandler(
             ValuationMode = AssetValuationMode.CurrencyValued,
         };
 
-        // The system-managed opening transaction: the only way the principal reaches Asset.Quantity
-        // (ADR-009), through the same calculator every transaction write uses. Funded from Cash, it is
-        // the In leg of a Cash → Deposit transfer (asset-transfers-deposit-funding).
+        // The system-managed opening transaction is the only way the principal reaches Asset.Quantity.
         FundingTransfer? funding = null;
         Transaction opening;
 
@@ -72,9 +70,7 @@ public sealed class AddDepositHandler(
             return recomputed.Error;
         }
 
-        // Last check before anything is staged, as in AddAsset: the start-date PLN rate is frozen on
-        // the opening transaction (ADR-026), and MarketData being down leaves nothing half-created. Both
-        // legs of a transfer are in the same currency, so the one rate is frozen on both.
+        // Last check before staging: MarketData being down leaves nothing half-created; both legs share the one rate.
         var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.StartDate, cancellationToken);
         if (fxRateToPln.IsFailure)
         {
@@ -103,8 +99,6 @@ public sealed class AddDepositHandler(
         dbContext.Transactions.Add(opening);
         dbContext.TermDeposits.Add(terms);
 
-        // Published before SaveChangesAsync so the outbox row commits with the three rows above
-        // (ADR-012); the principal is already folded into asset.Quantity.
         await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
 
         if (funding is not null)
@@ -132,13 +126,6 @@ public sealed class AddDepositHandler(
         return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), fundingSource, payout: null);
     }
 
-    /// <summary>
-    /// Loads the funding source through the tenancy filter and checks it against the transfer rules —
-    /// anything that is not one of the user's same-currency, non-archived assets on an allowed route, in
-    /// an active portfolio, is <see cref="TransferErrors.InvalidCounterpart"/> (a stranger's id gets the same
-    /// answer) — then builds both legs and replays the source's whole history with its Out leg, so its
-    /// balance must cover the transfer everywhere, not just at the end.
-    /// </summary>
     private async Task<Result<FundingTransfer>> PlanFundingAsync(
         Guid fundingAssetId, Asset deposit, AddDepositRequest request, CancellationToken cancellationToken)
     {
@@ -170,9 +157,5 @@ public sealed class AddDepositHandler(
         return new FundingTransfer(source, outLeg, inLeg, sourceQuantity.Value);
     }
 
-    /// <param name="Source">The tracked funding Cash asset.</param>
-    /// <param name="OutLeg">Its Withdraw leg.</param>
-    /// <param name="InLeg">The deposit's opening Deposit, the transfer's In leg.</param>
-    /// <param name="SourceQuantity">The source's quantity with <paramref name="OutLeg"/> replayed.</param>
     private sealed record FundingTransfer(Asset Source, Transaction OutLeg, Transaction InLeg, decimal SourceQuantity);
 }

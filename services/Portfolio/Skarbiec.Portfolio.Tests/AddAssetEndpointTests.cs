@@ -48,7 +48,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.NotNull(body);
         Assert.Equal(assetClass, body.AssetClass);
         Assert.Equal("USD", body.Currency);
-        // No Quantity request field (M1.5) and no InitialTransaction here — quantity stays 0.
+        // No InitialTransaction here, so the quantity stays 0.
         Assert.Equal(0m, body.Quantity);
         Assert.Equal(0, body.TransactionCount);
         Assert.Equal(1000.50m, body.ManualValue);
@@ -56,9 +56,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(AssetUri(portfolioId, body.Id), response.Headers.Location?.OriginalString);
     }
 
-    /// <summary>M1.5 AC: "Create without a transaction → asset exists, quantity 0, zero
-    /// transactions." Checks all three surfaces: the create response, TransactionCount, and
-    /// ListTransactions actually reporting an empty page — not just an untouched counter.</summary>
     [Fact]
     public async Task Add_WithoutInitialTransaction_CreatesAssetWithZeroQuantityAndNoTransactions()
     {
@@ -80,10 +77,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, transactions.TotalCount);
     }
 
-    /// <summary>M1.5 AC: "Create with one → quantity matches a from-scratch recompute, and the
-    /// transaction is listed by ListTransactions." transactions-pln-value-and-fee-removal AC8: the
-    /// listed transaction carries the asset's currency and its PLN value at the transaction-date
-    /// rate (5 × 150 USD × 4.00), and no fee.</summary>
     [Fact]
     public async Task Add_WithInitialTransaction_QuantityMatchesRecomputeAndTransactionIsListed()
     {
@@ -129,9 +122,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(("USD", new DateOnly(2026, 1, 1)), Assert.Single(Factory.FxRateLookupClient.Calls));
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal: the initial transaction resolves its PLN rate
-    /// like RecordTransaction does — MarketData being down is a 503 and no half-created asset is left
-    /// behind.</summary>
     [Fact]
     public async Task Add_WithInitialTransactionWhenFxUnavailable_ReturnsServiceUnavailableAndCreatesNoAsset()
     {
@@ -163,8 +153,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal: a PLN asset's initial transaction is valued
-    /// at rate 1 without asking MarketData.</summary>
     [Fact]
     public async Task Add_PlnAssetWithInitialTransaction_ValuePlnEqualsAmountWithoutFxLookup()
     {
@@ -195,11 +183,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Empty(Factory.FxRateLookupClient.Calls);
     }
 
-    /// <summary>M1.5 AC: "An invalid initial transaction → 400, and no asset is created (assert the
-    /// portfolio's asset count is unchanged)." A Sell as the very first transaction oversells an
-    /// empty position — the same <c>TransactionQuantityCalculator</c> check RecordTransaction relies
-    /// on. Proves the "no half-created asset" rule directly against the Assets table, not just the
-    /// denormalized counter.</summary>
     [Fact]
     public async Task Add_WithInvalidInitialTransaction_ReturnsBadRequestAndCreatesNoAsset()
     {
@@ -306,12 +289,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    /// <summary>
-    /// M1.5: <c>AddAssetRequest</c> no longer has a directly-settable <c>Quantity</c> — the
-    /// equivalent "negative quantity" input now lives on the optional <c>InitialTransaction</c>, and
-    /// its own <c>[Range]</c> attribute (inherited from <see cref="RecordTransactionRequest"/>) is
-    /// what rejects it, recursed into by .NET 10's Minimal API validation for nested properties.
-    /// </summary>
     [Fact]
     public async Task Add_WithNegativeInitialTransactionQuantity_ReturnsBadRequestWithFieldDetails()
     {
@@ -470,16 +447,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    /// <summary>M1.4: the third valuation mode — neither InstrumentId nor ManualValue — is only
-    /// accepted for classes <c>AssetValuationModes.SupportsCurrencyValued</c> (Cash, Deposit); for
-    /// every other class "neither" stays a 400 (see <see cref="Add_WithNeitherInstrumentIdNorManualValue_ReturnsBadRequest"/>,
-    /// unmodified by this change).
-    /// <para>
-    /// M1.5: <c>Quantity</c> is no longer a directly-settable field, and it is exactly Cash/Deposit
-    /// (currency-valued, value = <c>Quantity × FxRate</c>) where that carries the most weight — this
-    /// is the test proving the replacement path (an initial Deposit transaction) gives the asset the
-    /// same real, non-zero quantity the old direct-set field used to.
-    /// </para></summary>
     [Theory]
     [InlineData(AssetClass.Cash)]
     public async Task Add_CurrencyValuedClassWithInitialDeposit_ReturnsCreatedAsCurrencyValuedWithQuantityFromTransaction(AssetClass assetClass)
@@ -514,9 +481,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Null(body.ManualValueDate);
     }
 
-    /// <summary>cash-transaction-types AC-3: a cash-like class's opening transaction must be a
-    /// Deposit/Withdraw. Any other type is a 400 <c>Validation.TransactionTypeNotAllowed</c>, checked
-    /// before the FX lookup, and no asset (nor transaction) is created.</summary>
     [Theory]
     [InlineData(AssetClass.Cash, TransactionType.Buy)]
     [InlineData(AssetClass.Cash, TransactionType.Interest)]
@@ -582,7 +546,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var request = new AddAssetRequest
         {
-            AssetClass = AssetClass.Cash, // manual stays available even for a currency-valued class (M1.4 decision).
+            AssetClass = AssetClass.Cash,
             Name = "Manual cash",
             Currency = "PLN",
             ManualValue = 100m,
@@ -595,8 +559,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(AssetValuationMode.Manual, body!.ValuationMode);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC6: an archived portfolio is read-only — adding
-    /// an asset is a 409 <c>Conflict.PortfolioArchived</c> and no asset row is written.</summary>
     [Fact]
     public async Task AddAsset_ToArchivedPortfolio_Returns409()
     {
@@ -628,9 +590,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC9: tenancy wins over the archived check — a
-    /// stranger writing into someone else's archived portfolio gets 404, never a 409 that would
-    /// leak the portfolio's existence (and its archived state).</summary>
     [Fact]
     public async Task AddAsset_ToStrangersArchivedPortfolio_Returns404()
     {
@@ -656,11 +615,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().CountAsync(a => a.PortfolioId == portfolioId, cancellationToken));
     }
 
-    /// <summary>
-    /// term-deposits AC-9: a Deposit-class asset is created only through
-    /// <c>POST .../deposits</c> — every valuation shape of class Deposit sent here is a 400
-    /// <c>Validation.UseDepositEndpoints</c>, and nothing is written.
-    /// </summary>
     [Theory]
     [InlineData("currency-valued")]
     [InlineData("currency-valued-with-opening-deposit")]
@@ -697,11 +651,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
-    /// <summary>
-    /// savings-accounts AC-6: a Savings-class asset is created only through
-    /// <c>POST .../savings-accounts</c> — every valuation shape of class Savings sent here is a 400
-    /// <c>Validation.UseSavingsAccountEndpoints</c>, and nothing is written.
-    /// </summary>
     [Theory]
     [InlineData("currency-valued")]
     [InlineData("currency-valued-with-opening-deposit")]

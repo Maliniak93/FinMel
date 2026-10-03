@@ -6,12 +6,6 @@ namespace Skarbiec.Portfolio.Features.Transfers.ListTransferCandidates;
 
 public sealed class ListTransferCandidatesHandler(PortfolioDbContext dbContext)
 {
-    /// <summary>
-    /// The pick list of a transfer's counterpart (asset-transfers-deposit-funding): the current user's
-    /// assets of <paramref name="assetClass"/> in <paramref name="currency"/>, neither archived themselves
-    /// (asset-archive) nor in an archived portfolio — both are read-only — ordered by portfolio name,
-    /// then asset name.
-    /// </summary>
     public async Task<Result<IReadOnlyList<TransferCandidateResponse>>> HandleAsync(
         string currency, AssetClass assetClass, CancellationToken cancellationToken)
     {

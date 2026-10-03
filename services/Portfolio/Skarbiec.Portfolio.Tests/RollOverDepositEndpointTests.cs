@@ -12,21 +12,11 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// deposit-rollover: <c>POST .../deposits/{assetId}/rollover</c> with <c>{annualInterestRatePercent,
-/// grossInterest?, tax?}</c> starts the next term on the same asset — from Due it settles and rolls
-/// over in one save, from Settled (not paid out) it reuses the stored settlement. The new principal is
-/// the whole balance, the new start date the old maturity date, and only the rate changes. The
-/// endpoint under test is called directly and asserted on the raw response; <see cref="PortfolioApi"/>
-/// helpers only arrange. The outbox half is proven by <see cref="PortfolioOutboxTests"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>Warsaw 2026-04-14 12:00 — the day before <see cref="NewDepositRequest"/>'s 2026-04-15 maturity.</summary>
     private static readonly DateTimeOffset BeforeDefaultMaturityUtc = new(2026, 4, 14, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>AC-1: a Due deposit rolled over with the previewed settlement and a new rate of 5.5 %.</summary>
     [Fact]
     public async Task RollOver_DueDeposit_SettlesAndStartsNextTerm()
     {
@@ -79,10 +69,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Null(rolled.PaidOutOn);
     }
 
-    /// <summary>
-    /// AC-1 / ADR-026: from Due, the net-interest credit is dated on the old maturity date and freezes
-    /// that date's PLN rate — not the rate of today or of the start date.
-    /// </summary>
     [Fact]
     public async Task RollOver_ForeignCurrencyDueDeposit_FreezesFxRateOfMaturityDate()
     {
@@ -112,11 +98,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(4.25m, transactions[1].FxRateToPln);
     }
 
-    /// <summary>
-    /// AC-2: a deposit settled later (2026-04-17, net 121.50) and kept in the deposit rolls over with the
-    /// rate alone — the principal is principal + settled net, the start date is the old maturity date
-    /// (not the settlement date), and no transaction is written.
-    /// </summary>
     [Fact]
     public async Task RollOver_SettledDeposit_StartsNextTermWithoutNewTransaction()
     {
@@ -162,10 +143,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(10_121.50m, terms.Principal);
     }
 
-    /// <summary>
-    /// AC-3: a 1-month deposit that matured 2026-02-15 is rolled over on 2026-04-20 — its next term runs
-    /// 2026-02-15 → 2026-03-15, already past, so it lists as Due straight away.
-    /// </summary>
     [Fact]
     public async Task RollOver_LongOverdueDeposit_IsDueAgain()
     {
@@ -196,12 +173,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Null(listed.SettledOn);
     }
 
-    /// <summary>
-    /// AC-4 (409s): every state the rollover refuses — an Active, a paid-out, an archived-portfolio
-    /// deposit, one archived on its own (asset-archive: the one read-only guard covers the rollover too),
-    /// and a Settled one sent settlement amounts — answers with its conflict code and leaves
-    /// the deposit, its transactions and every other row exactly as they were.
-    /// </summary>
     [Theory]
     [InlineData("active", PortfolioAssertions.DepositNotDueErrorCode)]
     [InlineData("paid-out", PortfolioAssertions.DepositAlreadyPaidOutErrorCode)]
@@ -269,11 +240,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(0, before.Deposit.RolloverCount);
     }
 
-    /// <summary>
-    /// AC-4 (400s): a Due deposit rolled over without its settlement amounts, with a tax above the gross,
-    /// an amount with more than 2 dp or below 0, or a rate outside 0–100 or with more than 4 dp — 400,
-    /// and nothing changes.
-    /// </summary>
     [Theory]
     [InlineData("gross-missing")]
     [InlineData("tax-missing")]
@@ -326,7 +292,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(DepositStatus.Due, before.Deposit.Status);
     }
 
-    /// <summary>Unknown ids and non-deposit assets are 404 — the deposit endpoints address deposits only.</summary>
     [Fact]
     public async Task RollOver_UnknownOrNonDepositAsset_ReturnsNotFound()
     {
@@ -350,12 +315,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.True(real.IsSuccessStatusCode, $"Rolling over the real deposit answered {(int)real.StatusCode}.");
     }
 
-    /// <summary>
-    /// AC-5: the rolled-over term behaves like any other — once its new maturity passes it is Due, the
-    /// preview projects from the new principal and start date, SettleDeposit accepts a date on or after
-    /// the new start (and refuses one before it), a second rollover makes the count 2, and a payout of
-    /// a later settlement moves the whole balance and leaves it PaidOut.
-    /// </summary>
     [Fact]
     public async Task RollOver_NextTerm_CanBeSettledRolledAgainAndPaidOut()
     {

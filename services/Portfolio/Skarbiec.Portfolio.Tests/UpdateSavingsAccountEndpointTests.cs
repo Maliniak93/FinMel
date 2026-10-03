@@ -11,14 +11,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-accounts: <c>PUT .../savings-accounts/{assetId}</c> edits the name, bank, rate and tax
-/// status. Currency and balance are not in the request, and nothing is published.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-4.</summary>
     [Fact]
     public async Task Update_ChangesTermsAndKeepsBalance()
     {
@@ -56,7 +51,6 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         Assert.True(terms.TaxExempt);
     }
 
-    /// <summary>AC-4: a term deposit's id or an unknown id is a 404 — the endpoints address savings accounts only.</summary>
     [Fact]
     public async Task Update_NotASavingsAccount_ReturnsNotFound()
     {
@@ -76,7 +70,6 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         Assert.Equal("Term deposit", (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Name);
     }
 
-    /// <summary>AC-4: an archived portfolio is read-only — 409 and the terms are kept.</summary>
     [Fact]
     public async Task Update_ArchivedPortfolio_ReturnsConflict()
     {
@@ -95,7 +88,6 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         Assert.Equal(5.25m, unchanged.AnnualInterestRatePercent);
     }
 
-    /// <summary>AC-12: updating an archived account is a 409 <c>Conflict.AssetArchived</c> and it keeps its terms.</summary>
     [Fact]
     public async Task Update_ArchivedAccount_Returns409()
     {

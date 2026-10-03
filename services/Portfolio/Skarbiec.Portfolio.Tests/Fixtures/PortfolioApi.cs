@@ -19,16 +19,7 @@ using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
-/// <summary>
-/// Portfolio's HTTP surface as arrange-step helpers: route builders, plus the "get me a portfolio /
-/// an asset / a transaction to act on" calls that nearly every slice test needs before it can
-/// exercise the endpoint it actually cares about.
-/// </summary>
-/// <remarks>
-/// Arrange only. A test asserting on one of these endpoints must call it directly and assert on the
-/// raw <see cref="HttpResponseMessage"/> — the helpers here <c>EnsureSuccessStatusCode</c>, which
-/// would turn the very failure such a test is looking for into an exception.
-/// </remarks>
+// Arrange only: helpers EnsureSuccessStatusCode, so a test of endpoint X calls X directly and asserts on the raw response.
 internal static class PortfolioApi
 {
     public const string PortfoliosUri = "/api/portfolio/portfolios";
@@ -42,18 +33,12 @@ internal static class PortfolioApi
     public static string AssetUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/assets/{assetId}";
 
-    /// <summary>asset-archive: <c>POST .../assets/{id}/archive</c>.</summary>
     public static string ArchiveAssetUri(Guid portfolioId, Guid assetId) =>
         $"{AssetUri(portfolioId, assetId)}/archive";
 
-    /// <summary>asset-archive: <c>POST .../assets/{id}/restore</c>.</summary>
     public static string RestoreAssetUri(Guid portfolioId, Guid assetId) =>
         $"{AssetUri(portfolioId, assetId)}/restore";
 
-    /// <summary>
-    /// asset-archive: archives one asset (arrange only). From then on every write to it is a 409
-    /// <c>Conflict.AssetArchived</c> except removal — arrange any content the fact needs first.
-    /// </summary>
     public static async Task ArchiveAssetAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -61,7 +46,6 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>asset-archive: restores one archived asset (arrange only).</summary>
     public static async Task RestoreAssetAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -69,10 +53,6 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// asset-archive: a PLN Cash asset holding <paramref name="balance"/> (one top-up transaction) that
-    /// is then archived on its own, in a live portfolio of its own. Returns both ids.
-    /// </summary>
     public static async Task<(Guid PortfolioId, Guid CashId)> AddArchivedCashAssetInLivePortfolioAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
@@ -93,7 +73,6 @@ internal static class PortfolioApi
     public static string TransactionUri(Guid portfolioId, Guid assetId, Guid transactionId) =>
         $"{PortfoliosUri}/{portfolioId}/assets/{assetId}/transactions/{transactionId}";
 
-    /// <summary>term-deposits: every deposit of the calling user, across all their portfolios.</summary>
     public const string AllDepositsUri = "/api/portfolio/deposits";
 
     public static string DepositsUri(Guid portfolioId) =>
@@ -102,26 +81,14 @@ internal static class PortfolioApi
     public static string DepositUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/deposits/{assetId}";
 
-    /// <summary>term-deposits-settlement: the settlement projection of a Due deposit.</summary>
     public static string DepositSettlementPreviewUri(Guid portfolioId, Guid assetId) =>
         $"{DepositUri(portfolioId, assetId)}/settlement-preview";
 
-    /// <summary>term-deposits-settlement: settles a Due deposit at maturity.</summary>
     public static string SettleDepositUri(Guid portfolioId, Guid assetId) =>
         $"{DepositUri(portfolioId, assetId)}/settle";
 
-    /// <summary>
-    /// term-deposits-settlement: "now" for a settlement fact — Warsaw 2026-04-20 12:00, five days after
-    /// the <see cref="NewDepositRequest"/> deposit's 2026-04-15 maturity, so that deposit is Due.
-    /// Pin it with <c>Factory.Clock.SetUtcNow(...)</c>.
-    /// </summary>
     public static readonly DateTimeOffset AfterDefaultMaturityUtc = new(2026, 4, 20, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>
-    /// term-deposits-settlement: a valid <see cref="SettleDepositRequest"/> — by default exactly the
-    /// part-1 projection of <see cref="NewDepositRequest"/>'s deposit (gross 147.95, tax 28.12 → net
-    /// 119.83, final 10 119.83) settled on its 2026-04-15 maturity. Override only what the fact is about.
-    /// </summary>
     public static SettleDepositRequest NewSettleRequest(
         DateOnly? settledOn = null,
         decimal grossInterest = 147.95m,
@@ -134,22 +101,15 @@ internal static class PortfolioApi
             DestinationAssetId = destinationAssetId
         };
 
-    /// <summary>deposit-payout-to-cash: pays a settled deposit's whole balance out to a Cash asset.</summary>
     public static string PayOutDepositUri(Guid portfolioId, Guid assetId) =>
         $"{DepositUri(portfolioId, assetId)}/payout";
 
-    /// <summary>
-    /// deposit-payout-to-cash: a <see cref="PayOutDepositRequest"/> into <paramref name="destinationAssetId"/>,
-    /// by default on 2026-04-18 — after <see cref="NewSettleRequest"/>'s 2026-04-15 settlement and
-    /// before <see cref="AfterDefaultMaturityUtc"/>'s 2026-04-20 "today".
-    /// </summary>
     public static PayOutDepositRequest NewPayOutRequest(Guid destinationAssetId, DateOnly? date = null) => new()
     {
         DestinationAssetId = destinationAssetId,
         Date = date ?? new DateOnly(2026, 4, 18)
     };
 
-    /// <summary>deposit-payout-to-cash: pays <paramref name="assetId"/> out (arrange only). Defaults to <see cref="NewPayOutRequest"/>.</summary>
     public static async Task PayOutDepositAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken, DateOnly? date = null)
     {
@@ -158,7 +118,6 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>term-deposits-settlement: the settlement preview of a Due deposit (arrange only).</summary>
     public static async Task<DepositSettlementPreviewResponse> GetSettlementPreviewAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -168,15 +127,9 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<DepositSettlementPreviewResponse>(cancellationToken))!;
     }
 
-    /// <summary>deposit-rollover: rolls a Due or Settled deposit over into its next term on the same asset.</summary>
     public static string RollOverDepositUri(Guid portfolioId, Guid assetId) =>
         $"{DepositUri(portfolioId, assetId)}/rollover";
 
-    /// <summary>
-    /// deposit-rollover: a <see cref="RollOverDepositRequest"/> for a <b>Due</b> deposit — by default
-    /// <see cref="NewDepositRequest"/>'s previewed settlement (gross 147.95, tax 28.12 → net 119.83)
-    /// and a new rate of 5.5 %. Pass <see langword="null"/> for an amount to leave it out.
-    /// </summary>
     public static RollOverDepositRequest NewRollOverRequest(
         decimal annualInterestRatePercent = 5.5m,
         decimal? grossInterest = 147.95m,
@@ -187,17 +140,9 @@ internal static class PortfolioApi
             Tax = tax
         };
 
-    /// <summary>
-    /// deposit-rollover: the body the Roll over dialog sends for a <b>Settled</b> deposit — the rate
-    /// alone, with <c>grossInterest</c> and <c>tax</c> absent from the JSON (not <c>null</c>).
-    /// </summary>
     public static object SettledRollOverBody(decimal annualInterestRatePercent = 5.5m) =>
         new { annualInterestRatePercent };
 
-    /// <summary>
-    /// deposit-rollover: rolls <paramref name="assetId"/> over (arrange only — the fact must have pinned
-    /// a clock past its maturity). Defaults to <see cref="NewRollOverRequest"/>, i.e. a Due deposit.
-    /// </summary>
     public static async Task<DepositResponse> RollOverDepositAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, object? body = null)
     {
@@ -207,15 +152,8 @@ internal static class PortfolioApi
         return await client.GetDepositAsync(portfolioId, assetId, cancellationToken);
     }
 
-    /// <summary>deposit-payout-to-cash: what <see cref="CreatePaidOutDepositAsync"/> arranged.</summary>
     public sealed record PaidOutDeposit(Guid DepositPortfolioId, DepositResponse Deposit, Guid CashPortfolioId, Guid CashAssetId);
 
-    /// <summary>
-    /// deposit-payout-to-cash: the spec's AC-1 end state — the default deposit in a "Savings" portfolio,
-    /// settled on 2026-04-15 with the previewed values (final 10 119.83) and paid out at settlement into
-    /// a PLN "Cash account" in a "Wallet" portfolio that held 0, so the deposit holds 0 and the Cash
-    /// 10 119.83. The fact must have pinned a clock past the maturity (<see cref="AfterDefaultMaturityUtc"/>).
-    /// </summary>
     public static async Task<PaidOutDeposit> CreatePaidOutDepositAsync(this HttpClient client, CancellationToken cancellationToken)
     {
         var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
@@ -227,16 +165,9 @@ internal static class PortfolioApi
         return new PaidOutDeposit(depositPortfolioId, deposit, cashPortfolioId, cashId);
     }
 
-    /// <summary>deposit-payout-to-savings: what <see cref="CreateDepositPaidIntoSavingsAsync"/> arranged.</summary>
     public sealed record DepositPaidIntoSavings(
         Guid DepositPortfolioId, DepositResponse Deposit, Guid SavingsPortfolioId, SavingsAccountResponse Account);
 
-    /// <summary>
-    /// deposit-payout-to-savings: the default deposit in a "Savings" portfolio, settled on 2026-04-15 with
-    /// the previewed values (final 10 119.83) and paid out at settlement into an empty PLN savings account
-    /// in a separate "Wallet" portfolio. The fact must have pinned a clock past the maturity
-    /// (<see cref="AfterDefaultMaturityUtc"/>).
-    /// </summary>
     public static async Task<DepositPaidIntoSavings> CreateDepositPaidIntoSavingsAsync(
         this HttpClient client, CancellationToken cancellationToken)
     {
@@ -249,10 +180,6 @@ internal static class PortfolioApi
         return new DepositPaidIntoSavings(depositPortfolioId, deposit, savingsPortfolioId, account);
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings: an empty PLN savings account in a portfolio of its own, which is then
-    /// archived — a destination a payout must refuse. Returns both ids.
-    /// </summary>
     public static async Task<(Guid PortfolioId, Guid SavingsId)> AddArchivedSavingsAccountAsync(
         this HttpClient client, CancellationToken cancellationToken, string portfolioName = "Old savings")
     {
@@ -263,10 +190,6 @@ internal static class PortfolioApi
         return (portfolioId, account.AssetId);
     }
 
-    /// <summary>
-    /// term-deposits-settlement: settles <paramref name="assetId"/> (arrange only — the fact must have
-    /// pinned a clock past its maturity). Defaults to <see cref="NewSettleRequest"/>.
-    /// </summary>
     public static async Task SettleDepositAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, SettleDepositRequest? request = null)
     {
@@ -274,7 +197,6 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>term-deposits: a deposit as <c>GET .../deposits/{assetId}</c> returns it.</summary>
     public static async Task<DepositResponse> GetDepositAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -284,12 +206,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
     }
 
-    /// <summary>
-    /// term-deposits: a valid <see cref="AddDepositRequest"/> — by default the spec's AC-1 terms
-    /// (10 000.00 PLN at 6 % from 2026-01-15 for 3 months, capitalised at maturity, taxed), which
-    /// mature on 2026-04-15 with a net interest of 119.83. Override only what the fact is about;
-    /// derive an invalid request with a <c>with</c> expression.
-    /// </summary>
     public static AddDepositRequest NewDepositRequest(
         string name = "Term deposit",
         string? bankName = "Test bank",
@@ -318,7 +234,6 @@ internal static class PortfolioApi
             FundingAssetId = fundingAssetId
         };
 
-    /// <summary>The <see cref="UpdateDepositRequest"/> carrying the same terms as <paramref name="request"/> (currency is immutable, so it is dropped).</summary>
     public static UpdateDepositRequest ToUpdateRequest(this AddDepositRequest request) => new()
     {
         Name = request.Name,
@@ -333,11 +248,6 @@ internal static class PortfolioApi
         EarlyBreakInterestLossPercent = request.EarlyBreakInterestLossPercent
     };
 
-    /// <summary>
-    /// term-deposits: adds a term deposit to <paramref name="portfolioId"/> through the deposit
-    /// endpoint (the only way a Deposit-class asset comes to exist) and returns it. Defaults to
-    /// <see cref="NewDepositRequest"/>.
-    /// </summary>
     public static async Task<DepositResponse> AddDepositAsync(
         this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddDepositRequest? request = null)
     {
@@ -347,7 +257,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
     }
 
-    /// <summary>The common deposit arrange step: a portfolio holding one term deposit, both owned by <paramref name="client"/>'s user.</summary>
     public static async Task<(Guid PortfolioId, DepositResponse Deposit)> CreatePortfolioWithDepositAsync(
         this HttpClient client, CancellationToken cancellationToken, AddDepositRequest? request = null, string portfolioName = "Savings")
     {
@@ -357,7 +266,6 @@ internal static class PortfolioApi
         return (portfolioId, deposit);
     }
 
-    /// <summary>savings-accounts: every savings account of the calling user, across all their portfolios.</summary>
     public const string AllSavingsAccountsUri = "/api/portfolio/savings-accounts";
 
     public static string SavingsAccountsUri(Guid portfolioId) =>
@@ -366,17 +274,10 @@ internal static class PortfolioApi
     public static string SavingsAccountUri(Guid portfolioId, Guid assetId) =>
         $"{PortfoliosUri}/{portfolioId}/savings-accounts/{assetId}";
 
-    /// <summary>The fixed "today" (Europe/Warsaw) savings-account facts pin the clock to.</summary>
     public static readonly DateTimeOffset SavingsTodayUtc = new(2026, 2, 1, 10, 0, 0, TimeSpan.Zero);
 
     public static readonly DateOnly SavingsToday = new(2026, 2, 1);
 
-    /// <summary>
-    /// savings-accounts: a valid <see cref="AddSavingsAccountRequest"/> — by default a PLN account at
-    /// 5.25 %, taxed, with an opening deposit of 10 000 dated <see cref="SavingsToday"/> (pin the clock
-    /// to <see cref="SavingsTodayUtc"/>). Pass <paramref name="withOpeningDeposit"/> false for none;
-    /// derive an invalid request with a <c>with</c> expression.
-    /// </summary>
     public static AddSavingsAccountRequest NewSavingsAccountRequest(
         string name = "Savings account",
         string? bankName = "Test bank",
@@ -409,7 +310,6 @@ internal static class PortfolioApi
             TaxExempt = taxExempt
         };
 
-    /// <summary>savings-accounts: adds a savings account through its endpoint (the only way a Savings-class asset comes to exist) and returns it. Defaults to <see cref="NewSavingsAccountRequest"/>.</summary>
     public static async Task<SavingsAccountResponse> AddSavingsAccountAsync(
         this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null)
     {
@@ -419,7 +319,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
     }
 
-    /// <summary>The common savings arrange step: a portfolio holding one savings account, both owned by <paramref name="client"/>'s user.</summary>
     public static async Task<(Guid PortfolioId, SavingsAccountResponse Account)> CreatePortfolioWithSavingsAccountAsync(
         this HttpClient client, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null, string portfolioName = "Savings")
     {
@@ -438,10 +337,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: <c>GET /api/portfolio/transfer-candidates</c>. A <see langword="null"/>
-    /// argument leaves that query parameter out, so a fact can ask without it.
-    /// </summary>
     public static string TransferCandidatesUri(string? currency = "PLN", string? assetClass = "Cash")
     {
         var query = new List<string>();
@@ -459,14 +354,8 @@ internal static class PortfolioApi
         return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
     }
 
-    /// <summary>asset-transfers-deposit-funding: the default date a Cash asset is topped up on — before <see cref="NewDepositRequest"/>'s 2026-01-15 start.</summary>
     public static readonly DateOnly DefaultTopUpDate = new(2026, 1, 1);
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: a <see cref="AssetClass.Cash"/> asset holding
-    /// <paramref name="balance"/>, from one ordinary Deposit transaction dated <paramref name="toppedUpOn"/>
-    /// (default <see cref="DefaultTopUpDate"/>). Returns the asset id.
-    /// </summary>
     public static async Task<Guid> AddCashAssetWithBalanceAsync(
         this HttpClient client,
         Guid portfolioId,
@@ -483,11 +372,6 @@ internal static class PortfolioApi
         return cashId;
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: a PLN Cash asset holding <paramref name="balance"/> in a
-    /// portfolio of its own (<paramref name="portfolioName"/>), which is then archived — a counterpart a
-    /// transfer must refuse. Returns both ids.
-    /// </summary>
     public static async Task<(Guid PortfolioId, Guid CashId)> AddArchivedCashAssetAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
@@ -502,15 +386,8 @@ internal static class PortfolioApi
         return (portfolioId, cashId);
     }
 
-    /// <summary>asset-transfers-deposit-funding: what <see cref="CreateFundedDepositAsync"/> arranged.</summary>
     public sealed record FundedDeposit(Guid CashPortfolioId, Guid CashAssetId, Guid DepositPortfolioId, DepositResponse Deposit);
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: the spec's funded deposit — a PLN "Cash account" holding
-    /// <paramref name="cashBalance"/> (topped up on <see cref="DefaultTopUpDate"/>) in a "Wallet"
-    /// portfolio, and a <paramref name="principal"/> deposit in a separate "Savings" portfolio funded from
-    /// it (a Cash → Deposit transfer on the deposit's 2026-01-15 start date).
-    /// </summary>
     public static async Task<FundedDeposit> CreateFundedDepositAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
@@ -526,14 +403,12 @@ internal static class PortfolioApi
         return new FundedDeposit(cashPortfolioId, cashId, depositPortfolioId, deposit);
     }
 
-    /// <summary>asset-transfers-deposit-funding: the single Withdraw on <paramref name="cashId"/> — the Cash leg of a funding transfer.</summary>
     public static async Task<TransactionResponse> GetCashWithdrawAsync(
         this HttpClient client, Guid portfolioId, Guid cashId, CancellationToken cancellationToken) =>
         Assert.Single(
             (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items,
             t => t.Type == TransactionType.Withdraw);
 
-    /// <summary>Creates a portfolio and returns its id. Pass distinct <paramref name="name"/>s — the name is unique per user.</summary>
     public static async Task<Guid> CreatePortfolioAsync(
         this HttpClient client, CancellationToken cancellationToken, string name = "Retirement")
     {
@@ -544,10 +419,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken))!.Id;
     }
 
-    /// <summary>
-    /// Archives <paramref name="portfolioId"/>. From then on every asset/transaction write in it is
-    /// a 409 (archived-portfolio-out-of-net-worth) — arrange any content the fact needs first.
-    /// </summary>
     public static async Task ArchivePortfolioAsync(
         this HttpClient client, Guid portfolioId, CancellationToken cancellationToken)
     {
@@ -555,11 +426,6 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Adds an asset to <paramref name="portfolioId"/> and returns its id. No InitialTransaction is
-    /// sent (M1.5), so the asset starts at quantity 0 with zero transactions — quantity is driven
-    /// purely by transactions (ADR-009), never a directly-settable request field.
-    /// </summary>
     public static async Task<Guid> AddAssetAsync(
         this HttpClient client,
         Guid portfolioId,
@@ -584,12 +450,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
     }
 
-    /// <summary>
-    /// cash-transaction-types: adds a currency-valued <see cref="AssetClass.Cash"/> asset (neither
-    /// InstrumentId nor ManualValue) with no transactions, and returns its id. Such an asset accepts
-    /// only Deposit/Withdraw transactions. A Deposit-class asset goes through
-    /// <see cref="AddDepositAsync"/> instead (term-deposits).
-    /// </summary>
     public static async Task<Guid> AddCashAssetAsync(
         this HttpClient client,
         Guid portfolioId,
@@ -606,11 +466,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
     }
 
-    /// <summary>
-    /// The common arrange step: a portfolio holding one asset, both owned by <paramref name="client"/>'s
-    /// user. <paramref name="currency"/> is the asset's — a non-PLN one makes every transaction write
-    /// resolve its PLN rate through <see cref="FakeFxRateLookupClient"/>.
-    /// </summary>
     public static async Task<(Guid PortfolioId, Guid AssetId)> CreatePortfolioWithAssetAsync(
         this HttpClient client, CancellationToken cancellationToken, string currency = "PLN")
     {
@@ -620,11 +475,6 @@ internal static class PortfolioApi
         return (portfolioId, assetId);
     }
 
-    /// <summary>
-    /// spec-08: a portfolio holding <paramref name="assetCount"/> assets, each with
-    /// <paramref name="transactionsPerAsset"/> Buy transactions — the children a cascading delete
-    /// must take with it (or, for a stranger, must leave untouched).
-    /// </summary>
     public static async Task<(Guid PortfolioId, IReadOnlyList<Guid> AssetIds)> CreatePortfolioWithAssetsAndTransactionsAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
@@ -650,7 +500,6 @@ internal static class PortfolioApi
         return (portfolioId, assetIds);
     }
 
-    /// <summary>Records a transaction and returns its id.</summary>
     public static async Task<Guid> RecordTransactionAsync(
         this HttpClient client,
         Guid portfolioId,
@@ -687,8 +536,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken))!;
     }
 
-    // ---- savings-interest-settlement ------------------------------------------------------------
-
     public static string SavingsInterestPreviewUri(Guid portfolioId, Guid assetId) =>
         $"{SavingsAccountUri(portfolioId, assetId)}/interest-preview";
 
@@ -698,30 +545,20 @@ internal static class PortfolioApi
     public static string SavingsInterestSettlementUri(Guid portfolioId, Guid assetId, Guid settlementId) =>
         $"{SavingsInterestSettlementsUri(portfolioId, assetId)}/{settlementId}";
 
-    /// <summary>The date the interest accounts' opening deposit is dated: the first day of September 2026.</summary>
     public static readonly DateOnly InterestOpeningDate = new(2026, 9, 1);
 
     public static readonly DateOnly SeptemberEnd = new(2026, 9, 30);
 
     public static readonly DateOnly OctoberEnd = new(2026, 10, 31);
 
-    /// <summary>30 September 2026 (Europe/Warsaw): September has not ended yet, so nothing is due.</summary>
     public static readonly DateTimeOffset SeptemberLastDayUtc = new(2026, 9, 30, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>1 October 2026: September has just ended and is the only due period.</summary>
     public static readonly DateTimeOffset SeptemberEndedUtc = new(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>1 November 2026: September and October have ended.</summary>
     public static readonly DateTimeOffset OctoberEndedUtc = new(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>1 December 2026: September, October and November have ended.</summary>
     public static readonly DateTimeOffset NovemberEndedUtc = new(2026, 12, 1, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>
-    /// savings-interest-settlement: a savings account at 5 % (taxed unless <paramref name="taxExempt"/>)
-    /// whose only transaction is an opening deposit of 10 000 on <see cref="InterestOpeningDate"/>. Pin
-    /// the clock to one of the dates above before adding it.
-    /// </summary>
     public static AddSavingsAccountRequest NewInterestAccountRequest(
         string name = "Interest account", bool taxExempt = false, decimal annualInterestRatePercent = 5m, DateOnly? openingDate = null) =>
         NewSavingsAccountRequest(
@@ -730,11 +567,9 @@ internal static class PortfolioApi
             taxExempt: taxExempt,
             openingDate: openingDate ?? InterestOpeningDate);
 
-    /// <summary>The JSON body of <c>POST .../interest-settlements</c>.</summary>
     public static object NewSettleInterestBody(DateOnly periodEnd, decimal grossInterest, decimal tax) =>
         new { periodEnd, grossInterest, tax };
 
-    /// <summary>Arrange: <c>GET .../interest-preview</c> as a JSON element (the fact must have a period due).</summary>
     public static async Task<System.Text.Json.JsonElement> GetSavingsInterestPreviewAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -744,7 +579,6 @@ internal static class PortfolioApi
         return await response.ReadJsonAsync(cancellationToken);
     }
 
-    /// <summary>Arrange: settles <paramref name="periodEnd"/> with the given amounts.</summary>
     public static async Task SettleSavingsInterestAsync(
         this HttpClient client,
         Guid portfolioId,
@@ -759,7 +593,6 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>Arrange: previews the next due period and settles it with exactly the previewed values; returns the period's end.</summary>
     public static async Task<DateOnly> SettlePreviewedSavingsInterestAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -776,7 +609,6 @@ internal static class PortfolioApi
         return periodEnd;
     }
 
-    /// <summary>Arrange: the id of the account's latest settlement, read from <c>lastSettlement</c>.</summary>
     public static async Task<Guid> GetLastSettlementIdAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
@@ -785,16 +617,12 @@ internal static class PortfolioApi
         return account.LastSettlement!.SettlementId;
     }
 
-    // ---- savings-cash-transfers -----------------------------------------------------------------
-
     public const string TransfersUri = "/api/portfolio/transfers";
 
     public static string TransferUri(Guid transferId) => $"{TransfersUri}/{transferId}";
 
-    /// <summary>The date a manual transfer is made on by default: after <see cref="DefaultTopUpDate"/>, before <see cref="SavingsToday"/>.</summary>
     public static readonly DateOnly DefaultTransferDate = new(2026, 1, 20);
 
-    /// <summary>savings-cash-transfers: a valid <see cref="CreateTransferRequest"/> (amount 2 000 on <see cref="DefaultTransferDate"/> unless told otherwise).</summary>
     public static CreateTransferRequest NewTransferRequest(
         Guid sourceAssetId, Guid targetAssetId, decimal amount = 2_000m, DateOnly? date = null) => new()
         {
@@ -804,14 +632,8 @@ internal static class PortfolioApi
             Date = date ?? DefaultTransferDate
         };
 
-    /// <summary>savings-cash-transfers: what <see cref="CreateCashAndSavingsAsync"/> arranged.</summary>
     public sealed record CashAndSavings(Guid CashPortfolioId, Guid CashAssetId, Guid SavingsPortfolioId, Guid SavingsAssetId);
 
-    /// <summary>
-    /// savings-cash-transfers: a PLN Cash asset holding <paramref name="cashBalance"/> in "Wallet" and an
-    /// empty PLN savings account in a separate "Savings" portfolio. Pin the clock to
-    /// <see cref="SavingsTodayUtc"/> (or later) first.
-    /// </summary>
     public static async Task<CashAndSavings> CreateCashAndSavingsAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
@@ -827,7 +649,6 @@ internal static class PortfolioApi
         return new CashAndSavings(cashPortfolioId, cashId, savingsPortfolioId, account.AssetId);
     }
 
-    /// <summary>savings-cash-transfers: arranges a transfer through <c>POST /transfers</c> and returns its id.</summary>
     public static async Task<Guid> CreateTransferAsync(
         this HttpClient client, CancellationToken cancellationToken, CreateTransferRequest request)
     {

@@ -52,11 +52,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Contains(page.Items, t => t.Id == buyId);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-6 (delete half): the Cash Withdraw leg of a transfer cannot
-    /// be deleted on its own — 409 <c>Conflict.TransferLegManaged</c>, both legs stay and both
-    /// quantities hold — while the ordinary top-up beside it stays deletable (as far as history allows).
-    /// </summary>
     [Fact]
     public async Task Delete_TransferLeg_ReturnsConflict()
     {
@@ -118,7 +113,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>asset-archive AC-4: deleting a transaction of an archived asset is a 409 <c>Conflict.AssetArchived</c>; the transaction stays.</summary>
     [Fact]
     public async Task Delete_ArchivedAsset_Returns409()
     {
@@ -137,8 +131,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Contains((await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items, t => t.Id == depositId);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC7: deleting a transaction of an archived
-    /// portfolio's asset is a 409 <c>Conflict.PortfolioArchived</c>; transaction and quantity stay.</summary>
     [Fact]
     public async Task Delete_InArchivedPortfolio_Returns409()
     {
@@ -156,9 +148,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Contains(page.Items, t => t.Id == buyId);
     }
 
-    /// <summary>term-deposits AC-10: deleting a term deposit's opening transaction is a 409
-    /// <c>Conflict.DepositTransactionsManaged</c> — the deposit is removed as a whole, through
-    /// <c>DELETE .../assets/{id}</c>, and nothing changes here.</summary>
     [Fact]
     public async Task Delete_OnTermDeposit_ReturnsConflict()
     {
@@ -174,7 +163,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Contains((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items, t => t.Id == openingId);
     }
 
-    /// <summary>savings-accounts AC-7: deleting a savings account's Withdraw gives the money back to the balance.</summary>
     [Fact]
     public async Task Delete_SavingsAccountTransaction_MovesBalance()
     {
@@ -193,11 +181,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, account.AssetId, cancellationToken);
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-9: the credit a settlement created is removed only by undoing
-    /// the settlement - deleting it here is a 409 <c>Conflict.SavingsInterestManaged</c>, and the
-    /// credit, the settlement and the balance stay.
-    /// </summary>
     [Fact]
     public async Task Delete_SavingsInterestCredit_ReturnsConflict()
     {
@@ -219,7 +202,6 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
     }
 
-    /// <summary>savings-interest-settlement AC-9: an ordinary savings Withdraw stays deletable even after a settlement.</summary>
     [Fact]
     public async Task Delete_OrdinarySavingsWithdrawAfterSettlement_StaysAllowed()
     {

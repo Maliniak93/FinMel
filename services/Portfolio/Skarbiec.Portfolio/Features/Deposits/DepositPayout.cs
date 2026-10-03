@@ -5,28 +5,10 @@ using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.Deposits;
 
-/// <summary>
-/// A deposit's payout (deposit-payout-to-cash): the date of its Withdraw leg and the name of the Cash
-/// or Savings asset holding the matching Deposit leg — <see langword="null"/> once that asset was removed and the
-/// leg detached.
-/// </summary>
 public sealed record DepositPayoutInfo(DateOnly PaidOutOn, string? DestinationAssetName);
 
-/// <summary>
-/// The Deposit → Cash or Deposit → Savings (deposit-payout-to-savings) transfer that pays a settled deposit's whole balance out (deposit-payout-to-cash),
-/// shared by SettleDeposit's <c>destinationAssetId</c> and PayOutDeposit, plus the read side of it. No
-/// stored column: a deposit is paid out when it has a Withdraw — only a payout creates one — so the
-/// status survives a detach, which clears the link, not the leg.
-/// </summary>
 internal static class DepositPayout
 {
-    /// <summary>
-    /// Loads the destination through the tenancy filter and checks it against the transfer rules —
-    /// anything that is not one of the user's same-currency, non-archived assets on an allowed route, in
-    /// an active portfolio, is <see cref="TransferErrors.InvalidCounterpart"/> (a stranger's id and the deposit
-    /// itself get the same answer). Then builds both legs for the deposit's whole balance, as replayed
-    /// from <paramref name="depositHistory"/>, and recomputes both assets with them. Stages nothing.
-    /// </summary>
     public static async Task<Result<PayoutTransfer>> PlanPayoutAsync(
         this PortfolioDbContext dbContext,
         Asset deposit,
@@ -81,8 +63,7 @@ internal static class DepositPayout
         // A plain list parameter, whatever collection the caller passed.
         var ids = depositIds.ToList();
 
-        // The deposit's Withdraw is the Out leg; the destination is the asset of the In leg sharing its
-        // TransferId, missing once the transfer was detached.
+        // The deposit's Withdraw is the Out leg; the destination is the In leg's asset, missing once detached.
         var rows = await (
                 from outLeg in dbContext.Transactions.AsNoTracking()
                 where ids.Contains(outLeg.AssetId) && outLeg.Type == TransactionType.Withdraw
@@ -109,18 +90,9 @@ internal static class DepositPayout
         => (await dbContext.LoadPayoutsAsync([depositId], cancellationToken)).GetValueOrDefault(depositId);
 }
 
-/// <param name="Destination">The tracked destination Cash or Savings asset.</param>
-/// <param name="OutLeg">The deposit's Withdraw leg of its whole balance.</param>
-/// <param name="InLeg">The destination's Deposit leg.</param>
-/// <param name="DepositQuantity">The deposit's quantity with <paramref name="OutLeg"/> replayed — 0.</param>
-/// <param name="DestinationQuantity">The destination's quantity with <paramref name="InLeg"/> replayed.</param>
 internal sealed record PayoutTransfer(
     Asset Destination, Transaction OutLeg, Transaction InLeg, decimal DepositQuantity, decimal DestinationQuantity)
 {
-    /// <summary>
-    /// Stages both legs with the one PLN rate of their date (same currency, ADR-026) and both
-    /// quantities. The caller publishes both assets and saves them in one <c>SaveChangesAsync</c>.
-    /// </summary>
     public void Stage(PortfolioDbContext dbContext, Asset deposit, decimal? fxRateToPln)
     {
         OutLeg.FxRateToPln = fxRateToPln;

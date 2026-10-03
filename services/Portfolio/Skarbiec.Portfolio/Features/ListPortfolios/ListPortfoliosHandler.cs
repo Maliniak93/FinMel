@@ -14,8 +14,7 @@ public sealed class ListPortfoliosHandler(PortfolioDbContext dbContext)
             query = query.Where(p => !p.IsArchived);
         }
 
-        // assetCount as a correlated subquery inside this one query (spec-02) — no N+1, no second
-        // round trip, and no counter column to drift out of sync with the Assets table.
+        // assetCount as a correlated subquery: no N+1 and no counter column to drift.
         var rows = await query
             .OrderBy(p => p.Name)
             .Select(p => new { Portfolio = p, AssetCount = dbContext.Assets.Count(a => a.PortfolioId == p.Id) })

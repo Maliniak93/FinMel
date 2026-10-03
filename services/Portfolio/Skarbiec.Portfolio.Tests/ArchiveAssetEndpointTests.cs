@@ -10,11 +10,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>asset-archive: <c>POST .../assets/{id}/archive</c>. The event half is <see cref="PortfolioOutboxTests"/>.</summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class ArchiveAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-1: 200 with <c>isArchived</c> true, and the flag is stored.</summary>
     [Fact]
     public async Task Archive_SetsFlag()
     {
@@ -31,7 +29,6 @@ public sealed class ArchiveAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.True((await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).IsArchived);
     }
 
-    /// <summary>AC-1: a second call is 200 with the unchanged body (the no-event half is in the outbox tests).</summary>
     [Fact]
     public async Task Archive_AlreadyArchived_IsIdempotent()
     {
@@ -47,7 +44,6 @@ public sealed class ArchiveAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(before, await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken));
     }
 
-    /// <summary>Scope: archiving works at any balance, for any class.</summary>
     [Fact]
     public async Task Archive_CashWithBalance_KeepsQuantityAndTransactions()
     {
@@ -65,7 +61,6 @@ public sealed class ArchiveAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).TotalCount);
     }
 
-    /// <summary>Scope: archiving works in any deposit status — here a Due one, whose terms are kept.</summary>
     [Fact]
     public async Task Archive_DueDeposit_ReturnsOkAndKeepsTerms()
     {
@@ -83,7 +78,6 @@ public sealed class ArchiveAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(10_000m, archived.Principal);
     }
 
-    /// <summary>AC-3: an unknown id is a 404.</summary>
     [Fact]
     public async Task Archive_UnknownAsset_ReturnsNotFound()
     {
@@ -96,7 +90,6 @@ public sealed class ArchiveAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>AC-3: an asset in an archived portfolio is a 409 <c>Conflict.PortfolioArchived</c> and the flag stays.</summary>
     [Fact]
     public async Task Archive_ArchivedPortfolio_Returns409()
     {

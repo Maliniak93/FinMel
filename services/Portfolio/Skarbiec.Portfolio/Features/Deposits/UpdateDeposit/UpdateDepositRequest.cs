@@ -3,7 +3,6 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 
-/// <summary>The same terms as <see cref="AddDeposit.AddDepositRequest"/>, minus the currency, which is immutable.</summary>
 public sealed record UpdateDepositRequest : IValidatableObject
 {
     [Required, MaxLength(200)]
@@ -17,7 +16,7 @@ public sealed record UpdateDepositRequest : IValidatableObject
 
     public required DateOnly StartDate { get; init; }
 
-    /// <summary>At most 3650 days or 120 months — the months cap is checked in <see cref="Validate"/>.</summary>
+    /// <summary>At most 3650 days or 120 months.</summary>
     [Range(1, DepositTermsValidation.MaxTermDays)]
     public required int TermLength { get; init; }
 
@@ -28,7 +27,7 @@ public sealed record UpdateDepositRequest : IValidatableObject
 
     public required DepositCapitalization Capitalization { get; init; }
 
-    /// <summary>IKE/IKZE — no Belka tax.</summary>
+    /// <summary>IKE/IKZE: no Belka tax.</summary>
     public bool TaxExempt { get; init; }
 
     [Range(typeof(decimal), "0", "100")]

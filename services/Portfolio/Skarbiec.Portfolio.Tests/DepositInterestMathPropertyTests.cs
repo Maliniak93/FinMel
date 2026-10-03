@@ -3,12 +3,6 @@ using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits AC-3: invariants of <see cref="DepositInterestMath.Project"/> over a fixed-seed
-/// spread of valid terms (every capitalisation, both term units, taxed and exempt, rates from 0 to
-/// 100 %) — the arithmetic identities hold for every one, not just the worked examples in
-/// <see cref="DepositInterestMathTests"/>.
-/// </summary>
 public sealed class DepositInterestMathPropertyTests
 {
     private const int CaseCount = 300;
@@ -138,7 +132,6 @@ public sealed class DepositInterestMathPropertyTests
         Assert.Equal(0m, projection.NetProfitPercent);
     }
 
-    /// <summary>NetProfitPercent is the net interest as a percentage of the principal.</summary>
     [Theory]
     [MemberData(nameof(Seeds))]
     public void Project_AnyValidTerms_NetProfitPercentIsNetOverPrincipal(int seed)

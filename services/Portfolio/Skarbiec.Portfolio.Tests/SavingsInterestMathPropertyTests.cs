@@ -2,11 +2,6 @@ using Skarbiec.Portfolio.Features.SavingsAccounts;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-interest-settlement AC-3: invariants of <see cref="SavingsInterestMath.Accrue"/> over a
-/// fixed-seed spread of random histories that never go below 0 - the identities hold for every one,
-/// not just the worked examples in <see cref="SavingsInterestMathTests"/>.
-/// </summary>
 public sealed class SavingsInterestMathPropertyTests
 {
     private const int CaseCount = 300;

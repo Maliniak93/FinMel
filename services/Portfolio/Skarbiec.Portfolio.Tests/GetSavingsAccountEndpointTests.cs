@@ -8,11 +8,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>savings-accounts: <c>GET .../savings-accounts/{assetId}</c>.</summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetSavingsAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-5: the account with its balance after a later Withdraw.</summary>
     [Fact]
     public async Task Get_ReturnsAccount()
     {
@@ -39,7 +37,6 @@ public sealed class GetSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Assert.True(fetched.TaxExempt);
     }
 
-    /// <summary>AC-12.</summary>
     [Fact]
     public async Task Get_ArchivedAccount_ReturnsItWithFlag()
     {
@@ -55,7 +52,6 @@ public sealed class GetSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Assert.False(fetched.PortfolioIsArchived);
     }
 
-    /// <summary>AC-5: a term deposit, a Cash asset or an unknown id is a 404 here.</summary>
     [Fact]
     public async Task Get_NotASavingsAccount_ReturnsNotFound()
     {

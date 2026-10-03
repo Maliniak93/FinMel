@@ -3,12 +3,6 @@ using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// The route policy of the generic transfer core, pure and hostless. Every ordered pair of asset
-/// classes is checked: Cash → Deposit, Deposit → Cash, Cash → Savings and Savings → Cash are allowed
-/// (asset-transfers-deposit-funding AC-2, savings-cash-transfers AC-1), and only the last two are
-/// manual — the only routes the generic CreateTransfer / DeleteTransfer endpoints accept.
-/// </summary>
 public sealed class TransferRoutesTests
 {
     private static bool ExpectedAllowed(AssetClass source, AssetClass target) =>
@@ -55,7 +49,6 @@ public sealed class TransferRoutesTests
         Assert.False(TransferRoutes.IsManual(source, target));
     }
 
-    /// <summary>AC-1: Deposit → Savings is allowed and deposit-owned (not manual); the reverse is not a route.</summary>
     [Fact]
     public void Route_DepositToSavings_IsAllowedButNotManual()
     {

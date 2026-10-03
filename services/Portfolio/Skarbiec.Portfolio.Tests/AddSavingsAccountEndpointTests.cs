@@ -12,15 +12,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-accounts: <c>POST /api/portfolio/portfolios/{portfolioId}/savings-accounts</c> creates the
-/// Savings-class asset, its <see cref="SavingsAccount"/> terms and — when an opening deposit is
-/// sent — an ordinary Deposit transaction together.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AddSavingsAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-2 (HTTP half; the event is proven by <see cref="PortfolioOutboxTests.AddSavingsAccount_PublishesPositionChanged"/>).</summary>
     [Fact]
     public async Task Add_WithOpeningDeposit_CreatesAccount()
     {
@@ -69,7 +63,6 @@ public sealed class AddSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Assert.False(terms.TaxExempt);
     }
 
-    /// <summary>AC-2: without an opening deposit the account starts at 0 with no transaction.</summary>
     [Fact]
     public async Task Add_WithoutOpeningDeposit_StartsEmpty()
     {
@@ -92,7 +85,6 @@ public sealed class AddSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Assert.Empty((await client.ListTransactionsAsync(portfolioId, body.AssetId, cancellationToken)).Items);
     }
 
-    /// <summary>The opening deposit freezes the PLN rate of its date like any transaction write (ADR-026).</summary>
     [Fact]
     public async Task Add_EurAccountWithOpeningDeposit_FreezesFxRate()
     {
@@ -112,7 +104,6 @@ public sealed class AddSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(4_250.00m, opening.ValuePln);
     }
 
-    /// <summary>AC-3: every invalid input is a 400 and nothing is written.</summary>
     [Theory]
     [InlineData("name-empty")]
     [InlineData("rate-negative")]
@@ -147,7 +138,6 @@ public sealed class AddSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(0, await dbContext.Set<SavingsAccount>().CountAsync(cancellationToken));
     }
 
-    /// <summary>AC-3 boundaries: the edges of every range are themselves valid, and an opening date of today is allowed.</summary>
     [Theory]
     [InlineData("rate-zero")]
     [InlineData("rate-100")]
@@ -171,7 +161,6 @@ public sealed class AddSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
-    /// <summary>AC-3: an archived portfolio is read-only — 409 and nothing is written.</summary>
     [Fact]
     public async Task Add_ArchivedPortfolio_ReturnsConflict()
     {

@@ -8,61 +8,38 @@ using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
-/// <summary>Assertions on Portfolio invariants that outlive any single slice.</summary>
 internal static class PortfolioAssertions
 {
-    /// <summary>The error code every asset/transaction write into an archived portfolio fails with (archived-portfolio-out-of-net-worth).</summary>
     public const string PortfolioArchivedErrorCode = "Conflict.PortfolioArchived";
 
-    /// <summary>
-    /// Asserts <paramref name="response"/> is the 409 ProblemDetails a write into an archived
-    /// portfolio returns: status Conflict plus the <c>errorCode</c> extension stamped by the
-    /// Result→ProblemDetails mapping equal to <see cref="PortfolioArchivedErrorCode"/>.
-    /// </summary>
     public static async Task AssertPortfolioArchivedConflictAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioArchivedErrorCode, cancellationToken);
 
-    /// <summary>asset-archive: the error code every write to an archived asset fails with (removal excepted).</summary>
     public const string AssetArchivedErrorCode = "Conflict.AssetArchived";
 
-    /// <summary>asset-archive: asserts <paramref name="response"/> is the 409 <see cref="AssetArchivedErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertAssetArchivedConflictAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, AssetArchivedErrorCode, cancellationToken);
 
-    /// <summary>term-deposits: the 400 AddAsset/UpdateAsset answer when class Deposit is asked for, or an asset's class would change to or from Deposit.</summary>
     public const string UseDepositEndpointsErrorCode = "Validation.UseDepositEndpoints";
 
-    /// <summary>term-deposits: the 409 every transaction write (record/update/delete) on a Deposit-class asset answers — its transactions are system-managed.</summary>
     public const string DepositTransactionsManagedErrorCode = "Conflict.DepositTransactionsManaged";
 
-    /// <summary>term-deposits-settlement: the 409 preview/settle answer while the maturity date is still after today (Europe/Warsaw).</summary>
     public const string DepositNotDueErrorCode = "Conflict.DepositNotDue";
 
-    /// <summary>term-deposits-settlement: the 409 preview/settle answer for a deposit that is already settled.</summary>
     public const string DepositAlreadySettledErrorCode = "Conflict.DepositAlreadySettled";
 
-    /// <summary>term-deposits-settlement: the 409 UpdateDeposit answer for a settled deposit — its terms are immutable.</summary>
     public const string DepositSettledErrorCode = "Conflict.DepositSettled";
 
-    /// <summary>deposit-payout-to-cash: the 409 payout answer for a deposit that is not settled yet (Active or Due).</summary>
     public const string DepositNotSettledErrorCode = "Conflict.DepositNotSettled";
 
-    /// <summary>deposit-payout-to-cash: the 409 payout answer for a deposit that is already paid out.</summary>
     public const string DepositAlreadyPaidOutErrorCode = "Conflict.DepositAlreadyPaidOut";
 
-    /// <summary>deposit-rollover: the 409 UpdateDeposit answer when a rolled-over deposit's principal or start date would change.</summary>
     public const string DepositRolledOverErrorCode = "Conflict.DepositRolledOver";
 
-    /// <summary>deposit-rollover: the 400 RollOverDeposit answer for a Due deposit sent without <c>grossInterest</c> or <c>tax</c>.</summary>
     public const string SettlementAmountsRequiredErrorCode = "Validation.SettlementAmountsRequired";
 
-    /// <summary>
-    /// term-deposits-settlement: a rejected preview/settle "changes nothing" — the deposit is still
-    /// unsettled with no settlement data, its quantity is still <paramref name="principal"/> and it
-    /// still holds only its opening transaction.
-    /// </summary>
     public static async Task AssertDepositUnsettledAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, decimal principal = 10_000m)
     {
@@ -78,44 +55,30 @@ internal static class PortfolioAssertions
         Assert.False(asset.DepositSettled);
     }
 
-    /// <summary>Asserts <paramref name="response"/> is the 409 <see cref="DepositTransactionsManagedErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertDepositTransactionsManagedAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, DepositTransactionsManagedErrorCode, cancellationToken);
 
-    /// <summary>savings-interest-settlement: the 409 preview/settle answer while no month of the account is due.</summary>
     public const string SavingsInterestNotDueErrorCode = "Conflict.SavingsInterestNotDue";
 
-    /// <summary>savings-interest-settlement: the 409 settle answer when <c>periodEnd</c> is not the next due period's end.</summary>
     public const string SavingsInterestPeriodMismatchErrorCode = "Conflict.SavingsInterestPeriodMismatch";
 
-    /// <summary>savings-interest-settlement: the 409 undo answer for a settlement that is not the latest.</summary>
     public const string SavingsSettlementNotLatestErrorCode = "Conflict.SavingsSettlementNotLatest";
 
-    /// <summary>savings-interest-settlement: the 409 Update/DeleteTransaction answer for an interest credit.</summary>
     public const string SavingsInterestManagedErrorCode = "Conflict.SavingsInterestManaged";
 
-    /// <summary>The 409 an undo (or a transaction delete) answers when the removal would leave a later Withdraw with nothing to spend.</summary>
     public const string OversellsPositionErrorCode = "Conflict.OversellsPosition";
 
-    /// <summary>savings-accounts: the 400 AddAsset/UpdateAsset answer when class Savings is asked for, or an asset's class would change to or from Savings.</summary>
     public const string UseSavingsAccountEndpointsErrorCode = "Validation.UseSavingsAccountEndpoints";
 
-    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="UseSavingsAccountEndpointsErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertUseSavingsAccountEndpointsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseSavingsAccountEndpointsErrorCode, cancellationToken);
 
-    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="UseDepositEndpointsErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertUseDepositEndpointsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseDepositEndpointsErrorCode, cancellationToken);
 
-    /// <summary>
-    /// term-deposits: asserts <paramref name="response"/> is a 400 ValidationProblemDetails with an
-    /// error keyed on <paramref name="field"/> (case-insensitive) — the key the deposit form maps the
-    /// message back onto.
-    /// </summary>
     public static async Task AssertFieldValidationErrorAsync(
         this HttpResponseMessage response, string field, CancellationToken cancellationToken)
     {
@@ -128,35 +91,24 @@ internal static class PortfolioAssertions
             $"Expected a validation error keyed '{field}', got: {string.Join(", ", problem.Errors.Keys)}.");
     }
 
-    /// <summary>asset-transfers-deposit-funding: the 400 for a transfer counterpart that is not the user's, the same asset, off-route, in another currency or in an archived portfolio.</summary>
     public const string InvalidTransferCounterpartErrorCode = "Validation.InvalidTransferCounterpart";
 
-    /// <summary>asset-transfers-deposit-funding: the 400 when a transfer would take the source's running balance below zero anywhere in its history.</summary>
     public const string InsufficientFundsErrorCode = "Validation.InsufficientFunds";
 
-    /// <summary>asset-transfers-deposit-funding: the 409 UpdateTransaction/DeleteTransaction answer for a transfer leg — only its entry point changes it.</summary>
     public const string TransferLegManagedErrorCode = "Conflict.TransferLegManaged";
 
-    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="InvalidTransferCounterpartErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertInvalidTransferCounterpartAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidTransferCounterpartErrorCode, cancellationToken);
 
-    /// <summary>Asserts <paramref name="response"/> is the 400 <see cref="InsufficientFundsErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertInsufficientFundsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, InsufficientFundsErrorCode, cancellationToken);
 
-    /// <summary>Asserts <paramref name="response"/> is the 409 <see cref="TransferLegManagedErrorCode"/> ProblemDetails.</summary>
     public static async Task AssertTransferLegManagedAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, TransferLegManagedErrorCode, cancellationToken);
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: a Cash asset is exactly as arranged by
-    /// <see cref="PortfolioApi.AddCashAssetWithBalanceAsync"/> — quantity <paramref name="balance"/>,
-    /// its single top-up and no transfer leg.
-    /// </summary>
     public static async Task AssertCashUntouchedAsync(
         this HttpClient client, Guid portfolioId, Guid cashId, CancellationToken cancellationToken, decimal balance = 5_000m)
     {
@@ -168,14 +120,8 @@ internal static class PortfolioAssertions
         Assert.Null(topUp.Transfer);
     }
 
-    /// <summary>cash-transaction-types: the error code a transaction type the asset's class does not accept fails with (a top-level 400, no field key).</summary>
     public const string TransactionTypeNotAllowedErrorCode = "Validation.TransactionTypeNotAllowed";
 
-    /// <summary>
-    /// Asserts <paramref name="response"/> is the 400 a Cash/Deposit asset answers to any transaction
-    /// type other than Deposit/Withdraw: <see cref="TransactionTypeNotAllowedErrorCode"/>, with a
-    /// detail that names the accepted types.
-    /// </summary>
     public static async Task AssertTransactionTypeNotAllowedAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken)
     {
@@ -186,11 +132,6 @@ internal static class PortfolioAssertions
         Assert.Contains(nameof(Skarbiec.Contracts.TransactionType.Withdraw), problem.Detail, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Asserts <paramref name="response"/> is a ProblemDetails with <paramref name="status"/> and the
-    /// <c>errorCode</c> extension stamped by the Result→ProblemDetails mapping equal to
-    /// <paramref name="errorCode"/>; returns the problem for further assertions.
-    /// </summary>
     public static async Task<ProblemDetails> AssertProblemAsync(
         this HttpResponseMessage response, HttpStatusCode status, string errorCode, CancellationToken cancellationToken)
     {
@@ -207,17 +148,11 @@ internal static class PortfolioAssertions
         return problem;
     }
 
-    /// <summary>
-    /// transactions-pln-value-and-fee-removal: a transaction as it goes over the wire carries no
-    /// <c>fee</c> of any spelling. Checked on the raw JSON, because a typed read would silently drop
-    /// a property the response type no longer declares.
-    /// </summary>
     public static void AssertCarriesNoFee(this JsonElement transaction) =>
         Assert.DoesNotContain(
             transaction.EnumerateObject(),
             p => p.Name.StartsWith("fee", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Reads <paramref name="response"/>'s body as a detached JSON element, for wire-shape assertions.</summary>
     public static async Task<JsonElement> ReadJsonAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken)
     {
@@ -226,11 +161,6 @@ internal static class PortfolioAssertions
         return document.RootElement.Clone();
     }
 
-    /// <summary>
-    /// AC: "Quantity always equals recompute-from-scratch after any mutation" — re-derives
-    /// <see cref="Asset.Quantity"/> from the full transaction history returned by the API and
-    /// compares against what the API reports for the asset (ADR-009).
-    /// </summary>
     public static async Task AssertQuantityMatchesRecomputeFromScratchAsync(
         this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {

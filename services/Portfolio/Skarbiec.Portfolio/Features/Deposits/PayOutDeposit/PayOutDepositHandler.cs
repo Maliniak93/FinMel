@@ -5,10 +5,6 @@ using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
 
-/// <summary>
-/// Pays a settled deposit out later (deposit-payout-to-cash): its whole balance moves to a Cash asset
-/// as a Deposit → Cash transfer on the chosen date, emptying the deposit and marking it PaidOut.
-/// </summary>
 public sealed class PayOutDepositHandler(
     PortfolioDbContext dbContext,
     PositionEventPublisher positionEventPublisher,
@@ -18,8 +14,7 @@ public sealed class PayOutDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, PayOutDepositRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first, as in SettleDeposit: another user's deposit, a non-deposit asset
-        // and a deposit under the wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Deposit, cancellationToken);
         var terms = asset is null
@@ -77,7 +72,7 @@ public sealed class PayOutDepositHandler(
 
         var payout = planned.Value;
 
-        // Last check before the write: both legs freeze the PLN rate of their one date and currency (ADR-026).
+        // Last check before the write: both legs freeze the PLN rate of their one date and currency.
         var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
         if (fxRateToPln.IsFailure)
         {
@@ -86,7 +81,7 @@ public sealed class PayOutDepositHandler(
 
         payout.Stage(dbContext, asset, fxRateToPln.Value);
 
-        // Published before SaveChangesAsync so both outbox rows commit with both legs (ADR-012).
+        // Published before SaveChangesAsync so both outbox rows commit with both legs.
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
         await positionEventPublisher.PublishChangedAsync(payout.Destination, cancellationToken);
 
@@ -96,7 +91,7 @@ public sealed class PayOutDepositHandler(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Two racing payouts both bump the deposit row; the loser's xmin no longer matches.
+            // Two racing payouts both bump the deposit row; the loser's xmin is stale.
             return TransactionErrors.ConcurrentModification();
         }
 
