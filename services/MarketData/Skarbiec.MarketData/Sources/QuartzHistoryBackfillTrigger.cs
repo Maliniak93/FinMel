@@ -27,6 +27,6 @@ public sealed class QuartzHistoryBackfillTrigger(ISchedulerFactory schedulerFact
             .StartNow()
             .Build();
 
-        await scheduler.ScheduleJob(jobDetail, trigger, cancellationToken);
+        await scheduler.ScheduleJob(jobDetail, trigger, cancellationToken: cancellationToken);
     }
 }

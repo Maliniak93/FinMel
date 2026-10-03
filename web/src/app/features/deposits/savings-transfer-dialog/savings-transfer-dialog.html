@@ -1,0 +1,104 @@
+<h2 mat-dialog-title>{{ 'savings.transfer.title' | transloco }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="savings-transfer-dialog__name">
+      {{ account.name }} · {{ formatMoney(account.balance, account.currency) }}
+    </p>
+
+    <mat-button-toggle-group
+      class="savings-transfer-dialog__direction"
+      formControlName="direction"
+      [attr.aria-label]="'savings.transfer.direction' | transloco"
+    >
+      <mat-button-toggle value="in">{{ 'savings.transfer.into' | transloco }}</mat-button-toggle>
+      <mat-button-toggle value="out">{{ 'savings.transfer.out' | transloco }}</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-form-field appearance="outline" class="savings-transfer-dialog__field">
+      <mat-label>{{ 'savings.transfer.cash' | transloco }}</mat-label>
+      <mat-select formControlName="cashAssetId">
+        @if (cashCandidatesResource.hasValue()) {
+          @for (candidate of cashCandidatesResource.value(); track candidate.assetId) {
+            <mat-option [value]="candidate.assetId">
+              {{ candidate.name }} — {{ candidate.portfolioName }} ({{
+                formatMoney(candidate.balance, account.currency)
+              }})
+            </mat-option>
+          }
+        }
+      </mat-select>
+      @if (cashCandidatesResource.error(); as loadError) {
+        <mat-hint>{{ loadError.message }}</mat-hint>
+      } @else if (
+        cashCandidatesResource.hasValue() && cashCandidatesResource.value().length === 0
+      ) {
+        <mat-hint>{{
+          'savings.transfer.noCashAccount' | transloco: { currency: account.currency }
+        }}</mat-hint>
+      }
+      @if (form.controls.cashAssetId.hasError('required')) {
+        <mat-error>{{ 'savings.transfer.cashRequired' | transloco }}</mat-error>
+      } @else if (form.controls.cashAssetId.hasError('server')) {
+        <mat-error>{{ form.controls.cashAssetId.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="savings-transfer-dialog__field">
+      <mat-label>{{ 'common.amount' | transloco }}</mat-label>
+      <input matInput type="number" step="0.01" formControlName="amount" />
+      @if (form.controls.amount.hasError('required')) {
+        <mat-error>{{ 'savings.transfer.amountRequired' | transloco }}</mat-error>
+      } @else if (form.controls.amount.hasError('min')) {
+        <mat-error>{{ 'savings.transfer.amountPositive' | transloco }}</mat-error>
+      } @else if (form.controls.amount.hasError('exceedsBalance')) {
+        <mat-error>{{
+          'savings.transfer.exceedsBalance'
+            | transloco
+              : {
+                  balance: formatMoney(
+                    form.controls.amount.getError('exceedsBalance').balance,
+                    account.currency
+                  ),
+                }
+        }}</mat-error>
+      } @else if (form.controls.amount.hasError('server')) {
+        <mat-error>{{ form.controls.amount.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="savings-transfer-dialog__field">
+      <mat-label>{{ 'common.date' | transloco }}</mat-label>
+      <input matInput [matDatepicker]="datePicker" [max]="maxDate" formControlName="date" />
+      <mat-datepicker-toggle matIconSuffix [for]="datePicker"></mat-datepicker-toggle>
+      <mat-datepicker #datePicker></mat-datepicker>
+      @if (form.controls.date.hasError('required')) {
+        <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+      } @else if (
+        form.controls.date.hasError('dateInFuture') ||
+        form.controls.date.hasError('matDatepickerMax')
+      ) {
+        <mat-error>{{ 'savings.transfer.dateInFuture' | transloco }}</mat-error>
+      } @else if (form.controls.date.hasError('server')) {
+        <mat-error>{{ form.controls.date.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="savings-transfer-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'savings.transfer.submit' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

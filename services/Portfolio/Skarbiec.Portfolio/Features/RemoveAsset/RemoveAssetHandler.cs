@@ -46,6 +46,10 @@ public sealed class RemoveAssetHandler(
             dbContext.TermDeposits.Remove(termDeposit);
         }
 
+        // Interest settlements carry no FK (savings-interest-settlement), so they go here, with the asset.
+        dbContext.SavingsInterestSettlements.RemoveRange(
+            await dbContext.SavingsInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
+
         dbContext.Assets.Remove(asset);
 
         // Terminal for this asset (spec-02 design decision 3): no version, no further position

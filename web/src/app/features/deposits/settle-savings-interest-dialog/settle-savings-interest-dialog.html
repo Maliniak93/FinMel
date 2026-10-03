@@ -1,0 +1,96 @@
+<h2 mat-dialog-title>{{ 'savings.interest.title' | transloco }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="settle-savings-interest-dialog__name">{{ account.name }}</p>
+
+    @if (previewResource.error(); as loadError) {
+      <p class="settle-savings-interest-dialog__error" role="alert">{{ loadError.message }}</p>
+    } @else if (previewResource.isLoading()) {
+      <div class="settle-savings-interest-dialog__loading">
+        <mat-spinner diameter="24" />
+      </div>
+    }
+
+    @if (previewResource.hasValue() && previewResource.value(); as preview) {
+      <dl class="settle-savings-interest-dialog__summary">
+        <div>
+          <dt>{{ 'savings.interest.period' | transloco }}</dt>
+          <dd>{{ formatDate(preview.periodStart) }} – {{ formatDate(preview.periodEnd) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'deposits.rate' | transloco }}</dt>
+          <dd>{{ formatPercent(preview.annualInterestRatePercent) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'savings.interest.averageDailyBalance' | transloco }}</dt>
+          <dd>{{ formatMoney(preview.averageDailyBalance, account.currency) }}</dd>
+        </div>
+      </dl>
+    }
+
+    <div class="settle-savings-interest-dialog__row">
+      <mat-form-field appearance="outline" class="settle-savings-interest-dialog__field">
+        <mat-label>{{ 'deposits.fields.grossInterest' | transloco }}</mat-label>
+        <input matInput type="number" step="0.01" formControlName="grossInterest" />
+        @if (form.controls.grossInterest.hasError('required')) {
+          <mat-error>{{ 'deposits.errors.grossInterestRequired' | transloco }}</mat-error>
+        } @else if (form.controls.grossInterest.hasError('min')) {
+          <mat-error>{{ 'deposits.errors.grossInterestNegative' | transloco }}</mat-error>
+        } @else if (form.controls.grossInterest.hasError('server')) {
+          <mat-error>{{ form.controls.grossInterest.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="settle-savings-interest-dialog__field">
+        <mat-label>{{ 'deposits.fields.tax' | transloco }}</mat-label>
+        <input matInput type="number" step="0.01" formControlName="tax" />
+        @if (form.controls.tax.hasError('required')) {
+          <mat-error>{{ 'deposits.errors.taxRequired' | transloco }}</mat-error>
+        } @else if (form.controls.tax.hasError('min')) {
+          <mat-error>{{ 'deposits.errors.taxNegative' | transloco }}</mat-error>
+        } @else if (form.controls.tax.hasError('taxOverGross')) {
+          <mat-error>{{ 'deposits.errors.taxOverGross' | transloco }}</mat-error>
+        } @else if (form.controls.tax.hasError('server')) {
+          <mat-error>{{ form.controls.tax.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <dl class="settle-savings-interest-dialog__summary">
+      <div>
+        <dt>{{ 'deposits.settle.netInterest' | transloco }}</dt>
+        <dd>
+          @let net = netInterest();
+          @if (net !== null) {
+            <strong>{{ formatMoney(net, account.currency) }}</strong>
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+    </dl>
+
+    @if (formError()) {
+      <p class="settle-savings-interest-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      [disabled]="submitting() || !previewResource.hasValue()"
+    >
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'deposits.settle.submit' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -60,7 +60,7 @@ Messaging lives in `messaging.md`, tests in `testing.md`, domain rules in `domai
 - The callee maps every service-only endpoint through `app.MapInternalGroup("<path>")` (ServiceDefaults), which puts it at `/internal/<path>`, anonymous and excluded from OpenAPI (ADR-027). `/internal` sits outside `/api/`, so the Gateway has no route to it; never add one. Callers send no token — no handler on the typed client, no user or system JWT.
 - `/internal` endpoints serve global data only (no `UserId`): no identity reaches them, so a `UserId`-scoped `/internal` endpoint is forbidden. Anything user-scoped stays on `/api/<service>/...` behind `.RequireAuthorization()`.
 - Data the SPA also reads keeps its public, authorized `/api/<service>/...` route, and the service caller gets an `/internal` twin mapped beside it in the same endpoint file, on the same handler — one extra `MapGet`, no duplicated handler or response (e.g. `GetInstrumentEndpoint`).
-- `IgnoreQueryFilters()` is allowed only in consumers that legitimately write for many users. Every such call needs a comment saying why.
+- `IgnoreQueryFilters()` is allowed only in consumers that legitimately write for many users. Every such call needs a one-line `//` saying why.
 - A transport failure is an expected failure: return a `ServiceUnavailable`-prefixed `Error` so the endpoint maps it to 503 (see `Features/AssetErrors.cs` in Portfolio) — never let the `HttpRequestException` escape.
 
 ## Quartz jobs (MarketData only)
@@ -68,6 +68,9 @@ Messaging lives in `messaging.md`, tests in `testing.md`, domain rules in `domai
 - Register the schedule behind `Testing:DisableBackgroundJobs`; when it is set, register the NoOp trigger implementation instead (`NoOpSyncTrigger`, `NoOpHistoryBackfillTrigger`) so slice tests never race a job.
 - Each job owns an `ActivitySource` exposed as `public const string ActivitySourceName`, registered in the service's `AddSource(...)` call in `Program.cs`, and starts an activity named `<Job>.Run`.
 - Jobs are the only place that talks to NBP, Stooq or CoinGecko (ADR-007) — never a request path, with `ITickerVerifier` as the single exception (ADR-018).
+- Quartz owns its job-store schema: `ProvisionSchema()` creates the `quartz.qrtz_*` tables at scheduler start and validates them on every later start. Never model a `qrtz_*` table in EF and never put the `quartz` schema in a migration.
+- The store is configured only through `Sources/QuartzStore.cs` — `AddMarketDataScheduler` for a DI host (it also creates the `quartz` Postgres schema before the scheduler starts), `UseMarketDataStore` + `EnsureSchemaAsync` for a standalone `QuartzSchedulerBuilder`. Production and the scheduling tests both go through it; a test may override clustering timings on top, never copy the store block.
+- The Quartz health check (`AddHealthChecks().AddQuartz()`) is registered next to the scheduler, behind the same `Testing:DisableBackgroundJobs` switch — slice tests have no scheduler, so a check there would fail `/health/ready`.
 
 ## Observability
 

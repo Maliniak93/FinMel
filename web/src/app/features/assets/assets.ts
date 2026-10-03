@@ -206,6 +206,12 @@ export class Assets {
     );
   }
 
+  // A savings account is Due while an ended calendar month's interest is unsettled — computed on the
+  // server against the Europe/Warsaw date (savings-interest-settlement). Archived: read-only, never Due.
+  protected isSavingsInterestDue(asset: AssetResponse): boolean {
+    return !asset.isArchived && asset.savingsInterestDue === true;
+  }
+
   protected openCreateDialog(): void {
     const ref = this.dialog.open(AssetFormDialog, {
       width: '560px',

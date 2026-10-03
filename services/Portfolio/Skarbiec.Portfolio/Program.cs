@@ -27,8 +27,13 @@ using Skarbiec.Portfolio.Features.RestoreAsset;
 using Skarbiec.Portfolio.Features.RestorePortfolio;
 using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.SavingsAccounts.GetSavingsAccount;
+using Skarbiec.Portfolio.Features.SavingsAccounts.GetSavingsInterestPreview;
 using Skarbiec.Portfolio.Features.SavingsAccounts.ListSavingsAccounts;
+using Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
+using Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlement;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
+using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
+using Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 using Skarbiec.Portfolio.Features.Transfers.ListTransferCandidates;
 using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
@@ -110,7 +115,12 @@ builder.Services.AddScoped<AddSavingsAccountHandler>();
 builder.Services.AddScoped<UpdateSavingsAccountHandler>();
 builder.Services.AddScoped<GetSavingsAccountHandler>();
 builder.Services.AddScoped<ListSavingsAccountsHandler>();
+builder.Services.AddScoped<GetSavingsInterestPreviewHandler>();
+builder.Services.AddScoped<SettleSavingsInterestHandler>();
+builder.Services.AddScoped<UndoSavingsInterestSettlementHandler>();
 builder.Services.AddScoped<ListTransferCandidatesHandler>();
+builder.Services.AddScoped<CreateTransferHandler>();
+builder.Services.AddScoped<DeleteTransferHandler>();
 
 var app = builder.Build();
 
@@ -148,7 +158,12 @@ app.MapAddSavingsAccountEndpoint();
 app.MapUpdateSavingsAccountEndpoint();
 app.MapGetSavingsAccountEndpoint();
 app.MapListSavingsAccountsEndpoint();
+app.MapGetSavingsInterestPreviewEndpoint();
+app.MapSettleSavingsInterestEndpoint();
+app.MapUndoSavingsInterestSettlementEndpoint();
 app.MapListTransferCandidatesEndpoint();
+app.MapCreateTransferEndpoint();
+app.MapDeleteTransferEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton
 // service (T0.15 AC) — mirrors Skarbiec.Identity's /api/identity/me.

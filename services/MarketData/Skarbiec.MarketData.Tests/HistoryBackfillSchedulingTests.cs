@@ -28,8 +28,6 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
     // above, so referencing it directly elsewhere in this class would trigger CS9107.
     private readonly SkarbiecContainersFixture _containers = containers;
 
-    private const string TablePrefix = "quartz.qrtz_"; // must match MarketDataDbContext's modelBuilder.AddQuartz schema/prefix.
-
     [Fact]
     public async Task EnqueueAsync_ReturnsBeforeAnyFetch_ThenTheJobFiresOnItsOwnAndBackfillsOneYear()
     {
@@ -74,22 +72,7 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
         builder.Configuration["ConnectionStrings:marketdata-db"] = _containers.PostgresConnectionString;
         builder.Services.AddDbContext<MarketDataDbContext>(o => o.UseNpgsql(_containers.PostgresConnectionString));
         builder.Services.AddSingleton<IPriceSource>(priceSource);
-        builder.Services.AddQuartz(q =>
-        {
-            q.SchedulerId = "AUTO"; // unique per instance — same reasoning as PriceSyncJobExtensions.
-
-            q.UsePersistentStore(store =>
-            {
-                store.UsePostgres(c =>
-                {
-                    c.ConnectionString = _containers.PostgresConnectionString;
-                    c.TablePrefix = TablePrefix;
-                });
-                store.UseSystemTextJsonSerializer();
-                store.UseClustering();
-            });
-        });
-        builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        builder.Services.AddMarketDataScheduler(_containers.PostgresConnectionString); // production's store, no jobs of its own.
         builder.AddHistoryBackfillJob();
 
         // Deliberately not disposed — same reasoning as PriceSyncSchedulingTests: Quartz.Logging.LogProvider

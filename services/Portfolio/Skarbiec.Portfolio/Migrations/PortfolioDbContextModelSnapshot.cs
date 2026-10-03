@@ -311,6 +311,45 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("SavingsAccounts");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsInterestSettlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("GrossInterest")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Tax")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransactionId");
+
+                    b.HasIndex("AssetId", "PeriodEnd")
+                        .IsUnique();
+
+                    b.ToTable("SavingsInterestSettlements");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
                 {
                     b.Property<Guid>("AssetId")

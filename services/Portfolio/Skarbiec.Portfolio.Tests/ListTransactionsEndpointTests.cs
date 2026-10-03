@@ -160,4 +160,82 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-9: an interest credit carries <c>savingsInterestPeriodEnd</c> (the
+    /// settled month's last day) on the wire; every other transaction carries null.
+    /// </summary>
+    [Fact]
+    public async Task List_SavingsInterestCredit_ReturnsPeriodEnd()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(TransactionsUri(portfolioId, account.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(2, items.Count);
+        var credit = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 33.29m);
+        Assert.Equal("2026-09-30", credit.GetProperty("savingsInterestPeriodEnd").GetString());
+        var opening = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 10_000m);
+        Assert.True(!opening.TryGetProperty("savingsInterestPeriodEnd", out var value) || value.ValueKind == JsonValueKind.Null);
+    }
+
+    /// <summary>
+    /// savings-cash-transfers AC-5: both legs of a Cash/Savings transfer carry the transfer's id and
+    /// <c>manual: true</c>; the legs of a deposit-funding transfer carry their id and <c>manual: false</c>.
+    /// </summary>
+    [Fact]
+    public async Task List_ManualTransferLeg_IsManual()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
+        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
+
+        var cashLeg = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Items);
+
+        Assert.NotNull(cashLeg.Transfer);
+        Assert.Equal(transferId, cashLeg.Transfer.TransferId);
+        Assert.True(cashLeg.Transfer.Manual);
+        Assert.NotNull(savingsLeg.Transfer);
+        Assert.Equal(transferId, savingsLeg.Transfer.TransferId);
+        Assert.True(savingsLeg.Transfer.Manual);
+        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
+
+        using var fundingClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await fundingClient.CreateFundedDepositAsync(cancellationToken);
+        var fundingLeg = await fundingClient.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        Assert.NotNull(fundingLeg.Transfer);
+        Assert.NotEqual(Guid.Empty, fundingLeg.Transfer.TransferId);
+        Assert.False(fundingLeg.Transfer.Manual);
+    }
+
+    /// <summary>deposit-payout-to-savings AC-5: both legs of a deposit payout into savings carry <c>manual: false</c>.</summary>
+    [Fact]
+    public async Task List_DepositPayoutLegOnSavings_IsNotManual()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
+
+        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+        var depositLeg = Assert.Single(
+            (await client.ListTransactionsAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
+
+        Assert.NotNull(savingsLeg.Transfer);
+        Assert.False(savingsLeg.Transfer.Manual);
+        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
+        Assert.NotNull(depositLeg.Transfer);
+        Assert.False(depositLeg.Transfer.Manual);
+        Assert.Equal(savingsLeg.Transfer.TransferId, depositLeg.Transfer.TransferId);
+    }
 }

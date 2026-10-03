@@ -1,4 +1,4 @@
-<h2 mat-dialog-title>{{ 'deposits.transferToCash' | transloco }}</h2>
+<h2 mat-dialog-title>{{ 'deposits.payOutAction' | transloco }}</h2>
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
@@ -13,33 +13,11 @@
       </div>
     </dl>
 
-    <mat-form-field appearance="outline" class="pay-out-deposit-dialog__field">
-      <mat-label>{{ 'deposits.fields.moveTo' | transloco }}</mat-label>
-      <mat-select formControlName="destinationAssetId">
-        @if (destinationCandidatesResource.hasValue()) {
-          @for (candidate of destinationCandidatesResource.value(); track candidate.assetId) {
-            <mat-option [value]="candidate.assetId">
-              {{ candidate.name }} — {{ candidate.portfolioName }}
-            </mat-option>
-          }
-        }
-      </mat-select>
-      @if (destinationCandidatesResource.error(); as loadError) {
-        <mat-hint>{{ loadError.message }}</mat-hint>
-      } @else if (
-        destinationCandidatesResource.hasValue() &&
-        destinationCandidatesResource.value().length === 0
-      ) {
-        <mat-hint>{{
-          'deposits.payOut.noCashAccount' | transloco: { currency: deposit.currency }
-        }}</mat-hint>
-      }
-      @if (form.controls.destinationAssetId.hasError('required')) {
-        <mat-error>{{ 'deposits.payOut.destinationRequired' | transloco }}</mat-error>
-      } @else if (form.controls.destinationAssetId.hasError('server')) {
-        <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
-      }
-    </mat-form-field>
+    <app-payout-destination-field
+      formControlName="destinationAssetId"
+      [currency]="deposit.currency"
+      [portfolioId]="deposit.portfolioId"
+    />
 
     <mat-form-field appearance="outline" class="pay-out-deposit-dialog__field">
       <mat-label>{{ 'common.date' | transloco }}</mat-label>

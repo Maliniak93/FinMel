@@ -78,13 +78,11 @@
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.10.0" />
 
     <!-- MarketData PriceSyncJob (T2.6): Postgres-backed persistent store so schedule/state survive
-         restarts, clustered so two live instances never run the same fire concurrently (ADR-007). -->
-    <PackageVersion Include="Quartz" Version="3.22.3" />
-    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.22.3" />
-    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.22.3" />
-    <!-- Generates Quartz's ADO job-store schema as a normal EF Core migration in marketdata_db,
-         instead of hand-running Quartz's own tables_postgres.sql as a separate deploy step. -->
-    <PackageVersion Include="AppAny.Quartz.EntityFrameworkCore.Migrations.PostgreSQL" Version="0.6.1" />
+         restarts, clustered so two live instances never run the same fire concurrently (ADR-007).
+         Quartz 4 carries DI, hosting and System.Text.Json serialization itself and provisions its own
+         job-store schema (ProvisionSchema(), schema "quartz") at scheduler start — never modelled in EF.
+         The scheduler health check ships in Quartz itself; Quartz.AspNetCore 4.x is only the HTTP API. -->
+    <PackageVersion Include="Quartz" Version="4.3.0" />
   </ItemGroup>
 
 </Project>

@@ -559,6 +559,229 @@ describe('Transactions', () => {
     });
   });
 
+  // savings-cash-transfers AC-8: a manual Cash <-> Savings leg (`transfer.manual` true) keeps the
+  // "Transfer to/from …" label and offers a single "Delete transfer" action — no Edit — behind the same
+  // confirmation as Delete, which calls DELETE /api/portfolio/transfers/{transferId}. A deposit-funding
+  // leg (`manual` false) still has no actions.
+  describe('manual transfer legs', () => {
+    const transferId = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    const cashAsset: AssetResponse = {
+      ...asset,
+      assetClass: 0, // Cash
+      valuationMode: 2, // CurrencyValued
+      name: 'Cash account',
+      currency: 'PLN',
+      quantity: 3000,
+      manualValue: null,
+      manualValueDate: null,
+    };
+    const manualLeg = {
+      ...transaction,
+      id: '66666666-6666-6666-6666-666666666666',
+      type: 3, // Withdraw
+      quantity: 2000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 2000,
+      date: '2026-01-20',
+      transfer: {
+        transferId,
+        manual: true,
+        counterpartAssetId: '77777777-7777-7777-7777-777777777777',
+        counterpartAssetName: 'Savings account',
+        counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
+        counterpartPortfolioName: 'Savings',
+        direction: 0, // Out
+      },
+    } as TransactionResponse;
+    const fundingLeg = {
+      ...manualLeg,
+      id: '99999999-9999-9999-9999-999999999999',
+      transfer: {
+        ...manualLeg.transfer,
+        transferId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+        manual: false,
+        counterpartAssetName: 'Term deposit',
+      },
+    } as TransactionResponse;
+    const plainTopUp: TransactionResponse = {
+      ...transaction,
+      id: '55555555-5555-5555-5555-555555555555',
+      type: 2, // Deposit
+      quantity: 5000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 5000,
+      date: '2026-01-01',
+    };
+
+    function rows(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'tbody tr.mat-mdc-row',
+        ),
+      );
+    }
+
+    function rowMenu(row: HTMLElement): MatMenuTrigger | undefined {
+      return fixture.debugElement
+        .queryAll(By.directive(MatMenuTrigger))
+        .find((debugElement) => row.contains(debugElement.nativeElement))
+        ?.injector.get(MatMenuTrigger);
+    }
+
+    async function openMenuText(row: HTMLElement): Promise<string> {
+      rowMenu(row)!.openMenu();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return TestBed.inject(OverlayContainer).getContainerElement().textContent ?? '';
+    }
+
+    it('offers a manual leg only "Delete transfer", and a deposit-funding leg nothing', async () => {
+      await setup(
+        jsonResponse(pagedResponse([manualLeg, fundingLeg, plainTopUp])),
+        jsonResponse(cashAsset),
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const [manualRow, fundingRow] = rows();
+      expect(manualRow.textContent).toContain('Transfer to Savings account (Savings)');
+      expect(rowMenu(manualRow)).toBeDefined();
+      const menuText = await openMenuText(manualRow);
+      expect(menuText).toContain('Delete transfer');
+      expect(menuText).not.toContain('Edit');
+      expect(rowMenu(fundingRow)).toBeUndefined();
+    });
+
+    it('Delete transfer asks for confirmation, then calls DELETE /transfers/{id} and reloads', async () => {
+      await setup(jsonResponse(pagedResponse([manualLeg])), jsonResponse(cashAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const callsBefore = fetchSpy.mock.calls.length;
+      fetchSpy.mockImplementationOnce(async () => new Response(null, { status: 204 }));
+
+      const [manualRow] = rows();
+      await openMenuText(manualRow);
+      const item = Array.from(
+        TestBed.inject(OverlayContainer)
+          .getContainerElement()
+          .querySelectorAll<HTMLElement>('.mat-mdc-menu-item'),
+      ).find((candidate) => (candidate.textContent ?? '').includes('Delete transfer'));
+      item!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore));
+      const deleteCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+      expect(deleteCall.method).toBe('DELETE');
+      expect(deleteCall.url).toContain(`/api/portfolio/transfers/${transferId}`);
+    });
+
+    it('does not delete the transfer when the confirmation is cancelled', async () => {
+      await setup(jsonResponse(pagedResponse([manualLeg])), jsonResponse(cashAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      const callsBefore = fetchSpy.mock.calls.length;
+
+      const [manualRow] = rows();
+      await openMenuText(manualRow);
+      Array.from(
+        TestBed.inject(OverlayContainer)
+          .getContainerElement()
+          .querySelectorAll<HTMLElement>('.mat-mdc-menu-item'),
+      )
+        .find((candidate) => (candidate.textContent ?? '').includes('Delete transfer'))!
+        .click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls.length).toBe(callsBefore);
+    });
+  });
+
+  // savings-interest-settlement AC-13: the credit a settlement adds to a savings account
+  // (`savingsInterestPeriodEnd` set on the TransactionResponse) reads "Interest · <Month yyyy>" of the
+  // settled month and offers no Edit/Delete (the backend answers 409 Conflict.SavingsInterestManaged),
+  // while an ordinary transaction on the same account keeps both.
+  describe('savings interest credits', () => {
+    const savingsAsset: AssetResponse = {
+      ...asset,
+      assetClass: 9, // Savings
+      valuationMode: 2, // CurrencyValued
+      name: 'Savings account',
+      currency: 'PLN',
+      quantity: 10033.29,
+      manualValue: null,
+      manualValueDate: null,
+    };
+    const opening: TransactionResponse = {
+      ...transaction,
+      id: '55555555-5555-5555-5555-555555555555',
+      type: 2, // Deposit
+      quantity: 10000,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 10000,
+      date: '2026-09-01',
+    };
+    const credit = {
+      ...transaction,
+      id: '66666666-6666-6666-6666-666666666666',
+      type: 2, // Deposit
+      quantity: 33.29,
+      unitPrice: 1,
+      currency: 'PLN',
+      valuePln: 33.29,
+      date: '2026-09-30',
+      savingsInterestPeriodEnd: '2026-09-30',
+    } as TransactionResponse;
+
+    function rows(): HTMLElement[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'tbody tr.mat-mdc-row',
+        ),
+      );
+    }
+
+    function rowText(row: HTMLElement): string {
+      return (row.textContent ?? '').replace(/\s+/g, ' ');
+    }
+
+    function rowHasActions(row: HTMLElement): boolean {
+      return fixture.debugElement
+        .queryAll(By.directive(MatMenuTrigger))
+        .some((debugElement) => row.contains(debugElement.nativeElement));
+    }
+
+    it('labels the credit "Interest · <Month yyyy>" and offers it no edit / delete', async () => {
+      await setup(jsonResponse(pagedResponse([credit, opening])), jsonResponse(savingsAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const [creditRow, openingRow] = rows();
+      expect(rowText(creditRow)).toContain('Interest · September 2026');
+      expect(rowHasActions(creditRow)).toBe(false);
+
+      expect(rowText(openingRow)).not.toContain('Interest ·');
+      expect(rowHasActions(openingRow)).toBe(true);
+    });
+
+    it('labels the credit with the settled month, not the month of a later date', async () => {
+      const october = { ...credit, date: '2026-10-31', savingsInterestPeriodEnd: '2026-10-31' };
+      await setup(jsonResponse(pagedResponse([october])), jsonResponse(savingsAsset));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(rowText(rows()[0])).toContain('Interest · October 2026');
+    });
+  });
+
   // term-deposits AC-16: a term deposit's transactions are system-managed (the backend answers 409
   // Conflict.DepositTransactionsManaged to every write), so its view lists them but offers no
   // record / edit / delete action, even in an active portfolio.

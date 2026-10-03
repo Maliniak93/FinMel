@@ -33,6 +33,13 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
    `Explore` after the current implementation — which slices, entities, events, components and tests
    own the behaviour today — and write what it found under "Current behaviour". A change spec that
    guesses at today's code produces a Tier-2 mess at implementation time.
+   **Every spec gets a `## Code map`** (new behaviour too): ask Explore for the precedent
+   slice/component to copy, the test class and `Fixtures/<Service>Api` helpers to extend, and the files
+   that will change — as `path — why` lines — and paste that list into the draft. The test-writer,
+   implementer and reviewer start from it instead of each rediscovering the code, which is where most
+   of a build run's tokens went (measure with `node scripts/run-cost.mjs`).
+   If Explore finds the change needs another **open** issue merged first, list it under
+   `## Depends on` — `prepare` then refuses to build until it is closed.
 3. Ask as many questions as the design genuinely needs — there is no quota. The filter is not the
    count, it is this: **ask only what changes the design, and only what you cannot settle yourself.**
    Anything an ADR, a rule in `.claude/rules/`, or an existing pattern already answers, decide and
@@ -81,7 +88,8 @@ Signals worth a proposal:
   master working;
 - one part is mechanical (Tier 1, or `skip-tests` cleanup) and another is a new pattern (Tier 2) —
   splitting lets each run with its own tier and skip;
-- the diff would be too large to review in one sitting (roughly > 12 ACs or > 3 services).
+- the diff would be too large to review in one sitting (roughly > 8 ACs or > 3 services) — past
+  that, a single run's test-writer and implementer contexts grow past 300k tokens.
 
 A good cut:
 - **Each part is one issue, one branch, one PR**, with its own Goal, Scope, Out of scope and ACs that

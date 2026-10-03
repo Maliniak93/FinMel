@@ -35,7 +35,7 @@ public sealed class PriceSyncJob(
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
-    public Task Execute(IJobExecutionContext context) => RunAsync(context.CancellationToken);
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) => await RunAsync(cancellationToken);
 
     /// <summary>Quartz-independent entry point — lets tests drive a run directly instead of faking
     /// <see cref="IJobExecutionContext"/>.</summary>

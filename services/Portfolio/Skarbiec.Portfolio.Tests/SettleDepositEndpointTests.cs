@@ -377,6 +377,9 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
     [InlineData("stock")]
     [InlineData("archived-portfolio-cash")]
     [InlineData("strangers-cash")]
+    [InlineData("eur-savings")]
+    [InlineData("archived-portfolio-savings")]
+    [InlineData("strangers-savings")]
     public async Task Settle_InvalidDestination_ReturnsBadRequestAndSettlesNothing(string invalidCase)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -390,6 +393,13 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
             "stock" => await ArrangeOwnAsync(client, (c, p) => c.AddAssetAsync(p, cancellationToken, name: "Some stock")),
             "archived-portfolio-cash" => await ArrangeArchivedAsync(client),
             "strangers-cash" => await ArrangeOwnAsync(stranger, (c, p) => c.AddCashAssetAsync(p, cancellationToken)),
+            "eur-savings" => await ArrangeOwnAsync(
+                client, async (c, p) => (await c.AddSavingsAccountAsync(
+                    p, cancellationToken, NewSavingsAccountRequest(currency: "EUR", withOpeningDeposit: false))).AssetId),
+            "archived-portfolio-savings" => await ArrangeArchivedSavingsAsync(client),
+            "strangers-savings" => await ArrangeOwnAsync(
+                stranger, async (c, p) => (await c.AddSavingsAccountAsync(
+                    p, cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).AssetId),
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
@@ -413,5 +423,64 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
             var (archivedId, cashId) = await owner.AddArchivedCashAssetAsync(cancellationToken);
             return (owner, archivedId, cashId);
         }
+
+        async Task<(HttpClient, Guid, Guid)> ArrangeArchivedSavingsAsync(HttpClient owner)
+        {
+            var (archivedId, savingsId) = await owner.AddArchivedSavingsAccountAsync(cancellationToken);
+            return (owner, archivedId, savingsId);
+        }
+    }
+
+    /// <summary>
+    /// deposit-payout-to-savings AC-2 (HTTP half): settling with an empty PLN savings account in another
+    /// portfolio as destination pays the whole balance (10 119.83) into it on <c>settledOn</c> - the
+    /// deposit holds 0 and is PaidOut to the account's name, the account holds the final amount through
+    /// a linked Deposit leg. The per-asset <c>AssetPositionChanged</c> is proven by
+    /// <see cref="PortfolioOutboxTests.SettleDepositIntoSavings_PublishesBothPositions"/>.
+    /// </summary>
+    [Fact]
+    public async Task Settle_WithSavingsDestination_PaysOutWholeBalance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName: "Wallet");
+        var settledOn = new DateOnly(2026, 4, 15);
+
+        var response = await client.PostAsJsonAsync(
+            SettleDepositUri(portfolioId, deposit.AssetId), NewSettleRequest(destinationAssetId: account.AssetId), cancellationToken);
+
+        Assert.True(response.IsSuccessStatusCode, $"Settle answered {(int)response.StatusCode}.");
+
+        var withdraw = Assert.Single(
+            (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
+        Assert.Equal(10_119.83m, withdraw.Quantity);
+        Assert.Equal(settledOn, withdraw.Date);
+        Assert.NotNull(withdraw.Transfer);
+        Assert.Equal(account.AssetId, withdraw.Transfer.CounterpartAssetId);
+        Assert.Equal(TransferDirection.Out, withdraw.Transfer.Direction);
+
+        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(savingsPortfolioId, account.AssetId, cancellationToken)).Items);
+        Assert.Equal(TransactionType.Deposit, savingsLeg.Type);
+        Assert.Equal(10_119.83m, savingsLeg.Quantity);
+        Assert.Equal(settledOn, savingsLeg.Date);
+        Assert.NotNull(savingsLeg.Transfer);
+        Assert.Equal(deposit.AssetId, savingsLeg.Transfer.CounterpartAssetId);
+        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
+        Assert.Equal(withdraw.Transfer.TransferId, savingsLeg.Transfer.TransferId);
+
+        Assert.Equal(0m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(savingsPortfolioId, account.AssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, deposit.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(savingsPortfolioId, account.AssetId, cancellationToken);
+
+        var paidOut = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(DepositStatus.PaidOut, paidOut.Status);
+        Assert.Equal(settledOn, paidOut.PaidOutOn);
+        Assert.Equal(account.Name, paidOut.PaidOutToAssetName);
     }
 }

@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Makes a spec's failing tests pass - backend slices, Angular, migrations, generated client - owning the design and the tests, and reports what it touched and every deviation it made.
-tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
+tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7, LSP
 disallowedTools: Agent
 model: claude-opus-5-5
 effort: medium
@@ -15,7 +15,7 @@ hooks:
   Stop:
     - hooks:
         - type: command
-          command: 'node "${CLAUDE_PROJECT_DIR}/scripts/verify.mjs" --quick'
+          command: 'node "${CLAUDE_PROJECT_DIR}/scripts/verify.mjs" --quick --fix'
           timeout: 600
 ---
 
@@ -27,7 +27,8 @@ test or a design decision is wrong, you fix it yourself instead of stopping - an
 The delegation message carries some of these, as paths and JSON — never as file contents:
 
 - `spec` — path to `skarbiec-plan/issues/<n>.md`, a local copy of the spec issue. Always present.
-- `tests` — `[{ name, file, ac }]` written by the test-writer, plus the test `projects`. **Absent when
+- `tests` — `[{ name, file, ac }]` written by the test-writer, plus the test `projects` and
+  `contextFiles` (the existing files to read first). **Absent when
   the spec issue carries the `skip-tests` label** — that spec adds no behaviour, so nothing is red to start with:
   implement its Scope, run the command every acceptance criterion names as its proof, report those in
   `commandsRun`, and leave every existing suite green. Writing a test there is scope creep, not zeal.
@@ -61,11 +62,25 @@ cannot decide from the spec's goal at all.
 
 ## Read first, in this order
 
-1. The spec: Scope, Design decisions, Data / API changes, Acceptance criteria, Out of scope.
+1. The spec: Scope, Design decisions, Data / API changes, Acceptance criteria, Out of scope, and its
+   **Code map**.
 2. Only the `skarbiec-plan/architecture.md` / `domain.md` / `decisions.md` **sections the spec names**.
    Never the whole folder, never a document the spec does not reference.
 3. The files listed in `tests` — they are the contract you implement against.
-4. The nearest existing slice/component in the same service or feature area, as the pattern to copy.
+4. `tests.contextFiles` and the Code map's precedent — the nearest existing slice/component, as the
+   pattern to copy. Search further only for what those do not answer.
+
+## Read cheaply — every file you open stays in your context for the rest of the run
+
+- The spec's **Code map** names the precedent, the fixtures and the files expected to change. Start
+  there; search beyond it only for what it does not answer.
+- A file over ~300 lines (the big test classes, `Fixtures/<Service>Api.cs`, `Program.cs`): `Grep`
+  for the member you need, then `Read` with `offset`/`limit` around it — never the whole file, and
+  never the same file twice.
+- Use `Read` / `Grep` / `Glob` (or `LSP` go-to-definition / find-references when it is available)
+  instead of `cat`, `sed -n`, `find` and `ls -R` chains in Bash.
+- Pipe long command output through a filter (`| tail -40`, `| grep -E "FAIL|error"`) instead of
+  reading all of it.
 
 ## Look an API up instead of remembering it
 
@@ -141,7 +156,8 @@ that gets checked, not a suite you run yourself.
   MSB3027 ("being used by another process") on a build, EBUSY / EPERM on a file under `web/node_modules`,
   a port already in use. Then run `node scripts/stop-stack.mjs` (it stops only the stack and prints what
   it stopped), re-run the command once, and say so in `notes`. Never start the stack again afterwards.
-- A `Stop` hook runs `node scripts/verify.mjs --quick` (format + build) when you try to finish. If it
+- A `Stop` hook runs `node scripts/verify.mjs --quick --fix` (reformat the changed files, then format
+  check + build) when you try to finish. Formatting is therefore never yours to chase by hand. If it
   exits non-zero you are handed its stderr and must fix the cause. Do not route around it.
 
 ## Return

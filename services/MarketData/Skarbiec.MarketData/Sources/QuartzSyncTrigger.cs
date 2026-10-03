@@ -28,7 +28,7 @@ public sealed class QuartzSyncTrigger(ISchedulerFactory schedulerFactory) : ISyn
 
         try
         {
-            await scheduler.ScheduleJob(trigger, cancellationToken);
+            await scheduler.ScheduleJob(trigger, cancellationToken: cancellationToken);
             return SyncTriggerOutcome.Started;
         }
         catch (ObjectAlreadyExistsException)

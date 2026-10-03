@@ -11,6 +11,7 @@ import {
   findControl,
   hasControl,
   jsonResponse,
+  renderedText,
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
 import {
@@ -339,6 +340,113 @@ describe('SavingsAccountFormDialog', () => {
       expect(findControl(form(), 'annualInterestRatePercent').invalid).toBe(true);
       expect(writeRequests()).toEqual([]);
       expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+  });
+
+  // deposit-payout-to-savings AC-9. Opened from the payout destination select with
+  // `{currency, portfolioId}` the dialog creates an account for a payout: the currency is fixed and
+  // read-only, the portfolio defaults to the deposit's and can still be changed, there is no
+  // opening deposit, and success closes with the created account instead of `true`.
+  describe('payout target mode', () => {
+    const payoutData: SavingsAccountFormDialogData = {
+      currency: 'PLN',
+      portfolioId: savingsPortfolioId,
+    };
+
+    async function render(): Promise<void> {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    it('shows the given currency read-only', async () => {
+      await setup(payoutData);
+      await render();
+
+      if (hasControl(form(), 'currency')) {
+        const currency = findControl(form(), 'currency');
+        expect(currency.disabled).toBe(true);
+        expect(currency.value).toBe('PLN');
+      }
+      expect(renderedText(fixture)).toContain('PLN');
+      // Not a select the user could change.
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          'mat-select[formcontrolname="currency"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('defaults the portfolio to the given one and still offers the other active portfolios', async () => {
+      await setup(payoutData);
+      await render();
+
+      expect(findControl(form(), 'portfolioId').value).toBe(savingsPortfolioId);
+      const labels = await selectOptionLabels(fixture, 'portfolioId');
+      expect(labels).toContain('Savings');
+      expect(labels).toContain('Reserve');
+      expect(labels).not.toContain('Old savings');
+    });
+
+    it('hides the opening deposit', async () => {
+      await setup(payoutData);
+      await render();
+
+      const element = fixture.nativeElement as HTMLElement;
+      expect(hasControl(form(), 'openingAmount')).toBe(false);
+      expect(hasControl(form(), 'openingDate')).toBe(false);
+      expect(element.querySelector('[formcontrolname="openingAmount"]')).toBeNull();
+      expect(element.querySelector('[formcontrolname="openingDate"]')).toBeNull();
+    });
+
+    it('POSTs in the given currency to the default portfolio, with no opening deposit, and closes with the created account', async () => {
+      const created = savingsAccountResponse({ assetId: 'abababab-abab-abab-abab-abababababab' });
+      await setup(payoutData, () => jsonResponse(created, 201));
+      await render();
+      await fill({
+        name: 'Savings account',
+        bankName: 'Test bank',
+        annualInterestRatePercent: 5.25,
+      });
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect(request.method).toBe('POST');
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${savingsPortfolioId}/savings-accounts`,
+      );
+      const body = await request.json();
+      expect(body).not.toHaveProperty('openingDeposit');
+      expect(body).toMatchObject({ name: 'Savings account', currency: 'PLN' });
+      expect(dialogRef.close).toHaveBeenCalledTimes(1);
+      expect(dialogRef.close).toHaveBeenCalledWith(created);
+    });
+
+    it('creates the account in another portfolio when one is picked', async () => {
+      await setup(payoutData);
+      await render();
+      await fill({
+        name: 'Savings account',
+        annualInterestRatePercent: 5.25,
+        portfolioId: reservePortfolioId,
+      });
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect(request.url).toContain(
+        `/api/portfolio/portfolios/${reservePortfolioId}/savings-accounts`,
+      );
+      expect((await request.json()).currency).toBe('PLN');
+    });
+
+    it('plain create mode still closes with true', async () => {
+      await setup({});
+      await fill({ ...validTerms, portfolioId: savingsPortfolioId });
+
+      await component['onSubmit']();
+
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
   });
 });

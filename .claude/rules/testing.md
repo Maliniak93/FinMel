@@ -34,7 +34,7 @@ Before adding a helper to a test class, check `Fixtures/` first — and when a f
 
 ## Fixture helpers are arrange only
 
-They `EnsureSuccessStatusCode`. A test asserting on endpoint X **calls X directly** and inspects the raw `HttpResponseMessage` — routing it through a helper would turn the failure under test into an exception. Say so in a comment at the top of such a class. Give helpers optional parameters with sane defaults (`name`, `assetClass`, `quantity`) so a call site states only what its fact depends on.
+They `EnsureSuccessStatusCode`. A test asserting on endpoint X **calls X directly** and inspects the raw `HttpResponseMessage` — routing it through a helper would turn the failure under test into an exception. Say so in a one-line `//` above such a class. Give helpers optional parameters with sane defaults (`name`, `assetClass`, `quantity`) so a call site states only what its fact depends on.
 
 ## Tenancy isolation
 
@@ -43,6 +43,7 @@ They `EnsureSuccessStatusCode`. A test asserting on endpoint X **calls X directl
 
 ## Messaging and background work
 
+- Outbox tests live in one class per feature area (`<Feature>OutboxTests`, e.g. `DepositOutboxTests`), next to that feature's endpoint tests — never appended to a shared catch-all class. A test class that grows past ~600 lines gets split the same way: every build agent that touches it reads it, and a 2,000-line class is read again on every run.
 - Outbox and durability tests build their provider with `HostlessOutboxProvider`: MassTransit's hosted services never start, so the delivery poller cannot remove the row before the assertion reads it. Consumer tests that need a live bus use a queue name unique to the test class — queues are durable and outlive one class on the shared broker.
 - `SkarbiecApiFactory<TProgram>` sets `Testing:DisableBackgroundJobs`, so Quartz schedules are skipped and triggers resolve to their NoOp implementation. A test that wants the real job registers Quartz itself.
 - `/health/ready` needs polling with a deadline, not a single assertion: MassTransit's health check reports "not started" for a moment after the host comes up — exactly the window a real readiness probe rides out.

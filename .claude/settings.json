@@ -27,6 +27,8 @@
       "Bash(node scripts/verify.mjs:*)",
       "Bash(node scripts/stop-stack.mjs:*)",
       "Bash(node scripts/preflight.mjs:*)",
+      "Bash(node scripts/run-cost.mjs:*)",
+      "Bash(node scripts/prune-branches.mjs)",
       "Bash(npm run lint:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run gen:api:*)",

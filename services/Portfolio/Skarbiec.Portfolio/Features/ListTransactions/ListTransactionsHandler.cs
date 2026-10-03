@@ -16,16 +16,19 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
         // Every transaction is in its asset's currency, so the lookup doubles as the existence check.
-        var currency = await dbContext.Assets
+        // Its class tells, with the counterpart's, whether a transfer leg is on a manual route.
+        var asset = await dbContext.Assets
             .AsNoTracking()
             .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
-            .Select(a => a.Currency)
+            .Select(a => new { a.Currency, a.AssetClass })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (currency is null)
+        if (asset is null)
         {
             return AssetErrors.NotFound(assetId);
         }
+
+        var currency = asset.Currency;
 
         var query = dbContext.Transactions.AsNoTracking().Where(t => t.AssetId == assetId);
 
@@ -54,10 +57,18 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                     TransferId = leg.TransferId!.Value,
                     AssetId = counterpartAsset.Id,
                     AssetName = counterpartAsset.Name,
+                    counterpartAsset.AssetClass,
                     PortfolioId = counterpartPortfolio.Id,
                     PortfolioName = counterpartPortfolio.Name
                 })
             .ToDictionaryAsync(c => c.TransferId, cancellationToken);
+
+        // The settled month of every interest credit on this page, in one query (savings-interest-settlement).
+        var transactionIds = transactions.Select(t => (Guid?)t.Id).ToList();
+        var creditPeriodEnds = await dbContext.SavingsInterestSettlements
+            .AsNoTracking()
+            .Where(s => transactionIds.Contains(s.TransactionId))
+            .ToDictionaryAsync(s => s.TransactionId!.Value, s => s.PeriodEnd, cancellationToken);
 
         return new PagedResponse<TransactionResponse>
         {
@@ -68,13 +79,18 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                     t.TransferId is { } transferId && counterparts.TryGetValue(transferId, out var counterpart)
                         ? new TransactionTransferResponse
                         {
+                            TransferId = transferId,
+                            Manual = TransferLegs.DirectionOf(t) == TransferDirection.Out
+                                ? TransferRoutes.IsManual(asset.AssetClass, counterpart.AssetClass)
+                                : TransferRoutes.IsManual(counterpart.AssetClass, asset.AssetClass),
                             CounterpartAssetId = counterpart.AssetId,
                             CounterpartAssetName = counterpart.AssetName,
                             CounterpartPortfolioId = counterpart.PortfolioId,
                             CounterpartPortfolioName = counterpart.PortfolioName,
                             Direction = TransferLegs.DirectionOf(t)
                         }
-                        : null))
+                        : null,
+                    creditPeriodEnds.TryGetValue(t.Id, out var periodEnd) ? periodEnd : null))
             ],
             Page = page,
             PageSize = pageSize,

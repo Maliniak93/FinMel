@@ -87,6 +87,7 @@ node scripts/verify.mjs --quick            # format + build of touched projects 
 node scripts/verify.mjs --all              # every test project + web + api checks
 node scripts/verify.mjs --projects Portfolio,Gateway      # exactly these test projects
 node scripts/verify.mjs --web --api        # force the web / generated-client checks on
+node scripts/verify.mjs --fix              # reformat the changed files first (dotnet format, prettier, eslint --fix)
 ```
 
 With no flags `verify.mjs` picks the affected projects from the diff against `master`. It always ends

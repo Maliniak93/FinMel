@@ -54,6 +54,7 @@ export type AssetResponse = {
     transactionCount: number | string;
     depositMaturityDate?: null | string;
     depositSettled?: null | boolean;
+    savingsInterestDue?: null | boolean;
     isArchived: boolean;
 };
 
@@ -63,6 +64,17 @@ export type CreatePortfolioRequest = {
     name: string;
     description?: null | string;
     currency?: string;
+};
+
+export type CreateTransferRequest = {
+    sourceAssetId: string;
+    targetAssetId: string;
+    amount: number | string;
+    date: string;
+};
+
+export type CreateTransferResponse = {
+    transferId: string;
 };
 
 export type DepositCapitalization = number;
@@ -168,6 +180,29 @@ export type SavingsAccountResponse = {
     balance: number | string;
     annualInterestRatePercent: number | string;
     taxExempt: boolean;
+    interestDue: boolean;
+    duePeriodCount: number | string;
+    lastSettlement?: null | SavingsInterestSettlementResponse;
+};
+
+export type SavingsInterestPreviewResponse = {
+    periodStart: string;
+    periodEnd: string;
+    annualInterestRatePercent: number | string;
+    averageDailyBalance: number | string;
+    grossInterest: number | string;
+    tax: number | string;
+    netInterest: number | string;
+    duePeriodCount: number | string;
+};
+
+export type SavingsInterestSettlementResponse = {
+    settlementId: string;
+    periodStart: string;
+    periodEnd: string;
+    grossInterest: number | string;
+    tax: number | string;
+    netInterest: number | string;
 };
 
 export type SettleDepositRequest = {
@@ -175,6 +210,12 @@ export type SettleDepositRequest = {
     grossInterest: number | string;
     tax: number | string;
     destinationAssetId?: null | string;
+};
+
+export type SettleSavingsInterestRequest = {
+    periodEnd: string;
+    grossInterest: number | string;
+    tax: number | string;
 };
 
 export type TransactionResponse = {
@@ -187,9 +228,12 @@ export type TransactionResponse = {
     valuePln?: null | number | string;
     date: string;
     transfer?: null | TransactionTransferResponse;
+    savingsInterestPeriodEnd?: null | string;
 };
 
 export type TransactionTransferResponse = {
+    transferId: string;
+    manual: boolean;
     counterpartAssetId: string;
     counterpartAssetName: string;
     counterpartPortfolioId: string;
@@ -823,6 +867,64 @@ export type GetApiPortfolioSavingsAccountsResponses = {
 
 export type GetApiPortfolioSavingsAccountsResponse = GetApiPortfolioSavingsAccountsResponses[keyof GetApiPortfolioSavingsAccountsResponses];
 
+export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-preview';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses = {
+    /**
+     * OK
+     */
+    200: SavingsInterestPreviewResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsData = {
+    body: SettleSavingsInterestRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses = {
+    /**
+     * Created
+     */
+    201: SavingsInterestSettlementResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponse = PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses];
+
+export type DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+        settlementId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements/{settlementId}';
+};
+
+export type DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses];
+
 export type GetApiPortfolioTransferCandidatesData = {
     body?: never;
     path?: never;
@@ -841,3 +943,37 @@ export type GetApiPortfolioTransferCandidatesResponses = {
 };
 
 export type GetApiPortfolioTransferCandidatesResponse = GetApiPortfolioTransferCandidatesResponses[keyof GetApiPortfolioTransferCandidatesResponses];
+
+export type PostApiPortfolioTransfersData = {
+    body: CreateTransferRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/transfers';
+};
+
+export type PostApiPortfolioTransfersResponses = {
+    /**
+     * Created
+     */
+    201: CreateTransferResponse;
+};
+
+export type PostApiPortfolioTransfersResponse = PostApiPortfolioTransfersResponses[keyof PostApiPortfolioTransfersResponses];
+
+export type DeleteApiPortfolioTransfersByTransferIdData = {
+    body?: never;
+    path: {
+        transferId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfers/{transferId}';
+};
+
+export type DeleteApiPortfolioTransfersByTransferIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioTransfersByTransferIdResponse = DeleteApiPortfolioTransfersByTransferIdResponses[keyof DeleteApiPortfolioTransfersByTransferIdResponses];

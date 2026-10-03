@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Fresh-context adversarial review of the working tree against its spec - acceptance criteria, hard rules, scope. Reports findings, never edits.
-tools: Read, Grep, Glob, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
+tools: Read, Grep, Glob, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7, LSP
 disallowedTools: Edit, Write, Agent
 model: claude-opus-5-5
 effort: high
@@ -22,6 +22,18 @@ the spec issue — and usually the
 JSON the test-writer and implementer returned (`tests`, `filesTouched`, `notes`). Treat those claims
 as claims: verify each one against the tree.
 
+## Read cheaply — every file you open stays in your context for the rest of the run
+
+- The spec's **Code map** names the precedent, the fixtures and the files expected to change. Start
+  there; search beyond it only for what it does not answer.
+- A file over ~300 lines (the big test classes, `Fixtures/<Service>Api.cs`, `Program.cs`): `Grep`
+  for the member you need, then `Read` with `offset`/`limit` around it — never the whole file, and
+  never the same file twice.
+- Use `Read` / `Grep` / `Glob` (or `LSP` go-to-definition / find-references when it is available)
+  instead of `cat`, `sed -n`, `find` and `ls -R` chains in Bash.
+- Pipe long command output through a filter (`| tail -40`, `| grep -E "FAIL|error"`) instead of
+  reading all of it.
+
 ## Gather the evidence yourself
 
 1. The change is **staged — not committed — on its `feat/*` branch before you are called**, so
@@ -29,7 +41,8 @@ as claims: verify each one against the tree.
    `git diff` never does. Nothing is committed before the review, so `master...HEAD` shows
    nothing — do not reach for it. Then `git status --porcelain` for anything still unstaged: that
    belongs to the change too, and you read those files directly.
-2. Read the spec in full.
+2. Read the spec in full; its **Code map** says where the change was expected to land — a diff far
+   outside it is worth a look, not automatically a finding.
 3. Read only the `skarbiec-plan/architecture.md` / `domain.md` / `decisions.md` sections the spec
    names, plus `.claude/rules/*` for the areas the diff touches.
 4. Read the changed files, and the tests that are supposed to prove them.

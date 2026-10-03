@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
@@ -278,5 +279,85 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         await using var dbContext = CreateDbContext(userId);
         Assert.Null((await dbContext.Transactions.SingleAsync(t => t.Id == leg.Id, cancellationToken)).TransferId);
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == paidOut.Deposit.AssetId, cancellationToken));
+    }
+
+    /// <summary>
+    /// savings-interest-settlement AC-10: removing a savings account deletes its interest settlements
+    /// with it, while another account's settlement stays.
+    /// </summary>
+    [Fact]
+    public async Task Remove_SavingsAccount_DeletesSettlements()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var kept = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewInterestAccountRequest(name: "Kept"));
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, kept.AssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(portfolioId, account.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(0, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
+        Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, kept.AssetId));
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Set<SavingsInterestSettlement>().IgnoreQueryFilters().AnyAsync(s => s.AssetId == account.AssetId, cancellationToken));
+    }
+
+    /// <summary>
+    /// deposit-payout-to-savings AC-6: removing the savings account a deposit was paid into detaches the
+    /// payout - the deposit stays PaidOut with a null destination name and holds 0.
+    /// </summary>
+    [Fact]
+    public async Task Remove_SavingsAccountPaidFromDeposit_KeepsDepositPaidOut()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(setup.SavingsPortfolioId, setup.Account.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var deposit = await client.GetDepositAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken);
+        Assert.Equal(DepositStatus.PaidOut, deposit.Status);
+        Assert.Null(deposit.PaidOutToAssetName);
+        Assert.Equal(0m, (await client.GetAssetAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken)).Quantity);
+        var withdraw = Assert.Single(
+            (await client.ListTransactionsAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
+        Assert.Null(withdraw.Transfer);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+    }
+
+    /// <summary>
+    /// deposit-payout-to-savings AC-6: removing the deposit detaches the payout - the savings account keeps
+    /// its balance through the leg, now an ordinary Deposit with no transfer link.
+    /// </summary>
+    [Fact]
+    public async Task Remove_DepositPaidIntoSavings_KeepsSavingsBalance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
+        var leg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+
+        var response = await client.DeleteAsync(AssetUri(setup.DepositPortfolioId, setup.Deposit.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Quantity);
+        var kept = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+        Assert.Equal(leg.Id, kept.Id);
+        Assert.Equal(TransactionType.Deposit, kept.Type);
+        Assert.Equal(10_119.83m, kept.Quantity);
+        Assert.Null(kept.Transfer);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Null((await dbContext.Transactions.SingleAsync(t => t.Id == leg.Id, cancellationToken)).TransferId);
     }
 }

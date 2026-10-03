@@ -1,7 +1,7 @@
 ---
 name: test-writer
 description: Turns a spec's acceptance criteria into failing tests - slice, unit, tenancy, outbox - and confirms they are red. Writes no production code.
-tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7
+tools: Read, Edit, Write, Glob, Grep, Bash, mcp__microsoft-docs, mcp__plugin_context7_context7, LSP
 disallowedTools: Agent
 model: sonnet
 effort: medium
@@ -23,17 +23,31 @@ required; anything extra is context, not permission to widen scope.
 ## Read first, in this order
 
 1. The spec: Acceptance criteria (each one is Given/When/Then plus the test name that proves it),
-   Scope, Out of scope, Data / API changes.
+   Scope, Out of scope, Data / API changes, and its **Code map**.
 2. Only the `skarbiec-plan/architecture.md` / `domain.md` sections the spec names.
 3. The target test project's `Fixtures/` folder **before writing anything** — `<Service>Api` already
    owns route builders and arrange calls, `<Service>EndpointTests` already owns the factory lifetime
    and per-test DB reset, `Skarbiec.Testing` owns containers, auth and messaging helpers.
-4. One existing test class in the same project as the shape to copy.
+4. One existing test class in the same project as the shape to copy — the one the Code map names.
+
+## Read cheaply — every file you open stays in your context for the rest of the run
+
+- The spec's **Code map** names the precedent, the fixtures and the files expected to change. Start
+  there; search beyond it only for what it does not answer.
+- A file over ~300 lines (the big test classes, `Fixtures/<Service>Api.cs`, `Program.cs`): `Grep`
+  for the member you need, then `Read` with `offset`/`limit` around it — never the whole file, and
+  never the same file twice.
+- Use `Read` / `Grep` / `Glob` (or `LSP` go-to-definition / find-references when it is available)
+  instead of `cat`, `sed -n`, `find` and `ls -R` chains in Bash.
+- Pipe long command output through a filter (`| tail -40`, `| grep -E "FAIL|error"`) instead of
+  reading all of it.
 
 ## What to write
 
-One or more tests per acceptance criterion, named as the spec names them (if the spec names none,
-name them so the AC is obvious and report the name back).
+One test per acceptance criterion, named as the spec names them (if the spec names none, name them
+so the AC is obvious and report the name back). A second test for the same AC only for an edge case
+the AC itself states — no parametrised variations, input permutations or "while I am here" cases the
+spec does not ask for. Every extra test is paid for again by the implementer and every verify run.
 
 - **Slice / integration** for anything with an endpoint: call the endpoint under test directly and
   assert on the raw `HttpResponseMessage`; use fixture helpers only to arrange.
@@ -90,8 +104,11 @@ otherwise make the JSON your entire final message, with nothing before or after 
     { "name": "AddAsset_WithUnknownInstrument_Returns422", "file": "services/Portfolio/Skarbiec.Portfolio.Tests/AddAssetEndpointTests.cs", "ac": "AC-2" }
   ],
   "projects": ["Portfolio"],
+  "contextFiles": ["services/Portfolio/Skarbiec.Portfolio.Tests/Fixtures/PortfolioApi.cs", "services/Portfolio/Skarbiec.Portfolio/Features/AddAsset/AddAssetHandler.cs"],
   "notes": ["red for the right reason: Portfolio.Tests does not compile until IInstrumentLookupClient gains VerifyAsync"]
 }
 ```
 
 `projects` are short verify.mjs names (`Portfolio`, `Reporting`, `MarketData`, `Identity`, `web`).
+`contextFiles` are the existing files the implementer should read first (fixtures you extended, the
+precedent slice or component, the code under test) — at most 15 paths.

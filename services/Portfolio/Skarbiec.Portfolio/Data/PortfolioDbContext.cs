@@ -15,6 +15,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
     public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
+    public DbSet<SavingsInterestSettlement> SavingsInterestSettlements => Set<SavingsInterestSettlement>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -121,6 +122,20 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             savingsAccount.Property(s => s.BankName).HasMaxLength(100);
             savingsAccount.Property(s => s.AnnualInterestRatePercent).HasPrecision(7, 4);
+        });
+
+        modelBuilder.Entity<SavingsInterestSettlement>(settlement =>
+        {
+            // No FK to the asset or the credit (ADR-003 style, like Transaction): RemoveAsset and
+            // DeletePortfolio delete the rows explicitly. One settlement per account and month — the
+            // index also backs the latest-settlement lookups.
+            settlement.HasIndex(s => new { s.AssetId, s.PeriodEnd }).IsUnique();
+
+            // Update/DeleteTransaction ask whether a transaction is a settlement's managed credit.
+            settlement.HasIndex(s => s.TransactionId);
+
+            settlement.Property(s => s.GrossInterest).HasPrecision(18, 2);
+            settlement.Property(s => s.Tax).HasPrecision(18, 2);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).

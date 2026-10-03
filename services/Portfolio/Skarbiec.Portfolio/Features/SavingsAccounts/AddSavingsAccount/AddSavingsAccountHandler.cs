@@ -95,6 +95,9 @@ public sealed class AddSavingsAccountHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived);
+        // An opening deposit dated in an earlier month makes that month Due at once.
+        var interest = await dbContext.LoadSavingsInterestStatusAsync(asset.Id, WarsawCalendar.Today(timeProvider), cancellationToken);
+
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, interest);
     }
 }

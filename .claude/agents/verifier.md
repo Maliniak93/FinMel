@@ -5,8 +5,9 @@ tools: Bash, Read
 model: haiku
 effort: low
 color: cyan
+omitClaudeMd: true
 experimental:
-  cacheTtl: 1h
+  cacheTtl: 5m
 ---
 
 You run the verification script and report exactly what it said. You fix nothing.
@@ -18,14 +19,23 @@ The delegation message may carry `projects` — a JSON list of short names such 
 
 ## Run
 
-From the repo root, run exactly one command:
+The script can run up to 60 minutes (its own deadline), longer than one foreground Bash call may
+last, so run it in the background and wait for its result file — never poll it with `sleep`,
+`until`, `pwsh` or by re-reading output. From the repo root:
 
-- `projects` given → `node scripts/verify.mjs --projects <comma-separated list>`
-- `projects` empty or absent → `node scripts/verify.mjs` (it auto-detects changed areas from git)
-- mode `quick` → add `--quick`; mode `all` → `node scripts/verify.mjs --all`
+1. Start it with the Bash tool's `run_in_background: true` (one call):
+   - `projects` given → `node scripts/verify.mjs --fix --out .git/verify-result.json --projects <comma-separated list>`
+   - `projects` empty or absent → `node scripts/verify.mjs --fix --out .git/verify-result.json` (it auto-detects changed areas from git)
+   - mode `quick` → add `--quick`; mode `all` → use `--all` instead of `--projects`
+2. Wait in the foreground (Bash `timeout` 600000): `node scripts/verify.mjs --await .git/verify-result.json`.
+   It blocks up to 9 minutes. It prints `VERIFY_RESULT: …` (exit 0 or 2) once the run is done, or
+   `VERIFY_PENDING: …` (exit 3) while it is still going — then run the same `--await` command again.
+   After 8 pending answers in a row the run is lost: that is a failure with `step: "timeout"` and the
+   summary `verify.mjs did not finish`.
 
-Use a generous timeout (test runs start Docker containers; 20 minutes is normal). If the command dies
-or times out, that is a failure with `step: "test"` and the summary `verify.mjs did not finish: <reason>`.
+`--fix` lets the script reformat the changed files (`dotnet format`, `prettier`, `eslint --fix`)
+before it checks them, so a pure formatting slip never costs an implementer round. That is the
+script's doing, not yours — you still edit nothing.
 
 ## Parse
 
@@ -68,5 +78,5 @@ otherwise make the JSON your entire final message, with nothing before or after 
 }
 ```
 
-`step` is one of `format`, `build`, `test`, `web-typecheck`, `web-lint`, `web-build`, `web-test`, `api`.
+`step` is one of `format`, `build`, `test`, `web-typecheck`, `web-lint`, `web-format`, `web-build`, `web-test`, `api`, `timeout`.
 `failures` is `[]` when `ok` is true. `file` may be omitted when the script did not report one.

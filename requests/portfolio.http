@@ -376,7 +376,7 @@ Content-Type: application/json
 # and both assets publish AssetPositionChanged in one save (deposit-payout-to-cash). 200 with the
 # deposit, now PaidOut, with paidOutOn and paidOutToAssetName. 400 unless settledOn <= date <= today
 # (Europe/Warsaw); 400 Validation.InvalidTransferCounterpart for a destination that is not the user's
-# same-currency Cash in an active portfolio; 409 Conflict.DepositNotSettled for an Active or Due
+# same-currency Cash or Savings in an active portfolio; 409 Conflict.DepositNotSettled for an Active or Due
 # deposit, 409 Conflict.DepositAlreadyPaidOut once paid out, 409 Conflict.PortfolioArchived.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/payout
 Authorization: Bearer {{authToken}}
@@ -547,4 +547,121 @@ Content-Type: application/json
   "bankName": "Example bank",
   "annualInterestRatePercent": 4.75,
   "taxExempt": true
+}
+
+### Preview the savings account's next due interest month
+# Every calendar month is an interest period, the first one starting on the earliest transaction's
+# date; it is Due from the day after it ends (Europe/Warsaw). Returns the oldest ended, unsettled
+# month with interest: gross = round(Σ end-of-day balance × rate / 100 / 365, 2), the Belka tax, the
+# net, the average daily balance and duePeriodCount (savings-interest-settlement). Months with zero
+# interest are skipped. 409 Conflict.SavingsInterestNotDue when no month is due.
+# @name savingsInterestPreview
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-preview
+Authorization: Bearer {{authToken}}
+
+### Settle the previewed interest month
+# What the bank actually paid — override the previewed amounts when it paid something else. 400 unless
+# grossInterest >= 0 and 0 <= tax <= grossInterest; 409 Conflict.SavingsInterestNotDue, 409
+# Conflict.SavingsInterestPeriodMismatch when periodEnd is not the next due month's end (a stale
+# dialog or a double submit), 409 Conflict.PortfolioArchived. Stores the settlement and, when the net
+# is above 0, a system-managed Deposit of the net dated periodEnd (PLN rate frozen), then publishes
+# AssetPositionChanged, all in one save. 201 with the settlement.
+# @name settleSavingsInterest
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "periodEnd": "{{savingsInterestPreview.response.body.periodEnd}}",
+  "grossInterest": {{savingsInterestPreview.response.body.grossInterest}},
+  "tax": {{savingsInterestPreview.response.body.tax}}
+}
+
+### Undo the latest interest settlement
+# Deletes the settlement and its credit, recomputes the balance and publishes AssetPositionChanged; the
+# month becomes the due one again. 204. 409 Conflict.SavingsSettlementNotLatest for an older one, 409
+# Conflict.OversellsPosition when a later Withdraw spent the credit, 409 Conflict.PortfolioArchived; 404
+# for an unknown id or another user's. The credit itself is refused by the transaction endpoints (409
+# Conflict.SavingsInterestManaged).
+DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements/{{settleSavingsInterest.response.body.settlementId}}
+Authorization: Bearer {{authToken}}
+
+### --- Transfers between cash and savings ---
+
+### Transfer cash into the savings account
+# A manual transfer (savings-cash-transfers): Cash → Savings or Savings → Cash only, between two of the
+# user's same-currency assets, across portfolios too. Writes a Withdraw on the source and a Deposit on
+# the target (same amount and date, unit price 1, PLN rate frozen), linked by a shared TransferId, and
+# publishes AssetPositionChanged for both in one save. 201 with transferId. 400 for an amount of 0 or
+# less or a date after today (Europe/Warsaw); 400 Validation.InvalidTransferCounterpart for an asset
+# that is not the user's, the same asset twice, any other route (the deposit routes keep their own
+# endpoints) or another currency; 400 Validation.InsufficientFunds when the source's balance would drop
+# below 0 anywhere in its history; 409 Conflict.PortfolioArchived when either side's portfolio is
+# archived. Its legs are 409 Conflict.TransferLegManaged on PUT/DELETE .../transactions/{id}.
+# @name createTransfer
+POST {{baseUrl}}/api/portfolio/transfers
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "sourceAssetId": "{{addFundingCash.response.body.id}}",
+  "targetAssetId": "{{addSavingsAccount.response.body.assetId}}",
+  "amount": 500.00,
+  "date": "2026-02-02"
+}
+
+### Delete the transfer
+# Deletes both legs, recomputes both assets and publishes AssetPositionChanged for both in one save. A
+# transfer is never edited — delete it and create it again. 204. 404 for an unknown id or another
+# user's; 409 Conflict.TransferLegManaged for a deposit-route transfer (Cash ↔ Deposit); 409
+# Conflict.PortfolioArchived when either side's portfolio is archived; 409 Conflict.OversellsPosition
+# when removing the inflow would leave a later Withdraw on the target uncovered.
+DELETE {{baseUrl}}/api/portfolio/transfers/{{createTransfer.response.body.transferId}}
+Authorization: Bearer {{authToken}}
+
+### --- Paying a deposit out into a savings account ---
+
+### Add a matured deposit to pay out into savings
+# 10 000 PLN at 6 % for 3 months from 2026-01-15 — Due since its 2026-04-15 maturity.
+# @name addSavingsBoundDeposit
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Deposit for savings",
+  "bankName": "Example bank",
+  "currency": "PLN",
+  "principal": 10000.00,
+  "startDate": "2026-01-15",
+  "termLength": 3,
+  "termUnit": 1,
+  "annualInterestRatePercent": 6,
+  "capitalization": 0,
+  "taxExempt": false,
+  "earlyBreakInterestLossPercent": 100
+}
+
+### Preview the settlement of the deposit bound for savings
+# @name savingsBoundPreview
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settlement-preview
+Authorization: Bearer {{authToken}}
+
+### Settle the deposit and pay it out into the savings account
+# The destination may be a Savings asset as well as a Cash one (deposit-payout-to-savings): the whole
+# balance moves as a Deposit → Savings transfer on settledOn, in the same save as the settlement. The
+# savings leg is deposit-owned, not manual — listed with manual: false, 409 Conflict.TransferLegManaged
+# on PUT/DELETE .../transactions/{id} and on DELETE /transfers/{transferId} — and it counts in the
+# account's interest from its own date. The same destination works on POST .../payout for a deposit
+# settled earlier. A savings account in another currency, in an archived portfolio or another user's is
+# 400 Validation.InvalidTransferCounterpart.
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settle
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "settledOn": "{{savingsBoundPreview.response.body.settledOn}}",
+  "grossInterest": {{savingsBoundPreview.response.body.grossInterest}},
+  "tax": {{savingsBoundPreview.response.body.tax}},
+  "destinationAssetId": "{{addSavingsAccount.response.body.assetId}}"
 }

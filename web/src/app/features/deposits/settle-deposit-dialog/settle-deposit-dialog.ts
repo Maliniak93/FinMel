@@ -13,13 +13,11 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { map } from 'rxjs';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview,
-  getApiPortfolioTransferCandidates,
   postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettle,
   type DepositResponse,
 } from '../../../api/portfolio';
@@ -30,8 +28,8 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatDate, formatMoney } from '../../../shared/format';
-import { ASSET_CLASS } from '../../assets/asset-class';
 import { settlementAmounts } from '../deposit-terms';
+import { PayoutDestinationField } from '../payout-destination-field/payout-destination-field';
 
 export interface SettleDepositDialogData {
   deposit: DepositResponse;
@@ -57,9 +55,9 @@ function isAmount(value: number | string | null): value is number | string {
 }
 
 // Settles a Due term deposit (term-deposits-settlement): pre-filled from the server's settlement
-// preview, with what the bank actually paid editable. "Move to" (deposit-payout-to-cash) keeps the
-// money in the deposit by default, or pays the whole final amount out to a Cash asset in the same
-// request. Control names follow the SettleDepositRequest properties, so a server 400 keyed on a field
+// preview, with what the bank actually paid editable. "Move to" (deposit-payout-to-cash,
+// deposit-payout-to-savings) keeps the money in the deposit by default, or pays the whole final amount
+// out to a Cash or Savings asset in the same request. Control names follow the SettleDepositRequest properties, so a server 400 keyed on a field
 // lands on it.
 @Component({
   selector: 'app-settle-deposit-dialog',
@@ -71,7 +69,7 @@ function isAmount(value: number | string | null): value is number | string {
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatSelectModule,
+    PayoutDestinationField,
     TranslocoPipe,
   ],
   templateUrl: './settle-deposit-dialog.html',
@@ -104,7 +102,7 @@ export class SettleDepositDialog {
     ],
     grossInterest: [null as number | null, [Validators.required, Validators.min(0)]],
     tax: [null as number | null, [Validators.required, Validators.min(0), taxWithinGross]],
-    // null keeps the money in the deposit; otherwise one of the Cash transfer candidates.
+    // null keeps the money in the deposit; otherwise one of the Cash or Savings transfer candidates.
     destinationAssetId: [null as string | null],
   });
 
@@ -126,23 +124,6 @@ export class SettleDepositDialog {
   protected readonly movedAmount = computed(() =>
     this.formValue().destinationAssetId ? (this.amounts()?.finalAmount ?? null) : null,
   );
-
-  // Where the money can move to: the Cash transfer candidates in the deposit's currency.
-  protected readonly destinationCandidatesResource = resource({
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioTransferCandidates({
-        query: { currency: this.deposit.currency, assetClass: ASSET_CLASS.Cash },
-        signal: abortSignal,
-      });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('deposits.errors.cashAccountsLoadFailed'),
-        );
-      }
-      return result.data ?? [];
-    },
-  });
 
   protected readonly previewResource = resource({
     loader: async ({ abortSignal }) => {

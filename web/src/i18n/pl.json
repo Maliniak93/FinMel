@@ -222,6 +222,7 @@
     "value": "Wartość",
     "valuedOn": "Wycena z dnia",
     "maturedOn": "Zapadła dnia {{ date }}",
+    "interestToSettle": "Odsetki do rozliczenia",
     "due": "Zapadła",
     "noPriceYet": "Brak ceny",
     "priceStaleTooltip": "Cena tego instrumentu jest starsza niż 7 dni.",
@@ -267,6 +268,7 @@
     }
   },
   "transactions": {
+    "savingsInterest": "Odsetki · {{ month }}",
     "title": "Transakcje",
     "titleWithName": "Transakcje — {{ name }}",
     "newTransaction": "Nowa transakcja",
@@ -289,7 +291,13 @@
       "mustNotBeNegative": "{{ field }} nie może być ujemna.",
       "dateRequired": "Data jest wymagana."
     },
-    "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany."
+    "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany.",
+    "deleteTransfer": {
+      "action": "Usuń przelew",
+      "title": "Usunąć ten przelew?",
+      "message": "Obie strony tego przelewu ({{ quantity }}) — tutaj i w \"{{ counterpart }}\" — zostaną trwale usunięte. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć przelewu."
+    }
   },
   "deposits": {
     "title": "Lokaty i oszczędności",
@@ -311,7 +319,7 @@
     "archivedMarker": "(zarchiwizowany)",
     "settleMaturity": "Rozlicz zapadalność",
     "settleMaturityOf": "Rozlicz zapadalność lokaty {{ name }}",
-    "transferToCash": "Przenieś na gotówkę",
+    "payOutAction": "Wypłać",
     "rollOver": "Przedłuż lokatę",
     "actionsForThis": "Akcje dla tej lokaty",
     "loadFailed": "Nie udało się wczytać lokat.",
@@ -337,6 +345,7 @@
       "interestRateRequired": "Oprocentowanie jest wymagane.",
       "interestRateRange": "Oprocentowanie musi mieścić się w przedziale od 0 do 100.",
       "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych.",
+      "payoutDestinationsLoadFailed": "Nie udało się wczytać kont, na które można wypłacić pieniądze.",
       "previewLoadFailed": "Nie udało się wczytać podglądu rozliczenia."
     },
     "form": {
@@ -368,7 +377,10 @@
       "insufficientFunds": "Źródło środków nie pokrywa tego kapitału."
     },
     "payOut": {
-      "noCashAccount": "Nie masz konta gotówkowego w walucie {{ currency }}, na które można przenieść pieniądze.",
+      "noCashAccount": "Nie masz konta gotówkowego ani oszczędnościowego w walucie {{ currency }}, na które można przenieść pieniądze.",
+      "cashGroup": "Gotówka",
+      "savingsGroup": "Konta oszczędnościowe",
+      "newSavingsAccount": "Nowe konto oszczędnościowe…",
       "destinationRequired": "Wybierz, dokąd trafią pieniądze.",
       "dateBeforeSettlement": "Data nie może być wcześniejsza niż data rozliczenia.",
       "dateInFuture": "Data nie może być z przyszłości.",
@@ -398,6 +410,22 @@
     }
   },
   "savings": {
+    "lastInterest": "Ostatnie odsetki",
+    "interest": {
+      "settle": "Rozlicz odsetki",
+      "settleMonths": "Rozlicz odsetki (miesiące do rozliczenia: {{ count }})",
+      "settleOf": "Rozlicz odsetki konta {{ name }}",
+      "undo": "Cofnij ostatnie rozliczenie",
+      "undoOf": "Cofnij ostatnie rozliczenie konta {{ name }}",
+      "undoTitle": "Cofnąć ostatnie rozliczenie odsetek?",
+      "undoMessage": "Rozliczenie za {{ month }} konta \"{{ name }}\" i jego wpłata odsetek zostaną usunięte, a miesiąc znów będzie do rozliczenia.",
+      "undoConfirm": "Cofnij",
+      "undoFailed": "Nie udało się cofnąć rozliczenia.",
+      "title": "Rozlicz odsetki",
+      "period": "Okres",
+      "averageDailyBalance": "Średnie saldo dzienne",
+      "previewLoadFailed": "Nie udało się wczytać podglądu odsetek."
+    },
     "add": "Dodaj konto oszczędnościowe",
     "empty": "Nie masz jeszcze żadnych kont oszczędnościowych.",
     "addFirst": "Dodaj pierwsze konto oszczędnościowe",
@@ -417,6 +445,23 @@
       "openingDate": "Data wpłaty początkowej",
       "openingDateRequired": "Data jest wymagana.",
       "openingDateInFuture": "Data nie może być z przyszłości."
+    },
+    "transfer": {
+      "action": "Przelew",
+      "actionOf": "Przelej środki na konto {{ name }} lub z niego",
+      "title": "Przelew",
+      "direction": "Kierunek",
+      "into": "Na to konto",
+      "out": "Na gotówkę",
+      "cash": "Konto gotówkowe",
+      "cashRequired": "Wybierz konto gotówkowe.",
+      "noCashAccount": "Nie masz konta gotówkowego w {{ currency }}, z którym można zrobić przelew.",
+      "amountRequired": "Kwota jest wymagana.",
+      "amountPositive": "Kwota musi być większa od 0.",
+      "exceedsBalance": "Kwota przekracza saldo źródła ({{ balance }}).",
+      "insufficientFunds": "Źródło nie pokrywa tej kwoty w tym dniu.",
+      "dateInFuture": "Data nie może być z przyszłości.",
+      "submit": "Przelej"
     }
   },
   "assetArchive": {

@@ -15,6 +15,7 @@ using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
+using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
@@ -224,6 +225,42 @@ internal static class PortfolioApi
             depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: cashId));
 
         return new PaidOutDeposit(depositPortfolioId, deposit, cashPortfolioId, cashId);
+    }
+
+    /// <summary>deposit-payout-to-savings: what <see cref="CreateDepositPaidIntoSavingsAsync"/> arranged.</summary>
+    public sealed record DepositPaidIntoSavings(
+        Guid DepositPortfolioId, DepositResponse Deposit, Guid SavingsPortfolioId, SavingsAccountResponse Account);
+
+    /// <summary>
+    /// deposit-payout-to-savings: the default deposit in a "Savings" portfolio, settled on 2026-04-15 with
+    /// the previewed values (final 10 119.83) and paid out at settlement into an empty PLN savings account
+    /// in a separate "Wallet" portfolio. The fact must have pinned a clock past the maturity
+    /// (<see cref="AfterDefaultMaturityUtc"/>).
+    /// </summary>
+    public static async Task<DepositPaidIntoSavings> CreateDepositPaidIntoSavingsAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName: "Wallet");
+        await client.SettleDepositAsync(
+            depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: account.AssetId));
+
+        return new DepositPaidIntoSavings(depositPortfolioId, deposit, savingsPortfolioId, account);
+    }
+
+    /// <summary>
+    /// deposit-payout-to-savings: an empty PLN savings account in a portfolio of its own, which is then
+    /// archived — a destination a payout must refuse. Returns both ids.
+    /// </summary>
+    public static async Task<(Guid PortfolioId, Guid SavingsId)> AddArchivedSavingsAccountAsync(
+        this HttpClient client, CancellationToken cancellationToken, string portfolioName = "Old savings")
+    {
+        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName);
+        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+
+        return (portfolioId, account.AssetId);
     }
 
     /// <summary>
@@ -648,5 +685,155 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken))!;
+    }
+
+    // ---- savings-interest-settlement ------------------------------------------------------------
+
+    public static string SavingsInterestPreviewUri(Guid portfolioId, Guid assetId) =>
+        $"{SavingsAccountUri(portfolioId, assetId)}/interest-preview";
+
+    public static string SavingsInterestSettlementsUri(Guid portfolioId, Guid assetId) =>
+        $"{SavingsAccountUri(portfolioId, assetId)}/interest-settlements";
+
+    public static string SavingsInterestSettlementUri(Guid portfolioId, Guid assetId, Guid settlementId) =>
+        $"{SavingsInterestSettlementsUri(portfolioId, assetId)}/{settlementId}";
+
+    /// <summary>The date the interest accounts' opening deposit is dated: the first day of September 2026.</summary>
+    public static readonly DateOnly InterestOpeningDate = new(2026, 9, 1);
+
+    public static readonly DateOnly SeptemberEnd = new(2026, 9, 30);
+
+    public static readonly DateOnly OctoberEnd = new(2026, 10, 31);
+
+    /// <summary>30 September 2026 (Europe/Warsaw): September has not ended yet, so nothing is due.</summary>
+    public static readonly DateTimeOffset SeptemberLastDayUtc = new(2026, 9, 30, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>1 October 2026: September has just ended and is the only due period.</summary>
+    public static readonly DateTimeOffset SeptemberEndedUtc = new(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>1 November 2026: September and October have ended.</summary>
+    public static readonly DateTimeOffset OctoberEndedUtc = new(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>1 December 2026: September, October and November have ended.</summary>
+    public static readonly DateTimeOffset NovemberEndedUtc = new(2026, 12, 1, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// savings-interest-settlement: a savings account at 5 % (taxed unless <paramref name="taxExempt"/>)
+    /// whose only transaction is an opening deposit of 10 000 on <see cref="InterestOpeningDate"/>. Pin
+    /// the clock to one of the dates above before adding it.
+    /// </summary>
+    public static AddSavingsAccountRequest NewInterestAccountRequest(
+        string name = "Interest account", bool taxExempt = false, decimal annualInterestRatePercent = 5m, DateOnly? openingDate = null) =>
+        NewSavingsAccountRequest(
+            name: name,
+            annualInterestRatePercent: annualInterestRatePercent,
+            taxExempt: taxExempt,
+            openingDate: openingDate ?? InterestOpeningDate);
+
+    /// <summary>The JSON body of <c>POST .../interest-settlements</c>.</summary>
+    public static object NewSettleInterestBody(DateOnly periodEnd, decimal grossInterest, decimal tax) =>
+        new { periodEnd, grossInterest, tax };
+
+    /// <summary>Arrange: <c>GET .../interest-preview</c> as a JSON element (the fact must have a period due).</summary>
+    public static async Task<System.Text.Json.JsonElement> GetSavingsInterestPreviewAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(SavingsInterestPreviewUri(portfolioId, assetId), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await response.ReadJsonAsync(cancellationToken);
+    }
+
+    /// <summary>Arrange: settles <paramref name="periodEnd"/> with the given amounts.</summary>
+    public static async Task SettleSavingsInterestAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        DateOnly periodEnd,
+        decimal grossInterest,
+        decimal tax,
+        CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsJsonAsync(
+            SavingsInterestSettlementsUri(portfolioId, assetId), NewSettleInterestBody(periodEnd, grossInterest, tax), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>Arrange: previews the next due period and settles it with exactly the previewed values; returns the period's end.</summary>
+    public static async Task<DateOnly> SettlePreviewedSavingsInterestAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var preview = await client.GetSavingsInterestPreviewAsync(portfolioId, assetId, cancellationToken);
+        var periodEnd = DateOnly.Parse(preview.GetProperty("periodEnd").GetString()!, System.Globalization.CultureInfo.InvariantCulture);
+        await client.SettleSavingsInterestAsync(
+            portfolioId,
+            assetId,
+            periodEnd,
+            preview.GetProperty("grossInterest").GetDecimal(),
+            preview.GetProperty("tax").GetDecimal(),
+            cancellationToken);
+
+        return periodEnd;
+    }
+
+    /// <summary>Arrange: the id of the account's latest settlement, read from <c>lastSettlement</c>.</summary>
+    public static async Task<Guid> GetLastSettlementIdAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var account = await client.GetSavingsAccountAsync(portfolioId, assetId, cancellationToken);
+
+        return account.LastSettlement!.SettlementId;
+    }
+
+    // ---- savings-cash-transfers -----------------------------------------------------------------
+
+    public const string TransfersUri = "/api/portfolio/transfers";
+
+    public static string TransferUri(Guid transferId) => $"{TransfersUri}/{transferId}";
+
+    /// <summary>The date a manual transfer is made on by default: after <see cref="DefaultTopUpDate"/>, before <see cref="SavingsToday"/>.</summary>
+    public static readonly DateOnly DefaultTransferDate = new(2026, 1, 20);
+
+    /// <summary>savings-cash-transfers: a valid <see cref="CreateTransferRequest"/> (amount 2 000 on <see cref="DefaultTransferDate"/> unless told otherwise).</summary>
+    public static CreateTransferRequest NewTransferRequest(
+        Guid sourceAssetId, Guid targetAssetId, decimal amount = 2_000m, DateOnly? date = null) => new()
+        {
+            SourceAssetId = sourceAssetId,
+            TargetAssetId = targetAssetId,
+            Amount = amount,
+            Date = date ?? DefaultTransferDate
+        };
+
+    /// <summary>savings-cash-transfers: what <see cref="CreateCashAndSavingsAsync"/> arranged.</summary>
+    public sealed record CashAndSavings(Guid CashPortfolioId, Guid CashAssetId, Guid SavingsPortfolioId, Guid SavingsAssetId);
+
+    /// <summary>
+    /// savings-cash-transfers: a PLN Cash asset holding <paramref name="cashBalance"/> in "Wallet" and an
+    /// empty PLN savings account in a separate "Savings" portfolio. Pin the clock to
+    /// <see cref="SavingsTodayUtc"/> (or later) first.
+    /// </summary>
+    public static async Task<CashAndSavings> CreateCashAndSavingsAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal cashBalance = 5_000m,
+        DateOnly? toppedUpOn = null,
+        AddSavingsAccountRequest? savingsRequest = null)
+    {
+        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance, toppedUpOn: toppedUpOn);
+        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, savingsRequest ?? NewSavingsAccountRequest(withOpeningDeposit: false));
+
+        return new CashAndSavings(cashPortfolioId, cashId, savingsPortfolioId, account.AssetId);
+    }
+
+    /// <summary>savings-cash-transfers: arranges a transfer through <c>POST /transfers</c> and returns its id.</summary>
+    public static async Task<Guid> CreateTransferAsync(
+        this HttpClient client, CancellationToken cancellationToken, CreateTransferRequest request)
+    {
+        var response = await client.PostAsJsonAsync(TransfersUri, request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<CreateTransferResponse>(cancellationToken))!.TransferId;
     }
 }

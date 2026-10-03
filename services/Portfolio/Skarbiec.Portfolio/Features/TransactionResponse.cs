@@ -28,6 +28,13 @@ public sealed record TransactionResponse
     /// an ordinary transaction. A leg is changed only through its transfer's entry point.
     /// </summary>
     public TransactionTransferResponse? Transfer { get; init; }
+
+    /// <summary>
+    /// The last day of the settled month when this is a savings account's interest credit
+    /// (savings-interest-settlement) — system-managed, removed only by undoing its settlement;
+    /// <see langword="null"/> on every other transaction.
+    /// </summary>
+    public DateOnly? SavingsInterestPeriodEnd { get; init; }
 }
 
 public static class TransactionMappingExtensions
@@ -35,18 +42,24 @@ public static class TransactionMappingExtensions
     /// <param name="transaction">The stored transaction.</param>
     /// <param name="currency">The owning asset's currency.</param>
     /// <param name="transfer">The counterpart when <paramref name="transaction"/> is a transfer leg.</param>
-    public static TransactionResponse ToResponse(this Transaction transaction, string currency, TransactionTransferResponse? transfer = null) => new()
-    {
-        Id = transaction.Id,
-        AssetId = transaction.AssetId,
-        Type = transaction.Type,
-        Quantity = transaction.Quantity,
-        UnitPrice = transaction.UnitPriceAmount,
-        Currency = currency,
-        ValuePln = transaction.FxRateToPln is { } rate
+    /// <param name="savingsInterestPeriodEnd">The settled month's end when <paramref name="transaction"/> is an interest credit.</param>
+    public static TransactionResponse ToResponse(
+        this Transaction transaction,
+        string currency,
+        TransactionTransferResponse? transfer = null,
+        DateOnly? savingsInterestPeriodEnd = null) => new()
+        {
+            Id = transaction.Id,
+            AssetId = transaction.AssetId,
+            Type = transaction.Type,
+            Quantity = transaction.Quantity,
+            UnitPrice = transaction.UnitPriceAmount,
+            Currency = currency,
+            ValuePln = transaction.FxRateToPln is { } rate
             ? Math.Round(transaction.Quantity * transaction.UnitPriceAmount * rate, 2, MidpointRounding.AwayFromZero)
             : null,
-        Date = transaction.Date,
-        Transfer = transfer
-    };
+            Date = transaction.Date,
+            Transfer = transfer,
+            SavingsInterestPeriodEnd = savingsInterestPeriodEnd
+        };
 }

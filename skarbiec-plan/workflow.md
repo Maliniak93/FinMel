@@ -104,8 +104,11 @@ What can be a script or a hook is not a prompt (cheaper, deterministic, no drift
 | Concern | Mechanism |
 |---|---|
 | Verification (format, build, tests; `web/`: typecheck, lint, build, test; OpenAPI-client diff) | `scripts/verify.mjs` — one Node script usable from Bash, hooks and CI alike. It runs **once per Verify phase, in the `verifier` agent only**: the implementer and test-writer run nothing but `--filter`ed tests, so no suite is paid for twice |
-| Formatting | `format-on-edit` hook (`PostToolUse` on Edit/Write); `web/**` → prettier, `.cs` is left to the implementer's own gate |
-| Implementer quality gate | `Stop` hook running `verify.mjs --quick` (format + build of touched projects only) — the implementer cannot end its turn on a red build |
+| Formatting | `format-on-edit` hook (`PostToolUse` on Edit/Write); `web/**` → prettier. Whatever slips through (`.cs`, files written from Bash, lint autofixes) is fixed by `verify.mjs --fix` — in the implementer's `Stop` hook and in every Verify phase — so a formatting slip never costs a model round |
+| Implementer quality gate | `Stop` hook running `verify.mjs --quick --fix` (reformat the changed files, then format check + build) — the implementer cannot end its turn on a red build |
+| Verify that cannot hang | `verify.mjs` has a 60-min run deadline that kills the whole process tree; the verifier starts it in the background with `--out .git/verify-result.json` and waits with `--await` (≤ 9 min per call) instead of polling |
+| Build prerequisites | a spec's `## Depends on` section; `gh-project.mjs prepare` refuses while a listed issue is open |
+| Token accounting | `scripts/run-cost.mjs` — per run and per agent type: model calls, cache read/write, largest context, share of exploring Bash calls |
 | Orchestration | the `Workflow` script (`build-feature.js`) — zero model tokens spent on control flow |
 | Board mechanics | `scripts/gh-project.mjs`: `check`/`create`/`edit` clean a draft (HTML comments, empty sections) and refuse one without Goal, Out of scope or a `proof:` per AC; `prepare` decides whether an issue is buildable, writes its local copy, resolves tier/skips, moves the card and prints the exact workflow args; `report` formats and posts the run report and ticks the ACs. So `/build` and `/board` run on Haiku as relays, and the ops agent only pastes one pre-built command |
 | Plan status (which spec stands where, open PRs, rotting branches) | `scripts/plan-status.mjs`, derived from the project's spec issues + git + `gh`. A `SessionStart` hook injects it into every session, so no session ever starts from a stale README; `--write` refreshes the generated block in `skarbiec-plan/README.md`. Only "Open loops" there stays hand-written — that is judgement, not data |
@@ -122,6 +125,8 @@ What can be a script or a hook is not a prompt (cheaper, deterministic, no drift
 | reviewer (skippable with `--skip review`) | Opus | 40–100k | $0.3–0.8 |
 | ops — ship (commit, push, PR, report) | Haiku | 5–15k | < $0.1 |
 | **Total per feature** | | | **~$1–2 (Tier 1), ~$2–5 (Tier 2)** |
+
+The estimates above predate measurement. `node scripts/run-cost.mjs` over 29 runs (2026-09-24 → 10-02) found ~13.8M cache-read tokens per run, 51 % in the implementer and 39 % in the test-writer, half of their Bash calls exploring the code — hence the spec's `## Code map`, the agents' "Read cheaply" rules and the > 8 AC split signal. Re-run it for current numbers.
 
 Measured 2026-09 (transcripts, list prices): Tier 1 averaged **$1.7** per run, Tier 2 (then opus/xhigh implementer + opus/high test-writer) **$6.9** (range $2–13) — implementer ~50%, test-writer ~30%, reviewer ~15%, Haiku phases < 2%. Cost splits roughly 45% cache writes (1h TTL = 2× input), 35% cache reads, 15% output: since cache reads cost the same on Sonnet 5.5 and Opus 5.5, moving a role to Sonnet saves ~30% of it, not 50%. The token counts above are per-call context, not totals — a run makes 60–230 calls.
 

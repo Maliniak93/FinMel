@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 
-public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext)
+public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<SavingsAccountResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, UpdateSavingsAccountRequest request, CancellationToken cancellationToken)
@@ -42,6 +43,9 @@ public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext)
         // the account's transactions.
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived);
+        // The new rate and tax status re-project the unsettled months at once.
+        var interest = await dbContext.LoadSavingsInterestStatusAsync(assetId, WarsawCalendar.Today(timeProvider), cancellationToken);
+
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, interest);
     }
 }

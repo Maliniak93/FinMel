@@ -7,13 +7,13 @@ namespace Skarbiec.Portfolio.Features.Deposits;
 
 /// <summary>
 /// A deposit's payout (deposit-payout-to-cash): the date of its Withdraw leg and the name of the Cash
-/// asset holding the matching Deposit leg — <see langword="null"/> once that asset was removed and the
+/// or Savings asset holding the matching Deposit leg — <see langword="null"/> once that asset was removed and the
 /// leg detached.
 /// </summary>
 public sealed record DepositPayoutInfo(DateOnly PaidOutOn, string? DestinationAssetName);
 
 /// <summary>
-/// The Deposit → Cash transfer that pays a settled deposit's whole balance out (deposit-payout-to-cash),
+/// The Deposit → Cash or Deposit → Savings (deposit-payout-to-savings) transfer that pays a settled deposit's whole balance out (deposit-payout-to-cash),
 /// shared by SettleDeposit's <c>destinationAssetId</c> and PayOutDeposit, plus the read side of it. No
 /// stored column: a deposit is paid out when it has a Withdraw — only a payout creates one — so the
 /// status survives a detach, which clears the link, not the leg.
@@ -109,7 +109,7 @@ internal static class DepositPayout
         => (await dbContext.LoadPayoutsAsync([depositId], cancellationToken)).GetValueOrDefault(depositId);
 }
 
-/// <param name="Destination">The tracked destination Cash asset.</param>
+/// <param name="Destination">The tracked destination Cash or Savings asset.</param>
 /// <param name="OutLeg">The deposit's Withdraw leg of its whole balance.</param>
 /// <param name="InLeg">The destination's Deposit leg.</param>
 /// <param name="DepositQuantity">The deposit's quantity with <paramref name="OutLeg"/> replayed — 0.</param>

@@ -153,4 +153,30 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.False(assets.Single(a => a.Id == due.AssetId).DepositSettled);
         Assert.Null(assets.Single(a => a.Id == cashId).DepositSettled);
     }
+
+    /// <summary>
+    /// savings-interest-settlement AC-10: <c>AssetResponse.SavingsInterestDue</c> is true for an account
+    /// with an ended, unsettled month, false once it is settled up, and null for any other class.
+    /// </summary>
+    [Fact]
+    public async Task List_SavingsAccount_FlagsInterestDue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, settledUp) = await client.CreatePortfolioWithSavingsAccountAsync(
+            cancellationToken, NewInterestAccountRequest(name: "Settled up"));
+        var due = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewInterestAccountRequest(name: "Due"));
+        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(portfolioId, settledUp.AssetId, cancellationToken);
+
+        var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var assets = await response.Content.ReadFromJsonAsync<List<AssetResponse>>(cancellationToken);
+        Assert.NotNull(assets);
+        Assert.True(assets.Single(a => a.Id == due.AssetId).SavingsInterestDue);
+        Assert.False(assets.Single(a => a.Id == settledUp.AssetId).SavingsInterestDue);
+        Assert.Null(assets.Single(a => a.Id == cashId).SavingsInterestDue);
+    }
 }
