@@ -33,13 +33,6 @@ import {
 } from '../testing/deposit-fixtures';
 import { SettleDepositDialog } from './settle-deposit-dialog';
 
-// term-deposits-settlement AC-9. The settle dialog opens on a Due deposit, loads its settlement
-// preview (GET .../deposits/{assetId}/settlement-preview) and pre-fills the editable settlement date,
-// gross interest and tax from it; principal and maturity are shown read-only; net interest and the
-// final amount (principal + gross − tax) follow the edits live. Its controls are named after the
-// SettleDepositRequest properties (camelCase) so a server 400 keyed on a field lands on it. The
-// submit under test is called on the dialog itself and asserted on the raw request the generated
-// client hands to `fetch`.
 describe('SettleDepositDialog', () => {
   let fixture: ComponentFixture<SettleDepositDialog>;
   let component: SettleDepositDialog;
@@ -52,7 +45,6 @@ describe('SettleDepositDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -60,9 +52,6 @@ describe('SettleDepositDialog', () => {
     return typeof input === 'string' ? 'GET' : (input as Request).method;
   }
 
-  // The preview GET always answers with `dueDepositSettlementPreview`; the transfer candidates
-  // (GET /api/portfolio/transfer-candidates) answer per the `currency` query parameter from
-  // `transferCandidatesByCurrency`; every write answers with `writeResponse`.
   async function setup(
     writeResponse: () => Response = () => jsonResponse(settledDeposit),
   ): Promise<void> {
@@ -92,7 +81,6 @@ describe('SettleDepositDialog', () => {
     fixture = TestBed.createComponent(SettleDepositDialog);
     component = fixture.componentInstance;
     await fixture.whenStable();
-    // The form is pre-filled once the preview has loaded.
     await vi.waitFor(() =>
       expect(Number(findControl(form(), 'grossInterest').value)).toBe(
         dueDepositSettlementPreview.grossInterest,
@@ -148,13 +136,11 @@ describe('SettleDepositDialog', () => {
     expect(Number(findControl(form(), 'grossInterest').value)).toBe(147.95);
     expect(Number(findControl(form(), 'tax').value)).toBe(28.12);
 
-    // Principal and maturity are shown, never inputs the user could type into.
     const text = renderedText(fixture);
     expect(text).toContain(formatMoney(10000, 'PLN'));
     expect(text).toContain(mediumDate(2026, 4, 15));
     expect(hasControl(form(), 'principal')).toBe(false);
     expect(hasControl(form(), 'maturityDate')).toBe(false);
-    // Net interest and the final amount of the previewed values.
     expect(text).toContain(formatMoney(119.83, 'PLN'));
     expect(text).toContain(formatMoney(10119.83, 'PLN'));
   });
@@ -271,10 +257,6 @@ describe('SettleDepositDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  // deposit-payout-to-cash AC-7. A "Move to" select (control `destinationAssetId`, named after the
-  // SettleDepositRequest property) defaults to "Keep in the deposit" and otherwise lists the Cash
-  // transfer candidates in the deposit's currency; a hint states the final amount that will move.
-  // Picking one sends it as `destinationAssetId`; keeping the money in the deposit sends none.
   describe('move to', () => {
     function hintText(): string {
       return Array.from(
@@ -304,7 +286,6 @@ describe('SettleDepositDialog', () => {
       expect(labels.some((label) => label.includes(eurSavingsCandidate.name))).toBe(false);
     });
 
-    // deposit-payout-to-savings AC-10: a savings account picked in the select is the destination.
     it('picking a savings account POSTs it as destinationAssetId', async () => {
       await setup();
       await pickSelectOption(fixture, 'destinationAssetId', plnSavingsCandidate.name);
@@ -365,9 +346,6 @@ describe('SettleDepositDialog', () => {
       expect(hintText()).toContain(formatMoney(10121.5, 'PLN'));
     });
 
-    // null-option-select-display AC-2. `[value]="null"` is Material's reset option by default —
-    // picking it (or leaving the select untouched) must still show its label in the trigger, not
-    // leave it looking empty.
     it('moveTo_KeepInDepositChosen_ShowsKeepInDepositInTrigger', async () => {
       await setup();
 
@@ -392,8 +370,6 @@ describe('SettleDepositDialog', () => {
     });
   });
 
-  // i18n screens (#132) AC-6: the dialog's title, summary, field labels, hints, validation messages
-  // and buttons follow the language.
   describe('in Polish', () => {
     function errors(): string[] {
       return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');

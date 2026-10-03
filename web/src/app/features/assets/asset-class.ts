@@ -1,9 +1,6 @@
 import type { AssetClass } from '../../api/portfolio';
 
-// Backend enum (Skarbiec.Contracts.AssetClass) serializes as its underlying int, so the generated
-// client types it as a bare `number` — labels for the UI have to be maintained here, in the same
-// declaration order as the C# enum. A label is a translation key: templates render it through the
-// `transloco` pipe.
+// Mirrors Skarbiec.Contracts.AssetClass in declaration order: the enum travels as its int.
 export const ASSET_CLASSES: readonly { value: AssetClass; label: string }[] = [
   { value: 0, label: 'enums.assetClass.cash' },
   { value: 1, label: 'enums.assetClass.deposit' },
@@ -17,8 +14,6 @@ export const ASSET_CLASSES: readonly { value: AssetClass; label: string }[] = [
   { value: 9, label: 'enums.assetClass.savings' },
 ];
 
-// Named constants for the same values, so callers that branch on a specific class (the asset-form
-// shell's class-to-form mapping) read as intent ("PreciousMetal") rather than a bare int.
 export const ASSET_CLASS = {
   Cash: 0,
   Deposit: 1,
@@ -32,7 +27,6 @@ export const ASSET_CLASS = {
   Savings: 9,
 } as const satisfies Record<string, AssetClass>;
 
-// A translation key.
 export function assetClassLabel(value: AssetClass): string {
   return ASSET_CLASSES.find((c) => c.value === Number(value))?.label ?? 'enums.assetClass.unknown';
 }

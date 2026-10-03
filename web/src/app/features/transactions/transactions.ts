@@ -32,9 +32,7 @@ import { transferLabel } from './transfer-direction';
 
 const DEFAULT_PAGE_SIZE = 20;
 
-// MatDialog/MatSnackBar are injected as services only (never referenced as template directives) —
-// see assets.ts for why importing MatDialogModule/MatSnackBarModule here would shadow a
-// TestBed-level override in specs.
+// MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({
   selector: 'app-transactions',
   imports: [
@@ -76,9 +74,6 @@ export class Transactions {
     },
   });
 
-  // AssetResponse carries only the asset's own archived flag, not its portfolio's, so the owning
-  // portfolio is loaded for that alone. Loaded
-  // once: nothing on this page can archive or restore it, so reload() leaves it alone.
   protected readonly portfolioResource = resource({
     params: () => ({ portfolioId: this.portfolioId() }),
     loader: async ({ params, abortSignal }) => {
@@ -95,33 +90,24 @@ export class Transactions {
     },
   });
 
-  // An archived portfolio is read-only: Portfolio rejects every transaction write on its assets
-  // with 409 (archived-portfolio-out-of-net-worth), so the page offers no record / edit / delete
-  // action and shows a notice instead. The history stays listed. If the portfolio fails to load,
-  // the asset load right next to it fails the same way and the page shows that error.
   protected readonly isArchived = computed(
     () => this.portfolioResource.hasValue() && this.portfolioResource.value().isArchived,
   );
 
-  // A term deposit's transactions are system-managed (term-deposits): its single opening Deposit is
-  // rewritten through the deposit itself, and Portfolio answers 409 to any write here.
   protected readonly isTermDeposit = computed(
     () =>
       this.assetResource.hasValue() &&
       Number(this.assetResource.value().assetClass) === ASSET_CLASS.Deposit,
   );
 
-  // An asset archived on its own is read-only the same way (asset-archive): 409 on every write.
   protected readonly isAssetArchived = computed(
     () => this.assetResource.hasValue() && this.assetResource.value().isArchived,
   );
 
-  // No record / edit / delete action where none would be accepted.
   protected readonly isReadOnly = computed(
     () => this.isArchived() || this.isAssetArchived() || this.isTermDeposit(),
   );
 
-  // The actions column holds only Edit / Delete, so a read-only view drops it entirely.
   protected readonly displayedColumns = computed(() => [
     'date',
     'type',
@@ -161,9 +147,7 @@ export class Transactions {
   protected readonly formatDate = formatDate;
   protected readonly formatMonth = formatMonth;
 
-  // PagedResponse.TotalCount is a server-side int, but the generated client types every numeric
-  // DTO property as `number | string` (same as Asset.Quantity/ManualValue) — coerce for
-  // mat-paginator's `[length]` input, which requires a real number.
+  // The generated client types every numeric property as `number | string`.
   protected asNumber(value: number | string): number {
     return Number(value);
   }
@@ -175,13 +159,9 @@ export class Transactions {
 
   private reload(): void {
     this.transactionsResource.reload();
-    // Recording/editing/deleting a transaction changes the asset's derived quantity (ADR-009) —
-    // refresh the header so it never shows a stale number after a mutation.
     this.assetResource.reload();
   }
 
-  // The dialog filters its transaction types by the asset's class (cash-transaction-types), so it
-  // opens only once the asset has loaded; the buttons that open it are gated the same way.
   private dialogData(): TransactionFormDialogData | null {
     if (!this.assetResource.hasValue()) {
       return null;
@@ -257,8 +237,6 @@ export class Transactions {
     this.reload();
   }
 
-  // A manual transfer (savings-cash-transfers) goes as a whole — both legs — behind the same
-  // confirmation as Delete; it is never edited.
   protected async removeTransfer(transaction: TransactionResponse): Promise<void> {
     const transfer = transaction.transfer;
     if (!transfer) {

@@ -26,10 +26,7 @@ import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { PortfolioFormDialog } from './portfolio-form-dialog/portfolio-form-dialog';
 
-// MatDialog/MatSnackBar are injected as services only (never referenced as template directives),
-// so MatDialogModule/MatSnackBarModule are deliberately NOT in `imports` below — importing them
-// here would re-provide the real MatDialog/MatSnackBar at the component's own injector level,
-// shadowing any TestBed-level override in specs (see portfolios.spec.ts).
+// MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({
   selector: 'app-portfolios',
   imports: [
@@ -53,8 +50,6 @@ export class Portfolios {
 
   protected readonly includeArchived = signal(false);
 
-  // Status only makes sense once archived portfolios are actually in view (S3) — the column list
-  // itself reacts to the same toggle that filters the rows.
   protected readonly displayedColumns = computed(() =>
     this.includeArchived()
       ? ['name', 'currency', 'totalValue', 'status', 'actions']
@@ -77,13 +72,6 @@ export class Portfolios {
     },
   });
 
-  // Total value per portfolio is Reporting's existing dashboard read model (ByPortfolio), joined
-  // client-side on portfolioId — no new backend endpoint (S3). Independent of the "Show archived"
-  // toggle, and reloaded after every archive / restore / delete, since each one changes what counts
-  // toward net worth (archived-portfolio-out-of-net-worth): a portfolio absent from the payload (no
-  // snapshot yet, or a deleted one) simply has no map entry, and the template renders an explicit
-  // placeholder rather than treating "missing" as "zero". If Reporting itself is unreachable, every
-  // row degrades to that same placeholder instead of blocking the whole list.
   protected readonly dashboardResource = resource({
     loader: async ({ abortSignal }) => {
       const result = await getApiReportingDashboard({ signal: abortSignal });
@@ -112,9 +100,6 @@ export class Portfolios {
     return this.portfolioValues().get(portfolioId);
   }
 
-  // null when there's nothing to show: no description, or whitespace-only. Truncated to 200 chars
-  // (after trimming) with a trailing "…" when longer — the full text stays readable in the edit
-  // dialog, this is just a hover/focus hint on the name link.
   protected descriptionTooltip(portfolio: PortfolioResponse): string | null {
     const trimmed = portfolio.description?.trim();
     if (!trimmed) {
@@ -170,7 +155,6 @@ export class Portfolios {
     this.reloadAfterLifecycleChange();
   }
 
-  // Mirror of archive() — the row menu offers exactly one of the two, decided by isArchived.
   protected async restore(portfolio: PortfolioResponse): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
@@ -200,8 +184,6 @@ export class Portfolios {
     this.reloadAfterLifecycleChange();
   }
 
-  // The delete cascades to the portfolio's assets and their transactions (spec-08), so the
-  // confirmation says so whenever there is anything to take with it.
   protected async remove(portfolio: PortfolioResponse): Promise<void> {
     const assetCount = Number(portfolio.assetCount);
     const message =
@@ -240,8 +222,6 @@ export class Portfolios {
     this.reloadAfterLifecycleChange();
   }
 
-  // Archive, restore and delete all change what counts toward net worth, so the "Total value"
-  // column is refetched along with the list (archived-portfolio-out-of-net-worth).
   private reloadAfterLifecycleChange(): void {
     this.portfoliosResource.reload();
     this.dashboardResource.reload();

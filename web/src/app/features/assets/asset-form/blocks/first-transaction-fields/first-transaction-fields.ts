@@ -17,14 +17,6 @@ import {
   TRANSACTION_TYPES,
 } from '../../../../transactions/transaction-type';
 
-// "Add first transaction" (M1.5): AddAssetRequest.InitialTransaction. Create only — UpdateAssetRequest
-// has no counterpart, so quantity on an existing asset only moves through the transactions view.
-//
-// The group starts disabled and the checkbox enables it: a disabled group adds nothing to the form's
-// validity or value, so an unchecked box never blocks submission and buildInitialTransaction() sends
-// null. The pre-fill (Deposit / unit price 1 for a currency-valued asset, Buy / 0 otherwise) is the
-// group's initial value — the sub-form is hidden until the box is first checked, and what the user
-// typed survives unchecking and checking again.
 export function createFirstTransactionGroup(fb: FormBuilder, currencyValued = false) {
   const group = fb.nonNullable.group({
     type: [currencyValued ? TRANSACTION_TYPE_DEPOSIT : TRANSACTION_TYPE_BUY, [Validators.required]],
@@ -49,8 +41,6 @@ export function buildInitialTransaction(
   return {
     type: values.type,
     quantity: values.quantity,
-    // Unit price is hidden (and meaningless) for non-trade types — same rule as
-    // TransactionFormDialog: 1 keeps `quantity × unitPrice` a single value formula end to end.
     unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
     date: toDateOnly(values.date),
   };
@@ -72,9 +62,6 @@ export function buildInitialTransaction(
 })
 export class FirstTransactionFields {
   readonly group = input.required<FirstTransactionGroup>();
-  // cash-transaction-types: a cash-like asset accepts only Deposit/Withdraw, so its first transaction
-  // is always an opening Deposit — no type select and no unit price, just Amount and Date. Pair it with
-  // createFirstTransactionGroup(fb, true), whose fixed Deposit / unit price 1 is what gets sent.
   readonly openingDeposit = input(false);
 
   protected readonly transactionTypes = TRANSACTION_TYPES;

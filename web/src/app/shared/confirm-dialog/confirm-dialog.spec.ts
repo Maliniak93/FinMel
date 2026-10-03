@@ -33,7 +33,6 @@ describe('ConfirmDialog', () => {
   });
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
@@ -52,8 +51,6 @@ describe('ConfirmDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  // i18n foundation (#131) AC-10: the default Cancel/Confirm labels are the dialog's own text and
-  // follow the language; the caller's title and message are shown as given.
   it('default buttons follow the language', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const buttons = () => Array.from(element.querySelectorAll('button'), textOf);

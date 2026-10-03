@@ -1,33 +1,11 @@
 #!/usr/bin/env node
-// PreToolUse(Bash) guard: restricts mutating git/gh commands to a working lane.
-//
-// This hook only ever *narrows* permissions. It emits "ask" or "deny" and never "allow" — when a
-// command is inside a lane it prints nothing at all, which leaves the normal `permissions` rules
-// in settings.json fully in charge. It cannot grant anything those rules do not already grant.
-//
-// Why it exists: automated workflows need git add|commit|push and gh pr on the `allow` list so a
-// run does not stop on a prompt every step. That allowance is repo-wide, so on its own it would
-// also cover a silent commit straight onto master in any session. This hook puts those cases back
-// on `ask` (or `deny` for a force-push to trunk), no matter which lane produced them.
-//
-// Lanes — branches where commit / push / PR-to-trunk proceed without a prompt:
-//   - `feat/*`, `chore/*`, `fix/*` — the current model. A `/build` or `/fix` run's Ship step
-//     commits, pushes and opens its PR on the issue's `feat/*` / `fix/*` branch, and an explicit
-//     `/ops <task>` chore works the same lanes; inside them no step prompts.
-//   - `praca_YYYY-MM-DD` and `[MT]<n>.<n>-...` — legacy branches from the earlier /praca workflow,
-//     kept so old branches and open PRs keep behaving the way they always did.
-//
-// Merging is never silent: `gh pr merge` always asks, regardless of branch or base — that decision
-// stays with the user. Pushing straight to master/main always asks; force-pushing it is denied
-// outright. Commit/push/PR activity outside every lane above falls back to asking, same as anything
-// else this hook doesn't specifically recognize.
 
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const LANE_CONVENTIONAL = /^(feat|chore|fix)\//; // current model; /build's ops agent lives here
-const LANE_PRACA = /^praca_\d{4}-\d{2}-\d{2}$/; // legacy: integration branch created by /praca
-const LANE_TASK = /^[MT]\d+\.\d+-/; // legacy: per-task branch, e.g. M1.3-Portfolio--constrain-currency…
+const LANE_CONVENTIONAL = /^(feat|chore|fix)\//;
+const LANE_PRACA = /^praca_\d{4}-\d{2}-\d{2}$/;
+const LANE_TASK = /^[MT]\d+\.\d+-/;
 const TRUNK = /^(master|main)$/;
 
 function isLane(branch) {
@@ -45,7 +23,7 @@ function main() {
   if (typeof command !== "string" || !command.trim()) return;
 
   const verdict = decide(command, payload.cwd || process.cwd());
-  if (!verdict) return; // in-lane or irrelevant — say nothing, let settings.json decide
+  if (!verdict) return;
 
   process.stdout.write(
     JSON.stringify({
@@ -66,7 +44,6 @@ function readPayload() {
   }
 }
 
-// Most restrictive segment wins; deny beats ask beats silence.
 function decide(command, cwd) {
   let worst = null;
 
@@ -79,8 +56,7 @@ function decide(command, cwd) {
   return worst;
 }
 
-// Split on shell operators only. Quoted text is left intact so a commit message containing `;`
-// or `&&` cannot manufacture an extra segment.
+// Quoted text stays intact, so a commit message containing `;` or `&&` cannot manufacture a segment.
 function splitSegments(command) {
   const segments = [];
   let current = "";
@@ -102,7 +78,7 @@ function splitSegments(command) {
     if (ch === ";" || ch === "\n" || ch === "|" || ch === "&") {
       segments.push(current);
       current = "";
-      if (command[i + 1] === ch) i++; // swallow the second char of `&&` / `||`
+      if (command[i + 1] === ch) i++;
       continue;
     }
     current += ch;
@@ -138,7 +114,6 @@ function judgeGit(args, cwd, segment) {
     const forced = args.some(
       (a) => a === "--force" || a === "-f" || a.startsWith("--force-with-lease"),
     );
-    // `git push origin master`, `git push origin HEAD:master`, `git push origin +master`
     const trunkRef = args
       .filter((a) => !a.startsWith("-") && a !== "push")
       .some((ref) => TRUNK.test((ref.includes(":") ? ref.split(":").pop() : ref).replace(/^\+/, "")));
@@ -174,7 +149,7 @@ function judgeGh(args, cwd, segment) {
         reason: "PR has no explicit --base; it would default to the repository's default branch.",
       };
     }
-    if (TRUNK.test(base) && isLane(branch)) return null; // lane -> master/main is the expected flow
+    if (TRUNK.test(base) && isLane(branch)) return null;
 
     return {
       decision: ASK,
@@ -185,7 +160,6 @@ function judgeGh(args, cwd, segment) {
   }
 
   if (args[1] === "merge") {
-    // Always a human decision, regardless of branch, base, or how the PR was opened.
     return { decision: ASK, reason: "Merging is the user's decision" };
   }
 
@@ -196,7 +170,7 @@ function outsideLane(cwd, what) {
   const branch = currentBranch(cwd);
 
   if (!branch) return { decision: ASK, reason: `Could not determine the current branch for ${what}.` };
-  if (isLane(branch)) return null; // in lane — no opinion
+  if (isLane(branch)) return null;
 
   return {
     decision: ASK,
@@ -206,7 +180,7 @@ function outsideLane(cwd, what) {
 
 function currentBranch(cwd) {
   const branch = run("git", ["rev-parse", "--abbrev-ref", "HEAD"], cwd);
-  return branch === "HEAD" ? null : branch; // detached
+  return branch === "HEAD" ? null : branch;
 }
 
 function run(bin, args, cwd) {

@@ -1,22 +1,6 @@
 #!/usr/bin/env node
-// Stops a locally running Skarbiec stack so builds, tests and installs can proceed.
-//
 // Usage: node scripts/stop-stack.mjs [--dry-run]
-//
-// A running stack gets in the way of automated work: the Aspire AppHost and the services it launched
-// hold their bin/ outputs open, so `dotnet build` / `dotnet test` fail with MSB3027 / MSB3021 ("the
-// file is being used by another process"), and `ng serve` holds web/node_modules binaries (esbuild)
-// and port 4200. Any agent that hits one of those may run this script and retry. `verify.mjs` calls
-// it on its own when a build fails on a locked file.
-//
-// What counts as the stack:
-//   - `dotnet run ... Skarbiec...` (the AppHost, or a service run by hand) — killed with its tree;
-//   - any `Skarbiec.*` executable that is not a test host (the services, the Gateway, the AppHost);
-//   - `ng serve` (started by `npm start` in web/).
-// Test hosts, `dotnet build` / `dotnet test` and this script's own process chain are never touched.
-//
-// Prints one JSON line `{"stopped":[{pid,name,what}]}` and exits 0 — also when nothing was running.
-// Node >= 22, ESM, zero npm dependencies. Also importable: `import { stopStack } from "./stop-stack.mjs"`.
+//   --dry-run  list what would be stopped without stopping it
 
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -59,7 +43,7 @@ function classify(p) {
   return null;
 }
 
-// This script's own ancestors (e.g. an agent's shell running `dotnet run` elsewhere) are never killed.
+// This script's own ancestors (e.g. an agent's shell running `dotnet run`) are never killed.
 function ancestorsOf(pid, byPid) {
   const seen = new Set();
   for (let p = byPid.get(pid); p && !seen.has(p.pid); p = byPid.get(p.ppid)) seen.add(p.pid);
@@ -91,7 +75,6 @@ export function stopStack({ dryRun = false } = {}) {
   const order = { "dotnet run": 0, "ng serve": 1, service: 2 };
   for (const p of [...found].sort((a, b) => order[a.what] - order[b.what])) kill(p.pid);
 
-  // Wait until the processes are gone and their file handles are released.
   for (let i = 0; i < 20 && findStack().length; i++) sleep(1000);
   const left = findStack().map(({ pid, name, what }) => ({ pid, name, what }));
   return left.length ? { stopped, left } : { stopped };

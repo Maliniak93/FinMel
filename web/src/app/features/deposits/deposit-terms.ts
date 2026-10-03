@@ -1,9 +1,6 @@
 import type { DepositCapitalization, DepositStatus, DepositTermUnit } from '../../api/portfolio';
 
-// Backend enums (Skarbiec.Portfolio.Data.DepositTermUnit / DepositCapitalization,
-// Features.Deposits.DepositStatus) serialize as their underlying ints, so the generated client types
-// them as bare `number`s — labels live here, in the same declaration order as the C# enums. A label
-// is a translation key: templates render it through the `transloco` pipe.
+// Mirrors DepositTermUnit, DepositCapitalization and DepositStatus in declaration order: the enums travel as ints.
 export const DEPOSIT_TERM_UNIT = { Days: 0, Months: 1 } as const satisfies Record<
   string,
   DepositTermUnit
@@ -28,7 +25,6 @@ export const DEPOSIT_STATUS = {
   PaidOut: 3,
 } as const satisfies Record<string, DepositStatus>;
 
-// The same caps AddDepositRequest/UpdateDepositRequest enforce (the API is the source of truth).
 export const MAX_TERM_DAYS = 3650;
 export const MAX_TERM_MONTHS = 120;
 
@@ -49,10 +45,6 @@ export function depositStatusLabel(status: DepositStatus): string {
   }
 }
 
-// A settlement's net interest (gross − tax) and final amount (principal + net), for the settle
-// dialog's live preview, a Settled or PaidOut row and the payout dialog's amount (a settled deposit's
-// whole balance) — the server stores only the three inputs. Summed in whole grosze so the display
-// never shows a floating-point artefact; the server's decimals stay the truth.
 export function settlementAmounts(
   principal: number | string,
   grossInterest: number | string,
@@ -66,9 +58,7 @@ export function settlementAmounts(
   };
 }
 
-// Mirrors DepositInterestMath.MaturityDate for the form's read-only preview (the server stores the
-// authoritative one): Days adds calendar days, Months adds months clamped to the target month's end
-// (2026-01-31 + 1 month = 2026-02-28). Works on local calendar dates, like shared/date-only.ts.
+// Mirrors DepositInterestMath.MaturityDate; Months clamps to the target month's end.
 export function depositMaturityDate(
   startDate: Date,
   termLength: number,

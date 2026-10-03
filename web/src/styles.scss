@@ -1,22 +1,9 @@
-// Include theming for Angular Material with `mat.theme()`.
-// This Sass mixin will define CSS variables that are used for styling Angular Material
-// components according to the Material 3 design spec.
-// Learn more about theming and how to use it for your application's
-// custom components at https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
 
 html {
   height: 100%;
 
-  // Default: follow the OS preference, live, with no JS involved — `light-dark()` (used inside
-  // every `--mat-sys-*` variable below) re-evaluates automatically as `prefers-color-scheme`
-  // changes. `ThemeService` (`web/src/app/core/theme/theme.ts`) lets the user pin an explicit
-  // choice instead, by writing `color-scheme` directly onto this element's inline `style` (not a
-  // stylesheet rule here) — an inline style wins the cascade unconditionally, which matters
-  // because production builds inline only a "critical" subset of this stylesheet into <head> and
-  // load the rest async; a same-specificity override rule living in that async-loaded remainder
-  // would apply a beat after first paint and flash. `index.html`'s bootstrap script does the same
-  // synchronously before Angular loads, for the same reason.
+  // Follows the OS; a pinned theme is an inline style, which beats the async-loaded rest of this file.
   color-scheme: light dark;
 
   @include mat.theme(
@@ -32,27 +19,16 @@ html {
 }
 
 body {
-  // No `color-scheme` here on purpose — it must inherit from <html> above. Redeclaring it here
-  // (even to the same-looking value) would pin it for the whole app regardless of the user's
-  // choice, silently breaking the toggle, since `color-scheme` is what every `light-dark()` in
-  // `--mat-sys-*` resolves against.
-
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
+  // No `color-scheme` here: it must inherit from <html>, or the theme toggle stops working.
   background-color: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-body-medium);
 
-  // Reset the user agent margin.
   margin: 0;
   height: 100%;
 }
-/* You can add global styles to this file, and also import other style files */
 
-// Portfolio description tooltip (portfolios.html): the CDK overlay renders outside the component
-// host, so component styles (and ::ng-deep) can't reach it — this has to live globally. Preserves
-// line breaks the user typed into the description textarea.
+// The CDK overlay renders outside the component host, so this tooltip style has to be global.
 .portfolio-description-tooltip {
   white-space: pre-line;
 }

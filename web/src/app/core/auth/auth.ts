@@ -13,17 +13,13 @@ import { readProblemDetails, type ApiProblemDetails } from './problem-details';
 
 export type AuthResult = { success: true } | { success: false; problem: ApiProblemDetails };
 
-// Session state (ADR-005): the access token lives in memory only (this signal), never
-// localStorage; the refresh token stays in the httpOnly cookie the Identity service manages —
-// this service never reads or writes it directly.
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly router = inject(Router);
 
   private readonly accessTokenState = signal<string | null>(null);
 
-  // Concurrent 401s (e.g. a page firing several requests at once) must trigger exactly one
-  // /refresh call; latecomers await this same in-flight promise instead of racing.
+  // Concurrent 401s await this in-flight promise, so only one /refresh call runs.
   private refreshInFlight: Promise<boolean> | null = null;
 
   readonly isAuthenticated = computed(() => this.accessTokenState() !== null);
@@ -55,8 +51,6 @@ export class AuthService {
     await this.router.navigateByUrl('/login');
   }
 
-  // Called once by the app initializer on load (silent session restore from the refresh cookie)
-  // and by the response interceptor on a 401 — both paths share the same single-flight promise.
   async refreshOnce(): Promise<boolean> {
     this.refreshInFlight ??= this.performRefresh();
     try {

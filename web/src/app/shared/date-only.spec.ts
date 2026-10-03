@@ -1,7 +1,5 @@
 import { fromDateOnly, toDateOnly } from './date-only';
 
-// AC-10: the local-midnight DateOnly helpers live once, here, for both the asset and transaction
-// dialogs.
 describe('date-only', () => {
   it('round-trips a DateOnly string through fromDateOnly and toDateOnly', () => {
     expect(toDateOnly(fromDateOnly('2026-03-05'))).toBe('2026-03-05');

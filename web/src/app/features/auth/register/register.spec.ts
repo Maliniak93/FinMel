@@ -38,7 +38,6 @@ describe('Register', () => {
   });
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
     document.documentElement.lang = 'en';
@@ -127,8 +126,6 @@ describe('Register', () => {
     expect(component['formError']()).toBe('Something went wrong. Please try again.');
   });
 
-  // i18n foundation (#131) AC-5: Polish picked on /login carries over (the choice is global and
-  // persisted); the register page's own client-side validation follows it.
   it('shows validation messages in Polish', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const errors = () => Array.from(element.querySelectorAll('mat-error'), textOf);
@@ -151,7 +148,6 @@ describe('Register', () => {
 
     await TestBed.inject(LanguageService).setLanguage('pl');
 
-    // Every field empty: the three "required" messages.
     await component['onSubmit']();
     await fixture.whenStable();
     expectPolish(errors(), 3);
@@ -159,7 +155,6 @@ describe('Register', () => {
       expect(isTranslationIn('pl', message), `"${message}" is not a pl.json value`).toBe(true);
     }
 
-    // Malformed email, too-long name, too-short password: the format messages.
     component['form'].setValue({
       email: 'not-an-email',
       displayName: 'x'.repeat(201),

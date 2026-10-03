@@ -38,8 +38,6 @@ import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialo
 import { VALUATION_MODE } from './asset-valuation-mode';
 import { Assets } from './assets';
 
-// See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
-// generated client ultimately calls) instead of mocking the SDK module.
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -63,7 +61,7 @@ const asset: AssetResponse = {
   id: '11111111-1111-1111-1111-111111111111',
   portfolioId,
   assetClass: 2,
-  valuationMode: 1, // Manual
+  valuationMode: 1,
   name: 'Apple',
   currency: 'USD',
   quantity: 10,
@@ -77,7 +75,7 @@ const marketAsset: AssetResponse = {
   id: '44444444-4444-4444-4444-444444444444',
   portfolioId,
   assetClass: 2,
-  valuationMode: 0, // Market
+  valuationMode: 0,
   name: 'Apple',
   currency: 'USD',
   quantity: 10,
@@ -100,12 +98,11 @@ const currencyValuedAsset: AssetResponse = {
   isArchived: false,
 };
 
-// term-deposits: a Deposit-class asset carries its maturity date on AssetResponse.
 function depositAsset(maturityDate: string): AssetResponse {
   return {
     ...currencyValuedAsset,
     id: '99999999-9999-9999-9999-999999999999',
-    assetClass: 1, // Deposit
+    assetClass: 1,
     name: 'Term deposit',
     quantity: 10000,
     depositMaturityDate: maturityDate,
@@ -143,7 +140,6 @@ describe('Assets', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
@@ -233,8 +229,6 @@ describe('Assets', () => {
     expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
   });
 
-  // Spec #105: the create/edit shell lives in asset-form/ now and is 560px wide so the type-picker
-  // tile grid fits.
   it('opens the asset-form shell 560px wide for create and edit', async () => {
     await setup(jsonResponse([asset]));
     dialog.open.mockReturnValue({ afterClosed: () => of(false) });
@@ -290,8 +284,6 @@ describe('Assets', () => {
     expect(fetchSpy.mock.calls.length).toBe(callsBefore);
   });
 
-  // spec-08 AC-10: delete no longer has a 409-specific path, but any server failure still surfaces
-  // the ProblemDetails detail in a snackbar and skips the reload.
   it('shows a snackbar and does not reload when delete fails on the server', async () => {
     await setup(jsonResponse([asset]));
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
@@ -315,8 +307,6 @@ describe('Assets', () => {
     expect(fetchSpy.mock.calls.length).toBe(callsBefore + 1);
   });
 
-  // spec-08 AC-10: delete cascades to the asset's transactions, so the menu item is always enabled
-  // and the confirmation names how many transactions go with it.
   it('deletes an asset with transactions after a confirmation naming the transaction count', async () => {
     const withTransactions: AssetResponse = { ...asset, transactionCount: 3 };
     await setup(jsonResponse([withTransactions]));
@@ -338,7 +328,6 @@ describe('Assets', () => {
     ).find((button) => (button.textContent ?? '').includes('Delete')) as
       HTMLButtonElement | undefined;
     expect(deleteButton?.disabled).toBe(false);
-    // No "can't be deleted" tooltip any more — MatTooltip marks its host with this class.
     expect(deleteButton?.classList.contains('mat-mdc-tooltip-trigger')).toBe(false);
 
     deleteButton!.click();
@@ -349,7 +338,6 @@ describe('Assets', () => {
       /^"Apple" and its 3 transactions?(\(s\))? will be permanently deleted\. This can't be undone\.$/,
     );
 
-    // The DELETE, then the assets reload.
     await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
     const deleteCall = fetchSpy.mock.calls[callsBefore][0] as Request;
     expect(deleteCall.method).toBe('DELETE');
@@ -418,8 +406,6 @@ describe('Assets', () => {
     expect(text).toContain('No price yet');
   });
 
-  // spec fix-currency-valued-asset-value AC-1: a currency-valued asset's Value cell is its quantity
-  // in its own currency, not its (always-null) manualValue.
   it("shows a currency-valued asset's quantity as its value", async () => {
     await setup(jsonResponse([currencyValuedAsset]));
 
@@ -430,9 +416,6 @@ describe('Assets', () => {
     );
   });
 
-  // spec fix-currency-valued-asset-value AC-2: no valuation date exists for a currency-valued asset,
-  // so "Valued on" shows an em dash and never the manual Stale chip (its manualValueDate is null,
-  // which `isStale` would otherwise treat as 1970-01-01).
   it('does not flag a currency-valued asset as stale', async () => {
     await setup(jsonResponse([currencyValuedAsset]));
 
@@ -443,8 +426,6 @@ describe('Assets', () => {
     expect(cell?.textContent).not.toContain('Stale');
   });
 
-  // spec fix-currency-valued-asset-value AC-3: out of scope explicitly excludes converting to PLN —
-  // the list shows the asset's own currency, like a market asset shown in its quote currency.
   it('shows a non-PLN currency-valued asset in its own currency', async () => {
     await setup(jsonResponse([currencyValuedEurAsset]));
 
@@ -452,8 +433,6 @@ describe('Assets', () => {
     expect(text).toContain(formatMoney(250, 'EUR'));
   });
 
-  // spec fix-currency-valued-asset-value AC-4: the manual Stale chip is unchanged for Manual assets —
-  // it fires only when the hand-typed valuation date is more than 6 months old.
   it('flags only a manual asset with an old valuation date as stale', async () => {
     const staleDate = new Date();
     staleDate.setMonth(staleDate.getMonth() - 7);
@@ -480,9 +459,6 @@ describe('Assets', () => {
     expect(rows[1].textContent).not.toContain('Stale');
   });
 
-  // archived-portfolio-out-of-net-worth AC11: the backend rejects every asset write into an archived
-  // portfolio with 409, so the page must not offer one — no New asset / Add your first asset, no
-  // Edit / Delete in any row menu — and says why instead.
   describe('archived portfolio is read-only', () => {
     const archivedPortfolio: PortfolioResponse = { ...portfolio, isArchived: true };
     const archivedNotice = /This portfolio is archived\W+restore it to make changes/;
@@ -498,7 +474,6 @@ describe('Assets', () => {
       );
     }
 
-    // Opens every row menu the page renders (if any) and returns what the overlay offers.
     async function rowMenuText(): Promise<string> {
       const overlayContainer = TestBed.inject(OverlayContainer);
       for (const triggerElement of fixture.debugElement.queryAll(By.directive(MatMenuTrigger))) {
@@ -512,7 +487,6 @@ describe('Assets', () => {
     it('archived portfolio is read-only: no add / edit / remove actions, archived notice shown', async () => {
       await setup(jsonResponse([asset, currencyValuedAsset]), jsonResponse(archivedPortfolio));
 
-      // The assets themselves are still listed — archived is read-only, not hidden.
       expect(pageText()).toContain('Apple');
       expect(pageText()).toMatch(archivedNotice);
       expect(pageButtonTexts().some((text) => text.includes('New asset'))).toBe(false);
@@ -543,9 +517,6 @@ describe('Assets', () => {
     });
   });
 
-  // asset-archive AC-11: any asset can be archived on its own. "Show archived" (off by default)
-  // reveals it with an "Archived" chip; the row menu gains Archive / Restore behind a ConfirmDialog;
-  // an archived row has no Edit and no "Due" chip but keeps Restore and Delete.
   describe('archive', () => {
     const archivedCash = {
       ...currencyValuedAsset,
@@ -633,14 +604,12 @@ describe('Assets', () => {
       await setup(jsonResponse([asset, archivedCash]));
       await showArchived(fixture);
       dialog.open.mockReturnValue({ afterClosed: () => of(true) });
-      // Each reload reads a fresh list body: setup() hands back one Response, readable only once.
       fetchSpy.mockImplementation(async (input: unknown) =>
         requestUrl(input).includes('/assets')
           ? jsonResponse([asset, archivedCash])
           : jsonResponse(portfolio),
       );
 
-      // Archive the live asset.
       let callsBefore = fetchSpy.mock.calls.length;
       fetchSpy.mockImplementationOnce(async () => jsonResponse({ ...asset, isArchived: true }));
       await clickRowMenuItem(fixture, rowFor('Apple'), /\barchive\b/i);
@@ -652,7 +621,6 @@ describe('Assets', () => {
       expect(archiveCall.url).toContain(`/portfolios/${portfolioId}/assets/${asset.id}/archive`);
       expect((fetchSpy.mock.calls[callsBefore + 1][0] as Request).method).toBe('GET');
 
-      // Restore the archived one.
       callsBefore = fetchSpy.mock.calls.length;
       fetchSpy.mockImplementationOnce(async () =>
         jsonResponse({ ...archivedCash, isArchived: false }),
@@ -691,8 +659,6 @@ describe('Assets', () => {
     });
   });
 
-  // term-deposits AC-16: a Deposit row is edited through DepositFormDialog (its terms live on the
-  // deposit endpoints), never the generic asset form.
   it('Edit on a Deposit row opens DepositFormDialog, not the asset form', async () => {
     const deposit = depositAsset('2027-01-01');
     const terms = depositResponse({ assetId: deposit.id, portfolioId, maturityDate: '2027-01-01' });
@@ -706,9 +672,7 @@ describe('Assets', () => {
     const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data?: unknown }];
     expect(dialogType).toBe(DepositFormDialog);
     expect(dialogType).not.toBe(AssetFormDialog);
-    // Addresses this deposit — whether the page hands over the loaded terms or just the ids.
     expect(JSON.stringify(config?.data)).toContain(deposit.id);
-    // A save reloads the asset list.
     await vi.waitFor(() =>
       expect(
         fetchSpy.mock.calls
@@ -720,13 +684,11 @@ describe('Assets', () => {
     );
   });
 
-  // savings-accounts: a Savings-class row is edited through SavingsAccountFormDialog (its terms live
-  // on the savings-account endpoints), never the generic asset form.
   it('Edit on a Savings row opens SavingsAccountFormDialog, not the asset form', async () => {
     const savings: AssetResponse = {
       ...currencyValuedAsset,
       id: '88888888-aaaa-8888-aaaa-888888888888',
-      assetClass: 9, // Savings
+      assetClass: 9,
       name: 'Savings account',
       quantity: 10000,
     };
@@ -742,7 +704,6 @@ describe('Assets', () => {
     expect(dialogType).toBe(SavingsAccountFormDialog);
     expect(dialogType).not.toBe(AssetFormDialog);
     expect(JSON.stringify(config?.data)).toContain(savings.id);
-    // A save reloads the asset list.
     await vi.waitFor(() =>
       expect(
         fetchSpy.mock.calls
@@ -763,8 +724,6 @@ describe('Assets', () => {
     expect(dialog.open).toHaveBeenCalledWith(AssetFormDialog, expect.anything());
   });
 
-  // term-deposits AC-16: a Deposit whose maturity date has passed shows a "Due" chip; one still
-  // running does not.
   it('a past-maturity Deposit row shows the "Due" chip', async () => {
     const matured = { ...depositAsset(daysFromToday(-1)), name: 'Matured deposit' };
     const running = {
@@ -784,8 +743,6 @@ describe('Assets', () => {
     expect(runningRow?.textContent).not.toContain('Due');
   });
 
-  // term-deposits-settlement: a settled deposit is past maturity but no longer Due — AssetResponse
-  // carries `depositSettled`, and its row shows no "Due" chip.
   it('a settled Deposit row shows no "Due" chip', async () => {
     const matured = { ...depositAsset(daysFromToday(-1)), name: 'Matured deposit' };
     const settled = {
@@ -807,14 +764,11 @@ describe('Assets', () => {
     expect(settledRow?.textContent).not.toContain('Due');
   });
 
-  // savings-interest-settlement AC-13: a Savings account with an ended, unsettled month
-  // (`savingsInterestDue` on AssetResponse) shows the same "Due" chip, with the tooltip "Interest to
-  // settle"; a settled-up account (false) and a Cash asset (null) show none.
   it('a savings account with interest to settle shows the "Due" chip', async () => {
     const savings = (overrides: Partial<AssetResponse>): AssetResponse =>
       ({
         ...currencyValuedAsset,
-        assetClass: 9, // Savings
+        assetClass: 9,
         quantity: 10000,
         ...overrides,
       }) as AssetResponse;
@@ -846,8 +800,6 @@ describe('Assets', () => {
     expect(chip?.injector.get(MatTooltip).message).toBe('Interest to settle');
   });
 
-  // i18n foundation (#131) AC-7: money, quantity and date cells follow the language live — a
-  // switch re-renders them in pl-PL without reloading the page or its resources.
   it('reformats values when the language changes', async () => {
     const valuedAsset: AssetResponse = {
       ...asset,
@@ -882,8 +834,6 @@ describe('Assets', () => {
     expect(fetchSpy.mock.calls.length).toBe(fetchesBefore);
   });
 
-  // i18n screens (#132) AC-3: the list's headings, table headers, chips and their tooltips, row menu,
-  // empty state, delete confirmation and failure snackbar fallback follow the language.
   describe('in Polish', () => {
     const maturity = daysFromToday(-1);
 
@@ -948,7 +898,6 @@ describe('Assets', () => {
       expect(polishProblems(english, await texts())).toEqual([]);
       expect(heading()).not.toContain('Assets');
       expect(heading()).toContain('Retirement');
-      // "Matured on {date}": the parameterised key, with the date in the active locale.
       expect(maturedTooltip()).not.toMatch(/^Matured on /);
       expect(maturedTooltip()).toContain(formatDate(maturity));
       expect(
@@ -1069,7 +1018,6 @@ describe('Assets', () => {
       expect(polishProblems(['Retry'], labelsOf(element, '.assets-page__state button'))).toEqual(
         [],
       );
-      // The backend's own message stays as it arrived.
       expect(textOf(element.querySelector('.assets-page__state p'))).toBe('Service unavailable.');
     });
 

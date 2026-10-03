@@ -42,10 +42,6 @@ import {
   textOf,
 } from '../../../../testing/i18n';
 
-// term-deposits AC-14. The create/edit dialog for a term deposit: its controls are named after the
-// AddDepositRequest/UpdateDepositRequest properties (camelCase) so a server 400 keyed on a field
-// lands on it. The submit under test is called on the dialog itself and asserted on the raw
-// request the generated client hands to `fetch`.
 describe('DepositFormDialog', () => {
   let fixture: ComponentFixture<DepositFormDialog>;
   let component: DepositFormDialog;
@@ -58,7 +54,6 @@ describe('DepositFormDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -66,10 +61,6 @@ describe('DepositFormDialog', () => {
     return typeof input === 'string' ? 'GET' : (input as Request).method;
   }
 
-  // The portfolio list (GET /api/portfolio/portfolios) always answers with an archived portfolio in
-  // it, so the select has something to leave out; the transfer candidates
-  // (GET /api/portfolio/transfer-candidates) answer per the `currency` query parameter from
-  // `transferCandidatesByCurrency`; every write answers with `writeResponse`.
   async function setup(
     data: DepositFormDialogData,
     writeResponse: () => Response = () => jsonResponse(depositResponse(), 201),
@@ -118,7 +109,6 @@ describe('DepositFormDialog', () => {
     await fixture.whenStable();
   }
 
-  // A complete, valid set of terms — the spec's AC-1 deposit.
   const validTerms = {
     name: 'Term deposit',
     bankName: 'Test bank',
@@ -150,7 +140,6 @@ describe('DepositFormDialog', () => {
     await setup({});
 
     await fill({ startDate: new Date(2026, 0, 31), termLength: 1, termUnit: TERM_UNIT.Months });
-    // 2026-01-31 + 1 month clamps to the end of February.
     expect(renderedText(fixture)).toContain(mediumDate(2026, 2, 28));
 
     await fill({ termLength: 45, termUnit: TERM_UNIT.Days });
@@ -158,10 +147,8 @@ describe('DepositFormDialog', () => {
     expect(renderedText(fixture)).not.toContain(mediumDate(2026, 2, 28));
 
     await fill({ startDate: new Date(2026, 1, 1) });
-    // 2026-02-01 + 45 days.
     expect(renderedText(fixture)).toContain(mediumDate(2026, 3, 18));
 
-    // Read-only: it is shown, never an input the user could type into.
     expect(hasControl(form(), 'maturityDate')).toBe(false);
     expect(fetchSpy.mock.calls.every((call: unknown[]) => method(call[0]) === 'GET')).toBe(true);
   });
@@ -198,7 +185,6 @@ describe('DepositFormDialog', () => {
 
     expect(writeRequests()).toEqual([]);
 
-    // The same number of days is fine once it fits.
     await fill({ termLength: 3650, termUnit: TERM_UNIT.Days });
     await component['onSubmit']();
     expect(writeRequests()).toHaveLength(1);
@@ -269,7 +255,6 @@ describe('DepositFormDialog', () => {
     expect(Number(findControl(form(), 'termLength').value)).toBe(3);
     expect(findControl(form(), 'capitalization').value).toBe(CAPITALIZATION.Monthly);
     expect(findControl(form(), 'taxExempt').value).toBe(true);
-    // Portfolio and currency are fixed after create: no select for either.
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector('mat-select[formcontrolname="portfolioId"]')).toBeNull();
     expect(element.querySelector('mat-select[formcontrolname="currency"]')).toBeNull();
@@ -301,10 +286,6 @@ describe('DepositFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
-  // deposit-rollover AC-10. Once rolled over (`rolloverCount > 0`) the principal and start date were
-  // produced by earlier terms: both controls are disabled, yet the PUT still carries their current
-  // values. A never rolled-over deposit (`rolloverCount` 0) keeps them editable — proven by the edit
-  // fact above, whose fixture carries `rolloverCount: 0`.
   it('edit of a rolled-over deposit disables principal and start date, and the PUT still carries them', async () => {
     await setup({ deposit: rolledOverDeposit }, () => jsonResponse(rolledOverDeposit));
 
@@ -328,7 +309,6 @@ describe('DepositFormDialog', () => {
     expect(principalInput?.disabled).toBe(true);
 
     await fill({ name: 'Renamed deposit', annualInterestRatePercent: 4.5, termLength: 6 });
-    // The new maturity follows the unchanged start date: 2026-04-15 + 6 months.
     expect(renderedText(fixture)).toContain(mediumDate(2026, 10, 15));
     await component['onSubmit']();
 
@@ -407,12 +387,6 @@ describe('DepositFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  // asset-transfers-deposit-funding AC-11. In create mode a "Source of funds" select (control
-  // `fundingAssetId`, named after the AddDepositRequest property) defaults to "New money (from
-  // outside)" and lists the Cash transfer candidates of the chosen currency, "name — portfolio
-  // (balance)"; it reloads when the currency changes. A principal above the selected balance blocks
-  // submit, and the server's 400 Validation.InsufficientFunds lands on the principal too. In edit
-  // mode the source is shown read-only and never sent.
   describe('source of funds', () => {
     function candidateRequests(): URL[] {
       return fetchSpy.mock.calls
@@ -425,7 +399,6 @@ describe('DepositFormDialog', () => {
         .map((input: unknown) => new URL(requestUrl(input)));
     }
 
-    // Balances are formatted by the component; accept any grouping separator (or none).
     function balancePattern(amount: number): RegExp {
       const digits = String(amount);
       const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '[\\s,.\\u00a0\\u202f]?');
@@ -476,7 +449,6 @@ describe('DepositFormDialog', () => {
       expect(writeRequests()).toEqual([]);
       expect(dialogRef.close).not.toHaveBeenCalled();
 
-      // Exactly the balance is fine.
       await fill({ principal: plnCashCandidate.balance });
       await component['onSubmit']();
       expect(writeRequests()).toHaveLength(1);
@@ -575,9 +547,6 @@ describe('DepositFormDialog', () => {
       expect(renderedText(fixture)).toContain('New money');
     });
 
-    // null-option-select-display AC-1. `[value]="null"` is Material's reset option by default —
-    // picking it (or leaving the select untouched) must still show its label in the trigger, not
-    // leave it looking empty.
     it('sourceOfFunds_NewMoneyChosen_ShowsNewMoneyInTrigger', async () => {
       await setup({ portfolioId: savingsPortfolioId });
 
@@ -602,10 +571,7 @@ describe('DepositFormDialog', () => {
     });
   });
 
-  // i18n screens (#132) AC-6: the dialog's title, field labels, hints, validation messages and
-  // buttons follow the language.
   describe('in Polish', () => {
-    // An element's text without what `removed` matches inside it ("Matures on <strong>date</strong>").
     function textWithout(selector: string, removed: string): string {
       const clone = (fixture.nativeElement as HTMLElement)
         .querySelector(selector)!
@@ -710,7 +676,6 @@ describe('DepositFormDialog', () => {
 
       const polish = errors();
       expect(polishProblems(english, polish)).toEqual([]);
-      // "Term is at most {{ max }}." keeps its number.
       expect(polish[5]).toContain('120');
     });
 

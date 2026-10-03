@@ -36,12 +36,8 @@ import { ASSET_CLASS, assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
 
-// A manual valuation older than this is flagged as stale, prompting a refresh (no ADR/backlog
-// number given — domain-model.md just says "every N months").
 const STALE_MANUAL_VALUE_MONTHS = 6;
 
-// Market prices older than this are stale (domain.md, E4 [S]) — a separate, much tighter, rule
-// than manual valuations above since a synced price is expected daily, not entered by hand.
 const STALE_PRICE_DAYS = 7;
 
 function isStale(manualValueDate: string): boolean {
@@ -59,9 +55,7 @@ function isPriceStale(lastPriceDate: string | null | undefined): boolean {
   return new Date(lastPriceDate) < threshold;
 }
 
-// MatDialog/MatSnackBar are injected as services only (never referenced as template directives),
-// so MatDialogModule/MatSnackBarModule are deliberately NOT in `imports` below — see
-// portfolios.ts for why importing them here would shadow a TestBed-level override in specs.
+// MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({
   selector: 'app-assets',
   imports: [
@@ -101,14 +95,10 @@ export class Assets {
     },
   });
 
-  // An archived portfolio is read-only: Portfolio rejects every asset write into it with 409
-  // (archived-portfolio-out-of-net-worth), so the page offers no add / edit / remove action and
-  // shows a notice instead. The assets themselves stay listed.
   protected readonly isArchived = computed(
     () => this.portfolioResource.hasValue() && this.portfolioResource.value().isArchived,
   );
 
-  // The actions column holds only Edit / Delete, so an archived portfolio drops it entirely.
   protected readonly displayedColumns = computed(() => [
     'assetClass',
     'name',
@@ -133,9 +123,6 @@ export class Assets {
     },
   });
 
-  // asset-archive: an asset archived on its own is hidden until "Show archived" is on. Filtered here,
-  // because ListAssets returns every asset — other callers (the transactions view) must still resolve
-  // an archived one.
   protected readonly showArchived = signal(false);
 
   protected readonly visibleAssets = computed(() =>
@@ -144,8 +131,6 @@ export class Assets {
       : [],
   );
 
-  // AssetResponse only carries InstrumentId (ADR-003, no FK) — one lookup per distinct instrument
-  // used by this portfolio's market assets fills in ticker/last price/date/source for display.
   protected readonly instrumentDetailsResource = resource({
     params: () => {
       const instrumentIds = [
@@ -189,14 +174,10 @@ export class Assets {
       : undefined;
   }
 
-  // Only called once the template has confirmed instrument.lastPrice != null.
   protected marketValue(asset: AssetResponse, instrument: InstrumentDetailsResponse): number {
     return Number(asset.quantity) * Number(instrument.lastPrice);
   }
 
-  // A term deposit is Due once its maturity date is today or earlier — the same rule as the
-  // Deposits page's server-side status, on the viewer's local calendar date — until it is settled.
-  // An archived deposit is read-only, so it is never flagged Due.
   protected isDepositDue(asset: AssetResponse): boolean {
     return (
       !asset.isArchived &&
@@ -206,8 +187,6 @@ export class Assets {
     );
   }
 
-  // A savings account is Due while an ended calendar month's interest is unsettled — computed on the
-  // server against the Europe/Warsaw date (savings-interest-settlement). Archived: read-only, never Due.
   protected isSavingsInterestDue(asset: AssetResponse): boolean {
     return !asset.isArchived && asset.savingsInterestDue === true;
   }
@@ -246,8 +225,6 @@ export class Assets {
     });
   }
 
-  // A term deposit's terms live on the deposit endpoints, so its row edits through DepositFormDialog
-  // with the loaded terms, never through the generic asset form.
   private async openDepositEditDialog(asset: AssetResponse): Promise<void> {
     const result = await getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId({
       path: { portfolioId: this.portfolioId(), assetId: asset.id },
@@ -271,7 +248,6 @@ export class Assets {
     });
   }
 
-  // Likewise a savings account's terms live on the savings-account endpoints (savings-accounts).
   private async openSavingsAccountEditDialog(asset: AssetResponse): Promise<void> {
     const result = await getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId({
       path: { portfolioId: this.portfolioId(), assetId: asset.id },
@@ -295,7 +271,6 @@ export class Assets {
     });
   }
 
-  // asset-archive: Archive / Restore sit in the row menu, behind a confirmation, and reload the list.
   protected async setArchived(asset: AssetResponse, archive: boolean): Promise<void> {
     const done = await confirmSetAssetArchived(
       this.dialog,
@@ -308,8 +283,6 @@ export class Assets {
     }
   }
 
-  // The delete cascades to the asset's transactions (spec-08), so the confirmation names them
-  // whenever there are any.
   protected async remove(asset: AssetResponse): Promise<void> {
     const transactionCount = Number(asset.transactionCount);
     const message =

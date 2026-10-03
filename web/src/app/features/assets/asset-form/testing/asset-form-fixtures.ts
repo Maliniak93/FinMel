@@ -10,12 +10,6 @@ import type { AssetClass, AssetResponse } from '../../../../api/portfolio';
 import { InstrumentPicker } from '../blocks/instrument-picker/instrument-picker';
 import { provideI18nTesting } from '../../../../core/i18n/testing';
 
-// Shared arrange helpers for the asset-form specs (shell, picker, per-kind forms, blocks). Test-only:
-// nothing in the app imports this file. Kept free of Vitest globals so it also type-checks under
-// tsconfig.app.json, which compiles every non-spec file under src/.
-
-// Relative-import `vi.mock` is blocked (see auth.spec.ts), so specs stub `fetch` — what the generated
-// client ultimately calls — and answer with these.
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -27,8 +21,6 @@ export function requestUrl(input: unknown): string {
   return typeof input === 'string' ? input : (input as Request).url;
 }
 
-// Finds a control by name anywhere inside a form's tree (breadth-first), so a spec states which
-// field it touches without pinning how a form nests the groups its blocks' factories return.
 export function findControl(root: AbstractControl, name: string): AbstractControl {
   const found = searchControl(root, name);
   if (!found) {
@@ -59,8 +51,6 @@ function searchControl(root: AbstractControl, name: string): AbstractControl | n
   return null;
 }
 
-// Clicks the "Add first transaction" checkbox the way a user does — through the native input Material
-// renders inside <mat-checkbox> — so a spec never depends on the block's toggle method name.
 export async function toggleFirstTransaction(fixture: ComponentFixture<unknown>): Promise<void> {
   const element = fixture.nativeElement as HTMLElement;
   const checkbox = element.querySelector<HTMLInputElement>('mat-checkbox input[type="checkbox"]');
@@ -72,8 +62,6 @@ export async function toggleFirstTransaction(fixture: ComponentFixture<unknown>)
   await fixture.whenStable();
 }
 
-// Mounts one per-kind form component (cash/security/gold/manual) on its own, the way the shell renders
-// it: `assetClass` always, `asset` only for edit. The spec that calls this owns the fetch stub.
 export async function mountAssetForm<T>(
   component: Type<T>,
   assetClass: AssetClass,
@@ -93,9 +81,6 @@ export async function mountAssetForm<T>(
   return fixture;
 }
 
-// Picks an autocomplete option in the instrument-picker block rendered inside `fixture`, through the
-// same handler Material's (optionSelected) calls — the picker's internals moved as-is from the old
-// dialog, so this is exactly what the old dialog spec did.
 export async function pickInstrument(
   fixture: ComponentFixture<unknown>,
   option: InstrumentSearchResult | InstrumentDetailsResponse,
@@ -111,8 +96,6 @@ export async function pickInstrument(
   await fixture.whenStable();
 }
 
-// Marks every control of the form touched, the way a blocked submit does, so its error messages
-// render — then lets the view settle.
 export async function showValidationErrors(
   fixture: ComponentFixture<unknown>,
   form: AbstractControl,
@@ -132,8 +115,8 @@ export const instrumentId = '33333333-3333-3333-3333-333333333333';
 export const cashAsset: AssetResponse = {
   id: '11111111-1111-1111-1111-111111111111',
   portfolioId,
-  assetClass: 0, // Cash
-  valuationMode: 2, // CurrencyValued
+  assetClass: 0,
+  valuationMode: 2,
   name: 'Checking account',
   currency: 'PLN',
   quantity: 0,
@@ -144,8 +127,8 @@ export const cashAsset: AssetResponse = {
 export const realEstateAsset: AssetResponse = {
   id: '55555555-5555-5555-5555-555555555555',
   portfolioId,
-  assetClass: 7, // RealEstate
-  valuationMode: 1, // Manual
+  assetClass: 7,
+  valuationMode: 1,
   name: 'Apartment',
   currency: 'PLN',
   quantity: 0,
@@ -158,8 +141,8 @@ export const realEstateAsset: AssetResponse = {
 export const cryptoAsset: AssetResponse = {
   id: '44444444-4444-4444-4444-444444444444',
   portfolioId,
-  assetClass: 5, // Crypto
-  valuationMode: 0, // Market
+  assetClass: 5,
+  valuationMode: 0,
   name: 'Bitcoin',
   currency: 'PLN',
   quantity: 0.5,

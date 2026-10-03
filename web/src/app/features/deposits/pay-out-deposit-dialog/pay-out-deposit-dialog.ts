@@ -37,11 +37,6 @@ function today(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-// Pays a Settled deposit out (deposit-payout-to-cash, deposit-payout-to-savings): its whole balance —
-// principal + the settled net interest, never a part of it — moves to one of the Cash or Savings
-// transfer candidates in its currency (or a savings account opened from the destination select), on a
-// date between the settlement date and today. Control names follow the
-// PayOutDepositRequest properties, so a server 400 keyed on a field lands on it.
 @Component({
   selector: 'app-pay-out-deposit-dialog',
   imports: [
@@ -64,14 +59,11 @@ export class PayOutDepositDialog {
   protected readonly deposit = inject<PayOutDepositDialogData>(MAT_DIALOG_DATA).deposit;
 
   protected readonly formatMoney = formatMoney;
-  // Read-only: a payout always moves the whole balance.
   protected readonly amount = settlementAmounts(
     this.deposit.principal,
     this.deposit.settledGrossInterest ?? 0,
     this.deposit.settledTax ?? 0,
   ).finalAmount;
-  // The payout date lies between the settlement date and today (Europe/Warsaw on the server; the
-  // viewer's local date here).
   protected readonly minDate = fromDateOnly(this.deposit.settledOn ?? this.deposit.maturityDate);
   protected readonly maxDate = today();
 

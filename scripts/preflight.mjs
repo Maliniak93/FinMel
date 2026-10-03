@@ -1,31 +1,8 @@
 #!/usr/bin/env node
-// Preflight for /build and /fix: checks that everything the build pipeline needs is up, and starts or
-// fixes what can be fixed automatically.
-//
 // Usage: node scripts/preflight.mjs [--dry-run] [--no-web] [--docker-timeout <seconds>]
-//
-//   --dry-run                 only check — never start, stop or install anything. What would have been
-//                             fixed is reported as a failure carrying the fix text.
-//   --no-web                  skip the `web-deps` check (no npm ci).
-//   --docker-timeout <s>      how long to wait for the Docker daemon after starting it (default 180).
-//
-// Checks, in this order (each yields {name, status: "ok"|"fixed"|"fail", detail, fix?}). All of them
-// always run, so every problem shows up at once:
-//   node      version meets the Angular 22 CLI floor (>=22.22.3 on 22.x, >=24.15 on 24.x, >=26)   report only
-//   dotnet    a .NET 10 SDK is installed                                                          report only
-//   gh        installed, logged in, token scopes include `repo` and `project`                     report only
-//   git       inside the repo and remote `origin` exists                                          report only
-//   docker    daemon reachable (Testcontainers need it); starts Docker Desktop when it is down    auto-fix
-//   stack     stops a running local stack (Aspire AppHost, services, ng serve) via stop-stack.mjs auto-fix
-//   web-deps  `npm ci` in web/ when node_modules is missing or older than package-lock.json       auto-fix
-//
-// Output: one human progress line per check on stderr; the final line of stdout is always exactly
-// `PREFLIGHT_RESULT: <json>` with {"ok": bool, "checks": [...]} and nothing is printed after it.
-// Exit code 0 when ok, 1 otherwise (2 on a bad command line).
-//
-// Node >= 22, ESM, zero npm dependencies. Runs from any cwd: the repo root comes from this file's
-// location and every child process gets an explicit cwd. Also importable:
-// `import { preflight } from "./preflight.mjs"` (synchronous; progress goes to opts.log, default stderr).
+//   --dry-run                 only check; never start, stop or install anything
+//   --no-web                  skip the web-deps check (no npm ci)
+//   --docker-timeout <s>      how long to wait for the Docker daemon after starting it (default 180)
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
@@ -48,7 +25,6 @@ const ok = (name, detail) => ({ name, status: "ok", detail });
 const fixed = (name, detail) => ({ name, status: "fixed", detail });
 const fail = (name, detail, fix) => ({ name, status: "fail", detail, ...(fix ? { fix } : {}) });
 
-// Runs a command without a shell (gh, dotnet, docker, git are real executables everywhere).
 function run(cmd, args, { cwd = REPO_ROOT, timeout = 30_000 } = {}) {
   const res = spawnSync(cmd, args, { cwd, encoding: "utf8", timeout, windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
   return {
@@ -62,10 +38,6 @@ function run(cmd, args, { cwd = REPO_ROOT, timeout = 30_000 } = {}) {
 
 const firstLine = (s) => s.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
 const lastLines = (s, n = 8) => s.split(/\r?\n/).filter((l) => l.trim()).slice(-n).join("\n");
-
-// ---------------------------------------------------------------------------------------------
-// Report-only checks
-// ---------------------------------------------------------------------------------------------
 
 function checkNode() {
   const v = process.versions.node;
@@ -119,16 +91,10 @@ function checkGit() {
   return ok("git", `origin ${firstLine(origin.out)}`);
 }
 
-// ---------------------------------------------------------------------------------------------
-// docker
-// ---------------------------------------------------------------------------------------------
-
 const dockerInfo = () => run("docker", ["info"], { timeout: DOCKER_INFO_TIMEOUT_MS });
 
 function launchDocker() {
-  // Returns {started: true, how} or {started: false, reason, fix?}.
   if (IS_WIN) {
-    // Docker Desktop CLI plugin: `docker desktop start [-d|--detach] [--timeout s]`.
     const cli = run("docker", ["desktop", "start", "--detach"], { timeout: 60_000 });
     if (cli.status === 0) return { started: true, how: "docker desktop start" };
     const exe = path.join(process.env.ProgramFiles || "C:\\Program Files", "Docker", "Docker", "Docker Desktop.exe");
@@ -169,10 +135,6 @@ function checkDocker({ dryRun, dockerTimeoutS }) {
   );
 }
 
-// ---------------------------------------------------------------------------------------------
-// stack + web deps
-// ---------------------------------------------------------------------------------------------
-
 const describeProcs = (list) => list.map((p) => `${p.what} ${p.name} (pid ${p.pid})`).join(", ");
 
 function checkStack({ dryRun }) {
@@ -212,10 +174,6 @@ function checkWebDeps({ dryRun, web }) {
   const why = res.error?.code === "ETIMEDOUT" ? `npm ci timed out after ${NPM_CI_TIMEOUT_MS / 60000} min` : "npm ci failed";
   return fail("web-deps", `${why}:\n${lastLines(`${res.stdout ?? ""}${res.stderr ?? ""}`)}`, "cd web && npm ci  (stop anything holding node_modules first)");
 }
-
-// ---------------------------------------------------------------------------------------------
-// Orchestration
-// ---------------------------------------------------------------------------------------------
 
 function progressLine(c) {
   const mark = c.status === "fail" ? "\u2717" : "\u2713";

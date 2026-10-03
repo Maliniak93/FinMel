@@ -27,8 +27,6 @@ import type {
 import { Transactions } from './transactions';
 import { provideI18nTesting } from '../../core/i18n/testing';
 
-// See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
-// generated client ultimately calls) instead of mocking the SDK module.
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -43,7 +41,7 @@ const asset: AssetResponse = {
   id: assetId,
   portfolioId,
   assetClass: 2,
-  valuationMode: 1, // Manual
+  valuationMode: 1,
   name: 'Apple',
   currency: 'USD',
   quantity: 10,
@@ -97,12 +95,9 @@ describe('Transactions', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
-  // The owning portfolio (GET /portfolios/{id}, no "/assets" in the URL) is what tells the page
-  // whether it is archived (archived-portfolio-out-of-net-worth) — AssetResponse carries no flag.
   async function setup(
     transactionsResponse: Response,
     assetResponse = jsonResponse(asset),
@@ -191,13 +186,11 @@ describe('Transactions', () => {
     expect(fetchSpy.mock.calls.length).toBe(callsBefore);
   });
 
-  // cash-transaction-types AC-9: the dialog filters its types by the asset's class, so the page
-  // hands over the loaded asset's class on both create and edit.
   it('passes the asset class to the transaction dialog', async () => {
     const cashAsset: AssetResponse = {
       ...asset,
-      assetClass: 0, // Cash
-      valuationMode: 2, // CurrencyValued
+      assetClass: 0,
+      valuationMode: 2,
       name: 'Checking account',
       currency: 'PLN',
       manualValue: null,
@@ -275,9 +268,6 @@ describe('Transactions', () => {
     expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
   });
 
-  // transactions-pln-value-and-fee-removal AC12: the table shows each transaction's own currency and
-  // its server-computed PLN value (no unit price, no fee, no client-side money math); a transaction
-  // whose rate was unknown shows an em dash instead of a value.
   it('renders currency and PLN value columns', async () => {
     const unpriced: TransactionResponse = {
       ...transaction,
@@ -299,8 +289,6 @@ describe('Transactions', () => {
 
     const rows = Array.from(element.querySelectorAll('tbody tr.mat-mdc-row'));
     expect(rows.length).toBe(2);
-    // Whitespace is stripped because Intl separates the currency code from the amount with a
-    // non-breaking space.
     const cellTexts = (row: Element) =>
       Array.from(row.querySelectorAll('td'), (td) => (td.textContent ?? '').replace(/\s/g, ''));
 
@@ -313,9 +301,6 @@ describe('Transactions', () => {
     expect(unpricedCells[4]).toBe('—');
   });
 
-  // archived-portfolio-out-of-net-worth AC12: every transaction write on an archived portfolio's
-  // asset is a 409 on the backend, so the page offers none — no New transaction / Record your first
-  // transaction, no Edit / Delete in any row menu — and shows the archived notice instead.
   describe('archived portfolio is read-only', () => {
     const archivedPortfolio: PortfolioResponse = { ...portfolio, isArchived: true };
     const archivedNotice = /This portfolio is archived\W+restore it to make changes/;
@@ -331,7 +316,6 @@ describe('Transactions', () => {
       );
     }
 
-    // Opens every row menu the page renders (if any) and returns what the overlay offers.
     async function rowMenuText(): Promise<string> {
       const overlayContainer = TestBed.inject(OverlayContainer);
       for (const triggerElement of fixture.debugElement.queryAll(By.directive(MatMenuTrigger))) {
@@ -349,7 +333,6 @@ describe('Transactions', () => {
         jsonResponse(archivedPortfolio),
       );
 
-      // The history itself is still listed — archived is read-only, not hidden.
       expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
       expect(pageText()).toMatch(archivedNotice);
       expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(false);
@@ -384,8 +367,6 @@ describe('Transactions', () => {
     });
   });
 
-  // asset-archive AC-11: an archived asset's transactions are a 409 on the backend, so the view is
-  // read-only as for an archived portfolio — no record button, no Edit / Delete — with its own notice.
   describe('archived asset is read-only', () => {
     const archivedAsset = { ...asset, isArchived: true } as AssetResponse;
     const assetNotice = /This asset is archived\W+restore it to make changes/;
@@ -414,7 +395,6 @@ describe('Transactions', () => {
     it('is read-only for an archived asset', async () => {
       await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(archivedAsset));
 
-      // The history itself is still listed — archived is read-only, not hidden.
       expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
       expect(pageText()).toMatch(assetNotice);
       expect(pageText()).not.toMatch(/This portfolio is archived/);
@@ -442,19 +422,13 @@ describe('Transactions', () => {
     });
   });
 
-  // asset-transfers-deposit-funding AC-12: a transfer leg (`transfer` set on the TransactionResponse)
-  // is labelled beside its type — "Transfer to <asset> (<portfolio>)" on the Out leg, "Transfer from
-  // …" on the In leg — and offers no Edit/Delete (the backend answers 409
-  // Conflict.TransferLegManaged), while a plain transaction on the same Cash asset keeps both.
   describe('transfer legs', () => {
-    // Backend enum Skarbiec.Portfolio.Features.Transfers.TransferDirection arrives as an int, in C#
-    // declaration order.
     const TRANSFER_DIRECTION = { Out: 0, In: 1 } as const;
 
     const cashAsset: AssetResponse = {
       ...asset,
-      assetClass: 0, // Cash
-      valuationMode: 2, // CurrencyValued
+      assetClass: 0,
+      valuationMode: 2,
       name: 'Cash account',
       currency: 'PLN',
       quantity: 4000,
@@ -464,7 +438,7 @@ describe('Transactions', () => {
     const plainTopUp: TransactionResponse = {
       ...transaction,
       id: '55555555-5555-5555-5555-555555555555',
-      type: 2, // Deposit
+      type: 2,
       quantity: 5000,
       unitPrice: 1,
       currency: 'PLN',
@@ -474,7 +448,7 @@ describe('Transactions', () => {
     const outLeg = {
       ...transaction,
       id: '66666666-6666-6666-6666-666666666666',
-      type: 3, // Withdraw
+      type: 3,
       quantity: 1000,
       unitPrice: 1,
       currency: 'PLN',
@@ -491,7 +465,7 @@ describe('Transactions', () => {
     const inLeg = {
       ...outLeg,
       id: '99999999-9999-9999-9999-999999999999',
-      type: 2, // Deposit
+      type: 2,
       transfer: {
         counterpartAssetId: assetId,
         counterpartAssetName: 'Cash account',
@@ -559,16 +533,12 @@ describe('Transactions', () => {
     });
   });
 
-  // savings-cash-transfers AC-8: a manual Cash <-> Savings leg (`transfer.manual` true) keeps the
-  // "Transfer to/from …" label and offers a single "Delete transfer" action — no Edit — behind the same
-  // confirmation as Delete, which calls DELETE /api/portfolio/transfers/{transferId}. A deposit-funding
-  // leg (`manual` false) still has no actions.
   describe('manual transfer legs', () => {
     const transferId = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
     const cashAsset: AssetResponse = {
       ...asset,
-      assetClass: 0, // Cash
-      valuationMode: 2, // CurrencyValued
+      assetClass: 0,
+      valuationMode: 2,
       name: 'Cash account',
       currency: 'PLN',
       quantity: 3000,
@@ -578,7 +548,7 @@ describe('Transactions', () => {
     const manualLeg = {
       ...transaction,
       id: '66666666-6666-6666-6666-666666666666',
-      type: 3, // Withdraw
+      type: 3,
       quantity: 2000,
       unitPrice: 1,
       currency: 'PLN',
@@ -591,7 +561,7 @@ describe('Transactions', () => {
         counterpartAssetName: 'Savings account',
         counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
         counterpartPortfolioName: 'Savings',
-        direction: 0, // Out
+        direction: 0,
       },
     } as TransactionResponse;
     const fundingLeg = {
@@ -607,7 +577,7 @@ describe('Transactions', () => {
     const plainTopUp: TransactionResponse = {
       ...transaction,
       id: '55555555-5555-5555-5555-555555555555',
-      type: 2, // Deposit
+      type: 2,
       quantity: 5000,
       unitPrice: 1,
       currency: 'PLN',
@@ -704,15 +674,11 @@ describe('Transactions', () => {
     });
   });
 
-  // savings-interest-settlement AC-13: the credit a settlement adds to a savings account
-  // (`savingsInterestPeriodEnd` set on the TransactionResponse) reads "Interest · <Month yyyy>" of the
-  // settled month and offers no Edit/Delete (the backend answers 409 Conflict.SavingsInterestManaged),
-  // while an ordinary transaction on the same account keeps both.
   describe('savings interest credits', () => {
     const savingsAsset: AssetResponse = {
       ...asset,
-      assetClass: 9, // Savings
-      valuationMode: 2, // CurrencyValued
+      assetClass: 9,
+      valuationMode: 2,
       name: 'Savings account',
       currency: 'PLN',
       quantity: 10033.29,
@@ -722,7 +688,7 @@ describe('Transactions', () => {
     const opening: TransactionResponse = {
       ...transaction,
       id: '55555555-5555-5555-5555-555555555555',
-      type: 2, // Deposit
+      type: 2,
       quantity: 10000,
       unitPrice: 1,
       currency: 'PLN',
@@ -732,7 +698,7 @@ describe('Transactions', () => {
     const credit = {
       ...transaction,
       id: '66666666-6666-6666-6666-666666666666',
-      type: 2, // Deposit
+      type: 2,
       quantity: 33.29,
       unitPrice: 1,
       currency: 'PLN',
@@ -782,14 +748,11 @@ describe('Transactions', () => {
     });
   });
 
-  // term-deposits AC-16: a term deposit's transactions are system-managed (the backend answers 409
-  // Conflict.DepositTransactionsManaged to every write), so its view lists them but offers no
-  // record / edit / delete action, even in an active portfolio.
   describe('term deposit transactions are system-managed', () => {
     const depositAsset: AssetResponse = {
       ...asset,
-      assetClass: 1, // Deposit
-      valuationMode: 2, // CurrencyValued
+      assetClass: 1,
+      valuationMode: 2,
       name: 'Term deposit',
       currency: 'PLN',
       quantity: 10000,
@@ -798,7 +761,7 @@ describe('Transactions', () => {
     };
     const openingDeposit: TransactionResponse = {
       ...transaction,
-      type: 2, // Deposit
+      type: 2,
       quantity: 10000,
       unitPrice: 1,
       currency: 'PLN',
@@ -815,7 +778,6 @@ describe('Transactions', () => {
     it('the Deposit transactions view has no add / edit / delete actions', async () => {
       await setup(jsonResponse(pagedResponse([openingDeposit])), jsonResponse(depositAsset));
 
-      // The opening transaction is still listed.
       expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
       expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(false);
       expect(fixture.debugElement.queryAll(By.directive(MatMenuTrigger))).toHaveLength(0);
@@ -831,14 +793,11 @@ describe('Transactions', () => {
     });
   });
 
-  // i18n screens (#132) AC-5: headings, table headers, the transfer label (direction, asset and
-  // portfolio interpolated), the row menu, empty state, notices, delete confirmation and failure
-  // snackbar fallback follow the language.
   describe('in Polish', () => {
     const outLeg = {
       ...transaction,
       id: '66666666-6666-6666-6666-666666666666',
-      type: 3, // Withdraw
+      type: 3,
       quantity: 1000,
       unitPrice: 1,
       currency: 'PLN',
@@ -849,14 +808,14 @@ describe('Transactions', () => {
         counterpartAssetName: 'Term deposit',
         counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
         counterpartPortfolioName: 'Savings',
-        direction: 0, // Out
+        direction: 0,
       },
     } as TransactionResponse;
     const inLeg = {
       ...outLeg,
       id: '99999999-9999-9999-9999-999999999999',
-      type: 2, // Deposit
-      transfer: { ...outLeg.transfer!, direction: 1 }, // In
+      type: 2,
+      transfer: { ...outLeg.transfer!, direction: 1 },
     } as TransactionResponse;
 
     async function menuItems(): Promise<string[]> {
@@ -992,8 +951,8 @@ describe('Transactions', () => {
     it('renders the term-deposit notice in Polish', async () => {
       const deposit: AssetResponse = {
         ...asset,
-        assetClass: 1, // Deposit
-        valuationMode: 2, // CurrencyValued
+        assetClass: 1,
+        valuationMode: 2,
         name: 'Term deposit',
         currency: 'PLN',
         manualValue: null,
@@ -1022,7 +981,6 @@ describe('Transactions', () => {
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(['Retry'], retry())).toEqual([]);
-      // The backend's own message stays as it arrived.
       expect(textOf(element.querySelector('.transactions-page__state p'))).toBe(
         'Service unavailable.',
       );

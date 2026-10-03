@@ -16,13 +16,6 @@ import {
 import { dueSavingsAccount, savingsInterestPreview } from '../testing/savings-account-fixtures';
 import { SettleSavingsInterestDialog } from './settle-savings-interest-dialog';
 
-// savings-interest-settlement AC-12. The settle dialog opens on a Due savings account, loads
-// GET .../savings-accounts/{assetId}/interest-preview and pre-fills the editable gross interest and
-// tax from it; the period, the rate and the average daily balance are shown read-only; the net follows
-// the edits live as gross - tax. Its controls are named after the request properties (camelCase) so a
-// server 400 keyed on a field lands on it. Submit POSTs { periodEnd, grossInterest, tax } and closes
-// with true. The submit under test is called on the dialog itself and asserted on the raw request the
-// generated client hands to `fetch`.
 describe('SettleSavingsInterestDialog', () => {
   let fixture: ComponentFixture<SettleSavingsInterestDialog>;
   let component: SettleSavingsInterestDialog;
@@ -35,7 +28,6 @@ describe('SettleSavingsInterestDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -43,8 +35,6 @@ describe('SettleSavingsInterestDialog', () => {
     return typeof input === 'string' ? 'GET' : (input as Request).method;
   }
 
-  // The preview GET always answers with `savingsInterestPreview`; every write answers with
-  // `writeResponse`.
   async function setup(
     writeResponse: () => Response = () => jsonResponse({ settlementId: 'x' }, 201),
   ): Promise<void> {
@@ -70,7 +60,6 @@ describe('SettleSavingsInterestDialog', () => {
     fixture = TestBed.createComponent(SettleSavingsInterestDialog);
     component = fixture.componentInstance;
     await fixture.whenStable();
-    // The form is pre-filled once the preview has loaded.
     await vi.waitFor(() =>
       expect(Number(findControl(form(), 'grossInterest').value)).toBe(
         savingsInterestPreview.grossInterest,
@@ -113,7 +102,6 @@ describe('SettleSavingsInterestDialog', () => {
     expect(Number(findControl(form(), 'grossInterest').value)).toBe(41.1);
     expect(Number(findControl(form(), 'tax').value)).toBe(7.81);
 
-    // The period, the rate and the average daily balance are shown, never inputs the user could type into.
     const text = renderedText(fixture);
     expect(text).toContain(formatDate('2026-09-01'));
     expect(text).toContain(formatDate('2026-09-30'));
@@ -123,7 +111,6 @@ describe('SettleSavingsInterestDialog', () => {
     expect(hasControl(form(), 'periodEnd')).toBe(false);
     expect(hasControl(form(), 'annualInterestRatePercent')).toBe(false);
     expect(hasControl(form(), 'averageDailyBalance')).toBe(false);
-    // The net of the previewed values.
     expect(text).toContain(formatMoney(33.29, 'PLN'));
   });
 

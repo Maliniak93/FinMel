@@ -29,9 +29,6 @@ const completedRun: SyncStatusResponse = {
   },
 };
 
-// The generated client calls `fetch(request)` with a single `Request` instance (see
-// api/marketdata/client/client.gen.ts's `_fetch(request)`), not the two-arg `fetch(url, init)`
-// form — the method lives on that Request object, not on a separate `init` argument.
 function requestMethod(input: unknown): string {
   return input instanceof Request ? input.method : 'GET';
 }
@@ -47,7 +44,6 @@ describe('Settings', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
@@ -91,9 +87,6 @@ describe('Settings', () => {
   });
 
   it('shows the last Prices run and the last FX run', async () => {
-    // spec-04 AC23 / design decision 14: SyncStatusResponse is reshaped (ADR-019, not kept
-    // compatible) into per-kind summaries — this literal only compiles once the generated client
-    // (web/api/marketdata) picks up the new `prices`/`fx`/`backfill` shape from `npm run gen:api`.
     const pricesAndFxRun: SyncStatusResponse = {
       hasRun: true,
       prices: {
@@ -152,8 +145,6 @@ describe('Settings', () => {
     expect(component['triggerError']()).toBe('A price sync is already running.');
   });
 
-  // i18n foundation (#131) AC-10: headings, the button, the run kind and status labels follow the
-  // language, and so does the run's date.
   it('renders in Polish', async () => {
     await setup(jsonResponse(completedRun));
     const element = fixture.nativeElement as HTMLElement;

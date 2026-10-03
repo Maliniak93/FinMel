@@ -21,7 +21,6 @@ describe('NotFound', () => {
   });
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
@@ -30,7 +29,6 @@ describe('NotFound', () => {
     expect(component).toBeTruthy();
   });
 
-  // i18n foundation (#131) AC-10.
   it('renders in Polish', async () => {
     const message = () => textOf((fixture.nativeElement as HTMLElement).querySelector('p'));
     expect(message()).toBe('Page not found.');

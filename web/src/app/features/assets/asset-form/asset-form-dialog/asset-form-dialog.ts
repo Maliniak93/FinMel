@@ -39,9 +39,6 @@ export interface AssetFormDialogData {
 
 type AssetFormKind = 'cash' | 'security' | 'gold' | 'manual';
 
-// Which per-kind form each AssetClass opens. A Deposit is a term deposit with its own dialog
-// (DepositFormDialog), and a Savings asset a savings account with its own (SavingsAccountFormDialog),
-// so neither reaches a form here.
 function formKindFor(assetClass: AssetClass): AssetFormKind {
   switch (Number(assetClass)) {
     case ASSET_CLASS.Cash:
@@ -58,9 +55,6 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
   }
 }
 
-// The create/edit shell. Create shows the type picker, then the chosen class's form; edit goes
-// straight to the stored class's form, and the class cannot change there. The shell owns the title,
-// the actions, POST/PUT with the body the active form builds, and mapping ProblemDetails onto it.
 @Component({
   selector: 'app-asset-form-dialog',
   imports: [
@@ -87,7 +81,6 @@ export class AssetFormDialog {
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
-  // null while the picker is showing.
   private readonly assetClass = signal<AssetClass | null>(this.data.asset?.assetClass ?? null);
   protected readonly selection = computed(() => {
     const assetClass = this.assetClass();
@@ -99,8 +92,6 @@ export class AssetFormDialog {
   protected pick(assetClass: AssetClass): void {
     this.formError.set(null);
 
-    // A term deposit is created only through the deposit endpoint: hand over to its own dialog,
-    // preset to this portfolio, and close with its result so the asset list reloads after a save.
     if (Number(assetClass) === ASSET_CLASS.Deposit) {
       this.dialog
         .open(DepositFormDialog, { width: '560px', data: { portfolioId: this.data.portfolioId } })
@@ -109,7 +100,6 @@ export class AssetFormDialog {
       return;
     }
 
-    // Likewise a savings account is created only through the savings-account endpoint.
     if (Number(assetClass) === ASSET_CLASS.Savings) {
       this.dialog
         .open(SavingsAccountFormDialog, {
@@ -124,14 +114,12 @@ export class AssetFormDialog {
     this.assetClass.set(assetClass);
   }
 
-  // Back to the picker: the form is destroyed with whatever was typed into it.
   protected back(): void {
     this.formError.set(null);
     this.assetClass.set(null);
   }
 
-  // A native submit (the Save button, or Enter in a field): the forms' FormGroups live in the child
-  // components, so there is no [formGroup] here to raise (ngSubmit).
+  // A native submit: the FormGroups live in the child forms, so there is no [formGroup] here to raise (ngSubmit).
   protected submit(event: Event): void {
     event.preventDefault();
     void this.onSubmit();
@@ -196,9 +184,6 @@ export class AssetFormDialog {
     this.formError.set(problem.detail ?? translate('errors.generic'));
   }
 
-  // A form nests each block's group (basics, manual value, …), so a top-level key like "Name" is
-  // matched against every group in the tree — except the first-transaction sub-form, whose keys
-  // arrive prefixed and are routed by applyInitialTransactionFieldErrors.
   private applyBlockFieldErrors(group: FormGroup, problem: ApiProblemDetails): boolean {
     let matched = applyFieldErrors(group, problem);
     for (const [name, control] of Object.entries(group.controls)) {
@@ -209,10 +194,6 @@ export class AssetFormDialog {
     return matched;
   }
 
-  // AddAssetRequest.InitialTransaction is a nested complex property — .NET 10's validation recurses
-  // into it and reports keys like "InitialTransaction.Quantity", which applyFieldErrors (matching
-  // plain control names only) can't route on its own; this matches the suffix against the
-  // first-transaction group's own controls instead.
   private applyInitialTransactionFieldErrors(
     transaction: FormGroup,
     problem: ApiProblemDetails,

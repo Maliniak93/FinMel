@@ -26,15 +26,8 @@ import {
 import { savingsAccountResponse } from '../testing/savings-account-fixtures';
 import { SavingsTransferDialog } from './savings-transfer-dialog';
 
-// savings-cash-transfers AC-7. The dialog opens from a savings account's row (dialog data
-// `{ account }`) and moves money between a Cash asset and that account as one transfer. Controls:
-// `direction` ('in' = "Into this account", the default; 'out' = "Out to cash"), `cashAssetId`
-// (required, the Cash transfer candidates in the account's currency), `amount` (> 0 and at most the
-// source balance — the selected Cash balance going in, the account balance going out) and `date`
-// (defaults to today, never later). Submit POSTs /api/portfolio/transfers with
-// {sourceAssetId, targetAssetId, amount, date} according to the direction.
 describe('SavingsTransferDialog', () => {
-  const account = savingsAccountResponse({ balance: 10000 }); // PLN, 10 000
+  const account = savingsAccountResponse({ balance: 10000 });
   let fixture: ComponentFixture<SavingsTransferDialog>;
   let component: SavingsTransferDialog;
   let dialogRef: { close: ReturnType<typeof vi.fn> };
@@ -46,7 +39,6 @@ describe('SavingsTransferDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -180,7 +172,6 @@ describe('SavingsTransferDialog', () => {
     expect(findControl(form(), 'amount').invalid).toBe(true);
     expect(writeRequests(fetchSpy)).toEqual([]);
 
-    // Above the Cash balance (5 000) but within the account's 10 000: fine going out.
     await fill({ amount: 8000 });
     expect(findControl(form(), 'amount').valid).toBe(true);
   });

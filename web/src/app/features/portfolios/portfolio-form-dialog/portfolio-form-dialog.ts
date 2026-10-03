@@ -49,12 +49,6 @@ export class PortfolioFormDialog {
   protected readonly formError = signal<string | null>(null);
   protected readonly currencies = SUPPORTED_CURRENCIES;
 
-  // M1.3 already rejects a write outside PLN/EUR/USD server-side; this dropdown just makes the
-  // restriction the only reachable UI path. A portfolio stored before M1.3 (or seeded directly,
-  // e.g. T1.11's live-session USD row, or the GBP fixtures M1.3's own tests write straight through
-  // PortfolioDbContext) can still hold a currency outside that set — the value must survive into
-  // the form unchanged (never silently swapped for DEFAULT_CURRENCY) and stay visible, not render
-  // as a blank mat-select. See `legacyCurrency` and the template's extra <mat-option> for it.
   protected readonly legacyCurrency: string | null =
     this.data.portfolio &&
     !SUPPORTED_CURRENCIES.some((c) => c.code === this.data.portfolio!.currency)
@@ -64,9 +58,6 @@ export class PortfolioFormDialog {
   protected readonly form = this.formBuilder.nonNullable.group({
     name: [this.data.portfolio?.name ?? '', [Validators.required, Validators.maxLength(200)]],
     description: [this.data.portfolio?.description ?? '', [Validators.maxLength(1000)]],
-    // No pattern validator: a mat-select bound to `currencies` (plus, when editing, the one extra
-    // legacy option above) can only ever emit one of those exact values — the format is enforced
-    // by construction, same precedent as asset-form-dialog's Currency control (M1.7).
     currency: [this.data.portfolio?.currency ?? DEFAULT_CURRENCY, [Validators.required]],
   });
 

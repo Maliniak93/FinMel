@@ -4,8 +4,6 @@ import { provideI18nTesting } from '../core/i18n/testing';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../core/i18n/language';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from './format';
 
-// i18n foundation (#131) AC-6: the shared formatters follow the active language — en → en-US,
-// pl → pl-PL — instead of the hardcoded pl-PL they used before.
 const LOCALES = { en: 'en-US', pl: 'pl-PL' } as const;
 
 describe('locale-aware formatters', () => {
@@ -14,7 +12,6 @@ describe('locale-aware formatters', () => {
   });
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
@@ -45,7 +42,6 @@ describe('locale-aware formatters', () => {
 
     await language.setLanguage('en');
     expect(formatDate(new Date(2026, 8, 27))).toBe('Sep 27, 2026');
-    // A DateOnly string is a local calendar day, never parsed as UTC midnight.
     expect(formatDate('2026-09-27')).toBe('Sep 27, 2026');
 
     await language.setLanguage('pl');

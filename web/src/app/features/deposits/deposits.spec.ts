@@ -50,8 +50,6 @@ import {
 import { activeSavingsAccount, taxFreeEurSavingsAccount } from './testing/savings-account-fixtures';
 import { provideI18nTesting } from '../../core/i18n/testing';
 
-// term-deposits AC-15. The Deposits page (route `deposits`) lists every deposit of the user across
-// portfolios from GET /api/portfolio/deposits, with its projection and an Active / Due status chip.
 describe('Deposits', () => {
   let fixture: ComponentFixture<Deposits>;
   let component: Deposits;
@@ -65,7 +63,6 @@ describe('Deposits', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -77,7 +74,6 @@ describe('Deposits', () => {
       if (request.method === 'DELETE') {
         return new Response(null, { status: 204 });
       }
-      // asset-archive: the archive / restore endpoints answer 200 with the asset.
       if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
         return jsonResponse({});
       }
@@ -126,8 +122,6 @@ describe('Deposits', () => {
     ).length;
   }
 
-  // term-deposits-settlement: the settle action is an icon button on the row itself, recognised by
-  // its "Settle maturity" tooltip (or an aria-label saying the same).
   function settleButton(row: HTMLElement): HTMLButtonElement | undefined {
     return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) =>
@@ -136,7 +130,6 @@ describe('Deposits', () => {
     );
   }
 
-  // Opens a row's actions menu and returns the labels of the items it offers, icons left out.
   async function menuItemLabels(row: HTMLElement): Promise<string[]> {
     const trigger = row.querySelector<HTMLButtonElement>('button[aria-label^="Actions for"]');
     if (!trigger) {
@@ -153,8 +146,6 @@ describe('Deposits', () => {
     );
   }
 
-  // savings-accounts AC-11. The page is titled "Deposits & savings" and is a tab group: "Term deposits"
-  // holds the term-deposit table (everything below), "Savings accounts" the savings accounts.
   describe('tabs', () => {
     function tabs(): HTMLElement[] {
       return Array.from(
@@ -319,7 +310,6 @@ describe('Deposits', () => {
     expect(rowFor('Running deposit').querySelectorAll('button').length).toBeGreaterThan(0);
   });
 
-  // term-deposits-settlement AC-10.
   it('only the Due row carries the settle button', async () => {
     await setup([activeDeposit, dueDeposit, settledDeposit]);
 
@@ -388,11 +378,7 @@ describe('Deposits', () => {
     expect(depositListCalls()).toBe(listCallsBefore);
   });
 
-  // deposit-payout-to-cash AC-9. A Settled row carries a "Pay out" icon button that opens
-  // the payout dialog; a PaidOut row carries none, but shows a "Paid out" chip, the payout date and
-  // the destination's name ("—" once that asset was removed), and still offers Delete.
   describe('payout', () => {
-    // Recognised by its "Pay out" tooltip (or an aria-label saying the same).
     function transferButton(row: HTMLElement): HTMLButtonElement | undefined {
       return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
         (button) =>
@@ -412,7 +398,6 @@ describe('Deposits', () => {
       expect(transferButton(rowFor('Running deposit'))).toBeUndefined();
     });
 
-    // deposit-payout-to-savings AC-10: the payout action is "Pay out", shown with the `output` icon.
     it('the payout button of a Settled row is labelled "Pay out" and shows the output icon', async () => {
       await setup(allStatuses);
 
@@ -427,7 +412,6 @@ describe('Deposits', () => {
       ).toBe(false);
     });
 
-    // deposit-payout-to-savings AC-10: a savings account's name shows as the destination, like Cash's.
     it('a PaidOut row shows the name of a savings destination', async () => {
       await setup([paidOutIntoSavingsDeposit]);
 
@@ -500,11 +484,7 @@ describe('Deposits', () => {
     });
   });
 
-  // deposit-rollover AC-9. Due and Settled rows carry an `autorenew` icon button with the tooltip
-  // "Roll over" next to their existing button; it opens the roll-over dialog with that deposit and
-  // reloads the list after a successful rollover. Active and PaidOut rows carry none.
   describe('roll over', () => {
-    // Recognised by its "Roll over" tooltip (or an aria-label saying the same).
     function rollOverButton(row: HTMLElement): HTMLButtonElement | undefined {
       return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
         (button) =>
@@ -522,7 +502,6 @@ describe('Deposits', () => {
       expect(rollOverButton(rowFor('Settled deposit'))).toBeDefined();
       expect(rollOverButton(rowFor('Running deposit'))).toBeUndefined();
       expect(rollOverButton(rowFor('Paid-out deposit'))).toBeUndefined();
-      // Next to, not instead of, the row's existing action.
       expect(settleButton(rowFor('Matured deposit'))).toBeDefined();
     });
 
@@ -567,9 +546,6 @@ describe('Deposits', () => {
     });
   });
 
-  // asset-archive AC-10. A deposit can be archived on its own: "Show archived" (off by default)
-  // reveals it with an "Archived" chip, the row menu gains Archive / Restore behind a ConfirmDialog,
-  // and an archived row keeps only Restore and Delete.
   describe('archive', () => {
     const archiveMessage =
       'It drops out of net worth from today. Its transactions and history are kept, and you can restore it at any time.';
@@ -676,7 +652,6 @@ describe('Deposits', () => {
         expect(labels.some((label) => /delete/i.test(label))).toBe(true);
         expect(labels.some((label) => /edit/i.test(label))).toBe(false);
         expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(false);
-        // Not one of the row's own action buttons: no settle, no pay out.
         expect(settleButton(row)).toBeUndefined();
         expect(
           Array.from(row.querySelectorAll<HTMLButtonElement>('button')).some(
@@ -710,14 +685,9 @@ describe('Deposits', () => {
     expect(buttons.some((text) => /add/i.test(text))).toBe(true);
   });
 
-  // i18n screens (#132) AC-6: headings, table headers, the row actions' tooltips and accessible
-  // names, the row menu, empty state, delete confirmation and failure snackbar fallback follow the
-  // language.
   describe('in Polish', () => {
-    // Words spelled the same in Polish.
     const cognates = ['Bank', 'Start', 'Status'];
 
-    // What a row's icon buttons offer: their tooltip (when they have one) and accessible name.
     function actionTooltips(): string[] {
       return fixture.debugElement
         .queryAll(By.css('td.mat-column-actions button'))
@@ -811,7 +781,6 @@ describe('Deposits', () => {
 
       await switchLanguage(fixture, 'pl');
 
-      // The parentheses may sit in the template or in the translation.
       const text = marker();
       expect(text).not.toBe('(archived)');
       expect(
@@ -851,7 +820,6 @@ describe('Deposits', () => {
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(['Retry'], retry())).toEqual([]);
-      // The backend's own message stays as it arrived.
       expect(textOf(element.querySelector('.deposits-page__state p'))).toBe('Service unavailable.');
     });
 

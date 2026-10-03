@@ -15,11 +15,6 @@ import {
 import { TRANSFER_DIRECTION, transferLabel } from '../../features/transactions/transfer-direction';
 import { SUPPORTED_CURRENCIES } from '../../shared/currencies';
 
-// i18n foundation (#131) AC-9: every enum label map returns a translation key (templates translate
-// it through the `transloco` pipe), and every key it can return has a non-empty label in both
-// en.json and pl.json. Asserted against the real files, so a missing key fails here instead of
-// printing a raw key on screen.
-
 function expectTranslatedKey(source: string, key: string): void {
   for (const lang of ['en', 'pl'] as const) {
     const value = TRANSLATIONS[lang][key];
@@ -32,7 +27,6 @@ describe('enum label maps', () => {
   it('every enum value has a translated label in en and pl', () => {
     const keys: [string, string][] = [];
 
-    // Asset class — the picker list, the lookup and its unknown-value fallback.
     for (const assetClass of ASSET_CLASSES) {
       keys.push(['ASSET_CLASSES', assetClass.label]);
     }
@@ -41,7 +35,6 @@ describe('enum label maps', () => {
     }
     keys.push(['assetClassLabel(unknown)', assetClassLabel(99)]);
 
-    // Transaction type and the quantity field label that depends on it.
     for (const type of TRANSACTION_TYPES) {
       keys.push(['TRANSACTION_TYPES', type.label]);
       keys.push(['transactionTypeLabel', transactionTypeLabel(type.value)]);
@@ -49,7 +42,6 @@ describe('enum label maps', () => {
     }
     keys.push(['transactionTypeLabel(unknown)', transactionTypeLabel(99)]);
 
-    // Deposit term unit, capitalization and status.
     for (const unit of DEPOSIT_TERM_UNITS) {
       keys.push(['DEPOSIT_TERM_UNITS', unit.label]);
     }
@@ -60,7 +52,6 @@ describe('enum label maps', () => {
       keys.push(['depositStatusLabel', depositStatusLabel(status)]);
     }
 
-    // Sync run status (C# SyncRunStatus: Running, Completed, Partial, Failed) and run kind.
     for (const status of [0, 1, 2, 3, 99, null, undefined]) {
       keys.push(['syncRunStatusLabel', syncRunStatusLabel(status)]);
     }
@@ -68,7 +59,6 @@ describe('enum label maps', () => {
       keys.push(['RUN_KINDS', kind.label]);
     }
 
-    // Currency picker labels.
     for (const currency of SUPPORTED_CURRENCIES) {
       keys.push(['SUPPORTED_CURRENCIES', currency.label]);
     }
@@ -77,7 +67,6 @@ describe('enum label maps', () => {
       expectTranslatedKey(source, key);
     }
 
-    // The maps hand out keys, not English text: no two different enum values share one label.
     const assetClassKeys = ASSET_CLASSES.map((c) => c.label);
     expect(new Set(assetClassKeys).size).toBe(assetClassKeys.length);
     const typeKeys = TRANSACTION_TYPES.map((t) => t.label);

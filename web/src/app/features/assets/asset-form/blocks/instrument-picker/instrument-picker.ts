@@ -30,23 +30,14 @@ import { formatMoney } from '../../../../../shared/format';
 export type InstrumentOption =
   InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;
 
-// The selected instrument. Required: a market asset submits its InstrumentId, and without one
-// AddAssetRequest/UpdateAssetRequest would reject the body anyway.
 export function createInstrumentControl(): FormControl<InstrumentOption | null> {
   return new FormControl<InstrumentOption | null>(null, [Validators.required]);
 }
 
-// The banner the shell shows when a market asset is submitted with no instrument selected.
-// A translation key: the forms translate it when the submit is blocked.
 export const INSTRUMENT_REQUIRED_MESSAGE = 'assets.form.instrumentRequired';
 
-// ITickerVerifier's three outcomes (ADR-018) plus 'conflict' (409 already-in-dictionary) and a
-// generic 'error' fallback — mirrored in instrument-picker.html's @if/@else-if chain.
 type CustomInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'conflict' | 'error';
 
-// Instrument autocomplete, the edit pre-fill through GET instruments/{id}, and — behind
-// `allowCustomTicker` — the ADR-018 "verify a new ticker" panel. Writes the chosen instrument into
-// `control`, and into `nameControl` too when that is still empty.
 @Component({
   selector: 'app-instrument-picker',
   imports: [
@@ -67,8 +58,6 @@ export class InstrumentPicker {
   readonly control = input.required<FormControl<InstrumentOption | null>>();
   readonly assetClass = input.required<AssetClass>();
   readonly allowCustomTicker = input(false);
-  // The stored asset's instrument, pre-selected on edit: AssetResponse only carries InstrumentId,
-  // not the ticker/name/currency needed to display it.
   readonly existingInstrumentId = input<string | null | undefined>();
   readonly nameControl = input<FormControl<string>>();
 
@@ -76,7 +65,6 @@ export class InstrumentPicker {
 
   protected readonly selectedInstrument = signal<InstrumentOption | null>(null);
 
-  // The text box: holds the typed query, or the picked option (rendered through displayInstrument).
   protected readonly instrumentControl = new FormControl<InstrumentOption | string | null>(null);
 
   private readonly searchQuery = toSignal(
@@ -116,9 +104,6 @@ export class InstrumentPicker {
     },
   });
 
-  // resource().value() throws while the resource is in its error state — gated on hasValue() rather
-  // than trusting the loader's own try/catch (a network exception, not just an API error, can still
-  // land the resource there).
   private readonly prefillExistingInstrumentEffect = effect(() => {
     if (!this.existingInstrumentResource.hasValue()) {
       return;
@@ -134,8 +119,6 @@ export class InstrumentPicker {
   protected readonly customInstrumentOutcome = signal<CustomInstrumentOutcome>('idle');
   protected readonly customInstrumentMessage = signal<string | null>(null);
 
-  // No Source field: AddCustomInstrumentRequest derives the provider from AssetClass (M1.6) — the
-  // user never picks Stooq vs CoinGecko by hand anymore.
   protected readonly customInstrumentForm = this.formBuilder.nonNullable.group({
     ticker: ['', [Validators.required, Validators.maxLength(30)]],
     name: ['', [Validators.required, Validators.maxLength(200)]],
@@ -153,11 +136,7 @@ export class InstrumentPicker {
     this.selectInstrument(event.option.value as InstrumentOption);
   }
 
-  // Deliberately does NOT copy instrument.quoteCurrency into the asset's Currency (T1.11 did).
-  // ValuationAlgorithm.ValueMarketAsset resolves FX off the *instrument's* quote currency
-  // (price.QuoteCurrency), never off Asset.Currency — so for a market asset, Currency is just the
-  // user's own PLN/EUR/USD denomination choice (SupportedCurrency, M1.3), unrelated to what the
-  // instrument itself quotes in and never read by market valuation.
+  // The asset keeps its own currency: market valuation converts from the instrument's quote currency.
   private selectInstrument(instrument: InstrumentOption): void {
     this.selectedInstrument.set(instrument);
     this.control().setValue(instrument);
@@ -217,8 +196,6 @@ export class InstrumentPicker {
     this.customInstrumentForm.reset({ ticker: '', name: '', quoteCurrency: '' });
   }
 
-  // Renders ITickerVerifier's three outcomes (ADR-018) as three distinct states, plus a fallback for
-  // anything else (409 already-in-dictionary, or a genuinely unexpected error).
   private classifyCustomInstrumentError(problem: ApiProblemDetails): CustomInstrumentOutcome {
     switch (problem.errorCode) {
       case 'Validation.TickerNotFound':
@@ -232,9 +209,6 @@ export class InstrumentPicker {
     }
   }
 
-  // The documented ADR-018 opt-in: when the provider couldn't be reached, create the instrument
-  // Unverified anyway (HistoryBackfillJob resolves it later, off the request path) instead of
-  // leaving the user stuck.
   protected addInstrumentAnyway(): void {
     void this.submitCustomInstrument(true);
   }

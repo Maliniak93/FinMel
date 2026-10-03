@@ -13,8 +13,6 @@ import {
   textsOf,
 } from '../../../../testing/i18n';
 
-// See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
-// generated client ultimately calls) instead of mocking the SDK module.
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -43,7 +41,6 @@ describe('PortfolioFormDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -149,10 +146,6 @@ describe('PortfolioFormDialog', () => {
     expect(component['legacyCurrency']).toBeNull();
   });
 
-  // Simulates picking an option from the mat-select — the control only ever emits one of
-  // `currencies`' codes (Validators.required is the only validator left; format is enforced by
-  // construction, not a regex), so setting a value straight from that list is the same effect a
-  // real user selection has.
   it('round-trips a currency chosen from the dropdown set on create', async () => {
     await setup({});
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingPortfolio, currency: 'EUR' }, 201));
@@ -180,9 +173,6 @@ describe('PortfolioFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
-  // M1.3's server-side restriction predates this dropdown: a portfolio stored (or seeded) with a
-  // currency outside PLN/EUR/USD must still load into the form with its real value — never
-  // silently swapped for DEFAULT_CURRENCY, and never blank because no <mat-option> matches it.
   it('editing a portfolio with an out-of-set currency keeps its real value, not blank or defaulted', async () => {
     await setup({ portfolio: { ...existingPortfolio, currency: 'GBP' } });
 
@@ -209,8 +199,6 @@ describe('PortfolioFormDialog', () => {
     expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
-  // i18n screens (#132) AC-2: title, field labels, validation messages and buttons follow the
-  // language.
   it('shows labels and validation in Polish', async () => {
     await setup({});
     const element = fixture.nativeElement as HTMLElement;
@@ -242,7 +230,6 @@ describe('PortfolioFormDialog', () => {
 
     expect(polishProblems(english, texts())).toEqual([]);
 
-    // The other name error, too.
     component['form'].controls.name.setValue('a'.repeat(201));
     component['form'].controls.description.setValue('');
     fixture.detectChanges();

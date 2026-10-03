@@ -24,8 +24,6 @@ import { client as reportingClient } from '../../api/reporting/client.gen';
 import type { DashboardResponse } from '../../api/reporting';
 import { Portfolios } from './portfolios';
 
-// See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
-// generated client ultimately calls) instead of mocking the SDK module.
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -46,10 +44,6 @@ const portfolio: PortfolioResponse = {
   assetCount: 0,
 };
 
-// Portfolios loads its own list plus Reporting's dashboard (for ByPortfolio totals) concurrently
-// on init, so every test that doesn't care about valuation gets this empty-but-valid payload —
-// it must never be omitted, or the component's `byPortfolio` iteration throws on an undefined
-// shape when the mocked response was only ever the portfolios array.
 const emptyDashboard: DashboardResponse = {
   netWorthPln: 0,
   asOf: null,
@@ -72,16 +66,9 @@ describe('Portfolios', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
-  // Routes the two concurrent initial GETs (portfolios list, Reporting dashboard) to distinct
-  // responses by URL, cloning each so a later reload (e.g. after the "Show archived" toggle)
-  // gets its own readable body instead of hitting "body already read" on a consumed Response.
-  // Any `mockResolvedValueOnce` added later in a test (for a mutation's POST/DELETE + reload)
-  // takes priority over this base implementation, so those still work call-by-call regardless
-  // of URL.
   async function setup(
     portfoliosResponse: Response,
     dashboardResponse: Response = jsonResponse(emptyDashboard),
@@ -117,9 +104,6 @@ describe('Portfolios', () => {
     );
   }
 
-  // A mutation reloads both the portfolios list and (archived-portfolio-out-of-net-worth) the
-  // dashboard behind "Total value", in no guaranteed order — so the reload GETs are left to the
-  // URL-routing base implementation from setup() and asserted by URL, never by call position.
   function requestsFrom(index: number): Request[] {
     return fetchSpy.mock.calls.slice(index).map(([input]: [unknown]) => input as Request);
   }
@@ -224,7 +208,6 @@ describe('Portfolios', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(callsBefore);
   });
 
-  // spec-02 AC-17: an archived portfolio's row menu offers Restore instead of Archive.
   it('shows Restore only for archived portfolios', async () => {
     const archived: PortfolioResponse = { ...portfolio, isArchived: true };
     await setup(jsonResponse([archived]));
@@ -284,9 +267,6 @@ describe('Portfolios', () => {
     expect(portfoliosListReloadedFrom(callsBefore + 1)).toBe(true);
   });
 
-  // archived-portfolio-out-of-net-worth AC10: archive / restore / delete change what counts toward
-  // net worth, so the dashboard behind the "Total value" column is fetched again after each
-  // successful mutation — not only the portfolios list.
   it('reloads total values after archive / restore / delete', async () => {
     await setup(jsonResponse([portfolio]));
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
@@ -323,8 +303,6 @@ describe('Portfolios', () => {
     expect(dashboardFetchCount()).toBe(initialDashboardFetches);
   });
 
-  // spec-08 AC-10: delete no longer has a 409-specific path, but any server failure still surfaces
-  // the ProblemDetails detail in a snackbar and skips the reload.
   it('shows a snackbar and does not reload when delete fails on the server', async () => {
     await setup(jsonResponse([portfolio]));
     const callsBefore = fetchSpy.mock.calls.length;
@@ -348,9 +326,6 @@ describe('Portfolios', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(callsBefore + 1);
   });
 
-  // M1.9 — portfolio list columns (S3): Name, Currency, Total value, actions by default; Status
-  // only under "Show archived"; a portfolio without a dashboard snapshot renders a placeholder,
-  // never a zero.
   describe('columns (M1.9)', () => {
     it('shows Name, Currency, Total value and actions by default — no Status column', async () => {
       await setup(jsonResponse([portfolio]));
@@ -412,8 +387,6 @@ describe('Portfolios', () => {
       ) as HTMLButtonElement | undefined;
     }
 
-    // spec-08 AC-9: delete cascades, so a portfolio with assets is deletable straight from the
-    // menu — the confirmation dialog, not a disabled item, is where the safety lives.
     it('enables Delete for a portfolio with assets and warns about its assets in the confirmation', async () => {
       const withAssets: PortfolioResponse = { ...portfolio, assetCount: 2 };
       await setup(jsonResponse([withAssets]));
@@ -432,7 +405,6 @@ describe('Portfolios', () => {
 
       const deleteButton = deleteButtonInOverlay(overlayContainer);
       expect(deleteButton?.disabled).toBe(false);
-      // No "archive it instead" tooltip any more — MatTooltip marks its host with this class.
       expect(deleteButton?.classList.contains('mat-mdc-tooltip-trigger')).toBe(false);
 
       deleteButton!.click();
@@ -466,7 +438,6 @@ describe('Portfolios', () => {
     });
   });
 
-  // portfolio-description-tooltip: description read back as a tooltip on the name link.
   describe('description tooltip', () => {
     function tooltipOn(link: number): MatTooltip {
       return fixture.debugElement.queryAll(By.css('td a'))[link].injector.get(MatTooltip);
@@ -482,7 +453,7 @@ describe('Portfolios', () => {
     });
 
     it('does not show a tooltip for a portfolio without a description', async () => {
-      await setup(jsonResponse([portfolio])); // shared fixture has description: null
+      await setup(jsonResponse([portfolio]));
 
       expect(tooltipOn(0).disabled).toBe(true);
     });
@@ -518,12 +489,9 @@ describe('Portfolios', () => {
     });
   });
 
-  // i18n screens (#132) AC-2: the list, its row menu, the archive / restore / delete confirmations
-  // and the failure snackbar fallback follow the language.
   describe('in Polish', () => {
     const archived: PortfolioResponse = { ...portfolio, isArchived: true };
 
-    // The row menu's items, opened and closed again so the next read starts clean.
     async function menuItems(): Promise<string[]> {
       const trigger = fixture.debugElement
         .query(By.directive(MatMenuTrigger))
@@ -633,7 +601,6 @@ describe('Portfolios', () => {
       expect(polishProblems(['Retry'], textsOf(element, '.portfolios-page__state button'))).toEqual(
         [],
       );
-      // The backend's own message stays as it arrived.
       expect(textOf(element.querySelector('.portfolios-page__state p'))).toBe(
         'Service unavailable.',
       );

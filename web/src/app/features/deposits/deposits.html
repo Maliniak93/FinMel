@@ -1,7 +1,6 @@
 <div class="deposits-page">
   <h1>{{ 'deposits.title' | transloco }}</h1>
 
-  <!-- savings-accounts: term deposits and savings accounts each on a tab of their own. -->
   <mat-tab-group>
     <mat-tab [label]="'deposits.tabs.termDeposits' | transloco">
       <div class="deposits-page__header">
@@ -86,8 +85,6 @@
             <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.maturityDate) }}</td>
           </ng-container>
 
-          <!-- Server-computed projection: after Belka tax unless the deposit is IKE/IKZE. A Settled row
-           shows what the bank actually paid instead. -->
           <ng-container matColumnDef="netInterest">
             <th mat-header-cell *matHeaderCellDef>{{ 'deposits.netProfit' | transloco }}</th>
             <td mat-cell *matCellDef="let deposit">
@@ -113,7 +110,6 @@
                   <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
                 }
               </mat-chip-set>
-              <!-- Where the money went; the destination is gone ("—") once that Cash asset was removed. -->
               @if (isPaidOut(deposit)) {
                 <div class="deposits-page__payout">
                   {{ formatDate(deposit.paidOutOn) }} → {{ deposit.paidOutToAssetName ?? '—' }}
@@ -122,11 +118,6 @@
             </td>
           </ng-container>
 
-          <!-- A deposit of an archived portfolio is read-only, so its row offers no action. A deposit
-           archived on its own (asset-archive) is read-only too: its menu offers Restore and Delete
-           only. Otherwise a Due deposit can be settled; a Settled one can be transferred to cash;
-           either can be rolled over. The terms of a Settled or PaidOut one are immutable, so its menu
-           offers Archive and Delete only. -->
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let deposit">
@@ -145,8 +136,6 @@
                   </button>
                 }
                 @if (!deposit.isArchived && isSettled(deposit)) {
-                  <!-- Like the menu trigger, the name is the description: this label must not mention
-                   settling. -->
                   <button
                     mat-icon-button
                     type="button"
@@ -159,9 +148,6 @@
                   </button>
                 }
                 @if (!deposit.isArchived && canRollOver(deposit)) {
-                  <!-- deposit-rollover: a Due or Settled (not paid-out) deposit starts its next term on the
-                   same asset. As above, the name is the description, and the label must not mention
-                   settling. -->
                   <button
                     mat-icon-button
                     type="button"
@@ -173,8 +159,6 @@
                     <mat-icon>autorenew</mat-icon>
                   </button>
                 }
-                <!-- The name reaches the trigger as its description, not its label: only the settle
-                 button's label may mention settling. -->
                 <button
                   mat-icon-button
                   type="button"

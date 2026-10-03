@@ -16,14 +16,11 @@ import {
 } from '../../testing/asset-form-fixtures';
 import { ManualAssetForm } from './manual-asset-form';
 
-// AC-4: the manual-valuation (RealEstate/Other) form. Value and date are required here — the old
-// dialog only switched those validators on in manual mode; this form has no other mode.
 describe('ManualAssetForm', () => {
   let fixture: ComponentFixture<ManualAssetForm>;
   let component: ManualAssetForm;
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -33,7 +30,7 @@ describe('ManualAssetForm', () => {
   }
 
   it('requires value + date and submits them', async () => {
-    await setup(7); // RealEstate
+    await setup(7);
 
     findControl(component.form, 'name').setValue('Apartment');
     findControl(component.form, 'manualValue').setValue(650000);
@@ -50,7 +47,7 @@ describe('ManualAssetForm', () => {
   });
 
   it('sends the picked valuation date as a DateOnly', async () => {
-    await setup(8); // Other
+    await setup(8);
 
     findControl(component.form, 'name').setValue('Painting');
     findControl(component.form, 'manualValue').setValue(12000);
@@ -110,8 +107,6 @@ describe('ManualAssetForm', () => {
     expect(renderedText(fixture)).toContain('Valued on');
     expect(renderedText(fixture)).not.toContain('Instrument');
   });
-  // i18n screens (#132) AC-4: field labels, the first-transaction toggle and the client-side
-  // validation messages follow the language.
   describe('in Polish', () => {
     it('renders in Polish', async () => {
       await setup(7);

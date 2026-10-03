@@ -10,18 +10,12 @@ import {
 import { readProblemDetails } from '../core/auth/problem-details';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
 
-// The one asset a page archives or restores (asset-archive): an AssetResponse or a DepositResponse
-// mapped to its ids and name.
 export interface ArchivableAsset {
   portfolioId: string;
   assetId: string;
   name: string;
 }
 
-// asset-archive: confirms, then archives (`archive` true) or restores one asset. Resolves true once
-// the server accepted it, so the page reloads its list; false when the user cancelled or the call
-// failed (a snack bar says why). Shared by the asset list and the Deposits page, which offer the same
-// Archive / Restore row menu items.
 export async function confirmSetAssetArchived(
   dialog: MatDialog,
   snackBar: MatSnackBar,

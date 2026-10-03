@@ -1,71 +1,16 @@
 #!/usr/bin/env node
-// Specs live as GitHub issues on the "FinMel" user project. This is the one place that knows the
-// project's number, its custom fields and the spec labels, so skills call a verb instead of
-// hand-assembling `gh project` invocations — and so every mechanical step (cleaning a draft,
-// checking it, deciding whether an issue is buildable, formatting a run report) is code, not tokens.
-//
-// Usage:
-//   node scripts/gh-project.mjs init
-//       Idempotent. Creates the custom fields (Tier, Kind, Branch) and the labels (spec, epic,
-//       skip-tests) when missing. Built-in Status (Todo / In progress / Done) is left as it is.
-//
-//   node scripts/gh-project.mjs create --title <t> --body-file <path> --slug <slug>
-//                                      --tier 1|2 --kind new|change|cleanup|fix
-//                                      [--skip-tests] [--parent <issue number>] [--epic]
-//       Cleans the draft (strips HTML comments, drops empty sections and empty table rows), checks it
-//       (Goal, Out of scope, and at least one `- [ ] **AC-n**` checkbox, each naming a `proof:`; an
-//       epic needs only Goal) and refuses with the list of problems if it fails. Then creates the
-//       issue (label `spec`, plus `skip-tests`), adds it to the project and sets Status=Todo, Tier,
-//       Kind, Branch=feat/<slug> (fix/<slug> for kind fix). --parent makes it a sub-issue. --epic
-//       creates the umbrella of a split spec instead: label `epic`, no Branch — it is never built
-//       itself, its sub-issues are. Prints one JSON line: {"number","url","branch"}.
-//
-//   node scripts/gh-project.mjs check --body-file <path> [--epic]
-//       Dry run of the cleaning and checking `create` does: prints "publishable" or the problems.
-//       Warnings (no `## Code map`) do not block publishing; they go to stderr.
-//
-//   node scripts/gh-project.mjs edit <issue number> [--body-file <path>] [--tier 1|2] [--parent <epic number>]
-//       Replaces the body of an existing spec issue, cleaned and checked exactly like `create`.
-//       --parent attaches the issue to an epic as its next sub-issue — how an already published spec
-//       becomes one part of a split. Sub-issues build in the order they were attached.
-//
-//   node scripts/gh-project.mjs set <issue number> <field> <value>
-//       Sets one project field on an issue already in the project, e.g. `set 123 Status "In progress"`.
-//
-//   node scripts/gh-project.mjs get <issue number> [--out <path> [--raw]]
-//       Prints one JSON line: {number,title,url,state,labels,inProject,status,tier,kind,branch,epic,
-//       skipTests,parent,subIssues:[{number,title,state}]}. --out also writes the issue to a local file: a
-//       title heading, one metadata line, then the body — or with --raw the body alone, as a draft
-//       to amend and publish back with `edit`.
-//
-//   node scripts/gh-project.mjs prepare <issue number> [--tier 1|2] [--skip tests,review]
-//       Everything /build does before the workflow: fetches the issue, decides whether it is
-//       buildable (an epic never is; a sub-issue is only once every earlier sibling is closed, since
-//       each part's branch is cut from master after the previous part merges; every issue listed under
-//       the spec's `## Depends on` section must be closed too), writes the local copy to skarbiec-plan/issues/<n>.md, resolves tier and skipped
-//       phases, and moves the card to In progress. Prints one JSON line — either
-//       {"ok":true,"resumed":bool,"workflowArgs":{...}} to pass to Workflow verbatim, or
-//       {"ok":false,"reason":"...","next":"..."} with what to run instead.
-//
-//   node scripts/gh-project.mjs report <issue number> [--json '<run report>']   (else JSON on stdin)
-//       Formats a build run's result as an issue comment and posts it. On a shipped run it links the
-//       branch's open PR and, when the review ran, ticks every acceptance criterion. The
-//       build-feature workflow calls this through its ops agent, so nobody hand-writes the comment.
-//
-//   node scripts/gh-project.mjs list
-//       Prints a JSON array of every issue on the project with its fields; an epic also carries its
-//       sub-issue numbers in build order.
-//
-//   node scripts/gh-project.mjs comment <issue number> --body-file <path>
-//       Posts a comment on the issue.
-//
-//   node scripts/gh-project.mjs tick <issue number>
-//       Ticks every unticked acceptance-criterion checkbox (`- [ ] **AC-`) in the issue body.
-//
-// Node >= 22, ESM, zero npm dependencies, requires `gh` >= 2.97 authenticated with the `project`
-// scope (`gh auth refresh -s project`). Exit 1 on any failure, with the step that failed on stderr;
-// if the issue was already created, its URL is printed too so the remaining steps can be re-run
-// with `set`.
+// Usage: node scripts/gh-project.mjs <verb> ...
+//   init                                                   create the custom fields and labels when missing
+//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n>] [--epic]
+//   check --body-file <p> [--epic]                         dry run of create's cleaning and checking
+//   edit <n> [--body-file <p>] [--tier 1|2] [--parent <n>] replace the body, or attach the issue to an epic
+//   set <n> <field> <value>                                set one project field
+//   get <n> [--out <path> [--raw]]                         print the issue as JSON, optionally write a local copy
+//   prepare <n> [--tier 1|2] [--skip tests,review]         /build's pre-workflow step
+//   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise)
+//   list                                                   every issue on the project as JSON
+//   comment <n> --body-file <path>                         post a comment
+//   tick <n>                                               tick every acceptance-criterion checkbox
 
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -127,14 +72,9 @@ function readStdin() {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// draft cleaning and checking
-// ---------------------------------------------------------------------------------------------
-
 const isTableRule = (line) => /^\|[\s|:-]*\|$/.test(line.trim());
 const isEmptyRow = (line) => /^\|(\s*\|)+\s*$/.test(line.trim());
 
-// A section is empty when nothing but blank lines, sub-headings or a bare table header is left.
 function hasContent(lines) {
   const meaningful = lines.filter((l) => l.trim() && !/^#{2,6} /.test(l) && !isTableRule(l));
   const bareTableHeader = meaningful.length === 1 && meaningful[0].trim().startsWith("|");
@@ -173,7 +113,6 @@ function cleanBody(text) {
     .trim();
 }
 
-// The body of one `## <name>` section, up to the next `## ` heading ("" when there is none).
 function section(body, name) {
   const lines = body.split("\n");
   const start = lines.findIndex((l) => l.trim() === `## ${name}`);
@@ -185,12 +124,10 @@ function section(body, name) {
     .trim();
 }
 
-// Issue numbers listed under `## Depends on` — prerequisites that must be merged before this builds.
 function dependsOn(body) {
   return [...new Set([...section(body, "Depends on").matchAll(/#(\d+)/g)].map((m) => Number(m[1])))];
 }
 
-// Not blocking, but a spec without them costs every build agent a rediscovery of the code.
 function lintWarnings(body, { epic }) {
   if (epic) return [];
   return section(body, "Code map") ? [] : ["no `## Code map` section — the test-writer, implementer and reviewer will each rediscover the code"];
@@ -202,8 +139,6 @@ function lintBody(body, { epic }) {
   if (epic) return problems;
   if (!/^## Out of scope\s*$/m.test(body)) problems.push("no `## Out of scope` section (or it is empty) — it is not optional");
   if (section(body, "Depends on") && !dependsOn(body).length) problems.push("`## Depends on` names no issue as `#<number>`");
-  // An AC is its checkbox line plus any indented lines under it (a multi-line AC keeps its proof in
-  // a sub-bullet); the block ends at the next checkbox, heading or unindented line.
   const acs = [];
   for (const line of body.split("\n")) {
     const head = line.match(/^[-*] \[[ x]\] \*\*(AC-\d+)/);
@@ -225,10 +160,6 @@ function preparedBody(file, epic) {
   for (const w of lintWarnings(body, { epic })) process.stderr.write(`warning: ${w}\n`);
   return body;
 }
-
-// ---------------------------------------------------------------------------------------------
-// project reads
-// ---------------------------------------------------------------------------------------------
 
 function projectItems() {
   const { items } = JSON.parse(
@@ -286,10 +217,6 @@ function writeCopy(result, body, out, raw) {
   writeFileSync(file, raw ? `${body}\n` : `# ${result.title}\n\n${meta.join(" · ")}\n\n${body}\n`);
   return path.relative(REPO_ROOT, file).replaceAll(path.sep, "/");
 }
-
-// ---------------------------------------------------------------------------------------------
-// verbs
-// ---------------------------------------------------------------------------------------------
 
 function init() {
   const existing = JSON.parse(gh(["project", "field-list", PROJECT, "--owner", OWNER, "--format", "json"]));
@@ -434,9 +361,6 @@ function prepare([number, ...rest]) {
   );
 }
 
-// The run report the build-feature workflow sends: {status: "shipped"|"blocked", stage?, reason?,
-// branch?, tests?: string[], rounds?, reviewRan?, minor?: [{file,line,claim}],
-// failures?: [{step,summary,file}], blocking?: [{file,line,claim}], deviations?: [{kind,file,what,why}]}.
 function report([number, ...rest]) {
   if (!number) throw new Error("usage: report <issue number> [--json '<report>']   (else JSON on stdin)");
   const flags = parseFlags(rest);

@@ -40,8 +40,6 @@ function today(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-// The tax can't exceed the gross interest (as SettleDepositRequest.Validate), so it reads its sibling
-// and is re-run whenever the gross changes.
 function taxWithinGross(control: AbstractControl): ValidationErrors | null {
   const gross = control.parent?.get('grossInterest')?.value as number | null | undefined;
   if (gross === null || gross === undefined || control.value === null || control.value === '') {
@@ -54,11 +52,6 @@ function isAmount(value: number | string | null): value is number | string {
   return value !== null && value !== '' && Number.isFinite(Number(value));
 }
 
-// Settles a Due term deposit (term-deposits-settlement): pre-filled from the server's settlement
-// preview, with what the bank actually paid editable. "Move to" (deposit-payout-to-cash,
-// deposit-payout-to-savings) keeps the money in the deposit by default, or pays the whole final amount
-// out to a Cash or Savings asset in the same request. Control names follow the SettleDepositRequest properties, so a server 400 keyed on a field
-// lands on it.
 @Component({
   selector: 'app-settle-deposit-dialog',
   imports: [
@@ -83,8 +76,6 @@ export class SettleDepositDialog {
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
   protected readonly maturityDate = fromDateOnly(this.deposit.maturityDate);
-  // The settlement date lies between the start date and today (Europe/Warsaw on the server; the
-  // viewer's local date here).
   protected readonly minSettledOn = fromDateOnly(this.deposit.startDate);
   protected readonly maxSettledOn = today();
 
@@ -102,11 +93,9 @@ export class SettleDepositDialog {
     ],
     grossInterest: [null as number | null, [Validators.required, Validators.min(0)]],
     tax: [null as number | null, [Validators.required, Validators.min(0), taxWithinGross]],
-    // null keeps the money in the deposit; otherwise one of the Cash or Savings transfer candidates.
     destinationAssetId: [null as string | null],
   });
 
-  // Signal mirror of the form, so net interest and the final amount follow the edits live.
   private readonly formValue = toSignal(
     this.form.valueChanges.pipe(map(() => this.form.getRawValue())),
     { initialValue: this.form.getRawValue() },
@@ -120,7 +109,6 @@ export class SettleDepositDialog {
     return settlementAmounts(this.deposit.principal, grossInterest, tax);
   });
 
-  // The final amount the payout moves — only when a destination is chosen.
   protected readonly movedAmount = computed(() =>
     this.formValue().destinationAssetId ? (this.amounts()?.finalAmount ?? null) : null,
   );
@@ -142,16 +130,13 @@ export class SettleDepositDialog {
     },
   });
 
-  // Pre-fills the form once the preview has loaded — gated on hasValue(), since value() throws while
-  // the resource is in its error state.
   private readonly prefillFromPreviewEffect = effect(() => {
     if (!this.previewResource.hasValue()) {
       return;
     }
     const preview = this.previewResource.value();
     if (preview) {
-      // Untracked: whatever the form reads while updating must not make this effect re-run and
-      // overwrite the user's edits.
+      // Untracked: whatever the form reads while updating must not re-run this effect and overwrite the user's edits.
       untracked(() =>
         this.form.patchValue({
           settledOn: fromDateOnly(preview.settledOn),
@@ -188,7 +173,6 @@ export class SettleDepositDialog {
         settledOn: toDateOnly(values.settledOn!),
         grossInterest: Number(values.grossInterest),
         tax: Number(values.tax),
-        // Left out, not null, when the money stays in the deposit.
         destinationAssetId: values.destinationAssetId ?? undefined,
       },
     });

@@ -14,8 +14,6 @@ import {
   FirstTransactionFields,
 } from '../../blocks/first-transaction-fields/first-transaction-fields';
 
-// Cash and Deposit: currency-valued (Quantity × FxRate), so there is no instrument and no manual
-// value — the body is just the basics, plus an opening Deposit when the first transaction is added.
 @Component({
   selector: 'app-cash-asset-form',
   imports: [AssetBasicsFields, FirstTransactionFields, TranslocoPipe],

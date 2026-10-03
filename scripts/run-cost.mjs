@@ -1,25 +1,9 @@
 #!/usr/bin/env node
-// Where the tokens of the build-feature runs went: reads Claude Code's local session history for this
-// repo and reports, per workflow run and per agent type, how many model calls were made, how much
-// context was read from / written to the prompt cache, the output, the largest context any one agent
-// reached and what its Bash calls mostly did. Use it before and after a change to the flow (agents,
-// skills, spec template, verify.mjs) to see whether the change paid off.
-//
 // Usage: node scripts/run-cost.mjs [--since YYYY-MM-DD] [--issue <n>] [--runs <N>] [--json]
-//
-//   --since   only runs started on or after this date (default: 30 days before the newest run)
-//   --issue   only runs for this spec issue
-//   --runs    how many of the newest runs to list one by one (default 15; the totals cover all)
-//   --json    one JSON object instead of the tables
-//
-// Reads ~/.claude/projects/<this repo, path-encoded>/ (override with CLAUDE_CONFIG_DIR): every
-// <session>/workflows/wf_*.json (a run's args, result, duration and logs) and every
-// <session>/subagents/workflows/<run>/agent-*.jsonl + .meta.json (each agent's API usage and type).
-// Each API response is counted once (transcripts repeat a message id per content block).
-// "Cache read" dominates on a long agent: every turn re-reads the whole context, so cost grows with
-// turns × context size — the two numbers to drive down.
-//
-// Node >= 22, ESM, zero npm dependencies. Read-only.
+//   --since  only runs started on or after this date (default: 30 days before the newest run)
+//   --issue  only runs for this spec issue
+//   --runs   how many of the newest runs to list one by one (default 15)
+//   --json   one JSON object instead of the tables
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
@@ -28,8 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
-// Claude Code names a project's history folder after its path with every non-alphanumeric
-// character replaced by "-" (C:\Users\me\FinMel → C--Users-me-FinMel).
+// Claude Code names the history folder after the path with every non-alphanumeric character as "-".
 const HISTORY = path.join(CONFIG_DIR, "projects", REPO_ROOT.replace(/[^A-Za-z0-9]/g, "-"));
 
 function parseArgs(argv) {
@@ -54,7 +37,6 @@ const readJson = (file) => {
 };
 const dirs = (dir) => (existsSync(dir) ? readdirSync(dir).filter((d) => statSync(path.join(dir, d)).isDirectory()) : []);
 
-// What a Bash command mostly is: exploring the code, running tests, building, git, ...
 function bashClass(command) {
   const cmd = String(command)
     .replace(/^\s*cd\s+[^&;]+(&&|;)\s*/, "")

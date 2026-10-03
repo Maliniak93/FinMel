@@ -24,8 +24,6 @@ import { InstrumentPicker } from './instrument-picker';
 type InstrumentOption =
   InstrumentSearchResult | InstrumentDetailsResponse | CustomInstrumentResponse;
 
-// AC-6: the ADR-018 custom-ticker panel, moved as-is out of the old dialog into the picker block.
-// The picker writes the chosen instrument into the control it is given.
 describe('InstrumentPicker', () => {
   let fixture: ComponentFixture<InstrumentPicker>;
   let component: InstrumentPicker;
@@ -38,7 +36,6 @@ describe('InstrumentPicker', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -54,7 +51,7 @@ describe('InstrumentPicker', () => {
     fixture = TestBed.createComponent(InstrumentPicker);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('control', control);
-    fixture.componentRef.setInput('assetClass', 2); // Stock
+    fixture.componentRef.setInput('assetClass', 2);
     fixture.componentRef.setInput('allowCustomTicker', allowCustomTicker);
     await fixture.whenStable();
   }
@@ -147,12 +144,10 @@ describe('InstrumentPicker', () => {
         source: 1,
         quoteCurrency: 'USD',
         assetClass: 2,
-        verificationStatus: 1, // Unverified
+        verificationStatus: 1,
       };
       fetchSpy.mockResolvedValueOnce(jsonResponse(unverified, 201));
 
-      // addInstrumentAnyway() is a fire-and-forget wrapper around submitCustomInstrument(true) —
-      // call the awaitable method directly for a deterministic test.
       await component['submitCustomInstrument'](true);
 
       const secondRequest = fetchSpy.mock.calls[1][0] as Request;
@@ -181,9 +176,6 @@ describe('InstrumentPicker', () => {
     });
   });
 
-  // i18n screens (#132) AC-4: the field labels, the search placeholder and hint, the selected
-  // instrument line, the custom-ticker link and panel, and the outcome texts follow the language. A
-  // backend `detail` in an outcome stays as it arrived.
   describe('in Polish', () => {
     function click(selector: string): void {
       (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(selector)!.click();

@@ -1,68 +1,15 @@
 #!/usr/bin/env node
-// Single definition of "green" for Skarbiec: format -> build -> affected tests -> web -> api.
-//
-// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix]
-//                                [--deadline-min N] [--out <file>]
-//
-//   (no flags)        auto mode — selects affected .NET test projects and web/api checks from
-//                      changed files (git diff master...HEAD, falling back to origin/master...HEAD,
-//                      unioned with `git status --porcelain`; if neither ref exists, treat as --all).
-//   --quick           stop after `dotnet build` (format + build only). Overrides everything below.
-//   --projects a,b    run exactly these .NET test projects (short names like `Portfolio`, `Gateway`,
-//                      `Contracts`, `ServiceDefaults`, `Testing`, or a path to a test project/csproj).
-//                      Replaces auto-detection of .NET projects; web/api still need --web/--api/--all.
-//   --web             force the web checks on regardless of what changed.
-//   --api             force the api (generated TS client) check on regardless of what changed.
-//   --all             every test project + web + api.
-//   --fix             before checking, apply the mechanical fixes to the changed files only:
-//                      `dotnet format --include` on changed .cs files, `prettier --write` and
-//                      `eslint --fix` on changed web/ files. Prints what it reformatted. Never fails the
-//                      run by itself — whatever it cannot fix is reported by the checks that follow.
-//   --deadline-min N  wall-clock budget for the whole run (default 60). When it runs out the current
-//                      command and its whole process tree are killed and the run fails with
-//                      step "timeout". Each single command is also capped at 60 min.
-//   --out <file>      also write the result JSON ({ok, failures}) to <file> (atomically, via a temp
-//                      file and rename); a stale <file> is deleted at start. Lets a caller that runs
-//                      this script in the background wait for the file instead of polling output.
-//   --await <file>    do not verify: wait (at most --max-min N, default 9 — one foreground Bash call)
-//                      for a background run's --out file, print its VERIFY_RESULT line and exit 0/2;
-//                      still missing → `VERIFY_PENDING: …` and exit 3, so the caller calls it again.
-//
-// Steps run in order and STOP at the first failure: format, build, test (one dotnet test per
-// affected project), web (typecheck/lint/format/build/test), api (gen:api + diff check).
-//
-// The final line of stdout is always exactly `VERIFY_RESULT: <json>` — see `finish()` below for the
-// shape. Exit code 0 on success, 2 on failure (with a one-paragraph summary also written to stderr,
-// so this script can be wired directly as a blocking Claude Code Stop hook). Nothing else is ever
-// printed after that line.
-//
-// Node >= 22, ESM, zero npm dependencies — only node:fs / node:path / node:child_process / node:url.
-// Runs from any cwd: the repo root is resolved from this file's own location, and every child
-// process is given an explicit `cwd` rather than inheriting the caller's.
-//
-// Windows notes:
-//  - Every check runs via `spawn(cmdString, { shell: true, ... })` with a single pre-quoted
-//    command string (not an argv array) — Node does not itself quote array args for a Windows shell,
-//    so building the string ourselves (see `quoteArg`) keeps `cmd.exe` and POSIX shells consistent.
-//    It is async (not spawnSync) so a timeout can kill the whole tree (`taskkill /T`) while the shell
-//    is still alive — killing only the shell would orphan dotnet/testhost processes that keep build
-//    outputs locked.
-//  - `npm` has no `.exe` on Windows (it's `npm.cmd`); we call `npm.cmd` there and plain `npm` elsewhere.
-//  - Verified empirically on this repo's Angular 22 unit-test builder (`@angular/build:unit-test`,
-//    which wraps Vitest): `npm test -- --watch=false` runs once and exits 0 — that is the invocation
-//    used below for the `web-test` step.
-//  - `dotnet format`/`dotnet build` diagnostics are locale-sensitive for the free-text MESSAGE (this
-//    machine prints Polish, e.g. "Napraw znacznik końca wiersza" for ENDOFLINE) but NOT for the
-//    `error`/`warning` keyword or the rule code (`ENDOFLINE`, `CS0103`, ...) — the parsers below only
-//    ever key off the latter, never the message text.
-//  - `dotnet test` failures are read from xUnit's own `[FAIL]` marker lines (also not localized),
-//    never from a loose "Failed <word>" scan — that previously matched unrelated localized prose
-//    (e.g. a Polish sentence containing "Failed to...") and reported a garbage test name. A run
-//    where Docker isn't reachable is detected up front from the output itself and reported as that,
-//    rather than as a misleading one-word "test".
-//  - A running local stack (Aspire AppHost + services) holds its bin/ outputs open, so the build fails
-//    with MSB3021/MSB3026/MSB3027 (locked file). On one of those codes this script stops the stack
-//    (`scripts/stop-stack.mjs`) and retries the build once; the log says what it stopped.
+// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--deadline-min N] [--out <file>] [--await <file> [--max-min N]]
+//   (no flags)        affected .NET test projects and web/api checks, picked from the files changed against master
+//   --quick           format + build only; overrides everything below
+//   --projects a,b    exactly these .NET test projects; web/api still need --web/--api/--all
+//   --web             force the web checks
+//   --api             force the generated TS client check
+//   --all             every test project + web + api
+//   --fix             first reformat the changed files (dotnet format, prettier, eslint --fix)
+//   --deadline-min N  wall-clock budget for the whole run (default 60)
+//   --out <file>      also write the result JSON to <file>
+//   --await <file>    do not verify: wait (at most --max-min N, default 9) for a background run's --out file
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -76,16 +23,11 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const WEB_DIR = path.join(REPO_ROOT, "web");
 const NPM = IS_WIN ? "npm.cmd" : "npm";
 const NPX = IS_WIN ? "npx.cmd" : "npx";
-const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000; // per command — the suites keep growing; be generous
-const DEFAULT_DEADLINE_MIN = 60; // whole run
+const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
+const DEFAULT_DEADLINE_MIN = 60;
 
-// Set in main(); every command's timeout is capped by what is left of it.
 let deadlineAt = Infinity;
 let outFile = null;
-
-// ---------------------------------------------------------------------------------------------
-// CLI
-// ---------------------------------------------------------------------------------------------
 
 function parseArgs(argv) {
   const args = {
@@ -145,12 +87,6 @@ function splitList(s) {
     .filter(Boolean);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Project discovery
-// ---------------------------------------------------------------------------------------------
-
-// All directory names under services/ (regardless of whether a Tests project exists yet) — used to
-// recognize `services/<S>/**` paths even for a service that has no test project on disk yet.
 function discoverServiceNames() {
   const servicesDir = path.join(REPO_ROOT, "services");
   if (!existsSync(servicesDir)) return [];
@@ -160,8 +96,6 @@ function discoverServiceNames() {
     .sort();
 }
 
-// short name (as typed on the CLI, case-insensitive) -> { shortName, rel } for every test project
-// that actually exists on disk right now.
 function buildProjectMap(serviceNames) {
   const map = new Map();
   const add = (shortName, rel) => {
@@ -196,10 +130,6 @@ function resolveProjectsArg(tokens, projectMap) {
   return { rels, unknown };
 }
 
-// ---------------------------------------------------------------------------------------------
-// Change detection (auto mode)
-// ---------------------------------------------------------------------------------------------
-
 function normalizeSlashes(p) {
   return p.replace(/\\/g, "/");
 }
@@ -216,7 +146,6 @@ function gitOutput(args) {
   return res.ok ? res.stdout : null;
 }
 
-// Returns { files: string[], treatAsAll: boolean, base: string|null }
 function getChangedFiles() {
   for (const base of ["master...HEAD", "origin/master...HEAD"]) {
     const out = gitOutput(["diff", "--name-only", base]);
@@ -255,7 +184,6 @@ function unquotePath(raw) {
     try {
       return JSON.parse(s);
     } catch {
-      /* fall through to raw */
     }
   }
   return s;
@@ -271,7 +199,6 @@ function isApiSurfaceFile(lower) {
   return false;
 }
 
-// -> { affectedKeys: Set<lowercase short name>, web: boolean, api: boolean }
 function computeAffected(changedFiles, serviceNames) {
   const affectedKeys = new Set();
   const serviceKeys = serviceNames.map((s) => s.toLowerCase());
@@ -314,10 +241,6 @@ function computeAffected(changedFiles, serviceNames) {
   return { affectedKeys, web, api };
 }
 
-// ---------------------------------------------------------------------------------------------
-// Process execution
-// ---------------------------------------------------------------------------------------------
-
 function quoteArg(a) {
   const s = String(a);
   if (s === "") return '""';
@@ -325,7 +248,6 @@ function quoteArg(a) {
   return s;
 }
 
-// Short helper commands (git) — synchronous, never subject to the run deadline.
 function runSync(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const cmdStr = [bin, ...args].map(quoteArg).join(" ");
   const startedAt = Date.now();
@@ -358,15 +280,12 @@ function killTree(pid) {
     return;
   }
   try {
-    process.kill(-pid, "SIGKILL"); // the child leads its own process group (detached below)
+    process.kill(-pid, "SIGKILL");
   } catch {
-    /* already gone */
   }
 }
 
-// A check. Async so a timeout can kill the whole process tree while the shell is still alive. The
-// timeout is the smaller of `timeoutMs` and what is left of the run's deadline; `deadlineHit` says
-// the deadline was the one that ran out.
+// Async so a timeout can kill the whole process tree while the shell is still alive.
 function runCommand(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const cmdStr = [bin, ...args].map(quoteArg).join(" ");
   const startedAt = Date.now();
@@ -410,7 +329,6 @@ function runCommand(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS
   });
 }
 
-// --fix: hash a file so we can tell which ones a fixer actually rewrote.
 function hashOf(rel) {
   try {
     return createHash("sha1")
@@ -421,7 +339,7 @@ function hashOf(rel) {
   }
 }
 
-// cmd.exe caps a command line at 8191 characters; pass file lists in chunks well under that.
+// cmd.exe caps a command line at 8191 characters.
 function chunks(list, size = 40) {
   const result = [];
   for (let i = 0; i < list.length; i += size) result.push(list.slice(i, i + size));
@@ -430,8 +348,6 @@ function chunks(list, size = 40) {
 
 const WEB_GENERATED_RE = /^web\/(node_modules|dist|openapi|src\/app\/api)\//i;
 
-// The mechanical fixes `--fix` applies to the changed files only, before any check runs. A fixer that
-// fails (a syntax error mid-file, ...) is printed and ignored: the check that follows reports it.
 async function applyFixes(changedFiles) {
   const existing = [...new Set(changedFiles.map(normalizeSlashes))].filter((f) => existsSync(path.join(REPO_ROOT, f)));
   const cs = existing.filter((f) => f.toLowerCase().endsWith(".cs"));
@@ -458,10 +374,6 @@ async function applyFixes(changedFiles) {
   const rewritten = targets.filter((f) => hashOf(f) !== before.get(f));
   console.log(rewritten.length ? `\nfix: reformatted ${rewritten.length} file(s): ${rewritten.join(", ")}` : "\nfix: nothing to reformat");
 }
-
-// ---------------------------------------------------------------------------------------------
-// Output helpers
-// ---------------------------------------------------------------------------------------------
 
 const ANSI_RE = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 function stripAnsi(s) {
@@ -514,8 +426,8 @@ function toRel(p) {
 
 function isNoiseLine(t) {
   if (!t) return true;
-  if (t.startsWith("> ")) return true; // npm run script echo
-  if (/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✔✓]+$/.test(t)) return true; // spinner/checkmark-only lines
+  if (t.startsWith("> ")) return true;
+  if (/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✔✓]+$/.test(t)) return true;
   return false;
 }
 
@@ -527,16 +439,9 @@ function firstNonEmptyLines(text, n) {
   return lines.slice(0, n).join(" | ");
 }
 
-// ---------------------------------------------------------------------------------------------
-// Failure extraction (best-effort; always falls back to a truthful excerpt, never throws)
-// ---------------------------------------------------------------------------------------------
-
-// MSBuild's locked-output codes (not localized): copy failed / retrying / gave up after retries.
 const LOCKED_OUTPUT_RE = /\b(?:warning|error)\s+MSB30(?:21|26|27)\b/;
 
-// MSBuild/tsc shared diagnostic shape: `file(line,col): error CODE: message [project]`. The `error`/
-// `warning` keyword and the rule code are stable across locales — only `message` is localized, and
-// we never read it.
+// The error/warning keyword and the rule code are stable across locales; only the message is localized.
 const DIAG_RE = /^(.*?)\((\d+),(\d+)\):\s+(error|warning)\s+(\S+):\s*(.*?)\s*(?:\[(.*?)\])?$/;
 
 function extractCompilerFailure(stepName, text) {
@@ -557,29 +462,14 @@ function extractCompilerFailure(stepName, text) {
   return { step: stepName, summary: truncate(summary), file: uniqueFiles[0] ?? null };
 }
 
-// xUnit prints a literal (non-localized) `[FAIL]` tag after a failing test's display name, e.g.
-// `    Skarbiec.Portfolio.Tests.AddAssetEndpointTests.Returns422 [FAIL]`. This is the only thing we
-// trust as a real test name — never a generic "Failed <word>" scan, which can match unrelated
-// (possibly localized) prose elsewhere in the output and invent a bogus name.
+// xUnit's [FAIL] marker is not localized; a loose "Failed <word>" scan matches unrelated prose.
 const XUNIT_FAIL_RE = /^\s*(.+?)\s+\[FAIL\]\s*$/;
-// VSTest's per-test line on this SDK is `Failed <Fully.Qualified.Name> [12 ms]` (localized prefix,
-// e.g. `Niepowodzenie` in Polish). The dotted name AND the trailing `[N ms]` timing are both
-// required, which is what keeps prose like "Failed to connect to Docker endpoint" from matching.
 const VSTEST_FAIL_RE = /^\s*(?:Failed|Niepowodzenie)\s+([A-Za-z_][\w]*(?:\.[\w]+)+(?:\([^)]*\))?)\s+\[\d+\s*(?:ms|s)\]\s*$/;
-// Locale note: dotnet test's own run-summary line is "Failed!  - Failed: N, Passed: ..." in English
-// and "Niepowodzenie!  - Niepowodzenie: N, ..." has been observed in Polish; both name the marker
-// word twice with the count right after, so matching the marker then the first following number
-// gets the count without needing every language's full sentence.
 const SUMMARY_COUNT_RE = /(?:Failed!|Niepowodzenie!).*?(\d+)/;
-// A failure that never reached a real test — Testcontainers couldn't reach the Docker daemon — is a
-// far more useful and honest summary than whatever unrelated line a name/file scan would otherwise
-// latch onto.
 const DOCKER_UNREACHABLE_RE = /\b(docker|testcontainers|npipe|dockerdesktoplinuxengine)\b/i;
 const STACK_FILE_RE = /in\s+(.+?):line\s+\d+/;
 
-// Reject a stack-frame path that isn't actually inside this repo (e.g. Testcontainers ships PDBs
-// with its own build-time paths baked in, like `/_/src/Testcontainers/Guard.Null.cs`) — reporting
-// that as `file` would point straight at a NuGet package, not at anything the user can act on.
+// Testcontainers PDBs carry their own build-time paths, which point at no file in this repo.
 function looksRepoRelative(rel) {
   return !!rel && !rel.startsWith("/") && !/^[A-Za-z]:/.test(rel);
 }
@@ -617,8 +507,6 @@ function extractDotnetTestFailure(text) {
     };
   }
 
-  // No per-test [FAIL] marker found — fall back to the run's count-only summary line. Never invent
-  // a name from unrelated text.
   const countMatch = clean.match(SUMMARY_COUNT_RE);
   if (countMatch) {
     return {
@@ -688,10 +576,6 @@ function buildFailure(stepName, result) {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Result / exit
-// ---------------------------------------------------------------------------------------------
-
 function finish(ok, failures) {
   if (ok) {
     console.log("\nverify.mjs: all checks passed");
@@ -721,13 +605,6 @@ function fatal(message) {
   process.exit(process.exitCode);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------------------------
-
-// --await <file>: block until a background run's --out file appears (at most --max-min, default 9,
-// so it fits one foreground Bash call), then print its VERIFY_RESULT line and exit 0/2 like the run
-// itself. Still missing → prints `VERIFY_PENDING: …` and exits 3; the caller simply calls it again.
 function awaitResult(file, maxMin) {
   const giveUpAt = Date.now() + maxMin * 60 * 1000;
   return new Promise((resolve) => {
@@ -738,7 +615,6 @@ function awaitResult(file, maxMin) {
         try {
           ok = JSON.parse(json).ok === true;
         } catch {
-          /* a malformed file reads as a failure */
         }
         console.log(`VERIFY_RESULT: ${json}`);
         process.exitCode = ok ? 0 : 2;
@@ -778,9 +654,6 @@ async function main() {
     runApi = true;
     modeDescription = "--all: every test project + web + api";
   } else if (args.projects) {
-    // `web` is a pseudo-project: it enables the web checks rather than naming a .NET test project.
-    // `--projects web` alone means "no .NET tests, just web"; mixed with real names it adds web
-    // checks on top of them.
     const includesWeb = args.projects.some((t) => t.toLowerCase() === "web");
     const dotnetTokens = args.projects.filter((t) => t.toLowerCase() !== "web");
     const { rels, unknown } = resolveProjectsArg(dotnetTokens, projectMap);
@@ -822,18 +695,15 @@ async function main() {
   console.log(`api check: ${runApi ? "yes" : "no"}${args.quick && runApi ? " (skipped by --quick)" : ""}`);
   console.log(`fix: ${args.fix ? "yes" : "no"} · deadline: ${args.deadlineMin} min`);
 
-  // Step 0: --fix — mechanical fixes on the changed files only
   if (args.fix) {
     const { files, treatAsAll } = getChangedFiles();
     if (treatAsAll) console.log("\nnotice: no master or origin/master ref — --fix skipped");
     else await applyFixes(files);
   }
 
-  // Step 1: format
   const formatResult = await step("format", () => runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes"]));
   if (!formatResult.ok) return finish(false, [buildFailure("format", formatResult)]);
 
-  // Step 2: build (warnings are errors via Directory.Build.props)
   let buildResult = await step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
   if (!buildResult.ok && LOCKED_OUTPUT_RE.test(`${buildResult.stdout}\n${buildResult.stderr}`)) {
     const { stopped, left } = stopStack();
@@ -846,13 +716,11 @@ async function main() {
 
   if (args.quick) return finish(true, []);
 
-  // Step 3: dotnet test, one per affected project, stop at the first failure
   for (const rel of selectedRels) {
     const testResult = await step(`test: ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]));
     if (!testResult.ok) return finish(false, [buildFailure("test", testResult)]);
   }
 
-  // Step 4: web
   if (runWeb) {
     if (!existsSync(WEB_DIR)) {
       console.log("\nnotice: web/ not found — skipping web checks");
@@ -862,8 +730,6 @@ async function main() {
         ["web-lint", ["run", "lint"]],
         ["web-format", ["run", "format:check"]],
         ["web-build", ["run", "build"]],
-        // Verified empirically: `npm test -- --watch=false` runs the Angular/Vitest unit-test
-        // builder once and exits (see file header).
         ["web-test", ["test", "--", "--watch=false"]],
       ];
       for (const [canonical, npmArgs] of webSteps) {
@@ -873,7 +739,6 @@ async function main() {
     }
   }
 
-  // Step 5: api — generated TS client must match the build-time OpenAPI docs
   if (runApi) {
     const openapiDir = path.join(WEB_DIR, "openapi");
     if (!existsSync(openapiDir)) {

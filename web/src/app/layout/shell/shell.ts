@@ -18,8 +18,6 @@ const THEME_ICONS: Record<ThemePreference, string> = {
   dark: 'dark_mode',
 };
 
-// What clicking the button switches *to* — cycle() moves system -> light -> dark -> system, so
-// the label always names the state one click away, not the current one. Translation keys.
 const THEME_NEXT_LABELS: Record<ThemePreference, string> = {
   system: 'shell.theme.system',
   light: 'shell.theme.light',

@@ -48,9 +48,7 @@ POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/a
 Authorization: Bearer {{authToken}}
 
 ### Add an asset to the archived portfolio (409)
-# Run right after the archive above. An archived portfolio is read-only: every asset and transaction
-# write in it is 409 with errorCode Conflict.PortfolioArchived until it is restored
-# (archived-portfolio-out-of-net-worth). Renaming or deleting the portfolio itself still works.
+# Run right after the archive above.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -62,14 +60,10 @@ Content-Type: application/json
 }
 
 ### Restore an archived portfolio
-# Mirror of archive: 200 with isArchived=false. Repeating it on a portfolio that is not archived is
-# a no-op — still 200, but nothing is published (spec-02).
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/restore
 Authorization: Bearer {{authToken}}
 
 ### Delete a portfolio
-# Cascades: its assets and their transactions are deleted too, and one AssetRemoved per asset
-# (CascadedFromPortfolio = true) is published with PortfolioDeleted (spec-08). 204.
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}
 Authorization: Bearer {{authToken}}
 
@@ -128,14 +122,11 @@ Content-Type: application/json
 }
 
 ### Archive an asset
-# asset-archive: 200 with isArchived=true. The asset is read-only from now on (409 Conflict.AssetArchived
-# on every edit, transaction and deposit write; removal still works) and drops out of net worth from
-# today. Repeating it is 200 with the unchanged body. In an archived portfolio: 409 Conflict.PortfolioArchived.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/archive
 Authorization: Bearer {{authToken}}
 
 ### Update the archived asset (409)
-# Run right after the archive above: 409 with errorCode Conflict.AssetArchived.
+# Run right after the archive above.
 PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -149,12 +140,10 @@ Content-Type: application/json
 }
 
 ### Restore an archived asset
-# Mirror of archive: 200 with isArchived=false, and the asset counts toward net worth again from today.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/restore
 Authorization: Bearer {{authToken}}
 
 ### Remove an asset
-# Cascades: the asset's transactions are deleted too, and AssetRemoved is published (spec-08). 204.
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 
@@ -175,10 +164,6 @@ Content-Type: application/json
 }
 
 ### Record a Buy on the Cash asset (400)
-# A Cash or Deposit asset accepts only Deposit/Withdraw transactions: any other type is 400 with
-# errorCode Validation.TransactionTypeNotAllowed, and nothing is written (cash-transaction-types).
-# The same rule answers AddAsset's initialTransaction, UpdateTransaction, and an UpdateAsset that
-# turns an asset holding other types into Cash/Deposit.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -214,12 +199,6 @@ Authorization: Bearer {{authToken}}
 ### --- Term deposits ---
 
 ### Add a term deposit
-# Creates the Deposit-class asset (CurrencyValued), its system-managed opening Deposit transaction
-# (principal, start date, unit price 1, start-date PLN rate frozen) and its terms in one save, and
-# publishes AssetPositionChanged with quantity = principal. 201 with the maturity date, projection
-# and status (term-deposits). Enums are ints: termUnit 0 = Days, 1 = Months; capitalization
-# 0 = AtMaturity, 1 = Monthly, 2 = Quarterly, 3 = Yearly; status 0 = Active, 1 = Due, 2 = Settled,
-# 3 = PaidOut.
 # @name addDeposit
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
 Authorization: Bearer {{authToken}}
@@ -240,7 +219,6 @@ Content-Type: application/json
 }
 
 ### Add a Cash account to fund a deposit from
-# A currency-valued Cash asset topped up with 5 000 PLN before the deposit's start date.
 # @name addFundingCash
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
 Authorization: Bearer {{authToken}}
@@ -259,22 +237,10 @@ Content-Type: application/json
 }
 
 ### List transfer candidates (the deposit form's sources of funds)
-# The user's assets of that class and currency in non-archived portfolios, each with its balance
-# (quantity), ordered by portfolio name, then asset name (asset-transfers-deposit-funding).
-# assetClass takes the enum name or its int (0 = Cash). 400 for an unsupported currency or a
-# missing parameter.
 GET {{baseUrl}}/api/portfolio/transfer-candidates?currency=PLN&assetClass=Cash
 Authorization: Bearer {{authToken}}
 
 ### Add a term deposit funded from cash
-# fundingAssetId moves the principal out of that Cash asset as one Cash → Deposit transfer: a
-# Withdraw on the Cash and the opening Deposit on the deposit, same amount and start date, linked by
-# a shared TransferId; both assets publish AssetPositionChanged in one save. 201 with fundingAssetId
-# and fundingAssetName. 400 Validation.InvalidTransferCounterpart for a source that is not the
-# user's same-currency Cash in an active portfolio, 400 Validation.InsufficientFunds when the Cash
-# can't cover the principal on the start date. The source is fixed at creation; the Cash leg is
-# 409 Conflict.TransferLegManaged on PUT/DELETE .../transactions/{id}, and removing either asset
-# detaches the other side's leg instead of reversing it.
 # @name addFundedDeposit
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
 Authorization: Bearer {{authToken}}
@@ -296,8 +262,6 @@ Content-Type: application/json
 }
 
 ### List every deposit across portfolios
-# Portfolio name and archived flag, terms, projection and status (Due once the maturity date is on or
-# before today's Europe/Warsaw date).
 GET {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 
@@ -306,11 +270,6 @@ GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/de
 Authorization: Bearer {{authToken}}
 
 ### Update a deposit
-# Same fields as add, minus the currency and the funding source (both immutable). Rewrites the
-# opening transaction in place and publishes AssetPositionChanged with the new quantity. On a funded
-# deposit a new principal or start date rewrites both transfer legs and publishes for both assets
-# (400 Validation.InsufficientFunds when the Cash can't cover it, 409 Conflict.PortfolioArchived when
-# the Cash's portfolio is archived).
 PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -329,9 +288,6 @@ Content-Type: application/json
 }
 
 ### Record a transaction on the deposit (409)
-# A term deposit's transactions are system-managed: recording, editing or deleting one is 409 with
-# errorCode Conflict.DepositTransactionsManaged. Creating or editing a Deposit-class asset through
-# .../assets is 400 Validation.UseDepositEndpoints. Delete the deposit with DELETE .../assets/{id}.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addDeposit.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -344,22 +300,11 @@ Content-Type: application/json
 }
 
 ### Preview the settlement of a Due deposit
-# The part-1 projection (gross, tax, net, final amount) with settledOn defaulting to the maturity
-# date — what the settle dialog is pre-filled with (term-deposits-settlement). 409
-# Conflict.DepositNotDue before the maturity date (Europe/Warsaw), 409 Conflict.DepositAlreadySettled
-# once settled. The deposit updated above matures on 2026-08-01.
 # @name settlementPreview
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the deposit
-# What the bank actually paid — here the previewed values; override them when the bank paid
-# something else. 400 unless grossInterest >= 0, 0 <= tax <= grossInterest and
-# startDate <= settledOn <= today. Stores the settlement, adds a system-managed Deposit transaction of
-# the net interest (gross - tax, none when 0) on settledOn with that date's PLN rate frozen, raises
-# the quantity to principal + net and publishes AssetPositionChanged, all in one save. 200 with the
-# deposit, now Settled. A settled deposit's terms are immutable: updating it is 409
-# Conflict.DepositSettled; deleting it (DELETE .../assets/{id}) stays allowed.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -371,13 +316,6 @@ Content-Type: application/json
 }
 
 ### Pay the settled deposit out to cash
-# Moves the deposit's whole balance (principal + net) to a Cash asset as one Deposit → Cash transfer on
-# date: a Withdraw on the deposit linked to a Deposit on the Cash, the deposit's quantity becomes 0,
-# and both assets publish AssetPositionChanged in one save (deposit-payout-to-cash). 200 with the
-# deposit, now PaidOut, with paidOutOn and paidOutToAssetName. 400 unless settledOn <= date <= today
-# (Europe/Warsaw); 400 Validation.InvalidTransferCounterpart for a destination that is not the user's
-# same-currency Cash or Savings in an active portfolio; 409 Conflict.DepositNotSettled for an Active or Due
-# deposit, 409 Conflict.DepositAlreadyPaidOut once paid out, 409 Conflict.PortfolioArchived.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/payout
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -388,15 +326,11 @@ Content-Type: application/json
 }
 
 ### Preview the settlement of the funded deposit
-# The funded deposit above matures on 2026-04-15.
 # @name fundedSettlementPreview
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addFundedDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the funded deposit and pay it out at once
-# destinationAssetId pays the whole balance out in the same save as the settlement, on settledOn:
-# the deposit holds 0 and is PaidOut, the Cash rises by principal + net. A destination that breaks the
-# transfer rules is 400 Validation.InvalidTransferCounterpart and the deposit is not settled either.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addFundedDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -409,7 +343,6 @@ Content-Type: application/json
 }
 
 ### Add a matured deposit to roll over
-# 10 000 PLN at 6 % for 3 months from 2026-01-15 — Due since its 2026-04-15 maturity.
 # @name addRenewableDeposit
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
 Authorization: Bearer {{authToken}}
@@ -435,16 +368,6 @@ GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/de
 Authorization: Bearer {{authToken}}
 
 ### Roll the Due deposit over
-# Settles it and starts the next term on the same asset in one save (deposit-rollover): the net
-# interest (gross - tax, none when 0) is credited on the old maturity date with that date's PLN rate
-# frozen, the new principal is the whole balance (principal + net), the new start date the old
-# maturity date, the maturity date is recomputed from the unchanged term, and only the rate changes.
-# The settlement fields are cleared, rolloverCount goes up by 1 and AssetPositionChanged is
-# published. 200 with the deposit — Active, or Due at once when the new maturity date is already past.
-# grossInterest and tax are required here (400 Validation.SettlementAmountsRequired), with the settle
-# rules; 409 Conflict.DepositNotDue before the maturity date, 409 Conflict.DepositAlreadyPaidOut once
-# paid out, 409 Conflict.PortfolioArchived. Once rolled over, PUT .../deposits/{id} with another
-# principal or start date is 409 Conflict.DepositRolledOver; every other term stays editable.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -456,7 +379,6 @@ Content-Type: application/json
 }
 
 ### Preview the settlement of the rolled-over term
-# The next term runs 2026-04-15 → 2026-07-15 on the whole balance, so it is Due again once that passes.
 # @name renewedPreview
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
@@ -473,10 +395,6 @@ Content-Type: application/json
 }
 
 ### Roll the Settled deposit over
-# A Settled deposit that was not paid out reuses its stored settlement: send the rate alone —
-# grossInterest or tax is 409 Conflict.DepositAlreadySettled. The new principal is principal + the
-# settled net and the new start date the old maturity date (not the settlement date); no transaction
-# is written and no event is published, as the quantity is unchanged. rolloverCount becomes 2.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -488,11 +406,6 @@ Content-Type: application/json
 ### --- Savings accounts ---
 
 ### Add a savings account
-# Creates the Savings-class asset (CurrencyValued), its SavingsAccount terms and — when openingDeposit
-# is sent — an ordinary Deposit transaction (unit price 1, the date's PLN rate frozen), then publishes
-# AssetPositionChanged with the balance, all in one save (savings-accounts). Omit openingDeposit to
-# start at 0. 400 for an empty name, a rate outside 0–100, an unsupported currency, an opening amount
-# of 0 or less, or an opening date after today (Europe/Warsaw); 409 Conflict.PortfolioArchived.
 # @name addSavingsAccount
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts
 Authorization: Bearer {{authToken}}
@@ -511,8 +424,6 @@ Content-Type: application/json
 }
 
 ### Pay into the savings account
-# Money moves through the ordinary transaction endpoints — Deposit/Withdraw only, editable and
-# deletable; a Withdraw beyond the balance is 400 Validation.OversellsPosition.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addSavingsAccount.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -525,19 +436,14 @@ Content-Type: application/json
 }
 
 ### List every savings account across portfolios
-# Ordered by portfolio name, then account name; archived accounts and those of archived portfolios
-# are included with their flags. The balance is the asset's quantity, in the account's currency.
 GET {{baseUrl}}/api/portfolio/savings-accounts
 Authorization: Bearer {{authToken}}
 
 ### Get a savings account
-# 404 for another user's asset, or one that is not a savings account.
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
 ### Update a savings account
-# Name, bank, rate and tax status only: the currency is immutable and the balance moves through the
-# transactions. Publishes no event. 409 Conflict.PortfolioArchived / Conflict.AssetArchived.
 PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -550,22 +456,11 @@ Content-Type: application/json
 }
 
 ### Preview the savings account's next due interest month
-# Every calendar month is an interest period, the first one starting on the earliest transaction's
-# date; it is Due from the day after it ends (Europe/Warsaw). Returns the oldest ended, unsettled
-# month with interest: gross = round(Σ end-of-day balance × rate / 100 / 365, 2), the Belka tax, the
-# net, the average daily balance and duePeriodCount (savings-interest-settlement). Months with zero
-# interest are skipped. 409 Conflict.SavingsInterestNotDue when no month is due.
 # @name savingsInterestPreview
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the previewed interest month
-# What the bank actually paid — override the previewed amounts when it paid something else. 400 unless
-# grossInterest >= 0 and 0 <= tax <= grossInterest; 409 Conflict.SavingsInterestNotDue, 409
-# Conflict.SavingsInterestPeriodMismatch when periodEnd is not the next due month's end (a stale
-# dialog or a double submit), 409 Conflict.PortfolioArchived. Stores the settlement and, when the net
-# is above 0, a system-managed Deposit of the net dated periodEnd (PLN rate frozen), then publishes
-# AssetPositionChanged, all in one save. 201 with the settlement.
 # @name settleSavingsInterest
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements
 Authorization: Bearer {{authToken}}
@@ -578,26 +473,12 @@ Content-Type: application/json
 }
 
 ### Undo the latest interest settlement
-# Deletes the settlement and its credit, recomputes the balance and publishes AssetPositionChanged; the
-# month becomes the due one again. 204. 409 Conflict.SavingsSettlementNotLatest for an older one, 409
-# Conflict.OversellsPosition when a later Withdraw spent the credit, 409 Conflict.PortfolioArchived; 404
-# for an unknown id or another user's. The credit itself is refused by the transaction endpoints (409
-# Conflict.SavingsInterestManaged).
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements/{{settleSavingsInterest.response.body.settlementId}}
 Authorization: Bearer {{authToken}}
 
 ### --- Transfers between cash and savings ---
 
 ### Transfer cash into the savings account
-# A manual transfer (savings-cash-transfers): Cash → Savings or Savings → Cash only, between two of the
-# user's same-currency assets, across portfolios too. Writes a Withdraw on the source and a Deposit on
-# the target (same amount and date, unit price 1, PLN rate frozen), linked by a shared TransferId, and
-# publishes AssetPositionChanged for both in one save. 201 with transferId. 400 for an amount of 0 or
-# less or a date after today (Europe/Warsaw); 400 Validation.InvalidTransferCounterpart for an asset
-# that is not the user's, the same asset twice, any other route (the deposit routes keep their own
-# endpoints) or another currency; 400 Validation.InsufficientFunds when the source's balance would drop
-# below 0 anywhere in its history; 409 Conflict.PortfolioArchived when either side's portfolio is
-# archived. Its legs are 409 Conflict.TransferLegManaged on PUT/DELETE .../transactions/{id}.
 # @name createTransfer
 POST {{baseUrl}}/api/portfolio/transfers
 Authorization: Bearer {{authToken}}
@@ -611,18 +492,12 @@ Content-Type: application/json
 }
 
 ### Delete the transfer
-# Deletes both legs, recomputes both assets and publishes AssetPositionChanged for both in one save. A
-# transfer is never edited — delete it and create it again. 204. 404 for an unknown id or another
-# user's; 409 Conflict.TransferLegManaged for a deposit-route transfer (Cash ↔ Deposit); 409
-# Conflict.PortfolioArchived when either side's portfolio is archived; 409 Conflict.OversellsPosition
-# when removing the inflow would leave a later Withdraw on the target uncovered.
 DELETE {{baseUrl}}/api/portfolio/transfers/{{createTransfer.response.body.transferId}}
 Authorization: Bearer {{authToken}}
 
 ### --- Paying a deposit out into a savings account ---
 
 ### Add a matured deposit to pay out into savings
-# 10 000 PLN at 6 % for 3 months from 2026-01-15 — Due since its 2026-04-15 maturity.
 # @name addSavingsBoundDeposit
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
 Authorization: Bearer {{authToken}}
@@ -648,13 +523,6 @@ GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/de
 Authorization: Bearer {{authToken}}
 
 ### Settle the deposit and pay it out into the savings account
-# The destination may be a Savings asset as well as a Cash one (deposit-payout-to-savings): the whole
-# balance moves as a Deposit → Savings transfer on settledOn, in the same save as the settlement. The
-# savings leg is deposit-owned, not manual — listed with manual: false, 409 Conflict.TransferLegManaged
-# on PUT/DELETE .../transactions/{id} and on DELETE /transfers/{transferId} — and it counts in the
-# account's interest from its own date. The same destination works on POST .../payout for a deposit
-# settled earlier. A savings account in another currency, in an archived portfolio or another user's is
-# 400 Validation.InvalidTransferCounterpart.
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json

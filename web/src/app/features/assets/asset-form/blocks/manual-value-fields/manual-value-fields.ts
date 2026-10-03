@@ -8,9 +8,6 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import type { AssetResponse } from '../../../../../api/portfolio';
 import { fromDateOnly, toDateOnly } from '../../../../../shared/date-only';
 
-// A manually valued asset's value and the date it was valued on — both required: the form that
-// renders this block has no other way to value the asset (AddAssetRequest/UpdateAssetRequest's
-// "ManualValue + ManualValueDate together" rule).
 export function createManualValueGroup(fb: FormBuilder) {
   return fb.nonNullable.group({
     manualValue: [0, [Validators.required, Validators.min(0)]],
@@ -20,7 +17,6 @@ export function createManualValueGroup(fb: FormBuilder) {
 
 export type ManualValueGroup = ReturnType<typeof createManualValueGroup>;
 
-// Edit pre-fill — the stored DateOnly becomes local midnight (fromDateOnly), never a UTC parse.
 export function fillManualValue(group: ManualValueGroup, asset: AssetResponse): void {
   group.patchValue({
     manualValue: Number(asset.manualValue ?? 0),

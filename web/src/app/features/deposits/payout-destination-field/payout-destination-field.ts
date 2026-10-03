@@ -28,19 +28,12 @@ import {
   type SavingsAccountFormDialogData,
 } from '../savings-account-form-dialog/savings-account-form-dialog';
 
-// The value of the "New savings account…" option — never written to the bound control.
 const NEW_SAVINGS_ACCOUNT = '__new-savings-account__';
 
 function isSavingsAccount(result: unknown): result is SavingsAccountResponse {
   return typeof result === 'object' && result !== null && 'assetId' in result;
 }
 
-// The destination select of a deposit payout (deposit-payout-to-savings), shared by the settle and
-// payout dialogs: a form control bound to the destination asset id. It lists the user's Cash and
-// Savings transfer candidates in the deposit's currency in two groups — optionally after "Keep in
-// the deposit" (null) — and a last "New savings account…" option that opens SavingsAccountFormDialog
-// as a payout target: a created account is reloaded and selected, a cancel restores the previous
-// value. It renders the bound control's `required` and `server` errors; `hint` is the host's hint.
 @Component({
   selector: 'app-payout-destination-field',
   imports: [MatFormFieldModule, MatSelectModule, TranslocoPipe],
@@ -55,8 +48,7 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
 
   private readonly dialog = inject(MatDialog);
   private readonly changeDetector = inject(ChangeDetectorRef);
-  // The bound control — this component is its value accessor (set below, not provided, so it can
-  // read the control's errors without a circular dependency).
+  // Set below rather than provided, so it can read the control's errors without a circular dependency.
   protected readonly ngControl = inject(NgControl, { self: true, optional: true });
   private readonly select = viewChild(MatSelect);
 
@@ -64,7 +56,6 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
   protected readonly value = signal<string | null>(null);
   protected readonly disabled = signal(false);
 
-  // The inner select shows the bound control's error state, as a field bound to it directly would.
   protected readonly errorStateMatcher: ErrorStateMatcher = {
     isErrorState: (_control, form) => {
       const control = this.ngControl?.control;
@@ -103,9 +94,7 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
     }
   }
 
-  // The bound control's touched/errors change without an input changing (markAllAsTouched, a server
-  // error), and the inner select — bound to no control of its own — never re-reads its error state:
-  // refresh both whenever the host is checked.
+  // The inner select has no control of its own and never re-reads the bound control's error state.
   ngDoCheck(): void {
     this.select()?.updateErrorState();
     this.changeDetector.markForCheck();
@@ -164,12 +153,10 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
       .afterClosed()
       .subscribe((result: unknown) => {
         if (isSavingsAccount(result)) {
-          // The select picks the new option up once the reloaded candidates render it.
           this.candidatesResource.reload();
           this.choose(result.assetId);
           return;
         }
-        // The select itself already shows the "New savings account…" option: put it back.
         const select = this.select();
         if (select) {
           select.value = previous;

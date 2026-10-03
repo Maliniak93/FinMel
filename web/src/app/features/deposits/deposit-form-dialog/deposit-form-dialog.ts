@@ -46,15 +46,11 @@ import {
   maxTermLength,
 } from '../deposit-terms';
 
-// Create: no deposit — `portfolioId` presets the portfolio (the asset type picker), otherwise the
-// user picks one. Edit: the deposit being edited; its portfolio and currency are fixed.
 export interface DepositFormDialogData {
   portfolioId?: string;
   deposit?: DepositResponse;
 }
 
-// The term cap depends on the unit (3650 days / 120 months), so it reads its sibling control and is
-// re-run whenever the unit changes.
 function termLengthWithinCap(control: AbstractControl): ValidationErrors | null {
   const termUnit = control.parent?.get('termUnit')?.value as DepositTermUnit | undefined;
   if (termUnit === undefined || control.value === null || control.value === '') {
@@ -64,8 +60,6 @@ function termLengthWithinCap(control: AbstractControl): ValidationErrors | null 
   return Number(control.value) > max ? { termMax: { max } } : null;
 }
 
-// Create/edit dialog for a term deposit (term-deposits). Control names follow the
-// AddDepositRequest/UpdateDepositRequest properties, so a server 400 keyed on a field lands on it.
 @Component({
   selector: 'app-deposit-form-dialog',
   imports: [
@@ -90,10 +84,7 @@ export class DepositFormDialog {
 
   private readonly deposit = this.data.deposit;
   protected readonly isEdit = !!this.deposit;
-  // Once rolled over (deposit-rollover) the principal and start date came from earlier terms' balance:
-  // they are shown disabled and still sent unchanged (getRawValue), as the server requires.
   private readonly isRolledOver = Number(this.deposit?.rolloverCount ?? 0) > 0;
-  // The portfolio is chosen here only on a plain create; the type picker presets it, edit fixes it.
   protected readonly choosesPortfolio = !this.deposit && !this.data.portfolioId;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
@@ -104,9 +95,6 @@ export class DepositFormDialog {
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
 
-  // A principal funded from Cash can't exceed that Cash's balance (asset-transfers-deposit-funding);
-  // new money has no cap. Reads its sibling `fundingAssetId`, so it is re-run whenever the source or
-  // the candidates change. The server re-checks against the whole Cash history.
   private readonly principalWithinBalance = (control: AbstractControl): ValidationErrors | null => {
     const fundingAssetId = control.parent?.get('fundingAssetId')?.value as
       string | null | undefined;
@@ -168,12 +156,9 @@ export class DepositFormDialog {
       this.deposit ? Number(this.deposit.earlyBreakInterestLossPercent) : (100 as number | null),
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
-    // The source of funds (asset-transfers-deposit-funding): null is new money from outside the app,
-    // otherwise one of the transfer candidates. Chosen on create only — edit shows it read-only.
     fundingAssetId: [{ value: null as string | null, disabled: this.isEdit }],
   });
 
-  // Signal mirror of the form, so the read-only maturity date recomputes as start and term change.
   private readonly formValue = toSignal(
     this.form.valueChanges.pipe(map(() => this.form.getRawValue())),
     { initialValue: this.form.getRawValue() },
@@ -188,7 +173,6 @@ export class DepositFormDialog {
     return depositMaturityDate(startDate, length, termUnit);
   });
 
-  // Only the plain create offers a portfolio choice — and never an archived one (it is read-only).
   protected readonly portfoliosResource = resource({
     params: () => (this.choosesPortfolio ? {} : undefined),
     loader: async ({ abortSignal }) => {
@@ -203,8 +187,6 @@ export class DepositFormDialog {
     },
   });
 
-  // The Cash accounts a new deposit can be funded from: the transfer candidates of the chosen
-  // currency, reloaded whenever it changes. Edit never offers a choice, so it loads nothing.
   private readonly selectedCurrency = computed(() => this.formValue().currency);
 
   protected readonly fundingCandidatesResource = resource({
@@ -233,8 +215,6 @@ export class DepositFormDialog {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.principal.updateValueAndValidity());
 
-    // New candidates (another currency): a source no longer listed falls back to new money, and the
-    // principal is re-checked against the balances just loaded.
     effect(() => {
       if (!this.fundingCandidatesResource.hasValue()) {
         return;
@@ -293,7 +273,6 @@ export class DepositFormDialog {
         })
       : await postApiPortfolioPortfoliosByPortfolioIdDeposits({
           path: { portfolioId: values.portfolioId },
-          // New money leaves fundingAssetId out of the body altogether.
           body: {
             ...terms,
             currency: values.currency,
@@ -316,7 +295,6 @@ export class DepositFormDialog {
   }
 
   private applyServerErrors(problem: ApiProblemDetails): void {
-    // The source of funds can't cover the principal on the start date — a principal error.
     if (problem.errorCode === 'Validation.InsufficientFunds') {
       this.form.controls.principal.setErrors({
         server: problem.detail ?? translate('deposits.form.insufficientFunds'),

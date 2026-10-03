@@ -1,9 +1,6 @@
 import type { FormGroup } from '@angular/forms';
 import { translate } from '@jsverse/transloco';
 
-// ASP.NET Core's ProblemDetails shape (RFC 7807) plus the extensions ServiceDefaults/ADR-017
-// always add: `errorCode` (handler Result failures) and, for the built-in Minimal API validation
-// (AddValidation() + DataAnnotations), an `errors` dictionary keyed by request property name.
 export interface ApiProblemDetails {
   type?: string;
   title?: string;
@@ -14,10 +11,6 @@ export interface ApiProblemDetails {
   traceId?: string;
 }
 
-// The generated client (throwOnError: false) resolves failed calls to `{ error }` where `error`
-// is the parsed JSON body when the response was JSON, otherwise raw response text. A backend
-// `detail` is shown as-is (backend messages stay English); only the frontend's own fallback is
-// translated, at the moment the error is read.
 export function readProblemDetails(error: unknown): ApiProblemDetails {
   if (error && typeof error === 'object') {
     return error as ApiProblemDetails;
@@ -25,9 +18,7 @@ export function readProblemDetails(error: unknown): ApiProblemDetails {
   return { detail: typeof error === 'string' ? error : translate('errors.generic') };
 }
 
-// Field names in `errors` come from the C# request record's property names (PascalCase) and
-// aren't run through the JSON camelCase naming policy (that only applies to object properties,
-// not dictionary keys) — match case-insensitively against the form's actual control names.
+// `errors` keys are dictionary keys, which skip the camelCase policy, so they match case-insensitively.
 export function applyFieldErrors(form: FormGroup, problem: ApiProblemDetails): boolean {
   if (!problem.errors) {
     return false;

@@ -1,8 +1,6 @@
 import { ASSET_CLASS } from '../assets/asset-class';
 import { allowedTransactionTypes, TRANSACTION_TYPES } from './transaction-type';
 
-// cash-transaction-types AC-6: the UI mirror of the backend's AssetTransactionTypes rule — a
-// cash-like class (Cash, Deposit) takes only Deposit/Withdraw, every other class all six types.
 describe('transaction-type', () => {
   it('allowedTransactionTypes limits Cash, Deposit and Savings to Deposit/Withdraw', () => {
     const cashLike: number[] = [ASSET_CLASS.Cash, ASSET_CLASS.Deposit, ASSET_CLASS.Savings];
@@ -12,7 +10,7 @@ describe('transaction-type', () => {
 
       if (cashLike.includes(assetClass)) {
         expect(allowed).toEqual([TRANSACTION_TYPES[2], TRANSACTION_TYPES[3]]);
-        expect(allowed.map((t) => t.value)).toEqual([2, 3]); // Deposit, Withdraw
+        expect(allowed.map((t) => t.value)).toEqual([2, 3]);
       } else {
         expect(allowed).toEqual(TRANSACTION_TYPES);
       }

@@ -38,7 +38,6 @@ describe('Login', () => {
   });
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
     document.documentElement.lang = 'en';
@@ -76,8 +75,6 @@ describe('Login', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
-  // i18n foundation (#131) AC-5: the login page renders outside the shell, so it carries its own
-  // language menu; picking "Polski" there translates the page in place.
   it('switches to Polish from the login page', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const title = () => textOf(element.querySelector('mat-card-title'));
