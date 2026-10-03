@@ -6,4 +6,5 @@ public enum SyncRunKind
     Prices,
     Fx,
     Backfill,
+    BondCatalog,
 }

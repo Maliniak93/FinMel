@@ -13,6 +13,8 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<InstrumentUsage> InstrumentUsages => Set<InstrumentUsage>();
     public DbSet<AssetInstrumentLink> AssetInstrumentLinks => Set<AssetInstrumentLink>();
+    public DbSet<BondSeries> BondSeries => Set<BondSeries>();
+    public DbSet<BondSeriesPeriodRate> BondSeriesPeriodRates => Set<BondSeriesPeriodRate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -83,6 +85,32 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
 
             // The usage consumers recount links per instrument on every change.
             link.HasIndex(l => l.InstrumentId);
+        });
+
+        // Type stays an int column, so ordering by it follows TreasuryBondType's member order.
+        modelBuilder.Entity<BondSeries>(series =>
+        {
+            series.HasKey(s => s.Code);
+            series.Property(s => s.Code).HasMaxLength(7);
+            series.Property(s => s.Isin).HasMaxLength(12);
+            series.Property(s => s.IssuePrice).HasPrecision(18, 2);
+            series.Property(s => s.SwapPrice).HasPrecision(18, 2);
+            series.Property(s => s.MarginPercent).HasPrecision(9, 2);
+
+            series.HasMany(s => s.PeriodRates)
+                .WithOne()
+                .HasForeignKey(r => r.SeriesCode)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ListBondSeries filters by the sale window.
+            series.HasIndex(s => new { s.SaleStart, s.SaleEnd });
+        });
+
+        modelBuilder.Entity<BondSeriesPeriodRate>(rate =>
+        {
+            rate.HasKey(r => new { r.SeriesCode, r.PeriodIndex });
+            rate.Property(r => r.SeriesCode).HasMaxLength(7);
+            rate.Property(r => r.RatePercent).HasPrecision(9, 2);
         });
 
         // Prefixed table names: MassTransit's defaults collide with the other services' outbox tables in the shared test database.

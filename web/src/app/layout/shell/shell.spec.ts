@@ -69,13 +69,31 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/deposits');
   });
 
+  it('offers an "Obligacje" nav item linking to /bonds', async () => {
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const link = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
+    ).find((a) => (a.textContent ?? '').includes('Obligacje'));
+
+    expect(link).toBeDefined();
+    expect(link!.getAttribute('href')).toBe('/bonds');
+  });
+
   it('switches the navigation to Polish without a reload', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const navLabels = () =>
       Array.from(element.querySelectorAll('mat-nav-list a [matListItemTitle]'), textOf);
 
     const englishLabels = navLabels();
-    expect(englishLabels).toEqual(['Dashboard', 'Portfolios', 'Deposits & savings', 'Settings']);
+    expect(englishLabels).toEqual([
+      'Dashboard',
+      'Portfolios',
+      'Deposits & savings',
+      'Bonds',
+      'Settings',
+    ]);
 
     const items = (await openLanguageMenu(fixture)).map(textOf);
     expect(items.some((item) => item.includes('English'))).toBe(true);

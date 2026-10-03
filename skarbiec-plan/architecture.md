@@ -60,6 +60,7 @@ flowchart LR
     NBP["NBP API<br/>FX, gold"]
     STOOQ["Stooq<br/>GPW / ETF / metals"]
     CG["CoinGecko<br/>crypto"]
+    MF["Ministry of Finance (gov.pl)<br/>retail treasury bond file"]
 
     U -->|HTTPS| SPA
     SPA -->|"REST/JSON + JWT"| GW
@@ -69,6 +70,7 @@ flowchart LR
     SVC -->|"jobs, daily"| NBP
     SVC -->|"jobs, daily"| STOOQ
     SVC -->|"jobs, daily"| CG
+    SVC -->|"jobs, daily"| MF
 ```
 
 ### Container
@@ -95,7 +97,7 @@ flowchart TB
     MD --> MDB[("marketdata_db")]
     RP --> RDB[("reporting_db")]
 
-    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / CoinGecko"]
+    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / CoinGecko / MF"]
 
     ASPIRE["Aspire dashboard<br/>(traces, logs, metrics)"]
     ASPIRE -.-> GW & ID & PF & MD & RP

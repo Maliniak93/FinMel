@@ -1,4 +1,5 @@
 import { TRANSLATIONS } from '../../../testing/i18n';
+import { BOND_TYPES } from '../../features/bonds/bond-types';
 import { ASSET_CLASS, ASSET_CLASSES, assetClassLabel } from '../../features/assets/asset-class';
 import {
   DEPOSIT_CAPITALIZATIONS,
@@ -57,6 +58,11 @@ describe('enum label maps', () => {
     }
     for (const kind of RUN_KINDS) {
       keys.push(['RUN_KINDS', kind.label]);
+    }
+
+    for (const bondType of BOND_TYPES) {
+      keys.push(['BOND_TYPES', bondType.label]);
+      keys.push(['BOND_TYPES term', bondType.termLabel]);
     }
 
     for (const currency of SUPPORTED_CURRENCIES) {
