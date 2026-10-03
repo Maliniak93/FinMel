@@ -12,9 +12,7 @@ namespace Skarbiec.Reporting.Tests;
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
-    // Range boundaries are resolved against the real clock (TimeProvider.System, same as
-    // production) rather than a fake one — mirrors MarketData's job tests, which never fake time
-    // either. Each fact derives its expectations from "today" instead of hardcoding dates.
+    // The real clock, as in production, so each fact derives its dates from today.
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
     [Fact]
@@ -117,7 +115,7 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
         var userId = Guid.NewGuid();
         var portfolioId = Guid.NewGuid();
         var day1 = Today.AddDays(-2);
-        var day3 = Today; // day2 (Today.AddDays(-1)) deliberately has no row — e.g. a weekend the sync job skipped.
+        var day3 = Today;
 
         await using (var db = CreateDbContext(userId))
         {

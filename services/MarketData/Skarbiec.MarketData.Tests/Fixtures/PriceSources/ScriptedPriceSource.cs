@@ -3,14 +3,7 @@ using Skarbiec.MarketData.Sources;
 
 namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
-/// <summary>
-/// Canned <see cref="IPriceSource"/> — one scripted <see cref="PriceFetchResult{TValue}"/> per method,
-/// proving a caller's (job's) handling of the outcome rather than a vendor parser, unlike
-/// <see cref="FixturePriceSource"/> (T2.2). <see cref="PriceSyncJob"/> (T2.6) exercises only
-/// <see cref="latestResult"/>; <see cref="HistoryBackfillJob"/> (T2.7) exercises only
-/// <see cref="historyResult"/> — whichever a test doesn't script throws if called, so an accidental
-/// call shows up as a test failure instead of a silent null/default.
-/// </summary>
+// A method the test did not script throws, so an accidental call fails the test instead of returning a default.
 public sealed class ScriptedPriceSource(
     PriceSource source,
     PriceFetchResult<InstrumentQuote>? latestResult = null,
@@ -24,8 +17,7 @@ public sealed class ScriptedPriceSource(
 
     public int HistoryFetchCount { get; private set; }
 
-    /// <summary>Every instrument id the caller passed to <see cref="FetchLatestAsync"/> — the scripted
-    /// result ignores them, so a "which instruments were asked for" assertion must read them from here.</summary>
+    // The scripted result ignores the arguments, so a "which instruments were asked for" assertion reads them from here.
     public IReadOnlyList<Guid> LatestFetchedInstrumentIds => _latestFetchedInstrumentIds;
 
     public Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(

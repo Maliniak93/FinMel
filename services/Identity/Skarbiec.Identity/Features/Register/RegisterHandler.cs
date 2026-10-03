@@ -22,10 +22,7 @@ public sealed class RegisterHandler(
             DisplayName = request.DisplayName
         };
 
-        // Npgsql's retry-on-failure execution strategy forbids a bare BeginTransactionAsync — it
-        // can't replay a user-initiated transaction, only a whole delegate it controls. Running
-        // both CreateAsync's own SaveChanges and our outbox SaveChanges inside this delegate is
-        // also what lets them share one transaction, committing atomically (ADR-012).
+        // Npgsql's retrying strategy forbids a bare BeginTransactionAsync; inside its delegate CreateAsync and the outbox save share one transaction.
         var strategy = dbContext.Database.CreateExecutionStrategy();
 
         return await strategy.ExecuteAsync<Result<RegisterResponse>>(async attemptCancellationToken =>

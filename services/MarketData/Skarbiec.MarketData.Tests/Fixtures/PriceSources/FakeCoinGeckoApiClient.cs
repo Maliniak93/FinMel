@@ -2,13 +2,6 @@ using Skarbiec.MarketData.Sources.CoinGecko;
 
 namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
-/// <summary>
-/// Canned <see cref="ICoinGeckoApiClient"/>, keyed by call type — the same "swap the fetch, exercise
-/// the real parse logic through the public interface" pattern <see cref="FakeNbpApiClient"/>/
-/// <see cref="FakeStooqApiClient"/> established, adapted for CoinGecko's batched-latest /
-/// per-coin-history shape (T2.5 scope). Also simulates a 429 (once, or on every call) so
-/// <see cref="CoinGeckoPriceSource"/>'s retry-after backoff is testable without a real rate limit.
-/// </summary>
 public sealed class FakeCoinGeckoApiClient : ICoinGeckoApiClient
 {
     private readonly Dictionary<string, string> _historyResponses = new(StringComparer.OrdinalIgnoreCase);
@@ -36,8 +29,6 @@ public sealed class FakeCoinGeckoApiClient : ICoinGeckoApiClient
         return this;
     }
 
-    /// <summary>First call throws a 429 with <paramref name="retryAfter"/>; the retry (second call)
-    /// returns <paramref name="rawResponse"/> — the "recovers after one backoff" case.</summary>
     public FakeCoinGeckoApiClient RateLimitedOnceThenLatest(TimeSpan retryAfter, string rawResponse)
     {
         _rateLimitOnceOnLatest = new CoinGeckoRateLimitedException(retryAfter);
@@ -45,7 +36,6 @@ public sealed class FakeCoinGeckoApiClient : ICoinGeckoApiClient
         return this;
     }
 
-    /// <summary>Every call throws a 429 — the "still rate-limited after the one retry" case.</summary>
     public FakeCoinGeckoApiClient AlwaysRateLimitedOnLatest(TimeSpan retryAfter)
     {
         _alwaysRateLimitOnLatest = new CoinGeckoRateLimitedException(retryAfter);

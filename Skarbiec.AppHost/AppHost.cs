@@ -1,13 +1,6 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Fixed, non-generated local-dev credentials (not a real secret — nothing outside this machine's
-// Docker network can reach these containers). Postgres/RabbitMQ bake their admin password into
-// the persisted data volume the first time they initialize and never change it afterwards; a
-// *generated* password (Aspire's own default) only stays valid as long as it's faithfully
-// reloaded from user-secrets on every single run. Any run that skips that (e.g. missing
-// ASPNETCORE_ENVIRONMENT=Development, a different launch profile, CI) silently regenerates it,
-// permanently breaking auth against the already-initialized volume — which is exactly what
-// happened locally and showed up as "Unhealthy" in the dashboard. A fixed value can't drift.
+// Fixed local-dev passwords: Postgres and RabbitMQ bake the first one into their volume, and a regenerated one would break auth.
 var postgresPassword = builder.AddParameter("postgres-password", "skarbiec-local-postgres", secret: true);
 var rabbitmqPassword = builder.AddParameter("rabbitmq-password", "skarbiec-local-rabbitmq", secret: true);
 
@@ -23,7 +16,6 @@ var portfolioDb = await AddServiceDatabase("portfolio", "portfolio_db");
 var marketDataDb = await AddServiceDatabase("marketdata", "marketdata_db");
 var reportingDb = await AddServiceDatabase("reporting", "reporting_db");
 
-// First real service (T0.5); the rest land in T0.13.
 var identityService = builder.AddProject<Projects.Skarbiec_Identity>("identity-service")
     .WithReference(identityDb.ConnectionString)
     .WaitFor(identityDb.Database)
@@ -31,7 +23,6 @@ var identityService = builder.AddProject<Projects.Skarbiec_Identity>("identity-s
     .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-// T2.10: publishes DailyPricesSynced through the outbox once PriceSyncJob's daily run completes.
 var marketDataService = builder.AddProject<Projects.Skarbiec_MarketData>("marketdata-service")
     .WithReference(marketDataDb.ConnectionString)
     .WaitFor(marketDataDb.Database)
@@ -39,11 +30,7 @@ var marketDataService = builder.AddProject<Projects.Skarbiec_MarketData>("market
     .WaitFor(rabbitmq)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-// Publishes AssetPositionChanged/AssetRemoved and the Portfolio* lifecycle events through the outbox
-// (spec-02) — hence the RabbitMQ reference. T2.9: AddAsset/UpdateAsset validate a market asset's
-// InstrumentId by calling MarketData directly (not through the Gateway) — WithReference here is what
-// injects the "Services:marketdata-service:..." config the typed HttpClient's service discovery
-// resolves "https+http://marketdata-service" against.
+// WithReference injects the service-discovery config the MarketData typed client resolves against.
 var portfolioService = builder.AddProject<Projects.Skarbiec_Portfolio>("portfolio-service")
     .WithReference(portfolioDb.ConnectionString)
     .WaitFor(portfolioDb.Database)
@@ -53,10 +40,7 @@ var portfolioService = builder.AddProject<Projects.Skarbiec_Portfolio>("portfoli
     .WaitFor(marketDataService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-// Consumes Portfolio's events off RabbitMQ (spec-03) — no reference to portfolio-service, since the
-// DailyPricesSynced consumer values from its own Position read model now. Its one remaining REST
-// dependency is MarketData's price/FX batch, called directly (not through the Gateway) — same
-// WithReference rationale as Portfolio's own MarketData reference above.
+// No reference to portfolio-service: Reporting values from its own Position read model.
 var reportingService = builder.AddProject<Projects.Skarbiec_Reporting>("reporting-service")
     .WithReference(reportingDb.ConnectionString)
     .WaitFor(reportingDb.Database)
@@ -66,9 +50,7 @@ var reportingService = builder.AddProject<Projects.Skarbiec_Reporting>("reportin
     .WaitFor(marketDataService)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName);
 
-// T0.15: single entry point for Angular (ADR-013) — routes per prefix, JWT validated at the
-// gateway, downstream addresses resolved via Aspire service discovery (WithReference below injects
-// the "Services:<name>:..." config YARP's AddServiceDiscoveryDestinationResolver reads).
+// WithReference injects the Services:<name> config YARP's service-discovery resolver reads.
 builder.AddProject<Projects.Skarbiec_Gateway>("gateway")
     .WithReference(identityService)
     .WaitFor(identityService)
@@ -82,9 +64,7 @@ builder.AddProject<Projects.Skarbiec_Gateway>("gateway")
 
 builder.Build().Run();
 
-// Provisions a dedicated Postgres role per service, scoped to only its own database (ADR-003):
-// the role owns the database it's granted, and PUBLIC's default CONNECT privilege is revoked so
-// no other service's user can even open a connection to it (verified manually, see deploy/README.md).
+// A dedicated role per service owning only its database, with PUBLIC's CONNECT revoked.
 async Task<ServiceDatabase> AddServiceDatabase(string serviceName, string databaseName)
 {
     var dbUser = $"{serviceName}_user";
@@ -100,9 +80,7 @@ async Task<ServiceDatabase> AddServiceDatabase(string serviceName, string databa
             ALTER DATABASE "{databaseName}" OWNER TO "{dbUser}";
             """);
 
-    // `database` above authenticates as the Postgres *admin* user — services must never consume
-    // it directly (deploy/README.md). This connection string reuses the same fixed per-service
-    // password but scopes to the restricted role the creation script just provisioned.
+    // Services never use the admin connection: this one scopes the same password to the restricted role.
     var connectionString = builder.AddConnectionString(
         $"{serviceName}-db",
         ReferenceExpression.Create(
@@ -113,8 +91,7 @@ async Task<ServiceDatabase> AddServiceDatabase(string serviceName, string databa
     return new ServiceDatabase(database, connectionString);
 }
 
-// `Database` (admin-authenticated) is only for `WaitFor` — it exists once the creation script has
-// run. `ConnectionString` (restricted role) is what services pass to `WithReference`.
+// Database (admin) is only for WaitFor; ConnectionString (restricted role) is what services reference.
 readonly record struct ServiceDatabase(
     IResourceBuilder<PostgresDatabaseResource> Database,
     IResourceBuilder<IResourceWithConnectionString> ConnectionString);

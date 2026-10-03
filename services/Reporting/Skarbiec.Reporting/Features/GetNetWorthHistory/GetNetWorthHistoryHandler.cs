@@ -4,11 +4,6 @@ using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Features.GetNetWorthHistory;
 
-/// <summary>
-/// Backs the net-worth history chart (E5, T2.13: 1M/1Y/YTD/MAX switcher). Sums
-/// <see cref="ValuationSnapshot.TotalPln"/> across the user's portfolios per date, in SQL — the
-/// (UserId, Date) index (T2.12) keeps this an index range scan even on a seeded year of daily rows.
-/// </summary>
 public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvider timeProvider)
 {
     public async Task<Result<NetWorthHistoryResponse>> HandleAsync(
@@ -40,11 +35,7 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
         };
     }
 
-    /// <summary>
-    /// MAX has no lower bound (the earliest snapshot naturally becomes the first point) — everything
-    /// else is resolved against "today" (<see cref="timeProvider"/>), not the latest snapshot date,
-    /// so a stale sync doesn't silently shrink the requested window.
-    /// </summary>
+    // Resolved against today, not the latest snapshot, so a stale sync never shrinks the window; MAX has no lower bound.
     private Result<DateOnly?> ResolveRangeStart(string range)
     {
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);

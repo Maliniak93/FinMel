@@ -65,8 +65,7 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         var olderDate = new DateOnly(2026, 8, 1);
         var newerDate = new DateOnly(2026, 8, 2);
 
-        // laggingId never got a row for newerDate — the DailyPricesSynced consumer (T2.11) leaves a
-        // failed portfolio's last successful snapshot in place instead of overwriting it.
+        // laggingId never got a row for newerDate: a failed portfolio keeps its last good snapshot.
         await using (var db = CreateDbContext(userId))
         {
             await db.SeedSnapshotAsync(userId, caughtUpId, olderDate, 1000m, cancellationToken);
@@ -78,7 +77,7 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         var response = await client.GetAsync(DashboardUri, cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
 
-        Assert.Equal(1600m, body!.NetWorthPln); // 1100 (caughtUp's newest) + 500 (lagging's only row).
+        Assert.Equal(1600m, body!.NetWorthPln);
         Assert.Equal(newerDate, body.AsOf);
 
         var caughtUp = Assert.Single(body.ByPortfolio, p => p.PortfolioId == caughtUpId);
@@ -174,9 +173,7 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Empty(body.ByPortfolio);
     }
 
-    /// <summary>spec-03 AC14: ByAssetClass is grouped from AssetValuation, a second tenancy-scoped
-    /// entity alongside ValuationSnapshot — this proves the query filter covers it too, not just the
-    /// snapshot table already proven by <see cref="Get_NeverIncludesAnotherUsersSnapshots"/>.</summary>
+    // AssetValuation is a second tenancy-scoped entity, so the filter must cover it too.
     [Fact]
     public async Task Get_NeverIncludesAnotherUsersAssetValuations()
     {

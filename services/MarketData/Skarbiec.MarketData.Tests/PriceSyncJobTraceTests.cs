@@ -14,14 +14,7 @@ using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// T2.10 AC: "Trace: job span -&gt; publish span linked" — proves the <c>DailyPricesSynced</c> publish
-/// activity MassTransit emits (Diagnostics source "MassTransit", ADR-012) lands in the same distributed
-/// trace as <see cref="PriceSyncJob"/>'s own "PriceSyncJob.Run" span, the same way
-/// <see cref="PriceSyncSchedulingTests"/> proves the job span itself exists (T2.6 AC). Trace context
-/// propagation is automatic (System.Diagnostics.Activity ambient parenting, dotnet.md) — nothing in
-/// <see cref="PriceSyncJob"/> sets it manually.
-/// </summary>
+// Trace context propagates automatically; nothing in PriceSyncJob sets it.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers)
 {
@@ -52,11 +45,11 @@ public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers)
             Ticker = "AAPL.US",
             Name = "Apple",
             Source = PriceSource.Stooq,
-            QuoteCurrency = "PLN", // no FX hop needed (ADR-008 base currency) — keeps this test focused.
+            QuoteCurrency = "PLN",
             AssetClass = AssetClass.Stock,
         };
         db.Instruments.Add(instrument);
-        // spec-04: PriceSyncJob syncs only instruments in use.
+        // PriceSyncJob syncs only instruments in use.
         db.InstrumentUsages.Add(new InstrumentUsage { InstrumentId = instrument.Id, AssetCount = 1, FirstUsedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync(cancellationToken);
 

@@ -3,13 +3,6 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// Pure unit tests on 03-domain-model.md §Valuation algorithm (T2.11 AC, extended spec-03 AC10) —
-/// no Testcontainers, mirrors Portfolio's <c>TransactionQuantityCalculatorTests</c> container-free
-/// style. spec-03 design decision 6: the algorithm stays pure and returns one <see cref="ValuedPosition"/>
-/// line per input position (never fewer — a position with no usable quote/rate still gets a
-/// zero-valued, stale line, never a silently dropped one) instead of a pre-aggregated breakdown.
-/// </summary>
 public sealed class ValuationAlgorithmTests
 {
     private static readonly DateOnly SnapshotDate = new(2026, 8, 10);
@@ -44,7 +37,7 @@ public sealed class ValuationAlgorithmTests
         var assetId = Guid.NewGuid();
         var positions = new[] { MarketPosition(assetId, AssetClass.Stock, quantity: 5) };
         var prices = Prices((InstrumentId, "PLN", SnapshotDate, 200m));
-        var fx = FxRates(); // empty — PLN needs no rate.
+        var fx = FxRates();
 
         var result = ValuationAlgorithm.Calculate(positions, prices, fx, SnapshotDate);
 
@@ -54,9 +47,9 @@ public sealed class ValuationAlgorithmTests
     }
 
     [Theory]
-    [InlineData(3, false)] // weekend gap: within threshold, still fresh.
-    [InlineData(7, false)] // exactly at the threshold: not yet stale.
-    [InlineData(8, true)] // one day past the threshold: stale.
+    [InlineData(3, false)]
+    [InlineData(7, false)]
+    [InlineData(8, true)]
     [InlineData(30, true)]
     public void Calculate_LastKnownPriceFallback_StalenessFollowsAgeInDays(int ageDays, bool expectedStale)
     {
@@ -68,7 +61,7 @@ public sealed class ValuationAlgorithmTests
 
         var result = ValuationAlgorithm.Calculate(positions, prices, fx, SnapshotDate);
 
-        // The last known price still values the position — staleness is a flag, not an exclusion.
+        // The last known price still values the position: staleness is a flag, not an exclusion.
         Assert.Equal(100m, result.TotalPln);
         Assert.Equal(expectedStale, result.IsStale);
         Assert.Equal(expectedStale, Assert.Single(result.Lines).IsStale);
@@ -94,7 +87,7 @@ public sealed class ValuationAlgorithmTests
     {
         var assetId = Guid.NewGuid();
         var positions = new[] { MarketPosition(assetId, AssetClass.Stock, quantity: 10) };
-        var prices = Prices(); // never synced.
+        var prices = Prices();
         var fx = FxRates();
 
         var result = ValuationAlgorithm.Calculate(positions, prices, fx, SnapshotDate);
@@ -102,9 +95,7 @@ public sealed class ValuationAlgorithmTests
         Assert.Equal(0m, result.TotalPln);
         Assert.True(result.IsStale);
 
-        // spec-03: one AssetValuation per position, always — a missing quote never drops the line,
-        // it produces a zero-valued, stale one instead (the AC10 contract DailyPricesSyncedConsumer
-        // relies on to write exactly one row per position).
+        // A missing quote never drops the line: it produces a zero-valued, stale one.
         var line = Assert.Single(result.Lines);
         Assert.Equal(assetId, line.AssetId);
         Assert.Equal(0m, line.ValuePln);
@@ -173,9 +164,6 @@ public sealed class ValuationAlgorithmTests
         Assert.Equal(300_000m, realEstateLine.ValuePln);
     }
 
-    /// <summary>spec-03 AC10: one market, one manual and one currency-valued position each produce
-    /// exactly one line, correctly shaped per mode (PriceUsed/PriceDate market-only, FxRateUsed on
-    /// every non-PLN line), summing to the total.</summary>
     [Fact]
     public void Calculate_ThreeValuationModes_ProducesOneLineEach()
     {
@@ -220,8 +208,6 @@ public sealed class ValuationAlgorithmTests
         Assert.False(cashLine.IsStale);
     }
 
-    // --- M1.4: currency-valued mode (value = Quantity × FxRate(currency→PLN), no instrument, no manual amount). ---
-
     [Fact]
     public void Calculate_CurrencyValuedAssetInBaseCurrency_SkipsFxLookup()
     {
@@ -258,8 +244,7 @@ public sealed class ValuationAlgorithmTests
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
 
-        // Last known rate still values the position — staleness is a flag, not an exclusion (same
-        // contract as market/manual).
+        // The last known rate still values the position: staleness is a flag, not an exclusion.
         Assert.Equal(1_825m, result.TotalPln);
         Assert.True(result.IsStale);
         Assert.True(Assert.Single(result.Lines).IsStale);
@@ -270,12 +255,11 @@ public sealed class ValuationAlgorithmTests
     {
         var assetId = Guid.NewGuid();
         var positions = new[] { CurrencyValuedPosition(assetId, AssetClass.Cash, quantity: 1_000m, currency: "EUR") };
-        var fx = FxRates(); // no EURPLN row at all.
+        var fx = FxRates();
 
         var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
 
-        // Missing rate: still exactly one line (spec-03 — no AssetValuation is ever silently
-        // dropped), valued at 0 PLN and flagged stale rather than excluded from the total.
+        // A missing rate still gives exactly one line, valued at 0 and flagged stale.
         Assert.Equal(0m, result.TotalPln);
         Assert.True(result.IsStale);
 
@@ -290,7 +274,7 @@ public sealed class ValuationAlgorithmTests
         AssetId = assetId,
         AssetClass = assetClass,
         ValuationMode = AssetValuationMode.Market,
-        Currency = "PLN", // irrelevant for market assets — the instrument's own quote currency governs FX.
+        Currency = "PLN",
         Quantity = quantity,
         InstrumentId = InstrumentId,
     };

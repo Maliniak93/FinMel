@@ -3,7 +3,6 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>savings-accounts AC-1: every <see cref="AssetClass"/> resolves to a price source (or none) without throwing.</summary>
 public sealed class AssetClassPriceSourceMappingTests
 {
     [Fact]

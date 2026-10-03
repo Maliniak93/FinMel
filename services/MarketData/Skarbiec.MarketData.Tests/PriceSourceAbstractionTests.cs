@@ -5,11 +5,6 @@ using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// Fixture-based test kit proving <see cref="IPriceSource"/>'s tri-state outcome contract (T2.2
-/// AC) via <see cref="FixturePriceSource"/> — no database, no live network. T2.3-T2.5 follow the
-/// same pattern against their own recorded responses and real parsers.
-/// </summary>
 public sealed class PriceSourceAbstractionTests
 {
     private static readonly Instrument SampleInstrument = new()
@@ -76,8 +71,7 @@ public sealed class PriceSourceAbstractionTests
         }
     }
 
-    // Signature only knows IPriceSource — stands in for PriceSyncJob (T2.6), which will depend on
-    // the interface the same way.
+    // Knows only IPriceSource, standing in for a caller such as PriceSyncJob.
     private static Task<PriceFetchResult<InstrumentQuote>> FetchThroughAbstractionOnly(
         IPriceSource source, IReadOnlyCollection<Instrument> instruments) =>
         source.FetchLatestAsync(instruments, TestContext.Current.CancellationToken);

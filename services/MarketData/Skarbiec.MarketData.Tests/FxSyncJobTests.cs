@@ -12,19 +12,10 @@ using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// FxSyncJob's business logic (spec-04 AC3-8): a latest-rate sync for every catalog currency except
-/// PLN, a first-use 12-month backfill (never repeated once history exists), per-currency backfill
-/// failure isolation, and the Fx-kind <see cref="SyncRun"/> write — exercised via
-/// <see cref="FxSyncJob.RunAsync"/> directly, no Quartz scheduler involved, mirroring
-/// <see cref="PriceSyncJobTests"/>. Scheduling mechanics are covered separately in
-/// <see cref="FxSyncSchedulingTests"/>; outbox atomicity (AC9) in <see cref="MarketDataOutboxTests"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
-    // Explicit field: the primary constructor parameter is also passed to the base constructor
-    // above, so referencing it directly elsewhere in this class would trigger CS9107.
+    // An explicit field: the primary constructor parameter also goes to the base constructor, so using it here would trigger CS9107.
     private readonly SkarbiecContainersFixture _containers = containers;
 
     private static readonly DateOnly Today = new(2026, 9, 22);
@@ -41,7 +32,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
-        await SeedExistingHistoryAsync(db, cancellationToken); // no currency is a first-use here.
+        await SeedExistingHistoryAsync(db, cancellationToken);
 
         var fxSource = new ScriptedFxRateSource(LatestForAllNonPln());
 
@@ -68,7 +59,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
-        // No FxRate row at all yet — every non-PLN currency needs a first-use backfill.
+        // No FxRate row at all yet, so every non-PLN currency needs a first-use backfill.
 
         var history = OneYearOfDates().Select(d => new FxRateQuote("EURPLN", d, 4m)).ToList();
         var fxSource = new ScriptedFxRateSource(LatestForAllNonPln(), PriceFetchResult<FxRateQuote>.Success(history));
@@ -76,8 +67,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var job = new FxSyncJob(db, fxSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
         await job.RunAsync(cancellationToken);
 
-        // Read the range from the arguments the job passed, not from the canned history (which the
-        // fake returns regardless of from/to): exactly one call per non-PLN code, each ≥ 365 days.
+        // Read from the arguments the job passed: the fake returns the canned history regardless of the range.
         Assert.Equal(NonPlnCodes.Order(), fxSource.HistoryFetches.Select(f => f.CurrencyCode).Order());
         Assert.All(fxSource.HistoryFetches, f => Assert.True(
             f.To.DayNumber - f.From.DayNumber >= 365,
@@ -97,7 +87,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
-        await SeedExistingHistoryAsync(db, cancellationToken); // simulates a prior run's backfill.
+        await SeedExistingHistoryAsync(db, cancellationToken);
 
         var fxSource = new ScriptedFxRateSource(LatestForAllNonPln());
 
@@ -117,7 +107,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
-        await SeedExistingHistoryAsync(db, cancellationToken); // no backfill involved — isolates the NoData path.
+        await SeedExistingHistoryAsync(db, cancellationToken);
 
         var fxSource = new ScriptedFxRateSource(PriceFetchResult<FxRateQuote>.NoData());
 
@@ -139,8 +129,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
-        // No history for any currency — every one is a first-use backfill; EUR's is scripted to fail,
-        // every other currency's succeeds (ScriptedFxRateSource's per-code override).
+        // No history yet, so every currency backfills; EUR's is scripted to fail.
         var historyResultsByCode = NonPlnCodes.ToDictionary(
             code => code,
             code => code == "EUR"
@@ -172,8 +161,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
 
-        // Run 1: EUR's first-use backfill fails, every other currency's succeeds. The latest-rate
-        // result still carries EURPLN, so only the job itself can keep it out of the table.
+        // Run 1: EUR's backfill fails, yet the latest result still carries EURPLN, so only the job can keep it out.
         var firstRunSource = new ScriptedFxRateSource(
             LatestForAllNonPln(),
             historyResultsByCode: NonPlnCodes.ToDictionary(
@@ -189,7 +177,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
             await db.FxRates.AnyAsync(r => r.Pair == "EURPLN", cancellationToken),
             "a currency whose backfill failed must keep zero FxRate rows so the next run retries it.");
 
-        // Run 2: every backfill succeeds — EUR, and only EUR, is backfilled again.
+        // Run 2: every backfill succeeds, and only EUR is backfilled again.
         var secondRunSource = new ScriptedFxRateSource(
             LatestForAllNonPln(),
             PriceFetchResult<FxRateQuote>.Success(OneYearOfDates().Select(d => new FxRateQuote("EURPLN", d, 4m)).ToList()));

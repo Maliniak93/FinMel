@@ -1,6 +1,5 @@
 namespace Skarbiec.Identity.Data;
 
-/// <summary>Only <see cref="TokenHash"/> is ever stored — see <c>Security/RefreshTokenFactory</c>.</summary>
 public sealed class RefreshToken
 {
     public required Guid Id { get; init; }

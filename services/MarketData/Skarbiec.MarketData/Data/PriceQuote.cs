@@ -1,7 +1,6 @@
 namespace Skarbiec.MarketData.Data;
 
-// InstrumentId is a plain Guid — no navigation/FK, same aggregate-isolation convention Portfolio
-// uses between Asset and Transaction, even though both entities live in this same database.
+// No FK to Instrument, even within this database.
 public sealed class PriceQuote
 {
     public required Guid Id { get; init; }

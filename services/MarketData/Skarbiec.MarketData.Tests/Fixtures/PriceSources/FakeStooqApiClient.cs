@@ -2,14 +2,6 @@ using Skarbiec.MarketData.Sources.Stooq;
 
 namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
-/// <summary>
-/// Canned <see cref="IStooqApiClient"/>, keyed per ticker — the same "swap the fetch, exercise the
-/// real parse logic through the public interface" pattern <see cref="FakeNbpApiClient"/> established,
-/// adapted for Stooq's per-ticker fetch shape (T2.4 scope): each ticker can be wired to its own
-/// canned response or thrown exception, which is what makes isolation between instruments ("one bad
-/// ticker must not fail the batch") directly testable against the real <see cref="StooqPriceSource"/>.
-/// Also counts history-range calls, mirroring <see cref="FakeNbpApiClient.RangeRequestCount"/>.
-/// </summary>
 public sealed class FakeStooqApiClient : IStooqApiClient
 {
     private readonly Dictionary<string, string> _responses = new(StringComparer.OrdinalIgnoreCase);

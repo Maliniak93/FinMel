@@ -4,13 +4,10 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Features.GetSyncStatus;
 
-/// <summary>Reads the most recent <see cref="SyncRun"/> of each kind — including one still in
-/// progress — for the T2.14 UI's "last sync" affordance (spec-04 design decision 14).</summary>
 public sealed class GetSyncStatusHandler(MarketDataDbContext dbContext)
 {
     public async Task<Result<SyncStatusResponse>> HandleAsync(CancellationToken cancellationToken)
     {
-        // One indexed lookup per kind — (Kind, StartedAt desc).
         var prices = await LatestAsync(SyncRunKind.Prices, cancellationToken);
         var fx = await LatestAsync(SyncRunKind.Fx, cancellationToken);
         var backfill = await LatestAsync(SyncRunKind.Backfill, cancellationToken);

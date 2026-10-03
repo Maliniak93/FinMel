@@ -8,13 +8,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// T2.8 AC: "search returns matches with last price and date in &lt;100 ms on seeded data" — measured
-/// against <see cref="SearchInstrumentsHandler"/> directly (DB round trips only), not over HTTP: a full
-/// Kestrel/JSON round trip would mix in overhead the AC isn't about. A warm-up call absorbs first-query
-/// JIT/connection-pool cost before the timed call, mirroring how the AC reads in practice (a query
-/// against a warm service, not a cold-start request).
-/// </summary>
+// Timed against the handler, not over HTTP, after a warm-up call absorbs JIT and connection-pool cost.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SearchInstrumentsPerformanceTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -45,7 +39,7 @@ public sealed class SearchInstrumentsPerformanceTests(SkarbiecContainersFixture 
         await using var queryDb = CreateDbContext();
         var handler = new SearchInstrumentsHandler(queryDb);
 
-        await handler.HandleAsync("SYM", 20, cancellationToken); // warm-up: absorb JIT/connection-pool cost.
+        await handler.HandleAsync("SYM", 20, cancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
         var results = await handler.HandleAsync("SYM", 20, cancellationToken);

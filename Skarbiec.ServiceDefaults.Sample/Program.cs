@@ -30,8 +30,7 @@ app.MapGet("/sample-result/{outcome}", (string outcome) =>
     return result.ToHttpResult();
 });
 
-// Proves the global exception handler (genuinely unexpected failures, ADR-017) also
-// produces ProblemDetails with a traceId — not just the Result-mapped path above.
+// Proves the global exception handler also produces ProblemDetails with a traceId.
 app.MapGet("/boom", () =>
 {
     throw new InvalidOperationException("Sample unexpected failure.");

@@ -3,31 +3,15 @@ using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Valuation;
 
-/// <summary>
-/// The one place a portfolio's valuation turns into <see cref="AssetValuation"/> lines and a
-/// <see cref="ValuationSnapshot"/> (spec-07 design decision 6). Two callers: the daily
-/// <c>DailyPricesSyncedConsumer</c>, which stages every portfolio for the sync date from freshly
-/// fetched prices (<see cref="UpsertPortfolio"/>), and the position-event consumers, which revalue
-/// one portfolio for today from the locally stored last prices and rates (<see cref="RevalueTodayAsync"/>).
-/// </summary>
-/// <remarks>
-/// Not a service layer: no state, no interface, a small helper next to <see cref="ValuationAlgorithm"/>
-/// so the upsert logic exists once. Every write goes through the change tracker and the caller's
-/// DbContext, so it commits in the same transaction as the consumer's inbox row (ADR-012).
-/// </remarks>
+// Not a service layer: a stateless helper so the upsert logic exists once, writing through the caller's DbContext.
 public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider timeProvider)
 {
-    private const string BaseCurrency = "PLN"; // ADR-008
+    private const string BaseCurrency = "PLN";
 
-    /// <summary>Today as the event path values it: the UTC date, matching <c>DailyPricesSynced.SyncDate</c> (spec-07 design decision 2).</summary>
+    // The UTC date, matching DailyPricesSynced.SyncDate.
     public DateOnly Today => DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
-    /// <summary>
-    /// Every non-PLN currency→PLN pair a valuation of <paramref name="positions"/> needs: a market
-    /// asset's own quote currency (not its <c>Currency</c> — the price is denominated in whatever the
-    /// instrument quotes in), or a manual/currency-valued asset's own <c>Currency</c> (both
-    /// non-market modes key off it, so filtering on <c>InstrumentId is null</c> covers them).
-    /// </summary>
+    // A market asset converts from its quote currency, not its Currency; the other modes key off Currency.
     public static IReadOnlyList<string> RequiredFxPairs(
         IEnumerable<Position> positions, IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument) =>
         pricesByInstrument.Values.Select(p => p.QuoteCurrency)
@@ -37,26 +21,15 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
             .Distinct()
             .ToList();
 
-    /// <summary>
-    /// Event path (spec-07): values <paramref name="portfolioId"/>'s non-archived positions for
-    /// today from <see cref="LatestInstrumentPrice"/>/<see cref="LatestFxRate"/> only — never REST —
-    /// then upserts today's lines and snapshot under <paramref name="userId"/> (the event's) and saves.
-    /// A portfolio with no positions left gets a zero snapshot, and today's line of any asset no
-    /// longer held is removed, so lines and snapshot always agree. Earlier dates are never touched.
-    /// </summary>
+    // Values from the stored last prices and rates only, and drops today's lines of assets that are gone.
     public async Task RevalueTodayAsync(Guid portfolioId, Guid userId, CancellationToken cancellationToken)
     {
         var today = Today;
 
-        // spec-07 design decision 5: serialize revaluations of one portfolio across consumers
-        // (AssetPositionChanged and AssetRemoved have separate queues), so none writes a snapshot
-        // from a read another is about to invalidate. Transaction-scoped: released when the inbox
-        // transaction this runs in commits or rolls back.
+        // Serializes revaluations of one portfolio across queues; released when the inbox transaction ends.
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({AdvisoryLockKey(portfolioId)})", cancellationToken);
 
-        // IgnoreQueryFilters on every read below: a consumer has no request user (ICurrentUser is
-        // Guid.Empty) and writes on behalf of the user the event names — see
-        // AssetPositionChangedConsumer for the full rationale.
+        // IgnoreQueryFilters: a consumer has no request user and writes for the user the event names.
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
@@ -66,10 +39,12 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
         var pricesByInstrument = await LoadLatestPricesAsync(positions, cancellationToken);
         var fxRatesByPair = await LoadLatestFxRatesAsync(RequiredFxPairs(positions, pricesByInstrument), cancellationToken);
 
+        // IgnoreQueryFilters: the snapshot belongs to the event's user, not to a request user.
         var existingSnapshot = await db.ValuationSnapshots
             .IgnoreQueryFilters()
             .SingleOrDefaultAsync(s => s.PortfolioId == portfolioId && s.Date == today, cancellationToken);
 
+        // IgnoreQueryFilters: the lines belong to the event's user, not to a request user.
         var existingLines = await db.AssetValuations
             .IgnoreQueryFilters()
             .Where(l => l.PortfolioId == portfolioId && l.Date == today)
@@ -83,11 +58,7 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Values <paramref name="positions"/> for <paramref name="snapshotDate"/> and stages the lines and
-    /// snapshot in the change tracker — no I/O, so the sync consumer's per-portfolio isolation holds:
-    /// nothing reaches Postgres for a portfolio until the caller saves.
-    /// </summary>
+    // Stages only, with no I/O, so nothing reaches Postgres for a portfolio until the caller saves.
     public void UpsertPortfolio(
         Guid portfolioId,
         Guid userId,
@@ -215,6 +186,6 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
                 cancellationToken);
     }
 
-    /// <summary>A portfolio id folded into Postgres' 64-bit advisory lock key space. A collision only over-serializes two portfolios, it never under-serializes one.</summary>
+    // A collision only over-serializes two portfolios; it never under-serializes one.
     private static long AdvisoryLockKey(Guid portfolioId) => BitConverter.ToInt64(portfolioId.ToByteArray(), 0);
 }

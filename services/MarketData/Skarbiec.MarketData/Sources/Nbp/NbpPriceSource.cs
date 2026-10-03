@@ -4,18 +4,12 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources.Nbp;
 
-/// <summary>
-/// <see cref="IPriceSource"/> over NBP's gold price endpoint (cenyzlota) — the only instrument NBP
-/// prices (E4 [M]). NBP quotes 1 gram of gold in PLN (not a troy ounce, despite the "XAU" ticker
-/// convention); the seeded <see cref="Instrument"/> name documents this (see
-/// <see cref="Data.MarketDataSeeder"/>).
-/// </summary>
+// NBP quotes 1 gram of gold in PLN, not a troy ounce, despite the XAU ticker.
 public sealed class NbpPriceSource(INbpApiClient client) : IPriceSource
 {
     private const string GoldTicker = "XAU";
 
-    // Verified live against api.nbp.pl: cenyzlota accepts a 367-day range (the true ceiling is
-    // somewhat higher but wasn't pinned down exactly) — 367 is a safe, confirmed-working chunk size.
+    // Confirmed working; the true ceiling is somewhat higher but was never pinned down.
     private const int MaxRangeDays = 367;
 
     public PriceSource Source => PriceSource.Nbp;
@@ -94,9 +88,7 @@ public sealed class NbpPriceSource(INbpApiClient client) : IPriceSource
             return PriceFetchResult<InstrumentQuote>.NoData();
         }
 
-        // NBP has exactly one priced instrument (gold) — any instrument passed with a different
-        // ticker is a caller/seed mistake, not something this source errors on (same
-        // silently-excluded-if-unmatched contract FixturePriceSource established in T2.2).
+        // Gold is NBP's only instrument; any other ticker is excluded, not an error.
         var goldInstrumentIds = instruments.Where(i => i.Ticker == GoldTicker).Select(i => i.Id);
 
         var values = goldInstrumentIds

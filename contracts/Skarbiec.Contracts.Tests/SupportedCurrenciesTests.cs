@@ -14,10 +14,10 @@ public sealed class SupportedCurrenciesTests
     }
 
     [Theory]
-    [InlineData("GBP")] // seeded as an FxRate pair in MarketData, still not user-selectable
+    [InlineData("GBP")]
     [InlineData("CHF")]
     [InlineData("XYZ")]
-    [InlineData("pln")] // codes are canonical uppercase, never normalised
+    [InlineData("pln")]
     [InlineData("")]
     [InlineData(null)]
     public void Validate_WithUnsupportedCurrency_FailsNamingTheAcceptedSet(string? currency)
@@ -60,7 +60,7 @@ public sealed class SupportedCurrenciesTests
 
     [Theory]
     [InlineData("PLN")]
-    [InlineData(null)] // [Required] owns null, not this attribute
+    [InlineData(null)]
     public void Attribute_OnSupportedOrMissingCurrency_Passes(string? currency)
     {
         var subject = new CurrencyHolder { Currency = currency };

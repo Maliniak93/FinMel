@@ -6,12 +6,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// HTTP-level behavior of Features/TriggerSync (T2.14): auth gating and the happy path against
-/// <see cref="Sources.NoOpSyncTrigger"/> (this host runs under <c>Testing:DisableBackgroundJobs</c>,
-/// so there's no live Quartz scheduler to actually fire — that mechanism, including the double-click
-/// guard, is covered against a real one in <see cref="SyncTriggerSchedulingTests"/>).
-/// </summary>
+// This host has no scheduler, so SyncTriggerSchedulingTests cover the firing and the double-click guard.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class TriggerSyncEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {

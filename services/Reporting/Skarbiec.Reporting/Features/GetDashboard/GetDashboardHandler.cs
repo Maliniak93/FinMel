@@ -3,19 +3,11 @@ using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Features.GetDashboard;
 
-/// <summary>
-/// Replaces Portfolio's Phase 1 <c>GetWealthSummary</c> shortcut (T2.12/T2.13, ADR-013/015): the
-/// dashboard now reads Reporting's own <see cref="ValuationSnapshot"/> read model instead of
-/// re-pricing anything on every visit.
-/// </summary>
 public sealed class GetDashboardHandler(ReportingDbContext db)
 {
     public async Task<DashboardResponse> HandleAsync(Guid? portfolioId, CancellationToken cancellationToken)
     {
-        // Each portfolio can be on a different latest date: a per-portfolio compute failure in the
-        // DailyPricesSynced consumer (T2.11) leaves that one portfolio's row at whatever date it
-        // last succeeded on, while the rest move forward — "latest snapshot per portfolio" is a
-        // per-row max, not one global max applied to every portfolio.
+        // A per-portfolio compute failure leaves that portfolio at its last good date, so "latest" is a per-row max.
         var latestDatePerPortfolio = db.ValuationSnapshots
             .Where(s => portfolioId == null || s.PortfolioId == portfolioId)
             .GroupBy(s => s.PortfolioId)
@@ -44,10 +36,7 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
             .OrderByDescending(p => p.ValuePln)
             .ToList();
 
-        // spec-03: the per-class breakdown is a GROUP BY over the AssetValuation lines sharing each
-        // portfolio's latest (PortfolioId, Date) — the same join as above — instead of the JSONB
-        // blob the snapshot used to carry. Lines are tenancy-filtered in their own right, so this
-        // can never reach another user's assets.
+        // Lines are tenancy-filtered in their own right, so this never reaches another user's assets.
         var assetClassTotals = await db.AssetValuations
             .AsNoTracking()
             .Where(l => portfolioId == null || l.PortfolioId == portfolioId)

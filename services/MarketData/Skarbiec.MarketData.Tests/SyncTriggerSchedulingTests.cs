@@ -12,18 +12,11 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// T2.14's manual trigger against a real, DI-wired Quartz scheduler (<see cref="PriceSyncJobExtensions.AddPriceSyncJob"/>)
-/// — <see cref="TriggerSyncEndpointTests"/> only exercises the HTTP surface against
-/// <see cref="NoOpSyncTrigger"/> (no live scheduler under <c>Testing:DisableBackgroundJobs</c>), so
-/// the actual firing mechanism and the double-click guard need a real one, same reasoning as
-/// <see cref="PriceSyncSchedulingTests"/>.
-/// </summary>
+// A real DI-wired scheduler: TriggerSyncEndpointTests run against NoOpSyncTrigger, so firing and the double-click guard need this.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
-    // Explicit field: the primary constructor parameter is also passed to the base constructor
-    // above, so referencing it directly elsewhere in this class would trigger CS9107.
+    // An explicit field: the primary constructor parameter also goes to the base constructor, so using it here would trigger CS9107.
     private readonly SkarbiecContainersFixture _containers = containers;
 
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -83,8 +76,7 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
             var firstOutcome = await syncTrigger.TriggerAsync(cancellationToken);
             Assert.Equal(SyncTriggerOutcome.Started, firstOutcome);
 
-            // Wait until PriceSyncJob.RunAsync has genuinely started (its SyncRun row exists) before
-            // the "second click" — proves the guard sees an in-flight run, not just a queued trigger.
+            // Wait until the run has really started, so the second click meets an in-flight run, not a queued trigger.
             await using var db = CreateDbContext();
             await WaitUntilAsync(() => db.SyncRuns.AsNoTracking().AnyAsync(cancellationToken), cancellationToken);
 
@@ -92,11 +84,11 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
 
             Assert.Equal(SyncTriggerOutcome.AlreadyRunning, secondOutcome);
 
-            gate.SetResult(); // let the first (only) run finish.
+            gate.SetResult();
 
             var run = await WaitForFinishedRunAsync(db, cancellationToken);
             Assert.Equal(1, run.SyncedCount);
-            Assert.Equal(1, await db.SyncRuns.CountAsync(cancellationToken)); // never ran twice.
+            Assert.Equal(1, await db.SyncRuns.CountAsync(cancellationToken));
         }
         finally
         {
@@ -105,7 +97,7 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
         }
     }
 
-    // spec-04: PriceSyncJob syncs only instruments with InstrumentUsage.AssetCount > 0.
+    // PriceSyncJob syncs only instruments in use.
     private static async Task SeedInUseAsync(MarketDataDbContext db, Guid instrumentId, CancellationToken cancellationToken)
     {
         db.InstrumentUsages.Add(new InstrumentUsage { InstrumentId = instrumentId, AssetCount = 1, FirstUsedAt = DateTimeOffset.UtcNow });
@@ -130,9 +122,7 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
         builder.AddRabbitMqMessaging<HostApplicationBuilder, MarketDataDbContext>();
         builder.AddPriceSyncJob();
 
-        // Deliberately not disposed — see PriceSyncSchedulingTests' identical remark: disposing here
-        // would poison Quartz.Logging.LogProvider's process-wide cached ILoggerFactory for every later
-        // scheduler in this test process.
+        // Deliberately not disposed: Quartz's LogProvider caches this host's ILoggerFactory in a process-wide static.
         var host = builder.Build();
         await host.StartAsync(TestContext.Current.CancellationToken);
 
@@ -142,12 +132,8 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
     private static async Task CleanUpAsync(IHost host, CancellationToken cancellationToken)
     {
         var scheduler = await host.Services.GetRequiredService<ISchedulerFactory>().GetScheduler(cancellationToken);
-        // Plain DeleteJob(PriceSyncJob.Key) throws once a fired one-shot manual trigger is involved
-        // (Quartz keeps it around in "Complete" state instead of auto-removing it, and DeleteJob's own
-        // unschedule-all-triggers step chokes on that combination) — Clear() wipes all scheduling data
-        // for this store instead, which is fine here since each test builds its own throwaway host and
-        // this collection serializes test classes against the shared containers (no cross-test race).
-        await scheduler.Clear(cancellationToken); // don't leave this test's schedule persisted.
+        // Not DeleteJob: it throws once a fired one-shot manual trigger lingers in Complete state, and each test owns its host.
+        await scheduler.Clear(cancellationToken);
         await host.StopAsync(cancellationToken);
     }
 

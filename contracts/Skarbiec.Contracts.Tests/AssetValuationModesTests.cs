@@ -1,6 +1,5 @@
 namespace Skarbiec.Contracts.Tests;
 
-/// <summary>savings-accounts AC-1: every <see cref="AssetClass"/> maps to a valuation mode, and Savings is currency-valued.</summary>
 public sealed class AssetValuationModesTests
 {
     [Fact]

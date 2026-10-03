@@ -7,11 +7,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// Proves the unique indexes configured in <see cref="MarketDataDbContext.OnModelCreating"/>
-/// (T2.1 AC: "duplicate (instrument, date) insert fails / upserts") actually constrain the
-/// database, not just the C# model.
-/// </summary>
+// Proves the unique indexes constrain the database, not just the C# model.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class InstrumentIndexTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {

@@ -7,19 +7,7 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
 
-/// <summary>
-/// Daily FX sync over the <see cref="Currency"/> catalog (spec-04, ADR-023): one latest-rate fetch
-/// for every catalog currency except PLN (the fixed base, ADR-008), preceded by a 12-month history
-/// backfill for any currency that has no <see cref="FxRate"/> row at all yet. The only
-/// <see cref="IFxRateSource"/> consumer — <see cref="PriceSyncJob"/> and <see cref="HistoryBackfillJob"/>
-/// no longer touch FX (spec-04 design decision 6).
-/// </summary>
-/// <remarks>
-/// Every currency ends the run with exactly one outcome, so the <see cref="SyncRun"/> counters add up
-/// to the number of currencies attempted: a failed backfill counts it failed (the run continues for
-/// the others), otherwise the latest-rate fetch decides. Chunking the backfill range to NBP's 93-day
-/// limit is <c>NbpFxRateSource</c>'s concern, not this job's.
-/// </remarks>
+// Every currency ends the run with exactly one outcome, so the SyncRun counters add up to the currencies attempted.
 [DisallowConcurrentExecution]
 public sealed class FxSyncJob(
     MarketDataDbContext db,
@@ -30,18 +18,16 @@ public sealed class FxSyncJob(
 {
     public static readonly JobKey Key = new("fx-sync", "market-data");
 
-    /// <summary>Registered with OpenTelemetry tracing in Program.cs, same as <see cref="PriceSyncJob.ActivitySourceName"/>.</summary>
     public const string ActivitySourceName = "Skarbiec.MarketData.FxSyncJob";
 
-    private const string BaseCurrency = "PLN"; // ADR-008
-    private const int BackfillDays = 365; // same "min. 1 year back" as HistoryBackfillJob
+    private const string BaseCurrency = "PLN";
+    private const int BackfillDays = 365;
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) => await RunAsync(cancellationToken);
 
-    /// <summary>Quartz-independent entry point — lets tests drive a run directly instead of faking
-    /// <see cref="IJobExecutionContext"/>, matching <see cref="PriceSyncJob.RunAsync"/>'s pattern.</summary>
+    // Quartz-independent entry point, so tests drive a run without faking IJobExecutionContext.
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var activity = ActivitySource.StartActivity("FxSyncJob.Run");
@@ -69,14 +55,13 @@ public sealed class FxSyncJob(
         var noData = 0;
         var failed = backfillFailed.Count;
 
-        // A currency whose first backfill failed gets no latest rate this run: one row would count as
-        // "has history" and the next run would never retry its 12-month backfill.
+        // No latest rate after a failed first backfill: one row would count as history and the backfill would never retry.
         var latestCodes = codes.Where(c => !backfillFailed.Contains(c)).ToList();
         var latestPairs = latestCodes.Select(Pair).ToHashSet(StringComparer.Ordinal);
 
         if (latestCodes.Count > 0)
         {
-            // One call for every code — NBP table A returns all of them in a single request.
+            // One call for every code: NBP table A returns all of them in a single request.
             var result = await SafeFetch.RunAsync(
                 () => fxRateSource.FetchLatestAsync(latestCodes, cancellationToken),
                 ex => $"FX fetch threw unexpectedly: {ex.Message}");
@@ -102,9 +87,7 @@ public sealed class FxSyncJob(
 
         run.Finish(timeProvider.GetUtcNow(), synced, noData, failed);
 
-        // Same publish rule as PriceSyncJob: Completed or Partial only, enrolled on this db context's
-        // outbox so the SaveChangesAsync below commits the SyncRun completion write and the
-        // DailyPricesSynced outbox message in one transaction (ADR-012).
+        // Only a Completed or Partial run publishes, in the same save as the SyncRun completion.
         if (run.Status is SyncRunStatus.Completed or SyncRunStatus.Partial)
         {
             await publishEndpoint.Publish(new DailyPricesSynced
@@ -131,9 +114,7 @@ public sealed class FxSyncJob(
             run.Id, run.Status, synced, noData, failed);
     }
 
-    /// <summary>Backfills a year of history for every code whose pair has no <see cref="FxRate"/> row
-    /// at all, one currency at a time so one failure never stops the others. Returns the codes whose
-    /// backfill failed.</summary>
+    // One currency at a time, so one failure never stops the others.
     private async Task<HashSet<string>> BackfillNewCurrenciesAsync(List<string> codes, CancellationToken cancellationToken)
     {
         var pairs = codes.Select(Pair).ToList();

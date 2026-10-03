@@ -12,14 +12,6 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// <see cref="TickerVerifier"/>'s own contract (ADR-018/M1.6): the database short-circuit for a
-/// ticker already <see cref="InstrumentVerificationStatus.Verified"/>, the three-way outcome mapping
-/// off real <see cref="StooqPriceSource"/>/<see cref="CoinGeckoPriceSource"/> behavior (via their
-/// Fake*ApiClient — the same "exercise the real parse logic through the public interface" pattern
-/// <c>StooqSourceTests</c>/<c>CoinGeckoSourceTests</c> use), and the non-retrying request-path timeout
-/// budget. Exercised directly — no HTTP host, mirroring <c>HistoryBackfillJobTests</c>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -40,8 +32,7 @@ public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : 
         });
         await db.SaveChangesAsync(cancellationToken);
 
-        // No latestResult scripted: FetchLatestAsync throws if it's ever called (ScriptedPriceSource's
-        // own contract) — proves ADR-018's "confirmed from the database, no external call at all".
+        // No latest result scripted, so any external call throws: a Verified ticker is confirmed from the database alone.
         var source = new ScriptedPriceSource(PriceSource.Stooq);
         var verifier = new TickerVerifier(db, [source], NullLogger<TickerVerifier>.Instance);
 
@@ -109,7 +100,7 @@ public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
-        // Recorded live from stooq.com (ADR-018): a 404 HTML page instead of the expected CSV.
+        // Recorded from stooq.com: a 404 HTML page instead of the expected CSV.
         var apiClient = new FakeStooqApiClient().WithResponse("BLOCKED.US", RecordedResponse.Read("stooq-malformed.csv"));
         var source = new StooqPriceSource(apiClient);
         var verifier = new TickerVerifier(db, [source], NullLogger<TickerVerifier>.Instance);
@@ -173,12 +164,7 @@ public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : 
         Assert.Equal(TickerVerificationOutcome.Unreachable, outcome);
     }
 
-    /// <summary>
-    /// ADR-018's request-path budget: "one attempt, hard timeout (~5s), no rate-limit retry". A
-    /// <see cref="GatedPriceSource"/> whose gate is never released simulates a source that never
-    /// answers within the budget (the CoinGecko Retry-After-then-retry case this exists to cut off);
-    /// a tiny injected timeout keeps the test fast instead of waiting out the real ~5s default.
-    /// </summary>
+    // A gate never released stands in for a source that never answers; a tiny timeout keeps the test fast.
     [Fact]
     public async Task VerifyAsync_PriceSourceExceedsTimeout_ReturnsUnreachable_DoesNotPropagateCancellation()
     {
@@ -193,8 +179,6 @@ public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : 
         Assert.Equal(TickerVerificationOutcome.Unreachable, outcome);
     }
 
-    /// <summary>The caller's own cancellation (not the internal timeout) must still propagate as a
-    /// genuine cancellation rather than being swallowed into Unreachable.</summary>
     [Fact]
     public async Task VerifyAsync_CallerCancels_PropagatesCancellation()
     {

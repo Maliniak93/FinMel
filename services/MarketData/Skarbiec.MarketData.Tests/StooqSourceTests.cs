@@ -6,13 +6,7 @@ using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// Fixture-based tests for the real Stooq source (T2.4 AC: "normal CSV, empty/N/D, malformed",
-/// "historical range fetch returns a correctly parsed series", "quote currency respected"), via
-/// <see cref="FakeStooqApiClient"/> — same test-kit pattern as T2.3's <c>NbpSourceTests</c>.
-/// <c>stooq-malformed.csv</c> is an actual response recorded live from stooq.com on 2026-08-03 (a
-/// 404 error page, not the expected CSV) — see <see cref="StooqApiClient"/>'s doc comment.
-/// </summary>
+// stooq-malformed.csv is a real stooq.com 404 page, not the expected CSV.
 public sealed class StooqSourceTests
 {
     private static readonly Instrument UsdStock = new()
@@ -167,9 +161,7 @@ public sealed class StooqSourceTests
 
         Assert.Equal(PriceFetchOutcome.Success, result.Outcome);
         Assert.Equal(2, result.Values.Count);
-        // Both currencies' Close values land exactly as Stooq reported them — no FX applied at
-        // ingestion regardless of Instrument.QuoteCurrency (T2.4 AC); conversion is a valuation-time
-        // concern (ADR-008), not this source's.
+        // Close lands exactly as Stooq reported it: no FX at ingestion, whatever the QuoteCurrency.
         var usdQuote = Assert.Single(result.Values, v => v.InstrumentId == UsdStock.Id);
         Assert.Equal(232.47m, usdQuote.Close);
         var plnQuote = Assert.Single(result.Values, v => v.InstrumentId == PlnStock.Id);

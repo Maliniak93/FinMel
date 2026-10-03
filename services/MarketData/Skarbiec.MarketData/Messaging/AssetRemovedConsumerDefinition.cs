@@ -3,9 +3,7 @@ using Skarbiec.ServiceDefaults.Messaging;
 
 namespace Skarbiec.MarketData.Messaging;
 
-/// <summary>T0.12 inbox template — see <c>IdempotentConsumerDefinition</c> for what this wires onto the consumer's receive endpoint.</summary>
-/// <remarks>Explicit queue name for the same reason as <see cref="AssetPositionChangedConsumerDefinition"/>:
-/// Reporting's <c>AssetRemovedConsumer</c> would otherwise share the <c>asset-removed</c> queue.</remarks>
+// Explicit queue: Reporting's AssetRemovedConsumer would otherwise share the asset-removed queue.
 public sealed class AssetRemovedConsumerDefinition
     : IdempotentConsumerDefinition<AssetRemovedConsumer, MarketDataDbContext>
 {

@@ -10,12 +10,7 @@ namespace Skarbiec.ServiceDefaults.Authentication;
 
 public static class AuthenticationExtensions
 {
-    /// <summary>
-    /// JWT bearer auth reading the signing key + issuer from the "Jwt" config section, and an
-    /// <see cref="ICurrentUser"/> accessor mapping the <c>sub</c> claim to <c>UserId</c> (ADR-006).
-    /// Endpoints opt into auth explicitly via <c>.RequireAuthorization()</c> — no global fallback
-    /// policy here, since anonymous routes (register/login/health) are a per-service decision.
-    /// </summary>
+    // No global fallback policy: endpoints opt into auth, since anonymous routes are a per-service decision.
     public static TBuilder AddJwtAuthentication<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()

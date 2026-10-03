@@ -5,16 +5,7 @@ using Skarbiec.Reporting.Features.GetDashboard;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
-/// <summary>
-/// Reporting's HTTP surface as arrange-step helpers: route builders, plus the "seed me a snapshot"
-/// call slice tests need before exercising the endpoint they actually care about.
-/// </summary>
-/// <remarks>
-/// Arrange only. A test asserting on one of these endpoints must call it directly and assert on the
-/// raw <see cref="HttpResponseMessage"/>. There is no HTTP write path for <see cref="ValuationSnapshot"/>
-/// — only the <c>DailyPricesSynced</c> consumer (T2.11) writes it — so seeding goes straight through
-/// the DbContext instead of a POST, mirroring MarketData's <c>SeedQuoteAsync</c>/<c>SeedFxRateAsync</c>.
-/// </remarks>
+// Arrange only, so a test of an endpoint calls it directly; snapshots have no HTTP write path, so seeds go through the DbContext.
 internal static class ReportingApi
 {
     public const string DashboardUri = "/api/reporting/dashboard";
@@ -39,9 +30,6 @@ internal static class ReportingApi
         return parameters.Count > 0 ? $"{NetWorthHistoryBaseUri}?{string.Join('&', parameters)}" : NetWorthHistoryBaseUri;
     }
 
-    /// <summary>Seeds one <see cref="ValuationSnapshot"/> row. spec-03 drops the JSONB breakdown — the
-    /// dashboard's per-asset-class breakdown now comes from <see cref="Data.AssetValuation"/> rows
-    /// (<see cref="SeedValuationLineAsync"/>) sharing the same (<paramref name="portfolioId"/>, <paramref name="date"/>).</summary>
     public static async Task SeedSnapshotAsync(
         this ReportingDbContext db,
         Guid userId,
@@ -64,9 +52,6 @@ internal static class ReportingApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Seeds one <see cref="Data.Position"/> row (spec-03) — the read model an
-    /// <c>AssetPositionChanged</c> consumer would otherwise upsert. Used by consumer/valuation tests
-    /// that need a position on the books before publishing an event against it.</summary>
     public static async Task SeedPositionAsync(
         this ReportingDbContext db,
         Guid assetId,
@@ -105,9 +90,6 @@ internal static class ReportingApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Seeds one <see cref="Data.AssetValuation"/> line (spec-03) — the per-asset history row
-    /// the <c>DailyPricesSynced</c> consumer writes; the dashboard's <c>ByAssetClass</c> breakdown is
-    /// a <c>GROUP BY AssetClass</c> over these for the latest (PortfolioId, Date) per portfolio.</summary>
     public static async Task SeedValuationLineAsync(
         this ReportingDbContext db,
         Guid userId,
@@ -142,9 +124,6 @@ internal static class ReportingApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Seeds one <see cref="LatestFxRate"/> row (spec-07) — the last known rate the
-    /// <c>DailyPricesSynced</c> consumer would otherwise have stored, which the position-event path
-    /// values foreign currencies with.</summary>
     public static async Task SeedLatestFxRateAsync(
         this ReportingDbContext db,
         string pair,
@@ -162,8 +141,6 @@ internal static class ReportingApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Seeds one <see cref="LatestInstrumentPrice"/> row (spec-07) — the last known close
-    /// the <c>DailyPricesSynced</c> consumer would otherwise have stored for <paramref name="instrumentId"/>.</summary>
     public static async Task SeedLatestInstrumentPriceAsync(
         this ReportingDbContext db,
         Guid instrumentId,
@@ -183,10 +160,7 @@ internal static class ReportingApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Polls <c>/health/ready</c> until the host's bus reports started — a message published before
-    /// the consumer's queue is bound would be dropped. Arrange only: throws if never ready.
-    /// </summary>
+    // A message published before the consumer's queue is bound would be dropped.
     public static async Task WaitUntilReadyAsync(this HttpClient client, CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
@@ -204,12 +178,7 @@ internal static class ReportingApi
         throw new TimeoutException("The Reporting host never reported ready.");
     }
 
-    /// <summary>
-    /// Polls <c>GET /dashboard</c> with <paramref name="client"/> until its body satisfies
-    /// <paramref name="predicate"/> (an event-driven write lands asynchronously), then returns that
-    /// raw response for the test to assert on. After 15 s returns the last response as-is, so the
-    /// caller's own assertion reports what the dashboard actually said.
-    /// </summary>
+    // After 15 s returns the last response as-is, so the caller's assertion reports what the dashboard said.
     public static async Task<HttpResponseMessage> GetDashboardWhenAsync(
         this HttpClient client, Func<DashboardResponse, bool> predicate, CancellationToken cancellationToken)
     {
@@ -222,8 +191,7 @@ internal static class ReportingApi
                 return response;
             }
 
-            // Read as a string, not ReadFromJsonAsync: that disposes the content's cached read
-            // stream, and the caller reads this same response again.
+            // Read as a string: ReadFromJsonAsync disposes the cached stream, and the caller reads this response again.
             var body = JsonSerializer.Deserialize<DashboardResponse>(
                 await response.Content.ReadAsStringAsync(cancellationToken), JsonSerializerOptions.Web);
             if (body is not null && predicate(body))

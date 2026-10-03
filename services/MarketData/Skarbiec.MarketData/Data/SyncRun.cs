@@ -8,9 +8,6 @@ public enum SyncRunStatus
     Failed,
 }
 
-// Global, not user-owned (same reasoning as Instrument/PriceQuote/FxRate) — one row per job
-// execution, the "has it run lately" source of truth for T2.14's status endpoint. All three jobs
-// (PriceSyncJob, FxSyncJob, HistoryBackfillJob) write here, told apart by Kind (spec-04).
 public sealed class SyncRun
 {
     public required Guid Id { get; init; }
@@ -22,8 +19,7 @@ public sealed class SyncRun
     public int NoDataCount { get; set; }
     public int FailedCount { get; set; }
 
-    /// <summary>Records a run's outcome. Shared by all three jobs so "Partial" means the same thing in
-    /// each: something failed, but something else synced or legitimately came back empty.</summary>
+    // Shared by all three jobs, so Partial means the same in each: something failed, but something else synced or came back empty.
     public void Finish(DateTimeOffset finishedAt, int synced, int noData, int failed)
     {
         FinishedAt = finishedAt;

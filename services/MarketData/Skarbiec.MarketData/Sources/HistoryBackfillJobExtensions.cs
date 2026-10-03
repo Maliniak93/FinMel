@@ -4,25 +4,14 @@ namespace Skarbiec.MarketData.Sources;
 
 public static class HistoryBackfillJobExtensions
 {
-    // Same key/reasoning as PriceSyncJobExtensions.DisableBackgroundJobsConfigKey — no-ops under
-    // Skarbiec.Testing's SkarbiecApiFactory so slice tests never race a live Quartz scheduler.
     private const string DisableBackgroundJobsConfigKey = "Testing:DisableBackgroundJobs";
 
-    /// <summary>
-    /// Registers <see cref="HistoryBackfillJob"/> and <see cref="IHistoryBackfillTrigger"/> for DI
-    /// resolution. Must be called after <see cref="PriceSyncJobExtensions.AddPriceSyncJob"/> (or
-    /// another <c>AddQuartz</c> call) in the same builder — <see cref="QuartzHistoryBackfillTrigger"/>
-    /// only needs <c>ISchedulerFactory</c>, which that call is what registers; this method
-    /// deliberately doesn't call <c>AddQuartz</c>/<c>UsePersistentStore</c> a second time to avoid
-    /// reconfiguring the one scheduler both jobs share.
-    /// </summary>
+    // Call after AddPriceSyncJob, which registers the ISchedulerFactory this needs; AddQuartz is never repeated.
     public static TBuilder AddHistoryBackfillJob<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         if (builder.Configuration.GetValue<bool>(DisableBackgroundJobsConfigKey))
         {
-            // Features/AddCustomInstrument (T2.8) still needs IHistoryBackfillTrigger resolvable
-            // under SkarbiecApiFactory-based HTTP slice tests, even with no live Quartz scheduler to
-            // enqueue onto — see NoOpHistoryBackfillTrigger.
+            // AddCustomInstrument still resolves IHistoryBackfillTrigger in slice tests with no scheduler.
             builder.Services.AddSingleton<IHistoryBackfillTrigger, NoOpHistoryBackfillTrigger>();
             return builder;
         }

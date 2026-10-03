@@ -4,11 +4,7 @@ using Skarbiec.ServiceDefaults.Tenancy;
 
 namespace Skarbiec.Testing.Sample.Data;
 
-/// <summary>
-/// Exercises the shared tenancy plumbing (ADR-006) end to end over HTTP, so
-/// <see cref="Skarbiec.Testing.Tenancy.TenancyIsolationTests{TProgram}"/> (T0.14) has something real
-/// to prove itself against.
-/// </summary>
+// Exists so TenancyIsolationTests has a real tenancy-filtered resource to prove itself against.
 public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options, ICurrentUser currentUser)
     : DbContext(options), ITenantScopedDbContext
 {

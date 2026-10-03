@@ -41,8 +41,7 @@ public sealed class RefreshHandler(
 
         if (token.RevokedAtUtc is not null)
         {
-            // Reuse of an already-rotated/revoked token: someone other than the legitimate holder
-            // may have it, so the whole descendant chain is revoked (ADR-005 rotation strategy).
+            // A reused rotated token may be in someone else's hands, so its whole descendant chain is revoked.
             await RevokeChainAsync(token, cancellationToken);
             return InvalidRefreshToken;
         }

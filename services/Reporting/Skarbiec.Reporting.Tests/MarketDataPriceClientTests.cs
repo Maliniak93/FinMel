@@ -9,12 +9,7 @@ using Skarbiec.Testing.Http;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// What <see cref="MarketDataPriceClient"/> puts on the wire, resolved through Reporting's own
-/// <c>IHttpClientFactory</c> registration so every handler <c>Program.cs</c> puts in front of it
-/// runs. The network is replaced by <see cref="HttpRequestRecorder"/>: service-only calls go to
-/// MarketData's <c>/internal</c> endpoints with no token (ADR-027).
-/// </summary>
+// Resolved through Reporting's own IHttpClientFactory registration, so every handler Program.cs adds runs.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class MarketDataPriceClientTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {

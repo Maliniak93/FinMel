@@ -3,8 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Skarbiec.MarketData.Data;
 
-// No tenancy filter here: instruments/quotes are global reference data, not user-owned (ADR-006
-// scope note in T0.13 — custom per-user instruments are revisited in Phase 2).
+// No tenancy filter: instruments and quotes are global reference data.
 public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> options) : DbContext(options)
 {
     public DbSet<Instrument> Instruments => Set<Instrument>();
@@ -25,16 +24,12 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
             instrument.Property(i => i.Name).HasMaxLength(200);
             instrument.Property(i => i.QuoteCurrency).HasMaxLength(3);
 
-            // HasDefaultValue backfills every pre-existing row to Verified when the migration runs
-            // (T2.8) — the dictionary predates verification tracking and was curated by hand.
             instrument.Property(i => i.VerificationStatus)
                 .HasConversion<string>()
                 .HasMaxLength(20)
                 .HasDefaultValue(InstrumentVerificationStatus.Verified);
 
-            // Natural key of the dictionary — same ticker can recur under a different source, so
-            // the pair is what must stay unique. Also what keeps the seeder's idempotency check
-            // (MarketDataSeeder) cheap and DB-enforced, not just application-level.
+            // The same ticker can recur under another source, so the pair is the natural key.
             instrument.HasIndex(i => new { i.Source, i.Ticker }).IsUnique();
         });
 
@@ -42,7 +37,6 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
         {
             quote.Property(q => q.Close).HasPrecision(18, 8);
 
-            // Upsert-friendly: PriceSyncJob (T2.6) writes one row per instrument per day.
             quote.HasIndex(q => new { q.InstrumentId, q.Date }).IsUnique();
         });
 
@@ -51,7 +45,6 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
             rate.Property(r => r.Pair).HasMaxLength(6);
             rate.Property(r => r.Rate).HasPrecision(18, 8);
 
-            // Upsert-friendly: FxSyncJob (spec-04) writes one row per pair per day.
             rate.HasIndex(r => new { r.Pair, r.Date }).IsUnique();
         });
 
@@ -59,7 +52,6 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
         {
             run.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
 
-            // Default backfills every pre-spec-04 row to Prices — PriceSyncJob was the only writer.
             run.Property(r => r.Kind)
                 .HasConversion<string>()
                 .HasMaxLength(20)
@@ -77,8 +69,7 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
             currency.Property(c => c.Symbol).HasMaxLength(10);
         });
 
-        // InstrumentId/AssetId are ids reported by events, never generated here — and no FK to
-        // Instrument: a Portfolio event can name an instrument before this row exists.
+        // Ids come from events, with no FK: an event can name an instrument before its row exists.
         modelBuilder.Entity<InstrumentUsage>(usage =>
         {
             usage.HasKey(u => u.InstrumentId);
@@ -94,12 +85,7 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
             link.HasIndex(l => l.InstrumentId);
         });
 
-        // MassTransit EF Outbox (T2.10, ADR-012), same pattern as Identity (T0.10) and Portfolio
-        // (T1.5): PriceSyncJob's completion write and the DailyPricesSynced outbox row commit
-        // atomically. Table names prefixed "MarketData" — MassTransit's defaults ("InboxState" etc.)
-        // would otherwise collide with the other services' own outbox tables once every DbContext's
-        // migrations run against the single shared Postgres database Gateway.Tests uses to host every
-        // service's test host side by side.
+        // Prefixed table names: MassTransit's defaults collide with the other services' outbox tables in the shared test database.
         modelBuilder.AddInboxStateEntity(x => x.ToTable("MarketDataInboxState"));
         modelBuilder.AddOutboxMessageEntity(x => x.ToTable("MarketDataOutboxMessage"));
         modelBuilder.AddOutboxStateEntity(x => x.ToTable("MarketDataOutboxState"));

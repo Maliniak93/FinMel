@@ -13,15 +13,7 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// <c>PortfolioArchived</c>/<c>PortfolioRestored</c>/<c>PortfolioDeleted</c> in — spec-03 AC6-7.
-/// Archive/restore flips every <see cref="Position.PortfolioIsArchived"/> flag for the portfolio
-/// (belt and braces next to spec-02's per-asset <c>AssetPositionChanged</c> fan-out). Delete removes
-/// that portfolio's <see cref="Position"/>, <see cref="AssetValuation"/> and <see cref="ValuationSnapshot"/>
-/// rows entirely (design decision 1: a deleted portfolio must not keep a ghost value in net worth)
-/// without touching any other portfolio. All three consumers share one provider/bus on queue names
-/// unique to this test class, mirroring <c>AssetPositionChangedConsumerTests</c>.
-/// </summary>
+// All three consumers share one provider on queue names unique to this class.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -122,7 +114,6 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC9: a restored portfolio gets today's snapshot back right away, recomputed from its positions.</summary>
     [Fact]
     public async Task Restored_RevaluesTodaysSnapshot()
     {
@@ -166,11 +157,6 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// archived-portfolio-out-of-net-worth AC1: archiving revalues today's snapshot the way removing
-    /// the last asset does — the portfolio's only position (1000 PLN of cash) is now archived, so
-    /// today's <see cref="ValuationSnapshot"/> drops from 1000 to 0 and today's lines are gone.
-    /// </summary>
     [Fact]
     public async Task Consume_PortfolioArchived_SetsTodaysSnapshotToZero()
     {
@@ -207,11 +193,7 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// archived-portfolio-out-of-net-worth AC2: the archive revalues today only — yesterday's
-    /// snapshot and lines are history and stay exactly as they were. Today's snapshot reaching 0 is
-    /// the signal the consume finished, so the "unchanged" assertion cannot pass vacuously.
-    /// </summary>
+    // Today's snapshot reaching 0 signals the consume finished, so the unchanged assertion cannot pass vacuously.
     [Fact]
     public async Task Consume_PortfolioArchived_KeepsEarlierSnapshots()
     {

@@ -4,15 +4,7 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources.Verification;
 
-/// <summary>
-/// Real <see cref="ITickerVerifier"/> — the one request-path exception to ADR-007, contained exactly
-/// as ADR-018 describes: a ticker already <see cref="InstrumentVerificationStatus.Verified"/> in
-/// <see cref="MarketDataDbContext.Instruments"/> is confirmed from the database with no external call
-/// at all; anything else gets exactly one attempt against the matching <see cref="IPriceSource"/>,
-/// bounded by <see cref="DefaultTimeout"/> — deliberately short and non-retrying, unlike
-/// <c>CoinGeckoPriceSource</c>'s job-time rate-limit retry, which sleeps on <c>Retry-After</c> and
-/// would turn a single verification into a multi-second (or longer) stall in a request path.
-/// </summary>
+// A ticker already Verified skips the external call; anything else gets one short, non-retrying attempt.
 public sealed class TickerVerifier : ITickerVerifier
 {
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
@@ -27,9 +19,7 @@ public sealed class TickerVerifier : ITickerVerifier
     {
     }
 
-    /// <summary>Test seam: lets <c>TickerVerifierTests</c> prove the request-path timeout budget
-    /// (ADR-018) without actually waiting out <see cref="DefaultTimeout"/>, mirroring
-    /// <c>CoinGeckoPriceSource</c>'s own delay test seam.</summary>
+    // Test seam: a test proves the timeout budget without waiting it out.
     public TickerVerifier(MarketDataDbContext dbContext, IEnumerable<IPriceSource> priceSources, ILogger<TickerVerifier> logger, TimeSpan timeout)
     {
         _dbContext = dbContext;
@@ -58,9 +48,7 @@ public sealed class TickerVerifier : ITickerVerifier
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(_timeout);
 
-        // Ephemeral probe, never persisted (ADR-018) — every IPriceSource.FetchLatestAsync
-        // implementation keys purely off Instrument.Ticker; Name/QuoteCurrency/AssetClass aren't
-        // inspected (see Stooq/CoinGecko/NBP's own FetchLatestAsync).
+        // An ephemeral probe, never persisted: every source keys off Ticker alone.
         var probe = new Instrument
         {
             Id = Guid.NewGuid(),
@@ -78,9 +66,7 @@ public sealed class TickerVerifier : ITickerVerifier
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Our own budget expired (e.g. a rate-limit backoff sleep on the underlying source) — the
-            // caller didn't cancel, so this is "unreachable", not a propagated cancellation. Mirrors
-            // Portfolio's MarketDataInstrumentLookupClient.CheckAsync (T2.9).
+            // Our own budget expired while the caller did not cancel: unreachable, not a propagated cancellation.
             _logger.LogWarning("TickerVerifier: {Source} verification for '{Ticker}' exceeded the {Timeout} budget.", source, ticker, _timeout);
             return TickerVerificationOutcome.Unreachable;
         }

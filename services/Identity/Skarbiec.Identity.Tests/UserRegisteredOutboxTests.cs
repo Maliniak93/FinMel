@@ -11,13 +11,7 @@ using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Identity.Tests;
 
-/// <summary>
-/// Proves the outbox row and the user row commit atomically (T0.10 AC). Deliberately builds its
-/// own <see cref="ServiceProvider"/> instead of using <see cref="IdentityApiFactory"/>: no
-/// <see cref="IHostedService"/> (MassTransit's bus, the outbox delivery poller) is ever started,
-/// so the row can never be delivered/removed before the assertion runs — a real hosted bus would
-/// race the poller against this check.
-/// </summary>
+// Builds its own provider so no hosted service starts and the outbox row is never delivered before the assertion reads it.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UserRegisteredOutboxTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {

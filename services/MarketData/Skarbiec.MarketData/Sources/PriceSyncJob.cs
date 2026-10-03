@@ -7,18 +7,7 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
 
-/// <summary>
-/// Daily sync: quotes for every instrument in use, isolating per-source failures so one bad vendor
-/// doesn't stop the rest (E4 [M], ADR-007). External APIs are called only from here and the other
-/// Quartz jobs — <see cref="IPriceSource"/> implementations never run in a request path (enforced by
-/// <c>ArchitectureTests.OnlySourcesNamespace_DependsOn_PriceSourceAbstractions</c>). FX rates are
-/// <see cref="FxSyncJob"/>'s job, not this one's (spec-04 design decision 6).
-/// </summary>
-/// <remarks>
-/// "In use" (E4 AC: "only instruments attached to assets") is MarketData's own
-/// <see cref="InstrumentUsage"/> read model, built from Portfolio's <c>AssetPositionChanged</c>/
-/// <c>AssetRemoved</c> events (spec-04) — never a REST call back to Portfolio.
-/// </remarks>
+// "In use" comes from the InstrumentUsage read model built from Portfolio's events, never a call back to Portfolio.
 [DisallowConcurrentExecution]
 public sealed class PriceSyncJob(
     MarketDataDbContext db,
@@ -29,16 +18,14 @@ public sealed class PriceSyncJob(
 {
     public static readonly JobKey Key = new("price-sync", "market-data");
 
-    /// <summary>Registered with OpenTelemetry tracing in Program.cs — ServiceDefaults only adds the
-    /// app's own ApplicationName-named source plus MassTransit's, not this one.</summary>
+    // Registered in Program.cs: ServiceDefaults adds only the app's own and MassTransit's sources.
     public const string ActivitySourceName = "Skarbiec.MarketData.PriceSyncJob";
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) => await RunAsync(cancellationToken);
 
-    /// <summary>Quartz-independent entry point — lets tests drive a run directly instead of faking
-    /// <see cref="IJobExecutionContext"/>.</summary>
+    // Quartz-independent entry point, so tests drive a run without faking IJobExecutionContext.
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var activity = ActivitySource.StartActivity("PriceSyncJob.Run");
@@ -101,12 +88,7 @@ public sealed class PriceSyncJob(
 
         run.Finish(timeProvider.GetUtcNow(), synced, noData, failed);
 
-        // Partial runs still publish (T2.10 scope): Reporting's snapshots fall back to last-known
-        // prices anyway (domain valuation algorithm), so a partially-failed run is still useful
-        // signal. Only a wholesale Failed run (nothing synced, nothing even came back empty) is
-        // skipped — there's nothing new for Reporting to react to. IPublishEndpoint.Publish enrolls
-        // the outbox row on this same db context, so the SaveChangesAsync below commits the SyncRun
-        // completion write and the DailyPricesSynced outbox message in one transaction (ADR-012).
+        // A Partial run still publishes, as Reporting falls back to last-known prices; only a Failed run is skipped.
         if (run.Status is SyncRunStatus.Completed or SyncRunStatus.Partial)
         {
             await publishEndpoint.Publish(new DailyPricesSynced
@@ -129,16 +111,13 @@ public sealed class PriceSyncJob(
         activity?.SetTag("skarbiec.sync_run.failed", failed);
         activity?.SetTag("skarbiec.sync_run.skipped", skipped);
 
-        // Skipped is logged, not stored: the SyncRun counters keep meaning "attempted" (spec-04
-        // design decision 13).
+        // Skipped is logged, not stored, so the SyncRun counters keep meaning "attempted".
         logger.LogInformation(
             "PriceSyncJob run {RunId} finished: {Status} (synced={Synced}, noData={NoData}, failed={Failed}, skipped={Skipped}).",
             run.Id, run.Status, synced, noData, failed, skipped);
     }
 
-    /// <summary>Only instruments some live asset points at (<see cref="InstrumentUsage.AssetCount"/>
-    /// &gt; 0). No exception for <c>Unverified</c> instruments: <see cref="HistoryBackfillJob"/> resolves
-    /// those on creation and on first use, so nothing waits on this daily job for them.</summary>
+    // No exception for Unverified instruments: HistoryBackfillJob resolves those on creation and on first use.
     private async Task<(List<Instrument> Selected, int Skipped)> GetInstrumentsToSyncAsync(CancellationToken cancellationToken)
     {
         var selected = await db.Instruments

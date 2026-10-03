@@ -2,15 +2,7 @@ using System.Net;
 
 namespace Skarbiec.MarketData.Sources.CoinGecko;
 
-/// <summary>
-/// Real HTTP implementation of <see cref="ICoinGeckoApiClient"/> — a typed client resolved through
-/// <see cref="IHttpClientFactory"/> (registered by
-/// <see cref="CoinGeckoSourceExtensions.AddCoinGeckoSource{TBuilder}"/>), so ServiceDefaults' standard
-/// resilience handler (retry+jitter, circuit breaker, timeout) applies automatically; no per-source
-/// wiring needed (see <see cref="IPriceSource"/>'s doc comment). Prices are always requested in USD —
-/// a stable quote currency documented once here rather than per instrument; conversion to PLN happens
-/// at valuation time via <c>FxRate</c>, same as any other foreign-quoted instrument (ADR-008).
-/// </summary>
+// Prices are always requested in USD; conversion to PLN happens at valuation time.
 public sealed class CoinGeckoApiClient(HttpClient httpClient) : ICoinGeckoApiClient
 {
     private const string VsCurrency = "usd";
@@ -29,11 +21,7 @@ public sealed class CoinGeckoApiClient(HttpClient httpClient) : ICoinGeckoApiCli
             cancellationToken);
     }
 
-    // 429 carries the Retry-After the source needs to back off correctly (see
-    // CoinGeckoRateLimitedException's doc comment) — translated here rather than left to throw via
-    // EnsureSuccessStatusCode, which would discard the header. Any other non-success status still
-    // throws via EnsureSuccessStatusCode, treated as a transport failure by the source (same as
-    // NbpApiClient/StooqApiClient).
+    // A 429 becomes CoinGeckoRateLimitedException here, since EnsureSuccessStatusCode would discard Retry-After.
     private async Task<string> GetRawAsync(string requestUri, CancellationToken cancellationToken)
     {
         using var response = await httpClient.GetAsync(requestUri, cancellationToken);

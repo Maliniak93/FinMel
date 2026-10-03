@@ -21,10 +21,7 @@ if (app.Environment.IsDevelopment())
     await scope.ServiceProvider.GetRequiredService<NotesDbContext>().Database.MigrateAsync();
 }
 
-// Minimal tenant-scoped CRUD resource — exists only so
-// Skarbiec.Testing.Tenancy.TenancyIsolationTests<TProgram> (T0.14) has a real HTTP resource to
-// prove itself against. The tenancy filter on NotesDbContext (ADR-006) does all the isolation
-// work here: "not mine" and "doesn't exist" look identical, which is exactly the point.
+// The tenancy filter does all the isolation: "not mine" and "doesn't exist" look identical.
 
 app.MapPost("/notes", async (CreateNoteRequest request, NotesDbContext db, CancellationToken ct) =>
 {

@@ -7,16 +7,7 @@ using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// Fixture-based tests for the real CoinGecko source (T2.5 AC: "batch price parse, history parse,
-/// 429 → retry-after respected (simulated)", "rate limiting verified... no 429 storm on a
-/// 10-instrument batch"), via <see cref="FakeCoinGeckoApiClient"/> — same test-kit pattern as
-/// T2.3/T2.4's <c>NbpSourceTests</c>/<c>StooqSourceTests</c>. <c>coingecko-latest-happy-path.json</c>,
-/// <c>coingecko-latest-no-data.json</c>, <c>coingecko-history-happy-path.json</c> and
-/// <c>coingecko-history-no-data.json</c> are real responses recorded live from api.coingecko.com on
-/// 2026-08-03; <c>coingecko-malformed.json</c> is a real 404 body from an invalid path on the same
-/// host (an unexpected-but-valid-JSON shape, not the batch/history object either parser expects).
-/// </summary>
+// The recorded responses are real api.coingecko.com bodies; coingecko-malformed.json is the 404 body of an invalid path.
 public sealed class CoinGeckoSourceTests
 {
     private static readonly Instrument Bitcoin = new()
@@ -52,7 +43,7 @@ public sealed class CoinGeckoSourceTests
 
         Assert.Equal(PriceFetchOutcome.Success, result.Outcome);
         Assert.Equal(2, result.Values.Count);
-        Assert.Equal(1, client.LatestRequestCount); // one call for both coins, not one per coin
+        Assert.Equal(1, client.LatestRequestCount);
         var bitcoin = Assert.Single(result.Values, v => v.InstrumentId == Bitcoin.Id);
         Assert.Equal(new DateOnly(2026, 8, 3), bitcoin.Date);
         Assert.Equal(63890m, bitcoin.Close);
@@ -143,9 +134,9 @@ public sealed class CoinGeckoSourceTests
 
         Assert.Equal(PriceFetchOutcome.Success, result.Outcome);
         Assert.Equal(2, result.Values.Count);
-        Assert.Equal(2, client.LatestRequestCount); // the rate-limited call, then the retry
+        Assert.Equal(2, client.LatestRequestCount);
         var delay = Assert.Single(capturedDelays);
-        Assert.Equal(TimeSpan.FromSeconds(54), delay); // Retry-After respected exactly
+        Assert.Equal(TimeSpan.FromSeconds(54), delay);
     }
 
     [Fact]
@@ -161,7 +152,7 @@ public sealed class CoinGeckoSourceTests
 
         Assert.Equal(PriceFetchOutcome.Error, result.Outcome);
         Assert.NotNull(result.ErrorReason);
-        Assert.Equal(2, client.LatestRequestCount); // one retry attempted, then gives up — never hammers
+        Assert.Equal(2, client.LatestRequestCount);
         Assert.Single(capturedDelays);
     }
 
@@ -177,10 +168,10 @@ public sealed class CoinGeckoSourceTests
         var result = await source.FetchHistoryAsync(Bitcoin, from, to, TestContext.Current.CancellationToken);
 
         Assert.Equal(PriceFetchOutcome.Success, result.Outcome);
-        Assert.Equal(5, result.Values.Count); // 97 hourly points collapse to 5 distinct UTC dates
+        Assert.Equal(5, result.Values.Count);
         Assert.All(result.Values, v => Assert.Equal(Bitcoin.Id, v.InstrumentId));
         Assert.Equal(new DateOnly(2026, 4, 20), result.Values[0].Date);
-        Assert.Equal(75953.47314954984m, result.Values[0].Close); // last point of 04-20, not the first
+        Assert.Equal(75953.47314954984m, result.Values[0].Close);
         Assert.Equal(new DateOnly(2026, 4, 24), result.Values[^1].Date);
         Assert.Equal(78275.32582745969m, result.Values[^1].Close);
         Assert.Equal(1, client.HistoryRequestCount);
@@ -227,7 +218,7 @@ public sealed class CoinGeckoSourceTests
         var result = await source.FetchHistoryAsync(
             Bitcoin, new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 2), TestContext.Current.CancellationToken);
 
-        Assert.Equal(PriceFetchOutcome.NoData, result.Outcome); // reached the parser at all proves the retry succeeded
+        Assert.Equal(PriceFetchOutcome.NoData, result.Outcome);
         Assert.Equal(2, client.HistoryRequestCount);
         Assert.Equal(TimeSpan.FromSeconds(20), Assert.Single(capturedDelays));
     }

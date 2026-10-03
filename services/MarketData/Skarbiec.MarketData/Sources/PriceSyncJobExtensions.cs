@@ -5,34 +5,20 @@ namespace Skarbiec.MarketData.Sources;
 
 public static class PriceSyncJobExtensions
 {
-    // Mirrors Skarbiec.Testing's TestingDefaults.DisableBackgroundJobsConfigKey ("Testing:DisableBackgroundJobs"),
-    // kept as a literal rather than a project reference so this service never depends on the
-    // test-infrastructure project. SkarbiecApiFactory sets this to "true" on every
-    // WebApplicationFactory-based test host so slice tests never race a live Quartz job.
+    // A literal, not a reference to Skarbiec.Testing, so the service never depends on test infrastructure.
     private const string DisableBackgroundJobsConfigKey = "Testing:DisableBackgroundJobs";
 
     private const string PriceSyncCronConfigKey = "PriceSync:Cron";
 
-    // Business days, after GPW's ~17:00 CET close and well after NBP table A's midday publish
-    // (diagrams/price-sync-sequence.mermaid) — gives Stooq's EOD data time to settle before sync.
-    // appsettings.Development.json overrides this to a short interval for local demoing.
+    // Business days, after the GPW close and NBP's midday publish, giving Stooq's EOD data time to settle.
     private const string DefaultProductionCron = "0 30 18 ? * MON-FRI";
 
-    /// <summary>
-    /// Registers <see cref="PriceSyncJob"/> on a Postgres-backed, clustered persistent store — the
-    /// schedule and in-flight run state survive a service restart, and <c>DisallowConcurrentExecution</c>
-    /// plus clustering keep two live instances from ever running the same fire concurrently (T2.6 AC).
-    /// The store comes from <see cref="QuartzStore"/>; the scheduler's health check joins
-    /// <c>/health/ready</c> here, on the only path that registers a scheduler. No-ops under
-    /// <see cref="DisableBackgroundJobsConfigKey"/> so slice tests never race this job.
-    /// </summary>
+    // Postgres-backed and clustered, so the schedule survives a restart and two instances never run the same fire.
     public static TBuilder AddPriceSyncJob<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         if (builder.Configuration.GetValue<bool>(DisableBackgroundJobsConfigKey))
         {
-            // Features/TriggerSync (T2.14) still needs ISyncTrigger resolvable under
-            // SkarbiecApiFactory-based HTTP slice tests, even with no live Quartz scheduler here to
-            // enqueue onto — see NoOpSyncTrigger.
+            // TriggerSync still resolves ISyncTrigger in slice tests with no scheduler.
             builder.Services.AddSingleton<ISyncTrigger, NoOpSyncTrigger>();
             return builder;
         }
@@ -52,8 +38,7 @@ public static class PriceSyncJobExtensions
                 .WithCronSchedule(cron));
         });
 
-        // Never under DisableBackgroundJobs: with no scheduler registered the check would fail
-        // readiness in every slice test.
+        // Never under DisableBackgroundJobs: with no scheduler the check would fail readiness in every slice test.
         builder.Services.AddHealthChecks().AddQuartz();
         builder.Services.AddSingleton<ISyncTrigger, QuartzSyncTrigger>();
 

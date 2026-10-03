@@ -8,8 +8,7 @@ public static class GetFxRateEndpoint
 {
     public static IEndpointRouteBuilder MapGetFxRateEndpoint(this IEndpointRouteBuilder app)
     {
-        // Service-only (ADR-026, ADR-027): Portfolio's request-path lookup of the rate a transaction is
-        // frozen at. Anonymous, not in OpenAPI, unreachable through the Gateway.
+        // Portfolio's request-path lookup of the rate a transaction is frozen at.
         app.MapInternalGroup("fx").MapGet("/{currency}/rate", HandleAsync);
 
         return app;

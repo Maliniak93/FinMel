@@ -7,13 +7,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// T2.12 scope: "P95 &lt;1s success criterion — measure with seeded year of snapshots (index on
-/// (UserId, date))". Measured against <see cref="GetNetWorthHistoryHandler"/> directly (DB round
-/// trips only), same rationale as MarketData's <c>SearchInstrumentsPerformanceTests</c> — a full
-/// Kestrel/JSON round trip would mix in overhead this isn't about. A warm-up call absorbs first-query
-/// JIT/connection-pool cost before the timed call.
-/// </summary>
+// Timed against the handler, not over HTTP, after a warm-up call absorbs JIT and connection-pool cost.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
@@ -25,9 +19,7 @@ public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture
         var portfolioIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        // AddRange + one SaveChangesAsync instead of the SeedSnapshotAsync helper's per-row round
-        // trip — 1095 rows one at a time would make the arrange step dwarf what this test actually
-        // measures.
+        // One SaveChangesAsync instead of SeedSnapshotAsync per row, so the arrange step does not dwarf the measurement.
         await using (var seedDb = CreateDbContext(userId))
         {
             for (var i = 0; i < 365; i++)
@@ -53,7 +45,7 @@ public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture
         await using var queryDb = CreateDbContext(userId);
         var handler = new GetNetWorthHistoryHandler(queryDb, TimeProvider.System);
 
-        await handler.HandleAsync("MAX", null, cancellationToken); // warm-up: absorb JIT/connection-pool cost.
+        await handler.HandleAsync("MAX", null, cancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
         var result = await handler.HandleAsync("MAX", null, cancellationToken);

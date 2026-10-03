@@ -46,8 +46,7 @@ app.MapLoginEndpoint();
 app.MapRefreshEndpoint();
 app.MapLogoutEndpoint();
 
-// Diagnostic endpoint proving an access token minted by /login round-trips through JWT
-// bearer validation (ServiceDefaults) end to end — mirrors Skarbiec.ServiceDefaults.Sample's /secure.
+// Diagnostic endpoint proving a token minted by /login passes the shared JWT bearer validation.
 app.MapGet("/api/identity/me", (ICurrentUser currentUser) => TypedResults.Ok(currentUser.UserId))
     .RequireAuthorization();
 

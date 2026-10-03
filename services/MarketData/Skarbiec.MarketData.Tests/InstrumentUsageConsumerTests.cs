@@ -14,14 +14,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// <c>AssetPositionChanged</c>/<c>AssetRemoved</c> in, <see cref="AssetInstrumentLink"/> and the
-/// derived <see cref="InstrumentUsage"/> row out (spec-04 AC11-16, design decisions 9-12) — idempotent
-/// by <c>MessageId</c>, order-safe by <c>Version</c>, and the trigger for
-/// <see cref="IHistoryBackfillTrigger.EnqueueAsync"/> on a 0-to-1 usage transition. Builds its own
-/// provider (no HTTP host needed) on a queue name unique to this test class, mirroring Reporting's
-/// <c>AssetPositionChangedConsumerTests</c>/<c>DailyPricesSyncedConsumerTests</c>.
-/// </summary>
+// Builds its own provider, with no HTTP host, on a queue unique to this class.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -77,7 +70,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 2);
 
             Assert.Equal(2, usage.AssetCount);
-            Assert.Equal(1, trigger.CountFor(instrumentId)); // still only the first asset's 0->1 transition.
+            Assert.Equal(1, trigger.CountFor(instrumentId));
         }, cancellationToken);
     }
 
@@ -127,12 +120,10 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
             await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
 
-            // Redeliver: same MessageId, same content. The inbox (InboxState, keyed on MessageId +
-            // ConsumerId) must recognize it and skip the consumer body entirely.
+            // Same MessageId: the inbox must skip the consumer body.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
 
-            // No signal to wait on for "it was skipped" — give a genuine redelivery time to land
-            // before asserting it never did.
+            // Nothing signals a skip, so give a redelivery time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             await using var scope = provider.CreateAsyncScope();
@@ -157,12 +148,10 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             await bus.Publish(PositionChanged(assetId, instrumentA, version: 5), cancellationToken);
             await WaitForUsageAsync(provider, instrumentA, cancellationToken, u => u.AssetCount == 1);
 
-            // The late event points at a different instrument: applied, it would move the count from
-            // A to B and enqueue a backfill for B — so only the Version guard keeps the state below.
+            // The late event names another instrument, so only the Version guard keeps the state below.
             await bus.Publish(PositionChanged(assetId, instrumentB, version: 3), cancellationToken);
 
-            // No signal to wait on for "it was ignored" — give a genuine (mis-ordered) delivery time
-            // to land before asserting the stored state was left untouched.
+            // Nothing signals an ignored event, so give it time to land before asserting nothing changed.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             await using var scope = provider.CreateAsyncScope();
@@ -239,8 +228,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
 
         try
         {
-            // See Reporting's AssetPositionChangedConsumerTests: a publish fired immediately after
-            // StartAsync can race the exchange->queue binding on a fresh queue and be dropped.
+            // StartAsync does not wait for RabbitMQ to apply the bindings, so a publish right after it could be dropped.
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
             await action(provider, trigger);
@@ -291,9 +279,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         {
             x.SetKebabCaseEndpointNameFormatter();
 
-            // No UseBusOutbox() here: this test only exercises the consumer-side inbox, never
-            // IBus/IPublishEndpoint from a DI scope, so the producer-side bus outbox and its
-            // background delivery poller would be dead weight.
+            // No UseBusOutbox(): only the consumer-side inbox is under test.
             x.AddEntityFrameworkOutbox<MarketDataDbContext>(o => o.UsePostgres());
 
             x.AddConsumer<AssetPositionChangedConsumer>(typeof(TestAssetPositionChangedConsumerDefinition));

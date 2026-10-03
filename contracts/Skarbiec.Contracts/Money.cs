@@ -1,6 +1,5 @@
 namespace Skarbiec.Contracts;
 
-/// <summary>Amount in a given currency. Base currency is PLN (ADR-008).</summary>
 public sealed record Money
 {
     public const string BaseCurrency = "PLN";
@@ -14,7 +13,6 @@ public sealed record Money
         Currency = currency;
     }
 
-    /// <summary>Validates and creates a <see cref="Money"/>; returns a failed <see cref="Result{TValue}"/> instead of throwing (ADR-017).</summary>
     public static Result<Money> Create(decimal amount, string currency = BaseCurrency)
     {
         if (string.IsNullOrWhiteSpace(currency))

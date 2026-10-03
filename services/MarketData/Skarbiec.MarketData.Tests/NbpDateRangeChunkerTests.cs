@@ -18,7 +18,7 @@ public sealed class NbpDateRangeChunkerTests
     public void Chunk_RangeExceedingLimit_SplitsContiguouslyWithNoGapOrOverlap()
     {
         var from = new DateOnly(2026, 1, 1);
-        var to = from.AddDays(199); // 200-day span, limit 93 -> 3 chunks
+        var to = from.AddDays(199);
 
         var chunks = NbpDateRangeChunker.Chunk(from, to, maxDaysPerChunk: 93).ToList();
 
@@ -48,7 +48,7 @@ public sealed class NbpDateRangeChunkerTests
     public void Chunk_RangeExactlyAtLimit_ReturnsSingleChunk()
     {
         var from = new DateOnly(2026, 1, 1);
-        var to = from.AddDays(92); // exactly 93 days inclusive
+        var to = from.AddDays(92);
 
         var chunk = Assert.Single(NbpDateRangeChunker.Chunk(from, to, maxDaysPerChunk: 93));
 

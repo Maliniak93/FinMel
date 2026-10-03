@@ -5,14 +5,7 @@ namespace Skarbiec.ServiceDefaults.Tenancy;
 
 public static class TenancyModelBuilderExtensions
 {
-    /// <summary>
-    /// Adds <c>e => e.UserId == context.CurrentUserId</c> as a global query filter to every
-    /// entity type in the model implementing <see cref="IUserOwned"/> (ADR-006). One
-    /// reflection-based pass instead of a per-entity <c>HasQueryFilter</c> call, so new
-    /// user-owned entities are covered automatically as they're added in later phases. Takes the
-    /// context itself (not <see cref="Authentication.ICurrentUser"/> directly) — see
-    /// <see cref="ITenantScopedDbContext"/> for why that's required for correctness.
-    /// </summary>
+    // Takes the context, not ICurrentUser: see ITenantScopedDbContext.
     public static void ApplyUserOwnedQueryFilters<TContext>(this ModelBuilder modelBuilder, TContext context)
         where TContext : DbContext, ITenantScopedDbContext
     {

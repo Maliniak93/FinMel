@@ -9,8 +9,6 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>HTTP-level behavior of Features/GetSyncStatus (T2.14) — the "last sync" status the manual
-/// trigger button reads.</summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetSyncStatusEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -32,8 +30,6 @@ public sealed class GetSyncStatusEndpointTests(SkarbiecContainersFixture contain
         Assert.Null(body.Backfill);
     }
 
-    /// <summary>Reshaped response (design decision 14): a Prices-kind run's summary is exposed under
-    /// its own <c>Prices</c> slot, not a single flat "most recent of any kind" shape.</summary>
     [Fact]
     public async Task Get_AfterARun_ReturnsTheMostRecentOne()
     {
@@ -77,9 +73,7 @@ public sealed class GetSyncStatusEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(2, body.Prices!.NoDataCount);
     }
 
-    /// <summary>spec-04 AC18: the reshaped SyncStatusResponse (design decision 14) carries the latest
-    /// run per SyncRunKind separately — a later Fx run must not shadow an earlier Prices run in the
-    /// response.</summary>
+    // A later Fx run must not shadow an earlier Prices run.
     [Fact]
     public async Task Get_AfterPricesAndFxRuns_ReturnsLatestRunPerKind()
     {

@@ -3,12 +3,7 @@ using Skarbiec.MarketData.Sources;
 
 namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
-/// <summary>
-/// <see cref="IPriceSource"/> whose <see cref="FetchLatestAsync"/> blocks on an externally-controlled
-/// <paramref name="gate"/> until the test releases it — widens a <see cref="PriceSyncJob"/> run's
-/// execution window on demand instead of racing against incidental timing, e.g. to deterministically
-/// prove a second manual trigger sees the first run still in flight (T2.14's double-click AC).
-/// </summary>
+// Blocks the fetch until the test releases the gate, so a second trigger deterministically sees the first run in flight.
 public sealed class GatedPriceSource(
     PriceSource source, TaskCompletionSource gate, PriceFetchResult<InstrumentQuote> result) : IPriceSource
 {

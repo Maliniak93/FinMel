@@ -2,14 +2,7 @@ using Quartz;
 
 namespace Skarbiec.MarketData.Sources;
 
-/// <summary>
-/// <see cref="IHistoryBackfillTrigger"/> over Quartz: builds a fresh, non-durable
-/// <see cref="HistoryBackfillJob"/> + one-shot trigger pair per call (T2.7 scope: "enqueue a one-off
-/// Quartz job") and hands it to the scheduler. Non-durable means Quartz removes both job and trigger
-/// on its own once the single fire completes — no cleanup needed here. <see cref="EnqueueAsync"/>
-/// itself never touches <see cref="IPriceSource"/>/<see cref="IFxRateSource"/> — scheduling a trigger
-/// is all that happens on this call stack, so it returns before any external API call happens.
-/// </summary>
+// A non-durable job and a one-shot trigger: Quartz removes both once the fire completes.
 public sealed class QuartzHistoryBackfillTrigger(ISchedulerFactory schedulerFactory) : IHistoryBackfillTrigger
 {
     public async Task EnqueueAsync(Guid instrumentId, CancellationToken cancellationToken)

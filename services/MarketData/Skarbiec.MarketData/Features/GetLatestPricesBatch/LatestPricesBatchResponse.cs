@@ -1,11 +1,6 @@
 namespace Skarbiec.MarketData.Features.GetLatestPricesBatch;
 
-/// <summary>
-/// Latest quote at or before <c>AsOfDate</c> for one instrument (the "no quote today → last
-/// known" rule, 03-domain-model.md §valuation — Reporting compares <see cref="Date"/> against the
-/// snapshot date itself to decide staleness). An instrument absent from the response has no quote
-/// at all on or before <c>AsOfDate</c>.
-/// </summary>
+/// <summary>Latest quote on or before AsOfDate; an instrument absent from the response has none.</summary>
 public sealed record InstrumentQuoteResult
 {
     public required Guid InstrumentId { get; init; }

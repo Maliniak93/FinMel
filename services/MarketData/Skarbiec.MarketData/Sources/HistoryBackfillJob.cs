@@ -5,20 +5,7 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
 
-/// <summary>
-/// One-off backfill for a single instrument's price history (E4 [M]: min. 1 year back where the
-/// source allows). Enqueued by <see cref="IHistoryBackfillTrigger"/> when an instrument is created
-/// (T2.8) or enters use (spec-04); external APIs are still called only from a Quartz job (ADR-007),
-/// same as <see cref="PriceSyncJob"/> — this is its one-off, per-instrument counterpart. Chunking a
-/// long range is each <see cref="IPriceSource"/> implementation's own concern (T2.3-T2.5), not this
-/// job's. A currency's FX history is <see cref="FxSyncJob"/>'s job, not a per-instrument side effect
-/// (spec-04 design decision 6).
-/// </summary>
-/// <remarks>
-/// Writes one <see cref="SyncRun"/> (<see cref="SyncRunKind.Backfill"/>) per run so all three jobs
-/// share one run log, but publishes nothing: one instrument's history gives Reporting nothing new to
-/// recompute (spec-04 design decision 7).
-/// </remarks>
+// Writes a SyncRun but publishes nothing: one instrument's history gives Reporting nothing new to recompute.
 [DisallowConcurrentExecution]
 public sealed class HistoryBackfillJob(
     MarketDataDbContext db,
@@ -28,10 +15,9 @@ public sealed class HistoryBackfillJob(
 {
     public const string InstrumentIdDataKey = "instrumentId";
 
-    /// <summary>Registered with OpenTelemetry tracing in Program.cs, same as <see cref="PriceSyncJob.ActivitySourceName"/>.</summary>
     public const string ActivitySourceName = "Skarbiec.MarketData.HistoryBackfillJob";
 
-    private const int BackfillDays = 365; // E4 [M]: "min. 1 year back"
+    private const int BackfillDays = 365;
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
@@ -41,8 +27,7 @@ public sealed class HistoryBackfillJob(
         await RunAsync(instrumentId, cancellationToken);
     }
 
-    /// <summary>Quartz-independent entry point — lets tests drive a run directly instead of faking
-    /// <see cref="IJobExecutionContext"/>, matching <see cref="PriceSyncJob.RunAsync"/>'s pattern.</summary>
+    // Quartz-independent entry point, so tests drive a run without faking IJobExecutionContext.
     public async Task RunAsync(Guid instrumentId, CancellationToken cancellationToken)
     {
         using var activity = ActivitySource.StartActivity("HistoryBackfillJob.Run");
@@ -82,8 +67,7 @@ public sealed class HistoryBackfillJob(
 
         var (outcome, quoteCount) = await BackfillInstrumentAsync(source, instrument, from, to, cancellationToken);
 
-        // Only a custom instrument (Features/AddCustomInstrument, T2.8) is ever Unverified going in —
-        // this is the one-off check that resolves it, based on its own ticker's fetch outcome alone.
+        // Only a custom instrument is ever Unverified here; this run resolves it from its own fetch outcome.
         if (instrument.VerificationStatus == InstrumentVerificationStatus.Unverified)
         {
             var verified = outcome == PriceFetchOutcome.Success && quoteCount > 0;

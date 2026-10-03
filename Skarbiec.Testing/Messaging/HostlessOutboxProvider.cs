@@ -6,14 +6,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Testing.Messaging;
 
-/// <summary>
-/// Builds a bare <see cref="ServiceProvider"/> wired with MassTransit's EF outbox (T0.10, ADR-012)
-/// against <typeparamref name="TDbContext"/>, without ever starting its <see cref="IHostedService"/>s
-/// (the bus, the outbox delivery poller) unless the caller does so explicitly. Used by every
-/// service's "outbox row commits atomically with the business row" test and the durability test
-/// proving survival across a process "restart" (T0.11) — a real hosted bus would race its own
-/// delivery poller against the assertion, delivering/removing the row before the test can see it.
-/// </summary>
+// Never starts the bus or the delivery poller unless asked, so an outbox row stays readable for the assertion.
 public static class HostlessOutboxProvider
 {
     public static ServiceProvider Build<TDbContext>(

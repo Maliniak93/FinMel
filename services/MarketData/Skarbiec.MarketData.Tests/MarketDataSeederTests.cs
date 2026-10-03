@@ -7,12 +7,6 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// Starter dictionary + currency catalog seed (spec-04 AC1-2, T2.1's original AC: "seed idempotent,
-/// re-running doesn't duplicate"). Since design decision 2 deletes the seeder's four bootstrap FX
-/// rows outright, the seeder now writes no <see cref="FxRate"/> row at all — <see cref="Sources.FxSyncJob"/>'s
-/// own 12-month backfill (spec-04 AC4) is what gives a fresh catalog its first history.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class MarketDataSeederTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -27,8 +21,7 @@ public sealed class MarketDataSeederTests(SkarbiecContainersFixture containers) 
         var codes = await context.Currencies.Select(c => c.Code).ToListAsync(cancellationToken);
 
         Assert.All(SupportedCurrencies.All, code => Assert.Contains(code, codes));
-        // The catalog is deliberately wider than the user-facing SupportedCurrencies set (design
-        // decision 1) — GBP/CHF back FxSyncJob's coverage even though no user can pick them.
+        // The catalog is wider than the user-facing SupportedCurrencies set.
         Assert.Contains("GBP", codes);
         Assert.Contains("CHF", codes);
     }

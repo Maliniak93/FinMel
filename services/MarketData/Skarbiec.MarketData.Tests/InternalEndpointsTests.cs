@@ -10,12 +10,7 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// The service-only endpoints left the public <c>/api/marketdata</c> space for <c>/internal</c>
-/// (ADR-027): the old public routes are gone, and nothing under <c>/internal</c> leaks into the
-/// OpenAPI document the SPA's client is generated from. Every fact calls MarketData directly and
-/// asserts on the raw response.
-/// </summary>
+// Every fact calls MarketData directly and asserts on the raw response.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -58,8 +53,7 @@ public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers)
         using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
         var paths = document.RootElement.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
 
-        // Guards against a vacuous pass on an empty document: the public endpoints are still there,
-        // including the instrument lookup the SPA's generated client reads.
+        // Guards against a vacuous pass on an empty document.
         Assert.Contains(SearchInstrumentsBaseUri, paths);
         Assert.Multiple(
             () => Assert.Contains("/api/marketdata/instruments/{id}", paths),
