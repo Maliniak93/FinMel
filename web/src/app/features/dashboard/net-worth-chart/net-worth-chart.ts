@@ -50,9 +50,6 @@ export class NetWorthChart {
     },
   });
 
-  // The backend only returns dates with an actual snapshot (NetWorthHistoryResponse doc comment)
-  // — connecting them with straight polyline segments is the "visual interpolation across gaps"
-  // E5's AC asks for, no client-side padding of missing calendar days required.
   protected readonly points = computed<ChartPoint[]>(() => {
     const rawPoints = this.historyResource.value()?.points ?? [];
     if (rawPoints.length === 0) {
@@ -67,8 +64,7 @@ export class NetWorthChart {
     const maxValue = Math.max(...values);
     const dateSpan = maxDate - minDate || 1;
 
-    // Padding zooms the y-axis into the actual value range instead of anchoring at 0 — a wealth
-    // chart is read for its fluctuations, which a zero-anchored axis would flatten into a sliver.
+    // Zoomed into the value range rather than anchored at 0, which would flatten the fluctuations.
     const valueSpan = maxValue - minValue;
     const padding = valueSpan > 0 ? valueSpan * 0.1 : Math.abs(maxValue || 1) * 0.1;
     const paddedMin = minValue - padding;

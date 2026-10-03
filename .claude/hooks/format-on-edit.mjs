@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// PostToolUse(Edit|Write) hook: keeps web/ source files formatted without spending a model turn on
-// it. Runs `prettier --write` on the just-touched file when it's a web/ source file prettier owns.
-//
-// This hook never makes a permission decision (PostToolUse can't deny a tool call that already ran)
-// — it is a pure side effect. It always exits 0 and never writes to stdout; a prettier failure (a
-// syntax error mid-edit, a missing binary, ...) is reported as one short stderr line and otherwise
-// ignored, so a formatting hiccup never blocks the agent.
-//
-// Fast path: every non-matching file (not under web/, under an excluded subtree, or an extension
-// prettier doesn't touch here) returns before any process is spawned.
 
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -20,8 +10,6 @@ const REPO_ROOT =
 const WEB_DIR = path.join(REPO_ROOT, "web");
 const NPX = process.platform === "win32" ? "npx.cmd" : "npx";
 
-// Generated (hey-api) and build/dependency output — never hand-formatted, and reformatting them
-// would fight the generator or waste time on files that get wiped on the next build anyway.
 const EXCLUDED_PREFIXES = ["node_modules/", "dist/", "src/app/api/"];
 const EXCLUDED_EXACT = new Set(["node_modules", "dist", "src/app/api"]);
 
@@ -46,7 +34,7 @@ function main() {
 
   const absPath = path.resolve(REPO_ROOT, filePath);
   const webRel = path.relative(WEB_DIR, absPath);
-  if (webRel.startsWith("..") || path.isAbsolute(webRel)) return; // not under web/
+  if (webRel.startsWith("..") || path.isAbsolute(webRel)) return;
 
   const webRelPosix = webRel.split(path.sep).join("/");
   if (isExcluded(webRelPosix)) return;

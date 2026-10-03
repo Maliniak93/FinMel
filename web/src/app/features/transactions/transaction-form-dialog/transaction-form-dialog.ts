@@ -31,7 +31,6 @@ import {
 export interface TransactionFormDialogData {
   portfolioId: string;
   assetId: string;
-  // The asset's class decides which transaction types are offered (cash-transaction-types).
   assetClass: AssetClass;
   transaction?: TransactionResponse;
 }
@@ -62,8 +61,6 @@ export class TransactionFormDialog {
   protected readonly formError = signal<string | null>(null);
   protected readonly transactionTypes = allowedTransactionTypes(this.data.assetClass);
 
-  // Create starts on the first type the class accepts — Deposit for Cash/Deposit, Buy otherwise;
-  // edit keeps the stored type.
   protected readonly form = this.formBuilder.nonNullable.group({
     type: [this.data.transaction?.type ?? this.transactionTypes[0].value, [Validators.required]],
     quantity: [Number(this.data.transaction?.quantity ?? 0), [Validators.min(0)]],
@@ -74,9 +71,6 @@ export class TransactionFormDialog {
     ],
   });
 
-  // Signal mirror of the type control so the template can reactively show/hide the unit-price field
-  // (signals-first per angular.md, rather than reading form.controls.type.value directly in the
-  // template).
   private readonly selectedType = toSignal(this.form.controls.type.valueChanges, {
     initialValue: this.form.controls.type.value,
   });
@@ -100,8 +94,6 @@ export class TransactionFormDialog {
     const body = {
       type: values.type,
       quantity: values.quantity,
-      // Unit price is hidden (and meaningless) for non-trade types — 1 keeps `quantity × unitPrice`
-      // a single value formula end to end (transaction-type.ts).
       unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
       date: toDateOnly(values.date),
     };

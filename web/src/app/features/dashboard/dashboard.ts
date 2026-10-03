@@ -13,19 +13,18 @@ import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart
 import { assetClassLabel } from '../assets/asset-class';
 import { NetWorthChart } from './net-worth-chart/net-worth-chart';
 
-// Colors keyed 1:1 to AssetClass's declaration order (asset-class.ts) so a given class keeps the
-// same color across reloads instead of shifting with whichever classes happen to be present.
+// Indexed by AssetClass, so a class keeps its colour whichever classes are present.
 const ASSET_CLASS_COLORS: readonly string[] = [
-  '#4C6EF5', // Cash
-  '#22B8CF', // Deposit
-  '#12B886', // Stock
-  '#82C91E', // Etf
-  '#FAB005', // Bond
-  '#FA5252', // Crypto
-  '#F76707', // PreciousMetal
-  '#7048E8', // RealEstate
-  '#868E96', // Other
-  '#E64980', // Savings
+  '#4C6EF5',
+  '#22B8CF',
+  '#12B886',
+  '#82C91E',
+  '#FAB005',
+  '#FA5252',
+  '#F76707',
+  '#7048E8',
+  '#868E96',
+  '#E64980',
 ];
 
 @Component({

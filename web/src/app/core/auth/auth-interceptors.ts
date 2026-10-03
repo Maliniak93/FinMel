@@ -1,9 +1,5 @@
 import type { AuthService } from './auth';
 
-// The generated SDKs (T1.7) are @hey-api/client-fetch clients — plain `fetch` under the hood, not
-// Angular's HttpClient — so token attachment and 401-refresh-retry hook into *their* interceptor
-// API instead of an Angular HttpInterceptorFn. Typed narrowly to what's actually used, so the same
-// function wires up every service's client (all generated from the same template).
 interface ResolvedRequestOptions {
   url: string;
   method?: string;
@@ -31,9 +27,7 @@ interface InterceptableClient {
   };
 }
 
-// A 401 from these three is a credentials/session verdict the caller needs to see directly
-// (wrong password, expired/reused refresh token) — refreshing-and-retrying it would either loop
-// or mask the real error.
+// A 401 from these is a credentials verdict for the caller; refreshing and retrying would loop or mask it.
 const REFRESH_EXEMPT_URLS = new Set([
   '/api/identity/login',
   '/api/identity/register',
@@ -67,8 +61,7 @@ export function configureAuthInterceptors(
       const retryHeaders = new Headers(options.headers);
       retryHeaders.set('Authorization', `Bearer ${authService.accessToken()}`);
 
-      // request.url/method are always readable, but its body stream is already disturbed by the
-      // first fetch — rebuild the body from `options.serializedBody`, captured before that fetch.
+      // The first fetch consumed the body stream, so the retry rebuilds the body from serializedBody.
       const retryRequest = new Request(request.url, {
         method: options.method ?? request.method,
         headers: retryHeaders,

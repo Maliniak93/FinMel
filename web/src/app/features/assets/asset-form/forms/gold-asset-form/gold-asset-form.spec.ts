@@ -19,8 +19,6 @@ import {
 } from '../../testing/asset-form-fixtures';
 import { GoldAssetForm } from './gold-asset-form';
 
-// AC-7: the PreciousMetal form — the instrument picker without the custom-ticker panel (NBP has no
-// arbitrary-ticker lookup, ADR-018/M1.6) plus the old dialog's XAU hint in its place.
 describe('GoldAssetForm', () => {
   let fixture: ComponentFixture<GoldAssetForm>;
   let component: GoldAssetForm;
@@ -32,13 +30,12 @@ describe('GoldAssetForm', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
   async function setup(): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch');
-    fixture = await mountAssetForm(GoldAssetForm, 6); // PreciousMetal
+    fixture = await mountAssetForm(GoldAssetForm, 6);
     component = fixture.componentInstance;
   }
 
@@ -71,8 +68,6 @@ describe('GoldAssetForm', () => {
       initialTransaction: null,
     });
   });
-  // i18n screens (#132) AC-4: field labels, the instrument search placeholder, the hints, the
-  // first-transaction toggle and the client-side validation messages follow the language.
   describe('in Polish', () => {
     it('renders in Polish', async () => {
       await setup();

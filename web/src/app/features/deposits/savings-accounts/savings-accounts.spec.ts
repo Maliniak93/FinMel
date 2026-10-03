@@ -35,8 +35,6 @@ import {
 } from '../testing/savings-account-fixtures';
 import { SavingsAccounts } from './savings-accounts';
 
-// savings-accounts AC-11 / AC-12. The "Savings accounts" tab of the Deposits & savings page lists
-// every savings account of the user across portfolios from GET /api/portfolio/savings-accounts.
 describe('SavingsAccounts', () => {
   let fixture: ComponentFixture<SavingsAccounts>;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
@@ -55,7 +53,6 @@ describe('SavingsAccounts', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -65,7 +62,6 @@ describe('SavingsAccounts', () => {
       if (request.method === 'DELETE') {
         return new Response(null, { status: 204 });
       }
-      // asset-archive: the archive / restore endpoints answer 200 with the asset.
       if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
         return jsonResponse({});
       }
@@ -118,7 +114,6 @@ describe('SavingsAccounts', () => {
       .filter((request: Request) => request.method !== 'GET');
   }
 
-  // Opens a row's actions menu and returns the labels of the items it offers, icons left out.
   async function menuItemLabels(row: HTMLElement): Promise<string[]> {
     const trigger = row.querySelector<HTMLButtonElement>('button[aria-label^="Actions for"]');
     if (!trigger) {
@@ -142,7 +137,6 @@ describe('SavingsAccounts', () => {
       const text = rowFor(account.name).textContent ?? '';
       expect(text).toContain(account.bankName!);
       expect(text).toContain(account.portfolioName);
-      // The balance is shown in the account's own currency.
       expect(text).toContain(formatMoney(account.balance, account.currency));
     }
     expect(rowFor('Emergency fund').textContent).toMatch(/4[.,]5\s*%/);
@@ -265,9 +259,6 @@ describe('SavingsAccounts', () => {
     expect(buttons.some((text) => /add/i.test(text))).toBe(true);
   });
 
-  // asset-archive: an account can be archived on its own — "Show archived" (off by default) reveals
-  // it with an "Archived" chip, the row menu gains Archive / Restore behind a ConfirmDialog, and an
-  // archived row keeps only Restore and Delete.
   describe('archive', () => {
     it('hides archived accounts until Show archived is on', async () => {
       await setup([activeSavingsAccount, archivedSavingsAccount]);
@@ -366,12 +357,6 @@ describe('SavingsAccounts', () => {
     });
   });
 
-  // savings-interest-settlement AC-13. A Due row (`interestDue`) carries a `task_alt` icon button with
-  // the tooltip "Settle interest" — "Settle interest (n months due)" when `duePeriodCount` is above 1 —
-  // that opens the settle dialog and reloads the list after a success. A "Last interest" column shows
-  // the latest settled month and its net ("—" when none); that latest settlement has an undo icon
-  // ("Undo last settlement") behind the same ConfirmDialog as Delete. A row of an archived portfolio
-  // has neither icon.
   describe('interest settlement', () => {
     function iconButton(row: HTMLElement, pattern: RegExp): HTMLButtonElement | undefined {
       return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
@@ -384,7 +369,6 @@ describe('SavingsAccounts', () => {
     const settleButton = (row: HTMLElement) => iconButton(row, /settle interest/i);
     const undoButton = (row: HTMLElement) => iconButton(row, /undo last settlement/i);
 
-    // The tooltip's message as the MatTooltip directive on the row's button holds it.
     function tooltipMessages(row: HTMLElement): string[] {
       return fixture.debugElement
         .queryAll(By.directive(MatTooltip))
@@ -499,9 +483,6 @@ describe('SavingsAccounts', () => {
     });
   });
 
-  // savings-cash-transfers AC-8: each active savings row has a "Transfer" icon button (`swap_horiz`)
-  // that opens the SavingsTransferDialog with that account and reloads the list after a success; a row
-  // of an archived portfolio has none.
   describe('transfer', () => {
     const transferButton = (row: HTMLElement) =>
       Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(

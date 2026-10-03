@@ -35,7 +35,6 @@ describe('Shell', () => {
   });
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.clear();
     document.documentElement.lang = 'en';
@@ -61,7 +60,6 @@ describe('Shell', () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
 
-  // term-deposits: a "Deposits" nav item leads to the cross-portfolio Deposits page.
   it('offers a "Deposits & savings" nav item linking to /deposits', () => {
     const link = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
@@ -71,7 +69,6 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/deposits');
   });
 
-  // i18n foundation (#131) AC-4: the toolbar language menu switches the running app — no reload.
   it('switches the navigation to Polish without a reload', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const navLabels = () =>
@@ -80,7 +77,6 @@ describe('Shell', () => {
     const englishLabels = navLabels();
     expect(englishLabels).toEqual(['Dashboard', 'Portfolios', 'Deposits & savings', 'Settings']);
 
-    // Each language is offered under its own name, whatever the active language.
     const items = (await openLanguageMenu(fixture)).map(textOf);
     expect(items.some((item) => item.includes('English'))).toBe(true);
     expect(items.some((item) => item.includes('Polski'))).toBe(true);
@@ -96,7 +92,6 @@ describe('Shell', () => {
     });
     expect(document.documentElement.lang).toBe('pl');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('pl');
-    // Same component instance: the switch re-rendered in place.
     expect(fixture.componentInstance).toBe(component);
 
     const itemsInPolish = (await openLanguageMenu(fixture)).map(textOf);
@@ -111,7 +106,6 @@ describe('Shell', () => {
         button.getAttribute('aria-label'),
       );
     const english = ariaLabels();
-    // Toggle navigation, theme, log out (the language switch may add its own).
     expect(english.length).toBeGreaterThanOrEqual(3);
 
     await TestBed.inject(LanguageService).setLanguage('pl');

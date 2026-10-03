@@ -11,8 +11,6 @@ describe('supported currencies', () => {
     expect(SUPPORTED_CURRENCIES.some((c) => c.code === DEFAULT_CURRENCY)).toBe(true);
   });
 
-  // A label is a translation key (i18n foundation, #131); its text in every language starts with the
-  // code.
   it('labels every code and starts each label with the code the server stores', () => {
     for (const { code, label } of SUPPORTED_CURRENCIES) {
       expect(code).toMatch(/^[A-Z]{3}$/);

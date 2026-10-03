@@ -7,17 +7,8 @@ import { LANGUAGE_STORAGE_KEY, LanguageService } from '../app/core/i18n/language
 import en from '../i18n/en.json';
 import pl from '../i18n/pl.json';
 
-// Shared i18n helpers for the specs (i18n foundation, #131). Test-only: nothing in the app imports
-// this file. Kept free of Vitest globals so it also type-checks under tsconfig.app.json.
-//
-// Specs assert Polish text without pinning a translation's wording or its key: a rendered string
-// is "Polish" when it is one of the values in the real pl.json and differs from the English text
-// the same element showed before the switch.
-
 export type TestLanguage = 'en' | 'pl';
 
-// Flattens a nested translation file into dotted keys (`shell.nav.dashboard`), the same shape
-// Transloco keeps at runtime. A non-string leaf is kept as-is so a spec can flag it.
 export function flattenTranslations(tree: unknown, prefix = ''): Record<string, unknown> {
   const flat: Record<string, unknown> = {};
   if (tree === null || typeof tree !== 'object' || Array.isArray(tree)) {
@@ -45,24 +36,18 @@ export function translationValues(lang: TestLanguage): string[] {
   );
 }
 
-// The trimmed text is a whole value of that language's file.
 export function isTranslationIn(lang: TestLanguage, text: string | null | undefined): boolean {
   return translationValues(lang).includes((text ?? '').trim());
 }
 
-// A dotted, space-free token such as `shell.nav.dashboard` — what the pipe prints for a missing key.
 export function looksLikeTranslationKey(text: string | null | undefined): boolean {
   return /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$/.test((text ?? '').trim());
 }
 
-// An element's visible text with whitespace (including the non-breaking spaces Intl emits)
-// collapsed to single spaces.
 export function textOf(element: Element | null | undefined): string {
   return (element?.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
-// The items of the (only) Material menu rendered by the fixture — the language switch. Opens it
-// first; the items live in the CDK overlay container, not under the fixture's element.
 export async function openLanguageMenu(fixture: ComponentFixture<unknown>): Promise<HTMLElement[]> {
   const triggerElement = fixture.debugElement.query(By.directive(MatMenuTrigger));
   if (!triggerElement) {
@@ -79,8 +64,6 @@ export async function openLanguageMenu(fixture: ComponentFixture<unknown>): Prom
   );
 }
 
-// Picks a language the way the user does: open the menu, click the item labelled `label`
-// ("English" / "Polski"), then let the switch settle.
 export async function pickLanguageFromMenu(
   fixture: ComponentFixture<unknown>,
   label: 'English' | 'Polski',
@@ -97,8 +80,6 @@ export async function pickLanguageFromMenu(
   await fixture.whenStable();
 }
 
-// --- Polish rendering assertions for the feature screens (#132) ---------------------------------
-
 function collapse(text: string | null | undefined): string {
   return (text ?? '').replace(/\s+/g, ' ').trim();
 }
@@ -109,8 +90,6 @@ function escapeRegExp(text: string): string {
 
 const PARAMETER = /\{\{\s*[\w.]+\s*\}\}/;
 
-// The text is a whole value of that language's file, where a value with `{{ parameters }}` matches
-// any text in the parameter's place ("Stan na {{ date }}" matches "Stan na 9 sie 2026").
 export function matchesTranslation(lang: TestLanguage, text: string | null | undefined): boolean {
   const collapsed = collapse(text);
   return translationValues(lang).some((value) => {
@@ -125,22 +104,16 @@ export function matchesTranslation(lang: TestLanguage, text: string | null | und
   });
 }
 
-// Every element matching `selector` under `root`: its whitespace-collapsed text.
 export function textsOf(root: ParentNode, selector: string): string[] {
   return Array.from(root.querySelectorAll(selector), (element) => textOf(element));
 }
 
-// Every element matching `selector` under `root`: one attribute's value ('' when absent).
 export function attributesOf(root: ParentNode, selector: string, attribute: string): string[] {
   return Array.from(root.querySelectorAll(selector), (element) =>
     collapse(element.getAttribute(attribute)),
   );
 }
 
-// What is wrong with a list of texts read after switching to Polish, as messages (empty = all
-// Polish): each one must differ from the English text at the same position (unless that word is
-// spelled the same in Polish, listed in `cognates`), must not be a raw translation key, and must be
-// a value of the real pl.json.
 export function polishProblems(
   english: readonly string[],
   polish: readonly string[],
@@ -164,7 +137,6 @@ export function polishProblems(
   return problems;
 }
 
-// Switches the active language the way the language menu does and lets the view settle.
 export async function switchLanguage(
   fixture: ComponentFixture<unknown>,
   language: TestLanguage,
@@ -174,15 +146,11 @@ export async function switchLanguage(
   await fixture.whenStable();
 }
 
-// For `afterEach`: specs share one worker (isolate: false), so Polish must never leak into the next
-// file.
 export async function restoreEnglish(): Promise<void> {
   await TestBed.inject(LanguageService).setLanguage('en');
   localStorage.removeItem(LANGUAGE_STORAGE_KEY);
 }
 
-// Like `textsOf`, without the ligature text of any `<mat-icon>` inside ("add New portfolio" → "New
-// portfolio").
 export function labelsOf(root: ParentNode, selector: string): string[] {
   return Array.from(root.querySelectorAll(selector), (element) => {
     const clone = element.cloneNode(true) as Element;

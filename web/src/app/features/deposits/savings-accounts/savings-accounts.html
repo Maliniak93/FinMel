@@ -33,7 +33,6 @@
     </div>
   } @else if (accountsResource.hasValue()) {
     <table mat-table [dataSource]="visibleAccounts()" class="savings-accounts__table">
-      <!-- The name leads to the asset's transactions, where money is paid in and out. -->
       <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
         <td mat-cell *matCellDef="let account">
@@ -73,7 +72,6 @@
         </td>
       </ng-container>
 
-      <!-- The latest settled month and its net (savings-interest-settlement); only it can be undone. -->
       <ng-container matColumnDef="lastInterest">
         <th mat-header-cell *matHeaderCellDef>{{ 'savings.lastInterest' | transloco }}</th>
         <td mat-cell *matCellDef="let account">
@@ -110,10 +108,6 @@
         </td>
       </ng-container>
 
-      <!-- An account of an archived portfolio is read-only, so its row offers no action. An account
-           archived on its own (asset-archive) keeps Restore and Delete only. A Due account that is
-           writable also offers "Settle interest" (savings-interest-settlement), and every writable one
-           "Transfer" (savings-cash-transfers). -->
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let account">

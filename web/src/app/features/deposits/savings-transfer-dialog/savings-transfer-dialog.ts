@@ -36,7 +36,6 @@ export interface SavingsTransferDialogData {
   account: SavingsAccountResponse;
 }
 
-/** 'in' moves money from Cash into the account, 'out' from the account to Cash. */
 export type SavingsTransferDirection = 'in' | 'out';
 
 function today(): Date {
@@ -44,10 +43,6 @@ function today(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-// Moves money between a Cash asset and a savings account as one transfer (savings-cash-transfers):
-// "Into this account" takes it from the chosen Cash, "Out to cash" sends it there. The amount is capped
-// by the source's balance — the Cash going in, the account going out; the server re-checks it against
-// the source's whole history and answers InsufficientFunds, which lands on the amount field.
 @Component({
   selector: 'app-savings-transfer-dialog',
   imports: [
@@ -76,8 +71,6 @@ export class SavingsTransferDialog {
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
-  // Reads its siblings `direction` and `cashAssetId`, so it is re-run whenever either, or the
-  // candidates' balances, change.
   private readonly amountWithinBalance = (control: AbstractControl): ValidationErrors | null => {
     if (control.value === null || control.value === '') {
       return null;
@@ -126,7 +119,7 @@ export class SavingsTransferDialog {
   });
 
   constructor() {
-    // The cap had no parent to read its siblings from while the group was being built.
+    // The cap validators had no parent to read their siblings from while the group was being built.
     this.form.controls.amount.updateValueAndValidity({ emitEvent: false });
     this.form.controls.direction.valueChanges
       .pipe(takeUntilDestroyed())
@@ -135,7 +128,6 @@ export class SavingsTransferDialog {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.amount.updateValueAndValidity());
 
-    // The Cash balances just loaded cap the amount going in.
     effect(() => {
       if (this.cashCandidatesResource.hasValue()) {
         untracked(() => this.form.controls.amount.updateValueAndValidity());
@@ -182,8 +174,6 @@ export class SavingsTransferDialog {
     this.dialogRef.close(false);
   }
 
-  // The balance the amount can't exceed: the selected Cash going in, the account going out;
-  // undefined while unknown (no Cash selected yet, or the candidates still loading).
   private sourceBalance(
     direction: SavingsTransferDirection | undefined,
     cashAssetId: string | null | undefined,
@@ -205,7 +195,6 @@ export class SavingsTransferDialog {
   }
 
   private applyServerErrors(problem: ApiProblemDetails): void {
-    // The source can't cover the amount on that date — an amount error.
     if (problem.errorCode === 'Validation.InsufficientFunds') {
       this.form.controls.amount.setErrors({
         server: problem.detail ?? translate('savings.transfer.insufficientFunds'),

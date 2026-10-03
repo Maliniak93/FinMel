@@ -4,12 +4,6 @@ import { Router, provideRouter } from '@angular/router';
 import { client as identityClient } from '../../api/identity/client.gen';
 import { AuthService } from './auth';
 
-// The Angular unit-test system blocks `vi.mock` for relative imports ("use TestBed for mocking
-// dependencies" instead) — AuthService itself isn't a DI *consumer* of the generated SDK though,
-// it calls its plain functions directly, so there's nothing to substitute via TestBed providers.
-// Stubbing the underlying `fetch` (what the hey-api client ultimately calls) sidesteps both
-// problems: no relative-import mock, and it verifies the single-flight behavior at the network
-// boundary instead of trusting a mock to have been wired up correctly.
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -26,10 +20,6 @@ describe('AuthService', () => {
   let router: Router;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
-  // Unlike the real app (configureApiClients() sets this from the Gateway URL at bootstrap),
-  // nothing gives the identity client a baseUrl in a unit test — without one, the relative
-  // `/api/identity/...` path fails Node's (non-browser) `Request` constructor, which — unlike a
-  // browser's — has no document location to resolve a relative URL against.
   beforeAll(() => {
     identityClient.setConfig({ baseUrl: 'https://example.test' });
   });
@@ -99,8 +89,6 @@ describe('AuthService', () => {
   });
 
   it('coalesces concurrent refreshes into a single request (single-flight)', async () => {
-    // beforeRequest()/request() are themselves async, so `fetch` isn't invoked synchronously —
-    // wait for the actual call (however many microtask hops that takes) before resolving it.
     let resolveFetch!: (response: Response) => void;
     const fetchCalled = new Promise<void>((resolveCalled) => {
       fetchSpy.mockImplementation(() => {

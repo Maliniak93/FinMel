@@ -39,7 +39,6 @@
   width: 100%;
 }
 
-// Pushes the toggle next to the New asset button, away from the heading.
 .assets-page__show-archived {
   margin-left: auto;
   align-self: center;
@@ -50,14 +49,12 @@
   opacity: 0.7;
 }
 
-// The name cell's inline chips: "Due" on a matured deposit, "Archived" on an archived asset.
 .assets-page__due {
   display: inline-flex;
   margin-left: 8px;
   vertical-align: middle;
 }
 
-// "Due" in warning colour: the term deposit has matured.
 .assets-page__chip--due {
   --mat-chip-elevated-container-color: var(--mat-sys-error-container);
   --mat-chip-label-text-color: var(--mat-sys-on-error-container);

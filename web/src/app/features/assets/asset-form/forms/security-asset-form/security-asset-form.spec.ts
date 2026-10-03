@@ -20,9 +20,6 @@ import {
 } from '../../testing/asset-form-fixtures';
 import { SecurityAssetForm } from './security-asset-form';
 
-// AC-5: the market-instrument (Stock/Etf/Bond/Crypto) form — basics, the instrument picker with the
-// ADR-018 custom-ticker panel, and the first transaction. Expected bodies moved unchanged from the
-// old dialog's market cases.
 describe('SecurityAssetForm', () => {
   let fixture: ComponentFixture<SecurityAssetForm>;
   let component: SecurityAssetForm;
@@ -34,7 +31,6 @@ describe('SecurityAssetForm', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -45,7 +41,7 @@ describe('SecurityAssetForm', () => {
   }
 
   it('refuses to submit without a verified/selected instrument', async () => {
-    await setup(3); // Etf
+    await setup(3);
 
     findControl(component.form, 'name').setValue('World ETF');
 
@@ -53,14 +49,11 @@ describe('SecurityAssetForm', () => {
   });
 
   it('creates a market asset from an autocomplete selection, without copying the quote currency', async () => {
-    await setup(3); // Etf
+    await setup(3);
 
     await pickInstrument(fixture, etfSearchResult);
 
-    // Currency stays the user's own PLN/EUR/USD choice — the instrument's EUR quote currency is never
-    // copied in (ValueMarketAsset resolves FX off the instrument, not Asset.Currency).
     expect(findControl(component.form, 'currency').value).toBe('PLN');
-    // An empty name is filled from the instrument.
     expect(findControl(component.form, 'name').value).toBe('Vanguard FTSE All-World');
     expect(component.form.valid).toBe(true);
     expect(component.toBody()).toEqual({
@@ -82,26 +75,23 @@ describe('SecurityAssetForm', () => {
   });
 
   it('offers the custom-ticker link', async () => {
-    await setup(2); // Stock
+    await setup(2);
 
     expect(renderedText(fixture)).toContain('Verify a new ticker');
   });
 
   it('checked first transaction → defaults to Buy with unit price 0', async () => {
-    await setup(2); // Stock
+    await setup(2);
 
     await toggleFirstTransaction(fixture);
 
-    expect(findControl(component.form, 'type').value).toBe(0); // Buy
+    expect(findControl(component.form, 'type').value).toBe(0);
     expect(findControl(component.form, 'unitPrice').value).toBe(0);
     expect(renderedText(fixture)).toContain('Unit price');
   });
-  // i18n screens (#132) AC-4: field labels, the instrument search placeholder and hint, the
-  // custom-ticker link and panel, the first-transaction fields and their client-side validation
-  // messages follow the language.
   describe('in Polish', () => {
     it('renders in Polish', async () => {
-      await setup(2); // Stock
+      await setup(2);
       const element = fixture.nativeElement as HTMLElement;
       const texts = () => [
         ...labelsOf(element, 'mat-label'),

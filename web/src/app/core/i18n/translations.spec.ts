@@ -1,8 +1,5 @@
 import { TRANSLATIONS } from '../../../testing/i18n';
 
-// i18n foundation (#131) AC-12: en.json and pl.json stay in lockstep — the same keys, every value a
-// non-empty string — so switching language can never surface a raw key.
-
 function placeholders(value: string): string[] {
   return Array.from(value.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g), (match) => match[1]).sort();
 }

@@ -1,28 +1,7 @@
 #!/usr/bin/env node
-// Live status of the plan: every open spec issue on the FinMel GitHub project (read through
-// `scripts/gh-project.mjs list`) against what git and GitHub actually say. Derived, never
-// hand-written — the README's status table drifted three ways within two weeks of being written,
-// because nothing recomputed it.
-//
 // Usage: node scripts/plan-status.mjs [--write] [--no-gh]
-//
-//   (no flags)   print the status block to stdout. This is what the SessionStart hook injects, so
-//                every session starts from live facts even when the committed README lags.
-//   --write      also replace the block between the `status:start` / `status:end` markers in
-//                skarbiec-plan/README.md. Everything outside those markers is hand-written and is
-//                never touched — "Open loops" is judgement, not data.
-//   --no-gh      skip the GitHub queries (spec issues, open PRs) and report git alone. Implied when
-//                `gh` is missing or unauthenticated.
-//
-// Never mutates the repository: only `git` plumbing reads, one `gh-project.mjs list` and one
-// `gh pr list`. Exit code 0 in every
-// normal case including a missing `gh` — a status report that fails a session start would be worse
-// than a slightly thinner one. Exit 2 only when `--write` cannot find its markers, which is a real
-// misconfiguration the user must fix.
-//
-// Node >= 22, ESM, zero npm dependencies. Resolves the repo root from this file's own location and
-// gives every child process an explicit cwd, so it runs from anywhere (hooks run from wherever the
-// session happens to be). `gh` gets a short timeout: a session start must not wait on the network.
+//   --write  also replace the status:start/status:end block in skarbiec-plan/README.md
+//   --no-gh  skip the GitHub queries and report git alone
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -35,12 +14,8 @@ const README = path.join(REPO_ROOT, "skarbiec-plan", "README.md");
 const START = "<!-- status:start -->";
 const END = "<!-- status:end -->";
 const GH_TIMEOUT_MS = 8000;
-const PROJECT_TIMEOUT_MS = 20000; // item-list plus one sub-issue call per epic
+const PROJECT_TIMEOUT_MS = 20000;
 const TRUNK = "master";
-
-// ---------------------------------------------------------------------------------------------
-// shell
-// ---------------------------------------------------------------------------------------------
 
 function run(bin, argv, timeout = 15000) {
   const res = spawnSync(bin, argv, {
@@ -57,11 +32,6 @@ function run(bin, argv, timeout = 15000) {
 const git = (...argv) => run("git", argv);
 const lines = (text) => (text ? text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : []);
 
-// ---------------------------------------------------------------------------------------------
-// specs
-// ---------------------------------------------------------------------------------------------
-
-// Every issue on the project, or null when GitHub is skipped or unreachable.
 function readSpecs(enabled) {
   if (!enabled) return null;
   const raw = run(process.execPath, [GH_PROJECT, "list"], PROJECT_TIMEOUT_MS);
@@ -72,10 +42,6 @@ function readSpecs(enabled) {
     return null;
   }
 }
-
-// ---------------------------------------------------------------------------------------------
-// git / gh facts
-// ---------------------------------------------------------------------------------------------
 
 function repoFacts() {
   const head = git("rev-parse", "--abbrev-ref", "HEAD");
@@ -92,8 +58,6 @@ function repoFacts() {
   return { head, dirty, localBranches, remoteBranches, mergedLocal, behindTrunk };
 }
 
-// Recent PRs of every state: the open ones for the report, the merged ones to catch a card whose PR
-// merged without closing its issue (branch not linked to the issue).
 function pullRequests(enabled) {
   if (!enabled) return null;
   const raw = run(
@@ -109,8 +73,6 @@ function pullRequests(enabled) {
   }
 }
 
-// What `/build` can take now: the first open sub-issue of each epic (the rest wait for it), then
-// standalone specs, Tier 1 before Tier 2. Epics themselves are never buildable.
 function nextUp(specs) {
   const byNumber = new Map(specs.map((s) => [s.number, s]));
   const inEpic = new Set(specs.flatMap((s) => (s.epic ? s.subIssues || [] : [])));
@@ -125,7 +87,6 @@ function nextUp(specs) {
   return [...ready, ...standalone];
 }
 
-// Cards whose state disagrees with git or GitHub.
 function mismatches(specs, facts, prs) {
   const merged = new Set((prs || []).filter((p) => p.state === "MERGED").map((p) => p.headRefName));
   const out = [];
@@ -142,7 +103,7 @@ function mismatches(specs, facts, prs) {
   return out;
 }
 
-// Where a spec's branch actually stands, in one phrase. Order matters: the most decisive fact wins.
+// The most decisive fact wins, so the order matters.
 function branchState(spec, facts, prs) {
   if (spec.epic) return `epic of ${(spec.subIssues || []).map((n) => `#${n}`).join(", ") || "no sub-issues yet"}`;
   if (!spec.branch) return "no Branch field on the card";
@@ -160,8 +121,6 @@ function branchState(spec, facts, prs) {
   return `${ahead} commit(s) ${local && remote ? "pushed" : local ? "local only" : "on origin only"}, no open PR`;
 }
 
-// Lane branches, local or on origin, that belong to no spec and no open PR — the ones that quietly
-// rot after their PR is merged. Spec branches are already covered by the table above.
 function strayBranches(facts, prs, specs) {
   const owned = new Set((specs || []).map((s) => s.branch).filter(Boolean));
   const withPr = new Set((prs || []).map((p) => p.headRefName));
@@ -177,10 +136,6 @@ function strayBranches(facts, prs, specs) {
       return `\`${b}\` (${ahead === 0 ? "merged" : `${ahead} commit(s) ahead`}${where})`;
     });
 }
-
-// ---------------------------------------------------------------------------------------------
-// render
-// ---------------------------------------------------------------------------------------------
 
 function render(specs, facts, allPrs) {
   const prs = allPrs && allPrs.filter((p) => p.state === "OPEN");
@@ -234,10 +189,6 @@ function render(specs, facts, allPrs) {
 
   return out.join("\n");
 }
-
-// ---------------------------------------------------------------------------------------------
-// main
-// ---------------------------------------------------------------------------------------------
 
 const argv = process.argv.slice(2);
 const wantWrite = argv.includes("--write");

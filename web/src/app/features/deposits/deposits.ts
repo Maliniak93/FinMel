@@ -41,13 +41,6 @@ import {
   type SettleDepositDialogData,
 } from './settle-deposit-dialog/settle-deposit-dialog';
 
-// The Deposits & savings page. Its "Term deposits" tab lists every term deposit of the user across
-// portfolios, with the server's projection and Active / Due / Settled / Paid out status
-// (term-deposits, term-deposits-settlement, deposit-payout-to-cash, deposit-rollover); its "Savings
-// accounts" tab is the SavingsAccounts component (savings-accounts).
-// MatDialog/MatSnackBar are injected as
-// services only — see assets.ts for why MatDialogModule/MatSnackBarModule are deliberately not in
-// `imports`.
 @Component({
   selector: 'app-deposits',
   imports: [
@@ -96,8 +89,6 @@ export class Deposits {
     },
   });
 
-  // asset-archive: a deposit archived on its own is hidden until "Show archived" is on — filtered here,
-  // since the list endpoint returns every deposit with its flag.
   protected readonly showArchived = signal(false);
 
   protected readonly visibleDeposits = computed(() =>
@@ -129,17 +120,14 @@ export class Deposits {
     return Number(deposit.status) === DEPOSIT_STATUS.PaidOut;
   }
 
-  // deposit-rollover: a Due or a Settled (not paid-out) deposit can start its next term.
   protected canRollOver(deposit: DepositResponse): boolean {
     return this.isDue(deposit) || this.isSettled(deposit);
   }
 
-  // Settled or paid out: the terms are immutable and the row shows what the bank actually paid.
   protected hasSettlement(deposit: DepositResponse): boolean {
     return this.isSettled(deposit) || this.isPaidOut(deposit);
   }
 
-  // A Settled or PaidOut row shows what the bank actually paid; any other row the server's projection.
   protected netInterest(deposit: DepositResponse): number | string {
     return this.hasSettlement(deposit)
       ? this.settledAmounts(deposit).netInterest
@@ -160,8 +148,6 @@ export class Deposits {
     this.openDialog({ deposit });
   }
 
-  // A deposit is an asset: deleting it goes through the ordinary asset delete, which also removes its
-  // terms and its opening transaction.
   protected async remove(deposit: DepositResponse): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
@@ -194,7 +180,6 @@ export class Deposits {
     this.depositsResource.reload();
   }
 
-  // asset-archive: Archive / Restore sit in the row menu, behind a confirmation, and reload the list.
   protected async setArchived(deposit: DepositResponse, archive: boolean): Promise<void> {
     const done = await confirmSetAssetArchived(
       this.dialog,

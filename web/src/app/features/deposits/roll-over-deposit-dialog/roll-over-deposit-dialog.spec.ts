@@ -28,15 +28,6 @@ import { RollOverDepositDialog } from './roll-over-deposit-dialog';
 import { labelsOf, polishProblems, restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 
-// deposit-rollover AC-8. The "Roll over" dialog opens on a Due or a Settled (not paid-out) deposit
-// and starts its next term on the same asset: the term, capitalisation and the new start date (= the
-// old maturity date) are shown read-only, and only the rate (control `annualInterestRatePercent`) is
-// editable, pre-filled with the current one. In Due mode it also settles: gross interest and tax
-// (controls `grossInterest` / `tax`) are pre-filled from the settlement preview and editable, and the
-// new principal is principal + net. In Settled mode there are no settlement fields and the new
-// principal is principal + the settled net. Control names follow the RollOverDepositRequest
-// properties so a server 400 keyed on a field lands on it. The submit under test is called on the
-// dialog itself and asserted on the raw request the generated client hands to `fetch`.
 describe('RollOverDepositDialog', () => {
   let fixture: ComponentFixture<RollOverDepositDialog>;
   let component: RollOverDepositDialog;
@@ -49,12 +40,9 @@ describe('RollOverDepositDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
-  // The settlement preview answers with `dueDepositSettlementPreview` for a Due deposit and, as the
-  // server does, with a 409 for a Settled one; every write answers with `writeResponse`.
   async function setup(
     deposit: DepositResponse,
     writeResponse: () => Response = () => jsonResponse(rolledOverDeposit),
@@ -92,7 +80,6 @@ describe('RollOverDepositDialog', () => {
     component = fixture.componentInstance;
     await fixture.whenStable();
     if (Number(deposit.status) === DEPOSIT_STATUS.Due) {
-      // The settlement fields are pre-filled once the preview has loaded.
       await vi.waitFor(() =>
         expect(Number(findControl(form(), 'grossInterest').value)).toBe(
           dueDepositSettlementPreview.grossInterest,
@@ -153,7 +140,6 @@ describe('RollOverDepositDialog', () => {
 
       const text = renderedText(fixture);
       expect(text).toMatch(/roll over/i);
-      // The unchanged terms, read-only: 3 months, capitalised at maturity.
       expect(text).toMatch(/3\s*months/i);
       expect(text).toContain('At maturity');
       for (const readOnly of [
@@ -165,8 +151,6 @@ describe('RollOverDepositDialog', () => {
       ]) {
         expect(hasControl(form(), readOnly)).toBe(false);
       }
-      // New principal = 10 000 + (147.95 − 28.12); new start = the old 2026-04-15 maturity; the next
-      // term of 3 months matures 2026-07-15.
       expect(text).toContain(formatMoney(10119.83, 'PLN'));
       expect(text).toContain(mediumDate(2026, 4, 15));
       expect(text).toMatch(/matures on/i);
@@ -228,18 +212,14 @@ describe('RollOverDepositDialog', () => {
       expect(renderedInput('tax')).toBeNull();
       expect(renderedInput('annualInterestRatePercent')).not.toBeNull();
       expect(Number(findControl(form(), 'annualInterestRatePercent').value)).toBe(6);
-      // 10 000 + (150.00 − 28.50) — the settled net, not the projected 119.83.
       const text = renderedText(fixture);
       expect(text).toContain(formatMoney(10121.5, 'PLN'));
       expect(text).not.toContain(formatMoney(10119.83, 'PLN'));
-      // The next term starts on the old maturity date (not the 2026-04-17 settlement) and matures
-      // 3 months later.
       expect(text).toContain(mediumDate(2026, 4, 15));
       expect(text).toContain(mediumDate(2026, 7, 15));
     });
 
     it('"Matures on" follows the deposit maturity math from the new start date', async () => {
-      // A 1-month deposit that matured on 2026-01-31: its next term ends at the end of February.
       await setup(
         depositResponse({
           assetId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
@@ -337,8 +317,6 @@ describe('RollOverDepositDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  // i18n screens (#132) AC-6: the dialog's title, summary labels, field labels, validation messages
-  // and buttons follow the language. (The read-only term, e.g. "3 months", is not asserted here.)
   describe('in Polish', () => {
     function errors(): string[] {
       return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');

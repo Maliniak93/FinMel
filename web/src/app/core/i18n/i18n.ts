@@ -16,8 +16,7 @@ import {
   type Language,
 } from './language';
 
-// Each language is its own lazy chunk (web/src/i18n/<lang>.json), loaded through a dynamic
-// import() — the app has no HttpClient, and nothing is served from public/.
+// One dynamic import() per language: the app has no HttpClient and serves nothing from public/.
 const TRANSLATION_FILES: Record<Language, () => Promise<Translation>> = {
   en: () => import('../../../i18n/en.json').then((file) => file.default),
   pl: () => import('../../../i18n/pl.json').then((file) => file.default),
@@ -30,7 +29,6 @@ class TranslationFileLoader implements TranslocoLoader {
   }
 }
 
-// Transloco plus the initializer that restores the stored language before the first route renders.
 export function provideI18n(): EnvironmentProviders {
   return makeEnvironmentProviders([
     provideTransloco({

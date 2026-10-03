@@ -61,7 +61,6 @@ describe('Dashboard', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -119,8 +118,6 @@ describe('Dashboard', () => {
     ]);
   });
 
-  // savings-accounts AC-11: the colours are indexed by AssetClass, so the appended Savings class
-  // (9) gets a colour of its own instead of wrapping around to Cash's.
   it('gives the Savings class a colour of its own', async () => {
     await setup(
       jsonResponse({
@@ -157,8 +154,6 @@ describe('Dashboard', () => {
     await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
     expect(component['dashboardResource'].error()?.message).toBe('Service unavailable.');
   });
-  // i18n screens (#132) AC-1: headings, the stale chip and its tooltip, the "as of" line and the
-  // chart's own texts follow the language.
   it('renders in Polish', async () => {
     await setup(jsonResponse({ ...dashboard, isStale: true } satisfies DashboardResponse));
     const element = fixture.nativeElement as HTMLElement;
@@ -224,7 +219,6 @@ describe('Dashboard', () => {
     expect(polishProblems(['Retry'], textsOf(element, '.dashboard-page__state button'))).toEqual(
       [],
     );
-    // The backend's own message stays as it arrived.
     expect(textOf(element.querySelector('.dashboard-page__state p'))).toBe('Service unavailable.');
   });
 });

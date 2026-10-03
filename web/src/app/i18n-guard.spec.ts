@@ -1,19 +1,5 @@
 /// <reference types="vite/client" />
 
-// i18n screens (#132) AC-7: every template under src/app is loaded as raw text and scanned for
-// user-facing text that is not translated:
-//   - a text node with a letter outside `{{ … }}`;
-//   - a `placeholder` / `aria-label` / `matTooltip` / `title` / `label` attribute (static, or bound
-//     to an expression) with a letter outside `{{ … }}` or with an English string literal that does
-//     not go through the `transloco` pipe;
-//   - a string literal inside `{{ … }}` that starts with a capital letter and does not go through
-//     the `transloco` pipe (`{{ isEdit ? 'Save' : 'Create' }}`).
-// What is skipped on purpose: control-flow syntax (`@if (…) {`), comments, and the ligature name
-// inside `<mat-icon>` (an icon font glyph, not text).
-//
-// The allowlist below holds non-translatable tokens only — the brand and currency codes. It never
-// gets an English word: translate the text instead.
-
 const ALLOWLIST: readonly string[] = ['Skarbiec', 'PLN', 'EUR', 'USD', 'GBP', 'CHF'];
 
 const USER_FACING_ATTRIBUTES: readonly string[] = [
@@ -45,7 +31,6 @@ function hasLetter(text: string): boolean {
   return LETTER.test(withoutAllowlist(text));
 }
 
-// Index just past the bracket that closes the one at `start` (quote-aware).
 function skipBalanced(source: string, start: number, open: string, close: string): number {
   let depth = 0;
   let quote: string | null = null;
@@ -68,8 +53,6 @@ function skipBalanced(source: string, start: number, open: string, close: string
   return source.length;
 }
 
-// The literals of an expression that have a letter and are not piped through `transloco`
-// (`'key' | transloco` is a translation key, whatever its letters).
 function literalsWithoutTransloco(expression: string, onlyCapitalised: boolean): string[] {
   const found: string[] = [];
   for (const match of expression.matchAll(STRING_LITERAL)) {
@@ -111,7 +94,6 @@ function textProblems(text: string): string[] {
   return problems;
 }
 
-// Every piece of untranslated user-facing text in one template, as a readable description.
 function untranslatedIn(source: string): string[] {
   const problems: string[] = [];
   const html = source.replace(/<!--[\s\S]*?-->/g, '');
@@ -233,7 +215,6 @@ describe('template i18n guard', () => {
   });
 
   it('flags untranslated text and lets translated markup through', () => {
-    // Untranslated: a text node, static and bound attributes, and a capitalised literal in `{{ }}`.
     expect(untranslatedIn('<h1>Dashboard</h1>')).toHaveLength(1);
     expect(untranslatedIn('<button>Save <mat-icon>save</mat-icon></button>')).toHaveLength(1);
     expect(untranslatedIn('<input placeholder="Search by ticker" />')).toHaveLength(1);
@@ -246,7 +227,6 @@ describe('template i18n guard', () => {
       untranslatedIn('<mat-label>Name</mat-label> <mat-error>Required.</mat-error>'),
     ).toHaveLength(2);
 
-    // Translated, or not text at all.
     const fine = [
       `<h1>{{ 'dashboard.title' | transloco }}</h1>`,
       `<p>{{ 'asOf' | transloco: { date: formatDate(d) } }}</p>`,

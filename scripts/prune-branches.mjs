@@ -1,18 +1,6 @@
 #!/usr/bin/env node
-// Deletes local branches (any name but master/main) whose pull request has been merged. PRs are
-// squash-merged, so git never sees those branches as merged (`git branch -d` refuses them) and they
-// pile up — and every session start lists them as "lane branches with no spec issue and no PR".
-//
 // Usage: node scripts/prune-branches.mjs [--apply]
-//
-//   (default)  dry run: print the branches that would go, with their PR number, and change nothing
-//   --apply    delete them locally with `git branch -D` (never the current branch, never a branch
-//              whose merged PR is older than a commit made on it since — that work would be lost)
-//
-// Remote branches are left alone (GitHub deletes them on merge when that setting is on).
-// Run by the user or by the ops agent; git-guard asks before `git branch -D` from an agent.
-//
-// Node >= 22, ESM, zero npm dependencies; needs `gh` authenticated.
+//   --apply  delete the local branches whose PR was merged (dry run otherwise)
 
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -56,7 +44,7 @@ function main() {
   for (const b of local) {
     const pr = merged.get(b.name);
     if (!pr) continue;
-    // A commit after the merge is work the PR never carried — keep the branch.
+    // A commit after the merge is work the PR never carried, so the branch stays.
     if (new Date(b.lastCommit) > new Date(pr.mergedAt)) keep.push({ ...b, pr });
     else prune.push({ ...b, pr });
   }

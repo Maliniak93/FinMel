@@ -12,10 +12,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { formatDateTime } from '../../shared/format';
 
-// Backend enum (Skarbiec.MarketData.Data.SyncRunStatus) serializes as its underlying int, so the
-// generated client types it as a bare `number` — labels maintained here in the C# enum's declaration
-// order (Data/SyncRun.cs), same pattern as features/assets/asset-class.ts. Labels are translation
-// keys, rendered through the `transloco` pipe.
+// Mirrors Skarbiec.MarketData.Data.SyncRunStatus in declaration order: the enum travels as its int.
 const SYNC_RUN_STATUS_LABELS: readonly string[] = [
   'enums.syncRunStatus.running',
   'enums.syncRunStatus.completed',
@@ -29,8 +26,6 @@ export function syncRunStatusLabel(status: SyncRunStatus | null | undefined): st
     : (SYNC_RUN_STATUS_LABELS[Number(status)] ?? 'enums.syncRunStatus.unknown');
 }
 
-// The response also carries `backfill` (one per-instrument history run) for shape uniformity, but
-// only the two daily jobs are shown here (spec-04 design decision 14).
 export const RUN_KINDS = [
   { key: 'prices', label: 'enums.syncRunKind.prices' },
   { key: 'fx', label: 'enums.syncRunKind.fx' },

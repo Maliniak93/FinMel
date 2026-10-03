@@ -18,13 +18,11 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
     provideNativeDateAdapter(),
-    // Transloco + restoring the stored language, awaited before the first route renders.
     provideI18n(),
     provideAppInitializer(() => {
       const authService = inject(AuthService);
       configureAuthInterceptors(authService, apiClients);
-      // Silent session restore from the refresh cookie (T1.9 AC: hard refresh keeps the
-      // session) — awaited so the initial route's guards see the correct auth state.
+      // Awaited so the initial route's guards see the restored session.
       return authService.refreshOnce();
     }),
   ],

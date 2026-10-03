@@ -16,8 +16,6 @@ import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatDate } from '../../../shared/format';
 import { NetWorthChart } from './net-worth-chart';
 
-// See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
-// generated client ultimately calls) instead of mocking the SDK module.
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -45,7 +43,6 @@ describe('NetWorthChart', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -107,8 +104,6 @@ describe('NetWorthChart', () => {
 
     expect(component['historyResource'].error()?.message).toBe('Service unavailable.');
   });
-  // i18n screens (#132) AC-1: the range group's and the chart's accessible names and the "as of"
-  // line follow the language; the range buttons (1M, 1Y, YTD, MAX) are codes and stay.
   it('renders in Polish', async () => {
     await setup(jsonResponse(history));
     const element = fixture.nativeElement as HTMLElement;

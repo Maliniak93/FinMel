@@ -14,7 +14,6 @@ import { provideI18nTesting } from '../../../../core/i18n/testing';
 
 describe('AssetTypePicker', () => {
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -46,8 +45,6 @@ describe('AssetTypePicker', () => {
     expect(emitted).toEqual([ASSET_CLASS.Etf, ASSET_CLASS.PreciousMetal]);
   });
 
-  // savings-accounts AC-11: Savings is a class of its own — a "Savings account" tile with the bank
-  // icon, emitting the Savings class.
   it('renders a "Savings account" tile with the account_balance icon', async () => {
     await TestBed.configureTestingModule({
       imports: [AssetTypePicker],
@@ -69,7 +66,6 @@ describe('AssetTypePicker', () => {
     expect(emitted).toEqual([ASSET_CLASS.Savings]);
   });
 
-  // i18n screens (#132) AC-4: the class tiles follow the language.
   it('renders in Polish', async () => {
     await TestBed.configureTestingModule({
       imports: [AssetTypePicker],
@@ -84,7 +80,6 @@ describe('AssetTypePicker', () => {
 
     await switchLanguage(fixture, 'pl');
 
-    // "ETF" is spelled the same in Polish.
     expect(polishProblems(english, tiles(), ['ETF'])).toEqual([]);
   });
 });

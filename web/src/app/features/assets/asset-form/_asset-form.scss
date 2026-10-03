@@ -1,7 +1,4 @@
-// Layout shared by the asset-form shell, its per-kind forms and their building blocks — the old
-// asset-form dialog's rules, @use'd by each component's own stylesheet (component styles are
-// encapsulated, so each one pulls the rules it renders).
-
+// Component styles are encapsulated, so each component @uses the rules it renders.
 .asset-form__field {
   display: block;
   width: 100%;

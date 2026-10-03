@@ -18,14 +18,11 @@ import {
 } from '../../testing/asset-form-fixtures';
 import { CashAssetForm } from './cash-asset-form';
 
-// AC-3 / AC-8: the currency-valued (Cash/Deposit) form. toBody() must equal the body the old
-// dialog's onSubmit built for the same input — these expected bodies were moved unchanged.
 describe('CashAssetForm', () => {
   let fixture: ComponentFixture<CashAssetForm>;
   let component: CashAssetForm;
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -35,7 +32,7 @@ describe('CashAssetForm', () => {
   }
 
   it('creates Cash with just Name + Currency', async () => {
-    await setup(0); // Cash
+    await setup(0);
 
     findControl(component.form, 'name').setValue('Checking account');
 
@@ -49,7 +46,7 @@ describe('CashAssetForm', () => {
   });
 
   it('creates Deposit through the same form', async () => {
-    await setup(1); // Deposit
+    await setup(1);
 
     findControl(component.form, 'name').setValue('Savings deposit');
     findControl(component.form, 'currency').setValue('EUR');
@@ -77,8 +74,6 @@ describe('CashAssetForm', () => {
   });
 
   describe('add first transaction (create only)', () => {
-    // cash-transaction-types AC-7: a cash-like asset's first transaction is an opening deposit —
-    // no type select and no unit price, only Amount and Date — sent as a Deposit at unit price 1.
     it.each([
       { assetClass: 0, className: 'Cash' },
       { assetClass: 1, className: 'Deposit' },
@@ -96,14 +91,13 @@ describe('CashAssetForm', () => {
       findControl(component.form, 'quantity').setValue(500);
       findControl(component.form, 'date').setValue(new Date(2026, 2, 5));
 
-      // transactions-pln-value-and-fee-removal AC13: the first transaction carries no fee.
       expect(component.form.valid).toBe(true);
       expect(component.toBody()).toEqual({
         assetClass,
         name: 'Checking account',
         currency: 'PLN',
         initialTransaction: {
-          type: 2, // Deposit
+          type: 2,
           quantity: 500,
           unitPrice: 1,
           date: '2026-03-05',
@@ -126,14 +120,11 @@ describe('CashAssetForm', () => {
 
       expect((fixture.nativeElement as HTMLElement).querySelector('mat-checkbox')).toBeNull();
       expect(findControl(component.form, 'name').value).toBe('Checking account');
-      // Compared as it goes over the wire: UpdateAssetRequest has no InitialTransaction at all.
       const wire = JSON.parse(JSON.stringify(component.toBody()));
       expect(wire).not.toHaveProperty('initialTransaction');
       expect(wire).toEqual({ assetClass: 0, name: 'Checking account', currency: 'PLN' });
     });
   });
-  // i18n screens (#132) AC-4: field labels, the valuation hint, the opening-deposit toggle and the
-  // client-side validation messages follow the language.
   describe('in Polish', () => {
     it('renders in Polish', async () => {
       await setup(0);
@@ -149,7 +140,6 @@ describe('CashAssetForm', () => {
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(english, texts())).toEqual([]);
-      // The hint carries the chosen currency.
       expect(hint()).toContain('PLN');
       expect(hint()).not.toMatch(/^Valued automatically/);
       expect(matchesTranslation('pl', hint()), `"${hint()}" is not a pl.json value`).toBe(true);

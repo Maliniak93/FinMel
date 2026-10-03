@@ -41,13 +41,6 @@ import {
 } from '../testing/deposit-fixtures';
 import { PayOutDepositDialog } from './pay-out-deposit-dialog';
 
-// deposit-payout-to-cash AC-8. The payout dialog opens on a Settled deposit and moves its whole
-// balance (principal + settled net interest — 10 121.50 for `settledDeposit`) to a Cash asset: the
-// amount is read-only, the destination (control `destinationAssetId`) is required and lists the Cash
-// transfer candidates in the deposit's currency, and the date (control `date`) defaults to today and
-// must lie between the settlement date and today. Control names follow the PayOutDepositRequest
-// properties so a server 400 keyed on a field lands on it. The submit under test is called on the
-// dialog itself and asserted on the raw request the generated client hands to `fetch`.
 describe('PayOutDepositDialog', () => {
   let fixture: ComponentFixture<PayOutDepositDialog>;
   let component: PayOutDepositDialog;
@@ -60,12 +53,9 @@ describe('PayOutDepositDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
-  // The transfer candidates answer per the `currency` query parameter from
-  // `transferCandidatesByCurrency`; every write answers with `writeResponse`.
   async function setup(
     writeResponse: () => Response = () => jsonResponse(paidOutDeposit),
     candidatesByCurrency: typeof transferCandidatesByCurrency = transferCandidatesByCurrency,
@@ -74,8 +64,6 @@ describe('PayOutDepositDialog', () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (requestMethod(input) === 'GET') {
         if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
-          // `candidatesByCurrency` arranges the Cash candidates; a spec that overrides it has no
-          // savings accounts either.
           return jsonResponse(
             transferCandidatesFor(
               new URL(requestUrl(input)),
@@ -137,7 +125,6 @@ describe('PayOutDepositDialog', () => {
   it('shows the whole balance as a read-only amount', async () => {
     await setup();
 
-    // Either plain text or a disabled control — never something the user could type a part into.
     if (hasControl(form(), 'amount')) {
       const amount = findControl(form(), 'amount');
       expect(amount.disabled).toBe(true);
@@ -165,7 +152,6 @@ describe('PayOutDepositDialog', () => {
     expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
     expect(labels.some((label) => label.includes(plnSavingsCandidate.name))).toBe(true);
     expect(labels.some((label) => label.includes(eurSavingsCandidate.name))).toBe(false);
-    // A payout can't keep the money in the deposit.
     expect(labels.some((label) => /keep in the deposit/i.test(label))).toBe(false);
   });
 
@@ -223,7 +209,6 @@ describe('PayOutDepositDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
-  // deposit-payout-to-savings AC-10: a savings account is a destination like a Cash asset.
   it('submit POSTs a savings account as destinationAssetId', async () => {
     await setup();
     await pickSelectOption(fixture, 'destinationAssetId', plnSavingsCandidate.name);
@@ -283,8 +268,6 @@ describe('PayOutDepositDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  // i18n screens (#132) AC-6: the dialog's title, summary, field labels, hints, validation messages
-  // and buttons follow the language.
   describe('in Polish', () => {
     function errors(): string[] {
       return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
@@ -310,7 +293,6 @@ describe('PayOutDepositDialog', () => {
 
       await switchLanguage(fixture, 'pl');
 
-      // "Transfer" may stay as it is in Polish.
       expect(polishProblems(english, texts(), ['Transfer'])).toEqual([]);
     });
 
@@ -346,7 +328,6 @@ describe('PayOutDepositDialog', () => {
       }
     });
 
-    // deposit-payout-to-savings: the hint shows when there is neither a Cash nor a savings account.
     it('shows the missing-account hint in Polish', async () => {
       await setup(undefined, { PLN: [] });
       const element = fixture.nativeElement as HTMLElement;

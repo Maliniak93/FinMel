@@ -18,8 +18,6 @@ const ASSET_CLASS_ICONS: Record<AssetClass, string> = {
   [ASSET_CLASS.Savings]: 'account_balance',
 };
 
-// "New asset" starts here: one tile per AssetClass. The only place a class is chosen — an existing
-// asset's class cannot change in the UI.
 @Component({
   selector: 'app-asset-type-picker',
   imports: [MatIconModule, TranslocoPipe],

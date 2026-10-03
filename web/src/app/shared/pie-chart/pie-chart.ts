@@ -3,7 +3,6 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 export interface PieChartSegment {
   readonly label: string;
-  /** 0-100, already computed by the caller — this component never sums/divides money. */
   readonly percentage: number;
   readonly color: string;
 }
@@ -13,8 +12,7 @@ interface RenderedSegment extends PieChartSegment {
   readonly dashOffset: number;
 }
 
-// A circle radius that makes the circumference exactly 100, so a percentage (0-100) doubles as a
-// dasharray unit with no further scaling.
+// A radius whose circumference is exactly 100, so a percentage is a dasharray length.
 const RADIUS = 100 / (2 * Math.PI);
 const CIRCUMFERENCE = 100;
 

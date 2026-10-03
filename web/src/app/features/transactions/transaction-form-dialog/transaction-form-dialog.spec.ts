@@ -17,8 +17,6 @@ import {
   TRANSLATIONS,
 } from '../../../../testing/i18n';
 
-// See auth.spec.ts: relative-import `vi.mock` is blocked, so this stubs `fetch` (what the
-// generated client ultimately calls) instead of mocking the SDK module.
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -28,14 +26,12 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 const portfolioId = '22222222-2222-2222-2222-222222222222';
 const assetId = '11111111-1111-1111-1111-111111111111';
-// cash-transaction-types: the dialog knows its asset's class. A market class (ETF) keeps every
-// transaction type, so the pre-existing cases below run against one.
 const assetClass = ASSET_CLASS.Etf;
 
 const existingTransaction: TransactionResponse = {
   id: '33333333-3333-3333-3333-333333333333',
   assetId,
-  type: 0, // Buy
+  type: 0,
   quantity: 10,
   unitPrice: 100,
   currency: 'EUR',
@@ -55,7 +51,6 @@ describe('TransactionFormDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -78,8 +73,6 @@ describe('TransactionFormDialog', () => {
     await fixture.whenStable();
   }
 
-  // Opens the Type select the way a user does and reads the options Material renders into the
-  // overlay — what is offered, independent of how the dialog stores its list.
   async function typeOptionLabels(): Promise<string[]> {
     const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
       'mat-select[formcontrolname="type"] .mat-mdc-select-trigger',
@@ -140,7 +133,7 @@ describe('TransactionFormDialog', () => {
     await setup({ portfolioId, assetId, assetClass });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction, type: 2 }, 201));
 
-    component['form'].controls.type.setValue(2); // Deposit
+    component['form'].controls.type.setValue(2);
     component['form'].controls.quantity.setValue(500);
 
     expect(component['isPriced']()).toBe(false);
@@ -154,8 +147,6 @@ describe('TransactionFormDialog', () => {
     expect(body).not.toHaveProperty('fee');
   });
 
-  // transactions-pln-value-and-fee-removal AC13: Fee is gone as a transaction type and as a field.
-  // cash-transaction-types AC-8: run against a market class, which still offers all six types.
   it('offers no Fee type', async () => {
     await setup({ portfolioId, assetId, assetClass });
 
@@ -177,19 +168,17 @@ describe('TransactionFormDialog', () => {
     expect(fieldLabels).not.toContain('Fee');
   });
 
-  // cash-transaction-types AC-8: a Cash asset accepts only Deposit/Withdraw (the backend answers
-  // 400 to anything else), so the dialog offers only those two and starts on Deposit.
   it('offers only Deposit/Withdraw for a Cash asset', async () => {
     await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash });
 
-    expect(component['form'].controls.type.value).toBe(2); // Deposit
+    expect(component['form'].controls.type.value).toBe(2);
     expect(await typeOptionLabels()).toEqual(['Deposit', 'Withdraw']);
   });
 
   it('offers all six types and starts on Buy for a market asset (ETF)', async () => {
     await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Etf });
 
-    expect(component['form'].controls.type.value).toBe(0); // Buy
+    expect(component['form'].controls.type.value).toBe(0);
     expect(await typeOptionLabels()).toEqual([
       'Buy',
       'Sell',
@@ -205,7 +194,7 @@ describe('TransactionFormDialog', () => {
       portfolioId,
       assetId,
       assetClass: ASSET_CLASS.Cash,
-      transaction: { ...existingTransaction, type: 3 }, // Withdraw
+      transaction: { ...existingTransaction, type: 3 },
     });
 
     expect(component['form'].controls.type.value).toBe(3);
@@ -277,7 +266,7 @@ describe('TransactionFormDialog', () => {
       ),
     );
 
-    component['form'].controls.type.setValue(1); // Sell
+    component['form'].controls.type.setValue(1);
     component['form'].controls.quantity.setValue(999);
 
     await component['onSubmit']();
@@ -296,8 +285,6 @@ describe('TransactionFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  // i18n screens (#132) AC-5: title, field labels, validation messages and buttons follow the
-  // language.
   it('shows labels and validation in Polish', async () => {
     await setup({ portfolioId, assetId, assetClass });
     const element = fixture.nativeElement as HTMLElement;
@@ -336,7 +323,7 @@ describe('TransactionFormDialog', () => {
   it('names the amount field in the Polish validation message of a non-priced type', async () => {
     await setup({ portfolioId, assetId, assetClass });
     const element = fixture.nativeElement as HTMLElement;
-    component['form'].controls.type.setValue(2); // Deposit: an amount, no unit price
+    component['form'].controls.type.setValue(2);
     component['form'].controls.quantity.setValue(-1);
     await component['onSubmit']();
     fixture.detectChanges();

@@ -36,14 +36,6 @@ import {
   type SettleSavingsInterestDialogData,
 } from '../settle-savings-interest-dialog/settle-savings-interest-dialog';
 
-// The "Savings accounts" tab of the Deposits & savings page (savings-accounts): every savings account
-// of the user across portfolios, its balance in its own currency. Money moves in and out through the
-// asset's ordinary transactions, which the account name links to. Interest is settled one calendar
-// month at a time (savings-interest-settlement): a Due row offers "Settle interest", and the latest
-// settlement, shown under "Last interest", can be undone. Money moves between a Cash asset and the
-// account through "Transfer" (savings-cash-transfers).
-// MatDialog/MatSnackBar are injected as services only — see assets.ts for why
-// MatDialogModule/MatSnackBarModule are deliberately not in `imports`.
 @Component({
   selector: 'app-savings-accounts',
   imports: [
@@ -86,8 +78,6 @@ export class SavingsAccounts {
     },
   });
 
-  // asset-archive: an account archived on its own is hidden until "Show archived" is on — filtered
-  // here, since the list endpoint returns every account with its flag.
   protected readonly showArchived = signal(false);
 
   protected readonly visibleAccounts = computed(() =>
@@ -102,7 +92,6 @@ export class SavingsAccounts {
   protected readonly formatPercent = formatPercent;
   protected readonly formatMonth = formatMonth;
 
-  // An account of an archived portfolio, or archived on its own, is read-only: no settle, no undo.
   protected isWritable(account: SavingsAccountResponse): boolean {
     return !account.portfolioIsArchived && !account.isArchived;
   }
@@ -122,8 +111,6 @@ export class SavingsAccounts {
     });
   }
 
-  // Moves money between a Cash asset and the account (savings-cash-transfers); the new balance shows
-  // after a reload.
   protected openTransferDialog(account: SavingsAccountResponse): void {
     const data: SavingsTransferDialogData = { account };
     const ref = this.dialog.open(SavingsTransferDialog, { width: '520px', data });
@@ -134,7 +121,6 @@ export class SavingsAccounts {
     });
   }
 
-  // Undoes the latest settlement — the only one that can be — behind the same confirmation as Delete.
   protected async undoLastSettlement(account: SavingsAccountResponse): Promise<void> {
     const settlement = account.lastSettlement;
     if (!settlement) {
@@ -194,8 +180,6 @@ export class SavingsAccounts {
     this.openDialog({ account });
   }
 
-  // A savings account is an asset: deleting it goes through the ordinary asset delete, which also
-  // removes its terms and its transactions.
   protected async remove(account: SavingsAccountResponse): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
@@ -228,7 +212,6 @@ export class SavingsAccounts {
     this.accountsResource.reload();
   }
 
-  // asset-archive: Archive / Restore sit in the row menu, behind a confirmation, and reload the list.
   protected async setArchived(account: SavingsAccountResponse, archive: boolean): Promise<void> {
     const done = await confirmSetAssetArchived(
       this.dialog,

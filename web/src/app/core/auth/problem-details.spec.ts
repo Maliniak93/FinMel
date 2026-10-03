@@ -7,15 +7,12 @@ import { readProblemDetails } from './problem-details';
 
 const ENGLISH_FALLBACK = 'Something went wrong. Please try again.';
 
-// i18n foundation (#131) AC-11: a backend `detail` is always shown verbatim (backend messages stay
-// English by design); only the frontend's own generic fallback follows the language.
 describe('readProblemDetails', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({ providers: [provideI18nTesting()] });
   });
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
@@ -29,13 +26,11 @@ describe('readProblemDetails', () => {
   it('keeps the server detail and translates the fallback', async () => {
     await TestBed.inject(LanguageService).setLanguage('pl');
 
-    // A ProblemDetails body and a raw-text body both reach the UI unchanged.
     expect(readProblemDetails({ status: 404, detail: 'Asset not found.' }).detail).toBe(
       'Asset not found.',
     );
     expect(readProblemDetails('Bad gateway').detail).toBe('Bad gateway');
 
-    // No body at all: the generic fallback, in Polish.
     const fallback = readProblemDetails(undefined).detail;
     expect(fallback).not.toBe(ENGLISH_FALLBACK);
     expect(looksLikeTranslationKey(fallback)).toBe(false);

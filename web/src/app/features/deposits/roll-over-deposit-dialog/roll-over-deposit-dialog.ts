@@ -40,8 +40,6 @@ export interface RollOverDepositDialogData {
   deposit: DepositResponse;
 }
 
-// The tax can't exceed the gross interest (as RollOverDepositRequest.Validate), so it reads its
-// sibling and is re-run whenever the gross changes.
 function taxWithinGross(control: AbstractControl): ValidationErrors | null {
   const gross = control.parent?.get('grossInterest')?.value as number | null | undefined;
   if (gross === null || gross === undefined || control.value === null || control.value === '') {
@@ -50,8 +48,6 @@ function taxWithinGross(control: AbstractControl): ValidationErrors | null {
   return Number(control.value) > Number(gross) ? { taxOverGross: true } : null;
 }
 
-// "3 months", "1 day" — the unchanged term, shown read-only. One key per unit and count form, as
-// there are no plurals (the Polish count comes after its label).
 function termLabel(termLength: number, termUnit: DepositResponse['termUnit']): string {
   const unit = Number(termUnit) === DEPOSIT_TERM_UNIT.Days ? 'day' : 'month';
   const key = termLength === 1 ? unit : `${unit}s`;
@@ -62,12 +58,6 @@ function isAmount(value: number | string | null): value is number | string {
   return value !== null && value !== '' && Number.isFinite(Number(value));
 }
 
-// Rolls a Due or Settled (not paid-out) deposit over into its next term on the same asset
-// (deposit-rollover). The term and capitalisation stay, the next term starts on the old maturity date
-// with the whole balance, and only the rate can change. A Due deposit is settled in the same request,
-// so its gross interest and tax are pre-filled from the settlement preview and editable; a Settled one
-// reuses its stored settlement. Control names follow the RollOverDepositRequest properties, so a
-// server 400 keyed on a field lands on it.
 @Component({
   selector: 'app-roll-over-deposit-dialog',
   imports: [
@@ -87,13 +77,11 @@ export class RollOverDepositDialog {
   private readonly dialogRef = inject(MatDialogRef<RollOverDepositDialog>);
   protected readonly deposit = inject<RollOverDepositDialogData>(MAT_DIALOG_DATA).deposit;
 
-  // Due: settle and roll over in one request. Otherwise Settled: the stored settlement is reused.
   protected readonly isDue = Number(this.deposit.status) === DEPOSIT_STATUS.Due;
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
   protected readonly term = termLabel(Number(this.deposit.termLength), this.deposit.termUnit);
-  // A translation key, or null for a value outside the known set.
   protected readonly capitalization =
     DEPOSIT_CAPITALIZATIONS.find(
       (option) => Number(option.value) === Number(this.deposit.capitalization),
@@ -114,7 +102,6 @@ export class RollOverDepositDialog {
       Number(this.deposit.annualInterestRatePercent) as number | null,
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
-    // Due mode only: a Settled deposit sends neither, so both stay disabled (and unrendered) there.
     grossInterest: [
       { value: null as number | null, disabled: !this.isDue },
       [Validators.required, Validators.min(0)],
@@ -125,14 +112,11 @@ export class RollOverDepositDialog {
     ],
   });
 
-  // Signal mirror of the form, so the new principal follows the settlement edits live.
   private readonly formValue = toSignal(
     this.form.valueChanges.pipe(map(() => this.form.getRawValue())),
     { initialValue: this.form.getRawValue() },
   );
 
-  // The whole balance rolls over: principal + the net interest of the term that ended — the one being
-  // settled here (Due), or the stored settlement (Settled).
   protected readonly newPrincipal = computed(() => {
     if (!this.isDue) {
       return settlementAmounts(
@@ -148,7 +132,6 @@ export class RollOverDepositDialog {
     return settlementAmounts(this.deposit.principal, grossInterest, tax).finalAmount;
   });
 
-  // Only a Due deposit has a preview to pre-fill from; a Settled one loads nothing.
   protected readonly previewResource = resource({
     params: () => (this.isDue ? {} : undefined),
     loader: async ({ abortSignal }) => {
@@ -167,16 +150,13 @@ export class RollOverDepositDialog {
     },
   });
 
-  // Pre-fills the settlement once the preview has loaded — gated on hasValue(), since value() throws
-  // while the resource is in its error state.
   private readonly prefillFromPreviewEffect = effect(() => {
     if (!this.previewResource.hasValue()) {
       return;
     }
     const preview = this.previewResource.value();
     if (preview) {
-      // Untracked: whatever the form reads while updating must not make this effect re-run and
-      // overwrite the user's edits.
+      // Untracked: whatever the form reads while updating must not re-run this effect and overwrite the user's edits.
       untracked(() =>
         this.form.patchValue({
           grossInterest: Number(preview.grossInterest),
@@ -206,7 +186,6 @@ export class RollOverDepositDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    // A Settled deposit leaves grossInterest and tax out of the body altogether.
     const body: RollOverDepositRequest = this.isDue
       ? {
           annualInterestRatePercent: Number(values.annualInterestRatePercent),

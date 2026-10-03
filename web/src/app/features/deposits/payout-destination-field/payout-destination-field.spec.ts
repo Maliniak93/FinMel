@@ -29,11 +29,6 @@ import { savingsAccountResponse } from '../testing/savings-account-fixtures';
 import { SavingsAccountFormDialog } from '../savings-account-form-dialog/savings-account-form-dialog';
 import { PayoutDestinationField } from './payout-destination-field';
 
-// deposit-payout-to-savings AC-8. `PayoutDestinationField` is the destination select shared by the
-// settle and payout dialogs: a form control bound to a destination asset id, fed the deposit's
-// currency (`currency`), its portfolio (`portfolioId`) and whether "Keep in the deposit" is offered
-// (`offerKeep`). It lists the Cash and the Savings candidates of that currency in two groups, then a
-// last "New savings account…" option that opens SavingsAccountFormDialog in payout-target mode.
 @Component({
   imports: [ReactiveFormsModule, PayoutDestinationField],
   template: `
@@ -57,8 +52,6 @@ describe('PayoutDestinationField', () => {
   let host: HostComponent;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let dialog: { open: ReturnType<typeof vi.fn> };
-  // The savings accounts the candidates stub answers with — a spec adds one to simulate the account
-  // the dialog just created.
   let savingsCandidates: TransferCandidateFixture[];
 
   beforeAll(() => {
@@ -67,7 +60,6 @@ describe('PayoutDestinationField', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 

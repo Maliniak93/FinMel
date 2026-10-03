@@ -19,10 +19,6 @@ import {
   InstrumentPicker,
 } from '../../blocks/instrument-picker/instrument-picker';
 
-// PreciousMetal: market-valued like a security, but with no custom-ticker panel. Its only provider
-// (NBP) has no notion of an arbitrary user-typed ticker — AddCustomInstrumentHandler always rejects
-// it with Validation.UnsupportedInstrumentSource (AssetClassPriceSourceMapping, M1.6) — and the one
-// real gold instrument is already seeded Verified and reachable through search.
 @Component({
   selector: 'app-gold-asset-form',
   imports: [AssetBasicsFields, FirstTransactionFields, InstrumentPicker, TranslocoPipe],

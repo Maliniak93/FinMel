@@ -28,11 +28,6 @@ import {
   type SavingsAccountFormDialogData,
 } from './savings-account-form-dialog';
 
-// savings-accounts AC-10. The create/edit dialog for a savings account: its controls are named after
-// the AddSavingsAccountRequest / UpdateSavingsAccountRequest properties (camelCase) so a server 400
-// keyed on a field lands on it; the optional opening deposit is the flat pair `openingAmount` +
-// `openingDate`, sent as `openingDeposit: { amount, date }`. The submit under test is called on the
-// dialog itself and asserted on the raw request the generated client hands to `fetch`.
 describe('SavingsAccountFormDialog', () => {
   let fixture: ComponentFixture<SavingsAccountFormDialog>;
   let component: SavingsAccountFormDialog;
@@ -45,7 +40,6 @@ describe('SavingsAccountFormDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -53,8 +47,6 @@ describe('SavingsAccountFormDialog', () => {
     return typeof input === 'string' ? 'GET' : (input as Request).method;
   }
 
-  // The portfolio list always answers with an archived portfolio in it, so the select has something
-  // to leave out; every write answers with `writeResponse`.
   async function setup(
     data: SavingsAccountFormDialogData,
     writeResponse: () => Response = () => jsonResponse(savingsAccountResponse(), 201),
@@ -109,7 +101,6 @@ describe('SavingsAccountFormDialog', () => {
     return date;
   }
 
-  // A complete, valid set of terms without an opening deposit.
   const validTerms = {
     name: 'Savings account',
     bankName: 'Test bank',
@@ -245,7 +236,6 @@ describe('SavingsAccountFormDialog', () => {
       expect(findControl(form(), 'openingDate').invalid).toBe(true);
       expect(writeRequests()).toEqual([]);
 
-      // Today itself is fine.
       await fill({ openingDate: daysFromToday(0) });
       await component['onSubmit']();
       expect(writeRequests()).toHaveLength(1);
@@ -305,7 +295,6 @@ describe('SavingsAccountFormDialog', () => {
       expect(findControl(form(), 'bankName').value).toBe('Old bank');
       expect(Number(findControl(form(), 'annualInterestRatePercent').value)).toBe(4);
       expect(findControl(form(), 'taxExempt').value).toBe(true);
-      // Portfolio, currency and the opening deposit exist on create only.
       for (const absent of ['portfolioId', 'currency', 'openingAmount', 'openingDate']) {
         expect(hasControl(form(), absent)).toBe(false);
       }
@@ -343,10 +332,6 @@ describe('SavingsAccountFormDialog', () => {
     });
   });
 
-  // deposit-payout-to-savings AC-9. Opened from the payout destination select with
-  // `{currency, portfolioId}` the dialog creates an account for a payout: the currency is fixed and
-  // read-only, the portfolio defaults to the deposit's and can still be changed, there is no
-  // opening deposit, and success closes with the created account instead of `true`.
   describe('payout target mode', () => {
     const payoutData: SavingsAccountFormDialogData = {
       currency: 'PLN',
@@ -368,7 +353,6 @@ describe('SavingsAccountFormDialog', () => {
         expect(currency.value).toBe('PLN');
       }
       expect(renderedText(fixture)).toContain('PLN');
-      // Not a select the user could change.
       expect(
         (fixture.nativeElement as HTMLElement).querySelector(
           'mat-select[formcontrolname="currency"]',

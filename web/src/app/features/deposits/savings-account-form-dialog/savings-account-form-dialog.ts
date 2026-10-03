@@ -33,19 +33,12 @@ import {
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
 import { toDateOnly } from '../../../shared/date-only';
 
-// Create: no account — `portfolioId` presets the portfolio (the asset type picker), otherwise the
-// user picks one. Edit: the account being edited; its portfolio, currency and balance are fixed.
-// Payout target (deposit-payout-to-savings): `currency` set — a new account for a deposit payout, in
-// that fixed currency, `portfolioId` only the default portfolio, with no opening deposit; it closes
-// with the created SavingsAccountResponse instead of `true`.
 export interface SavingsAccountFormDialogData {
   portfolioId?: string;
   account?: SavingsAccountResponse;
   currency?: string;
 }
 
-// The portfolio, the currency and the optional opening deposit exist on create only: edit leaves
-// them out of the form altogether.
 interface SavingsAccountForm {
   name: FormControl<string>;
   bankName: FormControl<string>;
@@ -61,13 +54,10 @@ function isBlank(value: unknown): boolean {
   return value === null || value === undefined || value === '';
 }
 
-// Empty means "no opening deposit"; anything entered must be above 0.
 function positiveWhenEntered(control: AbstractControl): ValidationErrors | null {
   return !isBlank(control.value) && Number(control.value) <= 0 ? { positive: true } : null;
 }
 
-// The opening date is needed only with an amount, and — like the server (Europe/Warsaw) — can't be
-// later than today. Reads its sibling `openingAmount`, so it is re-run whenever the amount changes.
 function openingDateValid(control: AbstractControl): ValidationErrors | null {
   const date = control.value as Date | null;
   if (!date) {
@@ -76,9 +66,6 @@ function openingDateValid(control: AbstractControl): ValidationErrors | null {
   return toDateOnly(date) > toDateOnly(new Date()) ? { future: true } : null;
 }
 
-// Create/edit dialog for a savings account (savings-accounts). Control names follow the
-// AddSavingsAccountRequest/UpdateSavingsAccountRequest properties, so a server 400 keyed on a field
-// lands on it; the opening deposit is the flat pair `openingAmount` + `openingDate`.
 @Component({
   selector: 'app-savings-account-form-dialog',
   imports: [
@@ -103,8 +90,6 @@ export class SavingsAccountFormDialog {
   private readonly account = this.data.account;
   protected readonly isEdit = !!this.account;
   protected readonly isPayoutTarget = !this.account && !!this.data.currency;
-  // The portfolio is chosen here on a plain create and as a payout target (defaulting to the
-  // deposit's); the type picker presets it, edit fixes it.
   protected readonly choosesPortfolio =
     !this.account && (!this.data.portfolioId || this.isPayoutTarget);
   protected readonly submitting = signal(false);
@@ -137,7 +122,6 @@ export class SavingsAccountFormDialog {
             { value: this.data.currency ?? DEFAULT_CURRENCY, disabled: this.isPayoutTarget },
             { nonNullable: true, validators: [Validators.required] },
           ),
-          // A payout target starts empty: the payout is its first inflow.
           ...(this.isPayoutTarget
             ? {}
             : {
@@ -147,7 +131,6 @@ export class SavingsAccountFormDialog {
         }),
   });
 
-  // Only the plain create offers a portfolio choice — and never an archived one (it is read-only).
   protected readonly portfoliosResource = resource({
     params: () => (this.choosesPortfolio ? {} : undefined),
     loader: async ({ abortSignal }) => {
@@ -207,7 +190,6 @@ export class SavingsAccountFormDialog {
           body: {
             ...terms,
             currency: values.currency!,
-            // No amount, no opening deposit: the account starts at 0.
             ...(isBlank(values.openingAmount)
               ? {}
               : {
@@ -226,7 +208,6 @@ export class SavingsAccountFormDialog {
       return;
     }
 
-    // A payout target hands the new account back, so the payout can select it.
     this.dialogRef.close(this.isPayoutTarget ? result.data : true);
   }
 

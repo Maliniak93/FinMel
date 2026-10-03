@@ -19,8 +19,6 @@ import {
   InstrumentPicker,
 } from '../../blocks/instrument-picker/instrument-picker';
 
-// Stock, Etf, Bond and Crypto: market-valued off an instrument, which the user picks from search or
-// adds through the ADR-018 custom-ticker panel.
 @Component({
   selector: 'app-security-asset-form',
   imports: [AssetBasicsFields, FirstTransactionFields, InstrumentPicker],

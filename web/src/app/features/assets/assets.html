@@ -180,7 +180,6 @@
           >
             <mat-icon>more_vert</mat-icon>
           </button>
-          <!-- asset-archive: an archived asset is read-only — Restore and Delete only. -->
           <mat-menu #menu="matMenu">
             @if (asset.isArchived) {
               <button mat-menu-item type="button" (click)="setArchived(asset, false)">

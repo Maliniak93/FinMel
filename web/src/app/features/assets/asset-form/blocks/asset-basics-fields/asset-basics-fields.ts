@@ -8,7 +8,6 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import type { AssetResponse } from '../../../../../api/portfolio';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../../../shared/currencies';
 
-// Name + Currency — the two fields every asset form asks for.
 export function createAssetBasicsGroup(fb: FormBuilder) {
   return fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(200)]],
@@ -18,8 +17,7 @@ export function createAssetBasicsGroup(fb: FormBuilder) {
 
 export type AssetBasicsGroup = ReturnType<typeof createAssetBasicsGroup>;
 
-// Edit pre-fill. Called from the form's ngOnInit, because the `asset` input is not set yet while
-// the form's FormGroup is being built.
+// Called from the form's ngOnInit: the `asset` input is not set yet while the FormGroup is built.
 export function fillAssetBasics(group: AssetBasicsGroup, asset: AssetResponse): void {
   group.patchValue({ name: asset.name, currency: asset.currency });
 }

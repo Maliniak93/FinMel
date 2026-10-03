@@ -15,9 +15,6 @@ import { Settings } from './features/settings/settings';
 import { Shell } from './layout/shell/shell';
 import { provideI18nTesting } from './core/i18n/testing';
 
-// The protected area is a nested route (Shell wraps dashboard/portfolios/settings/**), so
-// RouterTestingHarness.navigateByUrl only ever verifies the *top-level* outlet's component
-// (Shell) — the nested feature component is asserted separately via the fixture's DebugElement.
 describe('app routing (authenticated)', () => {
   let harness: RouterTestingHarness;
 
@@ -43,7 +40,6 @@ describe('app routing (authenticated)', () => {
     expect(harness.fixture.debugElement.query(By.directive(Portfolios))).toBeTruthy();
   });
 
-  // term-deposits: the Deposits page lists every deposit across portfolios.
   it('renders Deposits at /deposits', async () => {
     await harness.navigateByUrl('/deposits', Shell);
     expect(harness.fixture.debugElement.query(By.directive(Deposits))).toBeTruthy();

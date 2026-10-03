@@ -49,8 +49,6 @@ const FORM_COMPONENTS: readonly Type<AssetFormComponent>[] = [
   ManualAssetForm,
 ];
 
-// Which per-kind form each AssetClass opens (spec #105, Scope → "Form components"). Deposit opens
-// no form here: term-deposits hands it to DepositFormDialog.
 const EXPECTED_FORM: Record<number, Type<AssetFormComponent>> = {
   [ASSET_CLASS.Cash]: CashAssetForm,
   [ASSET_CLASS.Stock]: SecurityAssetForm,
@@ -62,9 +60,6 @@ const EXPECTED_FORM: Record<number, Type<AssetFormComponent>> = {
   [ASSET_CLASS.Other]: ManualAssetForm,
 };
 
-// The shell: picker on create, the stored class's form on edit, and the one place that POSTs/PUTs
-// and maps ProblemDetails. The submit under test is called on the shell itself and asserted on the
-// raw request the generated client hands to `fetch`.
 describe('AssetFormDialog', () => {
   let fixture: ComponentFixture<AssetFormDialog>;
   let component: AssetFormDialog;
@@ -78,7 +73,6 @@ describe('AssetFormDialog', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
@@ -165,9 +159,6 @@ describe('AssetFormDialog', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    // term-deposits AC-16: a Deposit is a term deposit with real terms, created only through the
-    // deposit endpoint — its tile opens DepositFormDialog preset to this portfolio, never the cash
-    // form, and this dialog closes with the deposit dialog's result so the asset list reloads.
     it('the Deposit tile opens DepositFormDialog preset to the current portfolio', async () => {
       await setup({ portfolioId });
       const matDialog = fixture.debugElement.injector.get(MatDialog);
@@ -187,9 +178,6 @@ describe('AssetFormDialog', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    // savings-accounts AC-11: a Savings account carries terms and is created only through the
-    // savings-account endpoint — its tile opens SavingsAccountFormDialog preset to this portfolio,
-    // never the cash form, and this dialog closes with that dialog's result so the list reloads.
     it('the Savings account tile opens SavingsAccountFormDialog preset to the current portfolio', async () => {
       await setup({ portfolioId });
       const matDialog = fixture.debugElement.injector.get(MatDialog);
@@ -222,7 +210,6 @@ describe('AssetFormDialog', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(dialogRef.close).not.toHaveBeenCalled();
 
-      // The abandoned form was discarded, not kept around behind the picker.
       await pickTile(ASSET_CLASS.Cash);
       expect(findControl(activeForm().form, 'name').value).toBe('');
     });
@@ -286,10 +273,8 @@ describe('AssetFormDialog', () => {
       expect(picker()).toBeNull();
       expect(renderedForms()).toEqual([SecurityAssetForm]);
       expect(activeForm().assetClass()).toBe(ASSET_CLASS.Crypto);
-      // The class is fixed on edit: no class control anywhere, in the form or on screen.
       expect(hasControl(activeForm().form, 'assetClass')).toBe(false);
       expect(renderedText(fixture)).not.toContain('Asset class');
-      // Pre-filled, including the instrument fetched through GET instruments/{id}.
       expect(findControl(activeForm().form, 'name').value).toBe('Bitcoin');
       expect(
         fetchSpy.mock.calls.some((call: unknown[]) =>
@@ -351,8 +336,6 @@ describe('AssetFormDialog', () => {
       expect(dialogRef.close).not.toHaveBeenCalled();
     });
 
-    // transactions-pln-value-and-fee-removal: a currency change on an asset that already has
-    // transactions is a 400 field error on Currency, which lands on the currency control.
     it('the currency-locked error lands on the currency control when editing', async () => {
       await setup({ portfolioId, asset: { ...cashAsset, transactionCount: 1 } });
       fetchSpy.mockResolvedValue(
@@ -424,8 +407,6 @@ describe('AssetFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  // i18n screens (#132) AC-4: the dialog's title, the back button's accessible name, the buttons and
-  // the messages the shell itself raises follow the language.
   describe('in Polish', () => {
     it('renders the type picker step in Polish', async () => {
       await setup({ portfolioId });

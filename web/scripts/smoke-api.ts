@@ -3,9 +3,6 @@ import { postApiIdentityLogin, postApiIdentityRegister } from '../src/app/api/id
 import { client as portfolioClient } from '../src/app/api/portfolio/client.gen.js';
 import { getApiPortfolioPortfolios } from '../src/app/api/portfolio/sdk.gen.js';
 
-// T1.7 AC: "a smoke call (list portfolios) works through the Gateway" — proves the generated
-// client, the Gateway's openapi/business routing, and JWT auth all line up end to end. Talks only
-// to the Gateway (ADR-013): register + login on Identity mint the token listPortfolios needs.
 const gatewayUrl = process.env['SKARBIEC_GATEWAY_URL'] ?? 'http://localhost:60684';
 
 identityClient.setConfig({ baseUrl: gatewayUrl });

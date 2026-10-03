@@ -22,19 +22,14 @@ import {
 } from './first-transaction-fields';
 import { provideI18nTesting } from '../../../../../core/i18n/testing';
 
-// AC-8: the "Add first transaction" block on its own — a checkbox plus the type/quantity/unit
-// price/date sub-form, and buildInitialTransaction() turning it into AddAssetRequest.InitialTransaction.
 describe('FirstTransactionFields', () => {
   let fixture: ComponentFixture<FirstTransactionFields>;
   let group: ReturnType<typeof createFirstTransactionGroup>;
 
   afterEach(async () => {
-    // Specs share one worker (isolate: false) — never leave Polish active for the next file.
     await restoreEnglish();
   });
 
-  // `openingDeposit` mirrors how cash-asset-form renders the block (cash-transaction-types): its
-  // group is the currency-valued one and the block is told to show an opening deposit.
   async function setup(options: { openingDeposit?: boolean } = {}): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [FirstTransactionFields],
@@ -73,7 +68,7 @@ describe('FirstTransactionFields', () => {
     await setup();
 
     await toggleFirstTransaction(fixture);
-    findControl(group, 'type').setValue(2); // Deposit
+    findControl(group, 'type').setValue(2);
     findControl(group, 'quantity').setValue(1000);
     findControl(group, 'unitPrice').setValue(7);
     findControl(group, 'date').setValue(new Date(2026, 2, 5));
@@ -90,7 +85,7 @@ describe('FirstTransactionFields', () => {
     await setup();
 
     await toggleFirstTransaction(fixture);
-    findControl(group, 'type').setValue(0); // Buy
+    findControl(group, 'type').setValue(0);
     findControl(group, 'quantity').setValue(3);
     findControl(group, 'unitPrice').setValue(10);
     findControl(group, 'date').setValue(new Date(2026, 2, 5));
@@ -113,9 +108,6 @@ describe('FirstTransactionFields', () => {
     expect(buildInitialTransaction(group)).toBeNull();
   });
 
-  // cash-transaction-types AC-7: for a cash-like asset the first transaction is always an opening
-  // Deposit — only Amount and Date are asked for, and the built transaction is a Deposit at unit
-  // price 1.
   it('openingDeposit hides type and price and builds a Deposit', async () => {
     await setup({ openingDeposit: true });
     const element = fixture.nativeElement as HTMLElement;
@@ -138,14 +130,13 @@ describe('FirstTransactionFields', () => {
     findControl(group, 'date').setValue(new Date(2026, 2, 5));
 
     expect(buildInitialTransaction(group)).toEqual({
-      type: 2, // Deposit
+      type: 2,
       quantity: 500,
       unitPrice: 1,
       date: '2026-03-05',
     });
   });
 
-  // transactions-pln-value-and-fee-removal AC13: the first-transaction sub-form has no fee.
   it('has no fee control', async () => {
     await setup();
 
@@ -156,8 +147,6 @@ describe('FirstTransactionFields', () => {
       (fixture.nativeElement as HTMLElement).querySelector('[formcontrolname="fee"]'),
     ).toBeNull();
   });
-  // i18n screens (#132) AC-4: the toggle, the field labels and the "… must not be negative."
-  // messages (with the quantity or amount label interpolated) follow the language.
   describe('in Polish', () => {
     it('renders in Polish', async () => {
       await setup();
@@ -213,7 +202,7 @@ describe('FirstTransactionFields', () => {
     it('names the amount in the Polish validation message of a non-priced type', async () => {
       await setup();
       await toggleFirstTransaction(fixture);
-      findControl(group, 'type').setValue(2); // Deposit: an amount, no unit price
+      findControl(group, 'type').setValue(2);
       findControl(group, 'quantity').setValue(-1);
       await showValidationErrors(fixture, group);
       const errors = () => labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');

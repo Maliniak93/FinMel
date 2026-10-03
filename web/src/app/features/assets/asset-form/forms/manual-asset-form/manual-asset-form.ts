@@ -19,7 +19,6 @@ import {
   ManualValueFields,
 } from '../../blocks/manual-value-fields/manual-value-fields';
 
-// RealEstate and Other: valued by hand — a value and the date it was valued on.
 @Component({
   selector: 'app-manual-asset-form',
   imports: [AssetBasicsFields, FirstTransactionFields, ManualValueFields],
