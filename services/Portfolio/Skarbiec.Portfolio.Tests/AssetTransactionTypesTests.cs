@@ -8,7 +8,7 @@ public sealed class AssetTransactionTypesTests
     private static readonly TransactionType[] CashLikeTypes = [TransactionType.Deposit, TransactionType.Withdraw];
 
     private static bool IsCashLike(AssetClass assetClass) =>
-        assetClass is AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings;
+        assetClass is AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.Bond;
 
     public static TheoryData<AssetClass, TransactionType, bool> FullMatrix()
     {
@@ -35,6 +35,7 @@ public sealed class AssetTransactionTypesTests
     [InlineData(AssetClass.Cash)]
     [InlineData(AssetClass.Deposit)]
     [InlineData(AssetClass.Savings)]
+    [InlineData(AssetClass.Bond)]
     public void Allowed_CashLikeClass_ReturnsOnlyDepositAndWithdraw(AssetClass assetClass)
     {
         Assert.Equal(CashLikeTypes.Order(), AssetTransactionTypes.Allowed(assetClass).Order());
@@ -43,7 +44,6 @@ public sealed class AssetTransactionTypesTests
     [Theory]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
-    [InlineData(AssetClass.Bond)]
     [InlineData(AssetClass.Crypto)]
     [InlineData(AssetClass.PreciousMetal)]
     [InlineData(AssetClass.RealEstate)]

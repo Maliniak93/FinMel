@@ -169,6 +169,7 @@
   "bonds": {
     "title": "Obligacje skarbowe",
     "tabs": {
+      "myBonds": "Moje obligacje",
       "offer": "Aktualna oferta"
     },
     "term": {
@@ -194,7 +195,68 @@
         "inflation": "inflacja + marża {{ margin }}"
       },
       "empty": "Brak danych z MF — obligację można wprowadzić ręcznie",
-      "loadFailed": "Nie udało się wczytać oferty obligacji."
+      "loadFailed": "Nie udało się wczytać oferty obligacji.",
+      "buy": "Kup",
+      "buySeries": "Kup {{ code }}"
+    },
+    "my": {
+      "add": "Kup obligacje",
+      "addFirst": "Zapisz pierwszy zakup obligacji",
+      "empty": "Nie masz jeszcze obligacji.",
+      "loadFailed": "Nie udało się wczytać obligacji.",
+      "series": "Seria",
+      "type": "Typ",
+      "purchaseDate": "Data zakupu",
+      "count": "Liczba",
+      "bookValue": "Wartość księgowa",
+      "maturityDate": "Wykup",
+      "portfolio": "Portfel"
+    },
+    "status": {
+      "active": "Aktywna",
+      "interestDue": "Odsetki do rozliczenia",
+      "matured": "Do wykupu"
+    },
+    "delete": {
+      "title": "Usunąć tę obligację?",
+      "message": "„{{ name }}” i jej warunki zostaną trwale usunięte. Tego nie można cofnąć.",
+      "failed": "Nie udało się usunąć obligacji."
+    },
+    "purchase": {
+      "newTitle": "Zakup obligacji skarbowych",
+      "editTitle": "Edycja zakupu obligacji",
+      "series": "Seria z oferty",
+      "manual": "Wprowadź ręcznie",
+      "offerLoadFailed": "Nie udało się wczytać oferty na ten dzień.",
+      "portfolio": "Portfel",
+      "portfolioRequired": "Portfel jest wymagany.",
+      "portfoliosLoadFailed": "Nie udało się wczytać portfeli.",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameTooLong": "Nazwa jest za długa.",
+      "seriesCode": "Kod serii",
+      "seriesCodeRequired": "Kod serii jest wymagany.",
+      "seriesCodeInvalid": "Podaj typ i cztery cyfry, np. EDO1036.",
+      "type": "Typ obligacji",
+      "typeRequired": "Typ obligacji jest wymagany.",
+      "purchaseDate": "Data zakupu",
+      "purchaseDateRequired": "Data zakupu jest wymagana.",
+      "bondCount": "Liczba obligacji",
+      "bondCountMin": "Kup co najmniej jedną obligację.",
+      "price": "Cena za obligację",
+      "priceRange": "Cena musi być większa od 0 i nie większa niż 100.",
+      "firstRate": "Oprocentowanie w 1. okresie (%)",
+      "rateRange": "Podaj oprocentowanie od 0 do 100.",
+      "margin": "Marża (%)",
+      "marginRange": "Podaj marżę od 0 do 100.",
+      "fee": "Opłata za wcześniejszy wykup (za obligację)",
+      "feeRange": "Podaj opłatę od 0 do 100.",
+      "taxExempt": "IKE/IKZE (bez podatku Belki)",
+      "sourceOfFunds": "Źródło środków",
+      "newMoney": "Nowe środki (spoza aplikacji)",
+      "fundingLoadFailed": "Nie udało się wczytać źródeł środków.",
+      "exceedsBalance": "Koszt przekracza saldo źródła ({{ balance }}).",
+      "insufficientFunds": "Źródło środków nie pokrywa tego zakupu.",
+      "cost": "Koszt"
     }
   },
   "dashboard": {
@@ -274,6 +336,7 @@
     "loadFailed": "Nie udało się wczytać aktywów.",
     "depositLoadFailed": "Nie udało się wczytać lokaty.",
     "savingsAccountLoadFailed": "Nie udało się wczytać konta oszczędnościowego.",
+    "bondLoadFailed": "Nie udało się wczytać obligacji.",
     "delete": {
       "title": "Usunąć to aktywo?",
       "message": "\"{{ name }}\" zostanie trwale usunięte. Tej operacji nie można cofnąć.",

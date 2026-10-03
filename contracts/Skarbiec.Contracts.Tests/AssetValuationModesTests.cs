@@ -20,6 +20,12 @@ public sealed class AssetValuationModesTests
     }
 
     [Fact]
+    public void Default_Bond_IsCurrencyValued()
+    {
+        Assert.Equal(AssetValuationMode.CurrencyValued, AssetValuationModes.Default(AssetClass.Bond));
+    }
+
+    [Fact]
     public void Savings_IsAppendedWithStableValue()
     {
         Assert.Equal(9, (int)AssetClass.Savings);

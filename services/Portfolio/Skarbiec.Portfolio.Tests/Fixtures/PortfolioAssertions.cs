@@ -59,6 +59,18 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, DepositTransactionsManagedErrorCode, cancellationToken);
 
+    public const string UseBondEndpointsErrorCode = "Validation.UseBondEndpoints";
+
+    public const string BondTransactionsManagedErrorCode = "Conflict.BondTransactionsManaged";
+
+    public static async Task AssertUseBondEndpointsAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseBondEndpointsErrorCode, cancellationToken);
+
+    public static async Task AssertBondTransactionsManagedAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, BondTransactionsManagedErrorCode, cancellationToken);
+
     public const string SavingsInterestNotDueErrorCode = "Conflict.SavingsInterestNotDue";
 
     public const string SavingsInterestPeriodMismatchErrorCode = "Conflict.SavingsInterestPeriodMismatch";

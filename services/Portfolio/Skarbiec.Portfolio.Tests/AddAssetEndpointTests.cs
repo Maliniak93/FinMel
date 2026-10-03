@@ -18,11 +18,27 @@ namespace Skarbiec.Portfolio.Tests;
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task Add_Bond_UseBondEndpoints()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest { AssetClass = AssetClass.Bond, Name = "Treasury bond", Currency = "PLN" };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        await response.AssertUseBondEndpointsAsync(cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+    }
+
     [Theory]
     [InlineData(AssetClass.Cash)]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
-    [InlineData(AssetClass.Bond)]
     [InlineData(AssetClass.Crypto)]
     [InlineData(AssetClass.PreciousMetal)]
     [InlineData(AssetClass.RealEstate)]

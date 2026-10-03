@@ -9,6 +9,9 @@ public static class TransferRoutes
         // Funding a term deposit from cash — entered through AddDeposit's fundingAssetId.
         [(AssetClass.Cash, AssetClass.Deposit)] = false,
 
+        // Buying a treasury bond with cash — entered through AddBond's fundingAssetId.
+        [(AssetClass.Cash, AssetClass.Bond)] = false,
+
         // Paying a settled deposit out to cash, through SettleDeposit's destinationAssetId and PayOutDeposit.
         [(AssetClass.Deposit, AssetClass.Cash)] = false,
 

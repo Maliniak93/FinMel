@@ -56,14 +56,25 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     }
 
     [Fact]
-    public async Task Add_ValidBondTicker_RoutesToStooq()
+    public async Task Add_BondClass_ReturnsUnsupported()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var request = new AddCustomInstrumentRequest
+        {
+            Ticker = "BOND.PL",
+            Name = "Treasury bond",
+            QuoteCurrency = "PLN",
+            AssetClass = AssetClass.Bond,
+        };
 
-        var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "BOND.PL", assetClass: AssetClass.Bond);
+        var response = await client.PostAsJsonAsync(InstrumentsUri, request, cancellationToken);
 
-        Assert.Equal(PriceSource.Stooq, body.Source);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.Equal("Validation.UnsupportedInstrumentAssetClass", problem.Extensions["errorCode"]?.ToString());
+        Assert.Empty(Factory.TickerVerifier.Calls);
     }
 
     [Fact]

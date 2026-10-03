@@ -403,6 +403,84 @@ Content-Type: application/json
   "annualInterestRatePercent": 5
 }
 
+### --- Treasury bonds ---
+
+### Add a treasury bond bought with new money (type 5 = EDO)
+# @name addBond
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "EDO1036",
+  "seriesCode": "EDO1036",
+  "type": 5,
+  "purchaseDate": "2026-10-01",
+  "bondCount": 50,
+  "purchasePricePerBond": 100.00,
+  "firstPeriodRatePercent": 5.35,
+  "marginPercent": 2.00,
+  "earlyRedemptionFeePerBond": 3.00,
+  "taxExempt": false
+}
+
+### Add a treasury bond funded from cash (type 1 = ROR)
+# @name addFundedBond
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "ROR0627",
+  "seriesCode": "ROR0627",
+  "type": 1,
+  "purchaseDate": "2026-06-10",
+  "bondCount": 10,
+  "purchasePricePerBond": 100.00,
+  "firstPeriodRatePercent": 4.25,
+  "earlyRedemptionFeePerBond": 0.50,
+  "taxExempt": false,
+  "fundingAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### List every bond across portfolios
+GET {{baseUrl}}/api/portfolio/bonds
+Authorization: Bearer {{authToken}}
+
+### Get a bond
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addBond.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+
+### Update a bond
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addBond.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "EDO1036 (IKE)",
+  "seriesCode": "EDO1036",
+  "type": 5,
+  "purchaseDate": "2026-10-01",
+  "bondCount": 60,
+  "purchasePricePerBond": 100.00,
+  "firstPeriodRatePercent": 5.35,
+  "marginPercent": 2.00,
+  "earlyRedemptionFeePerBond": 3.00,
+  "taxExempt": true
+}
+
+### Record a transaction on the bond (409)
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addBond.response.body.assetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": 2,
+  "quantity": 500,
+  "unitPrice": 1,
+  "date": "2026-10-01"
+}
+
 ### --- Savings accounts ---
 
 ### Add a savings account

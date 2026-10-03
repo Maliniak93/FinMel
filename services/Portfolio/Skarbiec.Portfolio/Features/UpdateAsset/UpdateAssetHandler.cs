@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.MarketData;
@@ -30,6 +31,12 @@ public sealed class UpdateAssetHandler(
         if (asset.AssetClass == AssetClass.Deposit || request.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.UseDepositEndpoints;
+        }
+
+        // The same for a treasury bond and its terms.
+        if (asset.AssetClass == AssetClass.Bond || request.AssetClass == AssetClass.Bond)
+        {
+            return BondErrors.UseBondEndpoints;
         }
 
         // The same for a savings account and its terms.

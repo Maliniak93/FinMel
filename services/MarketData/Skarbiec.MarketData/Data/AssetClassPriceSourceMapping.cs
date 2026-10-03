@@ -7,10 +7,10 @@ public static class AssetClassPriceSourceMapping
 {
     public static PriceSource? Resolve(AssetClass assetClass) => assetClass switch
     {
-        AssetClass.Stock or AssetClass.Etf or AssetClass.Bond => PriceSource.Stooq,
+        AssetClass.Stock or AssetClass.Etf => PriceSource.Stooq,
         AssetClass.Crypto => PriceSource.CoinGecko,
         AssetClass.PreciousMetal => PriceSource.Nbp,
-        AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.RealEstate or AssetClass.Other => null,
+        AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.Bond or AssetClass.RealEstate or AssetClass.Other => null,
         _ => throw new ArgumentOutOfRangeException(nameof(assetClass), assetClass, "Unmapped AssetClass — add it to AssetClassPriceSourceMapping.Resolve."),
     };
 }

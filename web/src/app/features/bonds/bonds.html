@@ -2,6 +2,9 @@
   <h1>{{ 'bonds.title' | transloco }}</h1>
 
   <mat-tab-group>
+    <mat-tab [label]="'bonds.tabs.myBonds' | transloco">
+      <app-my-bonds />
+    </mat-tab>
     <mat-tab [label]="'bonds.tabs.offer' | transloco">
       <app-bond-offer />
     </mat-tab>

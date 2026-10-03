@@ -51,7 +51,7 @@ The UI runs on **Transloco** (`@jsverse/transloco`), English by default, Polish 
 
 ## Domain rules in the UI
 
-- The server does all money math (`decimal`); the client only formats, through `shared/format.ts` (see Languages). No floating-point arithmetic on amounts. The one exception is a display-only sum a spec asks for from stored inputs (the net interest in the deposit settlement and savings-interest dialogs, and a deposit's final amount — `settlementAmounts` in `features/deposits/deposit-terms.ts`), done in whole grosze; the server's values stay the truth.
+- The server does all money math (`decimal`); the client only formats, through `shared/format.ts` (see Languages). No floating-point arithmetic on amounts. The one exception is a display-only sum a spec asks for from stored inputs (the net interest in the deposit settlement and savings-interest dialogs, a deposit's final amount — `settlementAmounts` in `features/deposits/deposit-terms.ts` — and a bond purchase's cost, count × price, shown and checked against the funding Cash balance in `bond-purchase-dialog`), done in whole grosze; the server's values stay the truth.
 - A price older than 7 days is stale: show the marker with its date and source.
 - Manual-valuation assets: remind the user to refresh when `ManualValueDate` is old.
 - Allocation, rebalancing and goal views always carry the "information, not investment advice" disclaimer.

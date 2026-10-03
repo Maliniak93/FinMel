@@ -8,7 +8,7 @@ public enum AssetValuationMode
     // ManualValueAmount × FxRate(Currency→PLN) at the snapshot date.
     Manual,
 
-    // Quantity × FxRate(Currency→PLN), e.g. plain cash or a term deposit.
+    // Quantity × FxRate(Currency→PLN), e.g. plain cash, a term deposit or a treasury bond.
     CurrencyValued,
 }
 
@@ -17,8 +17,8 @@ public static class AssetValuationModes
 {
     public static AssetValuationMode Default(AssetClass assetClass) => assetClass switch
     {
-        AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings => AssetValuationMode.CurrencyValued,
-        AssetClass.Stock or AssetClass.Etf or AssetClass.Bond or AssetClass.Crypto or AssetClass.PreciousMetal => AssetValuationMode.Market,
+        AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.Bond => AssetValuationMode.CurrencyValued,
+        AssetClass.Stock or AssetClass.Etf or AssetClass.Crypto or AssetClass.PreciousMetal => AssetValuationMode.Market,
         AssetClass.RealEstate or AssetClass.Other => AssetValuationMode.Manual,
         _ => throw new ArgumentOutOfRangeException(nameof(assetClass), assetClass, "Unmapped AssetClass — add it to AssetValuationModes.Default."),
     };

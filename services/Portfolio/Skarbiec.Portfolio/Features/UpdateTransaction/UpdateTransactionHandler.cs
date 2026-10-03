@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.Features.Transfers;
@@ -31,6 +32,12 @@ public sealed class UpdateTransactionHandler(
         if (asset.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.TransactionsManaged;
+        }
+
+        // A treasury bond's only transaction is its opening one, rewritten by UpdateBond.
+        if (asset.AssetClass == AssetClass.Bond)
+        {
+            return BondErrors.TransactionsManaged;
         }
 
         var transaction = await dbContext.Transactions

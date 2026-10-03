@@ -30,11 +30,14 @@ import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language'
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../shared/format';
 import { toDateOnly } from '../../shared/date-only';
+import { bondResponse } from '../../../testing/bond-fixtures';
+import { BondPurchaseDialog } from '../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
 import { SavingsAccountFormDialog } from '../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { savingsAccountResponse } from '../deposits/testing/savings-account-fixtures';
 import { depositResponse } from '../deposits/testing/deposit-fixtures';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
+import { ASSET_CLASS } from './asset-class';
 import { VALUATION_MODE } from './asset-valuation-mode';
 import { Assets } from './assets';
 
@@ -150,6 +153,7 @@ describe('Assets', () => {
     instrumentResponse?: Response,
     depositResponseBody?: unknown,
     savingsAccountBody?: unknown,
+    bondBody?: unknown,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
@@ -160,6 +164,9 @@ describe('Assets', () => {
         return savingsAccountBody
           ? jsonResponse(savingsAccountBody)
           : jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (url.includes('/bonds')) {
+        return bondBody ? jsonResponse(bondBody) : jsonResponse({ detail: 'Not found.' }, 404);
       }
       if (url.includes('/deposits')) {
         return depositResponseBody
@@ -704,6 +711,37 @@ describe('Assets', () => {
     expect(dialogType).toBe(SavingsAccountFormDialog);
     expect(dialogType).not.toBe(AssetFormDialog);
     expect(JSON.stringify(config?.data)).toContain(savings.id);
+    await vi.waitFor(() =>
+      expect(
+        fetchSpy.mock.calls
+          .slice(callsBefore)
+          .some((call: unknown[]) =>
+            requestUrl(call[0]).endsWith(`/portfolios/${portfolioId}/assets`),
+          ),
+      ).toBe(true),
+    );
+  });
+
+  it('Edit on a Bond row opens BondPurchaseDialog, not the asset form', async () => {
+    const bond: AssetResponse = {
+      ...currencyValuedAsset,
+      id: '88888888-bbbb-8888-bbbb-888888888888',
+      assetClass: ASSET_CLASS.Bond,
+      name: 'EDO1036',
+      quantity: 5000,
+    };
+    const terms = bondResponse({ assetId: bond.id, portfolioId });
+    await setup(jsonResponse([bond]), undefined, undefined, undefined, undefined, terms);
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = fetchSpy.mock.calls.length;
+
+    component['openEditDialog'](bond);
+
+    await vi.waitFor(() => expect(dialog.open).toHaveBeenCalled());
+    const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data?: unknown }];
+    expect(dialogType).toBe(BondPurchaseDialog);
+    expect(dialogType).not.toBe(AssetFormDialog);
+    expect(JSON.stringify(config?.data)).toContain(bond.id);
     await vi.waitFor(() =>
       expect(
         fetchSpy.mock.calls

@@ -459,6 +459,55 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("Transactions");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.TreasuryBond", b =>
+                {
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BondCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("EarlyRedemptionFeePerBond")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("FirstPeriodRatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<decimal?>("MarginPercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<DateOnly>("MaturityDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("PurchaseDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("PurchasePricePerBond")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("SeriesCode")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<bool>("TaxExempt")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AssetId");
+
+                    b.ToTable("TreasuryBonds");
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
                 {
                     b.HasOne("MassTransit.EntityFrameworkCoreIntegration.OutboxState", null)
@@ -485,6 +534,15 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
                         .WithOne()
                         .HasForeignKey("Skarbiec.Portfolio.Data.TermDeposit", "AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.TreasuryBond", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
+                        .WithOne()
+                        .HasForeignKey("Skarbiec.Portfolio.Data.TreasuryBond", "AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

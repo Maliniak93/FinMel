@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { client as marketDataClient } from '../../../api/marketdata/client.gen';
+import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { jsonResponse, requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
 import { Bonds } from '../bonds';
@@ -48,6 +49,7 @@ describe('Bonds page, current offer tab', () => {
 
   beforeAll(() => {
     marketDataClient.setConfig({ baseUrl: 'https://example.test' });
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
   afterEach(async () => {
@@ -61,7 +63,9 @@ describe('Bonds page, current offer tab', () => {
       .mockImplementation(async (input) =>
         requestUrl(input).includes('/api/marketdata/bond-series')
           ? jsonResponse(series)
-          : jsonResponse({ detail: 'Not found.' }, 404),
+          : requestUrl(input).includes('/api/portfolio/bonds')
+            ? jsonResponse([])
+            : jsonResponse({ detail: 'Not found.' }, 404),
       );
     await TestBed.configureTestingModule({
       imports: [Bonds],
@@ -70,6 +74,17 @@ describe('Bonds page, current offer tab', () => {
     fixture = TestBed.createComponent(Bonds);
     await fixture.whenStable();
     await switchLanguage(fixture, 'pl');
+    const offerTab = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
+    ).find((tab) => textOf(tab).includes('Aktualna oferta'));
+    offerTab!.click();
+    fixture.detectChanges();
+    // The tab body attaches its content after the switch animation, so wait for it before the resource settles.
+    await vi.waitFor(() =>
+      expect((fixture.nativeElement as HTMLElement).querySelector('app-bond-offer')).not.toBeNull(),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
   }
 
   function rows(): HTMLElement[] {
@@ -92,8 +107,9 @@ describe('Bonds page, current offer tab', () => {
     const tabs = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
     );
-    expect(tabs).toHaveLength(1);
-    expect(textOf(tabs[0])).toContain('Aktualna oferta');
+    expect(tabs).toHaveLength(2);
+    expect(textOf(tabs[0])).toContain('Moje obligacje');
+    expect(textOf(tabs[1])).toContain('Aktualna oferta');
     expect(rows()).toHaveLength(3);
   });
 
@@ -113,7 +129,7 @@ describe('Bonds page, current offer tab', () => {
     rows().forEach((row) => {
       const cells = Array.from(row.querySelectorAll('td'));
       expect(cells.length).toBeGreaterThanOrEqual(6);
-      expect(textOf(cells[cells.length - 1])).toMatch(/\d/);
+      expect(textOf(cells[5])).toMatch(/\d/);
     });
   });
 

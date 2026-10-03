@@ -169,6 +169,7 @@
   "bonds": {
     "title": "Treasury bonds",
     "tabs": {
+      "myBonds": "My bonds",
       "offer": "Current offer"
     },
     "term": {
@@ -194,7 +195,68 @@
         "inflation": "inflation + margin {{ margin }}"
       },
       "empty": "No data from the Ministry of Finance — you can enter a bond manually",
-      "loadFailed": "Failed to load the bond offer."
+      "loadFailed": "Failed to load the bond offer.",
+      "buy": "Buy",
+      "buySeries": "Buy {{ code }}"
+    },
+    "my": {
+      "add": "Buy bonds",
+      "addFirst": "Record your first bond purchase",
+      "empty": "No bonds yet.",
+      "loadFailed": "Failed to load bonds.",
+      "series": "Series",
+      "type": "Type",
+      "purchaseDate": "Purchased",
+      "count": "Count",
+      "bookValue": "Book value",
+      "maturityDate": "Matures",
+      "portfolio": "Portfolio"
+    },
+    "status": {
+      "active": "Active",
+      "interestDue": "Interest due",
+      "matured": "Matured"
+    },
+    "delete": {
+      "title": "Delete this bond?",
+      "message": "\"{{ name }}\" and its terms will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete bond."
+    },
+    "purchase": {
+      "newTitle": "Buy treasury bonds",
+      "editTitle": "Edit bond purchase",
+      "series": "Series from the offer",
+      "manual": "Enter manually",
+      "offerLoadFailed": "Failed to load the offer for this date.",
+      "portfolio": "Portfolio",
+      "portfolioRequired": "Portfolio is required.",
+      "portfoliosLoadFailed": "Failed to load portfolios.",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name is too long.",
+      "seriesCode": "Series code",
+      "seriesCodeRequired": "Series code is required.",
+      "seriesCodeInvalid": "Use the type and four digits, e.g. EDO1036.",
+      "type": "Bond type",
+      "typeRequired": "Bond type is required.",
+      "purchaseDate": "Purchase date",
+      "purchaseDateRequired": "Purchase date is required.",
+      "bondCount": "Number of bonds",
+      "bondCountMin": "Buy at least one bond.",
+      "price": "Price per bond",
+      "priceRange": "The price must be above 0 and at most 100.",
+      "firstRate": "First-period rate (%)",
+      "rateRange": "Enter a rate between 0 and 100.",
+      "margin": "Margin (%)",
+      "marginRange": "Enter a margin between 0 and 100.",
+      "fee": "Early redemption fee per bond",
+      "feeRange": "Enter a fee between 0 and 100.",
+      "taxExempt": "IKE/IKZE (no Belka tax)",
+      "sourceOfFunds": "Source of funds",
+      "newMoney": "New money (from outside)",
+      "fundingLoadFailed": "Failed to load the sources of funds.",
+      "exceedsBalance": "The cost is above the source's balance ({{ balance }}).",
+      "insufficientFunds": "The source of funds cannot cover this purchase.",
+      "cost": "Cost"
     }
   },
   "dashboard": {
@@ -274,6 +336,7 @@
     "loadFailed": "Failed to load assets.",
     "depositLoadFailed": "Failed to load the deposit.",
     "savingsAccountLoadFailed": "Failed to load the savings account.",
+    "bondLoadFailed": "Failed to load the bond.",
     "delete": {
       "title": "Delete this asset?",
       "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",

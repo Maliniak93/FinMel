@@ -1,0 +1,130 @@
+<div class="my-bonds__header">
+  <mat-slide-toggle
+    class="my-bonds__show-archived"
+    [checked]="showArchived()"
+    (change)="showArchived.set($event.checked)"
+  >
+    {{ 'assetArchive.showArchived' | transloco }}
+  </mat-slide-toggle>
+  <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+    <mat-icon>add</mat-icon>
+    {{ 'bonds.my.add' | transloco }}
+  </button>
+</div>
+
+@if (bondsResource.error(); as loadError) {
+  <div class="my-bonds__state" role="alert">
+    <p>{{ loadError.message }}</p>
+    <button mat-button type="button" (click)="bondsResource.reload()">
+      {{ 'common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (bondsResource.isLoading() && !bondsResource.hasValue()) {
+  <div class="my-bonds__state">
+    <mat-spinner diameter="32" />
+  </div>
+} @else if (bondsResource.hasValue() && bondsResource.value().length === 0) {
+  <div class="my-bonds__state">
+    <p>{{ 'bonds.my.empty' | transloco }}</p>
+    <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      {{ 'bonds.my.addFirst' | transloco }}
+    </button>
+  </div>
+} @else if (bondsResource.hasValue()) {
+  <table mat-table [dataSource]="visibleBonds()" class="my-bonds__table">
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">{{ bond.name }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="seriesCode">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.series' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">{{ bond.seriesCode }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.type' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">{{ typeLabel(bond) | transloco }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="portfolio">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.portfolio' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">
+        {{ bond.portfolioName }}
+        @if (bond.portfolioIsArchived) {
+          <span class="my-bonds__muted">{{ 'deposits.archivedMarker' | transloco }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="purchaseDate">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.purchaseDate' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">{{ formatDate(bond.purchaseDate) }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="bondCount">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.count' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">{{ bond.bondCount }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="bookValue">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.bookValue' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">{{ formatMoney(bond.bookValue, 'PLN') }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="maturityDate">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.maturityDate' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">{{ formatDate(bond.maturityDate) }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond">
+        <mat-chip-set>
+          <mat-chip [class.my-bonds__chip--attention]="needsAttention(bond)">
+            {{ statusLabel(bond) | transloco }}
+          </mat-chip>
+          @if (bond.isArchived) {
+            <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
+          }
+        </mat-chip-set>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let bond">
+        @if (!bond.portfolioIsArchived) {
+          <button
+            mat-icon-button
+            type="button"
+            [matMenuTriggerFor]="menu"
+            [attr.aria-label]="'common.actionsFor' | transloco: { name: bond.name }"
+          >
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            @if (!bond.isArchived) {
+              <button mat-menu-item type="button" (click)="openEditDialog(bond)">
+                <mat-icon>edit</mat-icon>
+                <span>{{ 'common.edit' | transloco }}</span>
+              </button>
+            }
+            <button mat-menu-item type="button" (click)="remove(bond)">
+              <mat-icon>delete</mat-icon>
+              <span>{{ 'common.delete' | transloco }}</span>
+            </button>
+          </mat-menu>
+        }
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    <tr *matNoDataRow>
+      <td class="my-bonds__no-data" [attr.colspan]="displayedColumns.length">
+        {{ 'assetArchive.allArchived' | transloco }}
+      </td>
+    </tr>
+  </table>
+}

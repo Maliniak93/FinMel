@@ -14,6 +14,7 @@ import {
 } from '../../../../../testing/i18n';
 import { client as marketDataClient } from '../../../../api/marketdata/client.gen';
 import { client as portfolioClient } from '../../../../api/portfolio/client.gen';
+import { BondPurchaseDialog } from '../../../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
 import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { ASSET_CLASS, ASSET_CLASSES } from '../../asset-class';
@@ -53,7 +54,6 @@ const EXPECTED_FORM: Record<number, Type<AssetFormComponent>> = {
   [ASSET_CLASS.Cash]: CashAssetForm,
   [ASSET_CLASS.Stock]: SecurityAssetForm,
   [ASSET_CLASS.Etf]: SecurityAssetForm,
-  [ASSET_CLASS.Bond]: SecurityAssetForm,
   [ASSET_CLASS.Crypto]: SecurityAssetForm,
   [ASSET_CLASS.PreciousMetal]: GoldAssetForm,
   [ASSET_CLASS.RealEstate]: ManualAssetForm,
@@ -145,7 +145,10 @@ describe('AssetFormDialog', () => {
       expect(renderedForms()).toEqual([]);
 
       for (const { value } of ASSET_CLASSES.filter(
-        (c) => c.value !== ASSET_CLASS.Deposit && c.value !== ASSET_CLASS.Savings,
+        (c) =>
+          c.value !== ASSET_CLASS.Deposit &&
+          c.value !== ASSET_CLASS.Savings &&
+          c.value !== ASSET_CLASS.Bond,
       )) {
         await pickTile(value);
 
@@ -172,6 +175,25 @@ describe('AssetFormDialog', () => {
       expect(fixture.debugElement.query(By.directive(CashAssetForm))).toBeNull();
       expect(open).toHaveBeenCalledWith(
         DepositFormDialog,
+        expect.objectContaining({ data: expect.objectContaining({ portfolioId }) }),
+      );
+      await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('the Bond tile opens BondPurchaseDialog preset to the current portfolio', async () => {
+      await setup({ portfolioId });
+      const matDialog = fixture.debugElement.injector.get(MatDialog);
+      const open = vi
+        .spyOn(matDialog, 'open')
+        .mockReturnValue({ afterClosed: () => of(true) } as unknown as MatDialogRef<unknown>);
+
+      await pickTile(ASSET_CLASS.Bond);
+
+      expect(renderedForms()).toEqual([]);
+      expect(fixture.debugElement.query(By.directive(SecurityAssetForm))).toBeNull();
+      expect(open).toHaveBeenCalledWith(
+        BondPurchaseDialog,
         expect.objectContaining({ data: expect.objectContaining({ portfolioId }) }),
       );
       await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));

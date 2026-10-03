@@ -14,6 +14,20 @@ export type AddAssetRequest = {
     initialTransaction?: null | RecordTransactionRequest;
 };
 
+export type AddBondRequest = {
+    name: string;
+    seriesCode: string;
+    type: TreasuryBondType;
+    purchaseDate: string;
+    bondCount: number | string;
+    purchasePricePerBond: number | string;
+    firstPeriodRatePercent: number | string;
+    marginPercent?: null | number | string;
+    earlyRedemptionFeePerBond: number | string;
+    taxExempt?: boolean;
+    fundingAssetId?: null | string;
+};
+
 export type AddDepositRequest = {
     name: string;
     bankName?: null | string;
@@ -59,6 +73,42 @@ export type AssetResponse = {
 };
 
 export type AssetValuationMode = number;
+
+export type BondPeriodResponse = {
+    index: number | string;
+    start: string;
+    end: string;
+    state: BondPeriodState;
+};
+
+export type BondPeriodState = number;
+
+export type BondResponse = {
+    assetId: string;
+    portfolioId: string;
+    portfolioName: string;
+    portfolioIsArchived: boolean;
+    isArchived: boolean;
+    name: string;
+    seriesCode: string;
+    type: TreasuryBondType;
+    purchaseDate: string;
+    bondCount: number | string;
+    purchasePricePerBond: number | string;
+    firstPeriodRatePercent: number | string;
+    marginPercent?: null | number | string;
+    earlyRedemptionFeePerBond: number | string;
+    taxExempt: boolean;
+    maturityDate: string;
+    nominalValue: number | string;
+    bookValue: number | string;
+    fundingAssetId?: null | string;
+    fundingAssetName?: null | string;
+    status: BondStatus;
+    periods: Array<BondPeriodResponse>;
+};
+
+export type BondStatus = number;
 
 export type CreatePortfolioRequest = {
     name: string;
@@ -253,6 +303,8 @@ export type TransferCandidateResponse = {
 
 export type TransferDirection = number;
 
+export type TreasuryBondType = number;
+
 export type UpdateAssetRequest = {
     assetClass: AssetClass;
     name: string;
@@ -260,6 +312,19 @@ export type UpdateAssetRequest = {
     instrumentId?: null | string;
     manualValue?: null | number | string;
     manualValueDate?: null | string;
+};
+
+export type UpdateBondRequest = {
+    name: string;
+    seriesCode: string;
+    type: TreasuryBondType;
+    purchaseDate: string;
+    bondCount: number | string;
+    purchasePricePerBond: number | string;
+    firstPeriodRatePercent: number | string;
+    marginPercent?: null | number | string;
+    earlyRedemptionFeePerBond: number | string;
+    taxExempt?: boolean;
 };
 
 export type UpdateDepositRequest = {
@@ -794,6 +859,78 @@ export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResp
 };
 
 export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsData = {
+    body: AddBondRequest;
+    path: {
+        portfolioId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsResponses = {
+    /**
+     * Created
+     */
+    201: BondResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsResponses];
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: BondResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses];
+
+export type PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData = {
+    body: UpdateBondRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}';
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: BondResponse;
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses];
+
+export type GetApiPortfolioBondsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/bonds';
+};
+
+export type GetApiPortfolioBondsResponses = {
+    /**
+     * OK
+     */
+    200: Array<BondResponse>;
+};
+
+export type GetApiPortfolioBondsResponse = GetApiPortfolioBondsResponses[keyof GetApiPortfolioBondsResponses];
 
 export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData = {
     body: AddSavingsAccountRequest;
