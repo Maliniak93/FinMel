@@ -13,7 +13,7 @@ internal static class InstrumentErrors
     public static Error UnsupportedAssetClass(AssetClass assetClass) =>
         new(
             "Validation.UnsupportedInstrumentAssetClass",
-            $"Asset class '{assetClass}' has no market data provider — custom instruments are only for Stock, Etf, Bond, Crypto or PreciousMetal.");
+            $"Asset class '{assetClass}' has no market data provider — custom instruments are only for Stock, Etf, Crypto or PreciousMetal.");
 
     public static Error TickerNotFound(PriceSource source, string ticker) =>
         new(

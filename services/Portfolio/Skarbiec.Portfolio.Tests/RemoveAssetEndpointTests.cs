@@ -174,6 +174,28 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
+    public async Task Remove_Bond_DeletesTermsAndDetachesFunding()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedBondAsync(cancellationToken);
+        var leg = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(funded.BondPortfolioId, funded.Bond.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(BondUri(funded.BondPortfolioId, funded.Bond.AssetId), cancellationToken)).StatusCode);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        var detached = await client.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        Assert.Equal(leg.Id, detached.Id);
+        Assert.Null(detached.Transfer);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Set<TreasuryBond>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == funded.Bond.AssetId, cancellationToken));
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+    }
+
+    [Fact]
     public async Task Remove_FundingCash_DetachesDepositLeg()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

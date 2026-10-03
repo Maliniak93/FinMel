@@ -22,6 +22,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../../core/auth/problem-details';
+import { BondPurchaseDialog } from '../../../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
 import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { ASSET_CLASS } from '../../asset-class';
@@ -45,7 +46,6 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
       return 'cash';
     case ASSET_CLASS.Stock:
     case ASSET_CLASS.Etf:
-    case ASSET_CLASS.Bond:
     case ASSET_CLASS.Crypto:
       return 'security';
     case ASSET_CLASS.PreciousMetal:
@@ -95,6 +95,14 @@ export class AssetFormDialog {
     if (Number(assetClass) === ASSET_CLASS.Deposit) {
       this.dialog
         .open(DepositFormDialog, { width: '560px', data: { portfolioId: this.data.portfolioId } })
+        .afterClosed()
+        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
+      return;
+    }
+
+    if (Number(assetClass) === ASSET_CLASS.Bond) {
+      this.dialog
+        .open(BondPurchaseDialog, { width: '560px', data: { portfolioId: this.data.portfolioId } })
         .afterClosed()
         .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
       return;

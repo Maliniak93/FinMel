@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.MarketData;
@@ -30,6 +31,12 @@ public sealed class AddAssetHandler(
         if (request.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.UseDepositEndpoints;
+        }
+
+        // A Bond-class asset is a treasury bond holding, created only by AddBond.
+        if (request.AssetClass == AssetClass.Bond)
+        {
+            return BondErrors.UseBondEndpoints;
         }
 
         // Likewise only AddSavingsAccount creates a Savings-class asset.

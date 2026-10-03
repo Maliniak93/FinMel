@@ -15,6 +15,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
     public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
+    public DbSet<TreasuryBond> TreasuryBonds => Set<TreasuryBond>();
     public DbSet<SavingsInterestSettlement> SavingsInterestSettlements => Set<SavingsInterestSettlement>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -103,6 +104,22 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             savingsAccount.Property(s => s.BankName).HasMaxLength(100);
             savingsAccount.Property(s => s.AnnualInterestRatePercent).HasPrecision(7, 4);
+        });
+
+        modelBuilder.Entity<TreasuryBond>(treasuryBond =>
+        {
+            // Keyed and FK-cascaded exactly like TermDeposit.
+            treasuryBond.HasKey(b => b.AssetId);
+            treasuryBond.HasOne<Asset>()
+                .WithOne()
+                .HasForeignKey<TreasuryBond>(b => b.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            treasuryBond.Property(b => b.SeriesCode).HasMaxLength(7);
+            treasuryBond.Property(b => b.PurchasePricePerBond).HasPrecision(18, 2);
+            treasuryBond.Property(b => b.FirstPeriodRatePercent).HasPrecision(7, 4);
+            treasuryBond.Property(b => b.MarginPercent).HasPrecision(7, 4);
+            treasuryBond.Property(b => b.EarlyRedemptionFeePerBond).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<SavingsInterestSettlement>(settlement =>

@@ -1,5 +1,6 @@
-import { Component, resource } from '@angular/core';
+import { Component, inject, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
@@ -7,6 +8,10 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { getApiMarketdataBondSeries, type BondSeriesListItem } from '../../../api/marketdata';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { formatMoney, formatPercent } from '../../../shared/format';
+import {
+  BondPurchaseDialog,
+  type BondPurchaseDialogData,
+} from '../bond-purchase-dialog/bond-purchase-dialog';
 import { bondTypeInfo, type BondTypeInfo } from '../bond-types';
 
 interface FollowingRateLabel {
@@ -21,6 +26,8 @@ interface FollowingRateLabel {
   styleUrl: './bond-offer.scss',
 })
 export class BondOffer {
+  private readonly dialog = inject(MatDialog);
+
   protected readonly displayedColumns = [
     'code',
     'type',
@@ -28,6 +35,7 @@ export class BondOffer {
     'followingRate',
     'swapPrice',
     'earlyRedemptionFee',
+    'actions',
   ];
 
   // No onSaleOn: the server picks today's offer in Europe/Warsaw.
@@ -44,6 +52,11 @@ export class BondOffer {
   });
 
   protected readonly formatMoney = formatMoney;
+
+  protected buy(series: BondSeriesListItem): void {
+    const data: BondPurchaseDialogData = { seriesCode: series.code };
+    this.dialog.open(BondPurchaseDialog, { width: '560px', data });
+  }
 
   protected typeInfo(series: BondSeriesListItem): BondTypeInfo | undefined {
     return bondTypeInfo(series.type);

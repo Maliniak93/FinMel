@@ -1041,6 +1041,154 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/bonds": {
+      "post": {
+        "tags": [
+          "AddBondEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddBondRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}": {
+      "put": {
+        "tags": [
+          "UpdateBondEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBondRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "GetBondEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/bonds": {
+      "get": {
+        "tags": [
+          "ListBondsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BondResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/savings-accounts": {
       "post": {
         "tags": [
@@ -1465,6 +1613,97 @@
           }
         }
       },
+      "AddBondRequest": {
+        "required": [
+          "name",
+          "seriesCode",
+          "type",
+          "purchaseDate",
+          "bondCount",
+          "purchasePricePerBond",
+          "firstPeriodRatePercent",
+          "earlyRedemptionFeePerBond"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "seriesCode": {
+            "pattern": "^[A-Z]{3}[0-9]{4}$",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TreasuryBondType"
+          },
+          "purchaseDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "bondCount": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "purchasePricePerBond": {
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "firstPeriodRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "marginPercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "earlyRedemptionFeePerBond": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "taxExempt": {
+            "type": "boolean"
+          },
+          "fundingAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "AddDepositRequest": {
         "required": [
           "name",
@@ -1702,6 +1941,184 @@
         }
       },
       "AssetValuationMode": {
+        "type": "integer"
+      },
+      "BondPeriodResponse": {
+        "required": [
+          "index",
+          "start",
+          "end",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "state": {
+            "$ref": "#/components/schemas/BondPeriodState"
+          }
+        }
+      },
+      "BondPeriodState": {
+        "type": "integer"
+      },
+      "BondResponse": {
+        "required": [
+          "assetId",
+          "portfolioId",
+          "portfolioName",
+          "portfolioIsArchived",
+          "isArchived",
+          "name",
+          "seriesCode",
+          "type",
+          "purchaseDate",
+          "bondCount",
+          "purchasePricePerBond",
+          "firstPeriodRatePercent",
+          "earlyRedemptionFeePerBond",
+          "taxExempt",
+          "maturityDate",
+          "nominalValue",
+          "bookValue",
+          "status",
+          "periods"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioName": {
+            "type": "string"
+          },
+          "portfolioIsArchived": {
+            "type": "boolean"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "seriesCode": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TreasuryBondType"
+          },
+          "purchaseDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "bondCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "purchasePricePerBond": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "firstPeriodRatePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "marginPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "earlyRedemptionFeePerBond": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "taxExempt": {
+            "type": "boolean"
+          },
+          "maturityDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "nominalValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "bookValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "fundingAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "fundingAssetName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/BondStatus"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BondPeriodResponse"
+            }
+          }
+        }
+      },
+      "BondStatus": {
         "type": "integer"
       },
       "CreatePortfolioRequest": {
@@ -2679,6 +3096,9 @@
       "TransferDirection": {
         "type": "integer"
       },
+      "TreasuryBondType": {
+        "type": "integer"
+      },
       "UpdateAssetRequest": {
         "required": [
           "assetClass",
@@ -2719,6 +3139,90 @@
               "string"
             ],
             "format": "date"
+          }
+        }
+      },
+      "UpdateBondRequest": {
+        "required": [
+          "name",
+          "seriesCode",
+          "type",
+          "purchaseDate",
+          "bondCount",
+          "purchasePricePerBond",
+          "firstPeriodRatePercent",
+          "earlyRedemptionFeePerBond"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "seriesCode": {
+            "pattern": "^[A-Z]{3}[0-9]{4}$",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TreasuryBondType"
+          },
+          "purchaseDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "bondCount": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "purchasePricePerBond": {
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "firstPeriodRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "marginPercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "earlyRedemptionFeePerBond": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "taxExempt": {
+            "type": "boolean"
           }
         }
       },
@@ -2974,6 +3478,18 @@
     },
     {
       "name": "RollOverDepositEndpoint"
+    },
+    {
+      "name": "AddBondEndpoint"
+    },
+    {
+      "name": "UpdateBondEndpoint"
+    },
+    {
+      "name": "GetBondEndpoint"
+    },
+    {
+      "name": "ListBondsEndpoint"
     },
     {
       "name": "AddSavingsAccountEndpoint"

@@ -3,6 +3,9 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.AddAsset;
+using Skarbiec.Portfolio.Features.Bonds;
+using Skarbiec.Portfolio.Features.Bonds.AddBond;
+using Skarbiec.Portfolio.Features.Bonds.UpdateBond;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
@@ -264,6 +267,102 @@ internal static class PortfolioApi
         var deposit = await client.AddDepositAsync(portfolioId, cancellationToken, request);
 
         return (portfolioId, deposit);
+    }
+
+    public const string AllBondsUri = "/api/portfolio/bonds";
+
+    public static string BondsUri(Guid portfolioId) =>
+        $"{PortfoliosUri}/{portfolioId}/bonds";
+
+    public static string BondUri(Guid portfolioId, Guid assetId) =>
+        $"{PortfoliosUri}/{portfolioId}/bonds/{assetId}";
+
+    public static readonly DateOnly DefaultBondPurchaseDate = new(2026, 10, 1);
+
+    public static readonly DateTimeOffset BondPurchaseDayUtc = new(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
+
+    public static AddBondRequest NewBondRequest(
+        string name = "EDO1036",
+        string seriesCode = "EDO1036",
+        TreasuryBondType type = TreasuryBondType.Edo,
+        DateOnly? purchaseDate = null,
+        int bondCount = 50,
+        decimal purchasePricePerBond = 100m,
+        decimal firstPeriodRatePercent = 5.35m,
+        decimal? marginPercent = 2.00m,
+        decimal earlyRedemptionFeePerBond = 3.00m,
+        bool taxExempt = false,
+        Guid? fundingAssetId = null) => new()
+        {
+            Name = name,
+            SeriesCode = seriesCode,
+            Type = type,
+            PurchaseDate = purchaseDate ?? DefaultBondPurchaseDate,
+            BondCount = bondCount,
+            PurchasePricePerBond = purchasePricePerBond,
+            FirstPeriodRatePercent = firstPeriodRatePercent,
+            MarginPercent = marginPercent,
+            EarlyRedemptionFeePerBond = earlyRedemptionFeePerBond,
+            TaxExempt = taxExempt,
+            FundingAssetId = fundingAssetId
+        };
+
+    public static UpdateBondRequest ToUpdateRequest(this AddBondRequest request) => new()
+    {
+        Name = request.Name,
+        SeriesCode = request.SeriesCode,
+        Type = request.Type,
+        PurchaseDate = request.PurchaseDate,
+        BondCount = request.BondCount,
+        PurchasePricePerBond = request.PurchasePricePerBond,
+        FirstPeriodRatePercent = request.FirstPeriodRatePercent,
+        MarginPercent = request.MarginPercent,
+        EarlyRedemptionFeePerBond = request.EarlyRedemptionFeePerBond,
+        TaxExempt = request.TaxExempt
+    };
+
+    public static async Task<BondResponse> AddBondAsync(
+        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddBondRequest? request = null)
+    {
+        var response = await client.PostAsJsonAsync(BondsUri(portfolioId), request ?? NewBondRequest(), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken))!;
+    }
+
+    public static async Task<(Guid PortfolioId, BondResponse Bond)> CreatePortfolioWithBondAsync(
+        this HttpClient client, CancellationToken cancellationToken, AddBondRequest? request = null, string portfolioName = "Bonds")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var bond = await client.AddBondAsync(portfolioId, cancellationToken, request);
+
+        return (portfolioId, bond);
+    }
+
+    public static async Task<BondResponse> GetBondAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(BondUri(portfolioId, assetId), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken))!;
+    }
+
+    public sealed record FundedBond(Guid CashPortfolioId, Guid CashAssetId, Guid BondPortfolioId, BondResponse Bond);
+
+    public static async Task<FundedBond> CreateFundedBondAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal cashBalance = 6_000m,
+        AddBondRequest? request = null)
+    {
+        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance);
+        var bondPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
+        var bond = await client.AddBondAsync(
+            bondPortfolioId, cancellationToken, (request ?? NewBondRequest()) with { FundingAssetId = cashId });
+
+        return new FundedBond(cashPortfolioId, cashId, bondPortfolioId, bond);
     }
 
     public const string AllSavingsAccountsUri = "/api/portfolio/savings-accounts";

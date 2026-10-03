@@ -1,0 +1,228 @@
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'bonds.purchase.editTitle' : 'bonds.purchase.newTitle') | transloco }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    @if (choosesPortfolio) {
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.portfolio' | transloco }}</mat-label>
+        <mat-select formControlName="portfolioId">
+          @if (portfoliosResource.hasValue()) {
+            @for (portfolio of portfoliosResource.value(); track portfolio.id) {
+              <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
+            }
+          }
+        </mat-select>
+        @if (portfoliosResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        }
+        @if (form.controls.portfolioId.hasError('required')) {
+          <mat-error>{{ 'bonds.purchase.portfolioRequired' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+      <mat-label>{{ 'bonds.purchase.purchaseDate' | transloco }}</mat-label>
+      <input
+        matInput
+        [matDatepicker]="purchaseDatePicker"
+        [max]="today"
+        formControlName="purchaseDate"
+      />
+      <mat-datepicker-toggle matIconSuffix [for]="purchaseDatePicker"></mat-datepicker-toggle>
+      <mat-datepicker #purchaseDatePicker></mat-datepicker>
+      @if (form.controls.purchaseDate.hasError('required')) {
+        <mat-error>{{ 'bonds.purchase.purchaseDateRequired' | transloco }}</mat-error>
+      } @else if (form.controls.purchaseDate.hasError('server')) {
+        <mat-error>{{ form.controls.purchaseDate.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+      <mat-label>{{ 'bonds.purchase.series' | transloco }}</mat-label>
+      <mat-select formControlName="series">
+        @if (offerResource.hasValue()) {
+          @for (series of offerResource.value(); track series.code) {
+            <mat-option [value]="series.code">
+              {{ series.code }} — {{ typeLabel(series) | transloco }}
+            </mat-option>
+          }
+        }
+        <mat-option [value]="manualSeries">{{ 'bonds.purchase.manual' | transloco }}</mat-option>
+      </mat-select>
+      @if (offerResource.error(); as loadError) {
+        <mat-hint>{{ loadError.message }}</mat-hint>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
+      <input matInput type="text" formControlName="name" autocomplete="off" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>{{ 'bonds.purchase.nameRequired' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>{{ 'bonds.purchase.nameTooLong' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('server')) {
+        <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="bond-purchase-dialog__row">
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.seriesCode' | transloco }}</mat-label>
+        <input matInput type="text" formControlName="seriesCode" autocomplete="off" />
+        @if (form.controls.seriesCode.hasError('required')) {
+          <mat-error>{{ 'bonds.purchase.seriesCodeRequired' | transloco }}</mat-error>
+        } @else if (form.controls.seriesCode.hasError('pattern')) {
+          <mat-error>{{ 'bonds.purchase.seriesCodeInvalid' | transloco }}</mat-error>
+        } @else if (form.controls.seriesCode.hasError('server')) {
+          <mat-error>{{ form.controls.seriesCode.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.type' | transloco }}</mat-label>
+        <mat-select formControlName="type">
+          @for (info of bondTypes; track info.type) {
+            <mat-option [value]="info.type">{{ info.label | transloco }}</mat-option>
+          }
+        </mat-select>
+        @if (form.controls.type.hasError('required')) {
+          <mat-error>{{ 'bonds.purchase.typeRequired' | transloco }}</mat-error>
+        } @else if (form.controls.type.hasError('server')) {
+          <mat-error>{{ form.controls.type.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="bond-purchase-dialog__row">
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.bondCount' | transloco }}</mat-label>
+        <input matInput type="number" step="1" formControlName="bondCount" />
+        @if (
+          form.controls.bondCount.hasError('required') || form.controls.bondCount.hasError('min')
+        ) {
+          <mat-error>{{ 'bonds.purchase.bondCountMin' | transloco }}</mat-error>
+        } @else if (form.controls.bondCount.hasError('server')) {
+          <mat-error>{{ form.controls.bondCount.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.price' | transloco }}</mat-label>
+        <input matInput type="number" step="0.01" formControlName="purchasePricePerBond" />
+        @if (form.controls.purchasePricePerBond.hasError('server')) {
+          <mat-error>{{ form.controls.purchasePricePerBond.getError('server') }}</mat-error>
+        } @else if (form.controls.purchasePricePerBond.invalid) {
+          <mat-error>{{ 'bonds.purchase.priceRange' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <p class="bond-purchase-dialog__cost">
+      {{ 'bonds.purchase.cost' | transloco }}:
+      <strong>
+        @if (cost(); as amount) {
+          {{ formatMoney(amount, currency) }}
+        } @else {
+          —
+        }
+      </strong>
+    </p>
+
+    <div class="bond-purchase-dialog__row">
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.firstRate' | transloco }}</mat-label>
+        <input matInput type="number" step="0.01" formControlName="firstPeriodRatePercent" />
+        @if (form.controls.firstPeriodRatePercent.hasError('server')) {
+          <mat-error>{{ form.controls.firstPeriodRatePercent.getError('server') }}</mat-error>
+        } @else if (form.controls.firstPeriodRatePercent.invalid) {
+          <mat-error>{{ 'bonds.purchase.rateRange' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.margin' | transloco }}</mat-label>
+        <input matInput type="number" step="0.01" formControlName="marginPercent" />
+        @if (form.controls.marginPercent.hasError('server')) {
+          <mat-error>{{ form.controls.marginPercent.getError('server') }}</mat-error>
+        } @else if (form.controls.marginPercent.invalid) {
+          <mat-error>{{ 'bonds.purchase.marginRange' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+      <mat-label>{{ 'bonds.purchase.fee' | transloco }}</mat-label>
+      <input matInput type="number" step="0.01" formControlName="earlyRedemptionFeePerBond" />
+      @if (form.controls.earlyRedemptionFeePerBond.hasError('server')) {
+        <mat-error>{{ form.controls.earlyRedemptionFeePerBond.getError('server') }}</mat-error>
+      } @else if (form.controls.earlyRedemptionFeePerBond.invalid) {
+        <mat-error>{{ 'bonds.purchase.feeRange' | transloco }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-slide-toggle formControlName="taxExempt" class="bond-purchase-dialog__toggle">
+      {{ 'bonds.purchase.taxExempt' | transloco }}
+    </mat-slide-toggle>
+
+    @if (!isEdit) {
+      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
+        <mat-label>{{ 'bonds.purchase.sourceOfFunds' | transloco }}</mat-label>
+        <mat-select formControlName="fundingAssetId" canSelectNullableOptions>
+          <mat-option [value]="null">{{ 'bonds.purchase.newMoney' | transloco }}</mat-option>
+          @if (fundingCandidatesResource.hasValue()) {
+            @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
+                  formatMoney(candidate.balance, currency)
+                }})
+              </mat-option>
+            }
+          }
+        </mat-select>
+        @if (fundingCandidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        }
+        @if (form.controls.fundingAssetId.hasError('exceedsBalance')) {
+          <mat-error>{{
+            'bonds.purchase.exceedsBalance'
+              | transloco
+                : {
+                    balance: formatMoney(
+                      form.controls.fundingAssetId.getError('exceedsBalance').balance,
+                      currency
+                    ),
+                  }
+          }}</mat-error>
+        } @else if (form.controls.fundingAssetId.hasError('server')) {
+          <mat-error>{{ form.controls.fundingAssetId.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    } @else if (data.bond; as bond) {
+      <p class="bond-purchase-dialog__funding">
+        {{ 'bonds.purchase.sourceOfFunds' | transloco }}
+        <strong>{{ bond.fundingAssetName ?? ('bonds.purchase.newMoney' | transloco) }}</strong>
+      </p>
+    }
+
+    @if (formError()) {
+      <p class="bond-purchase-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

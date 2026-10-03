@@ -505,6 +505,44 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Theory]
+    [InlineData("cash-to-bond")]
+    [InlineData("bond-to-cash")]
+    [InlineData("bond-stays-bond")]
+    public async Task Update_ToOrFromBondClass_ReturnsBadRequest(string change)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        Guid assetId;
+        AssetClass originalClass;
+        string originalName;
+        decimal originalQuantity;
+        AssetClass requestedClass;
+        if (change == "cash-to-bond")
+        {
+            assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken, name: "Wallet");
+            await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Cash, "Wallet", 300m, AssetClass.Bond);
+        }
+        else
+        {
+            assetId = (await client.AddBondAsync(portfolioId, cancellationToken)).AssetId;
+            (originalClass, originalName, originalQuantity) = (AssetClass.Bond, "EDO1036", 5_000m);
+            requestedClass = change == "bond-to-cash" ? AssetClass.Cash : AssetClass.Bond;
+        }
+
+        var request = new UpdateAssetRequest { AssetClass = requestedClass, Name = "Edited through assets", Currency = "PLN" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertUseBondEndpointsAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(originalClass, unchanged.AssetClass);
+        Assert.Equal(originalName, unchanged.Name);
+        Assert.Equal(originalQuantity, unchanged.Quantity);
+    }
+
+    [Theory]
     [InlineData("cash-to-savings")]
     [InlineData("savings-to-cash")]
     public async Task Update_ToOrFromSavings_ReturnsUseSavingsAccountEndpoints(string change)
