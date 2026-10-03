@@ -6,14 +6,6 @@ using Testcontainers.PostgreSql;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Proves the shared tenancy plumbing (ADR-006, T0.13) end to end against a real Postgres: an
-/// entity implementing <see cref="IUserOwned"/>, inserted without ever setting <c>UserId</c>
-/// manually, is visible to the user who created it and invisible to every other user. Uses its
-/// own throwaway container/entity/DbContext instead of Portfolio's real one — Portfolio has no
-/// entities yet, and mixing <c>EnsureCreated</c> here with Portfolio's own <c>Migrate</c> on the
-/// same database would silently skip creating this table.
-/// </summary>
 public sealed class TenancyQueryFilterTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
@@ -33,8 +25,7 @@ public sealed class TenancyQueryFilterTests : IAsyncLifetime
         {
             await writerContext.Database.EnsureCreatedAsync(cancellationToken);
 
-            // UserId is never set here — proves UserOwnedSaveInterceptor stamps it from the
-            // current user, not from caller-supplied data (ADR-006).
+            // UserId is never set here: the interceptor must stamp it from the current user.
             writerContext.Probes.Add(new TenancyProbe { Name = "owned-by-a" });
             await writerContext.SaveChangesAsync(cancellationToken);
         }

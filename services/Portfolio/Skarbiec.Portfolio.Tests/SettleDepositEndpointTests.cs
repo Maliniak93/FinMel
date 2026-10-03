@@ -13,17 +13,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits-settlement: <c>POST .../deposits/{assetId}/settle</c> with <c>{settledOn,
-/// grossInterest, tax}</c> stores what the bank actually paid, credits the net interest to the
-/// deposit as a system-managed Deposit transaction on <c>settledOn</c>, raises the quantity to
-/// principal + net and marks the deposit Settled. The <c>AssetPositionChanged</c> written in the same
-/// save is proven hostlessly by <see cref="PortfolioOutboxTests.SettleDeposit_PublishesPositionChangedWithFinalAmount"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-3 (HTTP half).</summary>
     [Fact]
     public async Task Settle_WithPreviewValues_CreditsNetInterestAndMarksSettled()
     {
@@ -67,7 +59,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(28.12m, settled.SettledTax);
     }
 
-    /// <summary>AC-4: the bank paid something other than the projection — the overrides are what is stored and credited.</summary>
     [Fact]
     public async Task Settle_WithOverriddenAmounts_UsesThem()
     {
@@ -98,10 +89,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, deposit.AssetId, cancellationToken);
     }
 
-    /// <summary>
-    /// A settlement with no net interest (gross = tax, here both 0) adds no transaction: the quantity
-    /// stays at the principal, yet the deposit is Settled.
-    /// </summary>
     [Fact]
     public async Task Settle_ZeroNetInterest_AddsNoTransactionAndMarksSettled()
     {
@@ -124,10 +111,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(0m, settled.SettledTax);
     }
 
-    /// <summary>
-    /// ADR-026: the net-interest credit freezes the PLN rate of its own date (<c>settledOn</c>), while
-    /// the opening transaction keeps the start date's rate.
-    /// </summary>
     [Fact]
     public async Task Settle_ForeignCurrencyDeposit_FreezesFxRateOfSettlementDate()
     {
@@ -156,7 +139,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(4.25m, transactions[1].FxRateToPln);
     }
 
-    /// <summary>AC-2 (settle half): the maturity date is tomorrow in Warsaw — 409, and nothing changes.</summary>
     [Fact]
     public async Task Settle_BeforeMaturity_ReturnsConflict()
     {
@@ -174,7 +156,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertDepositUnsettledAsync(portfolioId, deposit.AssetId, cancellationToken);
     }
 
-    /// <summary>AC-5: every rejected input is a 400 and leaves the deposit exactly as it was.</summary>
     [Theory]
     [InlineData("tax-over-gross")]
     [InlineData("gross-negative")]
@@ -204,7 +185,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertDepositUnsettledAsync(portfolioId, deposit.AssetId, cancellationToken);
     }
 
-    /// <summary>AC-7 (settle half): a second settlement is a 409 and the first one stands.</summary>
     [Fact]
     public async Task Settle_Twice_ReturnsConflict()
     {
@@ -229,7 +209,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(28.12m, settled.SettledTax);
     }
 
-    /// <summary>asset-archive AC-5: settling an archived Due deposit is a 409 <c>Conflict.AssetArchived</c> and nothing changes.</summary>
     [Fact]
     public async Task Settle_ArchivedDeposit_Returns409()
     {
@@ -245,7 +224,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertDepositUnsettledAsync(portfolioId, deposit.AssetId, cancellationToken);
     }
 
-    /// <summary>asset-archive AC-6: an archived Cash as the destination is a 400 <c>Validation.InvalidTransferCounterpart</c>; nothing is written.</summary>
     [Fact]
     public async Task Settle_ToArchivedCash_ReturnsBadRequest()
     {
@@ -266,7 +244,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertCashUntouchedAsync(cashPortfolioId, cashId, cancellationToken);
     }
 
-    /// <summary>A deposit of an archived portfolio is read-only: settling it is a 409 and nothing changes.</summary>
     [Fact]
     public async Task Settle_ArchivedPortfolio_ReturnsConflict()
     {
@@ -282,7 +259,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertDepositUnsettledAsync(portfolioId, deposit.AssetId, cancellationToken);
     }
 
-    /// <summary>The deposit endpoints address Deposit-class assets only — a Cash asset is not a deposit.</summary>
     [Fact]
     public async Task Settle_NonDepositAsset_ReturnsNotFound()
     {
@@ -301,13 +277,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Null(cash.DepositSettled);
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-1 (HTTP half): settling with a destination pays the whole balance
-    /// (principal + net) out in the same request — a Withdraw of 10 119.83 on the deposit linked to a
-    /// Deposit of 10 119.83 on the Cash, both on <c>settledOn</c>. The deposit holds 0, the Cash the
-    /// final amount, and the deposit is PaidOut. The per-asset <c>AssetPositionChanged</c> is proven by
-    /// <see cref="PortfolioOutboxTests.SettleDepositWithDestination_PublishesBothPositions"/>.
-    /// </summary>
     [Fact]
     public async Task Settle_WithDestination_PaysOutWholeBalance()
     {
@@ -366,12 +335,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal("Cash account", paidOut.PaidOutToAssetName);
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-2: a destination that breaks the transfer rules — another currency,
-    /// a non-Cash class, an archived portfolio or another user's Cash — rejects the whole request with
-    /// 400 <c>Validation.InvalidTransferCounterpart</c>: the deposit is not settled either, and the
-    /// destination is untouched.
-    /// </summary>
     [Theory]
     [InlineData("eur-cash")]
     [InlineData("stock")]
@@ -431,13 +394,6 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         }
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings AC-2 (HTTP half): settling with an empty PLN savings account in another
-    /// portfolio as destination pays the whole balance (10 119.83) into it on <c>settledOn</c> - the
-    /// deposit holds 0 and is PaidOut to the account's name, the account holds the final amount through
-    /// a linked Deposit leg. The per-asset <c>AssetPositionChanged</c> is proven by
-    /// <see cref="PortfolioOutboxTests.SettleDepositIntoSavings_PublishesBothPositions"/>.
-    /// </summary>
     [Fact]
     public async Task Settle_WithSavingsDestination_PaysOutWholeBalance()
     {

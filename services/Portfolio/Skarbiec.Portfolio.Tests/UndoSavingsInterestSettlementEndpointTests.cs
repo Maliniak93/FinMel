@@ -8,16 +8,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-interest-settlement: <c>DELETE .../interest-settlements/{settlementId}</c> undoes the
-/// latest settlement - it deletes the settlement and its credit and recomputes the quantity. The
-/// <c>AssetPositionChanged</c> is proven hostlessly by
-/// <see cref="PortfolioOutboxTests.UndoSavingsInterestSettlement_PublishesPositionChanged"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-8.</summary>
     [Fact]
     public async Task Undo_Latest_RemovesCreditAndReopensPeriod()
     {
@@ -50,7 +43,6 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         Assert.Equal("2026-10-31", preview.GetProperty("periodEnd").GetString());
     }
 
-    /// <summary>AC-8: only the latest settlement can be undone.</summary>
     [Fact]
     public async Task Undo_NotLatest_ReturnsConflict()
     {
@@ -72,7 +64,6 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         Assert.Equal(3, (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).TotalCount);
     }
 
-    /// <summary>AC-8: removing a credit that a later Withdraw spent would break history - the calculator's error, and nothing changes.</summary>
     [Fact]
     public async Task Undo_CreditAlreadySpent_IsRejected()
     {
@@ -96,7 +87,6 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
             t => t.SavingsInterestPeriodEnd == SeptemberEnd);
     }
 
-    /// <summary>A zero-net settlement has no credit - undoing it only removes the settlement and reopens the month.</summary>
     [Fact]
     public async Task Undo_ZeroNetSettlement_RemovesItAndKeepsTheBalance()
     {

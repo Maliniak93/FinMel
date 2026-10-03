@@ -5,12 +5,6 @@ using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 
-/// <summary>
-/// Settles a Due term deposit (term-deposits-settlement): stores what the bank actually paid and
-/// credits the net interest to the deposit itself — the money stays in it until a payout moves it.
-/// With a destination (deposit-payout-to-cash) the same save also pays the whole balance out to that
-/// Cash asset on the settlement date; an invalid destination rejects the settlement too.
-/// </summary>
 public sealed class SettleDepositHandler(
     PortfolioDbContext dbContext,
     PositionEventPublisher positionEventPublisher,
@@ -20,8 +14,7 @@ public sealed class SettleDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, SettleDepositRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first, as in UpdateDeposit: another user's deposit, a non-deposit asset
-        // and a deposit under the wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Deposit, cancellationToken);
         var terms = asset is null
@@ -65,8 +58,7 @@ public sealed class SettleDepositHandler(
             return DepositErrors.SettledOnInFuture;
         }
 
-        // The net interest enters as a Deposit transaction, not Interest: Interest has a quantity delta
-        // of 0, and the deposit's value must rise by it (ADR-009). Nothing to credit when it is 0.
+        // The net enters as a Deposit, not Interest, whose quantity delta is 0; nothing to credit when it is 0.
         var netInterest = request.GrossInterest - request.Tax;
         var credit = netInterest > 0
             ? new Transaction
@@ -80,8 +72,7 @@ public sealed class SettleDepositHandler(
             }
             : null;
 
-        // Recompute over the full history (the opening transaction + the credit), the single code path
-        // deriving Asset.Quantity: it comes out as principal + net.
+        // Recompute over the full history: the quantity comes out as principal + net.
         var existingTransactions = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => t.AssetId == assetId)
@@ -94,8 +85,7 @@ public sealed class SettleDepositHandler(
             return recomputed.Error;
         }
 
-        // The payout moves principal + net on the settlement date; checked before anything is staged,
-        // so an invalid destination leaves the deposit unsettled (deposit-payout-to-cash).
+        // Checked before anything is staged, so an invalid destination leaves the deposit unsettled.
         PayoutTransfer? payout = null;
         if (request.DestinationAssetId is { } destinationAssetId)
         {
@@ -111,8 +101,7 @@ public sealed class SettleDepositHandler(
         decimal? fxRateToPln = null;
         if (credit is not null || payout is not null)
         {
-            // Last check before the write: the credit and both legs freeze the PLN rate of their one
-            // date and currency (ADR-026).
+            // Last check before the write: the credit and both legs freeze the PLN rate of their one date and currency.
             var resolved = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.SettledOn, cancellationToken);
             if (resolved.IsFailure)
             {
@@ -137,8 +126,7 @@ public sealed class SettleDepositHandler(
         terms.SettledGrossInterest = request.GrossInterest;
         terms.SettledTax = request.Tax;
 
-        // Published before SaveChangesAsync so the outbox rows commit with the settlement (ADR-012) —
-        // one per asset, each with its final quantity.
+        // One outbox row per asset, each with its final quantity, committed with the settlement.
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         if (payout is not null)
@@ -152,7 +140,7 @@ public sealed class SettleDepositHandler(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Two racing settlements both bump the asset row; the loser's xmin no longer matches.
+            // Two racing settlements both bump the asset row; the loser's xmin is stale.
             return TransactionErrors.ConcurrentModification();
         }
 

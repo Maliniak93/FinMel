@@ -16,9 +16,6 @@ namespace Skarbiec.Portfolio.Tests;
 [Collection(TestingDefaults.CollectionName)]
 public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>transactions-pln-value-and-fee-removal AC3: an EUR Buy of 10 @ 100 at a fake rate of
-    /// 4.30 answers with the asset's currency, <c>valuePln 4300.00</c> and no <c>fee</c>; the rate
-    /// was looked up for the transaction's own date.</summary>
     [Fact]
     public async Task Record_Buy_ReturnsCreatedAndUpdatesAssetQuantity()
     {
@@ -52,8 +49,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC4: a PLN asset is valued at rate 1 and never
-    /// asks MarketData.</summary>
     [Fact]
     public async Task Record_PlnAsset_ValuePlnEqualsAmountWithoutFxLookup()
     {
@@ -78,8 +73,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Empty(Factory.FxRateLookupClient.Calls);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC5: no rate on or before the date still saves
-    /// the transaction — its PLN value is simply unknown (<c>null</c>), in the response and the list.</summary>
     [Fact]
     public async Task Record_WhenNoRateForDate_SavesWithNullValuePln()
     {
@@ -109,8 +102,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(2m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC6: MarketData being down is a transient
-    /// failure, not a missing rate — 503 <c>ServiceUnavailable.MarketData</c>, and nothing is saved.</summary>
     [Fact]
     public async Task Record_WhenMarketDataUnavailable_ReturnsServiceUnavailable()
     {
@@ -136,8 +127,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(0, asset.TransactionCount);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal: <c>ValuePln</c> is rounded to 2 places,
-    /// midpoint away from zero — 1 × 0.35 × 4.30 = 1.505 → 1.51 (banker's rounding would give 1.50).</summary>
     [Fact]
     public async Task Record_ValuePln_RoundsMidpointAwayFromZero()
     {
@@ -160,8 +149,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(1.51m, body!.ValuePln);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC10: the archived guard runs before the rate
-    /// lookup — a write to an archived portfolio is a 409 and never calls MarketData.</summary>
     [Fact]
     public async Task Record_OnArchivedPortfolio_ReturnsConflictWithoutFxLookup()
     {
@@ -287,11 +274,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
             page.Items.Select(t => t.Type));
     }
 
-    /// <summary>cash-transaction-types AC-2: a Cash asset accepts only Deposit/Withdraw — a Buy is a
-    /// 400 <c>Validation.TransactionTypeNotAllowed</c>, checked before the FX lookup and the
-    /// recompute, so the quantity and the transaction list stay as they were. (The "no outbox row"
-    /// half is proven hostless in <see cref="PortfolioOutboxTests"/>, where no bus can deliver and
-    /// delete the row before the assertion.)</summary>
     [Fact]
     public async Task Record_DisallowedTypeOnCashAsset_ReturnsBadRequestAndWritesNothing()
     {
@@ -322,8 +304,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(TransactionType.Deposit, listed.Type);
     }
 
-    /// <summary>cash-transaction-types AC-2: the two types a Cash asset does accept still record —
-    /// a Deposit and then a Withdraw both answer 201 and move the balance.</summary>
     [Fact]
     public async Task Record_DepositAndWithdrawOnCashAsset_Succeed()
     {
@@ -354,7 +334,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(800m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>asset-archive AC-4: recording on an archived asset is a 409 <c>Conflict.AssetArchived</c>; quantity and history stay.</summary>
     [Fact]
     public async Task Record_ArchivedAsset_Returns409()
     {
@@ -372,8 +351,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).TotalCount);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC7: recording a transaction on an asset of an
-    /// archived portfolio is a 409 <c>Conflict.PortfolioArchived</c> and the quantity is unchanged.</summary>
     [Fact]
     public async Task Record_InArchivedPortfolio_Returns409()
     {
@@ -391,8 +368,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).TotalCount);
     }
 
-    /// <summary>term-deposits AC-10: a term deposit's transactions are system-managed — recording
-    /// any transaction on it is a 409 <c>Conflict.DepositTransactionsManaged</c> and nothing changes.</summary>
     [Theory]
     [InlineData(TransactionType.Deposit)]
     [InlineData(TransactionType.Withdraw)]
@@ -410,11 +385,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(1, (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).TotalCount);
     }
 
-    /// <summary>
-    /// savings-accounts AC-7: a savings account's transactions are ordinary but limited to
-    /// Deposit/Withdraw — those two answer 201 and move the balance, every other type is a 400
-    /// <c>Validation.TransactionTypeNotAllowed</c> and nothing changes.
-    /// </summary>
     [Theory]
     [InlineData(TransactionType.Deposit, true)]
     [InlineData(TransactionType.Withdraw, true)]
@@ -448,7 +418,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         }
     }
 
-    /// <summary>savings-accounts AC-7: a Withdraw beyond the balance is the existing oversell 400, and the balance stays.</summary>
     [Fact]
     public async Task Record_OnSavingsAccount_WithdrawBeyondBalance_ReturnsOversell()
     {

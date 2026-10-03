@@ -10,11 +10,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>asset-archive: <c>POST .../assets/{id}/restore</c>. The event half is <see cref="PortfolioOutboxTests"/>.</summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-2: 200 with <c>isArchived</c> false, and the flag is cleared.</summary>
     [Fact]
     public async Task Restore_ClearsFlag()
     {
@@ -31,7 +29,6 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.False((await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).IsArchived);
     }
 
-    /// <summary>AC-2: restoring an asset that is not archived is 200 with the unchanged body.</summary>
     [Fact]
     public async Task Restore_NotArchived_IsIdempotent()
     {
@@ -46,7 +43,6 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(before, await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken));
     }
 
-    /// <summary>After a restore the asset is writable again.</summary>
     [Fact]
     public async Task Restore_ArchivedAsset_AcceptsTransactionsAgain()
     {
@@ -63,7 +59,6 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(150m, (await client.GetAssetAsync(portfolioId, cashId, cancellationToken)).Quantity);
     }
 
-    /// <summary>AC-3: an unknown id is a 404.</summary>
     [Fact]
     public async Task Restore_UnknownAsset_ReturnsNotFound()
     {
@@ -76,7 +71,6 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>AC-3 + design: restoring an asset inside an archived portfolio is a 409 <c>Conflict.PortfolioArchived</c>; the flag stays.</summary>
     [Fact]
     public async Task Restore_ArchivedPortfolio_Returns409()
     {

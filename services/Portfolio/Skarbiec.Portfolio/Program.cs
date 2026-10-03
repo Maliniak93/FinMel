@@ -50,28 +50,18 @@ builder.AddServiceOpenApi();
 
 if (!OpenApiBuildTime.IsActive)
 {
-    // Plain scoped AddDbContext, not Aspire's AddNpgsqlDbContext — that helper always pools
-    // (AddDbContextPool), which can't take the constructor-injected, request-scoped ICurrentUser
-    // PortfolioDbContext needs for tenancy (ADR-006).
+    // Not AddNpgsqlDbContext: it always pools, and a pooled context cannot take the request-scoped ICurrentUser.
     var portfolioConnectionString = builder.Configuration.GetConnectionString("portfolio-db")
         ?? throw new InvalidOperationException("Missing connection string 'portfolio-db'.");
     builder.Services.AddDbContext<PortfolioDbContext>(options => options.UseNpgsql(portfolioConnectionString));
 
-    // No consumers — Portfolio only publishes (AssetPositionChanged/AssetRemoved and the
-    // Portfolio* lifecycle events, spec-02) through the outbox; Reporting consumes them (spec-03)
-    // and MarketData joins in spec-04.
     builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
 
-    // AddAsset/UpdateAsset validate a market asset's InstrumentId against MarketData (T2.9) — resilience
-    // and service discovery come from ServiceDefaults' ConfigureHttpClientDefaults; the call goes to
-    // MarketData's /internal endpoint with no token (ADR-027).
     builder.Services.AddHttpClient<IInstrumentLookupClient, MarketDataInstrumentLookupClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");
     });
 
-    // Transaction writes freeze the transaction-date PLN rate (ADR-026) — same wiring as above:
-    // MarketData's /internal endpoint, no token.
     builder.Services.AddHttpClient<IFxRateLookupClient, MarketDataFxRateLookupClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");
@@ -80,8 +70,7 @@ if (!OpenApiBuildTime.IsActive)
 
 builder.Services.AddValidation();
 
-// Same TimeProvider.System registration Reporting and MarketData's jobs use, so a test can inject a
-// fake clock and pin an event's OccurredAtUtc (spec-02 design decision 5).
+// Registered so a test can swap in a fake clock and pin an event's OccurredAtUtc.
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<PositionEventPublisher>();
@@ -165,8 +154,7 @@ app.MapListTransferCandidatesEndpoint();
 app.MapCreateTransferEndpoint();
 app.MapDeleteTransferEndpoint();
 
-// Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to a skeleton
-// service (T0.15 AC) — mirrors Skarbiec.Identity's /api/identity/me.
+// Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to this service.
 app.MapGet("/api/portfolio/me", (ICurrentUser currentUser) => TypedResults.Ok(currentUser.UserId))
     .RequireAuthorization();
 

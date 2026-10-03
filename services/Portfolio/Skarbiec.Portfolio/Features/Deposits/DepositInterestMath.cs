@@ -2,7 +2,6 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Deposits;
 
-/// <summary>The inputs of <see cref="DepositInterestMath.Project"/> — a term deposit's terms, free of any entity or request type.</summary>
 public sealed record DepositTerms
 {
     public required decimal Principal { get; init; }
@@ -14,7 +13,6 @@ public sealed record DepositTerms
     public required bool TaxExempt { get; init; }
 }
 
-/// <summary>One capitalisation period: interest earned on the balance at its start, taxed on its own.</summary>
 public sealed record DepositInterestPeriod
 {
     public required DateOnly StartDate { get; init; }
@@ -25,7 +23,6 @@ public sealed record DepositInterestPeriod
     public required decimal NetInterest { get; init; }
 }
 
-/// <summary>What a term deposit pays out at maturity, with the per-period breakdown it is summed from.</summary>
 public sealed record DepositProjection
 {
     public required DateOnly MaturityDate { get; init; }
@@ -34,20 +31,13 @@ public sealed record DepositProjection
     public required decimal NetInterest { get; init; }
     public required decimal FinalAmount { get; init; }
 
-    /// <summary><see cref="NetInterest"/> as a percentage of the principal, to 4 decimal places.</summary>
     public required decimal NetProfitPercent { get; init; }
 
     public required IReadOnlyList<DepositInterestPeriod> Periods { get; init; }
 }
 
-/// <summary>
-/// Pure term-deposit arithmetic (term-deposits) — no I/O, no clock. Day count is actual/365 and the
-/// rate is fixed for the whole term. Each capitalisation period's gross interest is rounded
-/// half-away-from-zero to grosze (bank-style); its Belka tax is <see cref="BelkaTax"/> of that gross; the net compounds into the next period's balance.
-/// </summary>
 public static class DepositInterestMath
 {
-    /// <summary><see cref="DepositTermUnit.Days"/>: <c>start + n</c> days; <see cref="DepositTermUnit.Months"/>: <c>start.AddMonths(n)</c>, clamped to the month's end.</summary>
     public static DateOnly MaturityDate(DateOnly startDate, int termLength, DepositTermUnit termUnit) => termUnit switch
     {
         DepositTermUnit.Days => startDate.AddDays(termLength),
@@ -73,8 +63,7 @@ public static class DepositInterestMath
 
         for (var k = 1; periodStart < maturityDate; k++)
         {
-            // Period ends step from the start date (not from the previous end), so a month-end start
-            // keeps landing on month ends; the last one is cut at maturity.
+            // Period ends step from the start date, not the previous end, so a month-end start keeps landing on month ends.
             var periodEnd = stepMonths is { } step
                 ? Min(terms.StartDate.AddMonths(k * step), maturityDate)
                 : maturityDate;

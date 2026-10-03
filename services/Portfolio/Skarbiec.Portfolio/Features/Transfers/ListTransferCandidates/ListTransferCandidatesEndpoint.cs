@@ -15,8 +15,7 @@ public static class ListTransferCandidatesEndpoint
         return app;
     }
 
-    // No defaults on purpose: both query parameters are required, so a missing one is a 400 from
-    // parameter binding. assetClass binds from the enum's name or its int value.
+    // No defaults on purpose: both query parameters are required, so a missing one is a 400.
     private static async Task<Results<Ok<IReadOnlyList<TransferCandidateResponse>>, ProblemHttpResult>> HandleAsync(
         string currency, AssetClass assetClass, ListTransferCandidatesHandler handler, CancellationToken cancellationToken)
         => (await handler.HandleAsync(currency, assetClass, cancellationToken)).ToHttpResult();

@@ -10,14 +10,6 @@ using Skarbiec.Testing.Http;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Exercises <see cref="MarketDataInstrumentLookupClient"/> directly. The failure-mode facts use a
-/// real (but unreachable) <see cref="HttpClient"/> — the point there is the client's own exception
-/// handling, proving T2.9's "MarketData unavailable → 503, not a hang" one layer below the endpoint
-/// tests, which substitute <see cref="FakeInstrumentLookupClient"/> and never touch this class. The
-/// wire-shape fact instead goes through Portfolio's own <c>IHttpClientFactory</c> registration, so
-/// every handler <c>Program.cs</c> puts in front of the client runs (ADR-027: no token forwarded).
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class MarketDataInstrumentLookupClientTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
@@ -29,14 +21,12 @@ public sealed class MarketDataInstrumentLookupClientTests(SkarbiecContainersFixt
         await using var host = Factory.WithRecordedOutboundHttp(recorder);
         var instrumentId = Guid.NewGuid();
 
-        // An inbound user request carrying a JWT is in flight while the lookup runs — exactly what
-        // AddAsset/UpdateAsset look like when they validate an InstrumentId.
+        // An inbound request carrying a JWT is in flight, as when AddAsset validates an InstrumentId.
         var httpContextAccessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
         httpContextAccessor.HttpContext.Request.Headers.Authorization = $"Bearer {Factory.IssueAccessToken(Guid.NewGuid())}";
         try
         {
-            // Portfolio's factory swaps IInstrumentLookupClient for a fake, so build the real typed
-            // client from the named HttpClient Program.cs registered for it.
+            // The factory swaps in a fake, so build the real typed client from the HttpClient Program.cs registered.
             var httpClient = host.Services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IInstrumentLookupClient));
             var client = new MarketDataInstrumentLookupClient(httpClient);
 
@@ -59,8 +49,7 @@ public sealed class MarketDataInstrumentLookupClientTests(SkarbiecContainersFixt
     [Fact]
     public async Task CheckAsync_TargetPortHasNothingListening_ReturnsUnavailableAndDoesNotHang()
     {
-        // Port 1 is a reserved/unassigned TCP port unlikely to have anything listening in any test
-        // environment; connection is refused immediately rather than timing out, so this stays fast.
+        // Port 1 refuses the connection immediately instead of timing out, so this stays fast.
         using var httpClient = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:1") };
         var client = new MarketDataInstrumentLookupClient(httpClient);
         var cancellationToken = TestContext.Current.CancellationToken;

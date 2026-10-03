@@ -13,15 +13,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits: <c>POST /api/portfolio/portfolios/{portfolioId}/deposits</c> creates the Deposit-class
-/// asset, its system-managed opening Deposit transaction and its <see cref="TermDeposit"/> terms
-/// together, and answers with the terms, maturity date, projection and status.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-5 (HTTP half; the event is proven by <see cref="PortfolioOutboxTests.AddDeposit_PublishesPositionChangedWithPrincipal"/>).</summary>
     [Fact]
     public async Task Add_ValidDeposit_ReturnsCreatedWithPrincipalAsQuantity()
     {
@@ -80,7 +74,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(new DateOnly(2026, 4, 15), terms.MaturityDate);
     }
 
-    /// <summary>The opening transaction freezes the start-date PLN rate like any transaction write (ADR-026).</summary>
     [Fact]
     public async Task Add_EurDeposit_FreezesStartDateFxRateOnOpeningTransaction()
     {
@@ -101,7 +94,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(("EUR", new DateOnly(2026, 1, 15)), Assert.Single(Factory.FxRateLookupClient.Calls));
     }
 
-    /// <summary>AC-6: every invalid term is a 400 keyed on the offending field, and nothing is written.</summary>
     [Theory]
     [InlineData("principal-zero", nameof(AddDepositRequest.Principal))]
     [InlineData("principal-negative", nameof(AddDepositRequest.Principal))]
@@ -148,7 +140,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
     }
 
-    /// <summary>AC-6 boundaries: the edges of every range are themselves valid.</summary>
     [Theory]
     [InlineData("rate-zero")]
     [InlineData("rate-100")]
@@ -178,7 +169,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
-    /// <summary>AC-7: an archived portfolio is read-only — 409 and nothing is written.</summary>
     [Fact]
     public async Task Add_ArchivedPortfolio_ReturnsConflict()
     {
@@ -197,13 +187,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-3 (HTTP half; the two events are proven by
-    /// <see cref="PortfolioOutboxTests.AddFundedDeposit_PublishesPositionChangedForBothAssets"/>): a
-    /// deposit funded from a PLN Cash asset in another portfolio moves the principal out of it as one
-    /// linked transfer — a Withdraw on Cash and the opening Deposit on the deposit, same amount, same
-    /// date, same <c>TransferId</c>.
-    /// </summary>
     [Fact]
     public async Task Add_FundedFromCash_MovesPrincipalWithLinkedLegs()
     {
@@ -256,11 +239,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(1, await dbContext.Transactions.CountAsync(t => t.AssetId == cashId && t.TransferId == null, cancellationToken));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-3, same-day half: the Cash was topped up on the deposit's
-    /// start date itself, with exactly the principal — the transfer out replays after the same-day
-    /// top-up (inflows before outflows), never failing on the Guid order.
-    /// </summary>
     [Fact]
     public async Task Add_FundedSameDayAsCashTopUp_Succeeds()
     {
@@ -285,12 +263,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(walletId, cashId, cancellationToken);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-4: a funding source off the Cash → Deposit route (a Stock, a
-    /// deposit), in another currency, in an archived portfolio, or unknown is a 400
-    /// <c>Validation.InvalidTransferCounterpart</c> — and nothing is written: no deposit, no leg, the
-    /// source untouched.
-    /// </summary>
     [Theory]
     [InlineData("stock")]
     [InlineData("eur-cash")]
@@ -327,10 +299,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
     }
 
-    /// <summary>
-    /// asset-archive AC-6: an archived Cash asset (in a live portfolio) as <c>fundingAssetId</c> is a 400
-    /// <c>Validation.InvalidTransferCounterpart</c>; nothing is written and the Cash keeps its balance.
-    /// </summary>
     [Fact]
     public async Task Add_ArchivedFundingAsset_ReturnsBadRequest()
     {
@@ -351,10 +319,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-4: a principal above the Cash balance is a 400
-    /// <c>Validation.InsufficientFunds</c>; no deposit is created and the Cash keeps its balance.
-    /// </summary>
     [Fact]
     public async Task Add_FundingExceedsBalance_ReturnsInsufficientFunds()
     {
@@ -376,11 +340,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: the balance is checked across the whole history, not just at
-    /// the end — a deposit starting before the Cash was topped up would take Cash below zero on its
-    /// start date, so it is <c>Validation.InsufficientFunds</c> although the final balance would cover it.
-    /// </summary>
     [Fact]
     public async Task Add_FundingDatedBeforeCashTopUp_ReturnsInsufficientFunds()
     {
@@ -403,10 +362,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: the entry asset's own archived portfolio stays a 409
-    /// <c>Conflict.PortfolioArchived</c> (as everywhere), even with a valid funding source; the Cash is untouched.
-    /// </summary>
     [Fact]
     public async Task Add_FundedIntoArchivedPortfolio_ReturnsConflict()
     {
@@ -424,7 +379,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
     }
 
-    /// <summary>asset-transfers-deposit-funding: a deposit without a funding source is new money — no transfer, no funding asset.</summary>
     [Fact]
     public async Task Add_WithoutFundingSource_HasNoTransferOrFundingAsset()
     {

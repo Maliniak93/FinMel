@@ -42,7 +42,6 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>spec-02 AC-14: transactionCount is computed from the Transactions table, with no counter column in the database.</summary>
     [Fact]
     public async Task Get_AssetWithTransactions_ReportsTransactionCountFromTransactions()
     {
@@ -59,7 +58,6 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(2, body!.TransactionCount);
     }
 
-    /// <summary>M1.3: an asset row holding an out-of-set currency (e.g. from before the rule existed) must keep reading back unchanged.</summary>
     [Fact]
     public async Task Get_AssetWithOutOfSetCurrency_ReadsBackUnchanged()
     {

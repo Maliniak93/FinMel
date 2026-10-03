@@ -11,13 +11,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits AC-13: a <see cref="TermDeposit"/> is user-owned and nested under a portfolio, so the
-/// flat <see cref="Skarbiec.Testing.Tenancy.TenancyIsolationTests{TProgram}"/> template does not fit —
-/// the same facts are written by hand, for both the owner's portfolio id and the stranger's own
-/// ("sneaky path"), plus the cross-portfolio list. Every single-resource call is a 404 (never 403),
-/// and nothing of the owner's changes.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
@@ -98,10 +91,6 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.Equal(1, await dbContext.Transactions.CountAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// term-deposits-settlement AC-6: a stranger previewing or settling the owner's Due deposit — via
-    /// the owner's portfolio id or their own — gets 404 every time, and the deposit stays unsettled.
-    /// </summary>
     [Fact]
     public async Task Settle_ForeignDeposit_IsRejected()
     {
@@ -137,11 +126,6 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.True(ownSettle.IsSuccessStatusCode, $"The owner's settle answered {(int)ownSettle.StatusCode}.");
     }
 
-    /// <summary>
-    /// deposit-rollover AC-7: a stranger rolling over the owner's Due deposit — via the owner's portfolio
-    /// id or their own — gets 404 every time, and the owner's deposit, its terms and transactions stay
-    /// exactly as they were.
-    /// </summary>
     [Fact]
     public async Task RollOver_ForeignDeposit_ReturnsNotFound()
     {
@@ -175,7 +159,6 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.True(ownRollOver.IsSuccessStatusCode, $"The owner's roll over answered {(int)ownRollOver.StatusCode}.");
     }
 
-    /// <summary>A stranger cannot add a deposit into the owner's portfolio — 404, and no row lands under either user.</summary>
     [Fact]
     public async Task Add_IntoStrangersPortfolio_ReturnsNotFound()
     {
@@ -193,7 +176,6 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().CountAsync(cancellationToken));
     }
 
-    /// <summary>The terms row itself is tenant-filtered: another user's context never sees it.</summary>
     [Fact]
     public async Task TermDeposit_QueriedAsStranger_IsFilteredOut()
     {
@@ -208,12 +190,6 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.True(await ownerDb.Set<TermDeposit>().AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-6: a stranger paying out the owner's settled deposit — via the
-    /// owner's portfolio id or their own, into their own Cash — gets 404 every time; the owner paying
-    /// out into the stranger's Cash gets 400 <c>Validation.InvalidTransferCounterpart</c> (the same
-    /// answer as any other invalid counterpart, so nothing leaks). Neither side changes.
-    /// </summary>
     [Fact]
     public async Task PayOut_ForeignDepositOrDestination_IsRejected()
     {

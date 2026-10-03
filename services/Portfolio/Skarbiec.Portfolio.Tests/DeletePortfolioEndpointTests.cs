@@ -9,8 +9,7 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-// The DELETE under test is called directly and asserted on the raw response; PortfolioApi helpers
-// only arrange.
+// The DELETE under test is called directly and asserted on the raw response; PortfolioApi helpers only arrange.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
@@ -29,7 +28,6 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(HttpStatusCode.NotFound, getAfterDelete.StatusCode);
     }
 
-    /// <summary>spec-08 AC-1: the delete cascades to the assets and their transactions — no "empty it first" step.</summary>
     [Fact]
     public async Task Delete_PortfolioWithAssetsAndTransactions_RemovesEverything()
     {
@@ -52,11 +50,6 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         }
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-7: deleting the portfolio that holds the funding Cash
-    /// detaches the deposit's leg in the other portfolio — the deposit, its opening transaction and
-    /// its quantity stay, unlinked.
-    /// </summary>
     [Fact]
     public async Task Delete_PortfolioWithTransferCounterpartOutside_DetachesIt()
     {
@@ -82,10 +75,6 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: a transfer whose both legs sit in the deleted portfolio has no
-    /// surviving counterpart — both legs go with it and nothing else is touched.
-    /// </summary>
     [Fact]
     public async Task Delete_PortfolioHoldingBothTransferLegs_RemovesThem()
     {
@@ -105,7 +94,6 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.False(await dbContext.Assets.AnyAsync(a => a.Id == deposit.AssetId || a.Id == cashId, cancellationToken));
     }
 
-    /// <summary>savings-accounts AC-8: deleting a portfolio takes its savings accounts, their terms and their transactions with it.</summary>
     [Fact]
     public async Task Delete_PortfolioWithSavingsAccount_DeletesTerms()
     {
@@ -137,8 +125,6 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC8: the read-only rule does not block deleting
-    /// an archived portfolio — the delete still cascades to its assets and succeeds.</summary>
     [Fact]
     public async Task Delete_ArchivedPortfolio_Succeeds()
     {
@@ -157,7 +143,6 @@ public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(HttpStatusCode.NotFound, getAsset.StatusCode);
     }
 
-    /// <summary>savings-interest-settlement: deleting a portfolio deletes the interest settlements of the accounts in it.</summary>
     [Fact]
     public async Task Delete_PortfolioWithSavingsSettlements_DeletesSettlements()
     {

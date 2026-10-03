@@ -101,8 +101,6 @@ public sealed class UpdatePortfolioEndpointTests(SkarbiecContainersFixture conta
             message => message.Contains(SupportedCurrencies.Accepted, StringComparison.Ordinal));
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC8: archiving makes the portfolio's contents
-    /// read-only, not the portfolio itself — renaming an archived portfolio still succeeds.</summary>
     [Fact]
     public async Task Update_ArchivedPortfolio_Succeeds()
     {

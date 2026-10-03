@@ -7,16 +7,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits-settlement: <c>GET .../deposits/{assetId}/settlement-preview</c> answers a Due
-/// deposit with the part-1 <c>DepositInterestMath</c> projection and a settlement date defaulting to
-/// the maturity date — the values the settle dialog is pre-filled with. Asserted on the wire JSON, so
-/// the facts hold whatever the response record is called.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-1.</summary>
     [Fact]
     public async Task Preview_DueDeposit_ReturnsProjection()
     {
@@ -37,7 +30,6 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10_119.83m, preview.GetProperty("finalAmount").GetDecimal());
     }
 
-    /// <summary>AC-2 (preview half): the maturity date is tomorrow in Warsaw — not Due yet.</summary>
     [Fact]
     public async Task Preview_BeforeMaturity_ReturnsConflict()
     {
@@ -52,7 +44,6 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositNotDueErrorCode, cancellationToken);
     }
 
-    /// <summary>A settled deposit has nothing left to preview.</summary>
     [Fact]
     public async Task Preview_SettledDeposit_ReturnsConflict()
     {
@@ -67,7 +58,6 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositAlreadySettledErrorCode, cancellationToken);
     }
 
-    /// <summary>The deposit endpoints address Deposit-class assets only.</summary>
     [Fact]
     public async Task Preview_NonDepositAsset_ReturnsNotFound()
     {

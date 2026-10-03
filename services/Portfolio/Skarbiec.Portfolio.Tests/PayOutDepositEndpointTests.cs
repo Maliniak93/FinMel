@@ -13,21 +13,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// deposit-payout-to-cash: <c>POST .../deposits/{assetId}/payout</c> with <c>{destinationAssetId, date}</c>
-/// moves a settled deposit's whole balance to a Cash asset as a Deposit → Cash transfer on
-/// <c>date</c> (<c>settledOn ≤ date ≤ today</c>, Europe/Warsaw), empties the deposit and marks it
-/// PaidOut. The endpoint under test is called directly and asserted on its raw response; the
-/// <see cref="PortfolioApi"/> helpers only arrange. The <c>AssetPositionChanged</c> per asset is proven
-/// hostlessly by <see cref="PortfolioOutboxTests.PayOutDeposit_PublishesBothPositions"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>
-    /// AC-3: a deposit settled without a destination (10 119.83) is paid out later into a PLN Cash
-    /// holding 5 000 — on <c>settledOn</c>, a day in between, or today, all three bounds inclusive.
-    /// </summary>
     [Theory]
     [InlineData("2026-04-15")]
     [InlineData("2026-04-18")]
@@ -87,11 +75,6 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal("Cash account", paidOut.PaidOutToAssetName);
     }
 
-    /// <summary>
-    /// AC-4 (state half): an Active or Due deposit is not settled yet, a paid-out one has nothing left,
-    /// and an archived portfolio is read-only — each a 409 with its own code, the destination and date
-    /// valid, and nothing of the user's changes.
-    /// </summary>
     [Theory]
     [InlineData("active", PortfolioAssertions.DepositNotSettledErrorCode)]
     [InlineData("due", PortfolioAssertions.DepositNotSettledErrorCode)]
@@ -145,7 +128,6 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken);
     }
 
-    /// <summary>asset-archive AC-5: paying out an archived Settled deposit is a 409 <c>Conflict.AssetArchived</c> and nothing changes.</summary>
     [Fact]
     public async Task PayOut_ArchivedDeposit_Returns409()
     {
@@ -169,7 +151,6 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_119.83m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>asset-archive AC-6: an archived Cash as the payout destination is a 400 <c>Validation.InvalidTransferCounterpart</c>; nothing is written.</summary>
     [Fact]
     public async Task PayOut_ToArchivedCash_ReturnsBadRequest()
     {
@@ -191,11 +172,6 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_119.83m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// AC-4 (input half): a date before <c>settledOn</c> or after today (Europe/Warsaw), or a
-    /// destination outside the transfer rules — another currency, a non-Cash class, Cash in an
-    /// archived portfolio, the deposit itself — is a 400, and nothing changes.
-    /// </summary>
     [Theory]
     [InlineData("date-before-settled-on")]
     [InlineData("date-in-future")]
@@ -253,10 +229,6 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(0m, (await client.GetAssetAsync(walletId, cashId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings AC-3: a deposit settled without a destination is paid out later into a
-    /// PLN savings account holding 500 - the account holds 500 + the whole balance, the deposit 0 and PaidOut.
-    /// </summary>
     [Fact]
     public async Task PayOut_ToSavingsAccount_MovesWholeBalance()
     {

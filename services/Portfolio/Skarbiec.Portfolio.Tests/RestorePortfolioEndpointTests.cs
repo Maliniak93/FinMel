@@ -12,7 +12,6 @@ namespace Skarbiec.Portfolio.Tests;
 [Collection(TestingDefaults.CollectionName)]
 public sealed class RestorePortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>spec-02 AC-9 (HTTP half — the outbox half is <c>PortfolioOutboxTests.RestorePortfolio_WritesPortfolioRestoredAndOnePositionEventPerAsset</c>).</summary>
     [Fact]
     public async Task Restore_ArchivedPortfolio_ReturnsOkAndClearsArchivedFlag()
     {
@@ -28,12 +27,6 @@ public sealed class RestorePortfolioEndpointTests(SkarbiecContainersFixture cont
         Assert.False(body!.IsArchived);
     }
 
-    /// <summary>
-    /// spec-02 AC-10 (HTTP half — the "publishes nothing" half is
-    /// <c>PortfolioOutboxTests.RestorePortfolio_NotArchivedPortfolio_WritesNoFurtherEvents</c>, since the
-    /// 200 body is identical whether or not the no-op early return fires): restoring an already-active
-    /// portfolio is a no-op (design decision 2).
-    /// </summary>
     [Fact]
     public async Task Restore_NotArchivedPortfolio_ReturnsOkAndPublishesNothing()
     {
@@ -59,7 +52,6 @@ public sealed class RestorePortfolioEndpointTests(SkarbiecContainersFixture cont
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>spec-02 AC-11: a stranger's token gets 404, never 403 (leaks existence).</summary>
     [Fact]
     public async Task Restore_ByStranger_ReturnsNotFound()
     {

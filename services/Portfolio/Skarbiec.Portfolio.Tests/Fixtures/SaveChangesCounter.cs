@@ -2,13 +2,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
-/// <summary>
-/// Counts <c>SaveChanges</c>/<c>SaveChangesAsync</c> calls on every DbContext it is registered with.
-/// Lets an outbox fact prove "all removals and outbox rows commit in one save" (ADR-012) instead of
-/// only proving that both eventually exist. Register it once per provider with
-/// <c>services.ConfigureDbContext&lt;TContext&gt;(o =&gt; o.AddInterceptors(counter))</c>, then
-/// <see cref="Reset"/> right before the act so arrange-step saves are not counted.
-/// </summary>
 internal sealed class SaveChangesCounter : SaveChangesInterceptor
 {
     private int _count;

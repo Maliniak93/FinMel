@@ -7,14 +7,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-interest-settlement: <c>GET .../savings-accounts/{assetId}/interest-preview</c> projects the
-/// next due calendar month from the account's daily balance, or answers 409 when none is due.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-4.</summary>
     [Fact]
     public async Task Preview_EndedPeriod_ReturnsProjection()
     {
@@ -37,7 +32,6 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(1, preview.GetProperty("duePeriodCount").GetInt32());
     }
 
-    /// <summary>AC-4: September is still running on its last day.</summary>
     [Fact]
     public async Task Preview_NothingDue_ReturnsConflict()
     {
@@ -51,7 +45,6 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsInterestNotDueErrorCode, cancellationToken);
     }
 
-    /// <summary>The preview offers the oldest unsettled month and counts every ended one.</summary>
     [Fact]
     public async Task Preview_SeveralMonthsEnded_OffersTheOldestAndCountsAll()
     {
@@ -66,7 +59,6 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(3, preview.GetProperty("duePeriodCount").GetInt32());
     }
 
-    /// <summary>A tax-exempt account previews a tax of 0 and a net equal to the gross.</summary>
     [Fact]
     public async Task Preview_TaxExemptAccount_HasNoTax()
     {
@@ -82,7 +74,6 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(41.10m, preview.GetProperty("netInterest").GetDecimal());
     }
 
-    /// <summary>A month with no interest (a 0 % account) is never due.</summary>
     [Fact]
     public async Task Preview_ZeroRateAccount_IsNeverDue()
     {
@@ -97,7 +88,6 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsInterestNotDueErrorCode, cancellationToken);
     }
 
-    /// <summary>The savings-account endpoints address savings accounts only: another asset class is a 404.</summary>
     [Fact]
     public async Task Preview_ForCashAsset_ReturnsNotFound()
     {
@@ -111,10 +101,6 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>
-    /// savings-cash-transfers AC-5: a 5 000 opening deposit on 1 September plus a Cash → Savings transfer
-    /// of 5 000 on 16 September averages 7 500 over September (5 000 for 15 days, 10 000 for 15).
-    /// </summary>
     [Fact]
     public async Task Preview_CountsTransferFromItsDate()
     {
@@ -145,10 +131,6 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings AC-7: an empty PLN savings account at 5 % that received a 10 000 deposit
-    /// payout on 16 September accrues on it from that day only (15 days) when September is previewed on 1 October.
-    /// </summary>
     [Fact]
     public async Task Preview_CountsDepositPayoutFromItsDate()
     {

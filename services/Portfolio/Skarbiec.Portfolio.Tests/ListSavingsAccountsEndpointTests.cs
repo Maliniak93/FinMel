@@ -10,11 +10,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>savings-accounts: <c>GET /api/portfolio/savings-accounts</c> lists the user's accounts across portfolios.</summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-5.</summary>
     [Fact]
     public async Task List_ReturnsAccountsAcrossPortfoliosWithBalance()
     {
@@ -52,7 +50,6 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
         Assert.Equal(10_000m, listed[1].Balance);
     }
 
-    /// <summary>AC-12: an archived account is still listed, with <c>isArchived</c> true next to a live one's false.</summary>
     [Fact]
     public async Task List_ArchivedAccount_ListedWithFlag()
     {
@@ -99,11 +96,6 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-10: each account carries <c>interestDue</c>, <c>duePeriodCount</c>
-    /// and <c>lastSettlement</c> - a settled-once account with one more month due, an untouched one with
-    /// two months due, and one opened today with nothing due.
-    /// </summary>
     [Fact]
     public async Task List_ReturnsInterestStatusAndLastSettlement()
     {
@@ -144,7 +136,6 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
         Assert.Null(opened.LastSettlement);
     }
 
-    /// <summary>The single-account read carries the same interest status.</summary>
     [Fact]
     public async Task Get_ReturnsInterestStatus()
     {

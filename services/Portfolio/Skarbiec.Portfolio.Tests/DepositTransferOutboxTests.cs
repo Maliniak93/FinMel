@@ -19,18 +19,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Outbox tests for term deposits moving money between assets: funded from Cash, paid out on settlement or later.
-/// The hostless provider and shared arrange helpers live in <see cref="PortfolioOutboxTestBase"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-3 (outbox half): a deposit funded from Cash in another
-    /// portfolio writes both legs and one <see cref="AssetPositionChanged"/> per asset — Cash at 4 000,
-    /// the deposit at 1 000 — all in a single save.
-    /// </summary>
     [Fact]
     public async Task AddFundedDeposit_PublishesPositionChangedForBothAssets()
     {
@@ -87,11 +78,6 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(1_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == depositId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-5 (outbox half): UpdateDeposit on a funded deposit rewrites
-    /// both legs and writes one further <see cref="AssetPositionChanged"/> per asset — Cash at 3 500,
-    /// the deposit at 1 500, each at a higher version — in a single save.
-    /// </summary>
     [Fact]
     public async Task UpdateFundedDeposit_PublishesPositionChangedForBothAssets()
     {
@@ -147,11 +133,6 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.All(legs, leg => Assert.Equal(new DateOnly(2026, 2, 1), leg.Date));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-7 (outbox half): removing a funded deposit writes its
-    /// <see cref="AssetRemoved"/> and detaches the Cash leg in the same save — but publishes nothing
-    /// for the Cash asset, whose quantity does not change.
-    /// </summary>
     [Fact]
     public async Task RemoveFundedDeposit_DetachesCashLegWithoutPublishingForIt()
     {
@@ -198,13 +179,6 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(4_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == cashId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-1 (outbox half): settling with a destination stores the settlement,
-    /// the net-interest credit and both transfer legs, and writes exactly one further
-    /// <see cref="AssetPositionChanged"/> per asset carrying its final quantity — the deposit at 0, the
-    /// Cash at 5 000 + 10 119.83 — all in a single save. The host clock is the real one (today is well
-    /// past the 2026-04-15 maturity).
-    /// </summary>
     [Fact]
     public async Task SettleDepositWithDestination_PublishesBothPositions()
     {
@@ -270,11 +244,6 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(new DateOnly(2026, 4, 15), terms.SettledOn);
     }
 
-    /// <summary>
-    /// deposit-payout-to-savings AC-2 (outbox half): settling into an empty PLN savings account writes
-    /// exactly one further <see cref="AssetPositionChanged"/> per asset carrying its final quantity - the
-    /// deposit at 0, the savings account at 10 119.83 - in a single save.
-    /// </summary>
     [Fact]
     public async Task SettleDepositIntoSavings_PublishesBothPositions()
     {
@@ -327,11 +296,6 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(10_119.83m, (await verifyDb.Assets.SingleAsync(a => a.Id == savingsId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-2 (outbox half): settle and payout are atomic — an invalid destination
-    /// (here a Stock) fails with <c>Validation.InvalidTransferCounterpart</c> before anything is saved:
-    /// no outbox row, no settlement, no transaction.
-    /// </summary>
     [Fact]
     public async Task SettleDepositWithInvalidDestination_WritesNothing()
     {
@@ -376,12 +340,6 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(10_000m, (await verifyDb.Assets.SingleAsync(a => a.Id == depositId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// deposit-payout-to-cash AC-3 (outbox half): paying a settled deposit out later writes both legs
-    /// and exactly one further <see cref="AssetPositionChanged"/> per asset — the deposit at 0, the Cash
-    /// at 5 000 + 10 119.83 — in a single save; a second payout of the now paid-out deposit fails with
-    /// <c>Conflict.DepositAlreadyPaidOut</c> and writes no further outbox row.
-    /// </summary>
     [Fact]
     public async Task PayOutDeposit_PublishesBothPositions()
     {

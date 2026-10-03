@@ -5,7 +5,6 @@ using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.RestoreAsset;
 
-/// <summary>The mirror of <c>ArchiveAssetHandler</c> — same shape, opposite flag (asset-archive).</summary>
 public sealed class RestoreAssetHandler(
     PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, TimeProvider timeProvider)
 {
@@ -19,8 +18,7 @@ public sealed class RestoreAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        // Two independent flags: an asset inside an archived portfolio stays archived until the
-        // portfolio is restored first.
+        // Two independent flags: an asset in an archived portfolio stays archived until the portfolio is restored.
         if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
         {
             return PortfolioErrors.Archived(portfolioId);

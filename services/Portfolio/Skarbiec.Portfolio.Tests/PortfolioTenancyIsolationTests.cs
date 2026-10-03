@@ -10,10 +10,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// T1.6: Portfolio is a flat, top-level resource, so it plugs directly into the T0.14
-/// <see cref="TenancyIsolationTests{TProgram}"/> template (same shape as the Notes sample).
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PortfolioTenancyIsolationTests(SkarbiecContainersFixture containers) : TenancyIsolationTests<Program>
 {
@@ -38,10 +34,6 @@ public sealed class PortfolioTenancyIsolationTests(SkarbiecContainersFixture con
         Assert.Empty(portfolios!);
     }
 
-    /// <summary>
-    /// spec-08 AC-5: now that DELETE cascades, a stranger's delete must still stop at the 404 —
-    /// the owner's portfolio, its assets and their transactions all survive it.
-    /// </summary>
     [Fact]
     public async Task Delete_PortfolioWithAssetsByStranger_ReturnsNotFoundAndLeavesChildren()
     {

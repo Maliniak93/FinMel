@@ -25,35 +25,30 @@ public sealed class RemoveAssetHandler(
             return PortfolioErrors.Archived(portfolioId);
         }
 
-        // The delete cascades to the asset's transactions explicitly — portfolio_db has no FKs, so
-        // the database cascades nothing (spec-08). The tenancy query filter scopes the load to this
-        // user's rows.
+        // portfolio_db has no FKs, so the delete cascades to the asset's transactions explicitly.
         var transactions = await dbContext.Transactions
             .Where(t => t.AssetId == assetId)
             .ToListAsync(cancellationToken);
 
         dbContext.Transactions.RemoveRange(transactions);
 
-        // Detach, never reverse (asset-transfers-deposit-funding): a transfer leg on another asset stays
-        // as an ordinary transaction, its asset's quantity unchanged — so nothing is published for it.
+        // Detach, never reverse: a leg on another asset stays an ordinary transaction, so nothing is published for it.
         await dbContext.DetachCounterpartsAsync(transactions, cancellationToken);
 
-        // A term deposit's terms go with it (term-deposits). A savings account's go through the FK
-        // cascade alone (savings-accounts): nothing else references them.
+        // A term deposit's terms go here; a savings account's go through the FK cascade alone.
         var termDeposit = await dbContext.TermDeposits.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);
         if (termDeposit is not null)
         {
             dbContext.TermDeposits.Remove(termDeposit);
         }
 
-        // Interest settlements carry no FK (savings-interest-settlement), so they go here, with the asset.
+        // Interest settlements carry no FK, so they go here, with the asset.
         dbContext.SavingsInterestSettlements.RemoveRange(
             await dbContext.SavingsInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
 
         dbContext.Assets.Remove(asset);
 
-        // Terminal for this asset (spec-02 design decision 3): no version, no further position
-        // event. Published before SaveChangesAsync so it commits with the deletions (ADR-012).
+        // Terminal for this asset: no version, no further position event.
         await publishEndpoint.Publish(new AssetRemoved
         {
             AssetId = asset.Id,
@@ -69,8 +64,7 @@ public sealed class RemoveAssetHandler(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // A transaction recorded concurrently moved the asset's xmin: nothing is deleted, so no
-            // orphan transaction is left behind, and the user retries (spec-08).
+            // A concurrent transaction moved the asset's xmin: nothing is deleted, and the user retries.
             return TransactionErrors.ConcurrentModification();
         }
 

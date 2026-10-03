@@ -18,18 +18,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Outbox tests for savings accounts: add, update, and monthly interest settlement and its undo.
-/// The hostless provider and shared arrange helpers live in <see cref="PortfolioOutboxTestBase"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
-    /// <summary>
-    /// savings-accounts AC-2 (outbox half): AddSavingsAccount writes the Savings-class asset, its
-    /// ordinary opening Deposit, its <see cref="SavingsAccount"/> terms and one
-    /// <see cref="AssetPositionChanged"/> carrying the opening amount as the quantity — all in a single save.
-    /// </summary>
     [Fact]
     public async Task AddSavingsAccount_PublishesPositionChanged()
     {
@@ -70,11 +61,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.False(evt.PortfolioIsArchived);
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-5 (outbox half): SettleSavingsInterest stores the settlement, adds
-    /// the net-interest credit and writes one further <see cref="AssetPositionChanged"/> carrying the
-    /// raised balance - all in a single save. The host clock is the real one, so January 2026 has ended.
-    /// </summary>
     [Fact]
     public async Task SettleSavingsInterest_PublishesPositionChanged()
     {
@@ -117,10 +103,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(credit.Id, settlement.TransactionId);
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-8 (outbox half): undoing the latest settlement deletes it and its
-    /// credit and writes one further <see cref="AssetPositionChanged"/> carrying the restored balance.
-    /// </summary>
     [Fact]
     public async Task UndoSavingsInterestSettlement_PublishesPositionChanged()
     {
@@ -165,7 +147,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(1, await verifyDb.Transactions.CountAsync(t => t.AssetId == assetId, cancellationToken));
     }
 
-    /// <summary>A 5 % taxed account with an opening deposit of 10 000 on 1 January 2026, arranged through its handlers.</summary>
     private async Task<(Guid PortfolioId, Guid AssetId)> ArrangeInterestAccountAsync(CancellationToken cancellationToken)
     {
         await using var arrange = Provider.CreateAsyncScope();
@@ -180,10 +161,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         return (portfolioId, added.Value.AssetId);
     }
 
-    /// <summary>
-    /// savings-accounts AC-2: without an opening deposit the account still publishes its position
-    /// (quantity 0) once, and writes no transaction.
-    /// </summary>
     [Fact]
     public async Task AddSavingsAccount_WithoutOpeningDeposit_PublishesPositionChangedWithZero()
     {
@@ -205,10 +182,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(0m, evt.Quantity);
     }
 
-    /// <summary>
-    /// savings-accounts AC-4: UpdateSavingsAccount changes only terms nothing downstream carries, so it
-    /// writes no event beyond the one AddSavingsAccount wrote.
-    /// </summary>
     [Fact]
     public async Task UpdateSavingsAccount_PublishesNoEvent()
     {

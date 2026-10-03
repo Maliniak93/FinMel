@@ -15,8 +15,7 @@ public sealed class UpdateDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         Guid portfolioId, Guid assetId, UpdateDepositRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a deposit under
-        // the wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Deposit, cancellationToken);
         var terms = asset is null
@@ -39,29 +38,24 @@ public sealed class UpdateDepositHandler(
             return readOnly;
         }
 
-        // A settled deposit's terms are immutable (term-deposits-settlement) — delete it instead.
+        // A settled deposit's terms are immutable; delete it instead.
         if (terms.SettledOn is not null)
         {
             return DepositErrors.Settled;
         }
 
-        // A rolled-over deposit's principal and start date came from earlier terms' balance
-        // (deposit-rollover): they are fixed, and its transactions are never rewritten.
+        // A rolled-over deposit's principal and start date came from earlier terms, so they are fixed.
         if (terms.RolloverCount > 0 && (request.Principal != terms.Principal || request.StartDate != terms.StartDate))
         {
             return DepositErrors.RolledOver;
         }
 
-        // An unsettled, never rolled-over term deposit holds exactly one transaction — the system-managed
-        // opening Deposit — and it is rewritten in place, never corrected by a second one.
+        // An unsettled, never rolled-over deposit holds one opening Deposit, rewritten in place.
         var opening = terms.RolloverCount == 0
             ? await dbContext.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken)
             : null;
 
-        // A funded deposit's opening transaction is the In leg of a Cash → Deposit transfer
-        // (asset-transfers-deposit-funding). Its legs move together, and only when the principal or the
-        // start date changes — any other edit (name, interest terms) leaves both untouched, whatever the
-        // state of the Cash side.
+        // A funded deposit's legs move together, and only when the principal or the start date changes.
         var fundingLeg = opening?.TransferId is { } transferId
             ? await dbContext.Transactions.FirstOrDefaultAsync(t => t.TransferId == transferId && t.Id != opening.Id, cancellationToken)
             : null;
@@ -74,8 +68,7 @@ public sealed class UpdateDepositHandler(
         {
             fundingAsset = await dbContext.Assets.FirstAsync(a => a.Id == fundingLeg.AssetId, cancellationToken);
 
-            // The Cash side is read-only while it or its portfolio is archived, like any of its
-            // transactions (asset-archive) — rewriting its leg would change an archived asset.
+            // The Cash side is read-only while it or its portfolio is archived, so its leg cannot be rewritten.
             if (await dbContext.ReadOnlyErrorAsync(fundingAsset, cancellationToken) is { } fundingReadOnly)
             {
                 return fundingReadOnly;
@@ -124,8 +117,7 @@ public sealed class UpdateDepositHandler(
                 return recomputed.Error;
             }
 
-            // Re-resolved on every rewrite, like UpdateTransaction: the stored rate always matches the
-            // current start date (ADR-026). Both legs of a transfer share the currency, so the one rate.
+            // Re-resolved on every rewrite so the stored rate matches the current start date; both legs share it.
             var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.StartDate, cancellationToken);
             if (fxRateToPln.IsFailure)
             {

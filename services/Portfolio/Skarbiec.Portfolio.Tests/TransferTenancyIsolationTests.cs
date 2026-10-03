@@ -11,13 +11,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// asset-transfers-deposit-funding AC-10: a transfer links two of one user's transactions, so a
-/// stranger can neither use the owner's Cash as a funding source (400
-/// <c>Validation.InvalidTransferCounterpart</c> — the same answer as any id not in their pick list,
-/// so nothing leaks), nor see it among their candidates, nor reach the owner's legs (404 via the
-/// owner's portfolio id and via their own). Nested resources, so the facts are written by hand.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
@@ -115,7 +108,6 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         await AssertFundedDepositUnchangedAsync(owner, ownerId, funded, cancellationToken);
     }
 
-    /// <summary>A stranger listing the owner's Cash transactions — the leg and its counterpart names included — gets a 404.</summary>
     [Fact]
     public async Task ListTransferLegs_ByStranger_ReturnsNotFound()
     {
@@ -132,7 +124,6 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
     }
 
-    /// <summary>savings-cash-transfers AC-6: a stranger moving money from or to the owner's asset is a 400 and nothing is written for either user.</summary>
     [Fact]
     public async Task Create_ForeignAsset_IsRejected()
     {
@@ -159,7 +150,6 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         await owner.AssertCashUntouchedAsync(ownerSetup.CashPortfolioId, ownerSetup.CashAssetId, cancellationToken);
     }
 
-    /// <summary>savings-cash-transfers AC-6: a stranger deleting the owner's transfer is a 404 and both sides stay as they were.</summary>
     [Fact]
     public async Task Delete_ForeignTransfer_ReturnsNotFound()
     {

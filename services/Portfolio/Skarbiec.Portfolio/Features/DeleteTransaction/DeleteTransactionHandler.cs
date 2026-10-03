@@ -24,7 +24,7 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
             return readOnly;
         }
 
-        // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit (term-deposits).
+        // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit.
         if (asset.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.TransactionsManaged;
@@ -38,23 +38,20 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
             return TransactionErrors.NotFound(id);
         }
 
-        // A transfer leg changes only through its transfer's entry point (asset-transfers-deposit-funding),
-        // so the two legs never drift apart.
+        // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
             return TransferErrors.LegManaged;
         }
 
-        // A savings interest credit goes only by undoing its settlement (savings-interest-settlement),
-        // so a settlement never loses its credit.
+        // A savings interest credit goes only by undoing its settlement, so a settlement never loses its credit.
         if (asset.AssetClass == AssetClass.Savings
             && await dbContext.SavingsInterestSettlements.AnyAsync(s => s.TransactionId == id, cancellationToken))
         {
             return SavingsAccountErrors.InterestManaged;
         }
 
-        // Recompute over what remains without the deleted transaction, without removing it from
-        // the change tracker yet — a rejected delete must leave the database untouched (AC).
+        // Recompute without the deleted transaction before removing it, so a rejected delete leaves the database untouched.
         var remainingTransactions = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => t.AssetId == assetId && t.Id != id)
@@ -69,8 +66,6 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         asset.Quantity = recomputed.Value;
         dbContext.Transactions.Remove(transaction);
 
-        // Deleting a transaction moves the quantity, which is the source of truth for the position
-        // (ADR-009) — so it publishes, where before spec-02 it published nothing at all (AC-5).
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         try

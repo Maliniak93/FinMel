@@ -12,37 +12,23 @@ public sealed record TransactionResponse
     public required decimal Quantity { get; init; }
     public required decimal UnitPrice { get; init; }
 
-    /// <summary>The asset's currency — the one <see cref="UnitPrice"/> is in.</summary>
+    /// <summary>The asset's currency, the one UnitPrice is in.</summary>
     public required string Currency { get; init; }
 
-    /// <summary>
-    /// <see cref="Quantity"/> × <see cref="UnitPrice"/> in PLN at the rate frozen on the transaction's
-    /// date (ADR-026), rounded to 2 places; <see langword="null"/> when no rate was known.
-    /// </summary>
+    /// <summary>Quantity × UnitPrice in PLN at the rate frozen on the transaction's date, rounded to 2 places; null when no rate was known.</summary>
     public decimal? ValuePln { get; init; }
 
     public required DateOnly Date { get; init; }
 
-    /// <summary>
-    /// The counterpart of a transfer leg (asset-transfers-deposit-funding); <see langword="null"/> on
-    /// an ordinary transaction. A leg is changed only through its transfer's entry point.
-    /// </summary>
+    /// <summary>The counterpart of a transfer leg; null on an ordinary transaction.</summary>
     public TransactionTransferResponse? Transfer { get; init; }
 
-    /// <summary>
-    /// The last day of the settled month when this is a savings account's interest credit
-    /// (savings-interest-settlement) — system-managed, removed only by undoing its settlement;
-    /// <see langword="null"/> on every other transaction.
-    /// </summary>
+    /// <summary>The last day of the settled month when this is a savings account's interest credit; null otherwise.</summary>
     public DateOnly? SavingsInterestPeriodEnd { get; init; }
 }
 
 public static class TransactionMappingExtensions
 {
-    /// <param name="transaction">The stored transaction.</param>
-    /// <param name="currency">The owning asset's currency.</param>
-    /// <param name="transfer">The counterpart when <paramref name="transaction"/> is a transfer leg.</param>
-    /// <param name="savingsInterestPeriodEnd">The settled month's end when <paramref name="transaction"/> is an interest credit.</param>
     public static TransactionResponse ToResponse(
         this Transaction transaction,
         string currency,

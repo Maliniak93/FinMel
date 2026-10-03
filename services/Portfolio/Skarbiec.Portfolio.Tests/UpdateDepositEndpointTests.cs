@@ -13,15 +13,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits: <c>PUT .../deposits/{assetId}</c> rewrites the terms, the system-managed opening
-/// transaction and the asset's quantity together — never a correction transaction. Currency is not
-/// part of the request (immutable).
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-8 (HTTP half; the single event is proven by <see cref="PortfolioOutboxTests.UpdateDeposit_PublishesOnePositionChangedWithNewQuantity"/>).</summary>
     [Fact]
     public async Task Update_PrincipalStartAndTerm_RewritesOpeningTransactionAndQuantity()
     {
@@ -82,12 +76,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(new DateOnly(2026, 8, 1), terms.MaturityDate);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-5 (HTTP half; both events are proven by
-    /// <see cref="PortfolioOutboxTests.UpdateFundedDeposit_PublishesPositionChangedForBothAssets"/>): a
-    /// new principal and start date on a funded deposit rewrite both legs of its transfer — Cash goes
-    /// from 4 000 to 3 500 — and the two legs stay linked, the funding source unchanged.
-    /// </summary>
     [Fact]
     public async Task Update_FundedDeposit_RewritesBothLegs()
     {
@@ -131,10 +119,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.All(legs, leg => Assert.Equal(new DateOnly(2026, 2, 1), leg.Date));
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-5: a funded deposit's new start date re-freezes the FX rate
-    /// on both legs (ADR-026) — here for a EUR deposit funded from EUR Cash.
-    /// </summary>
     [Fact]
     public async Task Update_FundedEurDepositNewStartDate_ReFreezesRateOnBothLegs()
     {
@@ -159,10 +143,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(4_300.00m, opening.ValuePln);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-5: a principal the Cash cannot cover is a 400
-    /// <c>Validation.InsufficientFunds</c> and nothing changes — terms, both legs and both quantities.
-    /// </summary>
     [Fact]
     public async Task Update_FundedDepositBeyondCashBalance_ReturnsInsufficientFunds()
     {
@@ -180,11 +160,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding: with the funding Cash's portfolio archived, a change that
-    /// would rewrite the legs is a 409 <c>Conflict.PortfolioArchived</c> and nothing changes, while a
-    /// change that leaves the legs alone (a rename) still goes through.
-    /// </summary>
     [Fact]
     public async Task Update_FundedDepositWithArchivedCashPortfolio_RejectsLegChangesOnly()
     {
@@ -211,7 +186,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal("Renamed deposit", (await client.GetDepositAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Name);
     }
 
-    /// <summary>asset-archive AC-5: updating an archived Active deposit is a 409 <c>Conflict.AssetArchived</c> and it keeps its terms.</summary>
     [Fact]
     public async Task Update_ArchivedDeposit_Returns409()
     {
@@ -230,10 +204,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// asset-archive AC-5: an active deposit funded from a Cash asset that is then archived — changing the
-    /// principal would rewrite the Cash leg, so it is a 409 <c>Conflict.AssetArchived</c> and neither leg changes.
-    /// </summary>
     [Fact]
     public async Task Update_ArchivedFundingAsset_Returns409()
     {
@@ -252,7 +222,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
     }
 
-    /// <summary>AC-7: updating a deposit of an archived portfolio is a 409 and the deposit keeps its terms.</summary>
     [Fact]
     public async Task Update_ArchivedPortfolio_ReturnsConflict()
     {
@@ -272,10 +241,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_000m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
     }
 
-    /// <summary>
-    /// term-deposits-settlement AC-7 (update half): a settled deposit's terms are immutable — 409
-    /// <c>Conflict.DepositSettled</c>, and the terms, settlement and quantity stay as they were.
-    /// </summary>
     [Fact]
     public async Task Update_SettledDeposit_ReturnsConflict()
     {
@@ -302,12 +267,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_000m, (await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken)).Principal);
     }
 
-    /// <summary>
-    /// deposit-rollover AC-6: a rolled-over Active deposit (10 119.83 from 2026-04-15) keeps every term
-    /// but its principal and start date editable — a new name, bank, rate, term and capitalisation with
-    /// the same principal and start date change the terms and recompute the maturity date, while its two
-    /// transactions (the opening one and the first term's net-interest credit) stay untouched.
-    /// </summary>
     [Fact]
     public async Task Update_RolledOverDeposit_EditsTermsOnly()
     {
@@ -364,11 +323,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(new DateOnly(2026, 10, 15), terms.MaturityDate);
     }
 
-    /// <summary>
-    /// deposit-rollover AC-6: once rolled over, a principal or start date that differs from the stored
-    /// one is 409 <c>Conflict.DepositRolledOver</c> — the balance of earlier terms produced them — and
-    /// nothing changes, not even the name sent alongside.
-    /// </summary>
     [Theory]
     [InlineData("principal")]
     [InlineData("start-date")]
@@ -398,7 +352,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(1, before.Deposit.RolloverCount);
     }
 
-    /// <summary>deposit-rollover: a rolled-over deposit whose next term is settled is still 409 <c>Conflict.DepositSettled</c>, as any settled deposit.</summary>
     [Fact]
     public async Task Update_SettledRolledOverDeposit_ReturnsSettledConflict()
     {
@@ -425,7 +378,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         await AssertDepositUnchangedAsync(client, userId, portfolioId, deposit.AssetId, before, cancellationToken);
     }
 
-    /// <summary>The same validation as AddDeposit applies; a rejected update leaves every row as it was.</summary>
     [Theory]
     [InlineData("principal-zero", nameof(UpdateDepositRequest.Principal))]
     [InlineData("rate-over-100", nameof(UpdateDepositRequest.AnnualInterestRatePercent))]
@@ -454,7 +406,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(new DateOnly(2026, 4, 15), asset.DepositMaturityDate);
     }
 
-    /// <summary>The deposit endpoint addresses Deposit-class assets only — any other asset is not a deposit.</summary>
     [Fact]
     public async Task Update_NonDepositAsset_ReturnsNotFound()
     {

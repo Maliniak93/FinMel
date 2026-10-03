@@ -15,13 +15,6 @@ namespace Skarbiec.Portfolio.Tests;
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>
-    /// M1.5: <c>UpdateAssetRequest</c> has no directly-settable <c>Quantity</c> (see its
-    /// <c>&lt;remarks&gt;</c>) — a prior Buy transaction gives the asset a real, non-zero quantity, and
-    /// the update (which touches every other field) must leave it exactly as the transaction produced
-    /// it, proving Quantity moves only through <c>TransactionQuantityCalculator</c> (ADR-009), never
-    /// through this endpoint.
-    /// </summary>
     [Fact]
     public async Task Update_ExistingAsset_ReturnsOkWithUpdatedFieldsAndQuantityUntouched()
     {
@@ -29,8 +22,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
-        // transactions-pln-value-and-fee-removal: the asset has a transaction, so its currency is
-        // locked; the update keeps PLN and changes everything else.
+        // The asset has a transaction, so its currency is locked; the update keeps PLN and changes everything else.
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Crypto,
@@ -155,7 +147,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         {
             AssetClass = AssetClass.Stock,
             Name = "Now market",
-            Currency = "PLN", // unchanged: the Buy above locks the asset's currency.
+            Currency = "PLN",
             InstrumentId = instrumentId
         };
 
@@ -166,8 +158,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(instrumentId, body!.InstrumentId);
         Assert.Null(body.ManualValue);
         Assert.Null(body.ManualValueDate);
-        // M1.5: no Quantity field on the request — the switch to Market must not disturb the
-        // quantity the earlier Buy transaction already produced.
+        // The switch to Market must not disturb the quantity the earlier Buy produced.
         Assert.Equal(5m, body.Quantity);
 
         var transactions = await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken);
@@ -201,26 +192,18 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(250m, body.ManualValue);
     }
 
-    /// <summary>M1.4: switching an existing (manual) asset to currency-valued clears the manual fields
-    /// and InstrumentId, and stores the explicit mode.
-    /// <para>
-    /// M1.5: <c>UpdateAssetRequest</c> has no directly-settable <c>Quantity</c>. A currency-valued
-    /// asset's quantity (value = <c>Quantity × FxRate</c>) still has to come from somewhere, and the
-    /// answer is the same as every other asset class: recorded transactions (ADR-009) — here a Deposit
-    /// of 500 before the mode switch, which the switch must leave untouched.
-    /// </para></summary>
     [Fact]
     public async Task Update_SwitchManualCashToCurrencyValued_ClearsManualValueAndSetsModeQuantityFromTransaction()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken); // default: manual, AssetClass.Stock.
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 500m, new DateOnly(2026, 1, 1), cancellationToken);
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Cash,
             Name = "Now currency-valued",
-            Currency = "PLN", // unchanged: the Deposit above locks the asset's currency.
+            Currency = "PLN",
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -234,9 +217,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(500m, body.Quantity);
     }
 
-    /// <summary>cash-transaction-types AC-5: turning a Stock that holds a Buy into Cash would leave a
-    /// Cash asset with a type it does not accept — 400 <c>Validation.TransactionTypeNotAllowed</c>,
-    /// and the asset keeps its class, name and valuation mode.</summary>
     [Fact]
     public async Task Update_ToCashLikeClassWithDisallowedTransactions_ReturnsBadRequest()
     {
@@ -263,8 +243,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(3m, unchanged.Quantity);
     }
 
-    /// <summary>cash-transaction-types AC-5: the guard rejects only a real conflict — a Stock whose
-    /// transactions are all Deposits becomes Cash with a 200.</summary>
     [Fact]
     public async Task Update_ToCashLikeClassWithOnlyDepositTransactions_Succeeds()
     {
@@ -290,8 +268,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(500m, body.Quantity);
     }
 
-    /// <summary>Mirrors <see cref="AddAssetEndpointTests.Add_WithNeitherInstrumentIdNorManualValue_ReturnsBadRequest"/>
-    /// on the update path: "neither" stays a 400 outside the currency-valued classes.</summary>
     [Fact]
     public async Task Update_NonCurrencyValuedClassWithNeitherInstrumentIdNorManualValue_ReturnsBadRequest()
     {
@@ -356,9 +332,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC9: once an asset has a transaction its
-    /// stored PLN rates are tied to its currency. Changing the currency is a 400 field error on
-    /// <c>Currency</c>, and the asset keeps its currency.</summary>
     [Fact]
     public async Task Update_ChangeCurrencyWithTransactions_ReturnsBadRequest()
     {
@@ -385,8 +358,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal("PLN", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC9: an asset without transactions has no
-    /// stored rates yet, so its currency stays freely editable.</summary>
     [Fact]
     public async Task Update_ChangeCurrencyWithoutTransactions_ReturnsOk()
     {
@@ -411,9 +382,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal("EUR", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC10: the archived guard runs before the
-    /// currency lock. An archived portfolio answers 409 <c>Conflict.PortfolioArchived</c>, not the
-    /// currency-lock 400, even for an asset whose currency is locked by its transactions.</summary>
     [Fact]
     public async Task Update_ChangeCurrencyOnArchivedPortfolio_ReturnsConflict()
     {
@@ -439,7 +407,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal("EUR", (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Currency);
     }
 
-    /// <summary>asset-archive AC-4: updating an archived asset is a 409 <c>Conflict.AssetArchived</c> and it keeps its state.</summary>
     [Fact]
     public async Task Update_ArchivedAsset_Returns409()
     {
@@ -459,7 +426,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.True(unchanged.IsArchived);
     }
 
-    /// <summary>asset-archive design: the portfolio check runs before the asset check — an archived asset in an archived portfolio answers <c>Conflict.PortfolioArchived</c>.</summary>
     [Fact]
     public async Task Update_ArchivedAssetInArchivedPortfolio_ReturnsPortfolioArchivedConflict()
     {
@@ -475,8 +441,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC6: updating an asset of an archived portfolio
-    /// is a 409 <c>Conflict.PortfolioArchived</c> and the asset keeps its previous state.</summary>
     [Fact]
     public async Task UpdateAsset_InArchivedPortfolio_Returns409()
     {
@@ -502,12 +466,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(100m, unchanged.ManualValue);
     }
 
-    /// <summary>
-    /// term-deposits AC-9: the asset endpoint never produces or edits a Deposit-class asset — turning
-    /// a Cash asset into a Deposit, turning a term deposit into Cash, or even re-saving a term deposit
-    /// as class Deposit here is a 400 <c>Validation.UseDepositEndpoints</c>, and the asset keeps its
-    /// class, name and quantity.
-    /// </summary>
     [Theory]
     [InlineData("cash-to-deposit")]
     [InlineData("deposit-to-cash")]
@@ -546,11 +504,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(originalQuantity, unchanged.Quantity);
     }
 
-    /// <summary>
-    /// savings-accounts AC-6: the asset endpoint never produces or edits a Savings-class asset — turning
-    /// a Cash asset into Savings, or a savings account into Cash, is a 400
-    /// <c>Validation.UseSavingsAccountEndpoints</c>, and the asset keeps its class, name and quantity.
-    /// </summary>
     [Theory]
     [InlineData("cash-to-savings")]
     [InlineData("savings-to-cash")]

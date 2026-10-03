@@ -2,11 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 
-/// <summary>
-/// What the bank actually paid at maturity (term-deposits-settlement). The date rules need the
-/// deposit and today's Europe/Warsaw date (<c>StartDate ≤ SettledOn ≤ today</c>), so the handler
-/// checks those.
-/// </summary>
+/// <summary>StartDate ≤ SettledOn ≤ today (Europe/Warsaw) is checked in the handler.</summary>
 public sealed record SettleDepositRequest : IValidatableObject
 {
     public required DateOnly SettledOn { get; init; }
@@ -17,17 +13,12 @@ public sealed record SettleDepositRequest : IValidatableObject
     [Range(typeof(decimal), "0", "79228162514264337593543950335")]
     public required decimal Tax { get; init; }
 
-    /// <summary>
-    /// The Cash asset to pay the whole balance (principal + net) out to on <see cref="SettledOn"/>
-    /// (deposit-payout-to-cash) — one of the user's same-currency Cash assets in an active portfolio
-    /// (<c>transfer-candidates</c>). Omitted: the money stays in the deposit until PayOutDeposit moves it.
-    /// </summary>
+    /// <summary>The Cash or Savings asset the whole balance is paid out to; omitted, the money stays in the deposit.</summary>
     public Guid? DestinationAssetId { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        // Both are stored as numeric(18,2): a finer value would be rounded silently by the database
-        // while the net-interest transaction kept it, so it is rejected instead.
+        // Stored as numeric(18,2): a finer value is rejected rather than rounded away from the net-interest transaction.
         if (decimal.Round(GrossInterest, 2) != GrossInterest)
         {
             yield return new ValidationResult(

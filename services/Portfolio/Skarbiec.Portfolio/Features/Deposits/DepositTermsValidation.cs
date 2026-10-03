@@ -3,11 +3,6 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Deposits;
 
-/// <summary>
-/// The cross-field rules AddDepositRequest and UpdateDepositRequest share (term-deposits), keyed on
-/// the request field names so the deposit form maps each message back onto its control. The simple
-/// ranges live on the records as DataAnnotations.
-/// </summary>
 internal static class DepositTermsValidation
 {
     public const int MaxTermDays = 3650;
@@ -21,8 +16,7 @@ internal static class DepositTermsValidation
         DepositCapitalization capitalization,
         decimal earlyBreakInterestLossPercent)
     {
-        // The stored columns are numeric(18,2), numeric(7,4) and numeric(5,2): a finer value would be
-        // rounded silently by the database, so it is rejected instead.
+        // The columns are numeric(18,2), numeric(7,4) and numeric(5,2): a finer value is rejected rather than silently rounded.
         if (decimal.Round(principal, 2) != principal)
         {
             yield return new ValidationResult(

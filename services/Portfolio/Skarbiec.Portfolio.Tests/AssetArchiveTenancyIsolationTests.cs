@@ -7,10 +7,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// asset-archive AC-3: archive and restore on another user's asset are 404 — never 403 — both under
-/// the owner's portfolio id and under the stranger's own, and the owner's flag never moves.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AssetArchiveTenancyIsolationTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {

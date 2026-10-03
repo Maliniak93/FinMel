@@ -3,12 +3,7 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 
-/// <summary>
-/// Starts a deposit's next term on the same asset (deposit-rollover). Only the rate can change. A Due
-/// deposit is settled in the same save, so it needs <see cref="GrossInterest"/> and <see cref="Tax"/>
-/// (what the bank paid, as in SettleDepositRequest); a Settled one reuses its stored settlement, so
-/// both must be absent. Which of the two applies depends on the deposit, so the handler checks it.
-/// </summary>
+/// <summary>A Due deposit needs GrossInterest and Tax, a Settled one must omit them; the handler checks which applies.</summary>
 public sealed record RollOverDepositRequest : IValidatableObject
 {
     [Range(typeof(decimal), "0", "100")]
@@ -22,9 +17,7 @@ public sealed record RollOverDepositRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        // The stored columns are numeric(7,4) and numeric(18,2): a finer value would be rounded silently
-        // by the database, so it is rejected instead — the same rules as DepositTermsValidation and
-        // SettleDepositRequest.
+        // The columns are numeric(7,4) and numeric(18,2): a finer value is rejected rather than silently rounded.
         if (decimal.Round(AnnualInterestRatePercent, 4) != AnnualInterestRatePercent)
         {
             yield return new ValidationResult(

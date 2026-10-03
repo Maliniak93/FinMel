@@ -7,14 +7,6 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Proves the xmin concurrency token configured on Asset/Transaction (T1.4 scope: "note on
-/// optimistic concurrency ... implement the simple safe option") actually detects a race, instead
-/// of two racing SaveChangesAsync calls silently overwriting each other's Asset.Quantity. Drives
-/// PortfolioDbContext directly via <see cref="PortfolioEndpointTests.CreateDbContext"/> — a genuine
-/// race (read, THEN a concurrent write, THEN save) can't be forced through the black-box HTTP
-/// client, since each request loads and saves within a single handler call.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {

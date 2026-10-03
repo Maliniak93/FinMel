@@ -14,18 +14,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Outbox tests for transfers between Cash and a savings account: create and delete.
-/// The hostless provider and shared arrange helpers live in <see cref="PortfolioOutboxTestBase"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
-    /// <summary>
-    /// savings-cash-transfers AC-2 (outbox half): a Cash → Savings transfer writes both legs and one
-    /// <see cref="AssetPositionChanged"/> per asset - Cash at 3 000, the savings account at 2 000 - in a
-    /// single save.
-    /// </summary>
     [Fact]
     public async Task CreateTransfer_PublishesPositionChangedForBothAssets()
     {
@@ -62,11 +53,6 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         Assert.Single(legs.Select(t => t.TransferId).Distinct());
     }
 
-    /// <summary>
-    /// savings-cash-transfers AC-4 (outbox half): deleting the transfer removes both legs and writes one
-    /// further <see cref="AssetPositionChanged"/> per asset - Cash back at 5 000, the account at 0 - in a
-    /// single save.
-    /// </summary>
     [Fact]
     public async Task DeleteTransfer_PublishesPositionChangedForBothAssets()
     {

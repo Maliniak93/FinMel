@@ -5,33 +5,13 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features;
 
-/// <summary>
-/// The single place that produces <see cref="AssetPositionChanged"/> (spec-02, ADR-021): it owns the
-/// <see cref="Asset.Version"/> counter, resolves the owning portfolio's archived flag and stamps
-/// <c>OccurredAtUtc</c>. Five mutating slices call it — extraction is the rule here, not a shortcut
-/// past ADR-002's "no service layer": this is one event's construction, not a business layer.
-/// </summary>
-/// <remarks>
-/// Every method must be awaited <b>before</b> the caller's <c>SaveChangesAsync</c>, so the outbox row
-/// and the business write commit in one transaction (ADR-012). Nothing here calls
-/// <c>SaveChangesAsync</c> itself — the version bump is staged on the tracked entity and saved by the
-/// caller.
-/// </remarks>
+// One event's construction shared by every mutating slice, not a service layer.
 public sealed class PositionEventPublisher(
     PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, TimeProvider timeProvider)
 {
-    /// <summary>
-    /// A brand-new asset, published at version 0 — its first state. The caller already holds the
-    /// portfolio (it just validated it), so no lookup is needed.
-    /// </summary>
     public Task PublishCreatedAsync(Asset asset, PortfolioEntity portfolio, CancellationToken cancellationToken)
         => PublishAsync(asset, portfolio.IsArchived, cancellationToken);
 
-    /// <summary>
-    /// An existing asset whose position moved (edited, archived or restored, or a transaction
-    /// recorded/edited/deleted against it). Bumps <see cref="Asset.Version"/> first, so successive events for one asset carry
-    /// strictly increasing versions (spec-02 AC-7).
-    /// </summary>
     public async Task PublishChangedAsync(Asset asset, CancellationToken cancellationToken)
     {
         var portfolioIsArchived = await dbContext.Portfolios
@@ -44,12 +24,6 @@ public sealed class PositionEventPublisher(
         await PublishAsync(asset, portfolioIsArchived, cancellationToken);
     }
 
-    /// <summary>
-    /// The archive/restore fan-out: one event per asset of <paramref name="portfolio"/>, carrying its
-    /// <b>new</b> <see cref="PortfolioEntity.IsArchived"/> value — otherwise a read model would keep
-    /// valuing an archived portfolio. The asset rows themselves don't change, which is precisely why
-    /// <c>Version</c> is an app-managed counter and not <c>xmin</c> (spec-02 design decision 1).
-    /// </summary>
     public async Task PublishForEveryAssetAsync(PortfolioEntity portfolio, CancellationToken cancellationToken)
     {
         var assets = await dbContext.Assets
@@ -64,8 +38,7 @@ public sealed class PositionEventPublisher(
     }
 
     private Task PublishAsync(Asset asset, bool portfolioIsArchived, CancellationToken cancellationToken)
-        // UserId comes from the DbContext's current user (ADR-006), not from the entity: the
-        // interceptor only stamps Asset.UserId during SaveChangesAsync, which hasn't run yet.
+        // The interceptor stamps Asset.UserId only during SaveChangesAsync, which has not run yet.
         => publishEndpoint.Publish(new AssetPositionChanged
         {
             AssetId = asset.Id,
@@ -79,8 +52,7 @@ public sealed class PositionEventPublisher(
             ManualValueAmount = asset.ManualValueAmount,
             ManualValueDate = asset.ManualValueDate,
             PortfolioIsArchived = portfolioIsArchived,
-            // The asset's own flag, carried as it stands on every event — the portfolio fan-out never
-            // changes it (asset-archive).
+            // The asset's own flag; the portfolio fan-out never changes it.
             IsArchived = asset.IsArchived,
             Version = asset.Version,
             OccurredAtUtc = timeProvider.GetUtcNow()

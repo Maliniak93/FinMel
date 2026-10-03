@@ -13,14 +13,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Outbox tests for transaction writes: record, update and delete each publish the recomputed quantity.
-/// The hostless provider and shared arrange helpers live in <see cref="PortfolioOutboxTestBase"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
-    /// <summary>spec-02 AC-3: published Quantity equals the recomputed quantity.</summary>
     [Fact]
     public async Task RecordTransaction_WritesAssetPositionChangedWithRecomputedQuantity()
     {
@@ -48,7 +43,6 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.Equal(5m, recordEvent.Quantity);
     }
 
-    /// <summary>spec-02 AC-4: editing a transaction now publishes — nothing was published before.</summary>
     [Fact]
     public async Task UpdateTransaction_WritesAssetPositionChangedWithRecomputedQuantity()
     {
@@ -82,7 +76,6 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.Equal(assetResult.Value.Id, updateEvent.AssetId);
     }
 
-    /// <summary>spec-02 AC-5: deleting a transaction now publishes — nothing was published before.</summary>
     [Fact]
     public async Task DeleteTransaction_WritesAssetPositionChangedWithRecomputedQuantity()
     {
@@ -111,8 +104,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
             .HandleAsync(portfolioResult.Value.Id, assetResult.Value.Id, sellResult.Value.Id, cancellationToken);
         Assert.True(deleteResult.IsSuccess);
 
-        // The last event in write order is the delete's — matching on the quantity alone would be
-        // ambiguous here, since the Buy that preceded the Sell also left the position at 10.
+        // The last event in write order is the delete's; the quantity alone is ambiguous, as the earlier Buy also left 10.
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
         var deleteEvent = events[^1];
         Assert.Equal(10m, deleteEvent.Quantity);

@@ -9,15 +9,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-cash-transfers: <c>DELETE /api/portfolio/transfers/{transferId}</c> removes both legs of a
-/// manual transfer and recomputes both assets (the position events are proven by
-/// <see cref="PortfolioOutboxTests.DeleteTransfer_PublishesPositionChangedForBothAssets"/>).
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-4.</summary>
     [Fact]
     public async Task Delete_ManualTransfer_RemovesBothLegs()
     {
@@ -40,7 +34,6 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal(1, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
-    /// <summary>AC-4: a funded deposit's transfer belongs to the deposit slices.</summary>
     [Fact]
     public async Task Delete_DepositRouteTransfer_ReturnsConflict()
     {
@@ -57,7 +50,6 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
         await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
     }
 
-    /// <summary>AC-4: the savings money was withdrawn after the transfer, so removing the inflow would leave a Withdraw uncovered.</summary>
     [Fact]
     public async Task Delete_WouldBreakTargetHistory_IsRejected()
     {
@@ -90,7 +82,6 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>An archived portfolio on either side is a 409 and the transfer stays.</summary>
     [Theory]
     [InlineData("source")]
     [InlineData("target")]
@@ -111,7 +102,6 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
     }
 
-    /// <summary>deposit-payout-to-savings AC-5: a deposit payout into savings is not a manual transfer.</summary>
     [Fact]
     public async Task Delete_DepositPayoutIntoSavings_ReturnsConflict()
     {

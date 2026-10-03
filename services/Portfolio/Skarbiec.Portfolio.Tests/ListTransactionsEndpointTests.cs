@@ -65,9 +65,6 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.Equal(new DateOnly(2026, 1, 2), page.Items[1].Date);
     }
 
-    /// <summary>transactions-pln-value-and-fee-removal AC8: every listed transaction carries the
-    /// asset's currency and its server-computed PLN value (<c>null</c> when no rate was known), and
-    /// no fee.</summary>
     [Fact]
     public async Task List_ReturnsCurrencyAndValuePln()
     {
@@ -99,11 +96,6 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.Null(unpriced.ValuePln);
     }
 
-    /// <summary>
-    /// asset-transfers-deposit-funding AC-8: each leg of a transfer carries <c>transfer</c> — the
-    /// counterpart's asset and portfolio (ids and names) and the direction (Out on the Cash Withdraw,
-    /// In on the deposit's opening Deposit) — and a plain transaction carries none.
-    /// </summary>
     [Fact]
     public async Task List_TransferLeg_ReturnsCounterpart()
     {
@@ -161,10 +153,6 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>
-    /// savings-interest-settlement AC-9: an interest credit carries <c>savingsInterestPeriodEnd</c> (the
-    /// settled month's last day) on the wire; every other transaction carries null.
-    /// </summary>
     [Fact]
     public async Task List_SavingsInterestCredit_ReturnsPeriodEnd()
     {
@@ -185,10 +173,6 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.True(!opening.TryGetProperty("savingsInterestPeriodEnd", out var value) || value.ValueKind == JsonValueKind.Null);
     }
 
-    /// <summary>
-    /// savings-cash-transfers AC-5: both legs of a Cash/Savings transfer carry the transfer's id and
-    /// <c>manual: true</c>; the legs of a deposit-funding transfer carry their id and <c>manual: false</c>.
-    /// </summary>
     [Fact]
     public async Task List_ManualTransferLeg_IsManual()
     {
@@ -217,7 +201,6 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.False(fundingLeg.Transfer.Manual);
     }
 
-    /// <summary>deposit-payout-to-savings AC-5: both legs of a deposit payout into savings carry <c>manual: false</c>.</summary>
     [Fact]
     public async Task List_DepositPayoutLegOnSavings_IsNotManual()
     {

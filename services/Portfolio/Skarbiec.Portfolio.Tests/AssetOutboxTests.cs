@@ -21,14 +21,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// Outbox tests for asset writes: add, update, remove, archive and restore, and the rejected writes that must leave the outbox untouched.
-/// The hostless provider and shared arrange helpers live in <see cref="PortfolioOutboxTestBase"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
-    /// <summary>spec-02 AC-1.</summary>
     [Fact]
     public async Task AddAsset_WritesAssetPositionChangedInSameTransactionAsAssetRow()
     {
@@ -68,7 +63,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.False(evt.PortfolioIsArchived);
     }
 
-    /// <summary>spec-02 AC-2: post-update ValuationMode, InstrumentId, Currency and ManualValue* travel on the event.</summary>
     [Fact]
     public async Task UpdateAsset_WritesAssetPositionChangedWithNewValuationMode()
     {
@@ -102,7 +96,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Null(updateEvent.ManualValueDate);
     }
 
-    /// <summary>spec-02 AC-6.</summary>
     [Fact]
     public async Task RemoveAsset_WritesAssetRemovedInSameTransactionAsDeletion()
     {
@@ -132,7 +125,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Equal(UserId, evt.UserId);
     }
 
-    /// <summary>spec-02 AC-7.</summary>
     [Fact]
     public async Task SuccessiveMutations_PublishStrictlyIncreasingVersionPerAsset()
     {
@@ -159,10 +151,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.True(events[1].Version > events[0].Version);
     }
 
-    /// <summary>
-    /// spec-08 AC-4: removing an asset takes its transactions with it and writes one
-    /// non-cascaded <see cref="AssetRemoved"/>, all in a single save.
-    /// </summary>
     [Fact]
     public async Task RemoveAsset_WithTransactions_RemovesTransactionsAndWritesAssetRemoved()
     {
@@ -197,13 +185,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.False(evt.CascadedFromPortfolio);
     }
 
-    /// <summary>
-    /// cash-transaction-types AC-2..AC-5 (outbox half): every write rejected with
-    /// <c>Validation.TransactionTypeNotAllowed</c> — a Buy recorded on a Cash asset, a Cash
-    /// asset opened with an Interest, a Cash Deposit edited into a Sell, a Stock holding a Buy turned
-    /// into Cash — fails before it writes anything: not one outbox row is added and no business row
-    /// moves. Each write runs in its own scope, as in <see cref="PortfolioLifecycleOutboxTests.WriteToArchivedPortfolio_WritesNoEvent"/>.
-    /// </summary>
     [Fact]
     public async Task DisallowedTransactionTypeOnCashLikeAsset_WritesNoEvent()
     {
@@ -301,7 +282,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Equal(AssetClass.Stock, stock.AssetClass);
     }
 
-    /// <summary>asset-archive AC-1: archiving writes exactly one <see cref="AssetPositionChanged"/> with <c>IsArchived = true</c> and a higher <c>Version</c>, in the same save as the flag.</summary>
     [Fact]
     public async Task ArchiveAsset_PublishesPositionChangedWithArchivedFlag()
     {
@@ -332,7 +312,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.True(evt.Version > versionBefore);
     }
 
-    /// <summary>asset-archive AC-1: a second archive is a success that writes no further event.</summary>
     [Fact]
     public async Task ArchiveAsset_AlreadyArchived_WritesNoEvent()
     {
@@ -353,7 +332,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Equal(outboxRowsBefore, await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken));
     }
 
-    /// <summary>asset-archive AC-2: restoring writes one <see cref="AssetPositionChanged"/> with <c>IsArchived = false</c> and a higher <c>Version</c>.</summary>
     [Fact]
     public async Task RestoreAsset_PublishesPositionChangedWithoutArchivedFlag()
     {
@@ -383,7 +361,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.True(evt.Version > versionBefore);
     }
 
-    /// <summary>asset-archive AC-2: restoring an asset that is not archived writes no event.</summary>
     [Fact]
     public async Task RestoreAsset_NotArchived_WritesNoEvent()
     {
@@ -403,7 +380,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Equal(outboxRowsBefore, await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken));
     }
 
-    /// <summary>asset-archive AC-3: archive and restore in an archived portfolio, or on an unknown asset, fail without an event or a flag change.</summary>
     [Fact]
     public async Task ArchiveAndRestoreAsset_ArchivedPortfolioOrUnknownAsset_WriteNoEvent()
     {
@@ -448,12 +424,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.False((await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken)).IsArchived);
     }
 
-    /// <summary>
-    /// asset-archive AC-4: every write the archived asset refuses — UpdateAsset, RecordTransaction,
-    /// UpdateTransaction, DeleteTransaction — answers <c>Conflict.AssetArchived</c> and adds not one outbox
-    /// row, while RemoveAsset still deletes it and publishes <see cref="AssetRemoved"/>. Each write runs in
-    /// its own scope, as in <see cref="PortfolioLifecycleOutboxTests.WriteToArchivedPortfolio_WritesNoEvent"/>.
-    /// </summary>
     [Fact]
     public async Task WriteToArchivedAsset_WritesNoEvent()
     {

@@ -2,12 +2,6 @@ using Skarbiec.Portfolio.Features.SavingsAccounts;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-interest-settlement: the worked examples of <see cref="SavingsInterestMath"/> - pure, no
-/// host, no DB, no clock. A period is a calendar month; the gross interest is the sum of the
-/// end-of-day balances x rate / 100 / 365, rounded half away from zero once per period; the tax is
-/// the term-deposit Belka rule.
-/// </summary>
 public sealed class SavingsInterestMathTests
 {
     private static readonly DateOnly SeptemberStart = new(2026, 9, 1);
@@ -22,7 +16,6 @@ public sealed class SavingsInterestMathTests
         { "zero rate", 0m, 0m, false, 0m, 0m, 0m, 10_000.00m },
     };
 
-    /// <summary>AC-1: a PLN account over the whole of September, opening deposit of 10 000 on 1 September.</summary>
     [Theory]
     [MemberData(nameof(AccrueCases))]
     public void Accrue_Examples(
@@ -43,14 +36,13 @@ public sealed class SavingsInterestMathTests
         Assert.Equal(averageDailyBalance, accrual.AverageDailyBalance);
     }
 
-    /// <summary>A withdrawal lowers the end-of-day balance of its own day, and an earlier credit compounds.</summary>
     [Fact]
     public void Accrue_WithdrawAndEarlierCredit_UsesEndOfDayBalances()
     {
         var flows = new List<SavingsCashFlow>
         {
             new(new DateOnly(2026, 8, 1), 10_000m),
-            new(new DateOnly(2026, 8, 31), 33.29m), // an earlier interest credit
+            new(new DateOnly(2026, 8, 31), 33.29m),
             new(new DateOnly(2026, 9, 16), -5_000m),
         };
 
@@ -73,7 +65,6 @@ public sealed class SavingsInterestMathTests
         { "a skipped month is not counted", new DateOnly(2026, 12, 1), new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31), 2 },
     };
 
-    /// <summary>AC-2. Each scenario's history and latest settlement are set up in <see cref="HistoryFor"/>.</summary>
     [Theory]
     [MemberData(nameof(NextDueCases))]
     public void NextDuePeriod_FollowsCalendarMonths(
@@ -114,7 +105,6 @@ public sealed class SavingsInterestMathTests
         Assert.Null(due);
     }
 
-    /// <summary>The due period carries the accrual of its own days.</summary>
     [Fact]
     public void NextDuePeriod_CarriesTheAccrualOfItsPeriod()
     {

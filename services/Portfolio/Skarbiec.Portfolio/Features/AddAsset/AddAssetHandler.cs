@@ -26,13 +26,13 @@ public sealed class AddAssetHandler(
             return PortfolioErrors.Archived(portfolioId);
         }
 
-        // A Deposit-class asset is a term deposit: it carries terms, so only AddDeposit creates one (term-deposits).
+        // A Deposit-class asset is a term deposit: it carries terms, so only AddDeposit creates one.
         if (request.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.UseDepositEndpoints;
         }
 
-        // Likewise a Savings-class asset is a savings account: only AddSavingsAccount creates one (savings-accounts).
+        // Likewise only AddSavingsAccount creates a Savings-class asset.
         if (request.AssetClass == AssetClass.Savings)
         {
             return SavingsAccountErrors.UseSavingsAccountEndpoints;
@@ -51,9 +51,7 @@ public sealed class AddAssetHandler(
             AssetClass = request.AssetClass,
             Name = request.Name,
             Currency = request.Currency,
-            // Currency-valued (M1.4) is the fallthrough: neither branch below applies when the
-            // request supplies neither InstrumentId nor ManualValue — AddAssetRequest.Validate already
-            // confirmed that combination is only accepted for classes that support it.
+            // Currency-valued is the fallthrough: AddAssetRequest.Validate already allowed it for this class.
             ValuationMode = AssetValuationMode.CurrencyValued,
         };
 
@@ -86,12 +84,7 @@ public sealed class AddAssetHandler(
             asset.ValuationMode = AssetValuationMode.Manual;
         }
 
-        // M1.5: the optional "add first transaction" checkbox. Fully validated (Money, then
-        // TransactionQuantityCalculator.Recompute — the single ADR-009 path RecordTransaction also
-        // uses) *before* anything below is added to the change tracker, so a failure here — the
-        // asset's own Money/instrument checks above already follow the same rule — returns with
-        // nothing staged: no half-created asset, no orphaned transaction (AC: validation failure in
-        // the transaction half leaves no half-created asset behind).
+        // Fully validated before anything is staged, so a failure leaves no half-created asset.
         Transaction? initialTransaction = null;
         if (request.InitialTransaction is { } transactionRequest)
         {
@@ -111,18 +104,14 @@ public sealed class AddAssetHandler(
                 Date = transactionRequest.Date
             };
 
-            // A brand-new asset has no prior history, so the "recompute over full history" rule
-            // (ADR-009) degenerates to recomputing over this one candidate transaction — same
-            // calculator, same oversell check (a Sell/Withdraw as a first transaction fails here,
-            // exactly as it would against an empty position through RecordTransaction).
+            // A new asset has no history, so recomputing over this one transaction applies the same oversell check.
             var recomputed = TransactionQuantityCalculator.Recompute([initialTransaction]);
             if (recomputed.IsFailure)
             {
                 return recomputed.Error;
             }
 
-            // Same rate resolution as RecordTransaction (ADR-026), after every other check and still
-            // before anything is staged — MarketData being down leaves no half-created asset either.
+            // Resolved after every other check and before staging, so MarketData being down leaves no half-created asset.
             var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(
                 asset.Currency, transactionRequest.Date, cancellationToken);
             if (fxRateToPln.IsFailure)
@@ -141,10 +130,7 @@ public sealed class AddAssetHandler(
             dbContext.Transactions.Add(initialTransaction);
         }
 
-        // One event for the finished position, published before SaveChangesAsync so the outbox row
-        // commits in the same transaction as the rows above (ADR-012) — the optional initial
-        // transaction is already folded into asset.Quantity, so a consumer sees the asset's real
-        // opening state, not a zero it would have to correct a moment later (spec-02 AC-1).
+        // The initial transaction is already folded into asset.Quantity, so a consumer sees the real opening state.
         await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);

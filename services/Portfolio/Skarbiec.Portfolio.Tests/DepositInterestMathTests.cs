@@ -3,14 +3,8 @@ using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// term-deposits: the worked examples of <see cref="DepositInterestMath"/> — pure, no host, no DB.
-/// Gross interest per period is actual/365 rounded half-away-from-zero to grosze; the Belka tax is
-/// 19 % of each period's gross, rounded up to grosze; the net is compounded into the next period.
-/// </summary>
 public sealed class DepositInterestMathTests
 {
-    /// <summary>AC-1.</summary>
     [Fact]
     public void AtMaturity_ThreeMonths_AppliesBelkaRoundedUpToGrosz()
     {
@@ -34,7 +28,6 @@ public sealed class DepositInterestMathTests
         Assert.Equal(10_119.83m, projection.FinalAmount);
     }
 
-    /// <summary>AC-2: each monthly period is taxed on its own and its net compounds into the next.</summary>
     [Fact]
     public void Monthly_ThreeMonths_TaxesAndCompoundsEachPeriod()
     {
@@ -60,7 +53,6 @@ public sealed class DepositInterestMathTests
         Assert.Equal(12_144.37m, projection.FinalAmount);
     }
 
-    /// <summary>AC-4: months clamp to the month's end; days are plain calendar days.</summary>
     [Theory]
     [InlineData(1, DepositTermUnit.Months, 2026, 2, 28)]
     [InlineData(45, DepositTermUnit.Days, 2026, 3, 17)]
@@ -72,11 +64,6 @@ public sealed class DepositInterestMathTests
         Assert.Equal(new DateOnly(year, month, day), maturity);
     }
 
-    /// <summary>
-    /// Capitalisation periods run from the start date (each end is <c>StartDate.AddMonths(k × step)</c>)
-    /// and the last one is cut at maturity: 45 days from 2026-01-15, capitalised monthly, is one full
-    /// month (31 days) and a 14-day stub.
-    /// </summary>
     [Fact]
     public void Monthly_DayTermNotAWholeNumberOfMonths_CutsLastPeriodAtMaturity()
     {
@@ -108,7 +95,6 @@ public sealed class DepositInterestMathTests
             });
     }
 
-    /// <summary>Quarterly and yearly periods step by 3 and 12 months from the start date.</summary>
     [Theory]
     [InlineData(DepositCapitalization.Quarterly, 12, 4)]
     [InlineData(DepositCapitalization.Yearly, 24, 2)]
@@ -144,7 +130,6 @@ public sealed class DepositInterestMathTests
         }
     }
 
-    /// <summary>An IKE/IKZE deposit pays no Belka tax: the AC-1 deposit keeps its whole 147.95 gross.</summary>
     [Fact]
     public void TaxExempt_AtMaturity_NetEqualsGross()
     {

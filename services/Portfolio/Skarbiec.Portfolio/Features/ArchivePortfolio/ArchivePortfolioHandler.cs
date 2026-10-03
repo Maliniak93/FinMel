@@ -22,9 +22,7 @@ public sealed class ArchivePortfolioHandler(
 
         var assetCount = await dbContext.Assets.CountAsync(a => a.PortfolioId == id, cancellationToken);
 
-        // Already archived: 200 with the unchanged body and no event (spec-02 design decision 2) —
-        // an event is a fact that happened, and a repeated click must not fan N position events out
-        // for a state that never moved.
+        // Already archived: 200 with no event, so a repeated click fans out no position events.
         if (portfolio.IsArchived)
         {
             return portfolio.ToResponse(assetCount);
@@ -39,8 +37,7 @@ public sealed class ArchivePortfolioHandler(
             OccurredAtUtc = timeProvider.GetUtcNow()
         }, cancellationToken);
 
-        // Plus one position event per asset carrying the new archived flag, in this same transaction:
-        // a read model holding per-asset state would otherwise keep valuing an archived portfolio.
+        // One position event per asset with the new flag, or a read model would keep valuing an archived portfolio.
         await positionEventPublisher.PublishForEveryAssetAsync(portfolio, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);

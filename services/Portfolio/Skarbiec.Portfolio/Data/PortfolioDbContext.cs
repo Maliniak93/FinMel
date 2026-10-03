@@ -30,8 +30,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             portfolio.Property(p => p.Description).HasMaxLength(1000);
             portfolio.Property(p => p.Currency).HasMaxLength(3);
 
-            // Name unique per user (T1.1 scope: "decide and document") — case-sensitive exact
-            // match on Postgres's default collation; the client is expected to trim before submit.
+            // Case-sensitive exact match on Postgres's default collation; the client trims before submit.
             portfolio.HasIndex(p => new { p.UserId, p.Name }).IsUnique();
         });
 
@@ -42,25 +41,13 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             asset.Property(a => a.Quantity).HasPrecision(18, 8);
             asset.Property(a => a.ManualValueAmount).HasPrecision(18, 2);
 
-            // ValuationMode (M1.4) needs no explicit config here — stored as its int ordinal by
-            // convention, same as AssetClass above it.
-
-            // No navigation/FK to Portfolio — cross-aggregate reference by plain Guid (ADR-003),
-            // but still worth indexing: every asset query in this service filters by PortfolioId,
-            // including the correlated assetCount subquery and the archive/restore fan-out (spec-02).
+            // No FK, but every asset query filters by PortfolioId.
             asset.HasIndex(a => a.PortfolioId);
 
-            // No FK to MarketData either (ADR-003) — indexed anyway now that AddAsset/UpdateAsset
-            // actually populate it (T2.9), same rationale as PortfolioId above.
+            // No FK to MarketData either; indexed for the same reason.
             asset.HasIndex(a => a.InstrumentId);
 
-            // Optimistic concurrency (T1.4 scope: two racing edits to the same asset's
-            // transactions must not silently lose one's Quantity recompute). Maps to Postgres's
-            // own xmin system column instead of an app-managed token — Postgres bumps it on every
-            // UPDATE regardless of which handler runs, so RecordTransaction (T1.3) is covered too
-            // without touching it. Shadow property: xmin already exists on every row, nothing to
-            // migrate. Named "Xmin" after its column since spec-02 gave Asset a real, app-managed
-            // "Version" counter for event ordering — the two are unrelated and must not share a name.
+            // xmin as the concurrency token, so two racing edits never silently lose a Quantity recompute.
             asset.Property<uint>("Xmin")
                 .HasColumnName("xmin")
                 .HasColumnType("xid")
@@ -74,15 +61,13 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             transaction.Property(t => t.UnitPriceAmount).HasPrecision(18, 2);
             transaction.Property(t => t.FxRateToPln).HasPrecision(18, 8);
 
-            // No navigation/FK to Asset (ADR-003) — every transaction query filters by AssetId.
+            // No FK to Asset, but every transaction query filters by AssetId.
             transaction.HasIndex(t => t.AssetId);
 
-            // A transfer's legs are found by their shared TransferId (asset-transfers-deposit-funding):
-            // the counterpart lookup of ListTransactions/deposits and the detach on asset removal.
+            // A transfer's legs are found by their shared TransferId.
             transaction.HasIndex(t => t.TransferId);
 
-            // Same xmin concurrency token as Asset (see above) — protects a transaction row
-            // itself against two concurrent edits/deletes of that exact transaction.
+            // Same xmin concurrency token as Asset, guarding concurrent edits of one transaction.
             transaction.Property<uint>("Xmin")
                 .HasColumnName("xmin")
                 .HasColumnType("xid")
@@ -92,10 +77,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
         modelBuilder.Entity<TermDeposit>(termDeposit =>
         {
-            // 1:1 with its Deposit-class asset (term-deposits): the asset id is the key and, unlike
-            // every other reference in this service, a real FK — both rows live in portfolio_db and
-            // one never exists without the other. RemoveAsset deletes the row explicitly; the
-            // cascade covers DeletePortfolio's asset sweep.
+            // Unlike every other reference here a real FK: both rows live in portfolio_db and one never exists without the other.
             termDeposit.HasKey(t => t.AssetId);
             termDeposit.HasOne<Asset>()
                 .WithOne()
@@ -112,8 +94,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
         modelBuilder.Entity<SavingsAccount>(savingsAccount =>
         {
-            // 1:1 with its Savings-class asset (savings-accounts), keyed and FK-cascaded exactly like
-            // TermDeposit above: the cascade removes it with its asset on RemoveAsset and DeletePortfolio.
+            // Keyed and FK-cascaded exactly like TermDeposit.
             savingsAccount.HasKey(s => s.AssetId);
             savingsAccount.HasOne<Asset>()
                 .WithOne()
@@ -126,9 +107,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
         modelBuilder.Entity<SavingsInterestSettlement>(settlement =>
         {
-            // No FK to the asset or the credit (ADR-003 style, like Transaction): RemoveAsset and
-            // DeletePortfolio delete the rows explicitly. One settlement per account and month — the
-            // index also backs the latest-settlement lookups.
+            // No FK to the asset or the credit: RemoveAsset and DeletePortfolio delete the rows explicitly.
             settlement.HasIndex(s => new { s.AssetId, s.PeriodEnd }).IsUnique();
 
             // Update/DeleteTransaction ask whether a transaction is a settlement's managed credit.
@@ -138,16 +117,10 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             settlement.Property(s => s.Tax).HasPrecision(18, 2);
         });
 
-        // Covers every IUserOwned entity added from here on without touching this method again (ADR-006).
+        // Covers every IUserOwned entity added from here on without touching this method again.
         modelBuilder.ApplyUserOwnedQueryFilters(this);
 
-        // MassTransit EF Outbox (T1.5, ADR-012), same pattern as Identity (T0.10): the bus outbox
-        // writes here in the same SaveChanges call as the business entities above, so both commit
-        // atomically. Table names prefixed with "Portfolio" — MassTransit's defaults ("InboxState"
-        // etc.) collide with Identity's own outbox tables of the same name once both DbContexts'
-        // migrations run against the single shared Postgres database Gateway.Tests uses to host
-        // every service's test host side by side (Skarbiec.Testing's Testcontainer, not a
-        // per-service database — ADR-003 db-per-service only holds for real deployments).
+        // Prefixed table names: MassTransit's defaults collide with Identity's outbox tables in the shared test database.
         modelBuilder.AddInboxStateEntity(x => x.ToTable("PortfolioInboxState"));
         modelBuilder.AddOutboxMessageEntity(x => x.ToTable("PortfolioOutboxMessage"));
         modelBuilder.AddOutboxStateEntity(x => x.ToTable("PortfolioOutboxState"));

@@ -11,16 +11,9 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-/// <summary>
-/// savings-interest-settlement: <c>POST .../savings-accounts/{assetId}/interest-settlements</c> stores
-/// what the bank paid for the next due month and credits the net to the account as a system-managed
-/// Deposit dated the period's last day. The <c>AssetPositionChanged</c> written in the same save is
-/// proven hostlessly by <see cref="PortfolioOutboxTests.SettleSavingsInterest_PublishesPositionChanged"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
-    /// <summary>AC-5.</summary>
     [Fact]
     public async Task Settle_WithPreviewValues_CreditsNetInterest()
     {
@@ -62,7 +55,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Assert.Equal(credit.Id, settlement.TransactionId);
     }
 
-    /// <summary>AC-5: October accrues on the balance including September's credit, so interest compounds monthly.</summary>
     [Fact]
     public async Task Settle_NextPeriodCompoundsTheCredit()
     {
@@ -83,7 +75,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Assert.Equal(1, preview.GetProperty("duePeriodCount").GetInt32());
     }
 
-    /// <summary>AC-6: the bank paid something other than the projection - the overrides are stored and credited.</summary>
     [Fact]
     public async Task Settle_WithOverriddenAmounts_UsesThem()
     {
@@ -111,7 +102,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Assert.Equal(9.50m, settlement.Tax);
     }
 
-    /// <summary>AC-6: gross equal to tax stores the settlement with no transaction, and the next period becomes the due one.</summary>
     [Fact]
     public async Task Settle_ZeroNet_StoresSettlementWithoutTransaction()
     {
@@ -151,7 +141,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         { "negative tax", 10.00m, -0.01m },
     };
 
-    /// <summary>AC-7: an invalid amount is a 400 and nothing is written.</summary>
     [Theory]
     [MemberData(nameof(InvalidAmounts))]
     public async Task Settle_InvalidInput_ReturnsBadRequest(string scenario, decimal grossInterest, decimal tax)
@@ -180,7 +169,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         { "archived portfolio", PortfolioAssertions.PortfolioArchivedErrorCode },
     };
 
-    /// <summary>AC-7: a request the account's state rejects is a 409 with its own code, and nothing more is written.</summary>
     [Theory]
     [MemberData(nameof(InvalidStates))]
     public async Task Settle_InvalidState_ReturnsConflict(string scenario, string errorCode)
@@ -223,7 +211,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Assert.Equal(transactionsBefore, after.TransactionCount);
     }
 
-    /// <summary>The credit freezes the PLN rate of its own date (ADR-026).</summary>
     [Fact]
     public async Task Settle_ForeignCurrencyAccount_FreezesFxRateOfPeriodEnd()
     {

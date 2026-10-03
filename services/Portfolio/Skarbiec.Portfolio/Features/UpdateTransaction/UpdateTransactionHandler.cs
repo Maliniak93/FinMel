@@ -27,7 +27,7 @@ public sealed class UpdateTransactionHandler(
             return readOnly;
         }
 
-        // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit (term-deposits).
+        // A term deposit's only transaction is its opening one, rewritten by UpdateDeposit.
         if (asset.AssetClass == AssetClass.Deposit)
         {
             return DepositErrors.TransactionsManaged;
@@ -41,15 +41,13 @@ public sealed class UpdateTransactionHandler(
             return TransactionErrors.NotFound(id);
         }
 
-        // A transfer leg changes only through its transfer's entry point (asset-transfers-deposit-funding),
-        // so the two legs never drift apart.
+        // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
             return TransferErrors.LegManaged;
         }
 
-        // A savings interest credit goes only by undoing its settlement (savings-interest-settlement),
-        // so a settlement never loses its credit.
+        // A savings interest credit goes only by undoing its settlement, so a settlement never loses its credit.
         if (asset.AssetClass == AssetClass.Savings
             && await dbContext.SavingsInterestSettlements.AnyAsync(s => s.TransactionId == id, cancellationToken))
         {
@@ -67,8 +65,7 @@ public sealed class UpdateTransactionHandler(
             return unitPrice.Error;
         }
 
-        // Recompute over the rest of the history plus the edited candidate, without touching the
-        // tracked `transaction` yet — a rejected edit must leave the database untouched (AC).
+        // Recompute with the edited candidate before touching the tracked transaction, so a rejected edit leaves the database untouched.
         var otherTransactions = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => t.AssetId == assetId && t.Id != id)
@@ -90,8 +87,7 @@ public sealed class UpdateTransactionHandler(
             return recomputed.Error;
         }
 
-        // Re-resolved on every update, whatever changed, so the stored rate always matches the
-        // current date (ADR-026) — and a rate that was unknown before can fill in here.
+        // Re-resolved on every update so the stored rate always matches the current date.
         var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
         if (fxRateToPln.IsFailure)
         {
@@ -105,8 +101,6 @@ public sealed class UpdateTransactionHandler(
         transaction.Date = candidate.Date;
         asset.Quantity = recomputed.Value;
 
-        // Editing a transaction moves the quantity, which is the source of truth for the position
-        // (ADR-009) — so it publishes, where before spec-02 it published nothing at all (AC-4).
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         try

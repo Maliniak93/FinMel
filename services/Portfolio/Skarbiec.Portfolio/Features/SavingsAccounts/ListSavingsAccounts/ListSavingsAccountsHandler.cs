@@ -6,7 +6,6 @@ namespace Skarbiec.Portfolio.Features.SavingsAccounts.ListSavingsAccounts;
 
 public sealed class ListSavingsAccountsHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
-    /// <summary>Every savings account of the current user across all their portfolios, archived ones included (flagged), by portfolio name, then account name.</summary>
     public async Task<IReadOnlyList<SavingsAccountResponse>> HandleAsync(CancellationToken cancellationToken)
     {
         var rows = await (

@@ -41,8 +41,7 @@ public sealed class AddSavingsAccountHandler(
             ValuationMode = AssetValuationMode.CurrencyValued,
         };
 
-        // The optional opening deposit is an ordinary Deposit — editable and deletable later like any
-        // other — so the balance reaches Asset.Quantity through the calculator every write uses (ADR-009).
+        // The opening deposit is an ordinary Deposit, editable and deletable later like any other.
         Transaction? opening = null;
         if (request.OpeningDeposit is { } deposit)
         {
@@ -62,8 +61,7 @@ public sealed class AddSavingsAccountHandler(
                 return recomputed.Error;
             }
 
-            // Last check before anything is staged: the date's PLN rate is frozen on the transaction
-            // (ADR-026), and MarketData being down leaves nothing half-created.
+            // Last check before staging: MarketData being down leaves nothing half-created.
             var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, deposit.Date, cancellationToken);
             if (fxRateToPln.IsFailure)
             {
@@ -89,8 +87,6 @@ public sealed class AddSavingsAccountHandler(
             dbContext.Transactions.Add(opening);
         }
 
-        // Published before SaveChangesAsync so the outbox row commits with the rows above (ADR-012);
-        // the opening deposit is already folded into asset.Quantity.
         await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -2,25 +2,17 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Deposits;
 
-/// <summary>A term deposit's read-time status (term-deposits).</summary>
 public enum DepositStatus
 {
     Active,
 
-    /// <summary>The maturity date is on or before today's Europe/Warsaw date.</summary>
     Due,
 
-    /// <summary>The deposit has been settled (term-deposits-settlement) — wins over Due and Active.</summary>
     Settled,
 
-    /// <summary>
-    /// A settled deposit whose whole balance was paid out to cash (deposit-payout-to-cash) — wins over
-    /// Settled. Derived from its Withdraw leg, which only a payout creates.
-    /// </summary>
     PaidOut,
 }
 
-/// <summary>The totals of <see cref="DepositProjection"/> — the per-period breakdown stays server-side.</summary>
 public sealed record DepositProjectionResponse
 {
     public required decimal GrossInterest { get; init; }
@@ -37,7 +29,6 @@ public sealed record DepositResponse
     public required string PortfolioName { get; init; }
     public required bool PortfolioIsArchived { get; init; }
 
-    /// <summary>The deposit asset's own archive flag (asset-archive), independent of <see cref="PortfolioIsArchived"/>.</summary>
     public required bool IsArchived { get; init; }
 
     public required string Name { get; init; }
@@ -55,41 +46,26 @@ public sealed record DepositResponse
     public required DepositProjectionResponse Projection { get; init; }
     public required DepositStatus Status { get; init; }
 
-    /// <summary>The settlement (term-deposits-settlement) — all three <see langword="null"/> until the deposit is settled.</summary>
     public DateOnly? SettledOn { get; init; }
 
     public decimal? SettledGrossInterest { get; init; }
     public decimal? SettledTax { get; init; }
 
-    /// <summary>
-    /// The Cash asset the principal was moved out of (asset-transfers-deposit-funding) — both
-    /// <see langword="null"/> when the money came from outside the app or the transfer was detached.
-    /// </summary>
+    /// <summary>The Cash asset the principal came from; null when the money came from outside the app or the transfer was detached.</summary>
     public Guid? FundingAssetId { get; init; }
 
     public string? FundingAssetName { get; init; }
 
-    /// <summary>The payout date (deposit-payout-to-cash) — <see langword="null"/> until the deposit is paid out.</summary>
     public DateOnly? PaidOutOn { get; init; }
 
-    /// <summary>
-    /// The Cash or Savings asset the payout went to — <see langword="null"/> until the deposit is paid out, and again
-    /// once that asset was removed (its leg detached).
-    /// </summary>
+    /// <summary>Null until the deposit is paid out, and again once the destination asset was removed.</summary>
     public string? PaidOutToAssetName { get; init; }
 
-    /// <summary>How many times the deposit was rolled over (deposit-rollover) — above 0, its principal and start date are fixed.</summary>
     public required int RolloverCount { get; init; }
 }
 
 public static class DepositMappingExtensions
 {
-    /// <summary>
-    /// The projection is computed here, at read time, from the stored terms — never stored itself.
-    /// <paramref name="today"/> is the Europe/Warsaw date (<see cref="WarsawCalendar.Today"/>);
-    /// <paramref name="funding"/> the deposit's funding source (<see cref="DepositFunding"/>), if any;
-    /// <paramref name="payout"/> its payout (<see cref="DepositPayout"/>), if any.
-    /// </summary>
     public static DepositResponse ToResponse(
         this TermDeposit terms,
         Asset asset,

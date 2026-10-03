@@ -9,7 +9,6 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext, TimeProvider t
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
     {
-        // transactionCount as a correlated subquery inside this one query (spec-02) — see ListAssets.
         var row = await dbContext.Assets
             .AsNoTracking()
             .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)

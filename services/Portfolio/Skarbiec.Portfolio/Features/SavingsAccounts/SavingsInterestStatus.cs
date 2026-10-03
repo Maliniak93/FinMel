@@ -3,7 +3,6 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.SavingsAccounts;
 
-/// <summary>A stored <see cref="SavingsInterestSettlement"/> on the wire (savings-interest-settlement).</summary>
 public sealed record SavingsInterestSettlementResponse
 {
     public required Guid SettlementId { get; init; }
@@ -14,7 +13,6 @@ public sealed record SavingsInterestSettlementResponse
     public required decimal NetInterest { get; init; }
 }
 
-/// <summary>A savings account's interest state at read time: the next due period, if any, and its latest settlement.</summary>
 public sealed record SavingsInterestStatus(SavingsInterestDuePeriod? Due, SavingsInterestSettlementResponse? LastSettlement)
 {
     public static readonly SavingsInterestStatus None = new(null, null);
@@ -32,12 +30,6 @@ public static class SavingsInterestStatusExtensions
         NetInterest = settlement.GrossInterest - settlement.Tax
     };
 
-    /// <summary>
-    /// The interest status of each savings account in <paramref name="assetIds"/> against
-    /// <paramref name="today"/> (Europe/Warsaw), in three queries whatever the count — the read models
-    /// (savings accounts, assets) compute it at read time, nothing is stored. An id with no
-    /// <see cref="SavingsAccount"/> row is absent from the result.
-    /// </summary>
     internal static async Task<IReadOnlyDictionary<Guid, SavingsInterestStatus>> LoadSavingsInterestStatusAsync(
         this PortfolioDbContext dbContext, IReadOnlyCollection<Guid> assetIds, DateOnly today, CancellationToken cancellationToken)
     {
@@ -81,7 +73,6 @@ public static class SavingsInterestStatusExtensions
             });
     }
 
-    /// <summary><see cref="LoadSavingsInterestStatusAsync(PortfolioDbContext, IReadOnlyCollection{Guid}, DateOnly, CancellationToken)"/> for one account.</summary>
     internal static async Task<SavingsInterestStatus> LoadSavingsInterestStatusAsync(
         this PortfolioDbContext dbContext, Guid assetId, DateOnly today, CancellationToken cancellationToken)
         => (await dbContext.LoadSavingsInterestStatusAsync([assetId], today, cancellationToken))
