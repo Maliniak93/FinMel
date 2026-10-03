@@ -14,6 +14,35 @@ export type AddCustomInstrumentRequest = {
 
 export type AssetClass = number;
 
+export type BondSeriesListItem = {
+    code: string;
+    type: TreasuryBondType;
+    isin: string;
+    saleStart: string;
+    saleEnd: string;
+    issuePrice: number | string;
+    swapPrice: null | number | string;
+    marginPercent: null | number | string;
+    firstPeriodRatePercent: null | number | string;
+};
+
+export type BondSeriesPeriodRateResponse = {
+    periodIndex: number | string;
+    ratePercent: number | string;
+};
+
+export type BondSeriesResponse = {
+    code: string;
+    type: TreasuryBondType;
+    isin: string;
+    saleStart: string;
+    saleEnd: string;
+    issuePrice: number | string;
+    swapPrice: null | number | string;
+    marginPercent: null | number | string;
+    periodRates: Array<BondSeriesPeriodRateResponse>;
+};
+
 export type CustomInstrumentResponse = {
     id: string;
     ticker: string;
@@ -69,6 +98,8 @@ export type SyncStatusResponse = {
     fx?: null | SyncRunSummary;
     backfill?: null | SyncRunSummary;
 };
+
+export type TreasuryBondType = number;
 
 export type GetApiMarketdataInstrumentsSearchData = {
     body?: never;
@@ -154,3 +185,39 @@ export type GetApiMarketdataSyncStatusResponses = {
 };
 
 export type GetApiMarketdataSyncStatusResponse = GetApiMarketdataSyncStatusResponses[keyof GetApiMarketdataSyncStatusResponses];
+
+export type GetApiMarketdataBondSeriesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        onSaleOn?: string;
+    };
+    url: '/api/marketdata/bond-series';
+};
+
+export type GetApiMarketdataBondSeriesResponses = {
+    /**
+     * OK
+     */
+    200: Array<BondSeriesListItem>;
+};
+
+export type GetApiMarketdataBondSeriesResponse = GetApiMarketdataBondSeriesResponses[keyof GetApiMarketdataBondSeriesResponses];
+
+export type GetApiMarketdataBondSeriesByCodeData = {
+    body?: never;
+    path: {
+        code: string;
+    };
+    query?: never;
+    url: '/api/marketdata/bond-series/{code}';
+};
+
+export type GetApiMarketdataBondSeriesByCodeResponses = {
+    /**
+     * OK
+     */
+    200: BondSeriesResponse;
+};
+
+export type GetApiMarketdataBondSeriesByCodeResponse = GetApiMarketdataBondSeriesByCodeResponses[keyof GetApiMarketdataBondSeriesByCodeResponses];

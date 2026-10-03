@@ -40,6 +40,14 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/marketdata/sync/status
 Authorization: Bearer {{authToken}}
 
+### List the treasury bond series on sale on a date — omit onSaleOn for today in Warsaw
+GET {{baseUrl}}/api/marketdata/bond-series?onSaleOn=2026-10-15
+Authorization: Bearer {{authToken}}
+
+### Get a treasury bond series with every published period rate; 404 NotFound.BondSeries for an unknown code
+GET {{baseUrl}}/api/marketdata/bond-series/ROR0623
+Authorization: Bearer {{authToken}}
+
 
 ### --- Service-only /internal endpoints ---
 # Unreachable through the Gateway: call MarketData directly, with no token.

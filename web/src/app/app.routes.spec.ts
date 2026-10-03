@@ -7,6 +7,7 @@ import { App } from './app';
 import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth';
 import { Login } from './features/auth/login/login';
+import { Bonds } from './features/bonds/bonds';
 import { Dashboard } from './features/dashboard/dashboard';
 import { Deposits } from './features/deposits/deposits';
 import { NotFound } from './features/not-found/not-found';
@@ -43,6 +44,11 @@ describe('app routing (authenticated)', () => {
   it('renders Deposits at /deposits', async () => {
     await harness.navigateByUrl('/deposits', Shell);
     expect(harness.fixture.debugElement.query(By.directive(Deposits))).toBeTruthy();
+  });
+
+  it('renders Bonds at /bonds', async () => {
+    await harness.navigateByUrl('/bonds', Shell);
+    expect(harness.fixture.debugElement.query(By.directive(Bonds))).toBeTruthy();
   });
 
   it('renders Settings at /settings', async () => {

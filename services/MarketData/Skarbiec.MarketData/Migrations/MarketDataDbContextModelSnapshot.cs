@@ -211,6 +211,66 @@ namespace Skarbiec.MarketData.Migrations
                     b.ToTable("AssetInstrumentLinks");
                 });
 
+            modelBuilder.Entity("Skarbiec.MarketData.Data.BondSeries", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<string>("Isin")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<decimal>("IssuePrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("MarginPercent")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)");
+
+                    b.Property<DateOnly>("SaleEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("SaleStart")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("SwapPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("SaleStart", "SaleEnd");
+
+                    b.ToTable("BondSeries");
+                });
+
+            modelBuilder.Entity("Skarbiec.MarketData.Data.BondSeriesPeriodRate", b =>
+                {
+                    b.Property<string>("SeriesCode")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<int>("PeriodIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)");
+
+                    b.HasKey("SeriesCode", "PeriodIndex");
+
+                    b.ToTable("BondSeriesPeriodRates");
+                });
+
             modelBuilder.Entity("Skarbiec.MarketData.Data.Currency", b =>
                 {
                     b.Property<string>("Code")
@@ -398,6 +458,20 @@ namespace Skarbiec.MarketData.Migrations
                         .WithMany()
                         .HasForeignKey("InboxMessageId", "InboxConsumerId")
                         .HasPrincipalKey("MessageId", "ConsumerId");
+                });
+
+            modelBuilder.Entity("Skarbiec.MarketData.Data.BondSeriesPeriodRate", b =>
+                {
+                    b.HasOne("Skarbiec.MarketData.Data.BondSeries", null)
+                        .WithMany("PeriodRates")
+                        .HasForeignKey("SeriesCode")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Skarbiec.MarketData.Data.BondSeries", b =>
+                {
+                    b.Navigation("PeriodRates");
                 });
 #pragma warning restore 612, 618
         }

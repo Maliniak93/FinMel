@@ -62,6 +62,9 @@
 
     <!-- Quartz 4 carries DI, hosting, System.Text.Json serialization and the health check itself; Quartz.AspNetCore is only the HTTP API. -->
     <PackageVersion Include="Quartz" Version="4.3.0" />
+
+    <!-- MF publishes its retail bond data only as a BIFF8 .xls (code page 1250). -->
+    <PackageVersion Include="ExcelDataReader" Version="3.9.0" />
   </ItemGroup>
 
 </Project>

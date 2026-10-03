@@ -34,6 +34,7 @@
       "dashboard": "Dashboard",
       "portfolios": "Portfolios",
       "deposits": "Deposits & savings",
+      "bonds": "Bonds",
       "settings": "Settings"
     },
     "toggleNavigation": "Toggle navigation",
@@ -153,6 +154,47 @@
       "pln": "PLN — Polish złoty",
       "eur": "EUR — Euro",
       "usd": "USD — US dollar"
+    },
+    "treasuryBondType": {
+      "ots": "3-month fixed",
+      "ror": "1-year floating",
+      "dor": "2-year floating",
+      "tos": "3-year fixed",
+      "coi": "4-year inflation-indexed",
+      "edo": "10-year inflation-indexed",
+      "ros": "6-year family",
+      "rod": "12-year family"
+    }
+  },
+  "bonds": {
+    "title": "Treasury bonds",
+    "tabs": {
+      "offer": "Current offer"
+    },
+    "term": {
+      "ots": "3 months",
+      "ror": "1 year",
+      "dor": "2 years",
+      "tos": "3 years",
+      "coi": "4 years",
+      "edo": "10 years",
+      "ros": "6 years",
+      "rod": "12 years"
+    },
+    "offer": {
+      "series": "Series",
+      "type": "Type",
+      "firstRate": "First-period rate",
+      "followingRate": "Then",
+      "swapPrice": "Swap price",
+      "earlyRedemptionFee": "Early redemption fee per bond",
+      "following": {
+        "fixed": "fixed",
+        "nbpReference": "NBP reference rate + margin {{ margin }}",
+        "inflation": "inflation + margin {{ margin }}"
+      },
+      "empty": "No data from the Ministry of Finance — you can enter a bond manually",
+      "loadFailed": "Failed to load the bond offer."
     }
   },
   "dashboard": {

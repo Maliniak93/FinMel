@@ -24,7 +24,10 @@ public sealed class ArchitectureTests
     {
         var result = Types.InAssembly(typeof(Program).Assembly)
             .That()
-            .HaveDependencyOnAny("Skarbiec.MarketData.Sources.IPriceSource", "Skarbiec.MarketData.Sources.IFxRateSource")
+            .HaveDependencyOnAny(
+                "Skarbiec.MarketData.Sources.IPriceSource",
+                "Skarbiec.MarketData.Sources.IFxRateSource",
+                "Skarbiec.MarketData.Sources.MfBonds.IMfBondSource")
             .Should()
             .ResideInNamespaceStartingWith("Skarbiec.MarketData.Sources")
             .GetResult();

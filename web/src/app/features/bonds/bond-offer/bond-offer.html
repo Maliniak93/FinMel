@@ -1,0 +1,67 @@
+@if (offerResource.error(); as loadError) {
+  <div class="bond-offer__state" role="alert">
+    <p>{{ loadError.message }}</p>
+    <button mat-button type="button" (click)="offerResource.reload()">
+      {{ 'common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (offerResource.isLoading() && !offerResource.hasValue()) {
+  <div class="bond-offer__state">
+    <mat-spinner diameter="32" />
+  </div>
+} @else if (offerResource.hasValue() && offerResource.value().length === 0) {
+  <div class="bond-offer__state">
+    <p>{{ 'bonds.offer.empty' | transloco }}</p>
+  </div>
+} @else if (offerResource.hasValue()) {
+  <table mat-table [dataSource]="offerResource.value()" class="bond-offer__table">
+    <ng-container matColumnDef="code">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.offer.series' | transloco }}</th>
+      <td mat-cell *matCellDef="let series">{{ series.code }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.offer.type' | transloco }}</th>
+      <td mat-cell *matCellDef="let series">
+        @if (typeInfo(series); as info) {
+          {{ info.label | transloco }}
+          <span class="bond-offer__muted">{{ info.termLabel | transloco }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="firstRate">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.offer.firstRate' | transloco }}</th>
+      <td mat-cell *matCellDef="let series">{{ rate(series.firstPeriodRatePercent) }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="followingRate">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.offer.followingRate' | transloco }}</th>
+      <td mat-cell *matCellDef="let series">
+        @let following = followingRate(series);
+        {{ following.key | transloco: following.params }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="swapPrice">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.offer.swapPrice' | transloco }}</th>
+      <td mat-cell *matCellDef="let series">
+        {{ series.swapPrice === null ? '—' : formatMoney(series.swapPrice) }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="earlyRedemptionFee">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ 'bonds.offer.earlyRedemptionFee' | transloco }}
+      </th>
+      <td mat-cell *matCellDef="let series">
+        @if (typeInfo(series); as info) {
+          {{ formatMoney(info.defaultEarlyRedemptionFee) }}
+        }
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+}

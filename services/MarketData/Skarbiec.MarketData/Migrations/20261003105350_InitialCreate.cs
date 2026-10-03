@@ -27,6 +27,25 @@ public partial class InitialCreate : Migration
             });
 
         migrationBuilder.CreateTable(
+            name: "BondSeries",
+            columns: table => new
+            {
+                Code = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
+                Type = table.Column<int>(type: "integer", nullable: false),
+                Isin = table.Column<string>(type: "character varying(12)", maxLength: 12, nullable: false),
+                SaleStart = table.Column<DateOnly>(type: "date", nullable: false),
+                SaleEnd = table.Column<DateOnly>(type: "date", nullable: false),
+                IssuePrice = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                SwapPrice = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: true),
+                MarginPercent = table.Column<decimal>(type: "numeric(9,2)", precision: 9, scale: 2, nullable: true),
+                UpdatedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_BondSeries", x => x.Code);
+            });
+
+        migrationBuilder.CreateTable(
             name: "Currencies",
             columns: table => new
             {
@@ -157,6 +176,25 @@ public partial class InitialCreate : Migration
             });
 
         migrationBuilder.CreateTable(
+            name: "BondSeriesPeriodRates",
+            columns: table => new
+            {
+                SeriesCode = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
+                PeriodIndex = table.Column<int>(type: "integer", nullable: false),
+                RatePercent = table.Column<decimal>(type: "numeric(9,2)", precision: 9, scale: 2, nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_BondSeriesPeriodRates", x => new { x.SeriesCode, x.PeriodIndex });
+                table.ForeignKey(
+                    name: "FK_BondSeriesPeriodRates_BondSeries_SeriesCode",
+                    column: x => x.SeriesCode,
+                    principalTable: "BondSeries",
+                    principalColumn: "Code",
+                    onDelete: ReferentialAction.Cascade);
+            });
+
+        migrationBuilder.CreateTable(
             name: "MarketDataOutboxMessage",
             columns: table => new
             {
@@ -202,6 +240,11 @@ public partial class InitialCreate : Migration
             name: "IX_AssetInstrumentLinks_InstrumentId",
             table: "AssetInstrumentLinks",
             column: "InstrumentId");
+
+        migrationBuilder.CreateIndex(
+            name: "IX_BondSeries_SaleStart_SaleEnd",
+            table: "BondSeries",
+            columns: new[] { "SaleStart", "SaleEnd" });
 
         migrationBuilder.CreateIndex(
             name: "IX_FxRates_Pair_Date",
@@ -267,6 +310,9 @@ public partial class InitialCreate : Migration
             name: "AssetInstrumentLinks");
 
         migrationBuilder.DropTable(
+            name: "BondSeriesPeriodRates");
+
+        migrationBuilder.DropTable(
             name: "Currencies");
 
         migrationBuilder.DropTable(
@@ -286,6 +332,9 @@ public partial class InitialCreate : Migration
 
         migrationBuilder.DropTable(
             name: "SyncRuns");
+
+        migrationBuilder.DropTable(
+            name: "BondSeries");
 
         migrationBuilder.DropTable(
             name: "MarketDataInboxState");

@@ -34,6 +34,7 @@
       "dashboard": "Pulpit",
       "portfolios": "Portfele",
       "deposits": "Lokaty i oszczędności",
+      "bonds": "Obligacje",
       "settings": "Ustawienia"
     },
     "toggleNavigation": "Pokaż lub ukryj nawigację",
@@ -153,6 +154,47 @@
       "pln": "PLN — złoty polski",
       "eur": "EUR — euro",
       "usd": "USD — dolar amerykański"
+    },
+    "treasuryBondType": {
+      "ots": "Trzymiesięczne stałoprocentowe",
+      "ror": "Roczne zmiennoprocentowe",
+      "dor": "Dwuletnie zmiennoprocentowe",
+      "tos": "Trzyletnie stałoprocentowe",
+      "coi": "Czteroletnie indeksowane inflacją",
+      "edo": "Dziesięcioletnie indeksowane inflacją",
+      "ros": "Rodzinne sześcioletnie",
+      "rod": "Rodzinne dwunastoletnie"
+    }
+  },
+  "bonds": {
+    "title": "Obligacje skarbowe",
+    "tabs": {
+      "offer": "Aktualna oferta"
+    },
+    "term": {
+      "ots": "3 miesiące",
+      "ror": "1 rok",
+      "dor": "2 lata",
+      "tos": "3 lata",
+      "coi": "4 lata",
+      "edo": "10 lat",
+      "ros": "6 lat",
+      "rod": "12 lat"
+    },
+    "offer": {
+      "series": "Seria",
+      "type": "Typ",
+      "firstRate": "Oprocentowanie w 1. okresie",
+      "followingRate": "Dalej",
+      "swapPrice": "Cena zamiany",
+      "earlyRedemptionFee": "Opłata za wcześniejszy wykup (za obligację)",
+      "following": {
+        "fixed": "stałe",
+        "nbpReference": "stopa ref. NBP + marża {{ margin }}",
+        "inflation": "inflacja + marża {{ margin }}"
+      },
+      "empty": "Brak danych z MF — obligację można wprowadzić ręcznie",
+      "loadFailed": "Nie udało się wczytać oferty obligacji."
     }
   },
   "dashboard": {

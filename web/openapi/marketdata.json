@@ -138,6 +138,67 @@
           }
         }
       }
+    },
+    "/api/marketdata/bond-series": {
+      "get": {
+        "tags": [
+          "ListBondSeriesEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "onSaleOn",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BondSeriesListItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketdata/bond-series/{code}": {
+      "get": {
+        "tags": [
+          "GetBondSeriesEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondSeriesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -174,6 +235,164 @@
       },
       "AssetClass": {
         "type": "integer"
+      },
+      "BondSeriesListItem": {
+        "required": [
+          "code",
+          "type",
+          "isin",
+          "saleStart",
+          "saleEnd",
+          "issuePrice",
+          "swapPrice",
+          "marginPercent",
+          "firstPeriodRatePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TreasuryBondType"
+          },
+          "isin": {
+            "type": "string"
+          },
+          "saleStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "saleEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "issuePrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "swapPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "marginPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "firstPeriodRatePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "BondSeriesPeriodRateResponse": {
+        "required": [
+          "periodIndex",
+          "ratePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "periodIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "ratePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "BondSeriesResponse": {
+        "required": [
+          "code",
+          "type",
+          "isin",
+          "saleStart",
+          "saleEnd",
+          "issuePrice",
+          "swapPrice",
+          "marginPercent",
+          "periodRates"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TreasuryBondType"
+          },
+          "isin": {
+            "type": "string"
+          },
+          "saleStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "saleEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "issuePrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "swapPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "marginPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "periodRates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BondSeriesPeriodRateResponse"
+            }
+          }
+        }
       },
       "CustomInstrumentResponse": {
         "required": [
@@ -419,6 +638,9 @@
             ]
           }
         }
+      },
+      "TreasuryBondType": {
+        "type": "integer"
       }
     }
   },
@@ -437,6 +659,12 @@
     },
     {
       "name": "GetSyncStatusEndpoint"
+    },
+    {
+      "name": "ListBondSeriesEndpoint"
+    },
+    {
+      "name": "GetBondSeriesEndpoint"
     }
   ]
 }

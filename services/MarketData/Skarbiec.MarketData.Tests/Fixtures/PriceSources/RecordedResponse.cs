@@ -5,4 +5,7 @@ public static class RecordedResponse
 {
     public static string Read(string fileName) =>
         File.ReadAllText(Path.Combine("Fixtures", "PriceSources", "RecordedResponses", fileName));
+
+    public static byte[] ReadBytes(string fileName) =>
+        File.ReadAllBytes(Path.Combine("Fixtures", "PriceSources", "RecordedResponses", fileName));
 }

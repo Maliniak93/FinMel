@@ -1,8 +1,11 @@
 using System.Net.Http.Json;
+using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.AddCustomInstrument;
 using Skarbiec.MarketData.Features.SearchInstruments;
+using Skarbiec.MarketData.Sources.MfBonds;
+using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
 namespace Skarbiec.MarketData.Tests.Fixtures;
 
@@ -19,6 +22,13 @@ internal static class MarketDataApi
     // Service-only endpoints: anonymous and outside /api/, so the Gateway has no route to them.
     public const string InternalLatestPricesBatchUri = "/internal/prices/latest-batch";
     public const string InternalFxRatesBatchUri = "/internal/fx/latest-batch";
+
+    public const string BondSeriesBaseUri = "/api/marketdata/bond-series";
+
+    public static string BondSeriesUri(DateOnly? onSaleOn = null) =>
+        onSaleOn is null ? BondSeriesBaseUri : $"{BondSeriesBaseUri}?onSaleOn={onSaleOn:yyyy-MM-dd}";
+
+    public static string BondSeriesUri(string code) => $"{BondSeriesBaseUri}/{code}";
 
     public static string InternalInstrumentUri(Guid id) => $"/internal/instruments/{id}";
 
@@ -100,6 +110,34 @@ internal static class MarketDataApi
         this MarketDataDbContext db, string pair, DateOnly date, decimal rate, CancellationToken cancellationToken)
     {
         db.FxRates.Add(new FxRate { Id = Guid.NewGuid(), Pair = pair, Date = date, Rate = rate });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public static async Task SeedBondCatalogFromFixtureAsync(this MarketDataDbContext db, CancellationToken cancellationToken)
+    {
+        var job = new BondCatalogSyncJob(
+            db, FakeMfBondSource.FromFixture(), TimeProvider.System, NullLogger<BondCatalogSyncJob>.Instance);
+        await job.RunAsync(cancellationToken);
+    }
+
+    public static async Task SeedBondSeriesAsync(
+        this MarketDataDbContext db,
+        string code,
+        TreasuryBondType type,
+        DateOnly saleStart,
+        DateOnly saleEnd,
+        CancellationToken cancellationToken)
+    {
+        db.BondSeries.Add(new BondSeries
+        {
+            Code = code,
+            Type = type,
+            Isin = $"PL{code}000",
+            SaleStart = saleStart,
+            SaleEnd = saleEnd,
+            IssuePrice = 100m,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
         await db.SaveChangesAsync(cancellationToken);
     }
 
