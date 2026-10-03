@@ -10,11 +10,6 @@ namespace Skarbiec.Identity.Security;
 
 public sealed record AccessToken(string Value, DateTimeOffset ExpiresAtUtc);
 
-/// <summary>
-/// Mints the 15-minute access token (ADR-005) signed with the same key ServiceDefaults'
-/// JWT bearer handler validates against, so a token minted here round-trips through any
-/// service's protected endpoints without extra configuration.
-/// </summary>
 public sealed class AccessTokenGenerator(IOptions<JwtOptions> jwtOptions)
 {
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);

@@ -4,11 +4,7 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Features.GetFxRate;
 
-/// <summary>
-/// Backs Portfolio's FX rate lookup (ADR-026): the latest <c>{currency}PLN</c> rate on or before
-/// <c>date</c> — the same "last rate on or before" rule as <c>GetFxRatesBatch</c> and Reporting's
-/// valuation, for a single currency.
-/// </summary>
+// The same "last rate on or before" rule as GetFxRatesBatch and Reporting's valuation.
 public sealed class GetFxRateHandler(MarketDataDbContext dbContext)
 {
     public async Task<Result<FxRateResponse>> HandleAsync(string currency, DateOnly date, CancellationToken cancellationToken)

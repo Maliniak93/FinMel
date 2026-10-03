@@ -1,6 +1,6 @@
 namespace Skarbiec.MarketData.Features.GetFxRatesBatch;
 
-/// <summary>Latest rate at or before <c>AsOfDate</c> for one pair; a pair absent from the response has no rate at all on or before it.</summary>
+/// <summary>Latest rate on or before AsOfDate; a pair absent from the response has none.</summary>
 public sealed record FxRateResult
 {
     public required string Pair { get; init; }

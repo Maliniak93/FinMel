@@ -14,20 +14,7 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// spec-07 AC12, end to end through the real host: an <c>AssetPositionChanged</c> consumed by the
-/// host's own running bus shows up on <c>GET /dashboard</c> with no <c>DailyPricesSynced</c> in
-/// between. The dashboard is the endpoint under test, so it is called directly and asserted on the
-/// raw response; <see cref="ReportingApi.GetDashboardWhenAsync"/> only waits for the asynchronous
-/// consume to land before handing that response back.
-/// </summary>
-/// <remarks>
-/// archived-portfolio-out-of-net-worth AC3-5: archiving drops the portfolio's value out of net worth
-/// from today on, whichever order the per-asset fan-out and <see cref="PortfolioArchived"/> arrive
-/// in, and restoring brings it back. Each ordering step waits for the previous message to be
-/// consumed (visible on the <c>Position</c> read model) before publishing the next — the two event
-/// types sit on separate queues, so publishing back to back would not pin the order at all.
-/// </remarks>
+// The dashboard is called directly; each step waits for the previous consume, since the two event types sit on separate queues.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
@@ -65,8 +52,7 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
 
         await Bus.PublishCashPositionAsync(userAId, Guid.NewGuid(), 500m, cancellationToken);
 
-        // User A's own dashboard reaching 500 is the signal the event was consumed — asserting B
-        // without it would pass vacuously on an event that simply hadn't landed yet.
+        // User A's dashboard reaching 500 signals the event was consumed, so asserting B cannot pass vacuously.
         using var userAResponse = await userAClient.GetDashboardWhenAsync(d => d.NetWorthPln == 500m, cancellationToken);
         var userABody = await userAResponse.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
         Assert.Equal(500m, userABody!.NetWorthPln);
@@ -82,9 +68,6 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
         Assert.Empty(userBBody.ByAssetClass);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC3: the fan-out <c>AssetPositionChanged
-    /// { PortfolioIsArchived = true }</c> lands first, then <see cref="PortfolioArchived"/> — net
-    /// worth drops from 1500 to the 500 of the portfolio that stays.</summary>
     [Fact]
     public async Task ArchivePortfolio_DropsItFromNetWorth()
     {
@@ -104,8 +87,6 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
         Assert.Equal(500m, body!.NetWorthPln);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC4 (design decision 2): <see cref="PortfolioArchived"/>
-    /// lands first, the per-asset fan-out after it — net worth still ends at 500.</summary>
     [Fact]
     public async Task ArchivePortfolio_EventsOutOfOrder_DropsItFromNetWorth()
     {
@@ -126,9 +107,7 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
         Assert.Equal(500m, body!.NetWorthPln);
     }
 
-    /// <summary>archived-portfolio-out-of-net-worth AC5: restoring the archived portfolio brings its
-    /// 1000 back — net worth returns to 1500. The intermediate 500 is asserted too, otherwise the
-    /// fact would pass vacuously on an archive that never dropped anything.</summary>
+    // The intermediate 500 is asserted too, or an archive that dropped nothing would pass.
     [Fact]
     public async Task RestorePortfolio_BringsItBackIntoNetWorth()
     {
@@ -166,7 +145,6 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
 
     private IBus Bus => Factory.Services.GetRequiredService<IBus>();
 
-    /// <summary>Two portfolios of one user — 1000 PLN of cash (the one to archive) and 500 PLN — both valued into today's net worth of 1500.</summary>
     private async Task ArrangeTwoPortfoliosAsync(HttpClient client, ArchiveScenario scenario, CancellationToken cancellationToken)
     {
         await client.WaitUntilReadyAsync(cancellationToken);
@@ -180,7 +158,6 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
         Assert.Equal(1_500m, body!.NetWorthPln);
     }
 
-    /// <summary>What <c>ArchivePortfolioHandler</c> fans out for the archived portfolio's one asset.</summary>
     private Task PublishArchiveFanOutAsync(ArchiveScenario scenario, CancellationToken cancellationToken) =>
         Bus.PublishCashPositionAsync(
             scenario.UserId, scenario.ArchivedPortfolioId, 1_000m, cancellationToken,

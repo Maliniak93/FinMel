@@ -1,9 +1,5 @@
 namespace Skarbiec.Contracts;
 
-/// <summary>
-/// Outcome of an operation that can fail in an expected way. Handlers and validating factories
-/// return this instead of throwing; the endpoint maps a failure to ProblemDetails (ADR-017).
-/// </summary>
 public readonly struct Result
 {
     public bool IsSuccess { get; }
@@ -32,7 +28,6 @@ public readonly struct Result
     public static implicit operator Result(Error error) => Failure(error);
 }
 
-/// <summary>Same as <see cref="Result"/>, carrying a value on success (ADR-017).</summary>
 public readonly struct Result<TValue>
 {
     private readonly TValue? _value;

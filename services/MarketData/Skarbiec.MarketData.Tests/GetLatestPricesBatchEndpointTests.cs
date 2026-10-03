@@ -9,11 +9,7 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// HTTP-level behavior of Features/GetLatestPricesBatch (T2.11) — Reporting's DailyPricesSynced
-/// consumer calls it. A service-only <c>/internal</c> endpoint (ADR-027): anonymous, so every fact
-/// calls it with no token, exactly as Reporting does.
-/// </summary>
+// An anonymous /internal endpoint, so every fact calls it with no token, as Reporting does.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetLatestPricesBatchEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {

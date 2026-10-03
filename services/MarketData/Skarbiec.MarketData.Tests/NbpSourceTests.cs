@@ -6,12 +6,6 @@ using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// Fixture-based tests for the real NBP source (T2.3 AC: "table A parse, gold parse, holiday (no
-/// data), API error"), via <see cref="FakeNbpApiClient"/> — same test-kit pattern as T2.2's
-/// <see cref="PriceSourceAbstractionTests"/>, one level lower (swapping the HTTP fetch instead of
-/// the whole source).
-/// </summary>
 public sealed class NbpSourceTests
 {
     private static readonly Instrument GoldInstrument = new()
@@ -147,12 +141,12 @@ public sealed class NbpSourceTests
         var client = FakeNbpApiClient.WithResponse(RecordedResponse.Read("nbp-table-a-happy-path.json"));
         var source = new NbpFxRateSource(client);
         var from = new DateOnly(2026, 1, 1);
-        var to = from.AddDays(199); // 200-day span > NBP's 93-day table A limit
+        var to = from.AddDays(199);
 
         var result = await source.FetchHistoryAsync("USD", from, to, TestContext.Current.CancellationToken);
 
         Assert.Equal(PriceFetchOutcome.Success, result.Outcome);
-        Assert.Equal(3, client.RangeRequestCount); // ceil(200/93)
+        Assert.Equal(3, client.RangeRequestCount);
     }
 
     [Fact]
@@ -161,11 +155,11 @@ public sealed class NbpSourceTests
         var client = FakeNbpApiClient.WithResponse(RecordedResponse.Read("nbp-gold-happy-path.json"));
         var source = new NbpPriceSource(client);
         var from = new DateOnly(2024, 1, 1);
-        var to = from.AddDays(399); // 400-day span > this source's 367-day chunk size
+        var to = from.AddDays(399);
 
         var result = await source.FetchHistoryAsync(GoldInstrument, from, to, TestContext.Current.CancellationToken);
 
         Assert.Equal(PriceFetchOutcome.Success, result.Outcome);
-        Assert.Equal(2, client.RangeRequestCount); // ceil(400/367)
+        Assert.Equal(2, client.RangeRequestCount);
     }
 }

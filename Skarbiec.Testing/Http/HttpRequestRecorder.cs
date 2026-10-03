@@ -6,32 +6,19 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Skarbiec.Testing.Http;
 
-/// <summary>What an outgoing service-to-service request looked like when it reached the wire.</summary>
-/// <param name="Method">The HTTP method.</param>
-/// <param name="Uri">The final request URI, after service discovery resolved the base address.</param>
-/// <param name="Authorization">The raw <c>Authorization</c> header, or <see langword="null"/> when none was sent.</param>
+/// <summary>An outgoing service-to-service request as it reached the wire; Uri is after service discovery.</summary>
 public sealed record RecordedHttpRequest(HttpMethod Method, Uri Uri, string? Authorization);
 
-/// <summary>
-/// Stands in for the network under a service's typed <see cref="HttpClient"/>s: every outgoing
-/// request is recorded (after the whole delegating-handler pipeline has run, so headers a handler
-/// adds are visible) and answered by <c>respond</c> instead of leaving the process. Plug it into a
-/// test host with <see cref="HttpRequestRecorderExtensions.WithRecordedOutboundHttp{TProgram}"/>.
-/// </summary>
-/// <param name="respond">Builds the response per request; defaults to an empty <c>200 OK</c>.</param>
+// Records after the whole delegating-handler pipeline, so headers a handler adds are visible.
 public sealed class HttpRequestRecorder(Func<HttpRequestMessage, HttpResponseMessage>? respond = null)
 {
     private readonly ConcurrentQueue<RecordedHttpRequest> _requests = new();
     private readonly Func<HttpRequestMessage, HttpResponseMessage> _respond =
         respond ?? (_ => new HttpResponseMessage(HttpStatusCode.OK));
 
-    /// <summary>Every request seen so far, in arrival order.</summary>
     public IReadOnlyList<RecordedHttpRequest> Requests => [.. _requests];
 
-    /// <summary>
-    /// A fresh primary handler writing into this recorder — <c>IHttpClientFactory</c> expects a new
-    /// handler instance per pipeline it builds.
-    /// </summary>
+    // IHttpClientFactory expects a new handler instance per pipeline.
     public HttpMessageHandler CreateHandler() => new RecordingHandler(this);
 
     private sealed class RecordingHandler(HttpRequestRecorder recorder) : HttpMessageHandler
@@ -55,13 +42,7 @@ public sealed class HttpRequestRecorder(Func<HttpRequestMessage, HttpResponseMes
 
 public static class HttpRequestRecorderExtensions
 {
-    /// <summary>
-    /// A copy of <paramref name="factory"/> whose every <see cref="HttpClient"/> built through
-    /// <c>IHttpClientFactory</c> (typed clients included) sends into <paramref name="recorder"/>
-    /// instead of the network. The service's own delegating handlers (resilience, service
-    /// discovery, anything a typed client adds) still run in front of it. Dispose the returned
-    /// factory with <c>await using</c>.
-    /// </summary>
+    // The service's own delegating handlers still run in front of the recorder.
     public static WebApplicationFactory<TProgram> WithRecordedOutboundHttp<TProgram>(
         this WebApplicationFactory<TProgram> factory, HttpRequestRecorder recorder)
         where TProgram : class =>

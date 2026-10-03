@@ -30,8 +30,6 @@ if (!OpenApiBuildTime.IsActive)
 {
     builder.AddNpgsqlDbContext<MarketDataDbContext>("marketdata-db");
 
-    // Publishes DailyPricesSynced through the outbox (T2.10); consumes Portfolio's position events
-    // into the InstrumentUsage read model PriceSyncJob filters by (spec-04).
     builder.AddRabbitMqMessaging<WebApplicationBuilder, MarketDataDbContext>(
         configureConsumers: x =>
         {
@@ -43,7 +41,8 @@ if (!OpenApiBuildTime.IsActive)
     builder.AddStooqSource();
     builder.AddCoinGeckoSource();
     builder.AddPriceSyncJob();
-    builder.AddFxSyncJob(); // after AddPriceSyncJob — it reuses that call's scheduler (see FxSyncJobExtensions).
+    // After AddPriceSyncJob: it reuses that call's scheduler.
+    builder.AddFxSyncJob();
     builder.AddHistoryBackfillJob();
     builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
         .AddSource(PriceSyncJob.ActivitySourceName)
@@ -77,8 +76,7 @@ app.MapGetFxRateEndpoint();
 app.MapTriggerSyncEndpoint();
 app.MapGetSyncStatusEndpoint();
 
-// Production applies migrations (and the seed below) as an explicit deploy step instead (see
-// deploy/README.md).
+// Production applies migrations and the seed as an explicit deploy step instead (see deploy/README.md).
 if (!OpenApiBuildTime.IsActive && app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();

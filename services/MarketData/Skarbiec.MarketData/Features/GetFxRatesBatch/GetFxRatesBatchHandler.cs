@@ -3,7 +3,6 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Features.GetFxRatesBatch;
 
-/// <summary>Backs Reporting's valuation consumer (T2.11) — same shape as GetLatestPricesBatch, keyed by pair instead of instrument.</summary>
 public sealed class GetFxRatesBatchHandler(MarketDataDbContext dbContext)
 {
     public async Task<FxRatesBatchResponse> HandleAsync(FxRatesBatchRequest request, CancellationToken cancellationToken)

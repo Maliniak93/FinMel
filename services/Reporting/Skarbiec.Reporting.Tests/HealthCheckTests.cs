@@ -14,10 +14,7 @@ public sealed class HealthCheckTests(SkarbiecContainersFixture containers) : Rep
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateClient();
 
-        // MassTransit's own health check (T2.11: Reporting's first real consumer, with the T0.12
-        // inbox middleware on its receive endpoint) briefly reports "not started" right after the
-        // host comes up — the same window a real readiness probe is meant to ride out, so this
-        // polls instead of asserting on the very first response.
+        // MassTransit's health check briefly reports not started after the host comes up, so this polls.
         var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
         HttpResponseMessage response;
         do

@@ -5,11 +5,6 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-/// <summary>
-/// Mirror of <see cref="PortfolioArchivedConsumer"/>: clears the archived flag on every
-/// <see cref="Position"/> of a restored portfolio so the daily valuation picks it up again (spec-03),
-/// then revalues its snapshot for today right away instead of waiting for that sync (spec-07 AC9).
-/// </summary>
 public sealed class PortfolioRestoredConsumer(ReportingDbContext db, PortfolioSnapshotWriter snapshotWriter)
     : IConsumer<PortfolioRestored>
 {

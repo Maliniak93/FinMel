@@ -12,11 +12,6 @@ using RegisterRequest = IdentityAssembly::Skarbiec.Identity.Features.Register.Re
 
 namespace Skarbiec.Gateway.Tests;
 
-/// <summary>
-/// End-to-end proof that the Gateway (T0.15 AC) validates JWTs before proxying, forwards a real
-/// login to Identity, and lets the resulting access token authorize a call routed to a skeleton
-/// service (Portfolio) — plus the burst rate limit on the anonymous auth routes.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GatewayRoutingTests : IAsyncLifetime
 {
@@ -33,8 +28,7 @@ public sealed class GatewayRoutingTests : IAsyncLifetime
         _identity = new IdentityTestHost(containers);
         _portfolio = new PortfolioTestHost(containers);
 
-        // Real Kestrel listeners: the Gateway's YARP instance proxies over a real outbound
-        // HttpClient, which can't reach an in-memory TestServer.
+        // Real Kestrel listeners: YARP proxies over a real HttpClient, which cannot reach an in-memory TestServer.
         _identity.StartServer();
         _portfolio.StartServer();
 
@@ -101,8 +95,7 @@ public sealed class GatewayRoutingTests : IAsyncLifetime
     [Fact]
     public async Task InternalPath_ThroughGateway_Returns404()
     {
-        // Service-only endpoints live on /internal, outside the /api/<service>/** space the Gateway
-        // routes (ADR-027) — so a browser has no way to reach them, token or not.
+        // Service-only endpoints sit outside the /api/<service> space the Gateway routes, so a browser cannot reach them.
         using var client = _gateway.CreateClient();
 
         var instrument = await client.GetAsync($"/internal/instruments/{Guid.NewGuid()}", TestContext.Current.CancellationToken);

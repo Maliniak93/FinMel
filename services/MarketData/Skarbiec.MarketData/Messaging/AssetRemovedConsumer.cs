@@ -5,17 +5,7 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Messaging;
 
-/// <summary>
-/// Releases a deleted asset's hold on its instrument (spec-04 design decision 10): the
-/// <see cref="AssetInstrumentLink"/> becomes a terminal tombstone and the old instrument's
-/// <see cref="InstrumentUsage"/> is recounted from the remaining links.
-/// </summary>
-/// <remarks>
-/// <see cref="AssetRemoved"/> carries no version, which is why the tombstone — not a version compare —
-/// guards it: the row stays, so a redelivered <see cref="AssetRemoved"/> and any later
-/// <see cref="AssetPositionChanged"/> for the asset are both no-ops. A removal arriving before the
-/// asset's first position event still writes the tombstone, so that late event is dropped too.
-/// </remarks>
+// Guarded by a tombstone, not a version: the row stays, so a redelivered removal and any later position event are no-ops.
 public sealed class AssetRemovedConsumer(MarketDataDbContext db) : IConsumer<AssetRemoved>
 {
     public async Task Consume(ConsumeContext<AssetRemoved> context)
@@ -40,7 +30,7 @@ public sealed class AssetRemovedConsumer(MarketDataDbContext db) : IConsumer<Ass
         link.IsRemoved = true;
         link.InstrumentId = null;
 
-        // Saved first so the recount below no longer sees this link.
+        // Saved first so the recount below skips this link.
         await db.SaveChangesAsync(cancellationToken);
 
         if (previousInstrumentId is not { } instrumentId)
@@ -48,8 +38,7 @@ public sealed class AssetRemovedConsumer(MarketDataDbContext db) : IConsumer<Ass
             return;
         }
 
-        // A removal can only lower a count, so there is never a usage row to create or a backfill to
-        // enqueue here.
+        // A removal only lowers a count, so there is no usage row to create or backfill to enqueue.
         var usage = await db.InstrumentUsages.SingleOrDefaultAsync(u => u.InstrumentId == instrumentId, cancellationToken);
         if (usage is not null)
         {

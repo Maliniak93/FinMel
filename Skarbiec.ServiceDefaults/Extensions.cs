@@ -13,10 +13,6 @@ using Skarbiec.ServiceDefaults.ErrorHandling;
 
 namespace Microsoft.Extensions.Hosting;
 
-/// <summary>
-/// Wires OpenTelemetry, health checks, JWT auth, HTTP resilience and ProblemDetails for every
-/// Skarbiec service via a single <see cref="AddServiceDefaults{TBuilder}"/> call (T0.3).
-/// </summary>
 public static class Extensions
 {
     private const string LivenessEndpointPath = "/health/live";
@@ -36,10 +32,8 @@ public static class Extensions
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            // Turn on resilience by default
             http.AddStandardResilienceHandler();
 
-            // Turn on service discovery by default
             http.AddServiceDiscovery();
         });
 
@@ -60,19 +54,14 @@ public static class Extensions
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    // MassTransit's own meter (T0.10) — harmless to register even for services
-                    // that don't use messaging yet.
                     .AddMeter("MassTransit");
             })
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
-                    // MassTransit's send/receive/consume/outbox activities (T0.10, ADR-012) —
-                    // without this, publish/consume spans never reach the exporter and a
-                    // register request's trace stops at the HTTP+DB spans.
+                    // Without it, publish and consume spans never reach the exporter.
                     .AddSource("MassTransit")
                     .AddAspNetCoreInstrumentation(tracing =>
-                        // Exclude health check requests from tracing
                         tracing.Filter = context =>
                             !context.Request.Path.StartsWithSegments(LivenessEndpointPath)
                             && !context.Request.Path.StartsWithSegments(ReadinessEndpointPath)
@@ -100,17 +89,12 @@ public static class Extensions
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHealthChecks()
-            // Add a default liveness check to ensure app is responsive
             .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
 
         return builder;
     }
 
-    /// <summary>
-    /// Maps <c>/health/live</c> (self only) and <c>/health/ready</c> (every registered check,
-    /// including DB/broker checks a service adds on top). Exposed in every environment: compose
-    /// and k3s use these for restart/readiness probes (T0.18/ADR-011), not just local dev.
-    /// </summary>
+    // Mapped in every environment: compose and k3s use these as restart and readiness probes.
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
         app.MapHealthChecks(LivenessEndpointPath, new HealthCheckOptions
@@ -123,14 +107,10 @@ public static class Extensions
         return app;
     }
 
-    /// <summary>Middleware-side wiring — call right after <c>builder.Build()</c>, before other middleware.</summary>
+    // Call right after builder.Build(), before other middleware.
     public static WebApplication UseServiceDefaults(this WebApplication app)
     {
-        // StatusCodeSelector (.NET 9+) is what makes UseExceptionHandler() honor
-        // BadHttpRequestException.StatusCode instead of flattening every exception to 500 — see
-        // BadHttpRequestExceptionHandler's old XML doc / T1.1 for why this exception occurs
-        // (Minimal API body binding throws it, with the correct status code already attached, only
-        // in Development — which is every Skarbiec test host and local `dotnet run`).
+        // StatusCodeSelector makes UseExceptionHandler honour BadHttpRequestException.StatusCode instead of flattening it to 500.
         app.UseExceptionHandler(new ExceptionHandlerOptions
         {
             StatusCodeSelector = exception => exception is BadHttpRequestException badHttpRequestException

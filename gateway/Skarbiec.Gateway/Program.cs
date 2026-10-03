@@ -18,7 +18,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Sane default applied to every route (ADR-013).
+    // Default applied to every route.
     options.AddFixedWindowLimiter("standard", limiter =>
     {
         limiter.PermitLimit = 100;
@@ -26,8 +26,7 @@ builder.Services.AddRateLimiter(options =>
         limiter.QueueLimit = 0;
     });
 
-    // Stricter limit on the anonymous auth endpoints (register/login/refresh) — the ones an
-    // unauthenticated attacker can hammer without ever holding a token.
+    // Stricter on the anonymous auth endpoints, which an attacker can hammer without a token.
     options.AddFixedWindowLimiter("auth", limiter =>
     {
         limiter.PermitLimit = 5;

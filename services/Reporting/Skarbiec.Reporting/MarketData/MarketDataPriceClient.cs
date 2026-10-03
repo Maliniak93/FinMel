@@ -3,12 +3,7 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.MarketData;
 
-/// <summary>
-/// Calls MarketData's service-only <c>POST /internal/prices/latest-batch</c> and
-/// <c>/internal/fx/latest-batch</c> (T2.11) with no token (ADR-027). Resilience and service
-/// discovery come from ServiceDefaults; a total failure to reach MarketData is deliberately left to
-/// propagate — see <c>DailyPricesSyncedConsumer</c> for why.
-/// </summary>
+// A total failure to reach MarketData propagates on purpose: DailyPricesSyncedConsumer relies on the retry.
 public sealed class MarketDataPriceClient(HttpClient httpClient) : IPriceQuoteClient
 {
     // Comfortably under MarketData's own MaxLength(1000) batch-size cap.

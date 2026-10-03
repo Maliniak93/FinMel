@@ -9,8 +9,7 @@ using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
-// HandleCookies is disabled so each request's refresh cookie is exactly what the test attaches,
-// never one implicitly carried over by the client's own cookie jar from a previous call.
+// HandleCookies is off, so each request carries exactly the refresh cookie the test attaches.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class RefreshEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
@@ -46,11 +45,9 @@ public sealed class RefreshEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(HttpStatusCode.OK, firstRefresh.StatusCode);
         var rotatedRefreshToken = ExtractRefreshTokenCookieValue(firstRefresh);
 
-        // Reusing the already-rotated token is a reuse-detection signal: it must fail...
         var reuseResponse = await client.PostWithRefreshCookieAsync(RefreshUri, originalRefreshToken, cancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, reuseResponse.StatusCode);
 
-        // ...and it must revoke the descendant it produced too, since that chain can no longer be trusted.
         var descendantResponse = await client.PostWithRefreshCookieAsync(RefreshUri, rotatedRefreshToken, cancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, descendantResponse.StatusCode);
     }

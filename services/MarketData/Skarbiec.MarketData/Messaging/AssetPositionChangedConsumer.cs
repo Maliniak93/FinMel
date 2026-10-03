@@ -7,20 +7,7 @@ using Skarbiec.MarketData.Sources;
 
 namespace Skarbiec.MarketData.Messaging;
 
-/// <summary>
-/// Keeps MarketData's <see cref="InstrumentUsage"/> read model current from Portfolio's
-/// <see cref="AssetPositionChanged"/> (spec-04 design decisions 9, 11-12) — the "in use" set
-/// <see cref="PriceSyncJob"/> syncs. The event carries the full position, so nothing here calls
-/// Portfolio back (ADR-021).
-/// </summary>
-/// <remarks>
-/// The per-asset <see cref="AssetInstrumentLink"/> is what makes this order-safe: an event whose
-/// <c>Version</c> is not newer than the stored link (late or duplicate delivery), or any event for a
-/// removed asset, is dropped. Usage is then recounted from the links rather than adjusted by ±1, so an
-/// instrument switch, a redelivery and an out-of-order event all converge on the same number.
-/// <c>PortfolioIsArchived</c> is deliberately ignored: an archived portfolio's assets keep their
-/// prices current for a restore.
-/// </remarks>
+// Order-safe: an event not newer than its link, or for a removed asset, is dropped, and usage is recounted from the links.
 public sealed class AssetPositionChangedConsumer(
     MarketDataDbContext db,
     IHistoryBackfillTrigger backfillTrigger,
@@ -67,17 +54,14 @@ public sealed class AssetPositionChangedConsumer(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // After SaveChangesAsync: this schedules a Quartz job outside the consume transaction. A
-        // duplicate enqueue (a retry after this point) is harmless — backfill upserts by
-        // (instrument, date).
+        // Scheduled after the save, outside the consume transaction; a duplicate enqueue is harmless, as backfill upserts.
         foreach (var affected in newlyUsed)
         {
             await backfillTrigger.EnqueueAsync(affected, cancellationToken);
         }
     }
 
-    /// <summary>Recomputes <see cref="InstrumentUsage.AssetCount"/> from the links and returns whether
-    /// the instrument just went from unused to used — the backfill-on-first-use trigger.</summary>
+    // True when the instrument just went from unused to used: the backfill-on-first-use trigger.
     private async Task<bool> RecountAsync(Guid instrumentId, CancellationToken cancellationToken)
     {
         var count = await db.AssetInstrumentLinks.CountAsync(

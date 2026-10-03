@@ -4,12 +4,7 @@ using Skarbiec.Contracts.Events;
 
 namespace Skarbiec.Identity.Tests.Messaging;
 
-/// <summary>
-/// A standalone MassTransit bus, independent of the Identity service under test, subscribing to
-/// <see cref="UserRegistered"/> on the shared Testcontainers RabbitMQ broker — proves fan-out
-/// delivery to a real consumer over the real transport (T0.10 AC), as opposed to the outbox-write
-/// guarantee (<c>UserRegisteredOutboxTests</c>), which never starts a bus at all.
-/// </summary>
+// A bus independent of the service under test, proving delivery to a real consumer over the real broker.
 public sealed class TestConsumerHost : IAsyncDisposable
 {
     private readonly ServiceProvider _provider;

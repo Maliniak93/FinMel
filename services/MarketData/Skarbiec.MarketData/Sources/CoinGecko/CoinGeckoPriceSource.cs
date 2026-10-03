@@ -4,21 +4,10 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources.CoinGecko;
 
-/// <summary>
-/// <see cref="IPriceSource"/> over CoinGecko's public v3 API — daily crypto prices (E4 [M]).
-/// <see cref="Instrument.Ticker"/> stores CoinGecko's own coin id for this source (e.g.
-/// <c>bitcoin</c>, <c>ethereum</c> — not the trading symbol), matching the convention
-/// <see cref="Data.MarketDataSeeder"/> already seeds. Prices are always fetched in USD (see
-/// <see cref="CoinGeckoApiClient"/>'s doc comment); conversion to PLN is a valuation-time concern
-/// (ADR-008), not this source's.
-/// </summary>
+// Ticker holds CoinGecko's coin id (bitcoin), not the trading symbol.
 public sealed class CoinGeckoPriceSource : IPriceSource
 {
-    // Conservative floor between requests for the free (no API key) tier — documented public limits
-    // are on the order of a handful of calls per minute, and a live check (T2.5, see
-    // CoinGeckoRateLimitedException's doc comment) showed a 429 after only a few calls in quick
-    // succession. Only matters for FetchHistoryAsync's per-coin backfill calls (T2.7): FetchLatestAsync
-    // batches every instrument into one request regardless of count, so it never needs to pace itself.
+    // The free tier answered 429 after a few quick calls; only per-coin history calls need pacing, as latest prices are one batched call.
     public static readonly TimeSpan DefaultRequestDelay = TimeSpan.FromSeconds(2);
 
     private readonly ICoinGeckoApiClient _client;
@@ -30,8 +19,7 @@ public sealed class CoinGeckoPriceSource : IPriceSource
     {
     }
 
-    /// <summary>Test seam: lets <c>CoinGeckoSourceTests</c> (T2.5 AC: "429 → retry-after respected")
-    /// capture/short-circuit the backoff wait instead of the test actually sleeping.</summary>
+    // Test seam: a test captures the backoff wait instead of sleeping.
     public CoinGeckoPriceSource(
         ICoinGeckoApiClient client, ILogger<CoinGeckoPriceSource> logger, Func<TimeSpan, CancellationToken, Task> delay)
     {
@@ -44,11 +32,6 @@ public sealed class CoinGeckoPriceSource : IPriceSource
 
     public TimeSpan RequestDelay => DefaultRequestDelay;
 
-    /// <summary>
-    /// Fetches every instrument's latest price in a single batched request (T2.5 scope: "batch by
-    /// ids — one call for many coins"), which is also what keeps a many-instrument sync from ever
-    /// turning into a 429 storm (T2.5 AC).
-    /// </summary>
     public async Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken)
     {
@@ -99,10 +82,7 @@ public sealed class CoinGeckoPriceSource : IPriceSource
         return ParseHistory(raw, instrument.Id);
     }
 
-    // One retry after honoring Retry-After — enough to ride out a single free-tier rate-limit hit
-    // without turning a transient 429 into a job failure, but bounded so a source that's truly stuck
-    // still surfaces as PriceFetchOutcome.Error rather than retrying forever (T2.5 scope: "honor 429
-    // with backoff", "never hammer").
+    // One retry after Retry-After rides out a single rate-limit hit; a source that stays limited still ends in Error.
     private async Task<string> FetchWithRateLimitRetryAsync(Func<Task<string>> fetch, CancellationToken cancellationToken)
     {
         try
@@ -121,8 +101,7 @@ public sealed class CoinGeckoPriceSource : IPriceSource
     private static bool IsTransportFailure(Exception ex, CancellationToken cancellationToken) =>
         ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested;
 
-    // Expected shape: {"<id>":{"usd":<price>,"last_updated_at":<unix seconds>}, ...} — one entry per
-    // requested id, missing entirely for an id CoinGecko doesn't recognize (delisted/typo'd ticker).
+    // {"<id>":{"usd":<price>,"last_updated_at":<unix seconds>}}; an unrecognised id is missing entirely.
     private static PriceFetchResult<InstrumentQuote> ParseLatest(string raw, IReadOnlyCollection<Instrument> instruments)
     {
         Dictionary<string, CoinEntryDto>? entries;
@@ -143,9 +122,7 @@ public sealed class CoinGeckoPriceSource : IPriceSource
         var values = new List<InstrumentQuote>();
         foreach (var instrument in instruments)
         {
-            // An id CoinGecko doesn't recognize is silently excluded rather than failing the whole
-            // batch — same contract NbpPriceSource/StooqPriceSource established for an unmatched
-            // instrument (T2.3/T2.4).
+            // An unrecognised id is excluded instead of failing the whole batch.
             if (!entries.TryGetValue(instrument.Ticker, out var entry) || entry.Usd is null || entry.LastUpdatedAt is null)
             {
                 continue;
@@ -158,12 +135,7 @@ public sealed class CoinGeckoPriceSource : IPriceSource
         return values.Count > 0 ? PriceFetchResult<InstrumentQuote>.Success(values) : PriceFetchResult<InstrumentQuote>.NoData();
     }
 
-    // Expected shape: {"prices":[[<unix ms>,<price>], ...]} — granularity varies with range age
-    // (5-min/hourly/daily, live-verified 2026-08-03), so points are deduped to one quote per UTC
-    // calendar date, keeping the latest point of each day, since PriceQuote is date-only (T2.1).
-    // "prices" is a required member: a response missing it entirely (e.g. an unexpected-shape error
-    // body) fails deserialization and is reported as malformed, distinct from a genuinely empty
-    // "prices":[] for a range with no data.
+    // {"prices":[[<unix ms>,<price>]]}: granularity varies with range age, so each day keeps its last point; a missing "prices" is malformed.
     private static PriceFetchResult<InstrumentQuote> ParseHistory(string raw, Guid instrumentId)
     {
         MarketChartDto? dto;
@@ -190,7 +162,7 @@ public sealed class CoinGeckoPriceSource : IPriceSource
             }
 
             var date = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeMilliseconds((long)point[0]).UtcDateTime);
-            byDate[date] = point[1]; // points arrive chronologically; last write per date wins
+            byDate[date] = point[1];
         }
 
         var values = byDate.Select(kv => new InstrumentQuote(instrumentId, kv.Key, kv.Value)).ToList();

@@ -15,23 +15,11 @@ using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// PriceSyncJob's business logic (T2.6 AC: per-source isolation, partial-run recording, upsert
-/// idempotency; spec-04 design decision 6: currencies/FX dropped entirely — <see cref="FxSyncJob"/>
-/// (<see cref="FxSyncJobTests"/>) covers every catalog currency unconditionally now, so this job no
-/// longer depends on <see cref="IFxRateSource"/> at all) exercised via
-/// <see cref="PriceSyncJob.RunAsync"/> directly — no Quartz scheduler involved. Scheduling mechanics
-/// (cron firing, restart/cluster safety) are covered separately in <see cref="PriceSyncSchedulingTests"/>.
-/// Outbox atomicity (T2.10 AC) is covered in <see cref="MarketDataOutboxTests"/>; the job still needs
-/// a real, outbox-aware <see cref="IPublishEndpoint"/> here (a hand-rolled no-op fake would have to
-/// match the whole interface), so each fact builds one via <see cref="HostlessOutboxProvider"/> — same
-/// helper, same scope, same DbContext instance the job runs against.
-/// </summary>
+// Each fact builds a real outbox-aware IPublishEndpoint through HostlessOutboxProvider, on the DbContext the job runs against.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
-    // Explicit field: the primary constructor parameter is also passed to the base constructor
-    // above, so referencing it directly elsewhere in this class would trigger CS9107.
+    // An explicit field: the primary constructor parameter also goes to the base constructor, so using it here would trigger CS9107.
     private readonly SkarbiecContainersFixture _containers = containers;
 
     private static readonly DateOnly Today = new(2026, 8, 3);
@@ -54,7 +42,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         [
             new ScriptedPriceSource(PriceSource.Nbp, PriceFetchResult<InstrumentQuote>.Success(
                 [new InstrumentQuote(nbpInstrument.Id, Today, 350.12m)])),
-            // The "middle" source — its whole fetch errors out, the other two must still sync.
+            // The middle source errors out entirely; the other two must still sync.
             new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Error("stooq is down")),
             new ScriptedPriceSource(PriceSource.CoinGecko, PriceFetchResult<InstrumentQuote>.Success(
                 [new InstrumentQuote(coinGeckoInstrument.Id, Today, 65_000m)])),
@@ -65,8 +53,8 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
 
         var run = await db.SyncRuns.SingleAsync(cancellationToken);
         Assert.Equal(SyncRunStatus.Partial, run.Status);
-        Assert.Equal(2, run.SyncedCount); // Nbp instrument + CoinGecko instrument
-        Assert.Equal(1, run.FailedCount); // Stooq instrument
+        Assert.Equal(2, run.SyncedCount);
+        Assert.Equal(1, run.FailedCount);
         Assert.Equal(0, run.NoDataCount);
         Assert.NotNull(run.FinishedAt);
 
@@ -105,10 +93,6 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         Assert.Equal(2, await db.SyncRuns.CountAsync(cancellationToken));
     }
 
-    /// <summary>spec-04 AC17: PriceSyncJob.GetInstrumentsToSyncAsync joins InstrumentUsage and keeps
-    /// only AssetCount > 0 — the in-use instrument gets fetched, the unused one is skipped
-    /// entirely (never handed to the source, not counted failed) and reported as the
-    /// <c>skarbiec.sync_run.skipped</c> activity tag.</summary>
     [Fact]
     public async Task RunAsync_SyncsOnlyInstrumentsInUse()
     {
@@ -142,9 +126,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         Assert.True(await db.PriceQuotes.AnyAsync(q => q.InstrumentId == usedInstrument.Id, cancellationToken));
         Assert.False(await db.PriceQuotes.AnyAsync(q => q.InstrumentId == unusedInstrument.Id, cancellationToken));
 
-        // The scripted source ignores its input, so the quote rows alone can't tell "skipped" from
-        // "asked for and missing" — the fetched ids and the counters can: without the usage filter the
-        // unused instrument reaches the source and is counted failed, turning the run Partial.
+        // The scripted source ignores its input, so the fetched ids and the counters, not the quote rows, show the skip.
         Assert.Equal(usedInstrument.Id, Assert.Single(source.LatestFetchedInstrumentIds));
 
         var run = await db.SyncRuns.SingleAsync(cancellationToken);
@@ -158,9 +140,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         Assert.Equal(1, Assert.IsType<int>(jobActivity.GetTagItem("skarbiec.sync_run.skipped")));
     }
 
-    /// <summary>Adds an <see cref="Instrument"/> plus an <see cref="InstrumentUsage"/> row with
-    /// <c>AssetCount > 0</c> — GetInstrumentsToSyncAsync (AC17) now filters on usage, so every fact in
-    /// this class that expects an instrument to actually be synced needs one.</summary>
+    // The job syncs only instruments in use, so every instrument a fact expects synced needs a usage row.
     private static Instrument NewUsedInstrument(
         MarketDataDbContext db, string ticker, PriceSource source, string quoteCurrency, AssetClass assetClass)
     {

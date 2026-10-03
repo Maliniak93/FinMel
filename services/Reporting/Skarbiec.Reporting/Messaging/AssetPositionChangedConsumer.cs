@@ -6,20 +6,7 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-/// <summary>
-/// Upserts Reporting's local <see cref="Position"/> read model from <see cref="AssetPositionChanged"/>
-/// (spec-03, ADR-021), then revalues today's snapshot and lines of the event's portfolio from the
-/// locally stored last prices and rates (spec-07, ADR-025). The event carries the full position
-/// state, so nothing here calls Portfolio back — that is the whole point of the read model.
-/// </summary>
-/// <remarks>
-/// Ordering is by the event's own per-asset <c>Version</c> counter, not by a timestamp: clocks
-/// across a publisher and a consumer are not a total order, the counter is (spec-03 design
-/// decision 4). An event older than the stored row is dropped so an out-of-order redelivery cannot
-/// resurrect an older quantity; an equal version is the same state, so applying it is harmless.
-/// A dropped event revalues nothing, and neither does an archived portfolio — its last snapshot
-/// stays where it was (spec-07).
-/// </remarks>
+// Ordered by the per-asset Version, not a timestamp: an older event is dropped, an equal one is the same state.
 public sealed class AssetPositionChangedConsumer(
     ReportingDbContext db,
     PortfolioSnapshotWriter snapshotWriter,
@@ -30,10 +17,7 @@ public sealed class AssetPositionChangedConsumer(
         var message = context.Message;
         var cancellationToken = context.CancellationToken;
 
-        // Bypasses the tenancy filter deliberately (IgnoreQueryFilters): a consumer has no request
-        // user — ICurrentUser.UserId is Guid.Empty — and writes on behalf of whichever user the
-        // event names. UserId below is set from the event, which is why UserOwnedSaveInterceptor's
-        // "already set" escape hatch exists.
+        // IgnoreQueryFilters: a consumer has no request user and writes for the user the event names.
         var position = await db.Positions
             .IgnoreQueryFilters()
             .SingleOrDefaultAsync(p => p.AssetId == message.AssetId, cancellationToken);
@@ -82,12 +66,10 @@ public sealed class AssetPositionChangedConsumer(
             position.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
-        // Saved first so the revaluation's read of the portfolio's positions sees this one — still
-        // inside the inbox transaction, so both commit or neither does (ADR-012).
+        // Saved first so the revaluation reads this position, inside the same inbox transaction.
         await db.SaveChangesAsync(cancellationToken);
 
-        // Only an archived portfolio skips the revaluation. An asset archive or restore revalues today,
-        // so its line leaves or rejoins today's snapshot — earlier dates stay (asset-archive).
+        // Only an archived portfolio skips revaluation; an asset archive or restore revalues today.
         if (message.PortfolioIsArchived)
         {
             return;

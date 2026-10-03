@@ -11,13 +11,8 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests.Fixtures;
 
-/// <summary>
-/// Arrange helpers for tests that run the production scheduler registration (<c>AddPriceSyncJob</c>)
-/// against a brand-new database, so Quartz's own schema provisioning is observable.
-/// </summary>
 internal static class FreshQuartzHost
 {
-    /// <summary>Creates an empty database on the test Postgres, applies the EF migrations and returns its connection string.</summary>
     public static async Task<string> CreateMigratedDatabaseAsync(SkarbiecContainersFixture containers, CancellationToken cancellationToken)
     {
         var name = $"quartz_{Guid.NewGuid():N}";
@@ -52,11 +47,7 @@ internal static class FreshQuartzHost
         return tables;
     }
 
-    /// <summary>
-    /// Waits for the host's scheduler to reach <see cref="SchedulerStatus.Running"/>. Quartz 4's hosted
-    /// service starts it once the application has started (<c>AwaitApplicationStarted</c>), which is
-    /// after <c>IHost.StartAsync</c> returns, so the status has to be awaited rather than read once.
-    /// </summary>
+    // Quartz 4 starts the scheduler only after the application has started, so the status has to be awaited.
     public static async Task<IScheduler> WaitForRunningSchedulerAsync(IHost host, CancellationToken cancellationToken)
     {
         var scheduler = await host.Services.GetRequiredService<ISchedulerFactory>().GetScheduler(cancellationToken);
@@ -69,7 +60,6 @@ internal static class FreshQuartzHost
         return scheduler;
     }
 
-    /// <summary>Builds (does not start) a host that registers the scheduler exactly as production does.</summary>
     public static IHost BuildSchedulerHost(SkarbiecContainersFixture containers, string marketDataConnectionString)
     {
         var builder = Host.CreateApplicationBuilder();

@@ -10,13 +10,6 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// T2.8 AC: a custom instrument (Features/AddCustomInstrument) ends in a visible Verified/Failed
-/// state — never stuck Unverified, never a 500 — once its <see cref="HistoryBackfillJob"/> run (T2.7)
-/// completes. <see cref="HistoryBackfillJobTests"/> covers the job's original range/FX/idempotency
-/// behavior for already-known-good instruments; this file covers only the verification-status
-/// transition T2.8 added on top of it.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -48,8 +41,6 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        // spec-04 design decision 6: HistoryBackfillJob no longer touches FX at all — a PLN or a
-        // non-PLN instrument's backfill both only ever depend on the instrument's own fetch outcome.
         var instrument = NewUnverifiedInstrument("BOGUS.PL", PriceSource.Stooq, "PLN");
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
@@ -58,7 +49,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
             PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Error("malformed Stooq history payload: unrecognized header"));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
-        await job.RunAsync(instrument.Id, cancellationToken); // must not throw — same "no 500" contract as the request path.
+        await job.RunAsync(instrument.Id, cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
         Assert.Equal(InstrumentVerificationStatus.Failed, stored.VerificationStatus);
@@ -86,9 +77,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
     [Fact]
     public async Task RunAsync_AlreadyVerifiedInstrument_ErrorFetch_StaysVerified()
     {
-        // Guards T2.9's future reuse of the same trigger for "instrument's first attach to an asset":
-        // a catalog instrument that's already Verified must never flip to Failed just because one
-        // backfill run had a hiccup — only a genuinely Unverified (custom, T2.8) instrument resolves.
+        // A Verified catalog instrument must never flip to Failed over one bad backfill run.
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
@@ -98,7 +87,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
             Ticker = "CDR.PL",
             Name = "CD Projekt",
             Source = PriceSource.Stooq,
-            QuoteCurrency = "PLN", // PLN-quoted: skips FX backfill, see the note above.
+            QuoteCurrency = "PLN",
             AssetClass = AssetClass.Stock,
             VerificationStatus = InstrumentVerificationStatus.Verified,
         };

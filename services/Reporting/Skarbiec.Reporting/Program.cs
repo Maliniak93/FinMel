@@ -14,10 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddServiceOpenApi();
 
-// T2.12: GetNetWorthHistory resolves the 1M/1Y/YTD range boundaries against "today" (and since
-// spec-07, PortfolioSnapshotWriter picks the date the position events revalue) — same
-// TimeProvider.System registration MarketData's Quartz jobs use, so tests can inject a fake later
-// without touching production wiring.
+// Registered so a test can swap in a fake clock.
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<GetDashboardHandler>();
@@ -25,21 +22,15 @@ builder.Services.AddScoped<GetNetWorthHistoryHandler>();
 
 if (!OpenApiBuildTime.IsActive)
 {
-    // Plain scoped AddDbContext, not Aspire's AddNpgsqlDbContext — that helper always pools
-    // (AddDbContextPool), which can't take the constructor-injected, request-scoped ICurrentUser
-    // ReportingDbContext needs for tenancy (ADR-006).
+    // Not AddNpgsqlDbContext: it always pools, and a pooled context cannot take the request-scoped ICurrentUser.
     var reportingConnectionString = builder.Configuration.GetConnectionString("reporting-db")
         ?? throw new InvalidOperationException("Missing connection string 'reporting-db'.");
     builder.Services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(reportingConnectionString));
 
-    // spec-07: the one valuation writer, shared by the DailyPricesSynced consumer and the position
-    // event consumers that revalue today's snapshot. Scoped, so it gets the consume scope's DbContext.
+    // Scoped, so it gets the consume scope's DbContext.
     builder.Services.AddScoped<PortfolioSnapshotWriter>();
 
-    // Consumes DailyPricesSynced (published by MarketData, T2.10) plus Portfolio's position and
-    // portfolio-lifecycle events (spec-02/spec-03), each through the T0.12 idempotent inbox
-    // template. Arity-1 AddConsumer<T> with the definition as a Type — the two-generic form doesn't
-    // compile here (.claude/rules/messaging.md).
+    // Arity-1 AddConsumer<T> with the definition as a Type: the two-generic form does not compile.
     builder.AddRabbitMqMessaging<WebApplicationBuilder, ReportingDbContext>(
         configureConsumers: x =>
         {
@@ -51,8 +42,7 @@ if (!OpenApiBuildTime.IsActive)
             x.AddConsumer<PortfolioDeletedConsumer>(typeof(PortfolioDeletedConsumerDefinition));
         });
 
-    // The one surviving cross-service REST call (ADR-021): the daily prices/FX batch, sent to
-    // MarketData's /internal endpoints with no token (ADR-027).
+    // The daily prices and FX batch, sent to MarketData's /internal endpoints with no token.
     builder.Services.AddHttpClient<IPriceQuoteClient, MarketDataPriceClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");

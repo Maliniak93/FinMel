@@ -26,8 +26,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             refreshToken.HasIndex(t => t.UserId);
         });
 
-        // MassTransit EF Outbox (T0.10, ADR-012): the bus outbox writes here in the same
-        // SaveChanges call as the business entities above, so both commit atomically.
         builder.AddInboxStateEntity();
         builder.AddOutboxMessageEntity();
         builder.AddOutboxStateEntity();

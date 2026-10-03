@@ -11,9 +11,7 @@ using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
-// Registration is the endpoint under test here, so these facts post to RegisterUri directly
-// instead of going through IdentityApi.RegisterAsync — that helper asserts 201 Created, which is
-// exactly what the weak-password, malformed-email and duplicate cases below need to observe.
+// Registration is under test, so these facts post to RegisterUri directly: IdentityApi.RegisterAsync asserts 201.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {

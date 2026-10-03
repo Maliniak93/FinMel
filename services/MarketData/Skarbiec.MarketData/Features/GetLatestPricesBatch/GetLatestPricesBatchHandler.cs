@@ -3,11 +3,6 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Features.GetLatestPricesBatch;
 
-/// <summary>
-/// Backs Reporting's valuation consumer (T2.11) — same "latest row per instrument via the
-/// (InstrumentId, Date) unique index" shape as SearchInstruments, but bounded by an explicit
-/// AsOfDate instead of always taking the newest quote ever seen.
-/// </summary>
 public sealed class GetLatestPricesBatchHandler(MarketDataDbContext dbContext)
 {
     public async Task<LatestPricesBatchResponse> HandleAsync(LatestPricesBatchRequest request, CancellationToken cancellationToken)

@@ -12,17 +12,12 @@
     <PackageVersion Include="xunit.v3.extensibility.core" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
 
-    <!-- Skarbiec.ServiceDefaults (T0.3) -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
-    <!-- Skarbiec.ServiceDefaults (T1.7): built-in OpenAPI generation, no Swashbuckle -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
-    <!-- Pinned above the 2.0.0 Microsoft.AspNetCore.OpenApi 10.0.10 pulls in transitively — NU1903
-         (audit-as-error) flags it for GHSA-v5pm-xwqc-g5wc (stack-overflow DoS parsing a circular
-         schema reference), patched from 2.7.5 onward. -->
+    <!-- Pinned above the transitive 2.0.0, which NU1903 flags for GHSA-v5pm-xwqc-g5wc. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="2.12.2" />
-    <!-- Build-time OpenAPI document generation (spec-00-hygiene): GetDocument.Insider, no running
-         Aspire stack needed for `gen:api`. -->
+    <!-- Build-time OpenAPI generation, so gen:api needs no running stack. -->
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.10.0" />
@@ -32,56 +27,40 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.19.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
 
-    <!-- Skarbiec.AppHost (T0.4) -->
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.6.0" />
 
-    <!-- Skarbiec.Identity (T0.5) -->
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.6.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
 
-    <!-- Skarbiec.Identity.Tests (T0.6) -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
 
-    <!-- Skarbiec.Identity (T0.7) -->
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
 
-    <!-- Skarbiec.Testing (T0.9) -->
     <PackageVersion Include="Testcontainers.RabbitMq" Version="4.15.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
 
-    <!-- Messaging: MassTransit v8 + EF Outbox (T0.10, ADR-012 — pinned to v8, no v9 upgrade) -->
+    <!-- Pinned to MassTransit v8: no v9 upgrade. -->
     <PackageVersion Include="MassTransit" Version="8.5.10" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.10" />
     <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.5.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
 
-    <!-- Portfolio/MarketData/Strategy/Reporting skeletons (T0.13) — pinned explicitly because
-         Aspire.Npgsql.EntityFrameworkCore.PostgreSQL's own transitive floor for this package
-         (10.0.8) otherwise conflicts with the 10.0.10 family pinned above. -->
+    <!-- Pinned explicitly: Aspire's Npgsql EF package otherwise pulls an older floor that conflicts. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
 
-    <!-- Portfolio/Strategy/Reporting (T0.13): registered via plain AddDbContext, not Aspire's
-         AddNpgsqlDbContext — that helper hardcodes DbContext pooling, which is incompatible with
-         constructor-injecting the request-scoped ICurrentUser these three contexts need for
-         tenancy (ADR-006). MarketData has no such dependency and keeps the Aspire helper. -->
+    <!-- For the services on plain AddDbContext: Aspire's helper always pools, which cannot take the request-scoped ICurrentUser. -->
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
 
-    <!-- Architecture tests (T0.14) -->
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
 
-    <!-- Skarbiec.Gateway (T0.15): YARP + Aspire service discovery destination resolver -->
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.10.0" />
 
-    <!-- MarketData PriceSyncJob (T2.6): Postgres-backed persistent store so schedule/state survive
-         restarts, clustered so two live instances never run the same fire concurrently (ADR-007).
-         Quartz 4 carries DI, hosting and System.Text.Json serialization itself and provisions its own
-         job-store schema (ProvisionSchema(), schema "quartz") at scheduler start — never modelled in EF.
-         The scheduler health check ships in Quartz itself; Quartz.AspNetCore 4.x is only the HTTP API. -->
+    <!-- Quartz 4 carries DI, hosting, System.Text.Json serialization and the health check itself; Quartz.AspNetCore is only the HTTP API. -->
     <PackageVersion Include="Quartz" Version="4.3.0" />
   </ItemGroup>
 

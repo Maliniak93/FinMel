@@ -9,10 +9,6 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Testing.Auth;
 
-/// <summary>
-/// Mints JWTs for arbitrary <c>UserId</c>s using a service's own test-host signing key, so tenancy
-/// tests (T0.14) can act as "user B" without going through registration/login.
-/// </summary>
 public static class TestJwtIssuer
 {
     public static string Issue(JwtOptions options, Guid userId, IEnumerable<Claim>? extraClaims = null, TimeSpan? lifetime = null)
@@ -40,11 +36,6 @@ public static class TestJwtIssuer
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    /// <summary>
-    /// Convenience overload that reads the test host's own <see cref="JwtOptions"/> (signing key,
-    /// issuer, audience) so the minted token validates against that same host without the caller
-    /// needing to know its configuration.
-    /// </summary>
     public static string IssueAccessToken<TProgram>(
         this SkarbiecApiFactory<TProgram> factory, Guid userId, IEnumerable<Claim>? extraClaims = null, TimeSpan? lifetime = null)
         where TProgram : class

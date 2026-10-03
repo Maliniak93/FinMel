@@ -19,7 +19,7 @@ public sealed class QuartzSchemaProvisioningTests(SkarbiecContainersFixture cont
         // EF migrations alone must not create the Quartz schema.
         Assert.Empty(await FreshQuartzHost.QuartzTablesAsync(connectionString, cancellationToken));
 
-        // Hosts are deliberately not disposed (Quartz.Logging.LogProvider process-wide cache, see PriceSyncSchedulingTests).
+        // Hosts are deliberately not disposed, see PriceSyncSchedulingTests.
         var first = FreshQuartzHost.BuildSchedulerHost(_containers, connectionString);
         await first.StartAsync(cancellationToken);
         try
@@ -39,7 +39,7 @@ public sealed class QuartzSchemaProvisioningTests(SkarbiecContainersFixture cont
         }
 
         var second = FreshQuartzHost.BuildSchedulerHost(_containers, connectionString);
-        await second.StartAsync(cancellationToken); // must validate the existing schema without throwing.
+        await second.StartAsync(cancellationToken);
         try
         {
             var scheduler = await FreshQuartzHost.WaitForRunningSchedulerAsync(second, cancellationToken);

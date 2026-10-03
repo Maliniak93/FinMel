@@ -15,14 +15,7 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// End-to-end (spec-03 AC8-12): <c>DailyPricesSynced</c> in, <see cref="AssetValuation"/> lines and
-/// <see cref="ValuationSnapshot"/> rows out — computed from Reporting's own local <see cref="Position"/>
-/// table, never Portfolio over REST (ADR-021). No <c>IPositionsClient</c> is registered in this
-/// container at all: the AC8 fact this class proves is precisely that the consumer no longer needs
-/// one. Builds its own provider (no HTTP host needed) on a queue name unique to this test class,
-/// mirroring <c>AssetPositionChangedConsumerTests</c>.
-/// </summary>
+// No positions client is registered at all: values come from the local Position table alone.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -68,7 +61,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             var snapshotB = await WaitForSnapshotAsync(provider, portfolioBId, snapshotDate, cancellationToken);
 
             Assert.Equal(userAId, snapshotA.UserId);
-            Assert.Equal(1_500m, snapshotA.TotalPln); // 10 units x 150 PLN, same-day quote.
+            Assert.Equal(1_500m, snapshotA.TotalPln);
 
             Assert.Equal(userBId, snapshotB.UserId);
             Assert.Equal(300_000m, snapshotB.TotalPln);
@@ -95,8 +88,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
-            // No snapshot to wait on for a portfolio that must never get one — give the consumer a
-            // full run's worth of time before asserting none appeared.
+            // Nothing to wait on for a portfolio that must never get a snapshot, so give the consumer a full run's time.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             await using var scope = provider.CreateAsyncScope();
@@ -109,10 +101,6 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// asset-archive AC-9: a daily price sync skips an archived position — no line for it, and the
-    /// portfolio's snapshot totals only the live one (the live position is the positive control).
-    /// </summary>
     [Fact]
     public async Task Consume_SkipsArchivedAssets()
     {
@@ -287,12 +275,10 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
             await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
 
-            // Redeliver: same MessageId, same content. The inbox (InboxState, keyed on MessageId +
-            // ConsumerId) must recognize it and skip the consumer body entirely.
+            // Same MessageId: the inbox must skip the consumer body.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
 
-            // No signal to wait on for "it was skipped" — give a genuine redelivery time to land
-            // before asserting it never did.
+            // Nothing signals a skip, so give a redelivery time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             await using var scope = provider.CreateAsyncScope();
@@ -310,10 +296,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
-    /// <summary>spec-04 AC21: an Fx-kind DailyPricesSynced recomputes exactly as a Prices-kind one
-    /// does (design decision 8) — both kinds trigger a snapshot recompute, never just one per day, and
-    /// the consumer's existing (PortfolioId, Date) upsert keeps a same-day Prices-then-Fx pair
-    /// idempotent regardless of which kind arrives second.</summary>
+    // Both kinds recompute, and the (PortfolioId, Date) upsert keeps a same-day pair idempotent.
     [Fact]
     public async Task Consume_FxKind_RecomputesSnapshots()
     {
@@ -348,11 +331,10 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
             var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
 
-            Assert.Equal(430m, snapshot.TotalPln); // 100 EUR x 4.30 EURPLN.
+            Assert.Equal(430m, snapshot.TotalPln);
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC10: every price and rate the sync fetched is kept locally, so the position-event path can value with it later.</summary>
     [Fact]
     public async Task Consume_StoresLatestPricesAndFxRatesLocally()
     {
@@ -399,7 +381,6 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC10: a run returning an older quote/rate than the one stored (e.g. a manual rerun for a past day) never regresses the local copy.</summary>
     [Fact]
     public async Task Consume_OlderQuoteDoesNotOverwriteNewerLocalRate()
     {

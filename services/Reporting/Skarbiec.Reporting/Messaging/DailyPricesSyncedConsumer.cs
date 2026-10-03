@@ -7,30 +7,7 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-/// <summary>
-/// On <see cref="DailyPricesSynced"/> (T2.10), recomputes every user's <see cref="ValuationSnapshot"/>
-/// and its <see cref="AssetValuation"/> lines for every portfolio (E5, ADR-015). Positions come from
-/// Reporting's own <see cref="Position"/> read model, fed by Portfolio's events (spec-03, ADR-021) —
-/// the only remaining cross-service call is the prices/FX batch to MarketData's <c>/internal</c>
-/// endpoints, sent with no token (ADR-027). Idempotent via the inbox template (T0.12, applied through
-/// <see cref="DailyPricesSyncedConsumerDefinition"/>) plus the upsert-by-(PortfolioId, Date) and
-/// -(AssetId, Date) unique indexes — a redelivery or a manual rerun overwrites the same rows.
-/// Both <see cref="PriceSyncKind"/> values recompute identically (spec-04 design decision 8): a
-/// same-day Prices run followed by an Fx run simply overwrites that day's rows with fresher inputs.
-/// Since spec-07 it also keeps every fetched price and rate in <see cref="LatestInstrumentPrice"/> /
-/// <see cref="LatestFxRate"/>, and the per-portfolio upsert lives in <see cref="PortfolioSnapshotWriter"/>,
-/// shared with the position-event path that revalues today from those local rows (ADR-025).
-/// </summary>
-/// <remarks>
-/// Isolation mirrors <c>PriceSyncJob</c> (same "one bad input doesn't stop the rest" philosophy):
-/// one portfolio's own computation failing (caught below) doesn't abort the others in the same
-/// message, and nothing is written to the DB for it until it succeeds — so no failed statement ever
-/// reaches Postgres to poison the single ambient transaction the EF outbox wraps this consume in
-/// (no savepoints are available to recover mid-transaction otherwise). A total failure to reach
-/// MarketData at all is a different failure mode — there's nothing to compute for anyone — so it's
-/// deliberately left to propagate and let the inbox's retry policy (<c>UseMessageRetry</c>) recover
-/// once the dependency is back, same as any other transient fault.
-/// </remarks>
+// A failed portfolio stays out of the database so it never poisons the outbox transaction; failing to reach MarketData propagates for the retry.
 public sealed class DailyPricesSyncedConsumer(
     ReportingDbContext db,
     IPriceQuoteClient priceQuoteClient,
@@ -42,10 +19,7 @@ public sealed class DailyPricesSyncedConsumer(
         var snapshotDate = context.Message.SyncDate;
         var cancellationToken = context.CancellationToken;
 
-        // Bypasses the tenancy filter deliberately (IgnoreQueryFilters): this consumer has no
-        // single current user to filter by, and it values every user's portfolios in one pass by
-        // design. Archived portfolios are excluded from valuation, same as before spec-03 — their
-        // last snapshot simply stays where it was. So are archived assets (asset-archive).
+        // IgnoreQueryFilters: this consumer values every user's portfolios in one pass; archived ones are excluded.
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
@@ -64,11 +38,13 @@ public sealed class DailyPricesSyncedConsumer(
         await RememberLatestPricesAsync(pricesByInstrument, cancellationToken);
         await RememberLatestFxRatesAsync(fxRatesByPair, cancellationToken);
 
+        // IgnoreQueryFilters: the sync date's snapshots of every user are upserted in this one pass.
         var existingSnapshots = await db.ValuationSnapshots
             .IgnoreQueryFilters()
             .Where(s => s.Date == snapshotDate)
             .ToDictionaryAsync(s => s.PortfolioId, cancellationToken);
 
+        // IgnoreQueryFilters: the sync date's lines of every user are upserted in this one pass.
         var existingLines = await db.AssetValuations
             .IgnoreQueryFilters()
             .Where(l => l.Date == snapshotDate)
@@ -134,12 +110,7 @@ public sealed class DailyPricesSyncedConsumer(
             : await priceQuoteClient.GetLatestFxRatesAsync(pairs, snapshotDate, cancellationToken);
     }
 
-    /// <summary>
-    /// spec-07: keeps every fetched close in <see cref="LatestInstrumentPrice"/> so the position-event
-    /// path can value with it later. Only moves forward — a run returning an older quote than the
-    /// stored one (a rerun for a past day) leaves the stored row alone. Staged, not saved: it commits
-    /// with this consume's one <c>SaveChangesAsync</c>.
-    /// </summary>
+    // Only moves forward: an older quote from a rerun leaves the stored row alone.
     private async Task RememberLatestPricesAsync(
         IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument, CancellationToken cancellationToken)
     {
@@ -174,7 +145,7 @@ public sealed class DailyPricesSyncedConsumer(
         }
     }
 
-    /// <summary>spec-07: the <see cref="LatestFxRate"/> twin of <see cref="RememberLatestPricesAsync"/> — same forward-only rule, pairs stored in canonical uppercase.</summary>
+    // The same forward-only rule, with pairs in canonical uppercase.
     private async Task RememberLatestFxRatesAsync(
         IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair, CancellationToken cancellationToken)
     {

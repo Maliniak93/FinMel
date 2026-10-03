@@ -11,7 +11,7 @@ public sealed class LogoutHandler(IdentityDbContext dbContext)
     {
         if (string.IsNullOrEmpty(rawRefreshToken))
         {
-            // Nothing to revoke — logging out without a session is a no-op, not an error.
+            // Logging out without a session is a no-op, not an error.
             return Result.Success();
         }
 

@@ -13,13 +13,7 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// <c>AssetPositionChanged</c> in, <see cref="Position"/> upserted by <c>AssetId</c> — idempotently
-/// and never regressed by an out-of-order redelivery (spec-03 AC1-4) — and, since spec-07, today's
-/// <see cref="AssetValuation"/> lines and <see cref="ValuationSnapshot"/> of the event's portfolio
-/// revalued from Reporting's locally stored last prices and FX rates (spec-07 AC1-7). Builds its own
-/// provider (no HTTP host needed) on a queue name unique to this test class.
-/// </summary>
+// Builds its own provider, with no HTTP host, on a queue unique to this class.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -104,7 +98,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>spec-03 AC3, extended by spec-07 AC5: a dropped stale-version event must not touch today's valuation either.</summary>
     [Fact]
     public async Task Consume_LowerVersionThanStored_IgnoresStaleEvent()
     {
@@ -124,8 +117,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
 
             await bus.Publish(Event(assetId, portfolioId, userId, quantity: 1m, version: 4), cancellationToken);
 
-            // No signal to wait on for "it was ignored" — give a genuine (mis-ordered) delivery time
-            // to land before asserting the stored row was left untouched.
+            // Nothing signals an ignored event, so give it time to land before asserting nothing changed.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             await using var scope = provider.CreateAsyncScope();
@@ -145,7 +137,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>spec-03 AC4, extended by spec-07 AC6: a redelivery leaves exactly one line per asset and one snapshot for today.</summary>
     [Fact]
     public async Task Consume_SameMessageIdTwice_AppliesOnce()
     {
@@ -165,12 +156,10 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             await WaitForPositionAsync(provider, assetId, cancellationToken);
             await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken);
 
-            // Redeliver: same MessageId, same content. The inbox (InboxState, keyed on MessageId +
-            // ConsumerId) must recognize it and skip the consumer body entirely.
+            // Same MessageId: the inbox must skip the consumer body.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
 
-            // No signal to wait on for "it was skipped" — give a genuine redelivery time to land
-            // before asserting it never did.
+            // Nothing signals a skip, so give a redelivery time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             await using var scope = provider.CreateAsyncScope();
@@ -194,7 +183,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC1.</summary>
     [Fact]
     public async Task Consume_PlnCash_WritesTodaysLineAndSnapshot()
     {
@@ -224,7 +212,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC2: a foreign currency is converted with the locally stored last FX rate, never a REST call.</summary>
     [Fact]
     public async Task Consume_ForeignCash_ValuesWithLatestLocalFxRate()
     {
@@ -254,7 +241,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC3 / design decision 3: no local price means a zero-valued stale line, and the snapshot turns stale.</summary>
     [Fact]
     public async Task Consume_InstrumentWithoutLocalPrice_WritesZeroStaleLine()
     {
@@ -295,7 +281,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC4: only the event's portfolio is revalued — another portfolio's today rows stay exactly as they were, even when they disagree with its positions.</summary>
     [Fact]
     public async Task Consume_RevaluesOnlyTheEventsPortfolio()
     {
@@ -315,8 +300,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             await db.SeedValuationLineAsync(userId, portfolioAId, assetAId, today, 100m, cancellationToken, quantity: 100m);
             await db.SeedSnapshotAsync(userId, portfolioAId, today, 100m, cancellationToken);
 
-            // B's position says 5 000 PLN but its rows for today say 777: any revaluation of B would
-            // be visible as 5 000.
+            // B's position says 5 000 PLN but its rows for today say 777, so any revaluation of B would show as 5 000.
             await db.SeedPositionAsync(assetBId, userId, portfolioBId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 5_000m);
             await db.SeedValuationLineAsync(userId, portfolioBId, assetBId, today, 777m, cancellationToken, quantity: 777m);
@@ -340,11 +324,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// spec-07 AC7: an archived portfolio's last snapshot stays put. A second, non-archived portfolio
-    /// consumed afterwards on the same queue is the positive control — it proves the revaluation
-    /// path is live, so "no rows" for the archived one means "skipped", not "never implemented".
-    /// </summary>
+    // The non-archived portfolio consumed afterwards is the positive control: the revaluation path is live.
     [Fact]
     public async Task Consume_ArchivedPortfolio_DoesNotRevalue()
     {
@@ -365,8 +345,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Event(archivedAssetId, archivedPortfolioId, userId, quantity: 1_000m, version: 0, portfolioIsArchived: true),
                 cancellationToken);
 
-            // The position upsert and any revaluation commit in one transaction, so once the
-            // position is visible the whole consume has finished.
+            // The upsert and any revaluation commit together, so a visible position means the consume has finished.
             await WaitForPositionAsync(provider, archivedAssetId, cancellationToken);
 
             await bus.Publish(Event(controlAssetId, controlPortfolioId, userId, quantity: 50m, version: 0), cancellationToken);
@@ -377,11 +356,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// asset-archive AC-9: an event with <c>IsArchived = true</c> revalues today without that asset —
-    /// today's snapshot totals only B and A has no line today — while yesterday's snapshot and line are
-    /// never touched.
-    /// </summary>
     [Fact]
     public async Task Consume_ArchivedAsset_DropsOutOfToday()
     {
@@ -421,7 +395,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
-    /// <summary>asset-archive AC-9: a later event with <c>IsArchived = false</c> brings the asset's line back — today totals A + B again.</summary>
     [Fact]
     public async Task Consume_RestoredAsset_RejoinsToday()
     {

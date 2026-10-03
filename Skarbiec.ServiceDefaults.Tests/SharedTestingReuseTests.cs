@@ -6,10 +6,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.ServiceDefaults.Tests;
 
-// A second, independent proof of T0.9's reuse AC alongside Skarbiec.Identity.Tests: this project
-// never references Identity, yet gets a working containers fixture and JWT test-auth helper for
-// free from Skarbiec.Testing. No ResetDatabaseAsync call here — the Sample host has no EF/DB
-// schema of its own (nothing to reset); that path is already exercised by Identity.Tests.
+// Never references Identity, yet gets a containers fixture and JWT helper from Skarbiec.Testing; there is no database to reset.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SharedTestingReuseTests(SkarbiecContainersFixture containers) : IAsyncDisposable
 {

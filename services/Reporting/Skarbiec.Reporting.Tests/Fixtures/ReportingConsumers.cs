@@ -11,21 +11,9 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
-/// <summary>
-/// Bare-provider harness for Reporting's consumer tests: no HTTP host (a consumer only touches
-/// <see cref="ReportingDbContext"/>), a live RabbitMQ bus, and the same service registrations the
-/// consumers get from <c>Program.cs</c>. Each test class registers its own consumer(s) under a queue
-/// name unique to that class — queues are durable and outlive one class on the shared broker.
-/// </summary>
-/// <remarks>
-/// spec-07: <c>AssetPositionChangedConsumer</c>, <c>AssetRemovedConsumer</c>,
-/// <c>PortfolioRestoredConsumer</c> and <c>DailyPricesSyncedConsumer</c> all revalue through the
-/// shared <see cref="PortfolioSnapshotWriter"/> and resolve "today" from <see cref="TimeProvider"/>,
-/// so every provider built here registers both — one place instead of four drifting copies.
-/// </remarks>
+// Each test class registers its consumers under its own queue name: queues are durable and outlive one class on the shared broker.
 internal static class ReportingConsumers
 {
-    /// <summary>Today as the event path sees it: the UTC date, matching <c>DailyPricesSynced.SyncDate</c> (spec-07 design decision 2).</summary>
     public static DateOnly Today => DateOnly.FromDateTime(TimeProvider.System.GetUtcNow().UtcDateTime);
 
     public static ServiceProvider BuildProvider(
@@ -39,10 +27,7 @@ internal static class ReportingConsumers
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<PortfolioSnapshotWriter>();
 
-        // No HTTP request in this bare provider (same as production: a MassTransit consumer has no
-        // HttpContext) — consumers never read ICurrentUser.UserId (writes set UserId explicitly from
-        // the event, reads use IgnoreQueryFilters), but ReportingDbContext's constructor still needs
-        // some implementation to satisfy DI. DesignTimeCurrentUser's UserId is Guid.Empty, not a throw.
+        // Consumers never read ICurrentUser.UserId, but ReportingDbContext's constructor needs an implementation.
         services.AddSingleton<ICurrentUser, DesignTimeCurrentUser>();
 
         services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
@@ -51,9 +36,7 @@ internal static class ReportingConsumers
         {
             x.SetKebabCaseEndpointNameFormatter();
 
-            // No UseBusOutbox() here: these tests only exercise the consumer-side inbox, never
-            // IBus/IPublishEndpoint from a DI scope, so the producer-side bus outbox and its
-            // background delivery poller would be dead weight.
+            // No UseBusOutbox(): only the consumer-side inbox is under test.
             x.AddEntityFrameworkOutbox<ReportingDbContext>(o => o.UsePostgres());
 
             configureConsumers(x);
@@ -69,7 +52,6 @@ internal static class ReportingConsumers
         return services.BuildServiceProvider();
     }
 
-    /// <summary>Applies Reporting's migrations and wipes the shared database — call from a consumer test class's <c>InitializeAsync</c>.</summary>
     public static async Task MigrateAndResetAsync(SkarbiecContainersFixture containers)
     {
         await using (var db = OpenDbContext(containers))
@@ -80,7 +62,6 @@ internal static class ReportingConsumers
         await containers.ResetDatabaseAsync();
     }
 
-    /// <summary>A plain <see cref="ReportingDbContext"/> for arranging rows and reading results — callers use <c>IgnoreQueryFilters</c> to read across users.</summary>
     public static ReportingDbContext OpenDbContext(SkarbiecContainersFixture containers)
     {
         var options = new DbContextOptionsBuilder<ReportingDbContext>()
@@ -90,7 +71,6 @@ internal static class ReportingConsumers
         return new ReportingDbContext(options, new DesignTimeCurrentUser());
     }
 
-    /// <summary>Builds a provider, starts its bus, runs <paramref name="action"/> and stops the bus again.</summary>
     public static async Task RunAsync(
         SkarbiecContainersFixture containers,
         Action<IBusRegistrationConfigurator> configureConsumers,
@@ -108,8 +88,7 @@ internal static class ReportingConsumers
 
         try
         {
-            // A publish fired immediately after StartAsync can race the exchange->queue binding on
-            // a fresh queue and be dropped.
+            // StartAsync does not wait for RabbitMQ to apply the bindings, so a publish right after it could be dropped.
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
             await action(provider);
@@ -123,10 +102,6 @@ internal static class ReportingConsumers
         }
     }
 
-    /// <summary>
-    /// Polls <paramref name="probe"/> (each attempt on a fresh DbContext) until it yields a value
-    /// satisfying <paramref name="predicate"/>, or throws <see cref="TimeoutException"/> after 15 s.
-    /// </summary>
     public static async Task<T> WaitForAsync<T>(
         IServiceProvider provider,
         Func<ReportingDbContext, CancellationToken, Task<T>> probe,
@@ -210,7 +185,6 @@ internal static class ReportingConsumers
         return snapshot!;
     }
 
-    /// <summary>Every <see cref="AssetValuation"/> line of <paramref name="portfolioId"/> on <paramref name="date"/>, across users.</summary>
     public static async Task<List<AssetValuation>> GetLinesAsync(
         SkarbiecContainersFixture containers, Guid portfolioId, DateOnly date, CancellationToken cancellationToken)
     {
@@ -220,7 +194,6 @@ internal static class ReportingConsumers
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>The <see cref="ValuationSnapshot"/> of <paramref name="portfolioId"/> on <paramref name="date"/>, or <c>null</c>.</summary>
     public static async Task<ValuationSnapshot?> GetSnapshotAsync(
         SkarbiecContainersFixture containers, Guid portfolioId, DateOnly date, CancellationToken cancellationToken)
     {

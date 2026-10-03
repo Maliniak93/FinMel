@@ -4,25 +4,7 @@ using Skarbiec.ServiceDefaults.Authentication;
 
 namespace Skarbiec.ServiceDefaults.Tenancy;
 
-/// <summary>
-/// Stamps <see cref="IUserOwned.UserId"/> from the current JWT on every newly-added user-owned
-/// entity that doesn't already carry one (ADR-006) — never from request input. Register per
-/// <see cref="DbContext"/> instance via constructor-injected <see cref="ICurrentUser"/> and
-/// <c>optionsBuilder.AddInterceptors(...)</c> in <c>OnConfiguring</c>, since this interceptor needs
-/// the request-scoped current user and can't be a shared singleton.
-/// </summary>
-/// <remarks>
-/// The "already set" escape hatch (T2.11) is for system-context writers with no single request
-/// user to read from <see cref="ICurrentUser"/>: every Reporting consumer runs that way, since a
-/// message has no <c>HttpContext</c> and <see cref="ICurrentUser"/>'s <c>UserId</c> is
-/// <see cref="Guid.Empty"/> there. <c>AssetPositionChangedConsumer</c>, <c>AssetRemovedConsumer</c>,
-/// <c>PortfolioArchivedConsumer</c>/<c>PortfolioRestoredConsumer</c> and
-/// <c>PortfolioDeletedConsumer</c> take the <c>UserId</c> straight off the event, and
-/// <c>DailyPricesSyncedConsumer</c> computes snapshots and valuation lines for many users in one
-/// message, taking each row's <c>UserId</c> from the <c>Position</c> read model those events built
-/// (trusted internal source, not a request body — ADR-006's guarantee is unchanged). Every other
-/// call site leaves <c>UserId</c> at its <c>Guid.Empty</c> default and is stamped exactly as before.
-/// </remarks>
+// A UserId already set is kept: consumers have no request user and write the user their event or Position row names.
 public sealed class UserOwnedSaveInterceptor(ICurrentUser currentUser) : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)

@@ -10,11 +10,7 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// HTTP-level behavior of Features/GetInstrument (T2.9). One handler backs two routes (ADR-027):
-/// the public, authorized <c>/api/marketdata/instruments/{id}</c> the SPA reads, and its anonymous
-/// <c>/internal/instruments/{id}</c> twin Portfolio's AddAsset/UpdateAsset call with no token.
-/// </summary>
+// One handler backs the authorized public route and its anonymous /internal twin.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetInstrumentEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {

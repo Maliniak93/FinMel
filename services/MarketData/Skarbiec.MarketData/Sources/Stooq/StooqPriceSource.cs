@@ -3,15 +3,7 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources.Stooq;
 
-/// <summary>
-/// <see cref="IPriceSource"/> over stooq.com's CSV endpoints — EOD quotes for GPW stocks, ETFs and
-/// metals (E4 [M]). <see cref="Instrument.Ticker"/> stores Stooq's own ticker convention directly
-/// (e.g. <c>AAPL.US</c>, <c>CDR.PL</c> — Warsaw Stock Exchange listings use Stooq's own
-/// <c>.PL</c> suffix, not the <c>.WA</c> suffix some other providers/brokers use); no ticker
-/// translation happens here, and no currency inference either — <see cref="Instrument.QuoteCurrency"/>
-/// is trusted as-is (set at instrument creation, T2.1/T2.8) and the parsed <c>Close</c> is stored
-/// unconverted, exactly as Stooq returns it (T2.4 AC: conversion happens at valuation, not ingestion).
-/// </summary>
+// Ticker holds Stooq's own convention (CDR.PL, not CDR.WA), and Close is stored unconverted in QuoteCurrency.
 public sealed class StooqPriceSource(IStooqApiClient client) : IPriceSource
 {
     private const string NoDataMarker = "N/D";
@@ -21,13 +13,7 @@ public sealed class StooqPriceSource(IStooqApiClient client) : IPriceSource
 
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
-    /// <summary>
-    /// Fetches each instrument's latest quote as its own request (T2.4 scope: "per-ticker fetch").
-    /// A single bad ticker — transport failure, malformed row — is excluded rather than failing the
-    /// whole call: the result is <c>Success</c> as long as at least one instrument produced a quote,
-    /// <c>Error</c> only when every instrument failed outright, and <c>NoData</c> when every
-    /// instrument simply had nothing to report (e.g. a market-wide non-trading day).
-    /// </summary>
+    // Success while any instrument got a quote, Error only when every one failed, NoData when none had anything.
     public async Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken)
     {
@@ -90,9 +76,7 @@ public sealed class StooqPriceSource(IStooqApiClient client) : IPriceSource
     private static bool IsTransportFailure(Exception ex, CancellationToken cancellationToken) =>
         ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested;
 
-    // Expected shape: a header line ("Symbol,Date,Time,Open,High,Low,Close,Volume") plus exactly one
-    // data row, since each ticker is its own request. An unknown ticker or a closed market comes back
-    // as a row with "N/D" fields rather than a missing row.
+    // A header plus one row per request; an unknown ticker or a closed market comes back as an N/D row.
     private static PriceFetchResult<InstrumentQuote> ParseLatest(string raw, Guid instrumentId)
     {
         var lines = SplitLines(raw);
@@ -123,9 +107,7 @@ public sealed class StooqPriceSource(IStooqApiClient client) : IPriceSource
         return PriceFetchResult<InstrumentQuote>.Success([new InstrumentQuote(instrumentId, date, close)]);
     }
 
-    // Expected shape: a header line ("Date,Open,High,Low,Close,Volume") plus one row per trading day
-    // in range. An invalid ticker or an empty range comes back as the literal body "No data" instead
-    // of a CSV — Stooq's long-documented no-data signal for this endpoint.
+    // A header plus one row per trading day; an invalid ticker or an empty range comes back as the literal body "No data".
     private static PriceFetchResult<InstrumentQuote> ParseHistory(string raw, Guid instrumentId)
     {
         if (raw.Trim().Equals(NoDataLine, StringComparison.OrdinalIgnoreCase))
@@ -163,8 +145,7 @@ public sealed class StooqPriceSource(IStooqApiClient client) : IPriceSource
     private static List<string> SplitLines(string raw) =>
         raw.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries).ToList();
 
-    // Culture-invariant: Stooq always renders dates/decimals in an invariant format, but the host's
-    // culture must never leak in (T2.4 scope).
+    // Culture-invariant, so the host's culture never leaks into parsing.
     private static bool TryParseDate(string field, out DateOnly date) =>
         DateOnly.TryParseExact(field, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 

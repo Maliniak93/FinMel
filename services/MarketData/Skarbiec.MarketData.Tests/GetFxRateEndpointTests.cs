@@ -8,13 +8,7 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// HTTP-level behavior of Features/GetFxRate (transactions-pln-value-and-fee-removal, ADR-026):
-/// Portfolio's request-path lookup of the <c>{currency}PLN</c> rate a transaction is frozen at. A
-/// service-only <c>/internal</c> endpoint (ADR-027): anonymous, so every fact calls it with no
-/// token, exactly as Portfolio does. Facts call the endpoint directly and assert on the raw
-/// response; the wire shape <c>{ currency, date, rate }</c> is read from the JSON itself.
-/// </summary>
+// An anonymous /internal endpoint, so every fact calls it with no token, as Portfolio does.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class GetFxRateEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -56,10 +50,7 @@ public sealed class GetFxRateEndpointTests(SkarbiecContainersFixture containers)
         Assert.Equal(4.35m, body.RootElement.GetProperty("rate").GetDecimal());
     }
 
-    /// <summary>
-    /// Only a rate <em>after</em> the date exists. The 404 must be the handler's own ProblemDetails
-    /// (ADR-017 <c>NotFound.*</c> error code), not the empty 404 an unmapped route answers with.
-    /// </summary>
+    // The 404 must be the handler's ProblemDetails, not the empty 404 of an unmapped route.
     [Fact]
     public async Task Returns_NotFound_WhenNoRateOnOrBeforeDate()
     {

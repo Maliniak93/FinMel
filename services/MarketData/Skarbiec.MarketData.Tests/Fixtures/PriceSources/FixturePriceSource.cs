@@ -4,12 +4,6 @@ using Skarbiec.MarketData.Sources;
 
 namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
-/// <summary>
-/// Reference <see cref="IPriceSource"/> driven by a recorded raw response instead of a live HTTP
-/// call — proves the tri-state outcome contract (T2.2 AC) end-to-end before any real vendor client
-/// exists. Real sources (T2.3-T2.5) follow the same fetch-then-parse split: a thin HTTP fetch, and a
-/// pure parse method exercised the same way against their own recorded responses.
-/// </summary>
 public sealed class FixturePriceSource(PriceSource source, string rawResponse) : IPriceSource
 {
     public PriceSource Source { get; } = source;

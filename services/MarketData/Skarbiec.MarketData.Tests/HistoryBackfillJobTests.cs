@@ -10,22 +10,13 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// HistoryBackfillJob's business logic (T2.7 AC: ≥1 year backfilled, idempotent re-run; spec-04
-/// design decision 6: FX backfill moved out to <see cref="FxSyncJob"/> entirely, so this job no
-/// longer depends on <see cref="IFxRateSource"/> at all) exercised via
-/// <see cref="HistoryBackfillJob.RunAsync"/> directly — no Quartz scheduler involved, mirroring
-/// <see cref="PriceSyncJobTests"/>. Enqueuing mechanics are covered separately in
-/// <see cref="HistoryBackfillSchedulingTests"/>.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
     private static readonly DateOnly OneYearAgo = Today.AddDays(-365);
 
-    /// <summary>spec-04 AC19: a USD (non-PLN) instrument's backfill still writes only its own quote
-    /// history — no <see cref="FxRate"/> row, which is now FxSyncJob's job alone (design decision 6).</summary>
+    // A USD instrument's backfill writes only its own quotes: FX history is FxSyncJob's alone.
     [Fact]
     public async Task RunAsync_UsdInstrument_BackfillsOneYearOfQuotes_AndWritesNoFxRates()
     {
@@ -49,9 +40,6 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         Assert.Equal(0, await db.FxRates.CountAsync(cancellationToken));
     }
 
-    /// <summary>spec-04 AC19: every HistoryBackfillJob run — including a PLN instrument's, which never
-    /// needed FX in the first place — writes one <see cref="SyncRun"/> with <c>Kind = Backfill</c> so
-    /// all three jobs share one run log (design decision 7).</summary>
     [Fact]
     public async Task RunAsync_WritesSyncRunWithKindBackfill()
     {

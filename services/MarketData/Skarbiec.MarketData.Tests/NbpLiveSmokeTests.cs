@@ -9,15 +9,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// T2.3 AC: "Live smoke (manually run once): today's or last trading day's rates land in
-/// marketdata_db" + "re-running the same day is idempotent (upsert)". Hits the real NBP API over the
-/// network — deliberately <see cref="FactAttribute.Skip"/>-marked so CI (which runs
-/// <c>dotnet test</c> with no filter) never depends on live internet or NBP's availability. Run
-/// locally by temporarily removing <c>Skip</c> and executing:
-/// <c>dotnet test --filter FullyQualifiedName~NbpLiveSmokeTests</c> against a Docker-backed
-/// Testcontainers Postgres.
-/// </summary>
+// Skipped so CI never depends on the live API; remove Skip to run it once locally.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class NbpLiveSmokeTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -40,13 +32,10 @@ public sealed class NbpLiveSmokeTests(SkarbiecContainersFixture containers) : Ma
 
         Assert.True(afterFirstRun.FxRates > 0, "expected at least one live FX rate to land in marketdata_db");
         Assert.True(afterFirstRun.PriceQuotes > 0, "expected the live gold price to land in marketdata_db");
-        Assert.Equal(afterFirstRun, afterSecondRun); // re-running the same day upserts, doesn't duplicate
+        Assert.Equal(afterFirstRun, afterSecondRun);
     }
 
-    // Deliberately minimal, test-only upsert (check-exists-then-add-or-update, same pattern as
-    // MarketDataSeeder) — proves the source's output round-trips through the real (instrument, date)
-    // / (pair, date) unique indexes from T2.1. The scheduled, failure-isolated version of this belongs
-    // to PriceSyncJob (T2.6).
+    // A minimal test-only upsert proving the output round-trips through the real unique indexes.
     private async Task SyncOnceAsync(IFxRateSource fxSource, IPriceSource priceSource, CancellationToken cancellationToken)
     {
         await using var db = CreateDbContext();

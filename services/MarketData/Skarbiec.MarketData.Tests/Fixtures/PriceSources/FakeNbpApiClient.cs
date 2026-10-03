@@ -2,13 +2,6 @@ using Skarbiec.MarketData.Sources.Nbp;
 
 namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
-/// <summary>
-/// Canned <see cref="INbpApiClient"/> driven by a recorded response, a "no data" (404) stand-in, or
-/// a thrown transport exception — the same "swap the fetch, exercise the real parse logic through
-/// the public interface" pattern T2.2's <see cref="FixturePriceSource"/> established, applied to the
-/// real <see cref="NbpPriceSource"/>/<see cref="NbpFxRateSource"/> instead of a throwaway double.
-/// Also counts range-query calls so history-backfill chunking (T2.3 scope) is verifiable.
-/// </summary>
 public sealed class FakeNbpApiClient : INbpApiClient
 {
     private readonly string? _rawResponse;
@@ -22,7 +15,6 @@ public sealed class FakeNbpApiClient : INbpApiClient
 
     public static FakeNbpApiClient WithResponse(string rawResponse) => new(rawResponse, throwOnRequest: null);
 
-    /// <summary>Mirrors <see cref="NbpApiClient"/> translating a live 404 (non-trading day) to <see langword="null"/>.</summary>
     public static FakeNbpApiClient NoData() => new(rawResponse: null, throwOnRequest: null);
 
     public static FakeNbpApiClient ThrowingOnRequest(Exception exception) => new(rawResponse: null, throwOnRequest: exception);

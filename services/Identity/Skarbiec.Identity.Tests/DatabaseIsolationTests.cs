@@ -4,10 +4,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
-// Proves the shared containers fixture actually isolates tests: both facts register the exact
-// same e-mail (no Guid uniquification) and both expect success. If the database reset between
-// tests didn't work, the second fact to run would see a leftover row from the first and get 409
-// Conflict instead of 201 Created (T0.9 AC: "two tests writing the same entity do not interfere").
+// Both facts register the same e-mail and expect 201, so a broken reset between tests fails one with 409.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class DatabaseIsolationTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
@@ -23,7 +20,6 @@ public sealed class DatabaseIsolationTests(SkarbiecContainersFixture containers)
     {
         using var client = Factory.CreateClient();
 
-        // RegisterAsync asserts 201 — the Conflict a broken reset would produce fails right here.
         await client.RegisterAsync(TestContext.Current.CancellationToken, FixedEmail);
     }
 }

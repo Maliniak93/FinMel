@@ -14,17 +14,7 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// HTTP-level behavior of Features/AddCustomInstrument (T2.8 AC, rewired by M1.6/ADR-018 to verify
-/// inline instead of always creating <see cref="InstrumentVerificationStatus.Unverified"/>). The
-/// verification outcome itself comes from <see cref="MarketDataApiFactory.TickerVerifier"/> (a fake —
-/// no live Stooq/CoinGecko call from a test), so these facts prove this handler's own logic: class →
-/// source derivation, the NBP/unsupported-class rejections, the Exists/DoesNotExist/Unreachable →
-/// HTTP mapping, and the AllowUnverified opt-in. The real provider → outcome mapping (Stooq/CoinGecko
-/// payloads → Exists/DoesNotExist/Unreachable) is <c>TickerVerifierTests</c>' job.
-/// <c>Testing:DisableBackgroundJobs</c> registers <see cref="Skarbiec.MarketData.Sources.NoOpHistoryBackfillTrigger"/>
-/// (no live Quartz scheduler here).
-/// </summary>
+// The outcome comes from the factory's fake verifier; TickerVerifierTests cover the real provider mapping.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -89,9 +79,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         Assert.Contains((PriceSource.CoinGecko, "solana"), Factory.TickerVerifier.Calls);
     }
 
-    /// <summary>M1.6 AC: "a crypto id submitted as an ETF does not silently succeed" — the same
-    /// ticker string verifies against Stooq (scripted Exists) but is scripted DoesNotExist against
-    /// CoinGecko, so only the class that actually derives the matching provider succeeds.</summary>
+    // The same ticker verifies against Stooq but not CoinGecko, so only the class that derives Stooq succeeds.
     [Fact]
     public async Task Add_SameTickerString_DifferentClassesRouteToDifferentProviders_CryptoDoesNotSilentlySucceedAsEtf()
     {

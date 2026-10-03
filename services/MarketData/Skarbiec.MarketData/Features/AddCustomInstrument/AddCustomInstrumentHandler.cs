@@ -6,13 +6,6 @@ using Skarbiec.MarketData.Sources.Verification;
 
 namespace Skarbiec.MarketData.Features.AddCustomInstrument;
 
-/// <summary>
-/// Adds a user-supplied instrument to the shared dictionary (E2 [S]), gated by inline ticker
-/// verification (ADR-018, M1.6) instead of T2.8's original always-<see cref="InstrumentVerificationStatus.Unverified"/>-
-/// then-poll flow. The source is derived from <see cref="AddCustomInstrumentRequest.AssetClass"/>
-/// (<see cref="AssetClassPriceSourceMapping"/>) rather than asked for, so an ETF ticker can only ever
-/// be checked against Stooq and a crypto id only against CoinGecko — never the other way round.
-/// </summary>
 public sealed class AddCustomInstrumentHandler(
     MarketDataDbContext dbContext, ITickerVerifier tickerVerifier, IHistoryBackfillTrigger backfillTrigger)
 {
@@ -24,11 +17,7 @@ public sealed class AddCustomInstrumentHandler(
             return InstrumentErrors.UnsupportedAssetClass(request.AssetClass);
         }
 
-        // NBP only serves its own fixed FX-table/gold endpoints (T2.3) — it has no notion of an
-        // arbitrary user-supplied ticker, unlike Stooq/CoinGecko. Only PreciousMetal maps here (the
-        // one real gold instrument is already seeded Verified and reachable via search); this keeps
-        // the rejection meaningful instead of silently trying to "verify" against an endpoint that has
-        // no way to answer an arbitrary ticker.
+        // NBP serves only its fixed endpoints and cannot verify an arbitrary ticker.
         if (source == PriceSource.Nbp)
         {
             return InstrumentErrors.UnsupportedCustomSource(source.Value);

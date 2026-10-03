@@ -10,18 +10,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
-/// <summary>
-/// Proves the shared <see cref="IdempotentConsumerDefinition{TConsumer,TDbContext}"/> template
-/// (T0.12, ADR-012) actually deduplicates by <c>MessageId</c>: redelivering the exact same message
-/// must not run the consumer body twice. Builds its own provider (rather than
-/// <see cref="IdentityApiFactory"/>) with a throwaway counting consumer on a queue name unique to
-/// this test class, mirroring <c>UserRegisteredOutboxDurabilityTests</c>.
-///
-/// Verified once by swapping <see cref="CountingConsumerDefinition"/>'s base to a plain
-/// <c>ConsumerDefinition&lt;CountingConsumer&gt;</c> (no inbox): the test goes red with
-/// <c>ConsumeCount == 2</c>, confirming it actually exercises dedup rather than passing vacuously.
-/// Reverted after confirming; not re-checked on every run.
-/// </summary>
+// Builds its own provider with a counting consumer on a queue unique to this class.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UserRegisteredIdempotentConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -54,12 +43,7 @@ public sealed class UserRegisteredIdempotentConsumerTests(SkarbiecContainersFixt
 
         try
         {
-            // MassTransit's bus StartAsync returns once it has issued the receive endpoint's
-            // queue/bind commands, but doesn't wait for RabbitMQ to have applied them — a publish
-            // fired immediately after can race the exchange->queue binding and be dropped (fanout
-            // exchanges don't hold messages for not-yet-bound queues). A short settle avoids that;
-            // it's a test-harness timing issue, not something a real publisher needs to work around
-            // (production publishes happen long after the consuming service's own startup).
+            // StartAsync does not wait for RabbitMQ to apply the bindings, so a publish right after it could be dropped.
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
             var bus = provider.GetRequiredService<IBus>();
@@ -75,12 +59,10 @@ public sealed class UserRegisteredIdempotentConsumerTests(SkarbiecContainersFixt
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
             await tracker.FirstConsume.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
 
-            // Redeliver: same MessageId, same content. The inbox (InboxState, keyed on
-            // MessageId + ConsumerId) must recognize it and skip the consumer body entirely.
+            // Same MessageId: the inbox must skip the consumer body.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
 
-            // No signal to wait on for "it was skipped" — give a genuine redelivery time to land
-            // before asserting it never did.
+            // Nothing signals a skip, so give a redelivery time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             Assert.Equal(1, tracker.ConsumeCount);
@@ -106,10 +88,7 @@ public sealed class UserRegisteredIdempotentConsumerTests(SkarbiecContainersFixt
         {
             x.SetKebabCaseEndpointNameFormatter();
 
-            // No UseBusOutbox() here: this test only exercises the consumer-side inbox
-            // (UseEntityFrameworkOutbox on the receive endpoint, wired by
-            // IdempotentConsumerDefinition), never IBus/IPublishEndpoint from a DI scope, so the
-            // producer-side bus outbox and its background delivery poller would be dead weight.
+            // No UseBusOutbox(): only the consumer-side inbox is under test.
             x.AddEntityFrameworkOutbox<IdentityDbContext>(o => o.UsePostgres());
 
             x.AddConsumer<CountingConsumer>(typeof(CountingConsumerDefinition));

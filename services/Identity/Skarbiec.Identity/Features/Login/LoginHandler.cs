@@ -20,8 +20,7 @@ public sealed class LoginHandler(
 {
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
 
-    // Same error for "no such user" and "wrong password" — the AC requires not revealing which
-    // part of the credentials was wrong (also covers the locked-out case via CheckPasswordSignInAsync).
+    // One error for an unknown user, a wrong password and a lockout, so the response never reveals which part was wrong.
     private static readonly Error InvalidCredentials =
         new("Unauthorized.InvalidCredentials", "Invalid email or password.");
 
@@ -33,7 +32,7 @@ public sealed class LoginHandler(
             return InvalidCredentials;
         }
 
-        // UserManager/SignInManager predate CancellationToken support and have no overload to forward it to.
+        // SignInManager predates CancellationToken support and has no overload to forward it to.
         var signInResult = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (!signInResult.Succeeded)
         {

@@ -6,12 +6,7 @@ namespace Skarbiec.ServiceDefaults.ErrorHandling;
 
 public static class ProblemDetailsExtensions
 {
-    /// <summary>
-    /// ProblemDetails as the default error shape, stamped with a "traceId" extension so a client
-    /// can correlate an error response with the matching trace in the Aspire dashboard.
-    /// Combine with <c>app.UseExceptionHandler()</c> (<see cref="Extensions.UseServiceDefaults"/>)
-    /// for genuinely unexpected failures; expected failures go through <see cref="ResultHttpExtensions"/>.
-    /// </summary>
+    // The traceId extension lets a client correlate an error response with its trace in the Aspire dashboard.
     public static TBuilder AddProblemDetailsWithTraceId<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddProblemDetails(options =>

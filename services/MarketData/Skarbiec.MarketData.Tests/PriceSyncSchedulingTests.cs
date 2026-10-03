@@ -14,18 +14,10 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// Quartz scheduling mechanics (T2.6 AC): a shortened dev cron fires the real job automatically with
-/// a trace span, a persisted schedule survives a scheduler restart, and two clustered scheduler
-/// instances that are briefly both live (the restart/rolling-deploy handoff window) share one fire
-/// exactly once — never lost, never duplicated. <see cref="PriceSyncJobTests"/> covers the job's own
-/// business logic without any of this scheduling machinery.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
-    // Explicit field: the primary constructor parameter is also passed to the base constructor
-    // above, so referencing it directly elsewhere in this class would trigger CS9107.
+    // An explicit field: the primary constructor parameter also goes to the base constructor, so using it here would trigger CS9107.
     private readonly SkarbiecContainersFixture _containers = containers;
 
     [Fact]
@@ -45,21 +37,14 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration["ConnectionStrings:marketdata-db"] = _containers.PostgresConnectionString;
         builder.Configuration["ConnectionStrings:rabbitmq"] = _containers.RabbitMqConnectionString;
-        builder.Configuration["PriceSync:Cron"] = "0/2 * * * * ?"; // every 2s — proves "runs on schedule" fast.
+        builder.Configuration["PriceSync:Cron"] = "0/2 * * * * ?";
         builder.Services.AddDbContext<MarketDataDbContext>(o => o.UseNpgsql(_containers.PostgresConnectionString));
         builder.Services.AddSingleton<IFxRateSource>(new NoOpFxRateSource());
-        // PriceSyncJob resolves IPublishEndpoint (T2.10) — the real job fires on this host's own
-        // schedule, so it needs the same outbox wiring Program.cs gives it in production.
+        // The real job fires on this host's schedule and resolves IPublishEndpoint, so it needs the outbox wiring.
         builder.AddRabbitMqMessaging<HostApplicationBuilder, MarketDataDbContext>();
         builder.AddPriceSyncJob();
 
-        // Deliberately not disposed: Quartz.Logging.LogProvider caches this host's ILoggerFactory
-        // in a process-wide static once AddQuartzHostedService starts it. Disposing the host here
-        // would dispose that factory and poison every later Quartz scheduler in this test process
-        // (including the classic-API ones in this same class) with an ObjectDisposedException on
-        // their first log call. The host is stopped (releasing the scheduler/DB connections) but
-        // left undisposed for the remainder of the test process — harmless, since the process exits
-        // once the test run finishes.
+        // Deliberately not disposed: Quartz's LogProvider caches this host's ILoggerFactory in a process-wide static.
         var host = builder.Build();
         await host.StartAsync(cancellationToken);
         try
@@ -70,7 +55,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
                 await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
             }
 
-            Assert.NotEmpty(activities); // the job fired on its own, without a manual trigger.
+            Assert.NotEmpty(activities);
             Assert.Contains(activities, a => a.OperationName == "PriceSyncJob.Run");
 
             await using var db = CreateDbContext();
@@ -79,7 +64,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
         finally
         {
             var scheduler = await host.Services.GetRequiredService<ISchedulerFactory>().GetScheduler(cancellationToken);
-            await scheduler.DeleteJob(PriceSyncJob.Key, cancellationToken); // don't leave this test's schedule persisted.
+            await scheduler.DeleteJob(PriceSyncJob.Key, cancellationToken);
             await host.StopAsync(cancellationToken);
         }
     }
@@ -96,7 +81,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
         var jobDetail = JobBuilder.Create<ProbeJob>().WithIdentity(jobKey).StoreDurably()
             .UsingJobData("stateKey", stateKey).Build();
         var trigger = TriggerBuilder.Create().WithIdentity(triggerKey).ForJob(jobKey)
-            .StartAt(DateTimeOffset.UtcNow.AddMinutes(5)) // far enough out it can't fire during this test.
+            .StartAt(DateTimeOffset.UtcNow.AddMinutes(5))
             .Build();
 
         await schedulerA.ScheduleJob(jobDetail, trigger, cancellationToken: cancellationToken);
@@ -133,7 +118,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
 
         var schedulerA = await BuildPersistentSchedulerAsync();
         var schedulerB = await BuildPersistentSchedulerAsync();
-        Assert.NotEqual(schedulerA.SchedulerInstanceId, schedulerB.SchedulerInstanceId); // two cluster nodes, not one scheduler twice.
+        Assert.NotEqual(schedulerA.SchedulerInstanceId, schedulerB.SchedulerInstanceId);
 
         var jobDetail = JobBuilder.Create<ProbeJob>().WithIdentity(jobKey).StoreDurably()
             .UsingJobData("stateKey", stateKey).Build();
@@ -142,8 +127,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
             .Build();
         await schedulerA.ScheduleJob(jobDetail, trigger, cancellationToken: cancellationToken);
 
-        // Both "instances" live before the fire time — the exact restart/rolling-deploy overlap
-        // window DisallowConcurrentExecution + clustering exist to protect (T2.6 AC).
+        // Both instances live before the fire time: the overlap DisallowConcurrentExecution and clustering protect.
         await schedulerA.Start(cancellationToken);
         await schedulerB.Start(cancellationToken);
         try
@@ -154,8 +138,8 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
                 await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
             }
 
-            Assert.Equal(1, state.ExecutionCount); // not lost (someone fired it) ...
-            Assert.Equal(1, state.MaxConcurrentExecutions); // ... and not duplicated (only one node at a time).
+            Assert.Equal(1, state.ExecutionCount);
+            Assert.Equal(1, state.MaxConcurrentExecutions);
         }
         finally
         {
@@ -165,8 +149,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
         }
     }
 
-    // Production's store (QuartzStore.UseMarketDataStore) on a standalone scheduler; the shortened
-    // clustering check-in is the only test-specific override on top of it.
+    // Production's store on a standalone scheduler; the shorter clustering check-in is the only test override.
     private async Task<IScheduler> BuildPersistentSchedulerAsync()
     {
         var connectionString = _containers.PostgresConnectionString;
@@ -181,9 +164,7 @@ public sealed class PriceSyncSchedulingTests(SkarbiecContainersFixture container
     }
 }
 
-/// <summary>Per-run state for <see cref="ProbeJob"/>, looked up by a key threaded through the
-/// trigger's <c>JobDataMap</c> — Quartz's classic (non-DI) job factory needs a public parameterless
-/// constructor, so state can't be constructor-injected the way <see cref="PriceSyncJob"/>'s can.</summary>
+// Looked up by a JobDataMap key: Quartz's classic job factory needs a parameterless constructor.
 internal sealed class ProbeState
 {
     public int ExecutionCount;
@@ -206,9 +187,7 @@ internal static class ProbeJobRegistry
     public static ProbeState Get(string key) => States[key];
 }
 
-/// <summary>Minimal <see cref="IJob"/> standing in for <see cref="PriceSyncJob"/> in scheduling-only
-/// tests (cron firing, restart/cluster safety) — carries no DI dependencies, so it can be built via
-/// Quartz's classic <see cref="JobBuilder"/> API against a bare <see cref="IScheduler"/>.</summary>
+// No DI dependencies, so Quartz's classic JobBuilder API can build it against a bare scheduler.
 [DisallowConcurrentExecution]
 public sealed class ProbeJob : IJob
 {

@@ -4,11 +4,6 @@ using Skarbiec.Testing.Tenancy;
 
 namespace Skarbiec.Testing.Tests;
 
-/// <summary>
-/// Proves <see cref="TenancyIsolationTests{TProgram}"/> (T0.14) actually catches a cross-user leak,
-/// using the Notes resource in <see cref="Skarbiec.Testing.Sample"/> as a stand-in for a real
-/// service's resource (portfolio, asset, transaction — Phase 1 onward, T1.x).
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class NotesTenancyIsolationTests(SkarbiecContainersFixture containers) : TenancyIsolationTests<Program>
 {

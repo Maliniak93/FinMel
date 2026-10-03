@@ -13,13 +13,7 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
-/// <summary>
-/// <c>AssetRemoved</c> in, <see cref="Position"/> gone but its historical
-/// <see cref="AssetValuation"/> lines kept — spec-03 AC5, design decision 2 ("AssetRemoved keeps the
-/// lines": deleting an asset must not silently change what last month's net worth was). Since
-/// spec-07 (AC8) only today's line of the removed asset goes, and today's snapshot of its portfolio
-/// is recomputed from what is left. Builds its own provider on a queue name unique to this test class.
-/// </summary>
+// Builds its own provider, with no HTTP host, on a queue unique to this class.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -61,7 +55,6 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC8: the removed asset's line for today goes, the snapshot equals what remains, and earlier history is untouched.</summary>
     [Fact]
     public async Task Consume_RemovesTodaysLineAndRecomputesSnapshot()
     {
@@ -107,7 +100,6 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         }, cancellationToken);
     }
 
-    /// <summary>spec-07 AC8: removing the only asset leaves today's snapshot at zero rather than the stale pre-removal value.</summary>
     [Fact]
     public async Task Consume_LastAsset_SetsTodaysSnapshotToZero()
     {
@@ -141,12 +133,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// spec-08 AC-7: an <see cref="AssetRemoved"/> fanned out by a portfolio delete removes the
-    /// <see cref="Position"/> only. <c>PortfolioDeletedConsumer</c> sweeps the lines and snapshots on
-    /// its own queue, so a revaluation here could land after that sweep and resurrect a zero snapshot
-    /// for a portfolio that no longer exists — today's snapshot and lines must stay exactly as seeded.
-    /// </summary>
+    // PortfolioDeletedConsumer sweeps on its own queue, so a revaluation here could resurrect a zero snapshot after it.
     [Fact]
     public async Task Consume_CascadedFromPortfolio_RemovesPositionWithoutRevaluing()
     {
@@ -174,8 +161,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(Removed(removedAssetId, portfolioId, userId, cascadedFromPortfolio: true), cancellationToken);
 
-            // Position removal and any revaluation commit in the same inbox transaction, so once the
-            // Position is gone the snapshot and lines are final.
+            // Removal and any revaluation commit together, so once the Position is gone the rows are final.
             await WaitForPositionGoneAsync(provider, removedAssetId, cancellationToken);
 
             var snapshot = await GetSnapshotAsync(containers, portfolioId, today, cancellationToken);

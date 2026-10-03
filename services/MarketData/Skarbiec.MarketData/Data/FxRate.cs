@@ -1,7 +1,6 @@
 namespace Skarbiec.MarketData.Data;
 
-// Pair is a plain 6-letter code (e.g. "USDPLN") — NBP table A convention, quote currency vs. PLN
-// base currency (ADR-008).
+// Pair is a 6-letter code such as "USDPLN": the quote currency against PLN.
 public sealed class FxRate
 {
     public required Guid Id { get; init; }

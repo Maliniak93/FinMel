@@ -3,20 +3,13 @@ using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Messaging;
 
-/// <summary>
-/// The one line <see cref="PortfolioArchivedConsumer"/> and <see cref="PortfolioRestoredConsumer"/>
-/// share — archive and restore are the same write with a flipped flag. Returns whether the
-/// portfolio has any positions at all, so both know whether there is anything to revalue.
-/// </summary>
+// Returns whether the portfolio has any positions, so the caller knows whether there is anything to revalue.
 internal static class PortfolioArchiveFlag
 {
     public static async Task<bool> ApplyAsync(
         ReportingDbContext db, Guid portfolioId, bool isArchived, CancellationToken cancellationToken)
     {
-        // IgnoreQueryFilters: a consumer has no request user to filter by — see
-        // AssetPositionChangedConsumer for the full rationale. Change tracker + one SaveChanges
-        // rather than ExecuteUpdate, so the write shares the transaction that commits the inbox row
-        // (ADR-012, spec-03 design decision 5).
+        // IgnoreQueryFilters: a consumer has no request user; the change tracker keeps the write in the inbox transaction.
         var positions = await db.Positions
             .IgnoreQueryFilters()
             .Where(p => p.PortfolioId == portfolioId)

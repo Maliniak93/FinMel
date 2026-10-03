@@ -11,13 +11,7 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// HTTP-level behavior of Features/SearchInstruments (T2.8 AC): matching, the last-price join, and
-/// that the endpoint is authenticated but never tenancy-filtered (MarketData has no per-user data,
-/// see ArchitectureTests' remark). The &lt;100 ms performance AC is verified separately, against the
-/// handler directly, in <see cref="SearchInstrumentsPerformanceTests"/> — a full HTTP round trip
-/// through Kestrel/serialization would be measuring more than the query itself.
-/// </summary>
+// The <100 ms check runs against the handler in SearchInstrumentsPerformanceTests, so HTTP overhead is not measured.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {

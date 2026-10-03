@@ -13,8 +13,7 @@ public static class SearchInstrumentsEndpoint
         return app;
     }
 
-    // Defaulted params (mirrors Portfolio's ListPortfoliosEndpoint/ListTransactionsEndpoint) so an
-    // omitted "?q=" or "?limit=" binds instead of 400ing as missing-required.
+    // Defaulted params, so an omitted ?q= or ?limit= binds instead of failing as missing.
     private static async Task<Ok<IReadOnlyList<InstrumentSearchResult>>> HandleAsync(
         SearchInstrumentsHandler handler, CancellationToken cancellationToken, string? q = null, int limit = 20)
         => TypedResults.Ok(await handler.HandleAsync(q, limit, cancellationToken));

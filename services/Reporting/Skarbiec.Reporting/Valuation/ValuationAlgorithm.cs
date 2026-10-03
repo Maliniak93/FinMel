@@ -2,20 +2,10 @@ using Skarbiec.Contracts;
 
 namespace Skarbiec.Reporting.Valuation;
 
-/// <summary>
-/// Pure implementation of 03-domain-model.md §Valuation algorithm — no DB/HTTP access, so it's
-/// unit-testable directly (spec-03 design decision 6). The consumer reads positions from its own
-/// <c>Position</c> table and prices/FX from MarketData first, then calls <see cref="Calculate"/> per
-/// portfolio.
-/// </summary>
-/// <remarks>
-/// Contract: exactly one <see cref="ValuedPosition"/> per input position, always. A missing quote or
-/// rate produces a zero-valued, stale line instead of dropping the position — the consumer writes
-/// one <c>AssetValuation</c> row per position and relies on that (spec-03 AC10).
-/// </remarks>
+// Pure, with no DB or HTTP access: exactly one line per input position, and a missing quote or rate gives a zero-valued stale line.
 public static class ValuationAlgorithm
 {
-    private const string BaseCurrency = "PLN"; // ADR-008
+    private const string BaseCurrency = "PLN";
     private const int StaleThresholdDays = 7;
 
     public static ValuationResult Calculate(
@@ -50,12 +40,10 @@ public static class ValuationAlgorithm
         IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
         DateOnly snapshotDate)
     {
-        // Defensive, not expected: Portfolio is the sole writer of ValuationMode and InstrumentId
-        // together, so Market without an InstrumentId shouldn't happen — a zero-valued stale line
-        // beats throwing if it ever does.
+        // Defensive: Portfolio always sets InstrumentId with Market, and a stale zero line beats throwing.
         if (position.InstrumentId is not { } instrumentId || !pricesByInstrument.TryGetValue(instrumentId, out var price))
         {
-            // No quote at all (not even an old one) — nothing to value, but the line still exists.
+            // No quote at all, not even an old one: nothing to value, but the line still exists.
             return Line(position, valuePln: 0m, isStale: true);
         }
 
@@ -87,9 +75,7 @@ public static class ValuationAlgorithm
             : Line(position, (position.ManualValueAmount ?? 0m) * rate.Value, fxIsStale, fxRateUsed: rate);
     }
 
-    /// <summary>M1.4's third mode: no instrument, no manual amount — <see cref="ValuationPosition.Quantity"/>
-    /// itself is the amount held in <see cref="ValuationPosition.Currency"/> (e.g. plain cash, a term
-    /// deposit), converted through the same <see cref="ResolveFxRate"/> the other two modes use.</summary>
+    // Currency-valued: Quantity is the amount held in Currency, converted like the other modes.
     private static ValuedPosition ValueCurrencyValuedAsset(
         ValuationPosition position,
         IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,

@@ -7,8 +7,7 @@ using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
-// HandleCookies is disabled so each request's refresh cookie is exactly what the test attaches,
-// never one implicitly carried over by the client's own cookie jar from a previous call.
+// HandleCookies is off, so each request carries exactly the refresh cookie the test attaches.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class LogoutEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {

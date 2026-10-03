@@ -3,11 +3,6 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Skarbiec.MarketData.Data;
 
-/// <summary>
-/// Used only by <c>dotnet ef migrations add</c>: design-time tooling builds the model without
-/// running the app (and without Aspire injecting the real connection string), so a placeholder
-/// Npgsql connection is enough — nothing here ever actually connects.
-/// </summary>
 public sealed class MarketDataDbContextFactory : IDesignTimeDbContextFactory<MarketDataDbContext>
 {
     public MarketDataDbContext CreateDbContext(string[] args)

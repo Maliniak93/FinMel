@@ -4,10 +4,6 @@ using Skarbiec.ServiceDefaults.Tenancy;
 
 namespace Skarbiec.Testing.Sample.Data;
 
-/// <summary>
-/// Used only by <c>dotnet ef migrations add</c>: design-time tooling builds the model without
-/// running the app, so a placeholder Npgsql connection is enough — nothing here ever actually connects.
-/// </summary>
 public sealed class NotesDbContextFactory : IDesignTimeDbContextFactory<NotesDbContext>
 {
     public NotesDbContext CreateDbContext(string[] args)

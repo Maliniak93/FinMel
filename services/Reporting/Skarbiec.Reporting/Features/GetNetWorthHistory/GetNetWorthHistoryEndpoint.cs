@@ -14,8 +14,7 @@ public static class GetNetWorthHistoryEndpoint
         return app;
     }
 
-    // Defaulted range (mirrors ListTransactionsEndpoint's page/pageSize) so an omitted query
-    // parameter binds instead of 400ing as missing-required; "1Y" is the chart's default view.
+    // Defaulted range, so an omitted parameter binds instead of failing as missing; 1Y is the chart's default view.
     private static async Task<Results<Ok<NetWorthHistoryResponse>, ProblemHttpResult>> HandleAsync(
         GetNetWorthHistoryHandler handler,
         CancellationToken cancellationToken,

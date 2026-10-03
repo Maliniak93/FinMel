@@ -3,16 +3,9 @@ using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
 
-/// <summary>
-/// Upsert-by-(instrument, date)/(pair, date) shared by every job that writes <see cref="PriceQuote"/>/
-/// <see cref="FxRate"/> rows — <see cref="PriceSyncJob"/> (T2.6) and <see cref="HistoryBackfillJob"/>
-/// (T2.7) both rely on the same idempotency guarantee, so it lives in exactly one place instead of two
-/// copies drifting apart.
-/// </summary>
 public static class QuoteUpsert
 {
-    /// <summary>Returns the distinct instrument ids that received a quote — callers use this to tell
-    /// which of the requested instruments actually got synced.</summary>
+    // Returns the instrument ids that received a quote, so callers can tell which were synced.
     public static async Task<HashSet<Guid>> UpsertInstrumentQuotesAsync(
         MarketDataDbContext db, IReadOnlyList<InstrumentQuote> quotes, CancellationToken cancellationToken)
     {
@@ -49,7 +42,6 @@ public static class QuoteUpsert
         return instrumentIds;
     }
 
-    /// <summary>Returns the distinct pairs that received a rate — see <see cref="UpsertInstrumentQuotesAsync"/>.</summary>
     public static async Task<HashSet<string>> UpsertFxRatesAsync(
         MarketDataDbContext db, IReadOnlyList<FxRateQuote> rates, CancellationToken cancellationToken)
     {

@@ -3,10 +3,7 @@ using Skarbiec.Contracts.Events;
 
 namespace Skarbiec.Contracts.Tests;
 
-/// <summary>
-/// One fact per <c>Portfolio*</c> lifecycle event (spec-02 AC-15) — all three share the same
-/// <c>{ PortfolioId, UserId, OccurredAtUtc }</c> shape, so one class covers all three fixtures.
-/// </summary>
+// All three events share the { PortfolioId, UserId, OccurredAtUtc } shape, so one class covers their fixtures.
 public sealed class PortfolioLifecycleContractTests
 {
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };

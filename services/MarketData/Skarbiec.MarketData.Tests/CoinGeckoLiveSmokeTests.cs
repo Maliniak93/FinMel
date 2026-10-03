@@ -10,14 +10,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-/// <summary>
-/// T2.5 AC: "Live smoke once: BTC/ETH prices land". Hits the real CoinGecko API over the network —
-/// deliberately <see cref="FactAttribute.Skip"/>-marked so CI (which runs <c>dotnet test</c> with no
-/// filter) never depends on live internet or CoinGecko's free-tier availability/rate limit. Run
-/// locally by temporarily removing <c>Skip</c> and executing:
-/// <c>dotnet test --filter FullyQualifiedName~CoinGeckoLiveSmokeTests</c> against a Docker-backed
-/// Testcontainers Postgres. Same pattern as T2.3's <c>NbpLiveSmokeTests</c>.
-/// </summary>
+// Skipped so CI never depends on the live API; remove Skip to run it once locally.
 [Collection(TestingDefaults.CollectionName)]
 public sealed class CoinGeckoLiveSmokeTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
@@ -26,8 +19,7 @@ public sealed class CoinGeckoLiveSmokeTests(SkarbiecContainersFixture containers
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.coingecko.com/api/v3/") };
-        // Without this, CoinGecko 403s every request (see CoinGeckoSourceExtensions' doc comment) —
-        // mirrored here since this test builds its own HttpClient instead of going through DI.
+        // CoinGecko answers 403 without a User-Agent, and this test builds its own HttpClient.
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Skarbiec/1.0 (+https://github.com/; personal wealth-management app, MarketData service)");
         ICoinGeckoApiClient apiClient = new CoinGeckoApiClient(httpClient);
         var priceSource = new CoinGeckoPriceSource(apiClient, NullLogger<CoinGeckoPriceSource>.Instance);
@@ -39,13 +31,10 @@ public sealed class CoinGeckoLiveSmokeTests(SkarbiecContainersFixture containers
         var afterSecondRun = await CountPriceQuotesAsync(cancellationToken);
 
         Assert.True(afterFirstRun > 0, "expected at least one live crypto price to land in marketdata_db");
-        Assert.Equal(afterFirstRun, afterSecondRun); // re-running the same day upserts, doesn't duplicate
+        Assert.Equal(afterFirstRun, afterSecondRun);
     }
 
-    // Deliberately minimal, test-only upsert (check-exists-then-add-or-update, same pattern as
-    // NbpLiveSmokeTests/MarketDataSeeder) — proves the source's output round-trips through the real
-    // (instrument, date) unique index from T2.1. The scheduled, failure-isolated version of this
-    // belongs to PriceSyncJob (T2.6).
+    // A minimal test-only upsert proving the output round-trips through the real unique index.
     private async Task SyncOnceAsync(IPriceSource priceSource, CancellationToken cancellationToken)
     {
         await using var db = CreateDbContext();

@@ -21,9 +21,6 @@ public sealed class DailyPricesSyncedContractTests
         Assert.Equal(2, evt.NoDataCount);
     }
 
-    /// <summary>spec-04 AC20: an Fx-kind payload with an unknown extra field still deserializes, and
-    /// the new <c>Kind</c> field (design decision 8: <c>PriceSyncKind</c>, edited in place per
-    /// ADR-019) maps to <see cref="PriceSyncKind.Fx"/>.</summary>
     [Fact]
     public void Deserialize_FxKindPayload_MapsToFx()
     {

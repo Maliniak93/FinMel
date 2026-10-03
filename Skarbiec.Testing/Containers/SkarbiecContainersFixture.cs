@@ -5,11 +5,6 @@ using Testcontainers.RabbitMq;
 
 namespace Skarbiec.Testing.Containers;
 
-/// <summary>
-/// Starts one PostgreSQL and one RabbitMQ container for an entire xUnit collection, so every test
-/// class in a service's test project shares them instead of paying container startup cost per class.
-/// Register as a collection fixture (see <see cref="TestingDefaults.CollectionName"/>).
-/// </summary>
 public sealed class SkarbiecContainersFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
@@ -29,26 +24,13 @@ public sealed class SkarbiecContainersFixture : IAsyncLifetime
         await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _rabbitMq.DisposeAsync().AsTask());
     }
 
-    /// <summary>
-    /// Deletes every row from every table (except EF's own migration history) so each test starts
-    /// from a clean, already-migrated schema. Call from the test class's own <see cref="IAsyncLifetime"/>
-    /// (not this fixture's) so the reset runs before each individual test, not once per collection.
-    /// </summary>
-    /// <remarks>
-    /// The <see cref="Respawner"/> is rebuilt on every call rather than cached: the schema doesn't
-    /// exist yet when the very first test in the collection resets (migrations run lazily, the first
-    /// time a service's <c>WebApplicationFactory</c> boots its host) — a cached snapshot taken that
-    /// early would permanently miss every table.
-    /// </remarks>
+    // Rebuilt on every call: a Respawner cached before the first migration would miss every table.
     public async Task ResetDatabaseAsync()
     {
         await using var connection = new NpgsqlConnection(PostgresConnectionString);
         await connection.OpenAsync();
 
-        // A service whose migrations create no business tables (T0.13 skeletons) still gets
-        // __EFMigrationsHistory from Migrate() — nothing left to reset once that's ignored.
-        // Respawner.CreateAsync throws on zero non-ignored tables, so skip it rather than treat an
-        // empty schema as a configuration error.
+        // Respawner.CreateAsync throws when only __EFMigrationsHistory exists, so that case is skipped.
         await using (var countCommand = connection.CreateCommand())
         {
             countCommand.CommandText = """
@@ -69,13 +51,7 @@ public sealed class SkarbiecContainersFixture : IAsyncLifetime
             TablesToIgnore = ["__EFMigrationsHistory"]
         });
 
-        // Retried on deadlock (Postgres 40P01): once a service has an EF outbox (T1.5), its
-        // WebApplicationFactory host runs a live MassTransit bus + outbox delivery poller as a
-        // background hosted service, which isn't always fully drained by the *previous* test
-        // class's WebApplicationFactory.DisposeAsync shutdown window — so this DELETE batch can
-        // occasionally lock-clash with a still-shutting-down poller touching
-        // OutboxMessage/OutboxState. Postgres's own recommendation for 40P01 is exactly this: retry
-        // the losing transaction.
+        // Retried on deadlock (40P01): a previous host's outbox poller may still be shutting down.
         const int maxAttempts = 3;
         for (var attempt = 1; ; attempt++)
         {

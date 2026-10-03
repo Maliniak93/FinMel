@@ -6,15 +6,7 @@ using Skarbiec.MarketData.Features.SearchInstruments;
 
 namespace Skarbiec.MarketData.Tests.Fixtures;
 
-/// <summary>
-/// MarketData's HTTP surface as arrange-step helpers: route builders, plus the "add me a custom
-/// instrument" call slice tests need before exercising the endpoint they actually care about.
-/// </summary>
-/// <remarks>
-/// Arrange only. A test asserting on one of these endpoints must call it directly and assert on the
-/// raw <see cref="HttpResponseMessage"/> — the helpers here <c>EnsureSuccessStatusCode</c>, which
-/// would turn the very failure such a test is looking for into an exception.
-/// </remarks>
+// Arrange only: helpers EnsureSuccessStatusCode, so a test of endpoint X calls X directly and asserts on the raw response.
 internal static class MarketDataApi
 {
     public const string InstrumentsUri = "/api/marketdata/instruments";
@@ -22,16 +14,14 @@ internal static class MarketDataApi
 
     public static string InstrumentUri(Guid id) => $"{InstrumentsUri}/{id}";
 
-    /// <summary>MarketData's own OpenAPI document (Development only) — the TS client generator's input.</summary>
     public const string OpenApiDocumentUri = "/api/marketdata/openapi/v1.json";
 
-    // Service-only endpoints (ADR-027): anonymous, outside /api/, so the Gateway has no route to them.
+    // Service-only endpoints: anonymous and outside /api/, so the Gateway has no route to them.
     public const string InternalLatestPricesBatchUri = "/internal/prices/latest-batch";
     public const string InternalFxRatesBatchUri = "/internal/fx/latest-batch";
 
     public static string InternalInstrumentUri(Guid id) => $"/internal/instruments/{id}";
 
-    /// <summary>GetFxRate (ADR-026): the latest <c>{currency}PLN</c> rate on or before <paramref name="date"/>.</summary>
     public static string InternalFxRateUri(string currency, DateOnly date) =>
         $"/internal/fx/{currency}/rate?date={date:yyyy-MM-dd}";
 
@@ -75,7 +65,6 @@ internal static class MarketDataApi
         return (await response.Content.ReadFromJsonAsync<CustomInstrumentResponse>(cancellationToken))!;
     }
 
-    /// <summary>Seeds an instrument directly (no fetch involved) and returns its id.</summary>
     public static async Task<Guid> SeedInstrumentAsync(
         this MarketDataDbContext db,
         string ticker,
@@ -114,9 +103,6 @@ internal static class MarketDataApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Seeds the spec-04 currency catalog (PLN + every FxSyncJob-covered non-PLN currency)
-    /// directly, without going through <c>MarketDataSeeder</c> — used by tests that need the catalog
-    /// present but don't care about the rest of the seeder's starter dictionary.</summary>
     public static async Task SeedCurrencyCatalogAsync(this MarketDataDbContext db, CancellationToken cancellationToken)
     {
         db.Currencies.AddRange(

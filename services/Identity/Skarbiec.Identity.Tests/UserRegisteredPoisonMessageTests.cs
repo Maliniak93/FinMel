@@ -10,13 +10,6 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
-/// <summary>
-/// Proves the other half of the shared <see cref="IdempotentConsumerDefinition{TConsumer,TDbContext}"/>
-/// template (T0.12, ADR-012): a consumer that keeps failing exhausts its capped retry and the
-/// message lands on the RabbitMQ transport's default <c>&lt;queue&gt;_error</c> queue instead of
-/// being redelivered forever — and, crucially, the main queue keeps consuming other messages
-/// afterwards rather than getting stuck behind the poison one.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -54,8 +47,7 @@ public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture c
 
         try
         {
-            // See the identical comment in UserRegisteredIdempotentConsumerTests: a publish fired
-            // immediately after StartAsync can race the receive endpoints' exchange->queue binding.
+            // StartAsync does not wait for RabbitMQ to apply the bindings, so a publish right after it could be dropped.
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
             var bus = producerProvider.GetRequiredService<IBus>();
@@ -73,8 +65,7 @@ public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture c
             var faulted = await errorQueueReceived.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
             Assert.Equal(PoisonEmail, faulted.Email);
 
-            // The queue must not be stuck behind the poisoned message: a message sent afterwards,
-            // to the very same consumer/queue, still has to be consumed normally.
+            // The queue must not be stuck behind the poisoned message.
             var goodEvent = new UserRegistered
             {
                 UserId = Guid.NewGuid(),
@@ -108,10 +99,7 @@ public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture c
         {
             x.SetKebabCaseEndpointNameFormatter();
 
-            // No UseBusOutbox() here: this test only exercises the consumer-side inbox
-            // (UseEntityFrameworkOutbox on the receive endpoint, wired by
-            // IdempotentConsumerDefinition), never IBus/IPublishEndpoint from a DI scope, so the
-            // producer-side bus outbox and its background delivery poller would be dead weight.
+            // No UseBusOutbox(): only the consumer-side inbox is under test.
             x.AddEntityFrameworkOutbox<IdentityDbContext>(o => o.UsePostgres());
 
             x.AddConsumer<PoisonAwareConsumer>(typeof(FastRetryPoisonConsumerDefinition));
@@ -141,10 +129,7 @@ public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture c
         }
     }
 
-    /// <summary>
-    /// Same idempotent-inbox template every real consumer uses, but with a fast, near-immediate
-    /// retry policy so exhausting it (and faulting to the error queue) doesn't make this test slow.
-    /// </summary>
+    // Near-immediate retry, so exhausting it keeps this test fast.
     private sealed class FastRetryPoisonConsumerDefinition : IdempotentConsumerDefinition<PoisonAwareConsumer, IdentityDbContext>
     {
         public FastRetryPoisonConsumerDefinition() => Endpoint(e => e.Name = QueueName);
@@ -152,11 +137,6 @@ public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture c
         protected override Action<IRetryConfigurator> RetryPolicy => r => r.Immediate(2);
     }
 
-    /// <summary>
-    /// A second, independent bus binding directly to the RabbitMQ transport's default
-    /// <c>&lt;queue&gt;_error</c> queue — the destination MassTransit moves a message to once
-    /// <see cref="FastRetryPoisonConsumerDefinition"/>'s retry is exhausted.
-    /// </summary>
     private sealed class ErrorQueueObserver(ServiceProvider provider, IBusControl busControl) : IAsyncDisposable
     {
         public static async Task<ErrorQueueObserver> StartAsync(

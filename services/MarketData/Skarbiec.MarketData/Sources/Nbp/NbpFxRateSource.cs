@@ -3,17 +3,12 @@ using System.Text.Json.Serialization;
 
 namespace Skarbiec.MarketData.Sources.Nbp;
 
-/// <summary>
-/// <see cref="IFxRateSource"/> over NBP table A (E4 [M], ADR-008). Table A returns every published
-/// currency in one call, so <see cref="FetchLatestAsync"/> fetches once and filters down to the
-/// requested codes rather than one request per currency.
-/// </summary>
+// Table A returns every currency in one call, so the latest fetch filters it down instead of asking per currency.
 public sealed class NbpFxRateSource(INbpApiClient client) : IFxRateSource
 {
-    private const string BaseCurrency = "PLN"; // ADR-008
+    private const string BaseCurrency = "PLN";
 
-    // Verified live against api.nbp.pl: a 94-day exchangerates/tables/A query 400s with "Limit of
-    // 93 days has been exceeded"; 93 days succeeds.
+    // A 94-day table A query fails with "Limit of 93 days has been exceeded".
     private const int MaxRangeDays = 93;
 
     public TimeSpan RequestDelay => TimeSpan.Zero;

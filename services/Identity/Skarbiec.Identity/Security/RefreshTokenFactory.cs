@@ -5,11 +5,7 @@ namespace Skarbiec.Identity.Security;
 
 public readonly record struct GeneratedRefreshToken(string RawValue, string Hash);
 
-/// <summary>
-/// The raw value is what goes in the httpOnly cookie; only its hash is persisted, so a DB
-/// read never discloses a value an attacker could replay (ADR-005: rotation, no server-side
-/// access-token blacklist — the refresh token store is the thing worth protecting).
-/// </summary>
+// Only the hash is persisted, so a database read never discloses a replayable token.
 public static class RefreshTokenFactory
 {
     private const int RawValueByteLength = 32;

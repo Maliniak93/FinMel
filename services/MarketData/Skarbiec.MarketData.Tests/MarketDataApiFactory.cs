@@ -10,15 +10,7 @@ namespace Skarbiec.MarketData.Tests;
 public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
     : SkarbiecApiFactory<Program>(containers, "marketdata-db")
 {
-    /// <summary>
-    /// Replaces the real, provider-calling <see cref="ITickerVerifier"/> for every test using this
-    /// factory (M1.6) — HTTP slice tests must not depend on a live Stooq/CoinGecko (constraint: "no
-    /// test depends on a live external provider in CI"), so AddCustomInstrument's verification step is
-    /// exercised against this fake instead. Real-provider outcome mapping (Exists/DoesNotExist/
-    /// Unreachable off actual Stooq/CoinGecko payloads) is covered separately by
-    /// <c>TickerVerifierTests</c>, which drives the real <c>TickerVerifier</c> directly against the
-    /// real <c>IPriceSource</c> implementations via their Fake*ApiClient fixtures.
-    /// </summary>
+    // HTTP slice tests never call a live provider; TickerVerifierTests cover the real verifier.
     public FakeTickerVerifier TickerVerifier { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

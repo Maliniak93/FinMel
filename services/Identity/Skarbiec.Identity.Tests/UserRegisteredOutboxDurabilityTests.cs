@@ -14,28 +14,6 @@ using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Identity.Tests;
 
-/// <summary>
-/// Proves the outbox survives a crash between commit and dispatch (T0.11 AC; E9: "killing the
-/// process between commit and publish doesn't lose the event"). This is the whole point of routing
-/// every publish through the outbox instead of calling the bus directly (ADR-012): the event's
-/// durability lives in Postgres, not in the process's memory, so a second, wholly independent
-/// process can pick up delivery later.
-///
-/// "Process 1" commits the user row and the outbox row in one transaction against a provider whose
-/// bus and outbox delivery service never start — nothing in that provider is capable of dispatching
-/// the message, simulating the process dying right after commit. "Process 2" is a fresh provider,
-/// pointed at the very same database, standing in for a restarted instance: starting its hosted
-/// services (bus + <c>BusOutboxDeliveryService</c>) is what finally delivers the still-pending row,
-/// to a consumer on a queue name unique to this test (the shared RabbitMQ container's queues are
-/// durable and outlive any one test class, so a shared/well-known queue name could pick up another
-/// test's message instead of this one's).
-///
-/// Verified once by temporarily replacing the outbox publish in <see cref="RegisterHandler"/> with a
-/// direct <c>IBus.Publish</c> call outside the transaction: with that change this test goes red
-/// (nothing survives "process 1" dying, because there is no durable outbox row for "process 2" to
-/// find) — confirming the test actually exercises the durability guarantee rather than passing
-/// vacuously. Reverted after confirming; not re-checked on every run.
-/// </summary>
 [Collection(TestingDefaults.CollectionName)]
 public sealed class UserRegisteredOutboxDurabilityTests(SkarbiecContainersFixture containers) : IAsyncLifetime
 {
@@ -57,11 +35,7 @@ public sealed class UserRegisteredOutboxDurabilityTests(SkarbiecContainersFixtur
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        // MassTransit caches the *first* ILoggerFactory it sees for the whole process (not per
-        // bus), so a bus built earlier in this test run whose provider has since been disposed
-        // would otherwise leave every later bus in the process resolving a disposed factory.
-        // Pointing it at a factory this test method owns and keeps alive for its whole duration
-        // keeps the bus built below logging correctly regardless of what other tests already ran.
+        // MassTransit caches the first ILoggerFactory process-wide, so this test owns one that outlives its bus.
         using var loggerFactory = LoggerFactory.Create(builder => { });
         LogContext.ConfigureCurrentLogContext(loggerFactory);
 
@@ -72,8 +46,7 @@ public sealed class UserRegisteredOutboxDurabilityTests(SkarbiecContainersFixtur
             DisplayName = "Ada Lovelace"
         };
 
-        // "Process 1": commit, then die. This provider's bus/delivery service is never started, so
-        // nothing here can dispatch the message to RabbitMQ - only the outbox row can carry it forward.
+        // Process 1 commits and dies: its bus never starts, so only the outbox row can carry the event.
         await using (var crashedProvider = BuildProvider())
         {
             await using var scope = crashedProvider.CreateAsyncScope();
@@ -87,10 +60,7 @@ public sealed class UserRegisteredOutboxDurabilityTests(SkarbiecContainersFixtur
             Assert.Contains(outboxMessages, m => m.MessageType.Contains(nameof(UserRegistered)));
         }
 
-        // "Process 2": an independent provider against the same database, with a consumer on a
-        // queue name unique to this test. Starting its hosted services (MassTransit bus +
-        // BusOutboxDeliveryService) is the "restart" that resumes delivery of the row process 1
-        // left behind.
+        // Process 2: a fresh provider on the same database, whose hosted services deliver the pending row to a queue unique to this test.
         var received = new TaskCompletionSource<UserRegistered>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         await using var restartedProvider = BuildProvider(

@@ -4,26 +4,16 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Testing.Tenancy;
 
-/// <summary>
-/// Reusable HTTP-level tenancy isolation template (T0.14, ADR-006, E1): user A creates a resource,
-/// then user B is proven unable to see or touch it — GET/PUT/DELETE all return 404 (never 403,
-/// which would leak the resource's existence) and it's absent from user B's own listing. A concrete
-/// service test inherits this per resource type (e.g. portfolio, asset, transaction — see T1.x)
-/// and only supplies how to create/locate/list that one resource; the four isolation facts below
-/// are proven identically every time.
-/// </summary>
+// A stranger gets 404, never 403, which would leak that the resource exists.
 public abstract class TenancyIsolationTests<TProgram> : ServiceEndpointTests<TProgram> where TProgram : class
 {
-    /// <summary>Creates the resource as <paramref name="ownerClient"/> and returns its GET/PUT/DELETE URL.</summary>
     protected abstract Task<Uri> CreateResourceAsync(HttpClient ownerClient, CancellationToken cancellationToken);
 
-    /// <summary>The URL listing resources of this type for whichever user the request is authenticated as.</summary>
     protected abstract Uri ListUrl { get; }
 
-    /// <summary>Body for the stranger's PUT attempt — any well-formed payload; it must 404 before validation ever runs.</summary>
+    // Any well-formed payload: the PUT must 404 before validation runs.
     protected abstract HttpContent CreateUpdatePayload();
 
-    /// <summary>Asserts the resource created by <see cref="CreateResourceAsync"/> is absent from a stranger's listing response.</summary>
     protected abstract Task AssertResourceAbsentFromListAsync(HttpResponseMessage listResponse, CancellationToken cancellationToken);
 
     [Fact]
