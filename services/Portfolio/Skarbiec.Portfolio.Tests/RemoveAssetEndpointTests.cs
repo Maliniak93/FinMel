@@ -336,4 +336,25 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         await using var dbContext = CreateDbContext(userId);
         Assert.Null((await dbContext.Transactions.SingleAsync(t => t.Id == leg.Id, cancellationToken)).TransferId);
     }
+
+    [Fact]
+    public async Task Remove_Bond_DeletesSettlements()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
+        await client.SettleBondInterestAsync(
+            funded.BondPortfolioId, funded.Bond.AssetId, [(1, null), (2, 3.75m)], funded.CashAssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(funded.BondPortfolioId, funded.Bond.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Set<BondInterestSettlement>().IgnoreQueryFilters().AnyAsync(s => s.AssetId == funded.Bond.AssetId, cancellationToken));
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == funded.Bond.AssetId, cancellationToken));
+        Assert.Equal(1_025.91m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == funded.CashAssetId && t.TransferId != null, cancellationToken));
+    }
 }

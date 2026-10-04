@@ -221,4 +221,24 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.False(depositLeg.Transfer.Manual);
         Assert.Equal(savingsLeg.Transfer.TransferId, depositLeg.Transfer.TransferId);
     }
+
+    [Fact]
+    public async Task List_BondInterestCredit_CarriesPeriod()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 10, 2, 10, 0, 0, TimeSpan.Zero));
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
+        await client.SettleBondInterestAsync(portfolioId, bond.AssetId, [(1, null)], null, cancellationToken);
+
+        var response = await client.GetAsync(TransactionsUri(portfolioId, bond.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(2, items.Count);
+        var credit = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 267.50m);
+        Assert.Equal(1, credit.GetProperty("bondInterestPeriodIndex").GetInt32());
+        var opening = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 5_000m);
+        Assert.True(!opening.TryGetProperty("bondInterestPeriodIndex", out var value) || value.ValueKind == JsonValueKind.Null);
+    }
 }

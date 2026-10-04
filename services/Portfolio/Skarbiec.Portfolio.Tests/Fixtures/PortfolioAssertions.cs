@@ -71,6 +71,20 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, BondTransactionsManagedErrorCode, cancellationToken);
 
+    public const string BondInterestPeriodMismatchErrorCode = "Conflict.BondInterestPeriodMismatch";
+
+    public const string BondInterestNotDueErrorCode = "Conflict.BondInterestNotDue";
+
+    public const string BondSettlementNotLatestErrorCode = "Conflict.BondSettlementNotLatest";
+
+    public const string BondSettledErrorCode = "Conflict.BondSettled";
+
+    public const string BondPeriodRateErrorCode = "Validation.BondPeriodRate";
+
+    public const string BondPayoutDestinationRequiredErrorCode = "Validation.BondPayoutDestinationRequired";
+
+    public const string BondPayoutDestinationNotAllowedErrorCode = "Validation.BondPayoutDestinationNotAllowed";
+
     public const string SavingsInterestNotDueErrorCode = "Conflict.SavingsInterestNotDue";
 
     public const string SavingsInterestPeriodMismatchErrorCode = "Conflict.SavingsInterestPeriodMismatch";

@@ -253,6 +253,58 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("Assets");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.BondInterestSettlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BondCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("CreditTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("GrossInterest")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<int>("PeriodIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<decimal>("Tax")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("TransferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreditTransactionId");
+
+                    b.HasIndex("AssetId", "PeriodIndex")
+                        .IsUnique();
+
+                    b.ToTable("BondInterestSettlements");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Portfolio", b =>
                 {
                     b.Property<Guid>("Id")

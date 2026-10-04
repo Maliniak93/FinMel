@@ -89,4 +89,87 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
     }
+
+    [Fact]
+    public async Task Settle_ByStranger_ReturnsNotFoundAndWritesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var (ownerPortfolioId, bond) = await owner.CreatePortfolioWithBondAsync(cancellationToken, NewRorBondRequest());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+        var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(strangerPortfolioId, cancellationToken);
+
+        var viaOwnersPortfolio = await stranger.SettleBondInterestRawAsync(ownerPortfolioId, bond.AssetId, [(1, null)], strangerCashId, cancellationToken);
+        var viaStrangersPortfolio = await stranger.SettleBondInterestRawAsync(strangerPortfolioId, bond.AssetId, [(1, null)], strangerCashId, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        Assert.Equal(0, await CountBondSettlementsAsync(ownerId, cancellationToken, bond.AssetId));
+        Assert.Equal(1, (await owner.ListTransactionsAsync(ownerPortfolioId, bond.AssetId, cancellationToken)).TotalCount);
+    }
+
+    [Fact]
+    public async Task Preview_ByStranger_ReturnsNotFound()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (ownerPortfolioId, bond) = await owner.CreatePortfolioWithBondAsync(cancellationToken, NewRorBondRequest());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+        var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(strangerPortfolioId, cancellationToken);
+        var body = NewSettleBondBody([(1, null)], strangerCashId);
+
+        var viaOwnersPortfolio = await stranger.PostAsJsonAsync(BondInterestPreviewUri(ownerPortfolioId, bond.AssetId), body, cancellationToken);
+        var viaStrangersPortfolio = await stranger.PostAsJsonAsync(BondInterestPreviewUri(strangerPortfolioId, bond.AssetId), body, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+    }
+
+    [Fact]
+    public async Task Undo_ByStranger_ReturnsNotFoundAndLeavesSettlement()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var funded = await owner.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
+        await owner.SettleBondInterestAsync(funded.BondPortfolioId, funded.Bond.AssetId, [(1, null)], funded.CashAssetId, cancellationToken);
+        var settlementId = await owner.GetLastBondSettlementIdAsync(funded.BondPortfolioId, funded.Bond.AssetId, cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+
+        var viaOwnersPortfolio = await stranger.DeleteAsync(
+            BondInterestSettlementUri(funded.BondPortfolioId, funded.Bond.AssetId, settlementId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.DeleteAsync(
+            BondInterestSettlementUri(strangerPortfolioId, funded.Bond.AssetId, settlementId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        Assert.Equal(1, await CountBondSettlementsAsync(ownerId, cancellationToken, funded.Bond.AssetId));
+        Assert.Equal(1_013.36m, (await owner.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+    }
+
+    [Fact]
+    public async Task Settle_WithOwnersCashAsDestination_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerWalletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(ownerWalletId, cancellationToken, balance: 6_000m);
+        var strangerId = Guid.NewGuid();
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var (strangerPortfolioId, bond) = await stranger.CreatePortfolioWithBondAsync(cancellationToken, NewRorBondRequest());
+
+        var response = await stranger.SettleBondInterestRawAsync(strangerPortfolioId, bond.AssetId, [(1, null)], ownerCashId, cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        await owner.AssertCashUntouchedAsync(ownerWalletId, ownerCashId, cancellationToken, balance: 6_000m);
+        Assert.Equal(0, await CountBondSettlementsAsync(strangerId, cancellationToken, bond.AssetId));
+    }
 }

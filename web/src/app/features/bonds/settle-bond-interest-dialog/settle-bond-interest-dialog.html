@@ -1,0 +1,141 @@
+<h2 mat-dialog-title>{{ 'bonds.settle.title' | transloco }}</h2>
+
+<mat-dialog-content>
+  <p class="settle-bond-interest-dialog__name">{{ bond.name }} · {{ bond.seriesCode }}</p>
+
+  @let current = section();
+  @if (!current) {
+    <div class="settle-bond-interest-dialog__loading">
+      <mat-spinner diameter="24" />
+    </div>
+  } @else {
+    @if (seriesResource.hasValue() && !seriesResource.value()) {
+      <p class="settle-bond-interest-dialog__hint">
+        {{ 'bonds.settle.seriesUnavailable' | transloco }}
+      </p>
+    }
+
+    <div class="settle-bond-interest-dialog__periods">
+      @for (period of current.periods; track period.index; let i = $index) {
+        <div class="settle-bond-interest-dialog__period">
+          <span class="settle-bond-interest-dialog__period-label">
+            {{ 'bonds.settle.period' | transloco: { index: period.index } }}
+            {{ formatDate(period.start) }} – {{ formatDate(period.end) }}
+          </span>
+          @let termsRate = usesTermsRate(bond, period.index);
+          <mat-form-field appearance="outline" class="settle-bond-interest-dialog__rate">
+            <mat-label>{{ 'bonds.settle.rate' | transloco }}</mat-label>
+            <input
+              matInput
+              type="number"
+              step="0.01"
+              [readonly]="termsRate"
+              [required]="!termsRate"
+              [formControl]="current.rates.at(i)"
+              [attr.data-testid]="'period-rate-' + period.index"
+            />
+            @if (termsRate) {
+              <mat-hint>{{
+                'bonds.settle.rateFromTerms'
+                  | transloco: { rate: formatPercent(bond.firstPeriodRatePercent) }
+              }}</mat-hint>
+            }
+            <mat-error>
+              @if (current.rates.at(i).hasError('required')) {
+                {{ 'bonds.settle.rateRequired' | transloco }}
+              } @else {
+                {{ 'bonds.purchase.rateRange' | transloco }}
+              }
+            </mat-error>
+          </mat-form-field>
+        </div>
+      }
+    </div>
+
+    @if (current.coupon) {
+      <mat-form-field appearance="outline" class="settle-bond-interest-dialog__destination">
+        <mat-label>{{ 'bonds.settle.destination' | transloco }}</mat-label>
+        <mat-select [formControl]="current.destination">
+          @if (candidatesResource.hasValue()) {
+            @for (candidate of candidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }}
+              </mat-option>
+            }
+          }
+        </mat-select>
+        @if (candidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
+          <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
+        }
+        <mat-error>{{ 'bonds.settle.destinationRequired' | transloco }}</mat-error>
+      </mat-form-field>
+    } @else {
+      <p class="settle-bond-interest-dialog__hint">{{ 'bonds.settle.capitalised' | transloco }}</p>
+    }
+
+    @if (previewResource.error(); as previewError) {
+      <p class="settle-bond-interest-dialog__error" role="alert">{{ previewError.message }}</p>
+    } @else if (previewResource.isLoading()) {
+      <div class="settle-bond-interest-dialog__loading">
+        <mat-spinner diameter="24" />
+      </div>
+    }
+    @if (previewResource.hasValue() && previewResource.value(); as preview) {
+      <table class="settle-bond-interest-dialog__preview">
+        <thead>
+          <tr>
+            <th>{{ 'bonds.periods.index' | transloco }}</th>
+            <th>{{ 'bonds.periods.rate' | transloco }}</th>
+            <th>{{ 'bonds.periods.gross' | transloco }}</th>
+            <th>{{ 'bonds.periods.tax' | transloco }}</th>
+            <th>{{ 'bonds.periods.net' | transloco }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of preview.rows; track row.periodIndex) {
+            <tr>
+              <td>{{ row.periodIndex }}</td>
+              <td>{{ formatPercent(row.ratePercent) }}</td>
+              <td>{{ formatMoney(row.gross, 'PLN') }}</td>
+              <td>{{ formatMoney(row.tax, 'PLN') }}</td>
+              <td>{{ formatMoney(row.net, 'PLN') }}</td>
+            </tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr>
+            <th colspan="2">{{ 'bonds.settle.total' | transloco }}</th>
+            <th>{{ formatMoney(preview.totals.gross, 'PLN') }}</th>
+            <th>{{ formatMoney(preview.totals.tax, 'PLN') }}</th>
+            <th>{{ formatMoney(preview.totals.net, 'PLN') }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    }
+  }
+
+  @if (formError()) {
+    <p class="settle-bond-interest-dialog__error" role="alert">{{ formError() }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">
+    {{ 'common.cancel' | transloco }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    [disabled]="submitting() || !section()"
+    (click)="onSubmit()"
+  >
+    @if (submitting()) {
+      <mat-spinner diameter="20" />
+    } @else {
+      {{ 'bonds.settle.submit' | transloco }}
+    }
+  </button>
+</mat-dialog-actions>

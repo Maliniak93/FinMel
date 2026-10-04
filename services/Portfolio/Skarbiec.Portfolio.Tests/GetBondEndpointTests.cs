@@ -73,4 +73,32 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(BondUri(portfolioId, bond.AssetId), cancellationToken)).StatusCode);
     }
+
+    [Fact]
+    public async Task Get_AfterSettlement_ShowsSettledPeriod()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
+        await client.SettleBondInterestAsync(
+            funded.BondPortfolioId, funded.Bond.AssetId, [(1, null), (2, 3.75m)], funded.CashAssetId, cancellationToken);
+
+        var body = await client.GetBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, cancellationToken);
+
+        Assert.Equal(BondPeriodState.Settled, body.Periods[0].State);
+        Assert.Equal(BondPeriodState.Settled, body.Periods[1].State);
+        Assert.Equal(BondPeriodState.Due, body.Periods[2].State);
+        Assert.Equal(BondPeriodState.Upcoming, body.Periods[3].State);
+        var first = body.Periods[0].Settlement!;
+        Assert.Equal(4.00m, first.RatePercent);
+        Assert.Equal(50, first.BondCount);
+        Assert.Equal(16.50m, first.GrossInterest);
+        Assert.Equal(3.14m, first.Tax);
+        Assert.Equal(3.75m, body.Periods[1].Settlement!.RatePercent);
+        Assert.Null(body.Periods[2].Settlement);
+        Assert.Equal(1, body.DuePeriodCount);
+        Assert.Equal(BondStatus.InterestDue, body.Status);
+        Assert.Equal(body.Periods[1].Settlement!.SettlementId, body.LastSettlement!.SettlementId);
+    }
 }

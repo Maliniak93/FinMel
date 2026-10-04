@@ -23,7 +23,8 @@ export async function rowMenuItems(
   fixture: ComponentFixture<unknown>,
   row: HTMLElement,
 ): Promise<HTMLElement[]> {
-  const trigger = row.querySelector<HTMLButtonElement>('button[aria-label^="Actions for"]');
+  // Matched by the menu trigger's class, not its translated label, so it works in either language.
+  const trigger = row.querySelector<HTMLButtonElement>('button.mat-mdc-menu-trigger');
   if (!trigger) {
     throw new Error('No actions menu on this row.');
   }

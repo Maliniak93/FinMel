@@ -24,8 +24,12 @@ public sealed class GetBondHandler(PortfolioDbContext dbContext, TimeProvider ti
         }
 
         var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+        var settlements = await dbContext.BondInterestSettlements
+            .AsNoTracking()
+            .Where(s => s.AssetId == assetId)
+            .ToListAsync(cancellationToken);
 
         return row.Terms.ToResponse(
-            row.Asset, row.PortfolioName, row.PortfolioIsArchived, WarsawCalendar.Today(timeProvider), funding);
+            row.Asset, row.PortfolioName, row.PortfolioIsArchived, WarsawCalendar.Today(timeProvider), funding, settlements);
     }
 }

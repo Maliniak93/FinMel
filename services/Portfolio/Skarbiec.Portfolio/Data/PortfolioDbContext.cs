@@ -17,6 +17,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
     public DbSet<TreasuryBond> TreasuryBonds => Set<TreasuryBond>();
     public DbSet<SavingsInterestSettlement> SavingsInterestSettlements => Set<SavingsInterestSettlement>();
+    public DbSet<BondInterestSettlement> BondInterestSettlements => Set<BondInterestSettlement>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -130,6 +131,19 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             // Update/DeleteTransaction ask whether a transaction is a settlement's managed credit.
             settlement.HasIndex(s => s.TransactionId);
 
+            settlement.Property(s => s.GrossInterest).HasPrecision(18, 2);
+            settlement.Property(s => s.Tax).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<BondInterestSettlement>(settlement =>
+        {
+            // No FK to the asset, the credit or the transfer: RemoveAsset and DeletePortfolio delete the rows explicitly.
+            settlement.HasIndex(s => new { s.AssetId, s.PeriodIndex }).IsUnique();
+
+            // ListTransactions marks a credit with its period through this column.
+            settlement.HasIndex(s => s.CreditTransactionId);
+
+            settlement.Property(s => s.RatePercent).HasPrecision(7, 4);
             settlement.Property(s => s.GrossInterest).HasPrecision(18, 2);
             settlement.Property(s => s.Tax).HasPrecision(18, 2);
         });

@@ -1,0 +1,56 @@
+.settle-bond-interest-dialog__name {
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
+.settle-bond-interest-dialog__loading {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 16px;
+}
+
+.settle-bond-interest-dialog__periods {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settle-bond-interest-dialog__period {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settle-bond-interest-dialog__period-label {
+  flex: 1;
+}
+
+.settle-bond-interest-dialog__rate {
+  width: 160px;
+}
+
+.settle-bond-interest-dialog__destination {
+  width: 100%;
+}
+
+.settle-bond-interest-dialog__hint {
+  opacity: 0.7;
+  margin: 0 0 12px;
+}
+
+.settle-bond-interest-dialog__preview {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+
+  th,
+  td {
+    padding: 4px 8px;
+    text-align: right;
+  }
+}
+
+.settle-bond-interest-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

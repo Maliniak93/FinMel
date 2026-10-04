@@ -1,0 +1,112 @@
+<h2 mat-dialog-title>{{ 'bonds.settle.allTitle' | transloco }}</h2>
+
+<mat-dialog-content>
+  @let all = sections();
+  @if (!all) {
+    <div class="settle-all-bonds-dialog__loading">
+      <mat-spinner diameter="24" />
+    </div>
+  } @else {
+    @for (section of all; track section.bond.assetId) {
+      <section class="settle-all-bonds-dialog__bond">
+        <mat-checkbox
+          [formControl]="section.included"
+          [attr.data-testid]="'include-' + section.bond.assetId"
+        >
+          <strong>{{ section.bond.name }}</strong> · {{ section.bond.seriesCode }}
+        </mat-checkbox>
+
+        @if (section.settled()) {
+          <p class="settle-all-bonds-dialog__done">{{ 'bonds.settle.settled' | transloco }}</p>
+        } @else if (section.included.value) {
+          <div class="settle-all-bonds-dialog__periods">
+            @for (period of section.periods; track period.index; let i = $index) {
+              <div class="settle-all-bonds-dialog__period">
+                <span class="settle-all-bonds-dialog__period-label">
+                  {{ 'bonds.settle.period' | transloco: { index: period.index } }}
+                  {{ formatDate(period.start) }} – {{ formatDate(period.end) }}
+                </span>
+                @let termsRate = usesTermsRate(section.bond, period.index);
+                <mat-form-field appearance="outline" class="settle-all-bonds-dialog__rate">
+                  <mat-label>{{ 'bonds.settle.rate' | transloco }}</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    step="0.01"
+                    [readonly]="termsRate"
+                    [required]="!termsRate"
+                    [formControl]="section.rates.at(i)"
+                    [attr.data-testid]="'period-rate-' + section.bond.assetId + '-' + period.index"
+                  />
+                  @if (termsRate) {
+                    <mat-hint>{{
+                      'bonds.settle.rateFromTerms'
+                        | transloco: { rate: formatPercent(section.bond.firstPeriodRatePercent) }
+                    }}</mat-hint>
+                  }
+                  <mat-error>
+                    @if (section.rates.at(i).hasError('required')) {
+                      {{ 'bonds.settle.rateRequired' | transloco }}
+                    } @else {
+                      {{ 'bonds.purchase.rateRange' | transloco }}
+                    }
+                  </mat-error>
+                </mat-form-field>
+              </div>
+            }
+          </div>
+
+          @if (section.coupon) {
+            <mat-form-field appearance="outline" class="settle-all-bonds-dialog__destination">
+              <mat-label>{{ 'bonds.settle.destination' | transloco }}</mat-label>
+              <mat-select [formControl]="section.destination">
+                @if (candidatesResource.hasValue()) {
+                  @for (candidate of candidatesResource.value(); track candidate.assetId) {
+                    <mat-option [value]="candidate.assetId">
+                      {{ candidate.name }} — {{ candidate.portfolioName }}
+                    </mat-option>
+                  }
+                }
+              </mat-select>
+              @if (candidatesResource.error(); as loadError) {
+                <mat-hint>{{ loadError.message }}</mat-hint>
+              } @else if (
+                candidatesResource.hasValue() && candidatesResource.value().length === 0
+              ) {
+                <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
+              }
+              <mat-error>{{ 'bonds.settle.destinationRequired' | transloco }}</mat-error>
+            </mat-form-field>
+          }
+        }
+
+        @if (section.error(); as message) {
+          <p class="settle-all-bonds-dialog__error" role="alert">
+            {{
+              'bonds.settle.failedFor' | transloco: { name: section.bond.name, message: message }
+            }}
+          </p>
+        }
+      </section>
+    }
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">
+    {{ 'bonds.settle.close' | transloco }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    [disabled]="submitting() || !sections()"
+    (click)="onSubmit()"
+  >
+    @if (submitting()) {
+      <mat-spinner diameter="20" />
+    } @else {
+      {{ 'bonds.settle.submit' | transloco }}
+    }
+  </button>
+</mat-dialog-actions>

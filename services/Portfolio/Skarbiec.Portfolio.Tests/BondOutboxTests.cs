@@ -4,6 +4,8 @@ using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds.AddBond;
+using Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
+using Skarbiec.Portfolio.Features.Bonds.UndoBondInterestSettlement;
 using Skarbiec.Portfolio.Features.Bonds.UpdateBond;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing;
@@ -117,5 +119,144 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         Assert.Equal(2, events.Count);
         Assert.Equal(2_000m, Assert.Single(events, e => e.AssetId == cashId).Quantity);
         Assert.Equal(4_000m, Assert.Single(events, e => e.AssetId == assetId).Quantity);
+    }
+
+    [Fact]
+    public async Task SettleBondInterest_PublishesAtomically()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (bondsId, cashId, assetId) = await ArrangeFundedRorAsync(cancellationToken);
+        var eventsBefore = await CountPositionEventsAsync(cancellationToken);
+        SaveChanges.FailNext();
+
+        await using (var failing = Provider.CreateAsyncScope())
+        {
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => failing.ServiceProvider
+                .GetRequiredService<SettleBondInterestHandler>()
+                .HandleAsync(bondsId, assetId, NewCouponSettlement(cashId), cancellationToken));
+        }
+
+        Assert.Equal(eventsBefore, await CountPositionEventsAsync(cancellationToken));
+        await using (var check = Provider.CreateAsyncScope())
+        {
+            var checkDb = check.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+            Assert.False(await checkDb.Set<BondInterestSettlement>().AnyAsync(s => s.AssetId == assetId, cancellationToken));
+        }
+
+        SaveChanges.Reset();
+
+        await using (var retry = Provider.CreateAsyncScope())
+        {
+            var result = await retry.ServiceProvider.GetRequiredService<SettleBondInterestHandler>()
+                .HandleAsync(bondsId, assetId, NewCouponSettlement(cashId), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, SaveChanges.Count);
+
+        await using var verify = Provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore).ToList();
+        Assert.Equal(2, events.Count);
+        Assert.Equal(5_000m, Assert.Single(events, e => e.AssetId == assetId).Quantity);
+        Assert.Equal(1_013.36m, Assert.Single(events, e => e.AssetId == cashId).Quantity);
+        var settlement = await verifyDb.Set<BondInterestSettlement>().SingleAsync(s => s.AssetId == assetId, cancellationToken);
+        Assert.Equal(16.50m, settlement.GrossInterest);
+        Assert.Equal(3.14m, settlement.Tax);
+    }
+
+    [Fact]
+    public async Task SettleBondInterest_Capitalising_PublishesBondPosition()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var portfolioId = await CreatePortfolioAsync(scope.ServiceProvider, "Bonds", cancellationToken);
+        var added = await scope.ServiceProvider.GetRequiredService<AddBondHandler>()
+            .HandleAsync(portfolioId, PortfolioApi.NewBondRequest(purchaseDate: new DateOnly(2025, 1, 10)), cancellationToken);
+        Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+        var assetId = added.Value.AssetId;
+        var eventsBefore = await CountPositionEventsAsync(cancellationToken);
+        SaveChanges.Reset();
+
+        await using (var act = Provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<SettleBondInterestHandler>().HandleAsync(
+                portfolioId,
+                assetId,
+                new SettleBondInterestRequest { Periods = [new SettleBondPeriodRequest { PeriodIndex = 1 }] },
+                cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, SaveChanges.Count);
+
+        await using var verify = Provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore).ToList();
+        var evt = Assert.Single(events);
+        Assert.Equal(assetId, evt.AssetId);
+        Assert.Equal(5_267.50m, evt.Quantity);
+        Assert.Equal(AssetClass.Bond, evt.AssetClass);
+        Assert.Equal(UserId, evt.UserId);
+    }
+
+    [Fact]
+    public async Task UndoBondInterestSettlement_PublishesBothPositions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (bondsId, cashId, assetId) = await ArrangeFundedRorAsync(cancellationToken);
+        await using (var settle = Provider.CreateAsyncScope())
+        {
+            var settled = await settle.ServiceProvider.GetRequiredService<SettleBondInterestHandler>()
+                .HandleAsync(bondsId, assetId, NewCouponSettlement(cashId), cancellationToken);
+            Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
+        }
+
+        Guid settlementId;
+        await using (var read = Provider.CreateAsyncScope())
+        {
+            settlementId = (await read.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .Set<BondInterestSettlement>().SingleAsync(s => s.AssetId == assetId, cancellationToken)).Id;
+        }
+
+        var eventsBefore = await CountPositionEventsAsync(cancellationToken);
+        SaveChanges.Reset();
+
+        await using (var act = Provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<UndoBondInterestSettlementHandler>()
+                .HandleAsync(bondsId, assetId, settlementId, cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, SaveChanges.Count);
+
+        await using var verify = Provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore).ToList();
+        Assert.Equal(2, events.Count);
+        Assert.Equal(5_000m, Assert.Single(events, e => e.AssetId == assetId).Quantity);
+        Assert.Equal(1_000m, Assert.Single(events, e => e.AssetId == cashId).Quantity);
+    }
+
+    private static SettleBondInterestRequest NewCouponSettlement(Guid cashId) => new()
+    {
+        Periods = [new SettleBondPeriodRequest { PeriodIndex = 1 }],
+        DestinationAssetId = cashId
+    };
+
+    private async Task<(Guid BondsId, Guid CashId, Guid AssetId)> ArrangeFundedRorAsync(CancellationToken cancellationToken)
+    {
+        await using var arrange = Provider.CreateAsyncScope();
+        var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+        var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 6_000m, cancellationToken);
+        var bondsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Bonds", cancellationToken);
+        var added = await arrange.ServiceProvider.GetRequiredService<AddBondHandler>().HandleAsync(
+            bondsId,
+            PortfolioApi.NewRorBondRequest(purchaseDate: new DateOnly(2026, 1, 10)) with { FundingAssetId = cashId },
+            cancellationToken);
+        Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+
+        return (bondsId, cashId, added.Value.AssetId);
     }
 }

@@ -37,6 +37,12 @@ public sealed class UpdateBondHandler(
             return readOnly;
         }
 
+        // A settlement was computed from these terms, so they stay fixed until every settlement is undone.
+        if (await dbContext.BondInterestSettlements.AnyAsync(s => s.AssetId == assetId, cancellationToken))
+        {
+            return BondErrors.Settled;
+        }
+
         var cost = request.BondCount * request.PurchasePricePerBond;
 
         // A bond holds one opening Deposit, rewritten in place together with its funding leg.
@@ -149,6 +155,6 @@ public sealed class UpdateBondHandler(
 
         var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), funding);
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), funding, []);
     }
 }

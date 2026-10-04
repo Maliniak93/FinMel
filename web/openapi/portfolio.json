@@ -1189,6 +1189,148 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements": {
+      "post": {
+        "tags": [
+          "SettleBondInterestEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleBondInterestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BondSettlementResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/preview": {
+      "post": {
+        "tags": [
+          "PreviewBondInterestEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleBondInterestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondInterestPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/{settlementId}": {
+      "delete": {
+        "tags": [
+          "UndoBondInterestSettlementEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "settlementId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/savings-accounts": {
       "post": {
         "tags": [
@@ -1943,6 +2085,129 @@
       "AssetValuationMode": {
         "type": "integer"
       },
+      "BondInterestPreviewResponse": {
+        "required": [
+          "rows",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BondInterestPreviewRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/BondInterestPreviewTotals"
+          }
+        }
+      },
+      "BondInterestPreviewRow": {
+        "required": [
+          "periodIndex",
+          "start",
+          "end",
+          "ratePercent",
+          "bondCount",
+          "gross",
+          "tax",
+          "net"
+        ],
+        "type": "object",
+        "properties": {
+          "periodIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "ratePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "bondCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "gross": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "net": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "BondInterestPreviewTotals": {
+        "required": [
+          "gross",
+          "tax",
+          "net"
+        ],
+        "type": "object",
+        "properties": {
+          "gross": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "net": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "BondPeriodResponse": {
         "required": [
           "index",
@@ -1970,6 +2235,16 @@
           },
           "state": {
             "$ref": "#/components/schemas/BondPeriodState"
+          },
+          "settlement": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BondSettlementResponse"
+              }
+            ]
           }
         }
       },
@@ -1996,6 +2271,7 @@
           "nominalValue",
           "bookValue",
           "status",
+          "duePeriodCount",
           "periods"
         ],
         "type": "object",
@@ -2110,11 +2386,77 @@
           "status": {
             "$ref": "#/components/schemas/BondStatus"
           },
+          "duePeriodCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastSettlement": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BondSettlementResponse"
+              }
+            ]
+          },
           "periods": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BondPeriodResponse"
             }
+          }
+        }
+      },
+      "BondSettlementResponse": {
+        "required": [
+          "settlementId",
+          "ratePercent",
+          "bondCount",
+          "grossInterest",
+          "tax"
+        ],
+        "type": "object",
+        "properties": {
+          "settlementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ratePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "bondCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "grossInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -2869,6 +3211,52 @@
           }
         }
       },
+      "SettleBondInterestRequest": {
+        "required": [
+          "periods"
+        ],
+        "type": "object",
+        "properties": {
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettleBondPeriodRequest"
+            }
+          },
+          "destinationAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "SettleBondPeriodRequest": {
+        "required": [
+          "periodIndex"
+        ],
+        "type": "object",
+        "properties": {
+          "periodIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "ratePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "SettleDepositRequest": {
         "required": [
           "settledOn",
@@ -3015,6 +3403,15 @@
               "string"
             ],
             "format": "date"
+          },
+          "bondInterestPeriodIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -3490,6 +3887,15 @@
     },
     {
       "name": "ListBondsEndpoint"
+    },
+    {
+      "name": "SettleBondInterestEndpoint"
+    },
+    {
+      "name": "PreviewBondInterestEndpoint"
+    },
+    {
+      "name": "UndoBondInterestSettlementEndpoint"
     },
     {
       "name": "AddSavingsAccountEndpoint"

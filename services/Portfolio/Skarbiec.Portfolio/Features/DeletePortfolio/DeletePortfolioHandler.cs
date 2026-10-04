@@ -36,6 +36,8 @@ public sealed class DeletePortfolioHandler(
         // Interest settlements carry no FK, so they go here, with their assets.
         dbContext.SavingsInterestSettlements.RemoveRange(
             await dbContext.SavingsInterestSettlements.Where(s => assetIds.Contains(s.AssetId)).ToListAsync(cancellationToken));
+        dbContext.BondInterestSettlements.RemoveRange(
+            await dbContext.BondInterestSettlements.Where(s => assetIds.Contains(s.AssetId)).ToListAsync(cancellationToken));
 
         dbContext.Assets.RemoveRange(assets);
         dbContext.Portfolios.Remove(portfolio);

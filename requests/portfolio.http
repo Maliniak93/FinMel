@@ -481,6 +481,43 @@ Content-Type: application/json
   "date": "2026-10-01"
 }
 
+### Preview the funded ROR's three due months (period 1 takes the rate from the terms)
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/preview
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "periods": [
+    { "periodIndex": 1 },
+    { "periodIndex": 2, "ratePercent": 3.75 },
+    { "periodIndex": 3, "ratePercent": 3.75 }
+  ],
+  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### Settle them: each net coupon is credited and moved Bond → Cash on its period end
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "periods": [
+    { "periodIndex": 1 },
+    { "periodIndex": 2, "ratePercent": 3.75 },
+    { "periodIndex": 3, "ratePercent": 3.75 }
+  ],
+  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### Get the funded ROR: settled periods, duePeriodCount and lastSettlement
+# @name getFundedBond
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+
+### Undo the latest settlement (only the latest can be undone)
+DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/{{getFundedBond.response.body.lastSettlement.settlementId}}
+Authorization: Bearer {{authToken}}
+
 ### --- Savings accounts ---
 
 ### Add a savings account

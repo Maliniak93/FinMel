@@ -107,4 +107,21 @@ public sealed class UpdateBondEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal("EDO1036", unchanged.Name);
         Assert.Equal(50, unchanged.BondCount);
     }
+
+    [Fact]
+    public async Task Update_Settled_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
+        await client.SettleBondInterestAsync(funded.BondPortfolioId, funded.Bond.AssetId, [(1, null)], funded.CashAssetId, cancellationToken);
+        var request = NewRorBondRequest(bondCount: 10).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(BondUri(funded.BondPortfolioId, funded.Bond.AssetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.BondSettledErrorCode, cancellationToken);
+        var unchanged = await client.GetBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, cancellationToken);
+        Assert.Equal(50, unchanged.BondCount);
+    }
 }
