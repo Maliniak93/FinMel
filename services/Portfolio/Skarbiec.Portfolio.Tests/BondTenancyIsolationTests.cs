@@ -155,6 +155,60 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task RedeemPreviewAndSwap_ByStranger_ReturnNotFoundAndWriteNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var funded = await owner.CreateSettledTosAsync(cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+        var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(strangerPortfolioId, cancellationToken);
+        var assetId = funded.Bond.AssetId;
+        var rowsBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
+
+        foreach (var portfolioId in new[] { funded.BondPortfolioId, strangerPortfolioId })
+        {
+            var redeem = await stranger.RedeemBondRawAsync(portfolioId, assetId, strangerCashId, cancellationToken);
+            var preview = await stranger.GetAsync(BondRedemptionPreviewUri(portfolioId, assetId), cancellationToken);
+            var swap = await stranger.SwapBondRawAsync(portfolioId, assetId, NewSwapBody(10, strangerCashId), cancellationToken);
+
+            Assert.Equal(HttpStatusCode.NotFound, redeem.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, swap.StatusCode);
+        }
+
+        Assert.Empty(await ReadBondRedemptionsAsync(ownerId, cancellationToken));
+        Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
+        await stranger.AssertCashUntouchedAsync(strangerPortfolioId, strangerCashId, cancellationToken);
+    }
+
+    [Fact]
+    public async Task RedeemAndSwap_WithOwnersCashAsDestination_ReturnBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerWalletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(ownerWalletId, cancellationToken, balance: 6_000m);
+        var strangerId = Guid.NewGuid();
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var funded = await stranger.CreateSettledTosAsync(cancellationToken);
+        var rowsBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
+
+        var redeem = await stranger.RedeemBondRawAsync(funded.BondPortfolioId, funded.Bond.AssetId, ownerCashId, cancellationToken);
+        var swap = await stranger.SwapBondRawAsync(
+            funded.BondPortfolioId, funded.Bond.AssetId, NewSwapBody(10, ownerCashId), cancellationToken);
+
+        await redeem.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        await swap.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        await owner.AssertCashUntouchedAsync(ownerWalletId, ownerCashId, cancellationToken, balance: 6_000m);
+        Assert.Empty(await ReadBondRedemptionsAsync(strangerId, cancellationToken));
+        Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
+    }
+
+    [Fact]
     public async Task Settle_WithOwnersCashAsDestination_ReturnsBadRequest()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

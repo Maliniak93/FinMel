@@ -1331,6 +1331,143 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption": {
+      "post": {
+        "tags": [
+          "RedeemBondEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemBondRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption-preview": {
+      "get": {
+        "tags": [
+          "GetBondRedemptionPreviewEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondRedemptionPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/swap": {
+      "post": {
+        "tags": [
+          "SwapBondEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapBondRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/savings-accounts": {
       "post": {
         "tags": [
@@ -2251,6 +2388,130 @@
       "BondPeriodState": {
         "type": "integer"
       },
+      "BondRedemptionKind": {
+        "type": "integer"
+      },
+      "BondRedemptionPreviewResponse": {
+        "required": [
+          "date",
+          "bondCount",
+          "capitalisedInterest",
+          "discountIncome",
+          "taxableIncome",
+          "tax",
+          "proceeds"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "bondCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "capitalisedInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "discountIncome": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "taxableIncome": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "proceeds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "BondRedemptionResponse": {
+        "required": [
+          "kind",
+          "date",
+          "bondCount",
+          "tax",
+          "proceeds"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/BondRedemptionKind"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "bondCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "proceeds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "destinationAssetName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "swapTargetAssetName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "BondResponse": {
         "required": [
           "assetId",
@@ -2272,7 +2533,8 @@
           "bookValue",
           "status",
           "duePeriodCount",
-          "periods"
+          "periods",
+          "redemptions"
         ],
         "type": "object",
         "properties": {
@@ -2409,6 +2671,22 @@
             "items": {
               "$ref": "#/components/schemas/BondPeriodResponse"
             }
+          },
+          "redemptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BondRedemptionResponse"
+            }
+          },
+          "swappedFrom": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BondSwapSourceResponse"
+              }
+            ]
           }
         }
       },
@@ -2462,6 +2740,22 @@
       },
       "BondStatus": {
         "type": "integer"
+      },
+      "BondSwapSourceResponse": {
+        "required": [
+          "assetId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
       },
       "CreatePortfolioRequest": {
         "required": [
@@ -2963,6 +3257,18 @@
           }
         }
       },
+      "RedeemBondRequest": {
+        "required": [
+          "destinationAssetId"
+        ],
+        "type": "object",
+        "properties": {
+          "destinationAssetId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "RollOverDepositRequest": {
         "required": [
           "annualInterestRatePercent"
@@ -3322,6 +3628,98 @@
           },
           "tax": {
             "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "SwapBondRequest": {
+        "required": [
+          "bondCount",
+          "newBond"
+        ],
+        "type": "object",
+        "properties": {
+          "bondCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "newBond": {
+            "$ref": "#/components/schemas/SwapNewBondRequest"
+          },
+          "destinationAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "SwapNewBondRequest": {
+        "required": [
+          "name",
+          "seriesCode",
+          "type",
+          "swapPricePerBond",
+          "firstPeriodRatePercent",
+          "earlyRedemptionFeePerBond"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "seriesCode": {
+            "pattern": "^[A-Z]{3}[0-9]{4}$",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TreasuryBondType"
+          },
+          "swapPricePerBond": {
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "firstPeriodRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "marginPercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "earlyRedemptionFeePerBond": {
+            "maximum": 100,
             "minimum": 0,
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -3896,6 +4294,15 @@
     },
     {
       "name": "UndoBondInterestSettlementEndpoint"
+    },
+    {
+      "name": "RedeemBondEndpoint"
+    },
+    {
+      "name": "GetBondRedemptionPreviewEndpoint"
+    },
+    {
+      "name": "SwapBondEndpoint"
     },
     {
       "name": "AddSavingsAccountEndpoint"

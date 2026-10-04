@@ -37,6 +37,30 @@ internal static class BondErrors
     public static readonly Error SettlementNotLatest =
         new("Conflict.BondSettlementNotLatest", "Only the latest interest settlement can be undone.");
 
+    public static readonly Error NotMatured =
+        new("Conflict.BondNotMatured", "A bond can be redeemed or swapped only on or after its maturity date.");
+
+    public static readonly Error InterestUnsettled =
+        new("Conflict.BondInterestUnsettled", "Settle every interest period of this bond before redeeming or swapping it.");
+
+    public static readonly Error AlreadyRedeemed =
+        new("Conflict.BondAlreadyRedeemed", "This bond has already been redeemed.");
+
+    public static readonly Error Redeemed =
+        new("Conflict.BondRedeemed", "This bond has been redeemed, so its interest settlements are fixed.");
+
+    public static readonly Error FromSwap =
+        new("Conflict.BondFromSwap", "A bond bought in a swap keeps its count, price, purchase date, series, type and tax exemption — only the name, rate, margin and fee can change.");
+
+    public static readonly Error SwapCount =
+        new("Validation.BondSwapCount", "The number of bonds to swap must be from 1 to the number of bonds held.");
+
+    public static readonly Error SwapExceedsProceeds =
+        new("Validation.BondSwapExceedsProceeds", "The swap costs more than the redemption pays out.");
+
+    public static readonly Error SwapLeftoverDestinationRequired =
+        new("Validation.BondPayoutDestinationRequired", "The swap leaves money over — pick the Cash asset that receives it.");
+
     public static readonly Error SettlementTransferDetached =
         new("Conflict.BondSettlementTransferDetached", "The Cash side of this coupon payout no longer exists, so the settlement can't be undone.");
 }

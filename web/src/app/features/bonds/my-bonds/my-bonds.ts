@@ -17,7 +17,6 @@ import {
   getApiPortfolioBonds,
   type BondPeriodResponse,
   type BondResponse,
-  type BondStatus,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
@@ -26,8 +25,21 @@ import {
   BondPurchaseDialog,
   type BondPurchaseDialogData,
 } from '../bond-purchase-dialog/bond-purchase-dialog';
-import { BOND_PERIOD_STATE, canSettle, usesTermsRate } from '../bond-interest';
+import {
+  BOND_PERIOD_STATE,
+  BOND_STATUS,
+  canRedeem,
+  canSettle,
+  canSwap,
+  isRedeemed,
+  usesTermsRate,
+} from '../bond-interest';
 import { bondTypeInfo } from '../bond-types';
+import {
+  RedeemBondDialog,
+  type RedeemBondDialogData,
+  type RedeemBondDialogResult,
+} from '../redeem-bond-dialog/redeem-bond-dialog';
 import {
   SettleAllBondsDialog,
   type SettleAllBondsDialogData,
@@ -36,17 +48,13 @@ import {
   SettleBondInterestDialog,
   type SettleBondInterestDialogData,
 } from '../settle-bond-interest-dialog/settle-bond-interest-dialog';
-
-// Mirrors BondStatus in declaration order: the enum travels as an int.
-const BOND_STATUS = { Active: 0, InterestDue: 1, Matured: 2 } as const satisfies Record<
-  string,
-  BondStatus
->;
+import { SwapBondDialog, type SwapBondDialogData } from '../swap-bond-dialog/swap-bond-dialog';
 
 const BOND_STATUS_LABELS: Record<number, string> = {
   [BOND_STATUS.Active]: 'bonds.status.active',
   [BOND_STATUS.InterestDue]: 'bonds.status.interestDue',
   [BOND_STATUS.Matured]: 'bonds.status.matured',
+  [BOND_STATUS.Redeemed]: 'bonds.status.redeemed',
 };
 
 const BOND_PERIOD_STATE_LABELS: Record<number, string> = {
@@ -101,10 +109,21 @@ export class MyBonds {
   });
 
   protected readonly showArchived = signal(false);
+  protected readonly showRedeemed = signal(false);
+
+  protected readonly hasRedeemed = computed(
+    () => this.bondsResource.hasValue() && this.bondsResource.value().some(isRedeemed),
+  );
 
   protected readonly visibleBonds = computed(() =>
     this.bondsResource.hasValue()
-      ? this.bondsResource.value().filter((bond) => this.showArchived() || !bond.isArchived)
+      ? this.bondsResource
+          .value()
+          .filter(
+            (bond) =>
+              (this.showArchived() || !bond.isArchived) &&
+              (this.showRedeemed() || !isRedeemed(bond)),
+          )
       : [],
   );
 
@@ -127,6 +146,9 @@ export class MyBonds {
   protected readonly formatDate = formatDate;
   protected readonly formatPercent = formatPercent;
   protected readonly canSettle = canSettle;
+  protected readonly canRedeem = canRedeem;
+  protected readonly canSwap = canSwap;
+  protected readonly isRedeemed = isRedeemed;
 
   protected typeLabel(bond: BondResponse): string {
     return bondTypeInfo(bond.type)?.label ?? '';
@@ -137,7 +159,7 @@ export class MyBonds {
   }
 
   protected needsAttention(bond: BondResponse): boolean {
-    return Number(bond.status) !== BOND_STATUS.Active;
+    return Number(bond.status) !== BOND_STATUS.Active && !isRedeemed(bond);
   }
 
   protected periodStateLabel(period: BondPeriodResponse): string {
@@ -167,6 +189,28 @@ export class MyBonds {
   protected openSettleDialog(bond: BondResponse): void {
     const data: SettleBondInterestDialogData = { bond };
     this.reloadWhenSaved(this.dialog.open(SettleBondInterestDialog, { width: '640px', data }));
+  }
+
+  protected openRedeemDialog(bond: BondResponse): void {
+    const data: RedeemBondDialogData = { bond };
+    this.dialog
+      .open<RedeemBondDialog, RedeemBondDialogData, RedeemBondDialogResult>(RedeemBondDialog, {
+        width: '560px',
+        data,
+      })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result === 'settle') {
+          this.openSettleDialog(bond);
+        } else if (result) {
+          this.bondsResource.reload();
+        }
+      });
+  }
+
+  protected openSwapDialog(bond: BondResponse): void {
+    const data: SwapBondDialogData = { bond };
+    this.reloadWhenSaved(this.dialog.open(SwapBondDialog, { width: '640px', data }));
   }
 
   protected openSettleAllDialog(): void {

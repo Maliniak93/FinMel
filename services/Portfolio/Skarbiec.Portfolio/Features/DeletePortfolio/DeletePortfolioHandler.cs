@@ -38,6 +38,8 @@ public sealed class DeletePortfolioHandler(
             await dbContext.SavingsInterestSettlements.Where(s => assetIds.Contains(s.AssetId)).ToListAsync(cancellationToken));
         dbContext.BondInterestSettlements.RemoveRange(
             await dbContext.BondInterestSettlements.Where(s => assetIds.Contains(s.AssetId)).ToListAsync(cancellationToken));
+        dbContext.BondRedemptions.RemoveRange(
+            await dbContext.BondRedemptions.Where(r => assetIds.Contains(r.AssetId)).ToListAsync(cancellationToken));
 
         dbContext.Assets.RemoveRange(assets);
         dbContext.Portfolios.Remove(portfolio);

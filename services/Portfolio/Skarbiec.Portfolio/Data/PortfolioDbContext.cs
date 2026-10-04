@@ -18,6 +18,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<TreasuryBond> TreasuryBonds => Set<TreasuryBond>();
     public DbSet<SavingsInterestSettlement> SavingsInterestSettlements => Set<SavingsInterestSettlement>();
     public DbSet<BondInterestSettlement> BondInterestSettlements => Set<BondInterestSettlement>();
+    public DbSet<BondRedemption> BondRedemptions => Set<BondRedemption>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -146,6 +147,18 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             settlement.Property(s => s.RatePercent).HasPrecision(7, 4);
             settlement.Property(s => s.GrossInterest).HasPrecision(18, 2);
             settlement.Property(s => s.Tax).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<BondRedemption>(redemption =>
+        {
+            // No FK to the asset, the swap target or the transactions: RemoveAsset and DeletePortfolio delete the rows explicitly.
+            // Unique: a holding is redeemed whole, once, so a racing second redemption fails here.
+            redemption.HasIndex(r => r.AssetId).IsUnique();
+
+            redemption.Property(r => r.CapitalisedInterest).HasPrecision(18, 2);
+            redemption.Property(r => r.DiscountIncome).HasPrecision(18, 2);
+            redemption.Property(r => r.Tax).HasPrecision(18, 2);
+            redemption.Property(r => r.Proceeds).HasPrecision(18, 2);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

@@ -43,6 +43,18 @@ public sealed class UpdateBondHandler(
             return BondErrors.Settled;
         }
 
+        // A swap-born bond's purchase was paid by the old bond's redemption, so only what that transfer did not fix can change.
+        if (terms.SwappedFromAssetId is not null
+            && (request.BondCount != terms.BondCount
+                || request.PurchasePricePerBond != terms.PurchasePricePerBond
+                || request.PurchaseDate != terms.PurchaseDate
+                || request.SeriesCode != terms.SeriesCode
+                || request.Type != terms.Type
+                || request.TaxExempt != terms.TaxExempt))
+        {
+            return BondErrors.FromSwap;
+        }
+
         var cost = request.BondCount * request.PurchasePricePerBond;
 
         // A bond holds one opening Deposit, rewritten in place together with its funding leg.
@@ -153,8 +165,6 @@ public sealed class UpdateBondHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
-
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), funding, []);
+        return (await dbContext.LoadBondAsync(portfolioId, assetId, WarsawCalendar.Today(timeProvider), cancellationToken))!;
     }
 }

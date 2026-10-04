@@ -85,6 +85,20 @@ internal static class PortfolioAssertions
 
     public const string BondPayoutDestinationNotAllowedErrorCode = "Validation.BondPayoutDestinationNotAllowed";
 
+    public const string BondNotMaturedErrorCode = "Conflict.BondNotMatured";
+
+    public const string BondInterestUnsettledErrorCode = "Conflict.BondInterestUnsettled";
+
+    public const string BondAlreadyRedeemedErrorCode = "Conflict.BondAlreadyRedeemed";
+
+    public const string BondRedeemedErrorCode = "Conflict.BondRedeemed";
+
+    public const string BondFromSwapErrorCode = "Conflict.BondFromSwap";
+
+    public const string BondSwapCountErrorCode = "Validation.BondSwapCount";
+
+    public const string BondSwapExceedsProceedsErrorCode = "Validation.BondSwapExceedsProceeds";
+
     public const string SavingsInterestNotDueErrorCode = "Conflict.SavingsInterestNotDue";
 
     public const string SavingsInterestPeriodMismatchErrorCode = "Conflict.SavingsInterestPeriodMismatch";

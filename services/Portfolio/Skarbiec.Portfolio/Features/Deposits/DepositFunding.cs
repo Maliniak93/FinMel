@@ -20,6 +20,8 @@ internal static class DepositFunding
                 join outLeg in dbContext.Transactions on inLeg.TransferId equals outLeg.TransferId
                 where outLeg.Id != inLeg.Id
                 join source in dbContext.Assets on outLeg.AssetId equals source.Id
+                // A swap-born bond's opening is the In leg of a Bond → Bond transfer, shown as swappedFrom instead.
+                where source.AssetClass == AssetClass.Cash
                 select new { DepositId = inLeg.AssetId, SourceId = source.Id, SourceName = source.Name })
             .ToListAsync(cancellationToken);
 

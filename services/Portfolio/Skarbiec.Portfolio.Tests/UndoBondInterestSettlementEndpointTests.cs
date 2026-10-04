@@ -106,4 +106,26 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
             t => t.BondInterestPeriodIndex == 1);
         Assert.Equal(0m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
     }
+
+    [Fact]
+    public async Task Undo_Redeemed_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateSettledTosAsync(cancellationToken);
+        var portfolioId = funded.BondPortfolioId;
+        var assetId = funded.Bond.AssetId;
+        var latestId = await client.GetLastBondSettlementIdAsync(portfolioId, assetId, cancellationToken);
+        await client.RedeemBondAsync(portfolioId, assetId, funded.CashAssetId, cancellationToken);
+        var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.DeleteAsync(BondInterestSettlementUri(portfolioId, assetId, latestId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.BondRedeemedErrorCode, cancellationToken);
+        Assert.Equal(3, await CountBondSettlementsAsync(userId, cancellationToken, assetId));
+        Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));
+        Assert.Single(await ReadBondRedemptionsAsync(userId, cancellationToken, assetId));
+    }
 }

@@ -4,7 +4,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
-import { clickRowMenuItem, showArchived as showArchivedToggle } from '../../../testing/archive';
+import {
+  clickRowMenuItem,
+  menuItemLabel,
+  rowMenuItems,
+  showArchived as showArchivedToggle,
+} from '../../../testing/archive';
 import {
   activeBond,
   archivedBond,
@@ -12,7 +17,11 @@ import {
   interestDueBond,
   maturedBond,
   octoberOffer,
+  redeemedTosBond,
   settledRorBond,
+  settledTosBond,
+  swapBornBond,
+  unsettledTosBond,
   type BondFixture,
 } from '../../../testing/bond-fixtures';
 import { restoreEnglish, switchLanguage, textOf } from '../../../testing/i18n';
@@ -24,8 +33,10 @@ import { formatMoney } from '../../shared/format';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { BondPurchaseDialog } from './bond-purchase-dialog/bond-purchase-dialog';
 import { Bonds } from './bonds';
+import { RedeemBondDialog } from './redeem-bond-dialog/redeem-bond-dialog';
 import { SettleAllBondsDialog } from './settle-all-bonds-dialog/settle-all-bonds-dialog';
 import { SettleBondInterestDialog } from './settle-bond-interest-dialog/settle-bond-interest-dialog';
+import { SwapBondDialog } from './swap-bond-dialog/swap-bond-dialog';
 
 describe('Bonds page, my bonds tab', () => {
   let fixture: ComponentFixture<Bonds>;
@@ -194,6 +205,96 @@ describe('Bonds page, my bonds tab', () => {
     expect(
       fetchSpy.mock.calls.some((call: unknown[]) => (call[0] as Request).method === 'DELETE'),
     ).toBe(false);
+  });
+
+  it('hides redeemed bonds behind "Pokaż wykupione" and marks a swap-born bond "z zamiany"', async () => {
+    await setup([swapBornBond, redeemedTosBond]);
+    await switchLanguage(fixture, 'pl');
+
+    expect(rows()).toHaveLength(1);
+    expect(textOf(rowFor(swapBornBond.name))).toContain(`z zamiany: ${redeemedTosBond.name}`);
+
+    const toggle = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="show-redeemed"] button',
+    );
+    expect(textOf(toggle!.closest('mat-slide-toggle')!)).toContain('Pokaż wykupione');
+    toggle!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(rows()).toHaveLength(2);
+    const redeemedRow = rows().find((row) => !textOf(row).includes('z zamiany'));
+    expect(textOf(redeemedRow!)).toContain(redeemedTosBond.name);
+    expect(textOf(redeemedRow!)).toContain('Wykupiona');
+  });
+
+  it('"Wykup" opens the redeem dialog for a matured bond and reloads after a redemption', async () => {
+    await setup([settledTosBond]);
+    await switchLanguage(fixture, 'pl');
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = bondListCalls();
+
+    await clickRowMenuItem(fixture, rowFor(settledTosBond.name), /^Wykup$/);
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      RedeemBondDialog,
+      expect.objectContaining({
+        data: { bond: expect.objectContaining({ assetId: settledTosBond.assetId }) },
+      }),
+    );
+    await vi.waitFor(() => expect(bondListCalls()).toBeGreaterThan(callsBefore));
+  });
+
+  it('"Zamień" opens the swap dialog for a matured, settled bond', async () => {
+    await setup([settledTosBond]);
+    await switchLanguage(fixture, 'pl');
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    await clickRowMenuItem(fixture, rowFor(settledTosBond.name), /^Zamień$/);
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      SwapBondDialog,
+      expect.objectContaining({
+        data: { bond: expect.objectContaining({ assetId: settledTosBond.assetId }) },
+      }),
+    );
+  });
+
+  it('offers "Wykup" but not "Zamień" on a matured bond with unsettled periods', async () => {
+    await setup([unsettledTosBond]);
+    await switchLanguage(fixture, 'pl');
+
+    const labels = (await rowMenuItems(fixture, rowFor(unsettledTosBond.name))).map(menuItemLabel);
+
+    expect(labels).toContain('Wykup');
+    expect(labels).not.toContain('Zamień');
+  });
+
+  it('offers neither "Wykup" nor "Zamień" before maturity', async () => {
+    await setup([activeBond]);
+    await switchLanguage(fixture, 'pl');
+
+    const labels = (await rowMenuItems(fixture, rowFor(activeBond.name))).map(menuItemLabel);
+
+    expect(labels).not.toContain('Wykup');
+    expect(labels).not.toContain('Zamień');
+  });
+
+  it('"Wykup" on a bond with unsettled periods opens the settle dialog when the redeem dialog points there', async () => {
+    await setup([unsettledTosBond]);
+    await switchLanguage(fixture, 'pl');
+    dialog.open.mockReturnValueOnce({ afterClosed: () => of('settle') });
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+    await clickRowMenuItem(fixture, rowFor(unsettledTosBond.name), /^Wykup$/);
+
+    expect(dialog.open).toHaveBeenNthCalledWith(1, RedeemBondDialog, expect.anything());
+    expect(dialog.open).toHaveBeenNthCalledWith(
+      2,
+      SettleBondInterestDialog,
+      expect.objectContaining({
+        data: { bond: expect.objectContaining({ assetId: unsettledTosBond.assetId }) },
+      }),
+    );
   });
 });
 

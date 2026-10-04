@@ -725,14 +725,33 @@ async function main() {
     if (!existsSync(WEB_DIR)) {
       console.log("\nnotice: web/ not found — skipping web checks");
     } else {
-      const webSteps = [
+      // Run independent static checks in parallel (typecheck, lint, format:check),
+      // then sequential checks (build, test) that may depend on earlier steps.
+      const staticChecks = [
         ["web-typecheck", ["run", "typecheck"]],
         ["web-lint", ["run", "lint"]],
         ["web-format", ["run", "format:check"]],
+      ];
+      const sequentialSteps = [
         ["web-build", ["run", "build"]],
         ["web-test", ["test", "--", "--watch=false"]],
       ];
-      for (const [canonical, npmArgs] of webSteps) {
+
+      // Run static checks in parallel
+      console.log("\n==> web checks (parallel: typecheck, lint, format:check)");
+      const staticPromises = staticChecks.map(([canonical, npmArgs]) =>
+        step(canonical, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }))
+      );
+      const staticResults = await Promise.all(staticPromises);
+      for (let i = 0; i < staticResults.length; i++) {
+        const r = staticResults[i];
+        if (!r.ok) {
+          return finish(false, [buildFailure(staticChecks[i][0], r)]);
+        }
+      }
+
+      // Run sequential checks (build, test)
+      for (const [canonical, npmArgs] of sequentialSteps) {
         const r = await step(canonical, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }));
         if (!r.ok) return finish(false, [buildFailure(canonical, r)]);
       }

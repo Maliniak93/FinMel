@@ -120,7 +120,7 @@ public sealed class AddBondHandler(
 
         var fundingSource = funding is null ? null : new DepositFundingSource(funding.Source.Id, funding.Source.Name);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), fundingSource, []);
+        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), fundingSource, [], [], null);
     }
 
     private async Task<Result<FundingTransfer>> PlanFundingAsync(
@@ -128,7 +128,9 @@ public sealed class AddBondHandler(
     {
         var source = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == fundingAssetId, cancellationToken);
 
+        // Bond → Bond is a swap's route only, so a purchase is funded from Cash alone.
         if (source is null
+            || source.AssetClass != AssetClass.Cash
             || !TransferRoutes.IsAllowed(source.AssetClass, bond.AssetClass)
             || source.Currency != bond.Currency
             || source.IsArchived

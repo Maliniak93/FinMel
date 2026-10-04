@@ -9,7 +9,8 @@ public sealed class TransferRoutesTests
         (source, target) is (AssetClass.Cash, AssetClass.Deposit) or (AssetClass.Deposit, AssetClass.Cash)
             or (AssetClass.Cash, AssetClass.Savings) or (AssetClass.Savings, AssetClass.Cash)
             or (AssetClass.Deposit, AssetClass.Savings)
-            or (AssetClass.Cash, AssetClass.Bond) or (AssetClass.Bond, AssetClass.Cash);
+            or (AssetClass.Cash, AssetClass.Bond) or (AssetClass.Bond, AssetClass.Cash)
+            or (AssetClass.Bond, AssetClass.Bond);
 
     private static bool ExpectedManual(AssetClass source, AssetClass target) =>
         (source, target) is (AssetClass.Cash, AssetClass.Savings) or (AssetClass.Savings, AssetClass.Cash);
@@ -48,6 +49,13 @@ public sealed class TransferRoutesTests
     {
         Assert.False(TransferRoutes.IsAllowed(source, target));
         Assert.False(TransferRoutes.IsManual(source, target));
+    }
+
+    [Fact]
+    public void Route_BondToBond_IsAllowedButNotManual()
+    {
+        Assert.True(TransferRoutes.IsAllowed(AssetClass.Bond, AssetClass.Bond));
+        Assert.False(TransferRoutes.IsManual(AssetClass.Bond, AssetClass.Bond));
     }
 
     [Fact]

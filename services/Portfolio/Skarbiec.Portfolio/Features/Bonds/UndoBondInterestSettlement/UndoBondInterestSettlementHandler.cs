@@ -30,6 +30,12 @@ public sealed class UndoBondInterestSettlementHandler(PortfolioDbContext dbConte
             return readOnly;
         }
 
+        // The redemption was computed from every settlement and has no undo, so they stay fixed.
+        if (await dbContext.BondRedemptions.AnyAsync(r => r.AssetId == assetId, cancellationToken))
+        {
+            return BondErrors.Redeemed;
+        }
+
         if (await dbContext.BondInterestSettlements.AnyAsync(
                 s => s.AssetId == assetId && s.PeriodIndex > settlement.PeriodIndex, cancellationToken))
         {

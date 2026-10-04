@@ -89,7 +89,9 @@ internal static class BondInterestPlanning
         {
             destination = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == destinationAssetId, cancellationToken);
 
+            // Bond → Bond is a swap's route only, so a coupon is paid to Cash alone.
             if (destination is null
+                || destination.AssetClass != AssetClass.Cash
                 || !TransferRoutes.IsAllowed(bond.AssetClass, destination.AssetClass)
                 || destination.Currency != bond.Currency
                 || destination.IsArchived

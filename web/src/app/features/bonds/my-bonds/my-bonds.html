@@ -6,6 +6,16 @@
   >
     {{ 'assetArchive.showArchived' | transloco }}
   </mat-slide-toggle>
+  @if (hasRedeemed()) {
+    <mat-slide-toggle
+      class="my-bonds__show-archived"
+      data-testid="show-redeemed"
+      [checked]="showRedeemed()"
+      (change)="showRedeemed.set($event.checked)"
+    >
+      {{ 'bonds.my.showRedeemed' | transloco }}
+    </mat-slide-toggle>
+  }
   @if (settleableBonds().length > 0) {
     <button mat-stroked-button type="button" (click)="openSettleAllDialog()">
       <mat-icon>payments</mat-icon>
@@ -56,7 +66,14 @@
 
     <ng-container matColumnDef="name">
       <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
-      <td mat-cell *matCellDef="let bond">{{ bond.name }}</td>
+      <td mat-cell *matCellDef="let bond">
+        {{ bond.name }}
+        @if (bond.swappedFrom; as source) {
+          <span class="my-bonds__muted" data-testid="swapped-from">
+            {{ 'bonds.my.swappedFrom' | transloco: { name: source.name } }}
+          </span>
+        }
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="seriesCode">
@@ -132,7 +149,19 @@
                 <span>{{ 'bonds.settle.action' | transloco }}</span>
               </button>
             }
-            @if (!bond.isArchived) {
+            @if (canRedeem(bond)) {
+              <button mat-menu-item type="button" (click)="openRedeemDialog(bond)">
+                <mat-icon>account_balance_wallet</mat-icon>
+                <span>{{ 'bonds.redeem.action' | transloco }}</span>
+              </button>
+            }
+            @if (canSwap(bond)) {
+              <button mat-menu-item type="button" (click)="openSwapDialog(bond)">
+                <mat-icon>swap_horiz</mat-icon>
+                <span>{{ 'bonds.swap.action' | transloco }}</span>
+              </button>
+            }
+            @if (!bond.isArchived && !isRedeemed(bond)) {
               <button mat-menu-item type="button" (click)="openEditDialog(bond)">
                 <mat-icon>edit</mat-icon>
                 <span>{{ 'common.edit' | transloco }}</span>

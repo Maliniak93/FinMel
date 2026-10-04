@@ -24,10 +24,18 @@ public sealed class ListBondsHandler(PortfolioDbContext dbContext, TimeProvider 
                 .Where(s => assetIds.Contains(s.AssetId))
                 .ToListAsync(cancellationToken))
             .ToLookup(s => s.AssetId);
+        var links = await dbContext.LoadBondLinksAsync([.. rows.Select(r => r.Terms)], cancellationToken);
 
         return rows
             .Select(r => r.Terms.ToResponse(
-                r.Asset, r.PortfolioName, r.PortfolioIsArchived, today, funding.GetValueOrDefault(r.Asset.Id), [.. settlements[r.Asset.Id]]))
+                r.Asset,
+                r.PortfolioName,
+                r.PortfolioIsArchived,
+                today,
+                funding.GetValueOrDefault(r.Asset.Id),
+                [.. settlements[r.Asset.Id]],
+                [.. links.Redemptions[r.Asset.Id]],
+                links.SwappedFrom.GetValueOrDefault(r.Asset.Id)))
             .ToList();
     }
 }
