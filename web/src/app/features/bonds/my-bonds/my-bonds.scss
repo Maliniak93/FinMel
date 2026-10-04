@@ -38,3 +38,15 @@
   --mat-chip-elevated-container-color: var(--mat-sys-error-container);
   --mat-chip-label-text-color: var(--mat-sys-on-error-container);
 }
+
+.my-bonds__periods {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 16px;
+
+  th,
+  td {
+    padding: 4px 8px;
+    text-align: left;
+  }
+}

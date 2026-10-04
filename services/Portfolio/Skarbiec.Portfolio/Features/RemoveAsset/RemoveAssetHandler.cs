@@ -45,6 +45,8 @@ public sealed class RemoveAssetHandler(
         // Interest settlements carry no FK, so they go here, with the asset.
         dbContext.SavingsInterestSettlements.RemoveRange(
             await dbContext.SavingsInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
+        dbContext.BondInterestSettlements.RemoveRange(
+            await dbContext.BondInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
 
         dbContext.Assets.Remove(asset);
 

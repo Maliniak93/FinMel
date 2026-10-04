@@ -18,6 +18,21 @@ public enum BondPeriodState
     Upcoming,
 
     Due,
+
+    Settled,
+}
+
+public sealed record BondSettlementResponse
+{
+    public required Guid SettlementId { get; init; }
+    public required decimal RatePercent { get; init; }
+    public required int BondCount { get; init; }
+
+    /// <summary>PLN for all the bonds of the lot.</summary>
+    public required decimal GrossInterest { get; init; }
+
+    /// <summary>Belka tax withheld, PLN; 0 for capitalised interest, which is taxed at redemption.</summary>
+    public required decimal Tax { get; init; }
 }
 
 public sealed record BondPeriodResponse
@@ -27,6 +42,9 @@ public sealed record BondPeriodResponse
     public required DateOnly Start { get; init; }
     public required DateOnly End { get; init; }
     public required BondPeriodState State { get; init; }
+
+    /// <summary>Set only on a Settled period.</summary>
+    public BondSettlementResponse? Settlement { get; init; }
 }
 
 public sealed record BondResponse
@@ -68,6 +86,13 @@ public sealed record BondResponse
     public string? FundingAssetName { get; init; }
 
     public required BondStatus Status { get; init; }
+
+    /// <summary>Ended periods not settled yet.</summary>
+    public required int DuePeriodCount { get; init; }
+
+    /// <summary>The settlement with the highest period index — the only one that can be undone.</summary>
+    public BondSettlementResponse? LastSettlement { get; init; }
+
     public required IReadOnlyList<BondPeriodResponse> Periods { get; init; }
 }
 
@@ -81,17 +106,24 @@ public static class BondMappingExtensions
         string portfolioName,
         bool portfolioIsArchived,
         DateOnly today,
-        DepositFundingSource? funding)
+        DepositFundingSource? funding,
+        IReadOnlyCollection<BondInterestSettlement> settlements)
     {
+        var settled = settlements.ToDictionary(s => s.PeriodIndex, s => s.ToResponse());
         var periods = BondSchedule.Periods(terms.Type, terms.PurchaseDate)
             .Select(p => new BondPeriodResponse
             {
                 Index = p.Index,
                 Start = p.Start,
                 End = p.End,
-                State = p.End <= today ? BondPeriodState.Due : BondPeriodState.Upcoming
+                State = settled.ContainsKey(p.Index) ? BondPeriodState.Settled
+                    : p.End <= today ? BondPeriodState.Due
+                    : BondPeriodState.Upcoming,
+                Settlement = settled.GetValueOrDefault(p.Index)
             })
             .ToList();
+        var duePeriodCount = periods.Count(p => p.State == BondPeriodState.Due);
+        var lastSettlement = settlements.MaxBy(s => s.PeriodIndex);
 
         return new BondResponse
         {
@@ -116,9 +148,20 @@ public static class BondMappingExtensions
             FundingAssetId = funding?.AssetId,
             FundingAssetName = funding?.AssetName,
             Status = terms.MaturityDate <= today ? BondStatus.Matured
-                : periods.Any(p => p.State == BondPeriodState.Due) ? BondStatus.InterestDue
+                : duePeriodCount > 0 ? BondStatus.InterestDue
                 : BondStatus.Active,
+            DuePeriodCount = duePeriodCount,
+            LastSettlement = lastSettlement?.ToResponse(),
             Periods = periods
         };
     }
+
+    public static BondSettlementResponse ToResponse(this BondInterestSettlement settlement) => new()
+    {
+        SettlementId = settlement.Id,
+        RatePercent = settlement.RatePercent,
+        BondCount = settlement.BondCount,
+        GrossInterest = settlement.GrossInterest,
+        Tax = settlement.Tax
+    };
 }

@@ -74,11 +74,34 @@ export type AssetResponse = {
 
 export type AssetValuationMode = number;
 
+export type BondInterestPreviewResponse = {
+    rows: Array<BondInterestPreviewRow>;
+    totals: BondInterestPreviewTotals;
+};
+
+export type BondInterestPreviewRow = {
+    periodIndex: number | string;
+    start: string;
+    end: string;
+    ratePercent: number | string;
+    bondCount: number | string;
+    gross: number | string;
+    tax: number | string;
+    net: number | string;
+};
+
+export type BondInterestPreviewTotals = {
+    gross: number | string;
+    tax: number | string;
+    net: number | string;
+};
+
 export type BondPeriodResponse = {
     index: number | string;
     start: string;
     end: string;
     state: BondPeriodState;
+    settlement?: null | BondSettlementResponse;
 };
 
 export type BondPeriodState = number;
@@ -105,7 +128,17 @@ export type BondResponse = {
     fundingAssetId?: null | string;
     fundingAssetName?: null | string;
     status: BondStatus;
+    duePeriodCount: number | string;
+    lastSettlement?: null | BondSettlementResponse;
     periods: Array<BondPeriodResponse>;
+};
+
+export type BondSettlementResponse = {
+    settlementId: string;
+    ratePercent: number | string;
+    bondCount: number | string;
+    grossInterest: number | string;
+    tax: number | string;
 };
 
 export type BondStatus = number;
@@ -255,6 +288,16 @@ export type SavingsInterestSettlementResponse = {
     netInterest: number | string;
 };
 
+export type SettleBondInterestRequest = {
+    periods: Array<SettleBondPeriodRequest>;
+    destinationAssetId?: null | string;
+};
+
+export type SettleBondPeriodRequest = {
+    periodIndex: number | string;
+    ratePercent?: null | number | string;
+};
+
 export type SettleDepositRequest = {
     settledOn: string;
     grossInterest: number | string;
@@ -279,6 +322,7 @@ export type TransactionResponse = {
     date: string;
     transfer?: null | TransactionTransferResponse;
     savingsInterestPeriodEnd?: null | string;
+    bondInterestPeriodIndex?: null | number | string;
 };
 
 export type TransactionTransferResponse = {
@@ -931,6 +975,64 @@ export type GetApiPortfolioBondsResponses = {
 };
 
 export type GetApiPortfolioBondsResponse = GetApiPortfolioBondsResponses[keyof GetApiPortfolioBondsResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsData = {
+    body: SettleBondInterestRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses = {
+    /**
+     * Created
+     */
+    201: Array<BondSettlementResponse>;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewData = {
+    body: SettleBondInterestRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/preview';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses = {
+    /**
+     * OK
+     */
+    200: BondInterestPreviewResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses];
+
+export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+        settlementId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/{settlementId}';
+};
+
+export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses];
 
 export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData = {
     body: AddSavingsAccountRequest;

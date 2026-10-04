@@ -365,6 +365,66 @@ internal static class PortfolioApi
         return new FundedBond(cashPortfolioId, cashId, bondPortfolioId, bond);
     }
 
+    public static string BondInterestSettlementsUri(Guid portfolioId, Guid assetId) =>
+        $"{BondUri(portfolioId, assetId)}/interest-settlements";
+
+    public static string BondInterestPreviewUri(Guid portfolioId, Guid assetId) =>
+        $"{BondInterestSettlementsUri(portfolioId, assetId)}/preview";
+
+    public static string BondInterestSettlementUri(Guid portfolioId, Guid assetId, Guid settlementId) =>
+        $"{BondInterestSettlementsUri(portfolioId, assetId)}/{settlementId}";
+
+    public static readonly DateOnly RorPurchaseDate = new(2026, 6, 10);
+
+    public static AddBondRequest NewRorBondRequest(
+        DateOnly? purchaseDate = null, int bondCount = 50, decimal firstPeriodRatePercent = 4.00m, bool taxExempt = false) =>
+        NewBondRequest(
+            name: "ROR0627",
+            seriesCode: "ROR0627",
+            type: TreasuryBondType.Ror,
+            purchaseDate: purchaseDate ?? RorPurchaseDate,
+            bondCount: bondCount,
+            firstPeriodRatePercent: firstPeriodRatePercent,
+            marginPercent: null,
+            taxExempt: taxExempt);
+
+    public static object NewSettleBondBody(
+        IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods, Guid? destinationAssetId = null) => new
+        {
+            periods = periods.Select(p => new { periodIndex = p.PeriodIndex, ratePercent = p.RatePercent }).ToList(),
+            destinationAssetId
+        };
+
+    public static async Task<HttpResponseMessage> SettleBondInterestRawAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods,
+        Guid? destinationAssetId,
+        CancellationToken cancellationToken) =>
+        await client.PostAsJsonAsync(
+            BondInterestSettlementsUri(portfolioId, assetId), NewSettleBondBody(periods, destinationAssetId), cancellationToken);
+
+    public static async Task SettleBondInterestAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods,
+        Guid? destinationAssetId,
+        CancellationToken cancellationToken)
+    {
+        var response = await client.SettleBondInterestRawAsync(portfolioId, assetId, periods, destinationAssetId, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<Guid> GetLastBondSettlementIdAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var bond = await client.GetBondAsync(portfolioId, assetId, cancellationToken);
+
+        return bond.LastSettlement!.SettlementId;
+    }
+
     public const string AllSavingsAccountsUri = "/api/portfolio/savings-accounts";
 
     public static string SavingsAccountsUri(Guid portfolioId) =>

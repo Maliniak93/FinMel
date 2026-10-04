@@ -25,6 +25,9 @@ public sealed record TransactionResponse
 
     /// <summary>The last day of the settled month when this is a savings account's interest credit; null otherwise.</summary>
     public DateOnly? SavingsInterestPeriodEnd { get; init; }
+
+    /// <summary>The settled period's 1-based index when this is a treasury bond's interest credit; null otherwise.</summary>
+    public int? BondInterestPeriodIndex { get; init; }
 }
 
 public static class TransactionMappingExtensions
@@ -33,7 +36,8 @@ public static class TransactionMappingExtensions
         this Transaction transaction,
         string currency,
         TransactionTransferResponse? transfer = null,
-        DateOnly? savingsInterestPeriodEnd = null) => new()
+        DateOnly? savingsInterestPeriodEnd = null,
+        int? bondInterestPeriodIndex = null) => new()
         {
             Id = transaction.Id,
             AssetId = transaction.AssetId,
@@ -46,6 +50,7 @@ public static class TransactionMappingExtensions
             : null,
             Date = transaction.Date,
             Transfer = transfer,
-            SavingsInterestPeriodEnd = savingsInterestPeriodEnd
+            SavingsInterestPeriodEnd = savingsInterestPeriodEnd,
+            BondInterestPeriodIndex = bondInterestPeriodIndex
         };
 }

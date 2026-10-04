@@ -9,7 +9,7 @@ public sealed class TransferRoutesTests
         (source, target) is (AssetClass.Cash, AssetClass.Deposit) or (AssetClass.Deposit, AssetClass.Cash)
             or (AssetClass.Cash, AssetClass.Savings) or (AssetClass.Savings, AssetClass.Cash)
             or (AssetClass.Deposit, AssetClass.Savings)
-            or (AssetClass.Cash, AssetClass.Bond);
+            or (AssetClass.Cash, AssetClass.Bond) or (AssetClass.Bond, AssetClass.Cash);
 
     private static bool ExpectedManual(AssetClass source, AssetClass target) =>
         (source, target) is (AssetClass.Cash, AssetClass.Savings) or (AssetClass.Savings, AssetClass.Cash);

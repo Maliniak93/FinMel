@@ -18,6 +18,9 @@ public static class TransferRoutes
         // Paying a settled deposit out into a savings account, through the same two payout slices.
         [(AssetClass.Deposit, AssetClass.Savings)] = false,
 
+        // Paying a treasury bond's coupon out to cash, through SettleBondInterest's destinationAssetId.
+        [(AssetClass.Bond, AssetClass.Cash)] = false,
+
         // Moving money between a current account and a savings account, through CreateTransfer and DeleteTransfer.
         [(AssetClass.Cash, AssetClass.Savings)] = true,
         [(AssetClass.Savings, AssetClass.Cash)] = true,

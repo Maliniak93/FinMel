@@ -8,9 +8,11 @@ import { clickRowMenuItem, showArchived as showArchivedToggle } from '../../../t
 import {
   activeBond,
   archivedBond,
+  dueRorBond,
   interestDueBond,
   maturedBond,
   octoberOffer,
+  settledRorBond,
   type BondFixture,
 } from '../../../testing/bond-fixtures';
 import { restoreEnglish, switchLanguage, textOf } from '../../../testing/i18n';
@@ -22,6 +24,8 @@ import { formatMoney } from '../../shared/format';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { BondPurchaseDialog } from './bond-purchase-dialog/bond-purchase-dialog';
 import { Bonds } from './bonds';
+import { SettleAllBondsDialog } from './settle-all-bonds-dialog/settle-all-bonds-dialog';
+import { SettleBondInterestDialog } from './settle-bond-interest-dialog/settle-bond-interest-dialog';
 
 describe('Bonds page, my bonds tab', () => {
   let fixture: ComponentFixture<Bonds>;
@@ -263,5 +267,174 @@ describe('Bonds page, current offer tab', () => {
         data: expect.objectContaining({ seriesCode: 'EDO1036' }),
       }),
     );
+  });
+});
+
+describe('Bonds page, interest settlement', () => {
+  let fixture: ComponentFixture<Bonds>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let dialog: { open: ReturnType<typeof vi.fn> };
+
+  beforeAll(() => {
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+    marketDataClient.setConfig({ baseUrl: 'https://example.test' });
+  });
+
+  afterEach(async () => {
+    fetchSpy.mockRestore();
+    await restoreEnglish();
+  });
+
+  async function setup(bonds: BondFixture[]): Promise<void> {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const request = input as Request;
+      const url = requestUrl(input);
+      if (request.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes('/api/marketdata/bond-series')) {
+        return jsonResponse(octoberOffer);
+      }
+      return url.includes('/api/portfolio/bonds')
+        ? jsonResponse(bonds)
+        : jsonResponse({ detail: 'Not found.' }, 404);
+    });
+    dialog = { open: vi.fn().mockReturnValue({ afterClosed: () => of(true) }) };
+
+    await TestBed.configureTestingModule({
+      imports: [Bonds],
+      providers: [
+        provideI18nTesting(),
+        provideRouter([]),
+        { provide: MatDialog, useValue: dialog },
+        { provide: MatSnackBar, useValue: { open: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(Bonds);
+    await fixture.whenStable();
+    await switchLanguage(fixture, 'pl');
+  }
+
+  function button(label: string): HTMLButtonElement | undefined {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+    ).find((candidate) => textOf(candidate).includes(label));
+  }
+
+  function bondListCalls(): number {
+    return fetchSpy.mock.calls.filter(
+      (call: unknown[]) =>
+        requestUrl(call[0]).includes('/api/portfolio/bonds') &&
+        (typeof call[0] === 'string' || (call[0] as Request).method === 'GET'),
+    ).length;
+  }
+
+  async function expand(bond: BondFixture): Promise<void> {
+    const toggle = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      `[data-testid="expand-${bond.assetId}"]`,
+    );
+    expect(toggle).not.toBeNull();
+    toggle!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  it('shows "Rozlicz wszystkie" only when a bond has due periods', async () => {
+    await setup([activeBond, maturedBond]);
+
+    expect(button('Rozlicz wszystkie')).toBeUndefined();
+
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+    await setup([activeBond, dueRorBond]);
+
+    expect(button('Rozlicz wszystkie')).toBeDefined();
+  });
+
+  it('"Rozlicz wszystkie" opens the settle-all dialog with the bonds that have due periods and reloads', async () => {
+    await setup([activeBond, dueRorBond]);
+    const callsBefore = bondListCalls();
+
+    button('Rozlicz wszystkie')!.click();
+    await fixture.whenStable();
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      SettleAllBondsDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bonds: [expect.objectContaining({ assetId: dueRorBond.assetId })],
+        }),
+      }),
+    );
+    await vi.waitFor(() => expect(bondListCalls()).toBeGreaterThan(callsBefore));
+  });
+
+  it('the row menu settles one bond through the settle dialog', async () => {
+    await setup([dueRorBond]);
+
+    await clickRowMenuItem(
+      fixture,
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'tbody tr.mat-mdc-row',
+        ),
+      ).find((row) => textOf(row).includes(dueRorBond.name))!,
+      /rozlicz/i,
+    );
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      SettleBondInterestDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bond: expect.objectContaining({ assetId: dueRorBond.assetId }),
+        }),
+      }),
+    );
+  });
+
+  it('expands a row into the period table and offers "Cofnij" on the latest settled period only', async () => {
+    await setup([settledRorBond]);
+
+    await expand(settledRorBond);
+
+    // textOf folds the locale's no-break spaces into plain ones, so the expected amounts are folded the same way.
+    const table = textOf(fixture.nativeElement);
+    const money = (amount: number): string => formatMoney(amount, 'PLN').replace(/\s+/g, ' ');
+    expect(table).toContain(money(16.5));
+    expect(table).toContain(money(15.5));
+    expect(table).toContain(money(3.14));
+    const root = fixture.nativeElement as HTMLElement;
+    const first = root.querySelector<HTMLElement>('[data-testid="period-row-1"]');
+    const second = root.querySelector<HTMLElement>('[data-testid="period-row-2"]');
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(textOf(first)).not.toContain('Cofnij');
+    expect(textOf(second)).toContain('Cofnij');
+  });
+
+  it('"Cofnij" asks for confirmation, then deletes the latest settlement and reloads', async () => {
+    await setup([settledRorBond]);
+    await expand(settledRorBond);
+    const callsBefore = bondListCalls();
+
+    const undo = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        '[data-testid="period-row-2"] button',
+      ),
+    ).find((candidate) => textOf(candidate).includes('Cofnij'))!;
+    undo.click();
+    await fixture.whenStable();
+
+    expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+    await vi.waitFor(() => {
+      const deleteCall = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .find((request: Request) => request.method === 'DELETE');
+      expect(deleteCall?.url).toContain(
+        `/api/portfolio/portfolios/${settledRorBond.portfolioId}/bonds/${settledRorBond.assetId}/interest-settlements/${settledRorBond.lastSettlement!.settlementId}`,
+      );
+    });
+    await vi.waitFor(() => expect(bondListCalls()).toBeGreaterThan(callsBefore));
   });
 });

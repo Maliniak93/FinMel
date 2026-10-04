@@ -17,11 +17,17 @@ public sealed class ListBondsHandler(PortfolioDbContext dbContext, TimeProvider 
             .ToListAsync(cancellationToken);
 
         var today = WarsawCalendar.Today(timeProvider);
-        var funding = await dbContext.LoadFundingSourcesAsync(rows.Select(r => r.Asset.Id).ToList(), cancellationToken);
+        var assetIds = rows.Select(r => r.Asset.Id).ToList();
+        var funding = await dbContext.LoadFundingSourcesAsync(assetIds, cancellationToken);
+        var settlements = (await dbContext.BondInterestSettlements
+                .AsNoTracking()
+                .Where(s => assetIds.Contains(s.AssetId))
+                .ToListAsync(cancellationToken))
+            .ToLookup(s => s.AssetId);
 
         return rows
             .Select(r => r.Terms.ToResponse(
-                r.Asset, r.PortfolioName, r.PortfolioIsArchived, today, funding.GetValueOrDefault(r.Asset.Id)))
+                r.Asset, r.PortfolioName, r.PortfolioIsArchived, today, funding.GetValueOrDefault(r.Asset.Id), [.. settlements[r.Asset.Id]]))
             .ToList();
     }
 }

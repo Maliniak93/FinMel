@@ -257,6 +257,48 @@
       "exceedsBalance": "Koszt przekracza saldo źródła ({{ balance }}).",
       "insufficientFunds": "Źródło środków nie pokrywa tego zakupu.",
       "cost": "Koszt"
+    },
+    "settle": {
+      "action": "Rozlicz odsetki",
+      "all": "Rozlicz wszystkie",
+      "title": "Rozlicz odsetki obligacji",
+      "allTitle": "Rozlicz wszystkie należne odsetki obligacji",
+      "period": "Okres {{ index }}:",
+      "rate": "Oprocentowanie (%)",
+      "rateFromTerms": "Z warunków emisji: {{ rate }}",
+      "rateRequired": "Podaj oprocentowanie ogłoszone przez Ministerstwo Finansów.",
+      "seriesUnavailable": "Brak ogłoszonych stóp dla tej serii — wpisz je ręcznie.",
+      "destination": "Wypłać na",
+      "destinationRequired": "Wybierz rachunek, na który trafią odsetki.",
+      "noCash": "Brak rachunku w PLN — najpierw go dodaj.",
+      "cashLoadFailed": "Nie udało się wczytać rachunków.",
+      "capitalised": "Odsetki powiększają wartość obligacji; podatek zostanie pobrany przy wykupie.",
+      "previewFailed": "Nie udało się wczytać podglądu.",
+      "total": "Razem",
+      "submit": "Rozlicz",
+      "settled": "Rozliczono.",
+      "close": "Zamknij",
+      "failed": "Nie udało się rozliczyć odsetek.",
+      "failedFor": "{{ name }}: {{ message }}",
+      "undo": "Cofnij",
+      "undoTitle": "Cofnąć ostatnie rozliczenie odsetek?",
+      "undoMessage": "Okres {{ index }} obligacji „{{ name }}” i jego wpłata odsetek zostaną usunięte, a okres znów będzie do rozliczenia.",
+      "undoFailed": "Nie udało się cofnąć rozliczenia."
+    },
+    "periods": {
+      "toggle": "Pokaż okresy odsetkowe: {{ name }}",
+      "index": "Nr",
+      "dates": "Okres",
+      "rate": "Oprocentowanie",
+      "count": "Liczba",
+      "gross": "Brutto",
+      "tax": "Podatek",
+      "net": "Netto",
+      "state": {
+        "upcoming": "Przyszły",
+        "due": "Do rozliczenia",
+        "settled": "Rozliczony"
+      }
     }
   },
   "dashboard": {

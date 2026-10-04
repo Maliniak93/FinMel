@@ -67,6 +67,10 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
             .AsNoTracking()
             .Where(s => transactionIds.Contains(s.TransactionId))
             .ToDictionaryAsync(s => s.TransactionId!.Value, s => s.PeriodEnd, cancellationToken);
+        var creditPeriodIndexes = await dbContext.BondInterestSettlements
+            .AsNoTracking()
+            .Where(s => transactionIds.Contains(s.CreditTransactionId))
+            .ToDictionaryAsync(s => s.CreditTransactionId!.Value, s => s.PeriodIndex, cancellationToken);
 
         return new PagedResponse<TransactionResponse>
         {
@@ -88,7 +92,8 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                             Direction = TransferLegs.DirectionOf(t)
                         }
                         : null,
-                    creditPeriodEnds.TryGetValue(t.Id, out var periodEnd) ? periodEnd : null))
+                    creditPeriodEnds.TryGetValue(t.Id, out var periodEnd) ? periodEnd : null,
+                    creditPeriodIndexes.TryGetValue(t.Id, out var periodIndex) ? periodIndex : null))
             ],
             Page = page,
             PageSize = pageSize,

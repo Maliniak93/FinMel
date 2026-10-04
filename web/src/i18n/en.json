@@ -257,6 +257,48 @@
       "exceedsBalance": "The cost is above the source's balance ({{ balance }}).",
       "insufficientFunds": "The source of funds cannot cover this purchase.",
       "cost": "Cost"
+    },
+    "settle": {
+      "action": "Settle interest",
+      "all": "Settle all",
+      "title": "Settle bond interest",
+      "allTitle": "Settle all due bond interest",
+      "period": "Period {{ index }}:",
+      "rate": "Rate (%)",
+      "rateFromTerms": "From the terms: {{ rate }}",
+      "rateRequired": "Enter the rate published by the Ministry of Finance.",
+      "seriesUnavailable": "No published rates for this series — enter them manually.",
+      "destination": "Pay out to",
+      "destinationRequired": "Pick the cash account that receives the interest.",
+      "noCash": "No PLN cash account — add one first.",
+      "cashLoadFailed": "Failed to load cash accounts.",
+      "capitalised": "The interest is added to the bond's value; the tax is due at redemption.",
+      "previewFailed": "Failed to load the preview.",
+      "total": "Total",
+      "submit": "Settle",
+      "settled": "Settled.",
+      "close": "Close",
+      "failed": "Failed to settle the interest.",
+      "failedFor": "{{ name }}: {{ message }}",
+      "undo": "Undo",
+      "undoTitle": "Undo the last interest settlement?",
+      "undoMessage": "Period {{ index }} of \"{{ name }}\" and its interest credit will be removed, and the period becomes due again.",
+      "undoFailed": "Failed to undo the settlement."
+    },
+    "periods": {
+      "toggle": "Show the interest periods of {{ name }}",
+      "index": "No.",
+      "dates": "Period",
+      "rate": "Rate",
+      "count": "Count",
+      "gross": "Gross",
+      "tax": "Tax",
+      "net": "Net",
+      "state": {
+        "upcoming": "Upcoming",
+        "due": "Due",
+        "settled": "Settled"
+      }
     }
   },
   "dashboard": {

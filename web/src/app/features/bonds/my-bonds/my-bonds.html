@@ -6,6 +6,12 @@
   >
     {{ 'assetArchive.showArchived' | transloco }}
   </mat-slide-toggle>
+  @if (settleableBonds().length > 0) {
+    <button mat-stroked-button type="button" (click)="openSettleAllDialog()">
+      <mat-icon>payments</mat-icon>
+      {{ 'bonds.settle.all' | transloco }}
+    </button>
+  }
   <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
     <mat-icon>add</mat-icon>
     {{ 'bonds.my.add' | transloco }}
@@ -31,7 +37,23 @@
     </button>
   </div>
 } @else if (bondsResource.hasValue()) {
-  <table mat-table [dataSource]="visibleBonds()" class="my-bonds__table">
+  <table mat-table [dataSource]="tableRows()" multiTemplateDataRows class="my-bonds__table">
+    <ng-container matColumnDef="expand">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let bond">
+        <button
+          mat-icon-button
+          type="button"
+          [attr.data-testid]="'expand-' + bond.assetId"
+          [attr.aria-expanded]="expandedId() === bond.assetId"
+          [attr.aria-label]="'bonds.periods.toggle' | transloco: { name: bond.name }"
+          (click)="toggleExpanded(bond)"
+        >
+          <mat-icon>{{ expandedId() === bond.assetId ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="name">
       <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
       <td mat-cell *matCellDef="let bond">{{ bond.name }}</td>
@@ -104,6 +126,12 @@
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
+            @if (canSettle(bond)) {
+              <button mat-menu-item type="button" (click)="openSettleDialog(bond)">
+                <mat-icon>payments</mat-icon>
+                <span>{{ 'bonds.settle.action' | transloco }}</span>
+              </button>
+            }
             @if (!bond.isArchived) {
               <button mat-menu-item type="button" (click)="openEditDialog(bond)">
                 <mat-icon>edit</mat-icon>
@@ -119,8 +147,59 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="periods">
+      <td mat-cell *matCellDef="let bond" [attr.colspan]="displayedColumns.length">
+        <table class="my-bonds__periods">
+          <thead>
+            <tr>
+              <th>{{ 'bonds.periods.index' | transloco }}</th>
+              <th>{{ 'bonds.periods.dates' | transloco }}</th>
+              <th>{{ 'bonds.periods.rate' | transloco }}</th>
+              <th>{{ 'bonds.periods.count' | transloco }}</th>
+              <th>{{ 'bonds.periods.gross' | transloco }}</th>
+              <th>{{ 'bonds.periods.tax' | transloco }}</th>
+              <th>{{ 'common.status' | transloco }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (period of bond.periods; track period.index) {
+              <tr [attr.data-testid]="'period-row-' + period.index">
+                <td>{{ period.index }}</td>
+                <td>{{ formatDate(period.start) }} – {{ formatDate(period.end) }}</td>
+                <td>
+                  @let rate = periodRate(bond, period);
+                  {{ rate === null ? '—' : formatPercent(rate) }}
+                </td>
+                <td>{{ period.settlement?.bondCount ?? '—' }}</td>
+                <td>
+                  {{
+                    period.settlement ? formatMoney(period.settlement.grossInterest, 'PLN') : '—'
+                  }}
+                </td>
+                <td>{{ period.settlement ? formatMoney(period.settlement.tax, 'PLN') : '—' }}</td>
+                <td>{{ periodStateLabel(period) | transloco }}</td>
+                <td>
+                  @if (canUndo(bond, period)) {
+                    <button mat-button type="button" (click)="undoLastSettlement(bond, period)">
+                      {{ 'bonds.settle.undo' | transloco }}
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </td>
+    </ng-container>
+
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
     <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    <tr
+      mat-row
+      *matRowDef="let row; columns: ['periods']; when: isExpanded"
+      class="my-bonds__periods-row"
+    ></tr>
     <tr *matNoDataRow>
       <td class="my-bonds__no-data" [attr.colspan]="displayedColumns.length">
         {{ 'assetArchive.allArchived' | transloco }}
