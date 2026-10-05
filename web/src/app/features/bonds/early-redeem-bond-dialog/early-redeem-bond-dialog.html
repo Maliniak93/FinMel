@@ -1,0 +1,194 @@
+<h2 mat-dialog-title>{{ 'bonds.earlyRedeem.title' | transloco }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="early-redeem-bond-dialog__name">{{ bond.name }} · {{ bond.seriesCode }}</p>
+
+    <div class="early-redeem-bond-dialog__row">
+      <mat-form-field appearance="outline" class="early-redeem-bond-dialog__field">
+        <mat-label>{{ 'bonds.earlyRedeem.date' | transloco }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="datePicker"
+          [min]="minDate"
+          [max]="maxDate"
+          formControlName="date"
+          data-testid="early-redeem-date"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="datePicker"></mat-datepicker-toggle>
+        <mat-datepicker #datePicker></mat-datepicker>
+        @if (form.controls.date.hasError('required')) {
+          <mat-error>{{ 'bonds.earlyRedeem.dateRequired' | transloco }}</mat-error>
+        } @else if (form.controls.date.hasError('server')) {
+          <mat-error>{{ form.controls.date.getError('server') }}</mat-error>
+        } @else {
+          <mat-error>{{ 'bonds.earlyRedeem.dateOutOfRange' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="early-redeem-bond-dialog__field">
+        <mat-label>{{ 'bonds.earlyRedeem.count' | transloco }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="1"
+          min="1"
+          [max]="maxCount"
+          formControlName="bondCount"
+          data-testid="early-redeem-count"
+        />
+        @if (form.controls.bondCount.hasError('server')) {
+          <mat-error>{{ form.controls.bondCount.getError('server') }}</mat-error>
+        } @else {
+          <mat-error>{{ 'bonds.earlyRedeem.countRange' | transloco: { max: maxCount } }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    @if (runningPeriod(); as period) {
+      <p class="early-redeem-bond-dialog__period">
+        {{
+          'bonds.earlyRedeem.runningPeriod'
+            | transloco
+              : {
+                  index: period.index,
+                  start: formatDate(period.start),
+                  end: formatDate(period.end),
+                }
+        }}
+      </p>
+    }
+
+    @if (unsettledCount() > 0) {
+      <p class="early-redeem-bond-dialog__settle-first" role="alert" data-testid="settle-first">
+        <strong>{{ 'bonds.earlyRedeem.settleFirst' | transloco }}</strong>
+        {{ 'bonds.earlyRedeem.settleFirstHint' | transloco: { count: unsettledCount() } }}
+      </p>
+    } @else {
+      <mat-form-field appearance="outline" class="early-redeem-bond-dialog__rate">
+        <mat-label>{{ 'bonds.earlyRedeem.rate' | transloco }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="0.01"
+          [readonly]="termsRate()"
+          formControlName="ratePercent"
+          data-testid="early-redeem-rate"
+        />
+        @if (termsRate()) {
+          <mat-hint>{{
+            'bonds.settle.rateFromTerms'
+              | transloco: { rate: formatPercent(bond.firstPeriodRatePercent) }
+          }}</mat-hint>
+        } @else if (seriesResource.hasValue() && !seriesResource.value()) {
+          <mat-hint>{{ 'bonds.settle.seriesUnavailable' | transloco }}</mat-hint>
+        }
+        @if (form.controls.ratePercent.hasError('required')) {
+          <mat-error>{{ 'bonds.settle.rateRequired' | transloco }}</mat-error>
+        } @else {
+          <mat-error>{{ 'bonds.purchase.rateRange' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+
+      @if (previewResource.error(); as loadError) {
+        <p class="early-redeem-bond-dialog__error" role="alert">{{ loadError.message }}</p>
+      } @else if (previewResource.isLoading()) {
+        <div class="early-redeem-bond-dialog__loading">
+          <mat-spinner diameter="24" />
+        </div>
+      }
+      @if (previewResource.hasValue()) {
+        @let preview = previewResource.value();
+        <dl class="early-redeem-bond-dialog__summary" data-testid="early-redemption-preview">
+          <div>
+            <dt>{{ 'bonds.my.count' | transloco }}</dt>
+            <dd>{{ preview.bondCount }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.earlyRedeem.interestDue' | transloco }}</dt>
+            <dd>{{ formatMoney(preview.interestDue, currency) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.earlyRedeem.fee' | transloco }}</dt>
+            <dd>{{ formatMoney(preview.fee, currency) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.redeem.discountIncome' | transloco }}</dt>
+            <dd>{{ formatMoney(preview.discountIncome, currency) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.redeem.tax' | transloco }}</dt>
+            <dd>{{ formatMoney(preview.tax, currency) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.redeem.proceeds' | transloco }}</dt>
+            <dd>
+              <strong>{{ formatMoney(preview.proceeds, currency) }}</strong>
+            </dd>
+          </div>
+        </dl>
+      }
+
+      @if (feeNote(); as note) {
+        <p class="early-redeem-bond-dialog__hint" data-testid="fee-note">{{ note | transloco }}</p>
+      }
+
+      <mat-form-field appearance="outline" class="early-redeem-bond-dialog__destination">
+        <mat-label>{{ 'bonds.redeem.destination' | transloco }}</mat-label>
+        <mat-select formControlName="destinationAssetId" data-testid="early-redeem-destination">
+          @if (candidatesResource.hasValue()) {
+            @for (candidate of candidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }}
+              </mat-option>
+            }
+          }
+        </mat-select>
+        @if (candidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
+          <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
+        }
+        @if (form.controls.destinationAssetId.hasError('required')) {
+          <mat-error>{{ 'bonds.redeem.destinationRequired' | transloco }}</mat-error>
+        } @else if (form.controls.destinationAssetId.hasError('server')) {
+          <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (formError()) {
+      <p class="early-redeem-bond-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    @if (unsettledCount() > 0) {
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        data-testid="settle-first-action"
+        (click)="settleFirst()"
+      >
+        {{ 'bonds.redeem.settleAction' | transloco }}
+      </button>
+    } @else {
+      <button
+        mat-flat-button
+        color="primary"
+        type="submit"
+        [disabled]="submitting() || !previewResource.hasValue()"
+      >
+        @if (submitting()) {
+          <mat-spinner diameter="20" />
+        } @else {
+          {{ 'bonds.earlyRedeem.submit' | transloco }}
+        }
+      </button>
+    }
+  </mat-dialog-actions>
+</form>

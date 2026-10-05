@@ -212,7 +212,8 @@
       "maturityDate": "Wykup",
       "portfolio": "Portfel",
       "showRedeemed": "Pokaż wykupione",
-      "swappedFrom": "z zamiany: {{ name }}"
+      "swappedFrom": "z zamiany: {{ name }}",
+      "partiallyRedeemed": "częściowo wykupiona"
     },
     "status": {
       "active": "Aktywna",
@@ -304,6 +305,26 @@
       "previewFailed": "Nie udało się wczytać podglądu wykupu.",
       "submit": "Wykup",
       "failed": "Nie udało się wykupić obligacji."
+    },
+    "earlyRedeem": {
+      "action": "Wykup przed terminem",
+      "title": "Przedterminowy wykup",
+      "date": "Data wykupu",
+      "dateRequired": "Podaj datę wykupu.",
+      "dateOutOfRange": "Wybierz datę po zakupie, przed terminem wykupu i nie późniejszą niż dziś.",
+      "count": "Liczba obligacji do wykupu",
+      "countRange": "Podaj liczbę całkowitą od 1 do {{ max }}.",
+      "runningPeriod": "Bieżący okres {{ index }}: {{ start }} – {{ end }}",
+      "rate": "Oprocentowanie bieżącego okresu (%)",
+      "settleFirst": "Najpierw rozlicz wcześniejsze okresy.",
+      "settleFirstHint": "Okresy zakończone do daty wykupu muszą być rozliczone — nierozliczone okresy: {{ count }}.",
+      "interestDue": "Narosłe odsetki",
+      "fee": "Opłata za przedterminowy wykup",
+      "feeCapped": "Opłata potrącana z odsetek, nie wyższa niż odsetki.",
+      "feeFull": "Pełna opłata — wcześniejsze kupony zostały już wypłacone.",
+      "previewFailed": "Nie udało się wczytać podglądu przedterminowego wykupu.",
+      "submit": "Wykup przed terminem",
+      "failed": "Nie udało się wykupić obligacji przed terminem."
     },
     "swap": {
       "action": "Zamień",

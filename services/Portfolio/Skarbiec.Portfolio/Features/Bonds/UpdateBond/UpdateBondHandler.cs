@@ -37,6 +37,11 @@ public sealed class UpdateBondHandler(
             return readOnly;
         }
 
+        if (await dbContext.BondRedemptions.AnyAsync(r => r.AssetId == assetId, cancellationToken))
+        {
+            return BondErrors.Redeemed;
+        }
+
         // A settlement was computed from these terms, so they stay fixed until every settlement is undone.
         if (await dbContext.BondInterestSettlements.AnyAsync(s => s.AssetId == assetId, cancellationToken))
         {

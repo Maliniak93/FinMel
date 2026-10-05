@@ -54,10 +54,16 @@ public sealed record BondRedemptionResponse
     public required BondRedemptionKind Kind { get; init; }
     public required DateOnly Date { get; init; }
 
-    /// <summary>The whole holding — a swap redeems every bond, swapped or not.</summary>
+    /// <summary>The bonds this redemption took: the whole holding at maturity or in a swap, swapped or not; the redeemed part when early.</summary>
     public required int BondCount { get; init; }
 
-    /// <summary>Belka tax on the capitalised interest and the purchase discount, PLN.</summary>
+    /// <summary>PLN interest accrued in the running period on the redeemed bonds; 0 unless early.</summary>
+    public required decimal AccruedInterest { get; init; }
+
+    /// <summary>PLN early-redemption fee on the redeemed bonds; 0 unless early.</summary>
+    public required decimal Fee { get; init; }
+
+    /// <summary>Belka tax on the taxable interest and the purchase discount, PLN.</summary>
     public required decimal Tax { get; init; }
 
     /// <summary>What the redemption pays out after tax, PLN; a swap spends part of it on the new bond.</summary>
@@ -183,8 +189,8 @@ public static class BondMappingExtensions
             BookValue = asset.Quantity,
             FundingAssetId = funding?.AssetId,
             FundingAssetName = funding?.AssetName,
-            // A holding is only ever redeemed whole, so one redemption means nothing is left.
-            Status = redemptions.Count > 0 ? BondStatus.Redeemed
+            // Maturity and swap redeem the holding whole; early redemptions only once they took every bond.
+            Status = terms.BondCount == 0 || redemptions.Any(r => r.Kind != BondRedemptionKind.Early) ? BondStatus.Redeemed
                 : terms.MaturityDate <= today ? BondStatus.Matured
                 : duePeriodCount > 0 ? BondStatus.InterestDue
                 : BondStatus.Active,

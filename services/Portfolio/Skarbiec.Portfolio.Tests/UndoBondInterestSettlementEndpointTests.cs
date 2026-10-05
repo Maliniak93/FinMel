@@ -108,6 +108,28 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
     }
 
     [Fact]
+    public async Task Undo_AfterEarlyRedemption_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
+        var portfolioId = funded.BondPortfolioId;
+        var assetId = funded.Bond.AssetId;
+        var settlementId = await client.GetLastBondSettlementIdAsync(portfolioId, assetId, cancellationToken);
+        await client.RedeemBondEarlyAsync(
+            portfolioId, assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+        var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.DeleteAsync(BondInterestSettlementUri(portfolioId, assetId, settlementId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.BondRedeemedErrorCode, cancellationToken);
+        Assert.Equal(1, await CountBondSettlementsAsync(userId, cancellationToken, assetId));
+        Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));
+    }
+
+    [Fact]
     public async Task Undo_Redeemed_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

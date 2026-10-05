@@ -53,6 +53,12 @@ internal static class BondRedemptionPlanning
             return readOnly;
         }
 
+        // Early redemptions took every bond already.
+        if (terms.BondCount == 0)
+        {
+            return BondErrors.AlreadyRedeemed;
+        }
+
         if (terms.MaturityDate > today)
         {
             return BondErrors.NotMatured;
@@ -69,7 +75,8 @@ internal static class BondRedemptionPlanning
             return BondErrors.InterestUnsettled;
         }
 
-        if (await dbContext.BondRedemptions.AnyAsync(r => r.AssetId == assetId, cancellationToken))
+        if (await dbContext.BondRedemptions.AnyAsync(
+                r => r.AssetId == assetId && r.Kind != BondRedemptionKind.Early, cancellationToken))
         {
             return BondErrors.AlreadyRedeemed;
         }

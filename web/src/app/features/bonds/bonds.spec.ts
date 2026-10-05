@@ -14,9 +14,11 @@ import {
   activeBond,
   archivedBond,
   dueRorBond,
+  edoYearOneSettledBond,
   interestDueBond,
   maturedBond,
   octoberOffer,
+  partiallyRedeemedEdoBond,
   redeemedTosBond,
   settledRorBond,
   settledTosBond,
@@ -33,6 +35,7 @@ import { formatMoney } from '../../shared/format';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { BondPurchaseDialog } from './bond-purchase-dialog/bond-purchase-dialog';
 import { Bonds } from './bonds';
+import { EarlyRedeemBondDialog } from './early-redeem-bond-dialog/early-redeem-bond-dialog';
 import { RedeemBondDialog } from './redeem-bond-dialog/redeem-bond-dialog';
 import { SettleAllBondsDialog } from './settle-all-bonds-dialog/settle-all-bonds-dialog';
 import { SettleBondInterestDialog } from './settle-bond-interest-dialog/settle-bond-interest-dialog';
@@ -295,6 +298,70 @@ describe('Bonds page, my bonds tab', () => {
         data: { bond: expect.objectContaining({ assetId: unsettledTosBond.assetId }) },
       }),
     );
+  });
+
+  it.each([
+    ['an active', activeBond, true],
+    ['an interest-due', dueRorBond, true],
+    ['a matured', settledTosBond, false],
+  ])('offers "Wykup przed terminem" on %s bond', async (_, bond, offered) => {
+    await setup([bond]);
+    await switchLanguage(fixture, 'pl');
+
+    const labels = (await rowMenuItems(fixture, rowFor(bond.name))).map(menuItemLabel);
+
+    expect(labels.includes('Wykup przed terminem')).toBe(offered);
+  });
+
+  it('"Wykup przed terminem" opens the early-redemption dialog and reloads after a redemption', async () => {
+    await setup([edoYearOneSettledBond]);
+    await switchLanguage(fixture, 'pl');
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const callsBefore = bondListCalls();
+
+    await clickRowMenuItem(fixture, rowFor(edoYearOneSettledBond.name), /^Wykup przed terminem$/);
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      EarlyRedeemBondDialog,
+      expect.objectContaining({
+        data: { bond: expect.objectContaining({ assetId: edoYearOneSettledBond.assetId }) },
+      }),
+    );
+    await vi.waitFor(() => expect(bondListCalls()).toBeGreaterThan(callsBefore));
+  });
+
+  it('"Wykup przed terminem" opens the settle dialog when the early-redemption dialog points there', async () => {
+    await setup([dueRorBond]);
+    await switchLanguage(fixture, 'pl');
+    dialog.open.mockReturnValueOnce({ afterClosed: () => of('settle') });
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    await clickRowMenuItem(fixture, rowFor(dueRorBond.name), /^Wykup przed terminem$/);
+
+    expect(dialog.open).toHaveBeenNthCalledWith(1, EarlyRedeemBondDialog, expect.anything());
+    expect(dialog.open).toHaveBeenNthCalledWith(
+      2,
+      SettleBondInterestDialog,
+      expect.objectContaining({
+        data: { bond: expect.objectContaining({ assetId: dueRorBond.assetId }) },
+      }),
+    );
+  });
+
+  it('shows the remaining count and "częściowo wykupiona" after a partial early redemption, and no Edit', async () => {
+    await setup([partiallyRedeemedEdoBond, edoYearOneSettledBond]);
+    await switchLanguage(fixture, 'pl');
+
+    const partial = textOf(rowFor(partiallyRedeemedEdoBond.name));
+    expect(partial).toContain('6');
+    expect(partial).toContain('częściowo wykupiona');
+    expect(textOf(rowFor(edoYearOneSettledBond.name))).not.toContain('częściowo wykupiona');
+
+    const labels = (await rowMenuItems(fixture, rowFor(partiallyRedeemedEdoBond.name))).map(
+      menuItemLabel,
+    );
+    expect(labels).toContain('Wykup przed terminem');
+    expect(labels).not.toContain('Edytuj');
   });
 });
 

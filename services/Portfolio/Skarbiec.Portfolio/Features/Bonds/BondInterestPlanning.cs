@@ -38,6 +38,11 @@ internal static class BondInterestPlanning
             return readOnly;
         }
 
+        if (terms.BondCount == 0)
+        {
+            return BondErrors.AlreadyRedeemed;
+        }
+
         // Capitalising math compounds every earlier period's rate, so the stored ones lead the list.
         var rates = await dbContext.BondInterestSettlements
             .AsNoTracking()
@@ -117,6 +122,6 @@ internal static class BondInterestPlanning
     }
 
     // Stored as numeric(7,4).
-    private static bool IsValidRate(decimal? ratePercent) =>
+    public static bool IsValidRate(decimal? ratePercent) =>
         ratePercent is { } rate && rate >= 0m && rate <= 100m && decimal.Round(rate, 4) == rate;
 }

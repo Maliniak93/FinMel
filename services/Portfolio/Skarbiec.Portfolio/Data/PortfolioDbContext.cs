@@ -152,11 +152,13 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
         modelBuilder.Entity<BondRedemption>(redemption =>
         {
             // No FK to the asset, the swap target or the transactions: RemoveAsset and DeletePortfolio delete the rows explicitly.
-            // Unique: a holding is redeemed whole, once, so a racing second redemption fails here.
-            redemption.HasIndex(r => r.AssetId).IsUnique();
+            // Not unique: early redemptions take a holding apart over time; the asset row's xmin guards a racing second one.
+            redemption.HasIndex(r => r.AssetId);
 
             redemption.Property(r => r.CapitalisedInterest).HasPrecision(18, 2);
             redemption.Property(r => r.DiscountIncome).HasPrecision(18, 2);
+            redemption.Property(r => r.AccruedInterest).HasPrecision(18, 2);
+            redemption.Property(r => r.Fee).HasPrecision(18, 2);
             redemption.Property(r => r.Tax).HasPrecision(18, 2);
             redemption.Property(r => r.Proceeds).HasPrecision(18, 2);
         });

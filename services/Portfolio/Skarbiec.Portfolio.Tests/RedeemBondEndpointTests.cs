@@ -122,6 +122,38 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, assetId, cancellationToken);
     }
 
+    [Fact]
+    public async Task Redeem_AfterPartialEarly_UsesRemainingCount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var earlyDate = new DateOnly(2027, 3, 12);
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 3, 12, 10, 0, 0, TimeSpan.Zero));
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
+        var portfolioId = funded.BondPortfolioId;
+        var assetId = funded.Bond.AssetId;
+        await client.RedeemBondEarlyAsync(portfolioId, assetId, earlyDate, 4, funded.CashAssetId, cancellationToken);
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        await client.SettleBondInterestAsync(portfolioId, assetId, [(1, null), (2, null), (3, null)], null, cancellationToken);
+        var cashBefore = (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity;
+
+        var response = await client.RedeemBondRawAsync(portfolioId, assetId, funded.CashAssetId, cancellationToken);
+
+        Assert.True(response.IsSuccessStatusCode, $"Redemption answered {(int)response.StatusCode}.");
+        var rows = await ReadBondRedemptionsAsync(userId, cancellationToken, assetId);
+        var row = Assert.Single(rows, r => r.Kind.ToString() == "Maturity");
+        Assert.Equal(6, row.BondCount);
+        Assert.Equal(82.74m, row.CapitalisedInterest);
+        Assert.Equal(15.73m, row.Tax);
+        Assert.Equal(667.01m, row.Proceeds);
+        Assert.Equal(0m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+        Assert.Equal(
+            cashBefore + 667.01m,
+            (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, assetId, cancellationToken);
+    }
+
     public static TheoryData<string, HttpStatusCode, string> InvalidRequests() => new()
     {
         { "before maturity", HttpStatusCode.Conflict, PortfolioAssertions.BondNotMaturedErrorCode },

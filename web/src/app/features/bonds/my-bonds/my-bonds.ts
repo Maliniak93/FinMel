@@ -28,13 +28,20 @@ import {
 import {
   BOND_PERIOD_STATE,
   BOND_STATUS,
+  canEarlyRedeem,
   canRedeem,
   canSettle,
   canSwap,
+  isPartiallyRedeemed,
   isRedeemed,
   usesTermsRate,
 } from '../bond-interest';
 import { bondTypeInfo } from '../bond-types';
+import {
+  EarlyRedeemBondDialog,
+  type EarlyRedeemBondDialogData,
+  type EarlyRedeemBondDialogResult,
+} from '../early-redeem-bond-dialog/early-redeem-bond-dialog';
 import {
   RedeemBondDialog,
   type RedeemBondDialogData,
@@ -146,9 +153,10 @@ export class MyBonds {
   protected readonly formatDate = formatDate;
   protected readonly formatPercent = formatPercent;
   protected readonly canSettle = canSettle;
+  protected readonly canEarlyRedeem = canEarlyRedeem;
   protected readonly canRedeem = canRedeem;
   protected readonly canSwap = canSwap;
-  protected readonly isRedeemed = isRedeemed;
+  protected readonly isPartiallyRedeemed = isPartiallyRedeemed;
 
   protected typeLabel(bond: BondResponse): string {
     return bondTypeInfo(bond.type)?.label ?? '';
@@ -198,6 +206,23 @@ export class MyBonds {
         width: '560px',
         data,
       })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result === 'settle') {
+          this.openSettleDialog(bond);
+        } else if (result) {
+          this.bondsResource.reload();
+        }
+      });
+  }
+
+  protected openEarlyRedeemDialog(bond: BondResponse): void {
+    const data: EarlyRedeemBondDialogData = { bond };
+    this.dialog
+      .open<EarlyRedeemBondDialog, EarlyRedeemBondDialogData, EarlyRedeemBondDialogResult>(
+        EarlyRedeemBondDialog,
+        { width: '640px', data },
+      )
       .afterClosed()
       .subscribe((result) => {
         if (result === 'settle') {

@@ -7,6 +7,8 @@ public enum BondRedemptionKind
     Maturity,
 
     Swap,
+
+    Early,
 }
 
 public sealed class BondRedemption : IUserOwned
@@ -21,6 +23,8 @@ public sealed class BondRedemption : IUserOwned
     public required int BondCount { get; init; }
     public required decimal CapitalisedInterest { get; init; }
     public required decimal DiscountIncome { get; init; }
+    public decimal AccruedInterest { get; init; }
+    public decimal Fee { get; init; }
     public required decimal Tax { get; init; }
     public required decimal Proceeds { get; init; }
 

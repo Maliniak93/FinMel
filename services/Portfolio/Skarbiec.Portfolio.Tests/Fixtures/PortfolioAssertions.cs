@@ -93,6 +93,12 @@ internal static class PortfolioAssertions
 
     public const string BondRedeemedErrorCode = "Conflict.BondRedeemed";
 
+    public const string BondEarlyRedemptionDateErrorCode = "Validation.BondEarlyRedemptionDate";
+
+    public const string BondRedemptionCountErrorCode = "Validation.BondRedemptionCount";
+
+    public const string BondEarlyRedemptionOutOfOrderErrorCode = "Conflict.BondEarlyRedemptionOutOfOrder";
+
     public const string BondFromSwapErrorCode = "Conflict.BondFromSwap";
 
     public const string BondSwapCountErrorCode = "Validation.BondSwapCount";

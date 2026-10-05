@@ -103,7 +103,14 @@
 
     <ng-container matColumnDef="bondCount">
       <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.count' | transloco }}</th>
-      <td mat-cell *matCellDef="let bond">{{ bond.bondCount }}</td>
+      <td mat-cell *matCellDef="let bond">
+        {{ bond.bondCount }}
+        @if (isPartiallyRedeemed(bond)) {
+          <span class="my-bonds__muted" data-testid="partially-redeemed">
+            {{ 'bonds.my.partiallyRedeemed' | transloco }}
+          </span>
+        }
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="bookValue">
@@ -149,6 +156,12 @@
                 <span>{{ 'bonds.settle.action' | transloco }}</span>
               </button>
             }
+            @if (canEarlyRedeem(bond)) {
+              <button mat-menu-item type="button" (click)="openEarlyRedeemDialog(bond)">
+                <mat-icon>savings</mat-icon>
+                <span>{{ 'bonds.earlyRedeem.action' | transloco }}</span>
+              </button>
+            }
             @if (canRedeem(bond)) {
               <button mat-menu-item type="button" (click)="openRedeemDialog(bond)">
                 <mat-icon>account_balance_wallet</mat-icon>
@@ -161,7 +174,7 @@
                 <span>{{ 'bonds.swap.action' | transloco }}</span>
               </button>
             }
-            @if (!bond.isArchived && !isRedeemed(bond)) {
+            @if (!bond.isArchived && bond.redemptions.length === 0) {
               <button mat-menu-item type="button" (click)="openEditDialog(bond)">
                 <mat-icon>edit</mat-icon>
                 <span>{{ 'common.edit' | transloco }}</span>
