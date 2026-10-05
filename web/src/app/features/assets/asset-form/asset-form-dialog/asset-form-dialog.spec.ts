@@ -37,6 +37,14 @@ import {
   showValidationErrors,
   toggleFirstTransaction,
 } from '../testing/asset-form-fixtures';
+import {
+  archivedPortfolio,
+  pickSelectOption,
+  reservePortfolio,
+  reservePortfolioId,
+  savingsPortfolio,
+  selectOptionLabels,
+} from '../../../deposits/testing/deposit-fixtures';
 import { INSTRUMENT_REQUIRED_MESSAGE } from '../blocks/instrument-picker/instrument-picker';
 import { AssetFormDialog, type AssetFormDialogData } from './asset-form-dialog';
 import { provideI18nTesting } from '../../../../core/i18n/testing';
@@ -160,6 +168,42 @@ describe('AssetFormDialog', () => {
       }
 
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('without a portfolioId shows a portfolio picker and posts to the chosen portfolio', async () => {
+      await setup({}, async (input) =>
+        typeof input !== 'string' && (input as Request).method === 'POST'
+          ? jsonResponse(cashAsset, 201)
+          : jsonResponse([savingsPortfolio, archivedPortfolio, reservePortfolio]),
+      );
+
+      const labels = await selectOptionLabels(fixture, 'portfolioId');
+      expect(labels).toContain('Savings');
+      expect(labels).toContain('Reserve');
+      expect(labels).not.toContain('Old savings');
+
+      await pickSelectOption(fixture, 'portfolioId', 'Reserve');
+      await pickTile(ASSET_CLASS.Cash);
+      findControl(activeForm().form, 'name').setValue('Wallet');
+
+      await component['onSubmit']();
+
+      const posts = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => typeof request !== 'string' && request.method === 'POST');
+      expect(posts).toHaveLength(1);
+      expect(posts[0].url).toContain(`/portfolios/${reservePortfolioId}/assets`);
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
+    });
+
+    it('with a preset asset class skips the type picker', async () => {
+      await setup({ assetClass: ASSET_CLASS.Cash }, async () =>
+        jsonResponse([savingsPortfolio, archivedPortfolio, reservePortfolio]),
+      );
+
+      expect(picker()).toBeNull();
+      expect(renderedForms()).toEqual([CashAssetForm]);
+      expect(activeForm().assetClass()).toBe(ASSET_CLASS.Cash);
     });
 
     it('the Deposit tile opens DepositFormDialog preset to the current portfolio', async () => {

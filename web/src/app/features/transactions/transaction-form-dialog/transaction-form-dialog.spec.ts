@@ -175,6 +175,12 @@ describe('TransactionFormDialog', () => {
     expect(await typeOptionLabels()).toEqual(['Deposit', 'Withdraw']);
   });
 
+  it('preselects the type from dialog data', async () => {
+    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash, type: 3 });
+
+    expect(component['form'].controls.type.value).toBe(3);
+  });
+
   it('offers all six types and starts on Buy for a market asset (ETF)', async () => {
     await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Etf });
 

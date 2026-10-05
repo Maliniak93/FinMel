@@ -3,7 +3,7 @@
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
     <p class="savings-transfer-dialog__name">
-      {{ account.name }} · {{ formatMoney(account.balance, account.currency) }}
+      {{ anchor.name }} · {{ formatMoney(anchor.balance, anchor.currency) }}
     </p>
 
     <mat-button-toggle-group
@@ -11,38 +11,69 @@
       formControlName="direction"
       [attr.aria-label]="'savings.transfer.direction' | transloco"
     >
-      <mat-button-toggle value="in">{{ 'savings.transfer.into' | transloco }}</mat-button-toggle>
-      <mat-button-toggle value="out">{{ 'savings.transfer.out' | transloco }}</mat-button-toggle>
+      <mat-button-toggle value="in">{{
+        (anchoredOnCash ? 'savings.transfer.toSavings' : 'savings.transfer.into') | transloco
+      }}</mat-button-toggle>
+      <mat-button-toggle value="out">{{
+        (anchoredOnCash ? 'savings.transfer.fromSavings' : 'savings.transfer.out') | transloco
+      }}</mat-button-toggle>
     </mat-button-toggle-group>
 
-    <mat-form-field appearance="outline" class="savings-transfer-dialog__field">
-      <mat-label>{{ 'savings.transfer.cash' | transloco }}</mat-label>
-      <mat-select formControlName="cashAssetId">
-        @if (cashCandidatesResource.hasValue()) {
-          @for (candidate of cashCandidatesResource.value(); track candidate.assetId) {
-            <mat-option [value]="candidate.assetId">
-              {{ candidate.name }} — {{ candidate.portfolioName }} ({{
-                formatMoney(candidate.balance, account.currency)
-              }})
-            </mat-option>
+    @if (anchoredOnCash) {
+      <mat-form-field appearance="outline" class="savings-transfer-dialog__field">
+        <mat-label>{{ 'savings.transfer.savingsAccount' | transloco }}</mat-label>
+        <mat-select formControlName="savingsAssetId">
+          @if (candidatesResource.hasValue()) {
+            @for (candidate of candidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
+                  formatMoney(candidate.balance, anchor.currency)
+                }})
+              </mat-option>
+            }
           }
+        </mat-select>
+        @if (candidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
+          <mat-hint>{{
+            'savings.transfer.noSavingsAccount' | transloco: { currency: anchor.currency }
+          }}</mat-hint>
         }
-      </mat-select>
-      @if (cashCandidatesResource.error(); as loadError) {
-        <mat-hint>{{ loadError.message }}</mat-hint>
-      } @else if (
-        cashCandidatesResource.hasValue() && cashCandidatesResource.value().length === 0
-      ) {
-        <mat-hint>{{
-          'savings.transfer.noCashAccount' | transloco: { currency: account.currency }
-        }}</mat-hint>
-      }
-      @if (form.controls.cashAssetId.hasError('required')) {
-        <mat-error>{{ 'savings.transfer.cashRequired' | transloco }}</mat-error>
-      } @else if (form.controls.cashAssetId.hasError('server')) {
-        <mat-error>{{ form.controls.cashAssetId.getError('server') }}</mat-error>
-      }
-    </mat-form-field>
+        @if (form.controls.savingsAssetId.hasError('required')) {
+          <mat-error>{{ 'savings.transfer.savingsRequired' | transloco }}</mat-error>
+        } @else if (form.controls.savingsAssetId.hasError('server')) {
+          <mat-error>{{ form.controls.savingsAssetId.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    } @else {
+      <mat-form-field appearance="outline" class="savings-transfer-dialog__field">
+        <mat-label>{{ 'savings.transfer.cash' | transloco }}</mat-label>
+        <mat-select formControlName="cashAssetId">
+          @if (candidatesResource.hasValue()) {
+            @for (candidate of candidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
+                  formatMoney(candidate.balance, anchor.currency)
+                }})
+              </mat-option>
+            }
+          }
+        </mat-select>
+        @if (candidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
+          <mat-hint>{{
+            'savings.transfer.noCashAccount' | transloco: { currency: anchor.currency }
+          }}</mat-hint>
+        }
+        @if (form.controls.cashAssetId.hasError('required')) {
+          <mat-error>{{ 'savings.transfer.cashRequired' | transloco }}</mat-error>
+        } @else if (form.controls.cashAssetId.hasError('server')) {
+          <mat-error>{{ form.controls.cashAssetId.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    }
 
     <mat-form-field appearance="outline" class="savings-transfer-dialog__field">
       <mat-label>{{ 'common.amount' | transloco }}</mat-label>
@@ -58,7 +89,7 @@
               : {
                   balance: formatMoney(
                     form.controls.amount.getError('exceedsBalance').balance,
-                    account.currency
+                    anchor.currency
                   ),
                 }
         }}</mat-error>

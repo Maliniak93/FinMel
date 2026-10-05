@@ -17,6 +17,7 @@ const WITHDRAW = 3;
 
 export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
 export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
+export const TRANSACTION_TYPE_WITHDRAW: TransactionType = WITHDRAW;
 
 const CASH_LIKE_CLASSES: readonly number[] = [
   ASSET_CLASS.Cash,

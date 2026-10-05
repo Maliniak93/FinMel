@@ -478,7 +478,9 @@
       "tryAnother": "Try searching for it above instead.",
       "verifyAndAdd": "Verify and add",
       "instrumentRequired": "Verify a ticker, or pick one from search, before creating this asset.",
-      "addInstrumentFailed": "Failed to add instrument."
+      "addInstrumentFailed": "Failed to add instrument.",
+      "portfolio": "Portfolio",
+      "portfolioRequired": "Choose a portfolio."
     }
   },
   "transactions": {
@@ -520,7 +522,11 @@
     "totals": "Totals",
     "totalLine": "{{ currency }}: {{ amount }}",
     "empty": "No cash accounts yet. Add a Cash asset to a portfolio to see it here.",
-    "loadFailed": "Failed to load cash accounts."
+    "loadFailed": "Failed to load cash accounts.",
+    "add": "Add cash account",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "transferWithSavings": "Transfer with savings"
   },
   "deposits": {
     "title": "Deposits & savings",
@@ -684,7 +690,12 @@
       "exceedsBalance": "The amount is above the source's balance ({{ balance }}).",
       "insufficientFunds": "The source can't cover this amount on this date.",
       "dateInFuture": "Date can't be in the future.",
-      "submit": "Transfer"
+      "submit": "Transfer",
+      "toSavings": "To savings",
+      "fromSavings": "From savings",
+      "savingsAccount": "Savings account",
+      "savingsRequired": "Choose a savings account.",
+      "noSavingsAccount": "You have no savings account in {{ currency }} to transfer with."
     }
   },
   "assetArchive": {

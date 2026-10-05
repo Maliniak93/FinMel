@@ -14,17 +14,24 @@ import {
   renderedText,
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
+import type { CashAccountResponse } from '../../../api/portfolio';
 import {
   eurCashCandidate,
+  onlySelectOptionLabels,
+  pickOnlySelectOption,
   plnCashCandidate,
+  plnSavingsCandidate,
   requestMethod,
+  savingsCandidatesByCurrency,
   selectOptionLabels,
   transferCandidateRequests,
-  transferCandidatesByCurrency,
+  transferCandidatesFor,
+  walletPortfolioId,
   writeRequests,
+  type TransferCandidateFixture,
 } from '../testing/deposit-fixtures';
 import { savingsAccountResponse } from '../testing/savings-account-fixtures';
-import { SavingsTransferDialog } from './savings-transfer-dialog';
+import { SavingsTransferDialog, type SavingsTransferDialogData } from './savings-transfer-dialog';
 
 describe('SavingsTransferDialog', () => {
   const account = savingsAccountResponse({ balance: 10000 });
@@ -42,16 +49,28 @@ describe('SavingsTransferDialog', () => {
     await restoreEnglish();
   });
 
+  const cash: CashAccountResponse = {
+    assetId: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    portfolioId: walletPortfolioId,
+    portfolioName: 'Wallet',
+    name: 'PLN wallet',
+    currency: 'PLN',
+    balance: 1200,
+  };
+
   async function setup(
     writeResponse: () => Response = () =>
       jsonResponse({ transferId: 'cccccccc-cccc-cccc-cccc-cccccccccccc' }, 201),
+    data: SavingsTransferDialogData = { account },
+    savings: Record<string, TransferCandidateFixture[]> = savingsCandidatesByCurrency,
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (requestMethod(input) === 'GET') {
         if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
-          const currency = new URL(requestUrl(input)).searchParams.get('currency') ?? '';
-          return jsonResponse(transferCandidatesByCurrency[currency] ?? []);
+          return jsonResponse(
+            transferCandidatesFor(new URL(requestUrl(input)), undefined, savings),
+          );
         }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -63,7 +82,7 @@ describe('SavingsTransferDialog', () => {
       providers: [
         provideI18nTesting(),
         provideNativeDateAdapter(),
-        { provide: MAT_DIALOG_DATA, useValue: { account } },
+        { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
@@ -239,6 +258,75 @@ describe('SavingsTransferDialog', () => {
     await render();
 
     expect(findControl(form(), 'amount').hasError('server')).toBe(true);
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('anchored on cash loads savings candidates in its currency', async () => {
+    await setup(undefined, { cash });
+
+    const requests = transferCandidateRequests(fetchSpy);
+    expect(requests.length).toBeGreaterThan(0);
+    const last = requests[requests.length - 1];
+    expect(last.searchParams.get('currency')).toBe('PLN');
+    expect(['Savings', '9']).toContain(last.searchParams.get('assetClass'));
+
+    const labels = await onlySelectOptionLabels(fixture);
+    expect(labels.some((text) => text.includes(plnSavingsCandidate.name))).toBe(true);
+    expect(labels.some((text) => text.includes(plnCashCandidate.name))).toBe(false);
+  });
+
+  it('anchored on cash posts the transfer in the chosen direction', async () => {
+    await setup(undefined, { cash });
+    await pickOnlySelectOption(fixture, plnSavingsCandidate.name);
+
+    await fill({ direction: 'in', amount: 1200.01 });
+    await component['onSubmit']();
+    expect(findControl(form(), 'amount').invalid).toBe(true);
+    expect(writeRequests(fetchSpy)).toEqual([]);
+
+    await fill({ amount: 1200, date: new Date(2026, 0, 20) });
+    await component['onSubmit']();
+
+    const [into] = writeRequests(fetchSpy);
+    expect(into.method).toBe('POST');
+    expect(into.url).toContain('/api/portfolio/transfers');
+    expect(await into.json()).toEqual({
+      sourceAssetId: cash.assetId,
+      targetAssetId: plnSavingsCandidate.assetId,
+      amount: 1200,
+      date: '2026-01-20',
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+
+    dialogRef.close.mockClear();
+    await fill({ direction: 'out', amount: 750.01 });
+    await component['onSubmit']();
+    expect(findControl(form(), 'amount').invalid).toBe(true);
+    expect(writeRequests(fetchSpy)).toHaveLength(1);
+
+    await fill({ amount: 750 });
+    await component['onSubmit']();
+
+    const out = writeRequests(fetchSpy)[1];
+    expect(await out.json()).toEqual({
+      sourceAssetId: plnSavingsCandidate.assetId,
+      targetAssetId: cash.assetId,
+      amount: 750,
+      date: '2026-01-20',
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('anchored on cash without savings candidates disables submit', async () => {
+    await setup(undefined, { cash }, {});
+
+    expect(renderedText(fixture)).toMatch(/no savings account in PLN/i);
+
+    await fill({ amount: 100 });
+    await component['onSubmit']();
+
+    expect(form().invalid).toBe(true);
+    expect(writeRequests(fetchSpy)).toEqual([]);
     expect(dialogRef.close).not.toHaveBeenCalled();
   });
 

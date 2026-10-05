@@ -1,10 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { CashAccountsResponse } from '../../api/portfolio';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatMoney } from '../../shared/format';
+import { clickRowMenuItem } from '../../../testing/archive';
+import { ASSET_CLASS } from '../assets/asset-class';
+import { AssetFormDialog } from '../assets/asset-form/asset-form-dialog/asset-form-dialog';
+import { SavingsTransferDialog } from '../deposits/savings-transfer-dialog/savings-transfer-dialog';
+import { TransactionFormDialog } from '../transactions/transaction-form-dialog/transaction-form-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { Cash } from './cash';
 
@@ -38,6 +45,7 @@ describe('Cash', () => {
   let fixture: ComponentFixture<Cash>;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let failNextLoad: boolean;
+  let dialog: { open: ReturnType<typeof vi.fn> };
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
@@ -60,9 +68,15 @@ describe('Cash', () => {
       return jsonResponse(body);
     });
 
+    dialog = { open: vi.fn().mockReturnValue({ afterClosed: () => of(true) }) };
+
     await TestBed.configureTestingModule({
       imports: [Cash],
-      providers: [provideI18nTesting(), provideRouter([])],
+      providers: [
+        provideI18nTesting(),
+        provideRouter([]),
+        { provide: MatDialog, useValue: dialog },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Cash);
@@ -150,5 +164,78 @@ describe('Cash', () => {
     expect(cashListCalls()).toBe(2);
     expect(element().querySelector('[role=alert]')).toBeNull();
     expect(rows()).toHaveLength(2);
+  });
+
+  function addButton(): HTMLButtonElement | undefined {
+    return Array.from(element().querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+      /add cash account/i.test(b.textContent ?? ''),
+    );
+  }
+
+  async function expectAddOpensAssetDialogAndReloads(): Promise<void> {
+    const before = cashListCalls();
+
+    addButton()!.click();
+    await fixture.whenStable();
+
+    expect(dialog.open).toHaveBeenCalledTimes(1);
+    const [component, config] = dialog.open.mock.calls[0];
+    expect(component).toBe(AssetFormDialog);
+    expect(config.data.assetClass).toBe(ASSET_CLASS.Cash);
+    expect(config.data.portfolioId).toBeUndefined();
+    await vi.waitFor(() => expect(cashListCalls()).toBeGreaterThan(before));
+  }
+
+  it('adds a cash account and reloads the list', async () => {
+    await setup();
+
+    expect(addButton()).toBeDefined();
+    await expectAddOpensAssetDialogAndReloads();
+  });
+
+  it('adds a cash account from the empty state and reloads the list', async () => {
+    await setup({ accounts: [], totals: [] });
+
+    await expectAddOpensAssetDialogAndReloads();
+  });
+
+  it('opens a deposit or withdrawal for the row and reloads', async () => {
+    await setup();
+
+    for (const [label, type] of [
+      [/^deposit$/i, 2],
+      [/^withdraw$/i, 3],
+    ] as const) {
+      dialog.open.mockClear();
+      const before = cashListCalls();
+
+      await clickRowMenuItem(fixture, rowFor('EUR wallet'), label);
+
+      expect(dialog.open).toHaveBeenCalledWith(
+        TransactionFormDialog,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            portfolioId: eurWallet.portfolioId,
+            assetId: eurWallet.assetId,
+            assetClass: ASSET_CLASS.Cash,
+            type,
+          }),
+        }),
+      );
+      await vi.waitFor(() => expect(cashListCalls()).toBeGreaterThan(before));
+    }
+  });
+
+  it('opens the savings transfer for the row and reloads', async () => {
+    await setup();
+    const before = cashListCalls();
+
+    await clickRowMenuItem(fixture, rowFor('EUR wallet'), /transfer with savings/i);
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      SavingsTransferDialog,
+      expect.objectContaining({ data: { cash: eurWallet } }),
+    );
+    await vi.waitFor(() => expect(cashListCalls()).toBeGreaterThan(before));
   });
 });
