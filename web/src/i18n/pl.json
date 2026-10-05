@@ -478,7 +478,9 @@
       "tryAnother": "Spróbuj zamiast tego wyszukać go powyżej.",
       "verifyAndAdd": "Zweryfikuj i dodaj",
       "instrumentRequired": "Zweryfikuj ticker lub wybierz jeden z wyników wyszukiwania, zanim utworzysz to aktywo.",
-      "addInstrumentFailed": "Nie udało się dodać instrumentu."
+      "addInstrumentFailed": "Nie udało się dodać instrumentu.",
+      "portfolio": "Portfel",
+      "portfolioRequired": "Wybierz portfel."
     }
   },
   "transactions": {
@@ -520,7 +522,11 @@
     "totals": "Suma",
     "totalLine": "{{ currency }}: {{ amount }}",
     "empty": "Nie masz jeszcze kont gotówkowych. Dodaj aktywo typu Gotówka do portfela, aby je tu zobaczyć.",
-    "loadFailed": "Nie udało się wczytać kont gotówkowych."
+    "loadFailed": "Nie udało się wczytać kont gotówkowych.",
+    "add": "Dodaj konto gotówkowe",
+    "deposit": "Wpłata",
+    "withdraw": "Wypłata",
+    "transferWithSavings": "Przelew z kontem oszczędnościowym"
   },
   "deposits": {
     "title": "Lokaty i oszczędności",
@@ -684,7 +690,12 @@
       "exceedsBalance": "Kwota przekracza saldo źródła ({{ balance }}).",
       "insufficientFunds": "Źródło nie pokrywa tej kwoty w tym dniu.",
       "dateInFuture": "Data nie może być z przyszłości.",
-      "submit": "Przelej"
+      "submit": "Przelej",
+      "toSavings": "Na konto oszczędnościowe",
+      "fromSavings": "Z konta oszczędnościowego",
+      "savingsAccount": "Konto oszczędnościowe",
+      "savingsRequired": "Wybierz konto oszczędnościowe.",
+      "noSavingsAccount": "Nie masz konta oszczędnościowego w {{ currency }}, z którym można zrobić przelew."
     }
   },
   "assetArchive": {

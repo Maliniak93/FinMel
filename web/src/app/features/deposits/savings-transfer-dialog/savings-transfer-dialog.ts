@@ -20,6 +20,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import {
   getApiPortfolioTransferCandidates,
   postApiPortfolioTransfers,
+  type CashAccountResponse,
   type SavingsAccountResponse,
   type TransferCandidateResponse,
 } from '../../../api/portfolio';
@@ -32,8 +33,14 @@ import { toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
 
-export interface SavingsTransferDialogData {
-  account: SavingsAccountResponse;
+export type SavingsTransferDialogData =
+  { account: SavingsAccountResponse } | { cash: CashAccountResponse };
+
+interface TransferAnchor {
+  assetId: string;
+  name: string;
+  currency: string;
+  balance: number;
 }
 
 export type SavingsTransferDirection = 'in' | 'out';
@@ -63,7 +70,12 @@ function today(): Date {
 export class SavingsTransferDialog {
   private readonly formBuilder = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<SavingsTransferDialog>);
-  protected readonly account = inject<SavingsTransferDialogData>(MAT_DIALOG_DATA).account;
+  private readonly data = inject<SavingsTransferDialogData>(MAT_DIALOG_DATA);
+  protected readonly anchoredOnCash = 'cash' in this.data;
+  protected readonly anchor: TransferAnchor =
+    'cash' in this.data
+      ? { ...this.data.cash, balance: Number(this.data.cash.balance) }
+      : { ...this.data.account, balance: Number(this.data.account.balance) };
 
   protected readonly formatMoney = formatMoney;
   protected readonly maxDate = today();
@@ -77,7 +89,7 @@ export class SavingsTransferDialog {
     }
     const balance = this.sourceBalance(
       control.parent?.get('direction')?.value as SavingsTransferDirection | undefined,
-      control.parent?.get('cashAssetId')?.value as string | null | undefined,
+      control.parent?.get(this.counterpartControl)?.value as string | null | undefined,
     );
     if (balance === undefined) {
       return null;
@@ -87,7 +99,14 @@ export class SavingsTransferDialog {
 
   protected readonly form = this.formBuilder.nonNullable.group({
     direction: ['in' as SavingsTransferDirection],
-    cashAssetId: [null as string | null, [Validators.required]],
+    cashAssetId: [
+      { value: null as string | null, disabled: this.anchoredOnCash },
+      [Validators.required],
+    ],
+    savingsAssetId: [
+      { value: null as string | null, disabled: !this.anchoredOnCash },
+      [Validators.required],
+    ],
     amount: [
       null as number | null,
       [Validators.required, Validators.min(0.01), this.amountWithinBalance],
@@ -102,16 +121,21 @@ export class SavingsTransferDialog {
     ],
   });
 
-  protected readonly cashCandidatesResource = resource({
+  protected readonly candidatesResource = resource({
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioTransferCandidates({
-        query: { currency: this.account.currency, assetClass: ASSET_CLASS.Cash },
+        query: {
+          currency: this.anchor.currency,
+          assetClass: this.anchoredOnCash ? ASSET_CLASS.Savings : ASSET_CLASS.Cash,
+        },
         signal: abortSignal,
       });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ??
-            translate('deposits.errors.cashAccountsLoadFailed'),
+            translate(
+              this.anchoredOnCash ? 'savings.loadFailed' : 'deposits.errors.cashAccountsLoadFailed',
+            ),
         );
       }
       return result.data ?? [];
@@ -124,12 +148,12 @@ export class SavingsTransferDialog {
     this.form.controls.direction.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.amount.updateValueAndValidity());
-    this.form.controls.cashAssetId.valueChanges
+    this.form.controls[this.counterpartControl].valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.amount.updateValueAndValidity());
 
     effect(() => {
-      if (this.cashCandidatesResource.hasValue()) {
+      if (this.candidatesResource.hasValue()) {
         untracked(() => this.form.controls.amount.updateValueAndValidity());
       }
     });
@@ -149,12 +173,14 @@ export class SavingsTransferDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const cashAssetId = values.cashAssetId!;
+    const counterpartId = values[this.counterpartControl]!;
+    const cashAssetId = this.anchoredOnCash ? this.anchor.assetId : counterpartId;
+    const savingsAssetId = this.anchoredOnCash ? counterpartId : this.anchor.assetId;
     const into = values.direction === 'in';
     const result = await postApiPortfolioTransfers({
       body: {
-        sourceAssetId: into ? cashAssetId : this.account.assetId,
-        targetAssetId: into ? this.account.assetId : cashAssetId,
+        sourceAssetId: into ? cashAssetId : savingsAssetId,
+        targetAssetId: into ? savingsAssetId : cashAssetId,
         amount: Number(values.amount),
         date: toDateOnly(values.date!),
       },
@@ -174,23 +200,29 @@ export class SavingsTransferDialog {
     this.dialogRef.close(false);
   }
 
-  private sourceBalance(
-    direction: SavingsTransferDirection | undefined,
-    cashAssetId: string | null | undefined,
-  ): number | undefined {
-    if (direction === 'out') {
-      return Number(this.account.balance);
-    }
-    if (!cashAssetId) {
-      return undefined;
-    }
-    const cash = this.cashCandidate(cashAssetId);
-    return cash ? Number(cash.balance) : undefined;
+  private get counterpartControl(): 'cashAssetId' | 'savingsAssetId' {
+    return this.anchoredOnCash ? 'savingsAssetId' : 'cashAssetId';
   }
 
-  private cashCandidate(assetId: string): TransferCandidateResponse | undefined {
-    return this.cashCandidatesResource.hasValue()
-      ? this.cashCandidatesResource.value().find((candidate) => candidate.assetId === assetId)
+  // Direction is always relative to the savings account: 'in' moves cash into savings.
+  private sourceBalance(
+    direction: SavingsTransferDirection | undefined,
+    counterpartId: string | null | undefined,
+  ): number | undefined {
+    const anchorIsSource = (direction === 'in') === this.anchoredOnCash;
+    if (anchorIsSource) {
+      return this.anchor.balance;
+    }
+    if (!counterpartId) {
+      return undefined;
+    }
+    const counterpart = this.candidate(counterpartId);
+    return counterpart ? Number(counterpart.balance) : undefined;
+  }
+
+  private candidate(assetId: string): TransferCandidateResponse | undefined {
+    return this.candidatesResource.hasValue()
+      ? this.candidatesResource.value().find((candidate) => candidate.assetId === assetId)
       : undefined;
   }
 

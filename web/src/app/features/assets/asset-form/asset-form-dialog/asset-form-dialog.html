@@ -1,5 +1,5 @@
 <h2 mat-dialog-title class="asset-form-dialog__title">
-  @if (!isEdit && selection()) {
+  @if (!isEdit && !presetClass && selection()) {
     <button
       mat-icon-button
       type="button"
@@ -14,6 +14,27 @@
 
 <form (submit)="submit($event)" novalidate>
   <mat-dialog-content>
+    @if (choosesPortfolio) {
+      <div [formGroup]="portfolioForm">
+        <mat-form-field appearance="outline" class="asset-form-dialog__portfolio">
+          <mat-label>{{ 'assets.form.portfolio' | transloco }}</mat-label>
+          <mat-select formControlName="portfolioId">
+            @if (portfoliosResource.hasValue()) {
+              @for (portfolio of portfoliosResource.value(); track portfolio.id) {
+                <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
+              }
+            }
+          </mat-select>
+          @if (portfoliosResource.error(); as loadError) {
+            <mat-hint>{{ loadError.message }}</mat-hint>
+          }
+          @if (portfolioForm.controls.portfolioId.hasError('required')) {
+            <mat-error>{{ 'assets.form.portfolioRequired' | transloco }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+    }
+
     @if (selection(); as selected) {
       @switch (selected.kind) {
         @case ('cash') {

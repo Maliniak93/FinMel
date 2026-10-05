@@ -1,5 +1,11 @@
 <div class="cash-page">
-  <h1>{{ 'cash.title' | transloco }}</h1>
+  <div class="cash-page__header">
+    <h1>{{ 'cash.title' | transloco }}</h1>
+    <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+      <mat-icon>add</mat-icon>
+      {{ 'cash.add' | transloco }}
+    </button>
+  </div>
 
   @if (cashResource.error(); as loadError) {
     <div class="cash-page__state" role="alert">
@@ -15,6 +21,9 @@
   } @else if (cashResource.hasValue() && cashResource.value().accounts.length === 0) {
     <div class="cash-page__state">
       <p>{{ 'cash.empty' | transloco }}</p>
+      <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+        {{ 'cash.add' | transloco }}
+      </button>
     </div>
   } @else if (cashResource.hasValue()) {
     <table mat-table [dataSource]="cashResource.value().accounts" class="cash-page__table">
@@ -39,6 +48,42 @@
         <th mat-header-cell *matHeaderCellDef>{{ 'cash.balance' | transloco }}</th>
         <td mat-cell *matCellDef="let account">
           {{ formatMoney(account.balance, account.currency) }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let account" class="cash-page__actions">
+          <button
+            mat-icon-button
+            type="button"
+            [matMenuTriggerFor]="menu"
+            [attr.aria-label]="'common.actionsFor' | transloco: { name: account.name }"
+          >
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button
+              mat-menu-item
+              type="button"
+              (click)="openTransactionDialog(account, depositType)"
+            >
+              <mat-icon>add_circle</mat-icon>
+              <span>{{ 'cash.deposit' | transloco }}</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              (click)="openTransactionDialog(account, withdrawType)"
+            >
+              <mat-icon>remove_circle</mat-icon>
+              <span>{{ 'cash.withdraw' | transloco }}</span>
+            </button>
+            <button mat-menu-item type="button" (click)="openTransferDialog(account)">
+              <mat-icon>swap_horiz</mat-icon>
+              <span>{{ 'cash.transferWithSavings' | transloco }}</span>
+            </button>
+          </mat-menu>
         </td>
       </ng-container>
 

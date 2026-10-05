@@ -15,6 +15,7 @@ import {
   putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
   type AssetClass,
   type TransactionResponse,
+  type TransactionType,
 } from '../../../api/portfolio';
 import {
   applyFieldErrors,
@@ -33,6 +34,7 @@ export interface TransactionFormDialogData {
   assetId: string;
   assetClass: AssetClass;
   transaction?: TransactionResponse;
+  type?: TransactionType;
 }
 
 @Component({
@@ -60,9 +62,15 @@ export class TransactionFormDialog {
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
   protected readonly transactionTypes = allowedTransactionTypes(this.data.assetClass);
+  private readonly presetType = this.transactionTypes.find(
+    (option) => option.value === Number(this.data.type),
+  )?.value;
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    type: [this.data.transaction?.type ?? this.transactionTypes[0].value, [Validators.required]],
+    type: [
+      this.data.transaction?.type ?? this.presetType ?? this.transactionTypes[0].value,
+      [Validators.required],
+    ],
     quantity: [Number(this.data.transaction?.quantity ?? 0), [Validators.min(0)]],
     unitPrice: [Number(this.data.transaction?.unitPrice ?? 0), [Validators.min(0)]],
     date: [

@@ -1,5 +1,5 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
-import { FormGroup } from '@angular/forms';
+import { Component, computed, inject, resource, signal, viewChild } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -7,11 +7,14 @@ import {
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
+  getApiPortfolioPortfolios,
   postApiPortfolioPortfoliosByPortfolioIdAssets,
   putApiPortfolioPortfoliosByPortfolioIdAssetsById,
   type AssetClass,
@@ -34,8 +37,9 @@ import { ManualAssetForm } from '../forms/manual-asset-form/manual-asset-form';
 import { SecurityAssetForm } from '../forms/security-asset-form/security-asset-form';
 
 export interface AssetFormDialogData {
-  portfolioId: string;
+  portfolioId?: string;
   asset?: AssetResponse;
+  assetClass?: AssetClass;
 }
 
 type AssetFormKind = 'cash' | 'security' | 'gold' | 'manual';
@@ -58,10 +62,13 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
 @Component({
   selector: 'app-asset-form-dialog',
   imports: [
+    ReactiveFormsModule,
     MatButtonModule,
     MatDialogModule,
+    MatFormFieldModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
     AssetTypePicker,
     CashAssetForm,
     GoldAssetForm,
@@ -81,7 +88,33 @@ export class AssetFormDialog {
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
-  private readonly assetClass = signal<AssetClass | null>(this.data.asset?.assetClass ?? null);
+  protected readonly presetClass = this.data.assetClass !== undefined;
+  protected readonly choosesPortfolio = !this.data.asset && !this.data.portfolioId;
+
+  protected readonly portfolioForm = new FormGroup({
+    portfolioId: new FormControl('', {
+      nonNullable: true,
+      validators: this.choosesPortfolio ? [Validators.required] : [],
+    }),
+  });
+
+  protected readonly portfoliosResource = resource({
+    params: () => (this.choosesPortfolio ? {} : undefined),
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioPortfolios({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ??
+            translate('deposits.form.portfoliosLoadFailed'),
+        );
+      }
+      return (result.data ?? []).filter((portfolio) => !portfolio.isArchived);
+    },
+  });
+
+  private readonly assetClass = signal<AssetClass | null>(
+    this.data.asset?.assetClass ?? this.data.assetClass ?? null,
+  );
   protected readonly selection = computed(() => {
     const assetClass = this.assetClass();
     return assetClass === null ? null : { assetClass, kind: formKindFor(assetClass) };
@@ -91,10 +124,11 @@ export class AssetFormDialog {
 
   protected pick(assetClass: AssetClass): void {
     this.formError.set(null);
+    const portfolioId = this.targetPortfolioId();
 
     if (Number(assetClass) === ASSET_CLASS.Deposit) {
       this.dialog
-        .open(DepositFormDialog, { width: '560px', data: { portfolioId: this.data.portfolioId } })
+        .open(DepositFormDialog, { width: '560px', data: { portfolioId } })
         .afterClosed()
         .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
       return;
@@ -102,7 +136,7 @@ export class AssetFormDialog {
 
     if (Number(assetClass) === ASSET_CLASS.Bond) {
       this.dialog
-        .open(BondPurchaseDialog, { width: '560px', data: { portfolioId: this.data.portfolioId } })
+        .open(BondPurchaseDialog, { width: '560px', data: { portfolioId } })
         .afterClosed()
         .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
       return;
@@ -110,10 +144,7 @@ export class AssetFormDialog {
 
     if (Number(assetClass) === ASSET_CLASS.Savings) {
       this.dialog
-        .open(SavingsAccountFormDialog, {
-          width: '560px',
-          data: { portfolioId: this.data.portfolioId },
-        })
+        .open(SavingsAccountFormDialog, { width: '560px', data: { portfolioId } })
         .afterClosed()
         .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
       return;
@@ -145,8 +176,10 @@ export class AssetFormDialog {
       return;
     }
 
-    if (active.form.invalid) {
+    const portfolioId = this.targetPortfolioId();
+    if (active.form.invalid || !portfolioId) {
       active.form.markAllAsTouched();
+      this.portfolioForm.markAllAsTouched();
       return;
     }
 
@@ -156,11 +189,11 @@ export class AssetFormDialog {
     const body = active.toBody();
     const result = this.data.asset
       ? await putApiPortfolioPortfoliosByPortfolioIdAssetsById({
-          path: { portfolioId: this.data.portfolioId, id: this.data.asset.id },
+          path: { portfolioId, id: this.data.asset.id },
           body,
         })
       : await postApiPortfolioPortfoliosByPortfolioIdAssets({
-          path: { portfolioId: this.data.portfolioId },
+          path: { portfolioId },
           body,
         });
 
@@ -176,6 +209,14 @@ export class AssetFormDialog {
 
   protected cancel(): void {
     this.dialogRef.close(false);
+  }
+
+  private targetPortfolioId(): string | undefined {
+    return (
+      this.data.portfolioId ??
+      this.data.asset?.portfolioId ??
+      (this.portfolioForm.controls.portfolioId.value || undefined)
+    );
   }
 
   private applyServerErrors(form: FormGroup, problem: ApiProblemDetails): void {
