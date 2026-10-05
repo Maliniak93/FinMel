@@ -195,6 +195,25 @@ export type BondSwapSourceResponse = {
     name: string;
 };
 
+export type CashAccountResponse = {
+    assetId: string;
+    portfolioId: string;
+    portfolioName: string;
+    name: string;
+    currency: string;
+    balance: number | string;
+};
+
+export type CashAccountsResponse = {
+    accounts: Array<CashAccountResponse>;
+    totals: Array<CashTotalResponse>;
+};
+
+export type CashTotalResponse = {
+    currency: string;
+    balance: number | string;
+};
+
 export type CreatePortfolioRequest = {
     name: string;
     description?: null | string;
@@ -1283,6 +1302,22 @@ export type GetApiPortfolioSavingsAccountsResponses = {
 };
 
 export type GetApiPortfolioSavingsAccountsResponse = GetApiPortfolioSavingsAccountsResponses[keyof GetApiPortfolioSavingsAccountsResponses];
+
+export type GetApiPortfolioCashAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/cash-accounts';
+};
+
+export type GetApiPortfolioCashAccountsResponses = {
+    /**
+     * OK
+     */
+    200: CashAccountsResponse;
+};
+
+export type GetApiPortfolioCashAccountsResponse = GetApiPortfolioCashAccountsResponses[keyof GetApiPortfolioCashAccountsResponses];
 
 export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewData = {
     body?: never;

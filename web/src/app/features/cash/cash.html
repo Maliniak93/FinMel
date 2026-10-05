@@ -1,0 +1,64 @@
+<div class="cash-page">
+  <h1>{{ 'cash.title' | transloco }}</h1>
+
+  @if (cashResource.error(); as loadError) {
+    <div class="cash-page__state" role="alert">
+      <p>{{ loadError.message }}</p>
+      <button mat-button type="button" (click)="cashResource.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (cashResource.isLoading() && !cashResource.hasValue()) {
+    <div class="cash-page__state">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (cashResource.hasValue() && cashResource.value().accounts.length === 0) {
+    <div class="cash-page__state">
+      <p>{{ 'cash.empty' | transloco }}</p>
+    </div>
+  } @else if (cashResource.hasValue()) {
+    <table mat-table [dataSource]="cashResource.value().accounts" class="cash-page__table">
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+        <td mat-cell *matCellDef="let account">
+          <a [routerLink]="transactionsLink(account)">{{ account.name }}</a>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="portfolio">
+        <th mat-header-cell *matHeaderCellDef>{{ 'cash.portfolio' | transloco }}</th>
+        <td mat-cell *matCellDef="let account">{{ account.portfolioName }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="currency">
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.currency' | transloco }}</th>
+        <td mat-cell *matCellDef="let account">{{ account.currency }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="balance">
+        <th mat-header-cell *matHeaderCellDef>{{ 'cash.balance' | transloco }}</th>
+        <td mat-cell *matCellDef="let account">
+          {{ formatMoney(account.balance, account.currency) }}
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+
+    <section class="cash-page__totals">
+      <h2>{{ 'cash.totals' | transloco }}</h2>
+      <ul>
+        @for (total of cashResource.value().totals; track total.currency) {
+          <li class="cash-page__total">
+            {{
+              'cash.totalLine'
+                | transloco
+                  : { currency: total.currency, amount: formatMoney(total.balance, total.currency) }
+            }}
+          </li>
+        }
+      </ul>
+    </section>
+  }
+</div>

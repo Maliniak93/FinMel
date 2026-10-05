@@ -33,6 +33,7 @@
     "nav": {
       "dashboard": "Pulpit",
       "portfolios": "Portfele",
+      "cash": "Gotówka",
       "deposits": "Lokaty i oszczędności",
       "bonds": "Obligacje",
       "settings": "Ustawienia"
@@ -511,6 +512,15 @@
       "message": "Obie strony tego przelewu ({{ quantity }}) — tutaj i w \"{{ counterpart }}\" — zostaną trwale usunięte. Tej operacji nie można cofnąć.",
       "failed": "Nie udało się usunąć przelewu."
     }
+  },
+  "cash": {
+    "title": "Gotówka",
+    "portfolio": "Portfel",
+    "balance": "Saldo",
+    "totals": "Suma",
+    "totalLine": "{{ currency }}: {{ amount }}",
+    "empty": "Nie masz jeszcze kont gotówkowych. Dodaj aktywo typu Gotówka do portfela, aby je tu zobaczyć.",
+    "loadFailed": "Nie udało się wczytać kont gotówkowych."
   },
   "deposits": {
     "title": "Lokaty i oszczędności",

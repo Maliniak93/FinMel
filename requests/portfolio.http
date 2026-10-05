@@ -637,6 +637,10 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/savings-accounts
 Authorization: Bearer {{authToken}}
 
+### List every active cash account across portfolios, with per-currency totals
+GET {{baseUrl}}/api/portfolio/cash-accounts
+Authorization: Bearer {{authToken}}
+
 ### Get a savings account
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
 Authorization: Bearer {{authToken}}

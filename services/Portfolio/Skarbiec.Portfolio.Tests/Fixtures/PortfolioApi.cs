@@ -637,6 +637,8 @@ internal static class PortfolioApi
         TaxExempt = bond.TaxExempt
     };
 
+    public const string AllCashAccountsUri = "/api/portfolio/cash-accounts";
+
     public const string AllSavingsAccountsUri = "/api/portfolio/savings-accounts";
 
     public static string SavingsAccountsUri(Guid portfolioId) =>

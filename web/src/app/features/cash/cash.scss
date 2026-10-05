@@ -1,0 +1,23 @@
+.cash-page__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.cash-page__table {
+  width: 100%;
+}
+
+.cash-page__totals ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cash-page__total {
+  padding: 4px 0;
+}
