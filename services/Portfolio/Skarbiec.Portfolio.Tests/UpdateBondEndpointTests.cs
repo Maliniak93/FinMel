@@ -124,4 +124,52 @@ public sealed class UpdateBondEndpointTests(SkarbiecContainersFixture containers
         var unchanged = await client.GetBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, cancellationToken);
         Assert.Equal(50, unchanged.BondCount);
     }
+
+    [Fact]
+    public async Task Update_SwapBorn_KeepsSwapTermsFixed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateSettledTosAsync(cancellationToken);
+        await client.SwapBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, 10, funded.CashAssetId, cancellationToken);
+        var edo = await client.FindSwappedBondAsync(funded.Bond.AssetId, cancellationToken);
+        var current = edo.ToUpdateRequest();
+        var uri = BondUri(edo.PortfolioId, edo.AssetId);
+        var forbidden = new[]
+        {
+            current with { BondCount = 9 },
+            current with { PurchasePricePerBond = 100m },
+            current with { PurchaseDate = new DateOnly(2029, 9, 15) },
+            current with { SeriesCode = "EDO1136" },
+            current with { Type = TreasuryBondType.Coi, SeriesCode = "COI1030" },
+        };
+
+        foreach (var request in forbidden)
+        {
+            var rejected = await client.PutAsJsonAsync(uri, request, cancellationToken);
+
+            await rejected.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.BondFromSwapErrorCode, cancellationToken);
+        }
+
+        var unchanged = await client.GetBondAsync(edo.PortfolioId, edo.AssetId, cancellationToken);
+        Assert.Equal(10, unchanged.BondCount);
+        Assert.Equal(99.90m, unchanged.PurchasePricePerBond);
+        Assert.Equal(TosMaturityDate, unchanged.PurchaseDate);
+        Assert.Equal(999.00m, unchanged.BookValue);
+
+        var allowed = await client.PutAsJsonAsync(
+            uri,
+            current with { Name = "Renamed EDO", FirstPeriodRatePercent = 5.50m, MarginPercent = 1.75m, EarlyRedemptionFeePerBond = 2.00m },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        var updated = await client.GetBondAsync(edo.PortfolioId, edo.AssetId, cancellationToken);
+        Assert.Equal("Renamed EDO", updated.Name);
+        Assert.Equal(5.50m, updated.FirstPeriodRatePercent);
+        Assert.Equal(1.75m, updated.MarginPercent);
+        Assert.Equal(2.00m, updated.EarlyRedemptionFeePerBond);
+        Assert.Equal(999.00m, updated.BookValue);
+        Assert.Equal(funded.Bond.AssetId, updated.SwappedFrom!.AssetId);
+    }
 }

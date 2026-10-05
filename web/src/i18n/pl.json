@@ -210,12 +210,15 @@
       "count": "Liczba",
       "bookValue": "Wartość księgowa",
       "maturityDate": "Wykup",
-      "portfolio": "Portfel"
+      "portfolio": "Portfel",
+      "showRedeemed": "Pokaż wykupione",
+      "swappedFrom": "z zamiany: {{ name }}"
     },
     "status": {
       "active": "Aktywna",
       "interestDue": "Odsetki do rozliczenia",
-      "matured": "Do wykupu"
+      "matured": "Do wykupu",
+      "redeemed": "Wykupiona"
     },
     "delete": {
       "title": "Usunąć tę obligację?",
@@ -284,6 +287,41 @@
       "undoTitle": "Cofnąć ostatnie rozliczenie odsetek?",
       "undoMessage": "Okres {{ index }} obligacji „{{ name }}” i jego wpłata odsetek zostaną usunięte, a okres znów będzie do rozliczenia.",
       "undoFailed": "Nie udało się cofnąć rozliczenia."
+    },
+    "redeem": {
+      "action": "Wykup",
+      "title": "Wykup obligacji",
+      "settleFirst": "Najpierw rozlicz okresy.",
+      "settleFirstHint": "Przed wykupem trzeba rozliczyć wszystkie okresy odsetkowe — nierozliczone okresy: {{ count }}.",
+      "settleAction": "Rozlicz okresy",
+      "date": "Data wykupu",
+      "capitalisedInterest": "Odsetki skapitalizowane",
+      "discountIncome": "Dyskonto",
+      "tax": "Podatek Belki",
+      "proceeds": "Do wypłaty",
+      "destination": "Wypłać na",
+      "destinationRequired": "Wybierz rachunek, na który trafią środki.",
+      "previewFailed": "Nie udało się wczytać podglądu wykupu.",
+      "submit": "Wykup",
+      "failed": "Nie udało się wykupić obligacji."
+    },
+    "swap": {
+      "action": "Zamień",
+      "title": "Zamiana obligacji",
+      "dateHint": "Nowe obligacje są kupowane w dniu wykupu: {{ date }}.",
+      "series": "Nowa seria",
+      "offerLoadFailed": "Nie udało się wczytać serii w sprzedaży w dniu wykupu.",
+      "count": "Liczba obligacji do zamiany (1–{{ max }})",
+      "countRange": "Podaj liczbę od 1 do {{ max }}.",
+      "swapPrice": "Cena zamiany za obligację",
+      "exceedsProceeds": "Zamiana kosztuje więcej niż kwota z wykupu.",
+      "proceeds": "Kwota z wykupu",
+      "cost": "Koszt zamiany",
+      "leftover": "Reszta na rachunek",
+      "destination": "Resztę wypłać na",
+      "destinationRequired": "Wybierz rachunek, na który trafi reszta.",
+      "submit": "Zamień",
+      "failed": "Nie udało się zamienić obligacji."
     },
     "periods": {
       "toggle": "Pokaż okresy odsetkowe: {{ name }}",

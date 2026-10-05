@@ -106,6 +106,28 @@ export type BondPeriodResponse = {
 
 export type BondPeriodState = number;
 
+export type BondRedemptionKind = number;
+
+export type BondRedemptionPreviewResponse = {
+    date: string;
+    bondCount: number | string;
+    capitalisedInterest: number | string;
+    discountIncome: number | string;
+    taxableIncome: number | string;
+    tax: number | string;
+    proceeds: number | string;
+};
+
+export type BondRedemptionResponse = {
+    kind: BondRedemptionKind;
+    date: string;
+    bondCount: number | string;
+    tax: number | string;
+    proceeds: number | string;
+    destinationAssetName?: null | string;
+    swapTargetAssetName?: null | string;
+};
+
 export type BondResponse = {
     assetId: string;
     portfolioId: string;
@@ -131,6 +153,8 @@ export type BondResponse = {
     duePeriodCount: number | string;
     lastSettlement?: null | BondSettlementResponse;
     periods: Array<BondPeriodResponse>;
+    redemptions: Array<BondRedemptionResponse>;
+    swappedFrom?: null | BondSwapSourceResponse;
 };
 
 export type BondSettlementResponse = {
@@ -142,6 +166,11 @@ export type BondSettlementResponse = {
 };
 
 export type BondStatus = number;
+
+export type BondSwapSourceResponse = {
+    assetId: string;
+    name: string;
+};
 
 export type CreatePortfolioRequest = {
     name: string;
@@ -245,6 +274,10 @@ export type RecordTransactionRequest = {
     date: string;
 };
 
+export type RedeemBondRequest = {
+    destinationAssetId: string;
+};
+
 export type RollOverDepositRequest = {
     annualInterestRatePercent: number | string;
     grossInterest?: null | number | string;
@@ -309,6 +342,22 @@ export type SettleSavingsInterestRequest = {
     periodEnd: string;
     grossInterest: number | string;
     tax: number | string;
+};
+
+export type SwapBondRequest = {
+    bondCount: number | string;
+    newBond: SwapNewBondRequest;
+    destinationAssetId?: null | string;
+};
+
+export type SwapNewBondRequest = {
+    name: string;
+    seriesCode: string;
+    type: TreasuryBondType;
+    swapPricePerBond: number | string;
+    firstPeriodRatePercent: number | string;
+    marginPercent?: null | number | string;
+    earlyRedemptionFeePerBond: number | string;
 };
 
 export type TransactionResponse = {
@@ -1033,6 +1082,63 @@ export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettl
 };
 
 export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionData = {
+    body: RedeemBondRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses = {
+    /**
+     * OK
+     */
+    200: BondResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses];
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption-preview';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses = {
+    /**
+     * OK
+     */
+    200: BondRedemptionPreviewResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapData = {
+    body: SwapBondRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/swap';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses = {
+    /**
+     * Created
+     */
+    201: BondResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses];
 
 export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData = {
     body: AddSavingsAccountRequest;

@@ -1,0 +1,109 @@
+<h2 mat-dialog-title>{{ 'bonds.redeem.title' | transloco }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="redeem-bond-dialog__name">{{ bond.name }}</p>
+
+    @if (unsettled) {
+      <p class="redeem-bond-dialog__settle-first" role="alert" data-testid="settle-first">
+        <strong>{{ 'bonds.redeem.settleFirst' | transloco }}</strong>
+        {{ 'bonds.redeem.settleFirstHint' | transloco: { count: bond.duePeriodCount } }}
+      </p>
+    } @else {
+      @if (previewResource.error(); as loadError) {
+        <p class="redeem-bond-dialog__error" role="alert">{{ loadError.message }}</p>
+      } @else if (previewResource.isLoading()) {
+        <div class="redeem-bond-dialog__loading">
+          <mat-spinner diameter="24" />
+        </div>
+      } @else if (previewResource.hasValue()) {
+        @let preview = previewResource.value();
+        <dl class="redeem-bond-dialog__summary" data-testid="redemption-preview">
+          <div>
+            <dt>{{ 'bonds.redeem.date' | transloco }}</dt>
+            <dd>{{ formatDate(preview.date) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.my.count' | transloco }}</dt>
+            <dd>{{ preview.bondCount }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.redeem.capitalisedInterest' | transloco }}</dt>
+            <dd>{{ formatMoney(preview.capitalisedInterest, currency) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.redeem.discountIncome' | transloco }}</dt>
+            <dd>{{ formatMoney(preview.discountIncome, currency) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.redeem.tax' | transloco }}</dt>
+            <dd>{{ formatMoney(preview.tax, currency) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'bonds.redeem.proceeds' | transloco }}</dt>
+            <dd>
+              <strong>{{ formatMoney(preview.proceeds, currency) }}</strong>
+            </dd>
+          </div>
+        </dl>
+      }
+
+      <mat-form-field appearance="outline" class="redeem-bond-dialog__field">
+        <mat-label>{{ 'bonds.redeem.destination' | transloco }}</mat-label>
+        <mat-select formControlName="destinationAssetId" data-testid="redeem-destination">
+          @if (candidatesResource.hasValue()) {
+            @for (candidate of candidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }}
+              </mat-option>
+            }
+          }
+        </mat-select>
+        @if (candidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
+          <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
+        }
+        @if (form.controls.destinationAssetId.hasError('required')) {
+          <mat-error>{{ 'bonds.redeem.destinationRequired' | transloco }}</mat-error>
+        } @else if (form.controls.destinationAssetId.hasError('server')) {
+          <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (formError()) {
+      <p class="redeem-bond-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    @if (unsettled) {
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        data-testid="settle-first-action"
+        (click)="settleFirst()"
+      >
+        {{ 'bonds.redeem.settleAction' | transloco }}
+      </button>
+    } @else {
+      <button
+        mat-flat-button
+        color="primary"
+        type="submit"
+        [disabled]="submitting() || !previewResource.hasValue()"
+      >
+        @if (submitting()) {
+          <mat-spinner diameter="20" />
+        } @else {
+          {{ 'bonds.redeem.submit' | transloco }}
+        }
+      </button>
+    }
+  </mat-dialog-actions>
+</form>

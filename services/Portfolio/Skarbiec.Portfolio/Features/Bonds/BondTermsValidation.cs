@@ -13,7 +13,7 @@ internal static class BondTermsValidation
         ValidationContext validationContext,
         string seriesCode,
         TreasuryBondType type,
-        DateOnly purchaseDate,
+        DateOnly? purchaseDate,
         decimal purchasePricePerBond,
         decimal firstPeriodRatePercent,
         decimal? marginPercent,
@@ -29,8 +29,9 @@ internal static class BondTermsValidation
                 $"The series code must start with the bond type '{type.ToString().ToUpperInvariant()}'.", [nameof(TreasuryBond.SeriesCode)]);
         }
 
+        // A swap sends no purchase date: the new bond is bought on the old one's maturity date.
         var timeProvider = validationContext.GetService(typeof(TimeProvider)) as TimeProvider ?? TimeProvider.System;
-        if (purchaseDate > WarsawCalendar.Today(timeProvider))
+        if (purchaseDate is { } date && date > WarsawCalendar.Today(timeProvider))
         {
             yield return new ValidationResult("The purchase date can't be in the future.", [nameof(TreasuryBond.PurchaseDate)]);
         }

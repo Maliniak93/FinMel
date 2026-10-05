@@ -101,4 +101,33 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(BondStatus.InterestDue, body.Status);
         Assert.Equal(body.Periods[1].Settlement!.SettlementId, body.LastSettlement!.SettlementId);
     }
+
+    [Fact]
+    public async Task Get_Redeemed_ShowsRedemptionAndSwapLinks()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateSettledTosAsync(cancellationToken);
+        await client.SwapBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, 6, funded.CashAssetId, cancellationToken);
+
+        var tos = await client.GetBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, cancellationToken);
+        var edo = await client.FindSwappedBondAsync(funded.Bond.AssetId, cancellationToken);
+
+        Assert.Equal(BondStatus.Redeemed, tos.Status);
+        Assert.Equal(0m, tos.BookValue);
+        Assert.Null(tos.SwappedFrom);
+        var redemption = Assert.Single(tos.Redemptions);
+        Assert.Equal("Swap", redemption.Kind.ToString());
+        Assert.Equal(TosMaturityDate, redemption.Date);
+        Assert.Equal(10, redemption.BondCount);
+        Assert.Equal(26.21m, redemption.Tax);
+        Assert.Equal(1_111.69m, redemption.Proceeds);
+        Assert.Equal("Cash account", redemption.DestinationAssetName);
+        Assert.Equal("EDO1036", redemption.SwapTargetAssetName);
+        Assert.Equal(BondStatus.Active, edo.Status);
+        Assert.Equal(funded.Bond.AssetId, edo.SwappedFrom!.AssetId);
+        Assert.Equal("TOS1029", edo.SwappedFrom.Name);
+        Assert.Empty(edo.Redemptions);
+    }
 }

@@ -1,0 +1,250 @@
+<h2 mat-dialog-title>{{ 'bonds.swap.title' | transloco }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="swap-bond-dialog__name">{{ bond.name }}</p>
+    <p class="swap-bond-dialog__hint">
+      {{ 'bonds.swap.dateHint' | transloco: { date: formatDate(bond.maturityDate) } }}
+    </p>
+
+    <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+      <mat-label>{{ 'bonds.swap.series' | transloco }}</mat-label>
+      <mat-select formControlName="series" data-testid="swap-series">
+        @if (offerResource.hasValue()) {
+          @for (series of offerResource.value(); track series.code) {
+            <mat-option [value]="series.code">
+              {{ series.code }} — {{ typeLabel(series) | transloco }}
+            </mat-option>
+          }
+        }
+        <mat-option [value]="manualSeries">{{ 'bonds.purchase.manual' | transloco }}</mat-option>
+      </mat-select>
+      @if (offerResource.error(); as loadError) {
+        <mat-hint>{{ loadError.message }}</mat-hint>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
+      <input matInput formControlName="name" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>{{ 'bonds.purchase.nameRequired' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>{{ 'bonds.purchase.nameTooLong' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('server')) {
+        <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="swap-bond-dialog__row">
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.purchase.seriesCode' | transloco }}</mat-label>
+        <input matInput formControlName="seriesCode" data-testid="swap-series-code" />
+        @if (form.controls.seriesCode.hasError('required')) {
+          <mat-error>{{ 'bonds.purchase.seriesCodeRequired' | transloco }}</mat-error>
+        } @else if (form.controls.seriesCode.hasError('pattern')) {
+          <mat-error>{{ 'bonds.purchase.seriesCodeInvalid' | transloco }}</mat-error>
+        } @else if (form.controls.seriesCode.hasError('server')) {
+          <mat-error>{{ form.controls.seriesCode.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.purchase.type' | transloco }}</mat-label>
+        <mat-select formControlName="type">
+          @for (info of bondTypes; track info.type) {
+            <mat-option [value]="info.type">{{ info.label | transloco }}</mat-option>
+          }
+        </mat-select>
+        @if (form.controls.type.hasError('required')) {
+          <mat-error>{{ 'bonds.purchase.typeRequired' | transloco }}</mat-error>
+        } @else if (form.controls.type.hasError('server')) {
+          <mat-error>{{ form.controls.type.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="swap-bond-dialog__row">
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.swap.count' | transloco: { max: heldCount } }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="1"
+          formControlName="bondCount"
+          data-testid="swap-count"
+        />
+        @if (form.controls.bondCount.hasError('required')) {
+          <mat-error>{{ 'bonds.swap.countRange' | transloco: { max: heldCount } }}</mat-error>
+        } @else if (
+          form.controls.bondCount.hasError('min') || form.controls.bondCount.hasError('max')
+        ) {
+          <mat-error>{{ 'bonds.swap.countRange' | transloco: { max: heldCount } }}</mat-error>
+        } @else if (form.controls.bondCount.hasError('exceedsProceeds')) {
+          <mat-error>{{ 'bonds.swap.exceedsProceeds' | transloco }}</mat-error>
+        } @else if (form.controls.bondCount.hasError('server')) {
+          <mat-error>{{ form.controls.bondCount.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.swap.swapPrice' | transloco }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="0.01"
+          formControlName="swapPricePerBond"
+          data-testid="swap-price"
+        />
+        @if (form.controls.swapPricePerBond.hasError('required')) {
+          <mat-error>{{ 'bonds.purchase.priceRange' | transloco }}</mat-error>
+        } @else if (
+          form.controls.swapPricePerBond.hasError('min') ||
+          form.controls.swapPricePerBond.hasError('max')
+        ) {
+          <mat-error>{{ 'bonds.purchase.priceRange' | transloco }}</mat-error>
+        } @else if (form.controls.swapPricePerBond.hasError('server')) {
+          <mat-error>{{ form.controls.swapPricePerBond.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="swap-bond-dialog__row">
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.purchase.firstRate' | transloco }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="0.01"
+          formControlName="firstPeriodRatePercent"
+          data-testid="swap-first-rate"
+        />
+        @if (
+          form.controls.firstPeriodRatePercent.hasError('required') ||
+          form.controls.firstPeriodRatePercent.hasError('min') ||
+          form.controls.firstPeriodRatePercent.hasError('max')
+        ) {
+          <mat-error>{{ 'bonds.purchase.rateRange' | transloco }}</mat-error>
+        } @else if (form.controls.firstPeriodRatePercent.hasError('server')) {
+          <mat-error>{{ form.controls.firstPeriodRatePercent.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.purchase.margin' | transloco }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="0.01"
+          formControlName="marginPercent"
+          data-testid="swap-margin"
+        />
+        @if (
+          form.controls.marginPercent.hasError('min') || form.controls.marginPercent.hasError('max')
+        ) {
+          <mat-error>{{ 'bonds.purchase.marginRange' | transloco }}</mat-error>
+        } @else if (form.controls.marginPercent.hasError('server')) {
+          <mat-error>{{ form.controls.marginPercent.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.purchase.fee' | transloco }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="0.01"
+          formControlName="earlyRedemptionFeePerBond"
+          data-testid="swap-fee"
+        />
+        @if (
+          form.controls.earlyRedemptionFeePerBond.hasError('required') ||
+          form.controls.earlyRedemptionFeePerBond.hasError('min') ||
+          form.controls.earlyRedemptionFeePerBond.hasError('max')
+        ) {
+          <mat-error>{{ 'bonds.purchase.feeRange' | transloco }}</mat-error>
+        } @else if (form.controls.earlyRedemptionFeePerBond.hasError('server')) {
+          <mat-error>{{ form.controls.earlyRedemptionFeePerBond.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    @if (previewResource.error(); as loadError) {
+      <p class="swap-bond-dialog__error" role="alert">{{ loadError.message }}</p>
+    } @else if (previewResource.isLoading()) {
+      <div class="swap-bond-dialog__loading">
+        <mat-spinner diameter="24" />
+      </div>
+    }
+
+    @if (amounts(); as current) {
+      <dl class="swap-bond-dialog__summary" data-testid="swap-amounts">
+        <div>
+          <dt>{{ 'bonds.swap.proceeds' | transloco }}</dt>
+          <dd data-testid="swap-proceeds">{{ formatMoney(current.proceeds, currency) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'bonds.swap.cost' | transloco }}</dt>
+          <dd data-testid="swap-cost">
+            {{ current.cost === null ? '—' : formatMoney(current.cost, currency) }}
+          </dd>
+        </div>
+        <div>
+          <dt>{{ 'bonds.swap.leftover' | transloco }}</dt>
+          <dd data-testid="swap-leftover">
+            <strong>
+              {{ current.leftover === null ? '—' : formatMoney(current.leftover, currency) }}
+            </strong>
+          </dd>
+        </div>
+      </dl>
+    }
+
+    @if (needsDestination()) {
+      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
+        <mat-label>{{ 'bonds.swap.destination' | transloco }}</mat-label>
+        <mat-select formControlName="destinationAssetId" data-testid="swap-destination">
+          @if (candidatesResource.hasValue()) {
+            @for (candidate of candidatesResource.value(); track candidate.assetId) {
+              <mat-option [value]="candidate.assetId">
+                {{ candidate.name }} — {{ candidate.portfolioName }}
+              </mat-option>
+            }
+          }
+        </mat-select>
+        @if (candidatesResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
+          <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
+        }
+        @if (form.controls.destinationAssetId.hasError('required')) {
+          <mat-error>{{ 'bonds.swap.destinationRequired' | transloco }}</mat-error>
+        } @else if (form.controls.destinationAssetId.hasError('server')) {
+          <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (formError()) {
+      <p class="swap-bond-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      [disabled]="submitting() || !previewResource.hasValue()"
+    >
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'bonds.swap.submit' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

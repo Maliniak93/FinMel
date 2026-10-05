@@ -47,6 +47,14 @@ public sealed class RemoveAssetHandler(
             await dbContext.SavingsInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
         dbContext.BondInterestSettlements.RemoveRange(
             await dbContext.BondInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
+        dbContext.BondRedemptions.RemoveRange(
+            await dbContext.BondRedemptions.Where(r => r.AssetId == assetId).ToListAsync(cancellationToken));
+
+        // A bond bought with this one in a swap keeps its value; like its detached opening leg, it stops pointing here.
+        foreach (var swapped in await dbContext.TreasuryBonds.Where(b => b.SwappedFromAssetId == assetId).ToListAsync(cancellationToken))
+        {
+            swapped.SwappedFromAssetId = null;
+        }
 
         dbContext.Assets.Remove(asset);
 

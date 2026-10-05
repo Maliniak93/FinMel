@@ -1,0 +1,49 @@
+.swap-bond-dialog__name {
+  margin: 0 0 4px;
+  font-weight: 500;
+}
+
+.swap-bond-dialog__hint {
+  margin: 0 0 16px;
+  opacity: 0.7;
+}
+
+.swap-bond-dialog__field {
+  display: block;
+  width: 100%;
+}
+
+.swap-bond-dialog__row {
+  display: flex;
+  gap: 12px;
+
+  .swap-bond-dialog__field {
+    flex: 1;
+  }
+}
+
+.swap-bond-dialog__summary {
+  display: flex;
+  gap: 24px;
+  margin: 0 0 16px;
+
+  dt {
+    opacity: 0.7;
+    font-size: 0.875em;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.swap-bond-dialog__loading {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 16px;
+}
+
+.swap-bond-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

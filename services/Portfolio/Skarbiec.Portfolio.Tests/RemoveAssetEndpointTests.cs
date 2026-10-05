@@ -270,6 +270,37 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
+    public async Task Remove_SwappedBond_DetachesLegs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateSettledTosAsync(cancellationToken);
+        await client.SwapBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, 10, funded.CashAssetId, cancellationToken);
+        var edo = await client.FindSwappedBondAsync(funded.Bond.AssetId, cancellationToken);
+
+        var response = await client.DeleteAsync(AssetUri(funded.BondPortfolioId, funded.Bond.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty(await ReadBondRedemptionsAsync(userId, cancellationToken));
+        var kept = await client.GetBondAsync(edo.PortfolioId, edo.AssetId, cancellationToken);
+        Assert.Null(kept.SwappedFrom);
+        Assert.Equal(999.00m, kept.BookValue);
+        var opening = Assert.Single((await client.ListTransactionsAsync(edo.PortfolioId, edo.AssetId, cancellationToken)).Items);
+        Assert.Equal(999.00m, opening.Quantity);
+        Assert.Null(opening.Transfer);
+        Assert.Equal(5_112.69m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        var leftover = Assert.Single(
+            (await client.ListTransactionsAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Items,
+            t => t.Quantity == 112.69m);
+        Assert.Null(leftover.Transfer);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == funded.Bond.AssetId, cancellationToken));
+    }
+
+    [Fact]
     public async Task Remove_SavingsAccount_DeletesSettlements()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -11,6 +11,8 @@ public enum BondStatus
     InterestDue,
 
     Matured,
+
+    Redeemed,
 }
 
 public enum BondPeriodState
@@ -45,6 +47,33 @@ public sealed record BondPeriodResponse
 
     /// <summary>Set only on a Settled period.</summary>
     public BondSettlementResponse? Settlement { get; init; }
+}
+
+public sealed record BondRedemptionResponse
+{
+    public required BondRedemptionKind Kind { get; init; }
+    public required DateOnly Date { get; init; }
+
+    /// <summary>The whole holding — a swap redeems every bond, swapped or not.</summary>
+    public required int BondCount { get; init; }
+
+    /// <summary>Belka tax on the capitalised interest and the purchase discount, PLN.</summary>
+    public required decimal Tax { get; init; }
+
+    /// <summary>What the redemption pays out after tax, PLN; a swap spends part of it on the new bond.</summary>
+    public required decimal Proceeds { get; init; }
+
+    /// <summary>The Cash asset that received the proceeds or a swap's leftover; null when nothing was paid to Cash or once it was removed.</summary>
+    public string? DestinationAssetName { get; init; }
+
+    /// <summary>The bond bought in a swap; null for a maturity redemption or once it was removed.</summary>
+    public string? SwapTargetAssetName { get; init; }
+}
+
+public sealed record BondSwapSourceResponse
+{
+    public required Guid AssetId { get; init; }
+    public required string Name { get; init; }
 }
 
 public sealed record BondResponse
@@ -94,6 +123,11 @@ public sealed record BondResponse
     public BondSettlementResponse? LastSettlement { get; init; }
 
     public required IReadOnlyList<BondPeriodResponse> Periods { get; init; }
+
+    public required IReadOnlyList<BondRedemptionResponse> Redemptions { get; init; }
+
+    /// <summary>The matured bond this one was bought with in a swap; null for a purchase or once that bond was removed.</summary>
+    public BondSwapSourceResponse? SwappedFrom { get; init; }
 }
 
 public static class BondMappingExtensions
@@ -107,7 +141,9 @@ public static class BondMappingExtensions
         bool portfolioIsArchived,
         DateOnly today,
         DepositFundingSource? funding,
-        IReadOnlyCollection<BondInterestSettlement> settlements)
+        IReadOnlyCollection<BondInterestSettlement> settlements,
+        IReadOnlyList<BondRedemptionResponse> redemptions,
+        BondSwapSourceResponse? swappedFrom)
     {
         var settled = settlements.ToDictionary(s => s.PeriodIndex, s => s.ToResponse());
         var periods = BondSchedule.Periods(terms.Type, terms.PurchaseDate)
@@ -147,12 +183,16 @@ public static class BondMappingExtensions
             BookValue = asset.Quantity,
             FundingAssetId = funding?.AssetId,
             FundingAssetName = funding?.AssetName,
-            Status = terms.MaturityDate <= today ? BondStatus.Matured
+            // A holding is only ever redeemed whole, so one redemption means nothing is left.
+            Status = redemptions.Count > 0 ? BondStatus.Redeemed
+                : terms.MaturityDate <= today ? BondStatus.Matured
                 : duePeriodCount > 0 ? BondStatus.InterestDue
                 : BondStatus.Active,
             DuePeriodCount = duePeriodCount,
             LastSettlement = lastSettlement?.ToResponse(),
-            Periods = periods
+            Periods = periods,
+            Redemptions = redemptions,
+            SwappedFrom = swappedFrom
         };
     }
 

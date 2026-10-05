@@ -18,4 +18,6 @@ public sealed class TreasuryBond : IUserOwned
     public bool TaxExempt { get; set; }
 
     public required DateOnly MaturityDate { get; set; }
+
+    public Guid? SwappedFromAssetId { get; set; }
 }

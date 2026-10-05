@@ -1,4 +1,5 @@
-export const BOND_STATUS = { Active: 0, InterestDue: 1, Matured: 2 } as const;
+export const BOND_STATUS = { Active: 0, InterestDue: 1, Matured: 2, Redeemed: 3 } as const;
+export const BOND_REDEMPTION_KIND = { Maturity: 0, Swap: 1 } as const;
 export const BOND_PERIOD_STATE = { Upcoming: 0, Due: 1, Settled: 2 } as const;
 
 export const bondPortfolioId = '22222222-2222-2222-2222-222222222222';
@@ -28,6 +29,18 @@ export interface BondFixture {
   duePeriodCount: number;
   lastSettlement: BondSettlementFixture | null;
   periods: BondPeriodFixture[];
+  redemptions: BondRedemptionFixture[];
+  swappedFrom: { assetId: string; name: string } | null;
+}
+
+export interface BondRedemptionFixture {
+  kind: number;
+  date: string;
+  bondCount: number;
+  tax: number;
+  proceeds: number;
+  destinationAssetName: string | null;
+  swapTargetAssetName: string | null;
 }
 
 export interface BondSettlementFixture {
@@ -80,6 +93,8 @@ export function bondResponse(overrides: Partial<BondFixture> = {}): BondFixture 
         settlement: null,
       },
     ],
+    redemptions: [],
+    swappedFrom: null,
     ...overrides,
   };
 }
@@ -312,5 +327,119 @@ export const cashCandidates = [
     portfolioId: '22222222-2222-2222-2222-222222222221',
     portfolioName: 'Wallet',
     balance: 50,
+  },
+];
+
+const tosSettlement = (index: number): BondSettlementFixture => ({
+  settlementId: `t0t0t0t0-0000-0000-0000-00000000000${index}`,
+  ratePercent: 4.4,
+  bondCount: 10,
+  grossInterest: [44, 45.9, 48][index - 1],
+  tax: 0,
+});
+
+export const settledTosBond = bondResponse({
+  assetId: 'b2b2b2b2-0000-0000-0000-00000000b001',
+  name: 'TOS1029',
+  seriesCode: 'TOS1029',
+  type: 3,
+  purchaseDate: '2026-10-01',
+  bondCount: 10,
+  firstPeriodRatePercent: 4.4,
+  marginPercent: null,
+  earlyRedemptionFeePerBond: 1,
+  maturityDate: '2029-10-01',
+  nominalValue: 1000,
+  bookValue: 1137.9,
+  fundingAssetId: fundingCashId,
+  fundingAssetName: 'Wallet cash',
+  status: BOND_STATUS.Matured,
+  duePeriodCount: 0,
+  lastSettlement: tosSettlement(3),
+  periods: [
+    rorPeriod(1, '2026-10-01', '2027-10-01', BOND_PERIOD_STATE.Settled, tosSettlement(1)),
+    rorPeriod(2, '2027-10-01', '2028-10-01', BOND_PERIOD_STATE.Settled, tosSettlement(2)),
+    rorPeriod(3, '2028-10-01', '2029-10-01', BOND_PERIOD_STATE.Settled, tosSettlement(3)),
+  ],
+});
+
+export const unsettledTosBond = bondResponse({
+  ...settledTosBond,
+  assetId: 'b2b2b2b2-0000-0000-0000-00000000b002',
+  name: 'Unsettled TOS',
+  bookValue: 1000,
+  duePeriodCount: 3,
+  lastSettlement: null,
+  periods: settledTosBond.periods.map((period) => ({
+    ...period,
+    state: BOND_PERIOD_STATE.Due,
+    settlement: null,
+  })),
+});
+
+export const tosRedemptionPreview = {
+  date: '2029-10-01',
+  bondCount: 10,
+  capitalisedInterest: 137.9,
+  discountIncome: 0,
+  taxableIncome: 137.9,
+  tax: 26.21,
+  proceeds: 1111.69,
+};
+
+export const redeemedTosBond = bondResponse({
+  ...settledTosBond,
+  assetId: 'b2b2b2b2-0000-0000-0000-00000000b003',
+  name: 'Redeemed TOS',
+  bookValue: 0,
+  status: BOND_STATUS.Redeemed,
+  redemptions: [
+    {
+      kind: BOND_REDEMPTION_KIND.Swap,
+      date: '2029-10-01',
+      bondCount: 10,
+      tax: 26.21,
+      proceeds: 1111.69,
+      destinationAssetName: 'Wallet cash',
+      swapTargetAssetName: 'EDO0939',
+    },
+  ],
+});
+
+export const swapBornBond = bondResponse({
+  assetId: 'b2b2b2b2-0000-0000-0000-00000000b004',
+  name: 'EDO0939',
+  seriesCode: 'EDO0939',
+  purchaseDate: '2029-10-01',
+  bondCount: 6,
+  purchasePricePerBond: 99.9,
+  maturityDate: '2039-10-01',
+  nominalValue: 600,
+  bookValue: 599.4,
+  swappedFrom: { assetId: redeemedTosBond.assetId, name: redeemedTosBond.name },
+});
+
+export const swapOffer: BondSeriesFixture[] = [
+  {
+    code: 'EDO0939',
+    type: 5,
+    isin: 'PL0000000020',
+    saleStart: '2029-09-01',
+    saleEnd: '2029-10-31',
+    issuePrice: 100,
+    swapPrice: 99.9,
+    marginPercent: 2,
+    firstPeriodRatePercent: 5.35,
+  },
+  {
+    code: 'OTS0130',
+    type: 0,
+    isin: 'PL0000000021',
+    saleStart: '2029-10-01',
+    saleEnd: '2029-10-31',
+    issuePrice: 100,
+    swapPrice: null,
+    marginPercent: null,
+    firstPeriodRatePercent: 3,
   },
 ];

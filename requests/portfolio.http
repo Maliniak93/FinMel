@@ -518,6 +518,73 @@ Authorization: Bearer {{authToken}}
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/{{getFundedBond.response.body.lastSettlement.settlementId}}
 Authorization: Bearer {{authToken}}
 
+### Add a matured 3-month bond funded from cash (type 0 = OTS)
+# @name addMaturedBond
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "OTS0926",
+  "seriesCode": "OTS0926",
+  "type": 0,
+  "purchaseDate": "2026-06-01",
+  "bondCount": 10,
+  "purchasePricePerBond": 100.00,
+  "firstPeriodRatePercent": 3.00,
+  "earlyRedemptionFeePerBond": 0.00,
+  "taxExempt": false,
+  "fundingAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### Settle its only period: the interest is capitalised into the bond
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/interest-settlements
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "periods": [
+    { "periodIndex": 1 }
+  ]
+}
+
+### Preview its redemption: capitalised interest, discount, Belka tax and proceeds, all dated the maturity date
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/redemption-preview
+Authorization: Bearer {{authToken}}
+
+### Swap 6 of the 10 into EDO1036 at the swap price; the rest of the proceeds goes to the cash (send the redemption below instead to pay everything out)
+# @name swapBond
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/swap
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "bondCount": 6,
+  "newBond": {
+    "name": "EDO0936",
+    "seriesCode": "EDO0936",
+    "type": 5,
+    "swapPricePerBond": 99.90,
+    "firstPeriodRatePercent": 5.35,
+    "marginPercent": 2.00,
+    "earlyRedemptionFeePerBond": 3.00
+  },
+  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### Redeem the whole holding to cash instead (409 once it was swapped)
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/redemption
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### Get the redeemed bond: status Redeemed, its redemption and the swap target's name
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+
 ### --- Savings accounts ---
 
 ### Add a savings account

@@ -8,7 +8,9 @@ using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.ArchiveAsset;
 using Skarbiec.Portfolio.Features.ArchivePortfolio;
 using Skarbiec.Portfolio.Features.Bonds.AddBond;
+using Skarbiec.Portfolio.Features.Bonds.RedeemBond;
 using Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
+using Skarbiec.Portfolio.Features.Bonds.SwapBond;
 using Skarbiec.Portfolio.Features.Bonds.UndoBondInterestSettlement;
 using Skarbiec.Portfolio.Features.Bonds.UpdateBond;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
@@ -71,6 +73,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddScoped<UpdateBondHandler>();
             services.AddScoped<SettleBondInterestHandler>();
             services.AddScoped<UndoBondInterestSettlementHandler>();
+            services.AddScoped<RedeemBondHandler>();
+            services.AddScoped<SwapBondHandler>();
             services.AddScoped<AddSavingsAccountHandler>();
             services.AddScoped<UpdateSavingsAccountHandler>();
             services.AddScoped<SettleSavingsInterestHandler>();

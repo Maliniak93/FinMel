@@ -21,6 +21,9 @@ public static class TransferRoutes
         // Paying a treasury bond's coupon out to cash, through SettleBondInterest's destinationAssetId.
         [(AssetClass.Bond, AssetClass.Cash)] = false,
 
+        // Buying a new series with a matured bond's proceeds, through SwapBond.
+        [(AssetClass.Bond, AssetClass.Bond)] = false,
+
         // Moving money between a current account and a savings account, through CreateTransfer and DeleteTransfer.
         [(AssetClass.Cash, AssetClass.Savings)] = true,
         [(AssetClass.Savings, AssetClass.Cash)] = true,

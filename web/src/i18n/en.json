@@ -210,12 +210,15 @@
       "count": "Count",
       "bookValue": "Book value",
       "maturityDate": "Matures",
-      "portfolio": "Portfolio"
+      "portfolio": "Portfolio",
+      "showRedeemed": "Show redeemed",
+      "swappedFrom": "from swap: {{ name }}"
     },
     "status": {
       "active": "Active",
       "interestDue": "Interest due",
-      "matured": "Matured"
+      "matured": "Matured",
+      "redeemed": "Redeemed"
     },
     "delete": {
       "title": "Delete this bond?",
@@ -284,6 +287,41 @@
       "undoTitle": "Undo the last interest settlement?",
       "undoMessage": "Period {{ index }} of \"{{ name }}\" and its interest credit will be removed, and the period becomes due again.",
       "undoFailed": "Failed to undo the settlement."
+    },
+    "redeem": {
+      "action": "Redeem",
+      "title": "Redeem bonds",
+      "settleFirst": "Settle the periods first.",
+      "settleFirstHint": "Every interest period must be settled before redemption — unsettled periods: {{ count }}.",
+      "settleAction": "Settle periods",
+      "date": "Redemption date",
+      "capitalisedInterest": "Capitalised interest",
+      "discountIncome": "Discount",
+      "tax": "Belka tax",
+      "proceeds": "Paid out",
+      "destination": "Pay out to",
+      "destinationRequired": "Pick the cash account that receives the money.",
+      "previewFailed": "Failed to load the redemption preview.",
+      "submit": "Redeem",
+      "failed": "Failed to redeem the bond."
+    },
+    "swap": {
+      "action": "Swap",
+      "title": "Swap bonds",
+      "dateHint": "The new bonds are bought on the maturity date: {{ date }}.",
+      "series": "New series",
+      "offerLoadFailed": "Failed to load the series on sale on the maturity date.",
+      "count": "Bonds to swap (1–{{ max }})",
+      "countRange": "Enter a number from 1 to {{ max }}.",
+      "swapPrice": "Swap price per bond",
+      "exceedsProceeds": "The swap costs more than the redemption pays out.",
+      "proceeds": "Redemption proceeds",
+      "cost": "Swap cost",
+      "leftover": "Leftover to cash",
+      "destination": "Pay the leftover to",
+      "destinationRequired": "Pick the cash account that receives the leftover.",
+      "submit": "Swap",
+      "failed": "Failed to swap the bond."
     },
     "periods": {
       "toggle": "Show the interest periods of {{ name }}",

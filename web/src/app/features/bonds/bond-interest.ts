@@ -7,6 +7,7 @@ import {
   type BondPeriodResponse,
   type BondPeriodState,
   type BondResponse,
+  type BondStatus,
   type SettleBondInterestRequest,
   type TransferCandidateResponse,
 } from '../../api/portfolio';
@@ -19,6 +20,14 @@ export const BOND_PERIOD_STATE = { Upcoming: 0, Due: 1, Settled: 2 } as const sa
   string,
   BondPeriodState
 >;
+
+// Mirrors BondStatus in declaration order: the enum travels as an int.
+export const BOND_STATUS = {
+  Active: 0,
+  InterestDue: 1,
+  Matured: 2,
+  Redeemed: 3,
+} as const satisfies Record<string, BondStatus>;
 
 const BOND_CURRENCY = 'PLN';
 
@@ -47,6 +56,20 @@ export function usesTermsRate(bond: BondResponse, periodIndex: number | string):
 
 export function canSettle(bond: BondResponse): boolean {
   return Number(bond.duePeriodCount) > 0 && !bond.isArchived && !bond.portfolioIsArchived;
+}
+
+export function isRedeemed(bond: BondResponse): boolean {
+  return Number(bond.status) === BOND_STATUS.Redeemed;
+}
+
+export function canRedeem(bond: BondResponse): boolean {
+  return (
+    Number(bond.status) === BOND_STATUS.Matured && !bond.isArchived && !bond.portfolioIsArchived
+  );
+}
+
+export function canSwap(bond: BondResponse): boolean {
+  return canRedeem(bond) && Number(bond.duePeriodCount) === 0;
 }
 
 // A series missing from the catalog only loses the prefill: the user types the rates in.
