@@ -5,6 +5,7 @@ using OpenTelemetry.Trace;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.AddCustomInstrument;
 using Skarbiec.MarketData.Features.GetBondSeries;
+using Skarbiec.MarketData.Features.GetBondSeriesRatesBatch;
 using Skarbiec.MarketData.Features.GetFxRate;
 using Skarbiec.MarketData.Features.GetFxRatesBatch;
 using Skarbiec.MarketData.Features.GetInstrument;
@@ -70,6 +71,7 @@ builder.Services.AddScoped<TriggerSyncHandler>();
 builder.Services.AddScoped<GetSyncStatusHandler>();
 builder.Services.AddScoped<ListBondSeriesHandler>();
 builder.Services.AddScoped<GetBondSeriesHandler>();
+builder.Services.AddScoped<GetBondSeriesRatesBatchHandler>();
 
 var app = builder.Build();
 
@@ -87,6 +89,7 @@ app.MapTriggerSyncEndpoint();
 app.MapGetSyncStatusEndpoint();
 app.MapListBondSeriesEndpoint();
 app.MapGetBondSeriesEndpoint();
+app.MapGetBondSeriesRatesBatchEndpoint();
 
 // Production applies migrations and the seed as an explicit deploy step instead (see deploy/README.md).
 if (!OpenApiBuildTime.IsActive && app.Environment.IsDevelopment())

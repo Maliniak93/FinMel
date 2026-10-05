@@ -213,7 +213,14 @@
       "portfolio": "Portfolio",
       "showRedeemed": "Show redeemed",
       "swappedFrom": "from swap: {{ name }}",
-      "partiallyRedeemed": "partially redeemed"
+      "partiallyRedeemed": "partially redeemed",
+      "grossToday": "Value today (gross)",
+      "netToday": "Payout today (net)",
+      "total": "Total",
+      "estimateUnavailable": {
+        "rateMissing": "No MF rate for the current period",
+        "marketDataUnavailable": "Valuation temporarily unavailable"
+      }
     },
     "status": {
       "active": "Active",

@@ -134,6 +134,11 @@ public sealed record BondResponse
 
     /// <summary>The matured bond this one was bought with in a swap; null for a purchase or once that bond was removed.</summary>
     public BondSwapSourceResponse? SwappedFrom { get; init; }
+
+    /// <summary>Value today; null for a redeemed bond or when EstimateUnavailableReason says why it could not be computed.</summary>
+    public BondEstimateResponse? Estimate { get; init; }
+
+    public BondEstimateUnavailableReason? EstimateUnavailableReason { get; init; }
 }
 
 public static class BondMappingExtensions

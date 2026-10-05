@@ -76,3 +76,11 @@ Content-Type: application/json
   "pairs": ["USDPLN", "EURPLN"],
   "asOfDate": "2026-08-18"
 }
+
+### Bond series rates batch (Portfolio's value-today estimate) — zero-based periodIndex; unknown codes are skipped
+POST {{marketDataUrl}}/internal/bond-series/rates-batch
+Content-Type: application/json
+
+{
+  "codes": ["EDO1035", "ROR0623"]
+}

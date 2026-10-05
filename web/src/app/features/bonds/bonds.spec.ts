@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -13,6 +15,7 @@ import {
 import {
   activeBond,
   archivedBond,
+  BOND_ESTIMATE_UNAVAILABLE_REASON,
   dueRorBond,
   edoYearOneSettledBond,
   interestDueBond,
@@ -362,6 +365,57 @@ describe('Bonds page, my bonds tab', () => {
     );
     expect(labels).toContain('Wykup przed terminem');
     expect(labels).not.toContain('Edytuj');
+  });
+
+  it('shows the value today gross and net with their totals, and "—" with the reason when there is no estimate', async () => {
+    const estimated = {
+      ...activeBond,
+      estimate: { grossValue: 1061.9, netValue: 1043.6, asOf: '2026-05-13' },
+    };
+    const secondEstimated = {
+      ...interestDueBond,
+      estimate: { grossValue: 1006.1, netValue: 1000.05, asOf: '2026-05-13' },
+    };
+    const rateMissing = {
+      ...maturedBond,
+      estimateUnavailableReason: BOND_ESTIMATE_UNAVAILABLE_REASON.RateMissing,
+    };
+    const marketDataDown = {
+      ...archivedBond,
+      isArchived: false,
+      estimateUnavailableReason: BOND_ESTIMATE_UNAVAILABLE_REASON.MarketDataUnavailable,
+    };
+    await setup([estimated, secondEstimated, rateMissing, marketDataDown]);
+    await switchLanguage(fixture, 'pl');
+
+    const root = fixture.nativeElement as HTMLElement;
+    const money = (amount: number): string => formatMoney(amount, 'PLN').replace(/\s+/g, ' ');
+    const cell = (row: HTMLElement, testId: string): string =>
+      textOf(row.querySelector(`[data-testid="${testId}"]`));
+    const tooltipsIn = (name: string): string[] =>
+      fixture.debugElement
+        .queryAll(By.css('[data-testid="estimate-missing"]'))
+        .filter((element) => rowFor(name).contains(element.nativeElement as HTMLElement))
+        .map((element) => element.injector.get(MatTooltip).message);
+
+    const headers = Array.from(root.querySelectorAll('th')).map(textOf);
+    expect(headers).toContain('Wartość dziś (brutto)');
+    expect(headers).toContain('Do wypłaty dziś (netto)');
+    expect(cell(rowFor(estimated.name), 'gross-today')).toBe(money(1061.9));
+    expect(cell(rowFor(estimated.name), 'net-today')).toBe(money(1043.6));
+    expect(cell(rowFor(rateMissing.name), 'gross-today')).toBe('—');
+    expect(cell(rowFor(rateMissing.name), 'net-today')).toBe('—');
+    expect(tooltipsIn(rateMissing.name)).toEqual([
+      'Brak stopy MF dla bieżącego okresu',
+      'Brak stopy MF dla bieżącego okresu',
+    ]);
+    expect(tooltipsIn(marketDataDown.name)).toEqual([
+      'Wycena chwilowo niedostępna',
+      'Wycena chwilowo niedostępna',
+    ]);
+    expect(textOf(root.querySelector('tfoot, tr.mat-mdc-footer-row'))).toContain('Razem');
+    expect(textOf(root.querySelector('[data-testid="gross-today-total"]'))).toBe(money(2068));
+    expect(textOf(root.querySelector('[data-testid="net-today-total"]'))).toBe(money(2043.65));
   });
 });
 

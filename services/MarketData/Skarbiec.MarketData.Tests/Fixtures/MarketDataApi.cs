@@ -23,6 +23,8 @@ internal static class MarketDataApi
     public const string InternalLatestPricesBatchUri = "/internal/prices/latest-batch";
     public const string InternalFxRatesBatchUri = "/internal/fx/latest-batch";
 
+    public const string InternalBondSeriesRatesBatchUri = "/internal/bond-series/rates-batch";
+
     public const string BondSeriesBaseUri = "/api/marketdata/bond-series";
 
     public static string BondSeriesUri(DateOnly? onSaleOn = null) =>
@@ -126,7 +128,8 @@ internal static class MarketDataApi
         TreasuryBondType type,
         DateOnly saleStart,
         DateOnly saleEnd,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<decimal>? periodRatesPercent = null)
     {
         db.BondSeries.Add(new BondSeries
         {
@@ -137,6 +140,7 @@ internal static class MarketDataApi
             SaleEnd = saleEnd,
             IssuePrice = 100m,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
+            PeriodRates = [.. (periodRatesPercent ?? []).Select((rate, index) => new BondSeriesPeriodRate { SeriesCode = code, PeriodIndex = index, RatePercent = rate })],
         });
         await db.SaveChangesAsync(cancellationToken);
     }

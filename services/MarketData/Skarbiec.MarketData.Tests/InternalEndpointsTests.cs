@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.Testing;
@@ -39,6 +40,27 @@ public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers)
         Assert.Multiple(
             () => Assert.Contains(pricesBatch.StatusCode, unmapped),
             () => Assert.Contains(fxBatch.StatusCode, unmapped));
+    }
+
+    [Fact]
+    public async Task BondSeriesRatesBatch_IsAnonymousAndAbsentFromOpenApi()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using (var seedDb = CreateDbContext())
+        {
+            await seedDb.SeedBondSeriesAsync(
+                "EDO1035", TreasuryBondType.Edo, new DateOnly(2025, 10, 1), new DateOnly(2025, 10, 31), cancellationToken, periodRatesPercent: [5.35m]);
+        }
+
+        using var client = Factory.CreateClient();
+        var batch = await client.PostAsJsonAsync(InternalBondSeriesRatesBatchUri, new { codes = new[] { "EDO1035" } }, cancellationToken);
+        var openApi = await client.GetAsync(OpenApiDocumentUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, batch.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, openApi.StatusCode);
+        using var document = await JsonDocument.ParseAsync(await openApi.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        var paths = document.RootElement.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
+        Assert.DoesNotContain(InternalBondSeriesRatesBatchUri, paths);
     }
 
     [Fact]

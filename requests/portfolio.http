@@ -443,7 +443,7 @@ Content-Type: application/json
   "fundingAssetId": "{{addFundingCash.response.body.id}}"
 }
 
-### List every bond across portfolios
+### List every bond across portfolios — each with estimate {grossValue, netValue, asOf} or null and estimateUnavailableReason (RateMissing | MarketDataUnavailable)
 GET {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
 

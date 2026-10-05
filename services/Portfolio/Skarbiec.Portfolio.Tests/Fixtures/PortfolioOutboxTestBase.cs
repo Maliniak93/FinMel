@@ -60,6 +60,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddSingleton<ICurrentUser>(new StubCurrentUser(UserId));
             services.AddSingleton<IInstrumentLookupClient>(new FakeInstrumentLookupClient());
             services.AddSingleton<IFxRateLookupClient>(new FakeFxRateLookupClient());
+            services.AddSingleton<IBondRateLookupClient>(new FakeBondRateLookupClient());
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<PositionEventPublisher>();
             services.AddScoped<CreatePortfolioHandler>();

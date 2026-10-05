@@ -31,6 +31,25 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task List_ForeignEstimates_Absent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        Factory.BondRateLookupClient.WithRates("EDO1036", (2, 4.00m));
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await owner.CreatePortfolioWithBondAsync(cancellationToken, NewEdoEarlyBondRequest());
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var ownerList = await owner.GetFromJsonAsync<List<BondResponse>>(AllBondsUri, cancellationToken);
+        var strangerResponse = await stranger.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.NotNull(Assert.Single(ownerList!).Estimate);
+        Assert.Equal(HttpStatusCode.OK, strangerResponse.StatusCode);
+        Assert.Empty((await strangerResponse.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken))!);
+        Assert.Single(Factory.BondRateLookupClient.Calls);
+    }
+
+    [Fact]
     public async Task Get_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

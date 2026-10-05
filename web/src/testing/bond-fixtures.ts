@@ -31,6 +31,19 @@ export interface BondFixture {
   periods: BondPeriodFixture[];
   redemptions: BondRedemptionFixture[];
   swappedFrom: { assetId: string; name: string } | null;
+  estimate: BondEstimateFixture | null;
+  estimateUnavailableReason: number | null;
+}
+
+export const BOND_ESTIMATE_UNAVAILABLE_REASON = {
+  RateMissing: 0,
+  MarketDataUnavailable: 1,
+} as const;
+
+export interface BondEstimateFixture {
+  grossValue: number;
+  netValue: number;
+  asOf: string;
 }
 
 export interface BondRedemptionFixture {
@@ -97,6 +110,8 @@ export function bondResponse(overrides: Partial<BondFixture> = {}): BondFixture 
     ],
     redemptions: [],
     swappedFrom: null,
+    estimate: null,
+    estimateUnavailableReason: null,
     ...overrides,
   };
 }

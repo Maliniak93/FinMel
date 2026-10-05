@@ -2423,6 +2423,39 @@
           }
         }
       },
+      "BondEstimateResponse": {
+        "required": [
+          "grossValue",
+          "netValue",
+          "asOf"
+        ],
+        "type": "object",
+        "properties": {
+          "grossValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "netValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "BondEstimateUnavailableReason": {
+        "type": "integer"
+      },
       "BondInterestPreviewResponse": {
         "required": [
           "rows",
@@ -2904,6 +2937,26 @@
               },
               {
                 "$ref": "#/components/schemas/BondSwapSourceResponse"
+              }
+            ]
+          },
+          "estimate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BondEstimateResponse"
+              }
+            ]
+          },
+          "estimateUnavailableReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BondEstimateUnavailableReason"
               }
             ]
           }
