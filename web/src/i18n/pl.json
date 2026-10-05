@@ -213,7 +213,14 @@
       "portfolio": "Portfel",
       "showRedeemed": "Pokaż wykupione",
       "swappedFrom": "z zamiany: {{ name }}",
-      "partiallyRedeemed": "częściowo wykupiona"
+      "partiallyRedeemed": "częściowo wykupiona",
+      "grossToday": "Wartość dziś (brutto)",
+      "netToday": "Do wypłaty dziś (netto)",
+      "total": "Razem",
+      "estimateUnavailable": {
+        "rateMissing": "Brak stopy MF dla bieżącego okresu",
+        "marketDataUnavailable": "Wycena chwilowo niedostępna"
+      }
     },
     "status": {
       "active": "Aktywna",

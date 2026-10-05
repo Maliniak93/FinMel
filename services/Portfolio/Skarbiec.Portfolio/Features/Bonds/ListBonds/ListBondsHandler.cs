@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Bonds.ListBonds;
 
-public sealed class ListBondsHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
+public sealed class ListBondsHandler(PortfolioDbContext dbContext, IBondRateLookupClient rateLookup, TimeProvider timeProvider)
 {
     public async Task<IReadOnlyList<BondResponse>> HandleAsync(CancellationToken cancellationToken)
     {
@@ -26,16 +27,24 @@ public sealed class ListBondsHandler(PortfolioDbContext dbContext, TimeProvider 
             .ToLookup(s => s.AssetId);
         var links = await dbContext.LoadBondLinksAsync([.. rows.Select(r => r.Terms)], cancellationToken);
 
-        return rows
-            .Select(r => r.Terms.ToResponse(
-                r.Asset,
-                r.PortfolioName,
-                r.PortfolioIsArchived,
-                today,
-                funding.GetValueOrDefault(r.Asset.Id),
-                [.. settlements[r.Asset.Id]],
-                [.. links.Redemptions[r.Asset.Id]],
-                links.SwappedFrom.GetValueOrDefault(r.Asset.Id)))
+        var bonds = rows
+            .Select(r =>
+            {
+                List<BondInterestSettlement> bondSettlements = [.. settlements[r.Asset.Id]];
+                var response = r.Terms.ToResponse(
+                    r.Asset,
+                    r.PortfolioName,
+                    r.PortfolioIsArchived,
+                    today,
+                    funding.GetValueOrDefault(r.Asset.Id),
+                    bondSettlements,
+                    [.. links.Redemptions[r.Asset.Id]],
+                    links.SwappedFrom.GetValueOrDefault(r.Asset.Id));
+
+                return new BondEstimateInput(response, r.Terms, bondSettlements);
+            })
             .ToList();
+
+        return await rateLookup.WithEstimatesAsync(bonds, today, cancellationToken);
     }
 }

@@ -78,6 +78,11 @@ if (!OpenApiBuildTime.IsActive)
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");
     });
+
+    builder.Services.AddHttpClient<IBondRateLookupClient, MarketDataBondRateLookupClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://marketdata-service");
+    });
 }
 
 builder.Services.AddValidation();

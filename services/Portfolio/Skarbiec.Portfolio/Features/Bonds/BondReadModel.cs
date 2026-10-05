@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Bonds;
 
@@ -10,6 +11,23 @@ internal sealed record BondLinks(
 internal static class BondReadModel
 {
     public static async Task<BondResponse?> LoadBondAsync(
+        this PortfolioDbContext dbContext, Guid portfolioId, Guid assetId, DateOnly today, CancellationToken cancellationToken) =>
+        (await dbContext.LoadBondInputAsync(portfolioId, assetId, today, cancellationToken))?.Response;
+
+    public static async Task<BondResponse?> LoadBondWithEstimateAsync(
+        this PortfolioDbContext dbContext,
+        Guid portfolioId,
+        Guid assetId,
+        DateOnly today,
+        IBondRateLookupClient rateLookup,
+        CancellationToken cancellationToken)
+    {
+        var input = await dbContext.LoadBondInputAsync(portfolioId, assetId, today, cancellationToken);
+
+        return input is null ? null : (await rateLookup.WithEstimatesAsync([input], today, cancellationToken))[0];
+    }
+
+    private static async Task<BondEstimateInput?> LoadBondInputAsync(
         this PortfolioDbContext dbContext, Guid portfolioId, Guid assetId, DateOnly today, CancellationToken cancellationToken)
     {
         // A TreasuryBond row exists only for a Bond-class asset, so any other asset id misses here.
@@ -33,7 +51,7 @@ internal static class BondReadModel
             .ToListAsync(cancellationToken);
         var links = await dbContext.LoadBondLinksAsync([row.Terms], cancellationToken);
 
-        return row.Terms.ToResponse(
+        var response = row.Terms.ToResponse(
             row.Asset,
             row.PortfolioName,
             row.PortfolioIsArchived,
@@ -42,6 +60,8 @@ internal static class BondReadModel
             settlements,
             [.. links.Redemptions[assetId]],
             links.SwappedFrom.GetValueOrDefault(assetId));
+
+        return new BondEstimateInput(response, row.Terms, settlements);
     }
 
     public static async Task<BondLinks> LoadBondLinksAsync(

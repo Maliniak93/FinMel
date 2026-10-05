@@ -37,11 +37,12 @@ endpoints. Both hit anonymous `/internal/**` endpoints with no token (ADR-027).
 - `xmin` is EF's Postgres concurrency token, added as a **shadow property** — never let a migration add or drop a real `xmin` column; one appearing in a migration diff means the model is wrong, not the DB.
 - An enum property configured with `HasDefaultValue(SomeEnum.X)` relies on EF treating the CLR-default value (`0`) as "unset" so it defers to the DB default. The member meant as the default **must be the first one declared** (value `0`) — reordering the enum silently breaks this.
 
-## Cross-service HTTP — the only two allowed call sites
+## Cross-service HTTP — the only allowed call sites
+Portfolio → MarketData instrument lookup and FX rate lookup (request path), Reporting → MarketData price/FX batch, and Portfolio → MarketData bond-series rates batch on the bond read path (ADR-021, ADR-026, ADR-028). A new one needs an ADR.
 - Typed client: `builder.Services.AddHttpClient<IThing, Impl>(c => c.BaseAddress = new Uri("https+http://<service>-service"))`.
 - No token and no delegating handler on the typed client: the call goes to the callee's `/internal/<path>` endpoint.
 - Callee side: map the endpoint through `app.MapInternalGroup("<path>")` (ServiceDefaults) instead of `MapGroup("/api/...")` — anonymous, excluded from OpenAPI, and outside `/api/`, so the Gateway cannot route to it. Global data only: a `UserId`-scoped `/internal` endpoint is forbidden, because no identity reaches it. If the SPA reads the same data, keep the public authorized route and map the `/internal` twin beside it on the same handler (see `GetInstrumentEndpoint`).
-- On failure/timeout, return a `ServiceUnavailable.<Detail>` `Result` from the handler (maps to 503) — never let the exception bubble as a bare 500.
+- On failure/timeout, return a `ServiceUnavailable.<Detail>` `Result` from the handler (maps to 503) — never let the exception bubble as a bare 500. Exception: the bond-rate lookup on a read fails soft (ADR-028) — the read stays 200 and the estimate is `null` with `MarketDataUnavailable`.
 
 ## Quartz jobs (MarketData only — ADR-007)
 - Register the job and its trigger behind `Testing:DisableBackgroundJobs`: when set, register a `NoOp*Trigger` implementation of the trigger interface instead of scheduling anything, so HTTP slice tests can still resolve it with no live scheduler.

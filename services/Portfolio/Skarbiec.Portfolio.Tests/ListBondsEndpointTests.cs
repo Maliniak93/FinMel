@@ -39,4 +39,46 @@ public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers)
         Assert.Equal("First", bonds[1].PortfolioName);
         Assert.Equal(new DateOnly(2026, 12, 1), bonds[0].MaturityDate);
     }
+
+    [Fact]
+    public async Task List_EstimatesWithOneBatchCall()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        Factory.BondRateLookupClient.WithRates("EDO1036", (2, 4.00m));
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        await client.AddBondAsync(portfolioId, cancellationToken, NewEdoEarlyBondRequest(bondCount: 10) with { Name = "Edo A" });
+        await client.AddBondAsync(portfolioId, cancellationToken, NewEdoEarlyBondRequest(bondCount: 5) with { Name = "Edo B" });
+        await client.AddBondAsync(
+            portfolioId, cancellationToken, NewTosBondRequest() with { Name = "Tos", PurchaseDate = new DateOnly(2026, 1, 15) });
+
+        var response = await client.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bonds = (await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken))!.ToDictionary(b => b.Name);
+        Assert.Equal(new[] { "EDO1036" }, Assert.Single(Factory.BondRateLookupClient.Calls));
+        Assert.All(bonds.Values, b => Assert.Null(b.EstimateUnavailableReason));
+        Assert.Equal(1_061.90m, bonds["Edo A"].Estimate!.GrossValue);
+        Assert.Equal(530.95m, bonds["Edo B"].Estimate!.GrossValue);
+        Assert.Equal(1_014.20m, bonds["Tos"].Estimate!.GrossValue);
+        Assert.Equal(new DateOnly(2026, 5, 13), bonds["Edo A"].Estimate!.AsOf);
+    }
+
+    [Fact]
+    public async Task List_MarketDataDown_EstimateNull()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        Factory.BondRateLookupClient.WithUnavailable();
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await client.CreatePortfolioWithBondAsync(cancellationToken, NewEdoEarlyBondRequest());
+
+        var response = await client.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bond = Assert.Single((await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken))!);
+        Assert.Null(bond.Estimate);
+        Assert.Equal(BondEstimateUnavailableReason.MarketDataUnavailable, bond.EstimateUnavailableReason);
+    }
 }

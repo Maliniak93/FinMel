@@ -85,6 +85,14 @@ export type BondEarlyRedemptionPreviewResponse = {
     proceeds: number | string;
 };
 
+export type BondEstimateResponse = {
+    grossValue: number | string;
+    netValue: number | string;
+    asOf: string;
+};
+
+export type BondEstimateUnavailableReason = number;
+
 export type BondInterestPreviewResponse = {
     rows: Array<BondInterestPreviewRow>;
     totals: BondInterestPreviewTotals;
@@ -168,6 +176,8 @@ export type BondResponse = {
     periods: Array<BondPeriodResponse>;
     redemptions: Array<BondRedemptionResponse>;
     swappedFrom?: null | BondSwapSourceResponse;
+    estimate?: null | BondEstimateResponse;
+    estimateUnavailableReason?: null | BondEstimateUnavailableReason;
 };
 
 export type BondSettlementResponse = {

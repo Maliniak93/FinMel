@@ -8,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
@@ -15,6 +16,7 @@ import {
   deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
   deleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementId,
   getApiPortfolioBonds,
+  type BondEstimateUnavailableReason,
   type BondPeriodResponse,
   type BondResponse,
 } from '../../../api/portfolio';
@@ -70,6 +72,17 @@ const BOND_PERIOD_STATE_LABELS: Record<number, string> = {
   [BOND_PERIOD_STATE.Settled]: 'bonds.periods.state.settled',
 };
 
+// Mirrors BondEstimateUnavailableReason in declaration order: the enum travels as an int.
+const ESTIMATE_UNAVAILABLE_LABELS = {
+  0: 'bonds.my.estimateUnavailable.rateMissing',
+  1: 'bonds.my.estimateUnavailable.marketDataUnavailable',
+} as const satisfies Record<BondEstimateUnavailableReason, string>;
+
+// Display-only sum of the server's amounts, in whole grosze.
+function sumInGrosze(amounts: readonly (number | string)[]): number {
+  return amounts.reduce<number>((sum, amount) => sum + Math.round(Number(amount) * 100), 0) / 100;
+}
+
 @Component({
   selector: 'app-my-bonds',
   imports: [
@@ -80,6 +93,7 @@ const BOND_PERIOD_STATE_LABELS: Record<number, string> = {
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
+    MatTooltipModule,
     TranslocoPipe,
   ],
   templateUrl: './my-bonds.html',
@@ -98,10 +112,22 @@ export class MyBonds {
     'purchaseDate',
     'bondCount',
     'bookValue',
+    'grossToday',
+    'netToday',
     'maturityDate',
     'status',
     'actions',
   ];
+
+  protected readonly footerColumns = [
+    'totalLabel',
+    'grossTodayTotal',
+    'netTodayTotal',
+    'totalRest',
+  ];
+  protected readonly totalLabelSpan = this.displayedColumns.indexOf('grossToday');
+  protected readonly totalRestSpan =
+    this.displayedColumns.length - this.displayedColumns.indexOf('netToday') - 1;
 
   protected readonly bondsResource = resource({
     loader: async ({ abortSignal }) => {
@@ -134,6 +160,16 @@ export class MyBonds {
       : [],
   );
 
+  protected readonly estimateTotals = computed(() => {
+    const estimates = this.visibleBonds().flatMap((bond) => (bond.estimate ? [bond.estimate] : []));
+    return estimates.length === 0
+      ? null
+      : {
+          gross: sumInGrosze(estimates.map((estimate) => estimate.grossValue)),
+          net: sumInGrosze(estimates.map((estimate) => estimate.netValue)),
+        };
+  });
+
   protected readonly expandedId = signal<string | null>(null);
 
   // A fresh array on every expand/collapse makes the table re-evaluate which bond gets its period row.
@@ -160,6 +196,14 @@ export class MyBonds {
 
   protected typeLabel(bond: BondResponse): string {
     return bondTypeInfo(bond.type)?.label ?? '';
+  }
+
+  protected estimateUnavailableLabel(bond: BondResponse): string | null {
+    const reason = bond.estimateUnavailableReason;
+    return reason === null || reason === undefined
+      ? null
+      : (ESTIMATE_UNAVAILABLE_LABELS[Number(reason) as keyof typeof ESTIMATE_UNAVAILABLE_LABELS] ??
+          null);
   }
 
   protected statusLabel(bond: BondResponse): string {

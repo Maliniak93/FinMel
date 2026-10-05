@@ -118,6 +118,58 @@
       <td mat-cell *matCellDef="let bond">{{ formatMoney(bond.bookValue, 'PLN') }}</td>
     </ng-container>
 
+    <ng-container matColumnDef="grossToday">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.grossToday' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond" data-testid="gross-today">
+        @if (bond.estimate; as estimate) {
+          {{ formatMoney(estimate.grossValue, 'PLN') }}
+        } @else {
+          @let reason = estimateUnavailableLabel(bond);
+          <span data-testid="estimate-missing" [matTooltip]="reason ? (reason | transloco) : ''">{{
+            '—'
+          }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="netToday">
+      <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.netToday' | transloco }}</th>
+      <td mat-cell *matCellDef="let bond" data-testid="net-today">
+        @if (bond.estimate; as estimate) {
+          {{ formatMoney(estimate.netValue, 'PLN') }}
+        } @else {
+          @let reason = estimateUnavailableLabel(bond);
+          <span data-testid="estimate-missing" [matTooltip]="reason ? (reason | transloco) : ''">{{
+            '—'
+          }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="totalLabel">
+      <td mat-footer-cell *matFooterCellDef [attr.colspan]="totalLabelSpan">
+        {{ 'bonds.my.total' | transloco }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="grossTodayTotal">
+      <td mat-footer-cell *matFooterCellDef data-testid="gross-today-total">
+        @let totals = estimateTotals();
+        {{ totals ? formatMoney(totals.gross, 'PLN') : '—' }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="netTodayTotal">
+      <td mat-footer-cell *matFooterCellDef data-testid="net-today-total">
+        @let totals = estimateTotals();
+        {{ totals ? formatMoney(totals.net, 'PLN') : '—' }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="totalRest">
+      <td mat-footer-cell *matFooterCellDef [attr.colspan]="totalRestSpan"></td>
+    </ng-container>
+
     <ng-container matColumnDef="maturityDate">
       <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.maturityDate' | transloco }}</th>
       <td mat-cell *matCellDef="let bond">{{ formatDate(bond.maturityDate) }}</td>
@@ -242,6 +294,7 @@
       *matRowDef="let row; columns: ['periods']; when: isExpanded"
       class="my-bonds__periods-row"
     ></tr>
+    <tr mat-footer-row *matFooterRowDef="footerColumns"></tr>
     <tr *matNoDataRow>
       <td class="my-bonds__no-data" [attr.colspan]="displayedColumns.length">
         {{ 'assetArchive.allArchived' | transloco }}

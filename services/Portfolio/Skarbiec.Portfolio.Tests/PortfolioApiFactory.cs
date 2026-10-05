@@ -14,6 +14,8 @@ public sealed class PortfolioApiFactory(SkarbiecContainersFixture containers)
 
     public FakeFxRateLookupClient FxRateLookupClient { get; } = new();
 
+    public FakeBondRateLookupClient BondRateLookupClient { get; } = new();
+
     public AdjustableTimeProvider Clock { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -24,6 +26,7 @@ public sealed class PortfolioApiFactory(SkarbiecContainersFixture containers)
         {
             services.AddSingleton<IInstrumentLookupClient>(InstrumentLookupClient);
             services.AddSingleton<IFxRateLookupClient>(FxRateLookupClient);
+            services.AddSingleton<IBondRateLookupClient>(BondRateLookupClient);
             services.AddSingleton<TimeProvider>(Clock);
         });
     }

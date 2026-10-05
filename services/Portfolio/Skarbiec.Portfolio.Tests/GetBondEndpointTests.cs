@@ -155,4 +155,21 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal("TOS1029", edo.SwappedFrom.Name);
         Assert.Empty(edo.Redemptions);
     }
+
+    [Fact]
+    public async Task Get_MarketDataDown_EstimateNull()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        Factory.BondRateLookupClient.WithUnavailable();
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken, NewEdoEarlyBondRequest());
+
+        var response = await client.GetAsync(BondUri(portfolioId, bond.AssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);
+        Assert.Null(body!.Estimate);
+        Assert.Equal(BondEstimateUnavailableReason.MarketDataUnavailable, body.EstimateUnavailableReason);
+    }
 }
