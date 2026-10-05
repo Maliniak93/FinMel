@@ -518,6 +518,22 @@ Authorization: Bearer {{authToken}}
 DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/{{getFundedBond.response.body.lastSettlement.settlementId}}
 Authorization: Bearer {{authToken}}
 
+### Preview redeeming 4 of the funded ROR's 10 early, inside month 3 (months 1–2 stay settled after the undo)
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/early-redemption-preview?date=2026-09-05&bondCount=4&runningPeriodRatePercent=3.75
+Authorization: Bearer {{authToken}}
+
+### Redeem them early: accrued interest credited, the full fee and Belka tax charged, the proceeds moved Bond → Cash; 6 bonds remain
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/early-redemption
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "date": "2026-09-05",
+  "bondCount": 4,
+  "runningPeriodRatePercent": 3.75,
+  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+}
+
 ### Add a matured 3-month bond funded from cash (type 0 = OTS)
 # @name addMaturedBond
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds

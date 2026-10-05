@@ -60,6 +60,8 @@ internal static class BondReadModel
                     redemption.Kind,
                     redemption.Date,
                     redemption.BondCount,
+                    redemption.AccruedInterest,
+                    redemption.Fee,
                     redemption.Tax,
                     redemption.Proceeds,
                     DestinationAssetName = (
@@ -97,6 +99,8 @@ internal static class BondReadModel
                     Kind = r.Kind,
                     Date = r.Date,
                     BondCount = r.BondCount,
+                    AccruedInterest = r.AccruedInterest,
+                    Fee = r.Fee,
                     Tax = r.Tax,
                     Proceeds = r.Proceeds,
                     DestinationAssetName = r.DestinationAssetName,

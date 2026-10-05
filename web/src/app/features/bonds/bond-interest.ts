@@ -68,6 +68,20 @@ export function canRedeem(bond: BondResponse): boolean {
   );
 }
 
+export function canEarlyRedeem(bond: BondResponse): boolean {
+  const status = Number(bond.status);
+  return (
+    (status === BOND_STATUS.Active || status === BOND_STATUS.InterestDue) &&
+    Number(bond.bondCount) > 0 &&
+    !bond.isArchived &&
+    !bond.portfolioIsArchived
+  );
+}
+
+export function isPartiallyRedeemed(bond: BondResponse): boolean {
+  return !isRedeemed(bond) && bond.redemptions.length > 0;
+}
+
 export function canSwap(bond: BondResponse): boolean {
   return canRedeem(bond) && Number(bond.duePeriodCount) === 0;
 }

@@ -1,0 +1,62 @@
+.early-redeem-bond-dialog__name {
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
+.early-redeem-bond-dialog__row {
+  display: flex;
+  gap: 12px;
+}
+
+.early-redeem-bond-dialog__field {
+  flex: 1;
+}
+
+.early-redeem-bond-dialog__period {
+  margin: 0 0 12px;
+}
+
+.early-redeem-bond-dialog__rate {
+  width: 240px;
+}
+
+.early-redeem-bond-dialog__destination {
+  display: block;
+  width: 100%;
+}
+
+.early-redeem-bond-dialog__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 0 0 16px;
+
+  dt {
+    opacity: 0.7;
+    font-size: 0.875em;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.early-redeem-bond-dialog__hint {
+  opacity: 0.7;
+  margin: 0 0 12px;
+}
+
+.early-redeem-bond-dialog__loading {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 16px;
+}
+
+.early-redeem-bond-dialog__settle-first {
+  margin: 0 0 8px;
+}
+
+.early-redeem-bond-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

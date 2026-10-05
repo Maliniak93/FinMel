@@ -47,7 +47,16 @@ internal static class BondErrors
         new("Conflict.BondAlreadyRedeemed", "This bond has already been redeemed.");
 
     public static readonly Error Redeemed =
-        new("Conflict.BondRedeemed", "This bond has been redeemed, so its interest settlements are fixed.");
+        new("Conflict.BondRedeemed", "This bond has been redeemed, in whole or in part, so its terms and interest settlements are fixed.");
+
+    public static readonly Error EarlyRedemptionDate =
+        new("Validation.BondEarlyRedemptionDate", "An early redemption date must fall after the purchase date, before the maturity date and not after today.");
+
+    public static readonly Error RedemptionCount =
+        new("Validation.BondRedemptionCount", "The number of bonds to redeem must be from 1 to the number of bonds held.");
+
+    public static readonly Error EarlyRedemptionOutOfOrder =
+        new("Conflict.BondEarlyRedemptionOutOfOrder", "An early redemption can't be dated before the latest settled period's end or the latest redemption.");
 
     public static readonly Error FromSwap =
         new("Conflict.BondFromSwap", "A bond bought in a swap keeps its count, price, purchase date, series, type and tax exemption — only the name, rate, margin and fee can change.");

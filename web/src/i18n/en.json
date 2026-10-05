@@ -212,7 +212,8 @@
       "maturityDate": "Matures",
       "portfolio": "Portfolio",
       "showRedeemed": "Show redeemed",
-      "swappedFrom": "from swap: {{ name }}"
+      "swappedFrom": "from swap: {{ name }}",
+      "partiallyRedeemed": "partially redeemed"
     },
     "status": {
       "active": "Active",
@@ -304,6 +305,26 @@
       "previewFailed": "Failed to load the redemption preview.",
       "submit": "Redeem",
       "failed": "Failed to redeem the bond."
+    },
+    "earlyRedeem": {
+      "action": "Redeem early",
+      "title": "Early redemption",
+      "date": "Redemption date",
+      "dateRequired": "Enter the redemption date.",
+      "dateOutOfRange": "Pick a date after the purchase, before maturity and not after today.",
+      "count": "Bonds to redeem",
+      "countRange": "Enter a whole number from 1 to {{ max }}.",
+      "runningPeriod": "Running period {{ index }}: {{ start }} – {{ end }}",
+      "rate": "Running period rate (%)",
+      "settleFirst": "Settle the earlier periods first.",
+      "settleFirstHint": "Every period that ended by the redemption date must be settled — unsettled periods: {{ count }}.",
+      "interestDue": "Accrued interest",
+      "fee": "Early redemption fee",
+      "feeCapped": "Fee taken from the interest, never more than the interest.",
+      "feeFull": "Full fee — earlier coupons have already been paid out.",
+      "previewFailed": "Failed to load the early redemption preview.",
+      "submit": "Redeem early",
+      "failed": "Failed to redeem the bonds early."
     },
     "swap": {
       "action": "Swap",

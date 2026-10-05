@@ -5,6 +5,7 @@ using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds.AddBond;
 using Skarbiec.Portfolio.Features.Bonds.RedeemBond;
+using Skarbiec.Portfolio.Features.Bonds.RedeemBondEarly;
 using Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
 using Skarbiec.Portfolio.Features.Bonds.SwapBond;
 using Skarbiec.Portfolio.Features.Bonds.UndoBondInterestSettlement;
@@ -264,6 +265,70 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         Assert.Equal(2, events.Count);
         Assert.Equal(0m, Assert.Single(events, e => e.AssetId == assetId).Quantity);
         Assert.True(Assert.Single(events, e => e.AssetId == cashId).Quantity > 6_000m);
+        Assert.Equal(1, await verifyDb.Set<BondRedemption>().CountAsync(r => r.AssetId == assetId, cancellationToken));
+    }
+
+    [Fact]
+    public async Task RedeemBondEarly_PublishesBothPositionsAtomically()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Guid bondsId;
+        Guid cashId;
+        Guid assetId;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 6_000m, cancellationToken);
+            bondsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Bonds", cancellationToken);
+            var added = await arrange.ServiceProvider.GetRequiredService<AddBondHandler>().HandleAsync(
+                bondsId,
+                PortfolioApi.NewBondRequest(purchaseDate: new DateOnly(2026, 2, 1), bondCount: 10, fundingAssetId: cashId),
+                cancellationToken);
+            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+            assetId = added.Value.AssetId;
+        }
+
+        var request = new RedeemBondEarlyRequest
+        {
+            Date = new DateOnly(2026, 4, 15),
+            BondCount = 4,
+            DestinationAssetId = cashId
+        };
+        var eventsBefore = await CountPositionEventsAsync(cancellationToken);
+        SaveChanges.FailNext();
+
+        await using (var failing = Provider.CreateAsyncScope())
+        {
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => failing.ServiceProvider
+                .GetRequiredService<RedeemBondEarlyHandler>()
+                .HandleAsync(bondsId, assetId, request, cancellationToken));
+        }
+
+        Assert.Equal(eventsBefore, await CountPositionEventsAsync(cancellationToken));
+        await using (var check = Provider.CreateAsyncScope())
+        {
+            Assert.False(await check.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+                .Set<BondRedemption>().AnyAsync(cancellationToken));
+        }
+
+        SaveChanges.Reset();
+
+        await using (var retry = Provider.CreateAsyncScope())
+        {
+            var result = await retry.ServiceProvider.GetRequiredService<RedeemBondEarlyHandler>()
+                .HandleAsync(bondsId, assetId, request, cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, SaveChanges.Count);
+
+        await using var verify = Provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(eventsBefore).ToList();
+        Assert.Equal(2, events.Count);
+        Assert.Equal(600m, Assert.Single(events, e => e.AssetId == assetId).Quantity);
+        Assert.Equal(5_400m, Assert.Single(events, e => e.AssetId == cashId).Quantity);
+        Assert.Equal(6, (await verifyDb.Set<TreasuryBond>().SingleAsync(t => t.AssetId == assetId, cancellationToken)).BondCount);
         Assert.Equal(1, await verifyDb.Set<BondRedemption>().CountAsync(r => r.AssetId == assetId, cancellationToken));
     }
 

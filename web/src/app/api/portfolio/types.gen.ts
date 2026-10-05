@@ -74,6 +74,17 @@ export type AssetResponse = {
 
 export type AssetValuationMode = number;
 
+export type BondEarlyRedemptionPreviewResponse = {
+    periodIndex: number | string;
+    bondCount: number | string;
+    interestDue: number | string;
+    fee: number | string;
+    discountIncome: number | string;
+    taxableIncome: number | string;
+    tax: number | string;
+    proceeds: number | string;
+};
+
 export type BondInterestPreviewResponse = {
     rows: Array<BondInterestPreviewRow>;
     totals: BondInterestPreviewTotals;
@@ -122,6 +133,8 @@ export type BondRedemptionResponse = {
     kind: BondRedemptionKind;
     date: string;
     bondCount: number | string;
+    accruedInterest: number | string;
+    fee: number | string;
     tax: number | string;
     proceeds: number | string;
     destinationAssetName?: null | string;
@@ -272,6 +285,13 @@ export type RecordTransactionRequest = {
     quantity?: number | string;
     unitPrice: number | string;
     date: string;
+};
+
+export type RedeemBondEarlyRequest = {
+    date: string;
+    bondCount: number | string;
+    runningPeriodRatePercent?: null | number | string;
+    destinationAssetId: string;
 };
 
 export type RedeemBondRequest = {
@@ -1139,6 +1159,48 @@ export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses =
 };
 
 export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionData = {
+    body: RedeemBondEarlyRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses = {
+    /**
+     * OK
+     */
+    200: BondResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses];
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query: {
+        date: string;
+        bondCount: number | string;
+        runningPeriodRatePercent?: number | string;
+    };
+    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption-preview';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses = {
+    /**
+     * OK
+     */
+    200: BondEarlyRedemptionPreviewResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses];
 
 export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData = {
     body: AddSavingsAccountRequest;

@@ -209,6 +209,58 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task EarlyRedeemAndPreview_ByStranger_ReturnNotFoundAndWriteNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var funded = await owner.CreateEdoYearOneSettledAsync(cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
+        var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(strangerPortfolioId, cancellationToken);
+        var assetId = funded.Bond.AssetId;
+        var rowsBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
+
+        foreach (var portfolioId in new[] { funded.BondPortfolioId, strangerPortfolioId })
+        {
+            var redeem = await stranger.RedeemBondEarlyRawAsync(
+                portfolioId, assetId, EdoEarlyRedemptionDate, 4, strangerCashId, cancellationToken, runningPeriodRatePercent: 4.00m);
+            var preview = await stranger.GetAsync(
+                BondEarlyRedemptionPreviewUri(portfolioId, assetId, EdoEarlyRedemptionDate, 4, 4.00m), cancellationToken);
+
+            Assert.Equal(HttpStatusCode.NotFound, redeem.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        }
+
+        Assert.Empty(await ReadBondRedemptionsAsync(ownerId, cancellationToken));
+        Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
+        await stranger.AssertCashUntouchedAsync(strangerPortfolioId, strangerCashId, cancellationToken);
+    }
+
+    [Fact]
+    public async Task EarlyRedeem_WithOwnersCashAsDestination_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerWalletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(ownerWalletId, cancellationToken, balance: 6_000m);
+        var strangerId = Guid.NewGuid();
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var funded = await stranger.CreateEdoYearOneSettledAsync(cancellationToken);
+        var rowsBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
+
+        var response = await stranger.RedeemBondEarlyRawAsync(
+            funded.BondPortfolioId, funded.Bond.AssetId, EdoEarlyRedemptionDate, 4, ownerCashId, cancellationToken, runningPeriodRatePercent: 4.00m);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        await owner.AssertCashUntouchedAsync(ownerWalletId, ownerCashId, cancellationToken, balance: 6_000m);
+        Assert.Empty(await ReadBondRedemptionsAsync(strangerId, cancellationToken));
+        Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
+    }
+
+    [Fact]
     public async Task Settle_WithOwnersCashAsDestination_ReturnsBadRequest()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

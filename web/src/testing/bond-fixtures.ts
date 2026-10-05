@@ -1,5 +1,5 @@
 export const BOND_STATUS = { Active: 0, InterestDue: 1, Matured: 2, Redeemed: 3 } as const;
-export const BOND_REDEMPTION_KIND = { Maturity: 0, Swap: 1 } as const;
+export const BOND_REDEMPTION_KIND = { Maturity: 0, Swap: 1, Early: 2 } as const;
 export const BOND_PERIOD_STATE = { Upcoming: 0, Due: 1, Settled: 2 } as const;
 
 export const bondPortfolioId = '22222222-2222-2222-2222-222222222222';
@@ -37,6 +37,8 @@ export interface BondRedemptionFixture {
   kind: number;
   date: string;
   bondCount: number;
+  accruedInterest: number;
+  fee: number;
   tax: number;
   proceeds: number;
   destinationAssetName: string | null;
@@ -398,6 +400,8 @@ export const redeemedTosBond = bondResponse({
       kind: BOND_REDEMPTION_KIND.Swap,
       date: '2029-10-01',
       bondCount: 10,
+      accruedInterest: 0,
+      fee: 0,
       tax: 26.21,
       proceeds: 1111.69,
       destinationAssetName: 'Wallet cash',
@@ -443,3 +447,109 @@ export const swapOffer: BondSeriesFixture[] = [
     firstPeriodRatePercent: 3,
   },
 ];
+
+const edoYearOneSettlement: BondSettlementFixture = {
+  settlementId: 'e0e0e0e0-0000-0000-0000-000000000001',
+  ratePercent: 5.35,
+  bondCount: 10,
+  grossInterest: 53.5,
+  tax: 0,
+};
+
+export const edoYearOneSettledBond = bondResponse({
+  assetId: 'c3c3c3c3-0000-0000-0000-00000000c001',
+  name: 'Edo year one settled',
+  seriesCode: 'EDO0335',
+  purchaseDate: '2025-03-01',
+  bondCount: 10,
+  maturityDate: '2035-03-01',
+  nominalValue: 1000,
+  bookValue: 1053.5,
+  fundingAssetId: fundingCashId,
+  fundingAssetName: 'Wallet cash',
+  lastSettlement: edoYearOneSettlement,
+  periods: [
+    rorPeriod(1, '2025-03-01', '2026-03-01', BOND_PERIOD_STATE.Settled, edoYearOneSettlement),
+    rorPeriod(2, '2026-03-01', '2027-03-01', BOND_PERIOD_STATE.Upcoming),
+    rorPeriod(3, '2027-03-01', '2028-03-01', BOND_PERIOD_STATE.Upcoming),
+  ],
+});
+
+export const edoEarlySeries = {
+  ...edoSeries,
+  code: 'EDO0335',
+  periodRates: [
+    { periodIndex: 2, ratePercent: 4 },
+    { periodIndex: 3, ratePercent: 3.5 },
+  ],
+};
+
+export const edoEarlyRedemptionPreview = {
+  periodIndex: 2,
+  bondCount: 4,
+  interestDue: 24.76,
+  fee: 12,
+  discountIncome: 0,
+  taxableIncome: 12.76,
+  tax: 2.43,
+  proceeds: 410.33,
+};
+
+export const partiallyRedeemedEdoBond = bondResponse({
+  ...edoYearOneSettledBond,
+  assetId: 'c3c3c3c3-0000-0000-0000-00000000c002',
+  name: 'Edo partially redeemed',
+  bondCount: 6,
+  nominalValue: 600,
+  bookValue: 632.1,
+  redemptions: [
+    {
+      kind: BOND_REDEMPTION_KIND.Early,
+      date: '2026-05-13',
+      bondCount: 4,
+      accruedInterest: 24.76,
+      fee: 12,
+      tax: 2.43,
+      proceeds: 410.33,
+      destinationAssetName: 'Wallet cash',
+      swapTargetAssetName: null,
+    },
+  ],
+});
+
+const rorMonthSettlement = (index: number): BondSettlementFixture => ({
+  settlementId: `r0r0r0r0-0000-0000-0000-00000000000${index}`,
+  ratePercent: 4,
+  bondCount: 20,
+  grossInterest: 6.6,
+  tax: 1.25,
+});
+
+export const rorMonthsSettledBond = bondResponse({
+  assetId: 'c3c3c3c3-0000-0000-0000-00000000c003',
+  name: 'Ror months settled',
+  seriesCode: 'ROR0627',
+  type: 1,
+  purchaseDate: '2026-06-10',
+  bondCount: 20,
+  firstPeriodRatePercent: 4,
+  marginPercent: null,
+  earlyRedemptionFeePerBond: 0.5,
+  maturityDate: '2027-06-10',
+  nominalValue: 2000,
+  bookValue: 2000,
+  fundingAssetId: fundingCashId,
+  fundingAssetName: 'Wallet cash',
+  lastSettlement: rorMonthSettlement(3),
+  periods: [
+    rorPeriod(1, '2026-06-10', '2026-07-10', BOND_PERIOD_STATE.Settled, rorMonthSettlement(1)),
+    rorPeriod(2, '2026-07-10', '2026-08-10', BOND_PERIOD_STATE.Settled, rorMonthSettlement(2)),
+    rorPeriod(3, '2026-08-10', '2026-09-10', BOND_PERIOD_STATE.Settled, rorMonthSettlement(3)),
+    rorPeriod(4, '2026-09-10', '2026-10-10', BOND_PERIOD_STATE.Upcoming),
+  ],
+});
+
+export const rorEarlySeries = {
+  ...rorSeries,
+  periodRates: [{ periodIndex: 4, ratePercent: 3.75 }],
+};

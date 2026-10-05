@@ -354,10 +354,12 @@ internal static class PortfolioApi
         this HttpClient client,
         CancellationToken cancellationToken,
         decimal cashBalance = 6_000m,
-        AddBondRequest? request = null)
+        AddBondRequest? request = null,
+        DateOnly? cashToppedUpOn = null)
     {
         var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance);
+        var cashId = await client.AddCashAssetWithBalanceAsync(
+            cashPortfolioId, cancellationToken, balance: cashBalance, toppedUpOn: cashToppedUpOn);
         var bondPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
         var bond = await client.AddBondAsync(
             bondPortfolioId, cancellationToken, (request ?? NewBondRequest()) with { FundingAssetId = cashId });
@@ -484,6 +486,89 @@ internal static class PortfolioApi
     {
         var response = await client.RedeemBondRawAsync(portfolioId, assetId, destinationAssetId, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    public static readonly DateOnly EdoEarlyPurchaseDate = new(2025, 3, 1);
+
+    public static readonly DateOnly EdoEarlyRedemptionDate = new(2026, 5, 13);
+
+    public static readonly DateTimeOffset EdoEarlyRedemptionDayUtc = new(2026, 5, 13, 10, 0, 0, TimeSpan.Zero);
+
+    public static readonly DateOnly RorEarlyRedemptionDate = new(2026, 9, 25);
+
+    public static readonly DateTimeOffset RorEarlyRedemptionDayUtc = new(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
+
+    public static string BondEarlyRedemptionUri(Guid portfolioId, Guid assetId) =>
+        $"{BondUri(portfolioId, assetId)}/early-redemption";
+
+    public static string BondEarlyRedemptionPreviewUri(
+        Guid portfolioId, Guid assetId, DateOnly date, int bondCount, decimal? runningPeriodRatePercent = null) =>
+        $"{BondUri(portfolioId, assetId)}/early-redemption-preview?date={date:yyyy-MM-dd}&bondCount={bondCount}"
+        + (runningPeriodRatePercent is { } rate ? $"&runningPeriodRatePercent={rate.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty);
+
+    public static AddBondRequest NewEdoEarlyBondRequest(int bondCount = 10) =>
+        NewBondRequest(purchaseDate: EdoEarlyPurchaseDate, bondCount: bondCount, earlyRedemptionFeePerBond: 3.00m);
+
+    public static object NewEarlyRedeemBody(
+        DateOnly date, int bondCount, Guid destinationAssetId, decimal? runningPeriodRatePercent = null) => new
+        {
+            date,
+            bondCount,
+            runningPeriodRatePercent,
+            destinationAssetId
+        };
+
+    public static async Task<HttpResponseMessage> RedeemBondEarlyRawAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        DateOnly date,
+        int bondCount,
+        Guid destinationAssetId,
+        CancellationToken cancellationToken,
+        decimal? runningPeriodRatePercent = null) =>
+        await client.PostAsJsonAsync(
+            BondEarlyRedemptionUri(portfolioId, assetId),
+            NewEarlyRedeemBody(date, bondCount, destinationAssetId, runningPeriodRatePercent),
+            cancellationToken);
+
+    public static async Task RedeemBondEarlyAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        DateOnly date,
+        int bondCount,
+        Guid destinationAssetId,
+        CancellationToken cancellationToken,
+        decimal? runningPeriodRatePercent = null)
+    {
+        var response = await client.RedeemBondEarlyRawAsync(
+            portfolioId, assetId, date, bondCount, destinationAssetId, cancellationToken, runningPeriodRatePercent);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<FundedBond> CreateEdoYearOneSettledAsync(
+        this HttpClient client, CancellationToken cancellationToken, bool settleYearOne = true)
+    {
+        var funded = await client.CreateFundedBondAsync(
+            cancellationToken, request: NewEdoEarlyBondRequest(), cashToppedUpOn: new DateOnly(2025, 1, 1));
+        if (settleYearOne)
+        {
+            await client.SettleBondInterestAsync(funded.BondPortfolioId, funded.Bond.AssetId, [(1, null)], null, cancellationToken);
+        }
+
+        return funded;
+    }
+
+    public static async Task<FundedBond> CreateRorWithThreeMonthsSettledAsync(
+        this HttpClient client, CancellationToken cancellationToken, int bondCount = 20)
+    {
+        var funded = await client.CreateFundedBondAsync(
+            cancellationToken, request: NewRorBondRequest(bondCount: bondCount) with { EarlyRedemptionFeePerBond = 0.50m });
+        await client.SettleBondInterestAsync(
+            funded.BondPortfolioId, funded.Bond.AssetId, [(1, null), (2, 3.75m), (3, 3.75m)], funded.CashAssetId, cancellationToken);
+
+        return funded;
     }
 
     public static object NewSwapBody(

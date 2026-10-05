@@ -103,6 +103,31 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
     }
 
     [Fact]
+    public async Task Get_EarlyRedeemed_ShowsRedemption()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
+        await client.RedeemBondEarlyAsync(
+            funded.BondPortfolioId, funded.Bond.AssetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+
+        var bond = await client.GetBondAsync(funded.BondPortfolioId, funded.Bond.AssetId, cancellationToken);
+
+        Assert.Equal(6, bond.BondCount);
+        var redemption = Assert.Single(bond.Redemptions);
+        Assert.Equal("Early", redemption.Kind.ToString());
+        Assert.Equal(EdoEarlyRedemptionDate, redemption.Date);
+        Assert.Equal(4, redemption.BondCount);
+        Assert.Equal(24.76m, redemption.AccruedInterest);
+        Assert.Equal(12.00m, redemption.Fee);
+        Assert.Equal(2.43m, redemption.Tax);
+        Assert.Equal(410.33m, redemption.Proceeds);
+        Assert.Equal("Cash account", redemption.DestinationAssetName);
+        Assert.Null(redemption.SwapTargetAssetName);
+    }
+
+    [Fact]
     public async Task Get_Redeemed_ShowsRedemptionAndSwapLinks()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

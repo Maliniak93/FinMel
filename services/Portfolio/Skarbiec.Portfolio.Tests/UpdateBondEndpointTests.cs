@@ -126,6 +126,24 @@ public sealed class UpdateBondEndpointTests(SkarbiecContainersFixture containers
     }
 
     [Fact]
+    public async Task Update_Redeemed_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 3, 1, 10, 0, 0, TimeSpan.Zero));
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await client.CreateFundedBondAsync(cancellationToken);
+        var portfolioId = funded.BondPortfolioId;
+        var assetId = funded.Bond.AssetId;
+        await client.RedeemBondEarlyAsync(portfolioId, assetId, new DateOnly(2027, 3, 1), 3, funded.CashAssetId, cancellationToken);
+        var request = NewBondRequest(bondCount: 40).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(BondUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.BondRedeemedErrorCode, cancellationToken);
+        Assert.Equal(47, (await client.GetBondAsync(portfolioId, assetId, cancellationToken)).BondCount);
+    }
+
+    [Fact]
     public async Task Update_SwapBorn_KeepsSwapTermsFixed()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

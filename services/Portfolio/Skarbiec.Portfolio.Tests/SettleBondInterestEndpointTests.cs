@@ -55,6 +55,35 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
     }
 
     [Fact]
+    public async Task Settle_AfterPartialRedemption_UsesRemainingCount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
+        var portfolioId = funded.BondPortfolioId;
+        var assetId = funded.Bond.AssetId;
+        await client.RedeemBondEarlyAsync(
+            portfolioId, assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 3, 2, 10, 0, 0, TimeSpan.Zero));
+
+        var response = await client.SettleBondInterestRawAsync(portfolioId, assetId, [(2, 4.00m)], null, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            var settlement = await dbContext.Set<BondInterestSettlement>()
+                .SingleAsync(s => s.AssetId == assetId && s.PeriodIndex == 2, cancellationToken);
+            Assert.Equal(6, settlement.BondCount);
+            Assert.Equal(25.26m, settlement.GrossInterest);
+        }
+
+        Assert.Equal(657.36m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, assetId, cancellationToken);
+    }
+
+    [Fact]
     public async Task Settle_Coupon_PaysNetToCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
