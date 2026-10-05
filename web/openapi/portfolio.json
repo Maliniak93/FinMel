@@ -1738,6 +1738,25 @@
         }
       }
     },
+    "/api/portfolio/cash-accounts": {
+      "get": {
+        "tags": [
+          "ListCashAccountsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashAccountsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-preview": {
       "get": {
         "tags": [
@@ -3026,6 +3045,85 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "CashAccountResponse": {
+        "required": [
+          "assetId",
+          "portfolioId",
+          "portfolioName",
+          "name",
+          "currency",
+          "balance"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "balance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "CashAccountsResponse": {
+        "required": [
+          "accounts",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashAccountResponse"
+            }
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashTotalResponse"
+            }
+          }
+        }
+      },
+      "CashTotalResponse": {
+        "required": [
+          "currency",
+          "balance"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "balance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4628,6 +4726,9 @@
     },
     {
       "name": "ListSavingsAccountsEndpoint"
+    },
+    {
+      "name": "ListCashAccountsEndpoint"
     },
     {
       "name": "GetSavingsInterestPreviewEndpoint"

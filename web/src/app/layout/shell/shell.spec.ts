@@ -69,6 +69,27 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/deposits');
   });
 
+  it('offers a "Cash" nav item linking to /cash', () => {
+    const link = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
+    ).find((a) => (a.textContent ?? '').includes('Cash'));
+
+    expect(link).toBeDefined();
+    expect(link!.getAttribute('href')).toBe('/cash');
+  });
+
+  it('offers a "Gotówka" nav item linking to /cash in Polish', async () => {
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const link = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
+    ).find((a) => (a.textContent ?? '').includes('Gotówka'));
+
+    expect(link).toBeDefined();
+    expect(link!.getAttribute('href')).toBe('/cash');
+  });
+
   it('offers an "Obligacje" nav item linking to /bonds', async () => {
     await TestBed.inject(LanguageService).setLanguage('pl');
     await fixture.whenStable();
@@ -90,6 +111,7 @@ describe('Shell', () => {
     expect(englishLabels).toEqual([
       'Dashboard',
       'Portfolios',
+      'Cash',
       'Deposits & savings',
       'Bonds',
       'Settings',

@@ -33,6 +33,7 @@
     "nav": {
       "dashboard": "Dashboard",
       "portfolios": "Portfolios",
+      "cash": "Cash",
       "deposits": "Deposits & savings",
       "bonds": "Bonds",
       "settings": "Settings"
@@ -511,6 +512,15 @@
       "message": "Both sides of this transfer of {{ quantity }} — here and in \"{{ counterpart }}\" — will be permanently deleted. This can't be undone.",
       "failed": "Failed to delete the transfer."
     }
+  },
+  "cash": {
+    "title": "Cash",
+    "portfolio": "Portfolio",
+    "balance": "Balance",
+    "totals": "Totals",
+    "totalLine": "{{ currency }}: {{ amount }}",
+    "empty": "No cash accounts yet. Add a Cash asset to a portfolio to see it here.",
+    "loadFailed": "Failed to load cash accounts."
   },
   "deposits": {
     "title": "Deposits & savings",
