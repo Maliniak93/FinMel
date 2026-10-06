@@ -44,9 +44,9 @@
     <PackageVersion Include="Npgsql" Version="10.0.3" />
 
     <!-- Pinned to MassTransit v8: no v9 upgrade. -->
-    <PackageVersion Include="MassTransit" Version="8.5.10" />
-    <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.10" />
-    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.5.10" />
+    <PackageVersion Include="MassTransit" Version="8.5.11" />
+    <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.11" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.5.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
 
     <!-- Pinned explicitly: Aspire's Npgsql EF package otherwise pulls an older floor that conflicts. -->
