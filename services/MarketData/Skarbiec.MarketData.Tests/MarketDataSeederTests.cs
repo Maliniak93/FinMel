@@ -50,6 +50,26 @@ public sealed class MarketDataSeederTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
+    public async Task Seeds_YahooStockAndEtf_NotTheOldStooqTickers()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var context = CreateDbContext();
+
+        await MarketDataSeeder.SeedAsync(context, cancellationToken);
+
+        var instruments = await context.Instruments.ToListAsync(cancellationToken);
+        var stock = Assert.Single(instruments, i => i.Ticker == "CDR.WA");
+        Assert.Equal(AssetClass.Stock, stock.AssetClass);
+        Assert.Equal("PLN", stock.QuoteCurrency);
+        Assert.Equal(PriceSource.Yahoo, stock.Source);
+        var etf = Assert.Single(instruments, i => i.Ticker == "VWCE.DE");
+        Assert.Equal(AssetClass.Etf, etf.AssetClass);
+        Assert.Equal("EUR", etf.QuoteCurrency);
+        Assert.Equal(PriceSource.Yahoo, etf.Source);
+        Assert.DoesNotContain(instruments, i => i.Ticker is "AAPL.US" or "CDR.PL");
+    }
+
+    [Fact]
     public async Task SeedAsync_WritesNoBootstrapFxRates()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

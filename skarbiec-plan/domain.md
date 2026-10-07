@@ -158,7 +158,7 @@ erDiagram
     INSTRUMENT {
         uuid id PK
         string ticker
-        string source "Nbp Stooq CoinGecko"
+        string source "Yahoo CoinGecko GoldApi"
         string quote_currency
         string asset_class
         string verification_status "Verified Unverified Failed"

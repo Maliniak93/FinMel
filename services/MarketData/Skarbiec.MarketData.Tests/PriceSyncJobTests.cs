@@ -35,7 +35,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var goldInstrument = NewUsedInstrument(db, "XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
-        var stooqInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
+        var yahooInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         var coinGeckoInstrument = NewUsedInstrument(db, "bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -44,7 +44,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
             new ScriptedPriceSource(PriceSource.GoldApi, PriceFetchResult<InstrumentQuote>.Success(
                 [new InstrumentQuote(goldInstrument.Id, Today, 350.12m)])),
             // The middle source errors out entirely; the other two must still sync.
-            new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Error("stooq is down")),
+            new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Error("yahoo is down")),
             new ScriptedPriceSource(PriceSource.CoinGecko, PriceFetchResult<InstrumentQuote>.Success(
                 [new InstrumentQuote(coinGeckoInstrument.Id, Today, 65_000m)])),
         ];
@@ -63,7 +63,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         Assert.Equal(2, quotes.Count);
         Assert.Contains(quotes, q => q.InstrumentId == goldInstrument.Id && q.Close == 350.12m);
         Assert.Contains(quotes, q => q.InstrumentId == coinGeckoInstrument.Id && q.Close == 65_000m);
-        Assert.DoesNotContain(quotes, q => q.InstrumentId == stooqInstrument.Id);
+        Assert.DoesNotContain(quotes, q => q.InstrumentId == yahooInstrument.Id);
     }
 
     [Fact]
@@ -98,15 +98,15 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var instrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
+        var instrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         await db.SaveChangesAsync(cancellationToken);
 
-        var firstRunSource = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
+        var firstRunSource = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, Today, 100m)]));
         var firstJob = new PriceSyncJob(db, [firstRunSource], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await firstJob.RunAsync(cancellationToken);
 
-        var secondRunSource = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
+        var secondRunSource = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, Today, 105m)]));
         var secondJob = new PriceSyncJob(db, [secondRunSource], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await secondJob.RunAsync(cancellationToken);
@@ -136,12 +136,12 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var usedInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Stooq, "PLN", AssetClass.Stock);
-        var unusedInstrument = NewInstrument("MSFT.US", PriceSource.Stooq, "PLN", AssetClass.Stock);
+        var usedInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "PLN", AssetClass.Stock);
+        var unusedInstrument = NewInstrument("MSFT.US", PriceSource.Yahoo, "PLN", AssetClass.Stock);
         db.Instruments.Add(unusedInstrument);
         await db.SaveChangesAsync(cancellationToken);
 
-        var source = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(usedInstrument.Id, Today, 190m)]));
 
         var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);

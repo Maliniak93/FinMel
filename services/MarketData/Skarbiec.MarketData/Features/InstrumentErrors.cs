@@ -8,7 +8,7 @@ internal static class InstrumentErrors
     public static Error UnsupportedCustomSource(PriceSource source) =>
         new(
             "Validation.UnsupportedInstrumentSource",
-            $"Custom instruments can't use source '{source}' — it serves only the built-in gold and silver instruments. Use Stooq or CoinGecko.");
+            $"Custom instruments can't use source '{source}' — it serves only the built-in gold and silver instruments. Use Yahoo or CoinGecko.");
 
     public static Error UnsupportedAssetClass(AssetClass assetClass) =>
         new(

@@ -26,12 +26,12 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("XYZ.WA", "Xyz SA", PriceSource.Stooq, "PLN", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("XYZ.WA", "Xyz SA", PriceSource.Yahoo, "PLN", cancellationToken);
         await SeedInUseAsync(seedDb, instrumentId, cancellationToken);
 
         var (host, _) = await BuildHostAsync(
             new GatedPriceSource(
-                PriceSource.Stooq,
+                PriceSource.Yahoo,
                 CompletedGate(),
                 PriceFetchResult<InstrumentQuote>.Success([new InstrumentQuote(instrumentId, Today, 42.50m)])));
         try
@@ -62,13 +62,13 @@ public sealed class SyncTriggerSchedulingTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("SLOW.WA", "Slow SA", PriceSource.Stooq, "PLN", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("SLOW.WA", "Slow SA", PriceSource.Yahoo, "PLN", cancellationToken);
         await SeedInUseAsync(seedDb, instrumentId, cancellationToken);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var (host, _) = await BuildHostAsync(
             new GatedPriceSource(
-                PriceSource.Stooq, gate, PriceFetchResult<InstrumentQuote>.Success([new InstrumentQuote(instrumentId, Today, 10m)])));
+                PriceSource.Yahoo, gate, PriceFetchResult<InstrumentQuote>.Success([new InstrumentQuote(instrumentId, Today, 10m)])));
         try
         {
             var syncTrigger = host.Services.GetRequiredService<ISyncTrigger>();

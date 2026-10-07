@@ -67,7 +67,7 @@ Messaging lives in `messaging.md`, tests in `testing.md`, domain rules in `domai
 
 - Register the schedule behind `Testing:DisableBackgroundJobs`; when it is set, register the NoOp trigger implementation instead (`NoOpSyncTrigger`, `NoOpHistoryBackfillTrigger`) so slice tests never race a job.
 - Each job owns an `ActivitySource` exposed as `public const string ActivitySourceName`, registered in the service's `AddSource(...)` call in `Program.cs`, and starts an activity named `<Job>.Run`.
-- Jobs are the only place that talks to NBP, Stooq, CoinGecko or the MF bond page (ADR-007) — never a request path, with `ITickerVerifier` as the single exception (ADR-018).
+- Jobs are the only place that talks to NBP, Yahoo, CoinGecko or the MF bond page (ADR-007) — never a request path, with `ITickerVerifier` as the single exception (ADR-018).
 - Quartz owns its job-store schema: `ProvisionSchema()` creates the `quartz.qrtz_*` tables at scheduler start and validates them on every later start. Never model a `qrtz_*` table in EF and never put the `quartz` schema in a migration.
 - The store is configured only through `Sources/QuartzStore.cs` — `AddMarketDataScheduler` for a DI host (it also creates the `quartz` Postgres schema before the scheduler starts), `UseMarketDataStore` + `EnsureSchemaAsync` for a standalone `QuartzSchedulerBuilder`. Production and the scheduling tests both go through it; a test may override clustering timings on top, never copy the store block.
 - The Quartz health check (`AddHealthChecks().AddQuartz()`) is registered next to the scheduler, behind the same `Testing:DisableBackgroundJobs` switch — slice tests have no scheduler, so a check there would fail `/health/ready`.

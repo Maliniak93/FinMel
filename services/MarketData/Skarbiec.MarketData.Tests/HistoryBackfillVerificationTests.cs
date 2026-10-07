@@ -21,12 +21,12 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        var instrument = NewUnverifiedInstrument("MSFT.US", PriceSource.Stooq, "USD");
+        var instrument = NewUnverifiedInstrument("MSFT.US", PriceSource.Yahoo, "USD");
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
         var quotes = new[] { new InstrumentQuote(instrument.Id, Today, 420m) };
-        var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
@@ -41,12 +41,12 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        var instrument = NewUnverifiedInstrument("BOGUS.PL", PriceSource.Stooq, "PLN");
+        var instrument = NewUnverifiedInstrument("BOGUS.PL", PriceSource.Yahoo, "PLN");
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
         var source = new ScriptedPriceSource(
-            PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Error("malformed Stooq history payload: unrecognized header"));
+            PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Error("malformed Yahoo history payload: unrecognized header"));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
@@ -61,11 +61,11 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        var instrument = NewUnverifiedInstrument("EMPTY.PL", PriceSource.Stooq, "PLN");
+        var instrument = NewUnverifiedInstrument("EMPTY.PL", PriceSource.Yahoo, "PLN");
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
-        var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.NoData());
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.NoData());
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
@@ -86,7 +86,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
             Id = Guid.NewGuid(),
             Ticker = "CDR.PL",
             Name = "CD Projekt",
-            Source = PriceSource.Stooq,
+            Source = PriceSource.Yahoo,
             QuoteCurrency = "PLN",
             AssetClass = AssetClass.Stock,
             VerificationStatus = InstrumentVerificationStatus.Verified,
@@ -94,7 +94,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
-        var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Error("transient failure"));
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Error("transient failure"));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);

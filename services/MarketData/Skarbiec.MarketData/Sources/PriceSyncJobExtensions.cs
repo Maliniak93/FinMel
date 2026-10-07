@@ -10,7 +10,7 @@ public static class PriceSyncJobExtensions
 
     private const string PriceSyncCronConfigKey = "PriceSync:Cron";
 
-    // Business days, after the GPW close and NBP's midday publish, giving Stooq's EOD data time to settle.
+    // Business days, after the GPW close and NBP's midday publish, giving Yahoo's EOD data time to settle.
     private const string DefaultProductionCron = "0 30 18 ? * MON-FRI";
 
     // Postgres-backed and clustered, so the schedule survives a restart and two instances never run the same fire.

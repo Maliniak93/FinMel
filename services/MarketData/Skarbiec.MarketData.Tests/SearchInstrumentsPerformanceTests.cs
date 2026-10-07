@@ -25,7 +25,7 @@ public sealed class SearchInstrumentsPerformanceTests(SkarbiecContainersFixture 
                     Id = Guid.NewGuid(),
                     Ticker = $"SYM{i:D4}.US",
                     Name = $"Symbol {i:D4} Inc.",
-                    Source = PriceSource.Stooq,
+                    Source = PriceSource.Yahoo,
                     QuoteCurrency = "USD",
                     AssetClass = AssetClass.Stock,
                 };

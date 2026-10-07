@@ -33,7 +33,7 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
                 Id = Guid.NewGuid(),
                 Ticker = "AAPL.US",
                 Name = "AAPL.US",
-                Source = PriceSource.Stooq,
+                Source = PriceSource.Yahoo,
                 QuoteCurrency = "USD",
                 AssetClass = AssetClass.Stock,
             };
@@ -45,7 +45,7 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
         var to = DateOnly.FromDateTime(DateTime.UtcNow);
         var from = to.AddDays(-365);
         var quotes = Enumerable.Range(0, 366).Select(offset => new InstrumentQuote(instrumentId, from.AddDays(offset), 100m)).ToList();
-        var priceSource = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
+        var priceSource = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         // Completion signal: the job's span covers the whole run, so it stops only after the write commits.
         var activities = new ConcurrentBag<Activity>();

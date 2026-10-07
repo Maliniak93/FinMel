@@ -1,21 +1,21 @@
-using Skarbiec.MarketData.Sources.Stooq;
+using Skarbiec.MarketData.Sources.Yahoo;
 
 namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 
-public sealed class FakeStooqApiClient : IStooqApiClient
+public sealed class FakeYahooApiClient : IYahooApiClient
 {
     private readonly Dictionary<string, string> _responses = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Exception> _exceptions = new(StringComparer.OrdinalIgnoreCase);
 
     public int HistoryRequestCount { get; private set; }
 
-    public FakeStooqApiClient WithResponse(string ticker, string rawResponse)
+    public FakeYahooApiClient WithResponse(string ticker, string rawResponse)
     {
         _responses[ticker] = rawResponse;
         return this;
     }
 
-    public FakeStooqApiClient ThrowingFor(string ticker, Exception exception)
+    public FakeYahooApiClient ThrowingFor(string ticker, Exception exception)
     {
         _exceptions[ticker] = exception;
         return this;
@@ -41,6 +41,6 @@ public sealed class FakeStooqApiClient : IStooqApiClient
             return Task.FromResult(raw);
         }
 
-        throw new InvalidOperationException($"FakeStooqApiClient: no canned response wired for ticker '{ticker}'.");
+        throw new InvalidOperationException($"FakeYahooApiClient: no canned response wired for ticker '{ticker}'.");
     }
 }
