@@ -40,6 +40,10 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/marketdata/sync/status
 Authorization: Bearer {{authToken}}
 
+### Latest gold and silver spot prices per gram in USD and PLN — null prices for a metal with no quote yet
+GET {{baseUrl}}/api/marketdata/metal-prices
+Authorization: Bearer {{authToken}}
+
 ### List the treasury bond series on sale on a date — omit onSaleOn for today in Warsaw
 GET {{baseUrl}}/api/marketdata/bond-series?onSaleOn=2026-10-15
 Authorization: Bearer {{authToken}}

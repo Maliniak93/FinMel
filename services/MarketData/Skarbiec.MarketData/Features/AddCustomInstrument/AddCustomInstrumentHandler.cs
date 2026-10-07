@@ -17,8 +17,7 @@ public sealed class AddCustomInstrumentHandler(
             return InstrumentErrors.UnsupportedAssetClass(request.AssetClass);
         }
 
-        // NBP serves only its fixed endpoints and cannot verify an arbitrary ticker.
-        if (source == PriceSource.Nbp)
+        if (source == PriceSource.GoldApi)
         {
             return InstrumentErrors.UnsupportedCustomSource(source.Value);
         }

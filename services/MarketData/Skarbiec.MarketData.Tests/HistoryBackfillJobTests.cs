@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
+using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing;
@@ -46,18 +47,39 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        var instrument = NewInstrument("XAU", PriceSource.Nbp, "PLN", AssetClass.PreciousMetal);
+        var instrument = NewInstrument("XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
         var quotes = OneYearOfDates().Select(d => new InstrumentQuote(instrument.Id, d, 350m)).ToList();
-        var source = new ScriptedPriceSource(PriceSource.Nbp, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
+        var source = new ScriptedPriceSource(PriceSource.GoldApi, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
 
         var run = await db.SyncRuns.SingleAsync(cancellationToken);
         Assert.Equal(SyncRunKind.Backfill, run.Kind);
+    }
+
+    [Fact]
+    public async Task RunAsync_NewlyUsedMetal_BackfillsTodaysQuote()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var db = CreateDbContext();
+
+        var instrument = NewInstrument("XAG", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
+        db.Instruments.Add(instrument);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var client = new FakeGoldApiClient().WithPricePerOunce("XAG", 62.2m, DateTimeOffset.UtcNow);
+        var source = new GoldApiPriceSource(client, NullLogger<GoldApiPriceSource>.Instance);
+
+        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        await job.RunAsync(instrument.Id, cancellationToken);
+
+        var quote = await db.PriceQuotes.SingleAsync(q => q.InstrumentId == instrument.Id, cancellationToken);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), quote.Date);
+        Assert.Equal(Math.Round(62.2m / 31.1034768m, 8), quote.Close);
     }
 
     [Fact]

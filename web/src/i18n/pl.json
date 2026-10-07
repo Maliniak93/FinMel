@@ -465,7 +465,7 @@
       "valueRequired": "Wartość jest wymagana.",
       "valuationDateRequired": "Data wyceny jest wymagana.",
       "cashHint": "Wyceniane automatycznie według kursu waluty {{ currency }} — nic więcej nie trzeba wypełniać. Użyj opcji \"Dodaj wpłatę początkową\" poniżej, aby wpłacić kwotę początkową.",
-      "goldHint": "Metale szlachetne nie mają własnego wyszukiwania tickera — gotowy instrument złota jest już na liście powyżej.",
+      "goldHint": "Podaj ilość w gramach czystego kruszcu — wyceniamy ją po światowej cenie spot w USD, przeliczonej na PLN, a nie po cenie złota NBP.",
       "instrument": "Instrument finansowy",
       "searchPlaceholder": "Szukaj po tickerze lub nazwie",
       "verified": "Zweryfikowano: {{ ticker }} — {{ name }} ({{ currency }})",

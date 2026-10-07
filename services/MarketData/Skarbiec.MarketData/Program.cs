@@ -10,6 +10,7 @@ using Skarbiec.MarketData.Features.GetFxRate;
 using Skarbiec.MarketData.Features.GetFxRatesBatch;
 using Skarbiec.MarketData.Features.GetInstrument;
 using Skarbiec.MarketData.Features.GetLatestPricesBatch;
+using Skarbiec.MarketData.Features.GetMetalPrices;
 using Skarbiec.MarketData.Features.GetSyncStatus;
 using Skarbiec.MarketData.Features.ListBondSeries;
 using Skarbiec.MarketData.Features.SearchInstruments;
@@ -17,6 +18,7 @@ using Skarbiec.MarketData.Features.TriggerSync;
 using Skarbiec.MarketData.Messaging;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
+using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Sources.MfBonds;
 using Skarbiec.MarketData.Sources.Nbp;
 using Skarbiec.MarketData.Sources.Stooq;
@@ -45,6 +47,7 @@ if (!OpenApiBuildTime.IsActive)
     builder.AddNbpSources();
     builder.AddStooqSource();
     builder.AddCoinGeckoSource();
+    builder.AddGoldApiSource();
     builder.AddMfBondSource();
     builder.AddPriceSyncJob();
     // After AddPriceSyncJob: it reuses that call's scheduler.
@@ -72,6 +75,7 @@ builder.Services.AddScoped<GetSyncStatusHandler>();
 builder.Services.AddScoped<ListBondSeriesHandler>();
 builder.Services.AddScoped<GetBondSeriesHandler>();
 builder.Services.AddScoped<GetBondSeriesRatesBatchHandler>();
+builder.Services.AddScoped<GetMetalPricesHandler>();
 
 var app = builder.Build();
 
@@ -90,6 +94,7 @@ app.MapGetSyncStatusEndpoint();
 app.MapListBondSeriesEndpoint();
 app.MapGetBondSeriesEndpoint();
 app.MapGetBondSeriesRatesBatchEndpoint();
+app.MapGetMetalPricesEndpoint();
 
 // Production applies migrations and the seed as an explicit deploy step instead (see deploy/README.md).
 if (!OpenApiBuildTime.IsActive && app.Environment.IsDevelopment())

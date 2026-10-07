@@ -7,9 +7,4 @@ public interface INbpApiClient
 
     // The caller respects NBP's per-request range limit.
     Task<string?> GetTableARangeAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
-
-    Task<string?> GetGoldPriceAsync(DateOnly? date, CancellationToken cancellationToken);
-
-    // The caller respects NBP's per-request range limit.
-    Task<string?> GetGoldPriceRangeAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
 }

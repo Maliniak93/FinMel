@@ -12,14 +12,6 @@ public sealed class NbpApiClient(HttpClient httpClient) : INbpApiClient
     public Task<string?> GetTableARangeAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
         GetRawAsync($"exchangerates/tables/A/{Format(from)}/{Format(to)}/?format=json", cancellationToken);
 
-    public Task<string?> GetGoldPriceAsync(DateOnly? date, CancellationToken cancellationToken) =>
-        GetRawAsync(date is null
-            ? "cenyzlota/?format=json"
-            : $"cenyzlota/{Format(date.Value)}/?format=json", cancellationToken);
-
-    public Task<string?> GetGoldPriceRangeAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
-        GetRawAsync($"cenyzlota/{Format(from)}/{Format(to)}/?format=json", cancellationToken);
-
     // NBP answers 404 with a plain-text body for a day with no data; any other failure still throws.
     private async Task<string?> GetRawAsync(string requestUri, CancellationToken cancellationToken)
     {

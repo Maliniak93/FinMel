@@ -29,14 +29,6 @@ public sealed class FakeNbpApiClient : INbpApiClient
         return Respond();
     }
 
-    public Task<string?> GetGoldPriceAsync(DateOnly? date, CancellationToken cancellationToken) => Respond();
-
-    public Task<string?> GetGoldPriceRangeAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
-    {
-        RangeRequestCount++;
-        return Respond();
-    }
-
     private Task<string?> Respond() =>
         _throwOnRequest is not null ? Task.FromException<string?>(_throwOnRequest) : Task.FromResult(_rawResponse);
 }
