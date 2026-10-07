@@ -15,6 +15,9 @@ public sealed record AssetPositionChanged
     public required string Currency { get; init; }
     public required decimal Quantity { get; init; }
 
+    /// <summary>Quote units per unit of Quantity: grams of fine metal per piece for PreciousMetal, 1 for every other class.</summary>
+    public required decimal QuoteUnitsPerQuantity { get; init; }
+
     /// <summary>Manual mode only, set together with ManualValueDate.</summary>
     public decimal? ManualValueAmount { get; init; }
 

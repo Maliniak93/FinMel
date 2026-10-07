@@ -1,0 +1,163 @@
+<div class="metals-page">
+  <div class="metals-page__header">
+    <h1>{{ 'metals.title' | transloco }}</h1>
+    <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+      <mat-icon>add</mat-icon>
+      {{ 'metals.add' | transloco }}
+    </button>
+  </div>
+
+  <section class="metals-page__prices" [attr.aria-label]="'metals.prices' | transloco">
+    @if (pricesResource.error(); as pricesError) {
+      <p class="metals-page__prices-error" role="alert">{{ pricesError.message }}</p>
+    }
+    @for (row of priceRows(); track row.label) {
+      <div class="metals-page__price">
+        <strong>{{ row.label | transloco }}</strong>
+        @if (hasPrice(row.price)) {
+          <span>{{
+            'metals.perGram' | transloco: { price: formatMoney(row.price.pricePerGramPln) }
+          }}</span>
+          @if (
+            row.price.pricePerTroyOuncePln !== null && row.price.pricePerTroyOuncePln !== undefined
+          ) {
+            <span>{{
+              'metals.perOunce' | transloco: { price: formatMoney(row.price.pricePerTroyOuncePln) }
+            }}</span>
+          }
+          @if (row.price.date) {
+            <span class="metals-page__price-date">{{
+              'metals.asOf' | transloco: { date: formatDate(row.price.date) }
+            }}</span>
+          }
+          @if (row.price.isStale) {
+            <span class="metals-page__stale">{{ 'common.stale' | transloco }}</span>
+          }
+        } @else {
+          <span>—</span>
+        }
+      </div>
+    }
+  </section>
+
+  @if (holdingsResource.error(); as loadError) {
+    <div class="metals-page__state" role="alert">
+      <p>{{ loadError.message }}</p>
+      <button mat-button type="button" (click)="holdingsResource.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (holdingsResource.isLoading() && !holdingsResource.hasValue()) {
+    <div class="metals-page__state">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (holdingsResource.hasValue() && holdingsResource.value().length === 0) {
+    <div class="metals-page__state">
+      <p>{{ 'metals.empty' | transloco }}</p>
+      <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+        {{ 'metals.add' | transloco }}
+      </button>
+    </div>
+  } @else if (holdingsResource.hasValue()) {
+    <table mat-table [dataSource]="holdingsResource.value()" class="metals-page__table">
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+        <td mat-cell *matCellDef="let holding">
+          <a [routerLink]="transactionsLink(holding)">{{ holding.name }}</a>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="portfolio">
+        <th mat-header-cell *matHeaderCellDef>{{ 'metals.portfolio' | transloco }}</th>
+        <td mat-cell *matCellDef="let holding">{{ holding.portfolioName }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="metal">
+        <th mat-header-cell *matHeaderCellDef>{{ 'metals.metal.column' | transloco }}</th>
+        <td mat-cell *matCellDef="let holding">{{ metalLabel(holding.metal) | transloco }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="weightPerPiece">
+        <th mat-header-cell *matHeaderCellDef>{{ 'metals.weightPerPiece' | transloco }}</th>
+        <td mat-cell *matCellDef="let holding">
+          {{
+            'metals.grams' | transloco: { value: formatQuantity(holding.fineWeightGramsPerPiece) }
+          }}
+          @if (wholeTroyOunces(holding.fineWeightGramsPerPiece); as ounces) {
+            ({{ 'metals.ounces' | transloco: { value: formatQuantity(ounces) } }})
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="pieces">
+        <th mat-header-cell *matHeaderCellDef>{{ 'metals.pieces' | transloco }}</th>
+        <td mat-cell *matCellDef="let holding">{{ formatQuantity(holding.pieces) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="totalWeight">
+        <th mat-header-cell *matHeaderCellDef>{{ 'metals.totalWeight' | transloco }}</th>
+        <td mat-cell *matCellDef="let holding">
+          {{ 'metals.grams' | transloco: { value: formatQuantity(holding.totalFineGrams) } }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="valueToday">
+        <th mat-header-cell *matHeaderCellDef>{{ 'metals.valueToday' | transloco }}</th>
+        <td mat-cell *matCellDef="let holding">
+          @let value = valueToday(holding);
+          @if (value !== null) {
+            {{ formatMoney(value) }}
+          } @else {
+            —
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let holding" class="metals-page__actions">
+          <button
+            mat-icon-button
+            type="button"
+            [matMenuTriggerFor]="menu"
+            [attr.aria-label]="'common.actionsFor' | transloco: { name: holding.name }"
+          >
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button
+              mat-menu-item
+              type="button"
+              [disabled]="isReadOnly(holding)"
+              (click)="openEditDialog(holding)"
+            >
+              <mat-icon>edit</mat-icon>
+              <span>{{ 'common.edit' | transloco }}</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              [disabled]="isReadOnly(holding)"
+              (click)="openTransactionDialog(holding, buyType)"
+            >
+              <mat-icon>add_circle</mat-icon>
+              <span>{{ 'metals.buy' | transloco }}</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              [disabled]="isReadOnly(holding)"
+              (click)="openTransactionDialog(holding, sellType)"
+            >
+              <mat-icon>remove_circle</mat-icon>
+              <span>{{ 'metals.sell' | transloco }}</span>
+            </button>
+          </mat-menu>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  }
+</div>

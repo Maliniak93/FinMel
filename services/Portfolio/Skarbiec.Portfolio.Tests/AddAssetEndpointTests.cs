@@ -35,12 +35,34 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
+    [Fact]
+    public async Task Add_PreciousMetal_UseMetalEndpoints()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var request = new AddAssetRequest
+        {
+            AssetClass = AssetClass.PreciousMetal,
+            Name = "Gold coin",
+            Currency = "PLN",
+            ManualValue = 1000m,
+            ManualValueDate = new DateOnly(2026, 7, 1)
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        await response.AssertUseMetalEndpointsAsync(cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+    }
+
     [Theory]
     [InlineData(AssetClass.Cash)]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
     [InlineData(AssetClass.Crypto)]
-    [InlineData(AssetClass.PreciousMetal)]
     [InlineData(AssetClass.RealEstate)]
     [InlineData(AssetClass.Other)]
     public async Task Add_EveryAssetClassWithManualValue_ReturnsCreated(AssetClass assetClass)

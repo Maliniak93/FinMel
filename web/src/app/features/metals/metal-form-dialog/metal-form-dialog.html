@@ -1,0 +1,125 @@
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'metals.form.editTitle' : 'metals.form.newTitle') | transloco }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    @if (choosesPortfolio) {
+      <mat-form-field appearance="outline" class="metal-form-dialog__field">
+        <mat-label>{{ 'metals.portfolio' | transloco }}</mat-label>
+        <mat-select formControlName="portfolioId">
+          @if (portfoliosResource.hasValue()) {
+            @for (portfolio of portfoliosResource.value(); track portfolio.id) {
+              <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
+            }
+          }
+        </mat-select>
+        @if (portfoliosResource.error(); as loadError) {
+          <mat-hint>{{ loadError.message }}</mat-hint>
+        }
+        @if (hasError('portfolioId', 'required')) {
+          <mat-error>{{ 'deposits.form.portfolioRequired' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" class="metal-form-dialog__field">
+      <mat-label>{{ 'metals.metal.column' | transloco }}</mat-label>
+      <mat-select formControlName="metal">
+        @for (metal of metals; track metal.value) {
+          <mat-option [value]="metal.value">{{ metal.label | transloco }}</mat-option>
+        }
+      </mat-select>
+      @if (serverError('metal')) {
+        <mat-error>{{ serverError('metal') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="metal-form-dialog__field">
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
+      <input matInput type="text" formControlName="name" autocomplete="off" />
+      @if (hasError('name', 'required')) {
+        <mat-error>{{ 'deposits.form.nameRequired' | transloco }}</mat-error>
+      } @else if (hasError('name', 'maxlength')) {
+        <mat-error>{{ 'deposits.form.nameTooLong' | transloco }}</mat-error>
+      } @else if (serverError('name')) {
+        <mat-error>{{ serverError('name') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="metal-form-dialog__row">
+      <mat-form-field appearance="outline" class="metal-form-dialog__field">
+        <mat-label>{{ 'metals.form.fineWeight' | transloco }}</mat-label>
+        <input matInput type="number" step="any" formControlName="fineWeight" />
+        @if (hasError('fineWeight', 'required')) {
+          <mat-error>{{ 'metals.form.fineWeightRequired' | transloco }}</mat-error>
+        } @else if (hasError('fineWeight', 'positive')) {
+          <mat-error>{{ 'metals.form.fineWeightPositive' | transloco }}</mat-error>
+        } @else if (serverError('fineWeight')) {
+          <mat-error>{{ serverError('fineWeight') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="metal-form-dialog__field">
+        <mat-label>{{ 'metals.form.unit' | transloco }}</mat-label>
+        <mat-select formControlName="weightUnit">
+          @for (unit of weightUnits; track unit.value) {
+            <mat-option [value]="unit.value">{{ unit.label | transloco }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    @if (!isEdit) {
+      <h3 class="metal-form-dialog__section">{{ 'metals.form.firstPurchase' | transloco }}</h3>
+      <div class="metal-form-dialog__row">
+        <mat-form-field appearance="outline" class="metal-form-dialog__field">
+          <mat-label>{{ 'metals.pieces' | transloco }}</mat-label>
+          <input matInput type="number" step="1" formControlName="pieces" />
+          @if (hasError('pieces', 'positive')) {
+            <mat-error>{{ 'metals.form.piecesPositive' | transloco }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="metal-form-dialog__field">
+          <mat-label>{{ 'metals.form.pricePerPiece' | transloco }}</mat-label>
+          <input matInput type="number" step="0.01" formControlName="pricePerPiece" />
+          @if (hasError('pricePerPiece', 'required')) {
+            <mat-error>{{ 'metals.form.pricePerPieceRequired' | transloco }}</mat-error>
+          } @else if (hasError('pricePerPiece', 'min')) {
+            <mat-error>{{ 'metals.form.pricePerPieceNegative' | transloco }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="metal-form-dialog__field">
+        <mat-label>{{ 'metals.form.purchaseDate' | transloco }}</mat-label>
+        <input matInput [matDatepicker]="purchaseDatePicker" formControlName="purchaseDate" />
+        <mat-datepicker-toggle matIconSuffix [for]="purchaseDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #purchaseDatePicker></mat-datepicker>
+        @if (hasError('purchaseDate', 'required')) {
+          <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+        } @else if (hasError('purchaseDate', 'future')) {
+          <mat-error>{{ 'metals.form.purchaseDateInFuture' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (formError()) {
+      <p class="metal-form-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

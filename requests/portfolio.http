@@ -735,3 +735,80 @@ Content-Type: application/json
   "tax": {{savingsBoundPreview.response.body.tax}},
   "destinationAssetId": "{{addSavingsAccount.response.body.assetId}}"
 }
+
+### --- Precious metals ---
+
+### Add a silver coin with a first purchase (metal 1 = Silver; weightUnit Gram | TroyOunce)
+# @name addMetal
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Maple Leaf 1 oz",
+  "metal": 1,
+  "fineWeight": 1,
+  "weightUnit": "TroyOunce",
+  "firstPurchase": {
+    "pieces": 10,
+    "pricePerPiece": 260.00,
+    "date": "2026-10-01"
+  }
+}
+
+### Add a gold bar with no purchase yet (metal 0 = Gold)
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Gold bar 50 g",
+  "metal": 0,
+  "fineWeight": 50,
+  "weightUnit": "Gram"
+}
+
+### List every precious metal holding across portfolios
+GET {{baseUrl}}/api/portfolio/metals
+Authorization: Bearer {{authToken}}
+
+### Get a precious metal holding
+GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals/{{addMetal.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+
+### Update it: metal, name and fine weight (moves the instrument with the metal)
+PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals/{{addMetal.response.body.assetId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Silver bar 100 g",
+  "metal": 1,
+  "fineWeight": 100,
+  "weightUnit": "Gram"
+}
+
+### Buy one more piece (a PreciousMetal asset takes Buy and Sell only)
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addMetal.response.body.assetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": 0,
+  "quantity": 1,
+  "unitPrice": 270.00,
+  "date": "2026-10-02"
+}
+
+### Add a precious metal through the generic assets endpoint (400 Validation.UseMetalEndpoints)
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": 6,
+  "name": "Gold coin",
+  "currency": "PLN",
+  "manualValue": 1000,
+  "manualValueDate": "2026-10-01"
+}

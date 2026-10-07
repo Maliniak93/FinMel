@@ -372,6 +372,26 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("BondRedemptions");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.MetalHolding", b =>
+                {
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("FineWeightGramsPerPiece")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<int>("Metal")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AssetId");
+
+                    b.ToTable("MetalHoldings");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Portfolio", b =>
                 {
                     b.Property<Guid>("Id")
@@ -640,6 +660,15 @@ namespace Skarbiec.Portfolio.Migrations
                         .WithMany()
                         .HasForeignKey("InboxMessageId", "InboxConsumerId")
                         .HasPrincipalKey("MessageId", "ConsumerId");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.MetalHolding", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
+                        .WithOne()
+                        .HasForeignKey("Skarbiec.Portfolio.Data.MetalHolding", "AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsAccount", b =>

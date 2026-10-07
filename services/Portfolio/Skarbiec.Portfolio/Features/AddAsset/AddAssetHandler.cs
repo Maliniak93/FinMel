@@ -3,6 +3,7 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.Metals;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.MarketData;
 
@@ -43,6 +44,12 @@ public sealed class AddAssetHandler(
         if (request.AssetClass == AssetClass.Savings)
         {
             return SavingsAccountErrors.UseSavingsAccountEndpoints;
+        }
+
+        // And only AddMetal creates a PreciousMetal-class asset, with its fixed instrument and fine weight.
+        if (request.AssetClass == AssetClass.PreciousMetal)
+        {
+            return MetalErrors.UseMetalEndpoints;
         }
 
         // Before the instrument and FX lookups: a disallowed opening type calls nothing and creates nothing.

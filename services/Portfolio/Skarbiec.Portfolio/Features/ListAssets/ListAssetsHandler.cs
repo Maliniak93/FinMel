@@ -35,6 +35,10 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext, TimeProvider
                 DepositSettled = dbContext.TermDeposits
                     .Where(t => t.AssetId == a.Id)
                     .Select(t => (bool?)(t.SettledOn != null))
+                    .FirstOrDefault(),
+                FineWeightGramsPerPiece = dbContext.MetalHoldings
+                    .Where(m => m.AssetId == a.Id)
+                    .Select(m => (decimal?)m.FineWeightGramsPerPiece)
                     .FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
@@ -50,7 +54,8 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext, TimeProvider
                 r.TransactionCount,
                 r.DepositMaturityDate,
                 r.DepositSettled,
-                interest.TryGetValue(r.Asset.Id, out var status) ? status.Due is not null : null))
+                interest.TryGetValue(r.Asset.Id, out var status) ? status.Due is not null : null,
+                r.FineWeightGramsPerPiece))
             .ToList();
         return Result<IReadOnlyList<AssetResponse>>.Success(response);
     }

@@ -50,6 +50,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/bonds/bonds').then((m) => m.Bonds),
       },
       {
+        path: 'metals',
+        loadComponent: () => import('./features/metals/metals').then((m) => m.Metals),
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
       },

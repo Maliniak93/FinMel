@@ -26,6 +26,9 @@ public sealed record AssetResponse
 
     public bool? SavingsInterestDue { get; init; }
 
+    /// <summary>PreciousMetal only: grams of fine metal per piece, the multiplier on the per-gram price.</summary>
+    public decimal? FineWeightGramsPerPiece { get; init; }
+
     public required bool IsArchived { get; init; }
 }
 
@@ -36,7 +39,8 @@ public static class AssetMappingExtensions
         int transactionCount,
         DateOnly? depositMaturityDate = null,
         bool? depositSettled = null,
-        bool? savingsInterestDue = null) => new()
+        bool? savingsInterestDue = null,
+        decimal? fineWeightGramsPerPiece = null) => new()
         {
             Id = asset.Id,
             PortfolioId = asset.PortfolioId,
@@ -52,6 +56,7 @@ public static class AssetMappingExtensions
             DepositMaturityDate = depositMaturityDate,
             DepositSettled = depositSettled,
             SavingsInterestDue = savingsInterestDue,
+            FineWeightGramsPerPiece = fineWeightGramsPerPiece,
             IsArchived = asset.IsArchived
         };
 
@@ -66,8 +71,13 @@ public static class AssetMappingExtensions
             .FirstOrDefaultAsync(cancellationToken);
 
         var savingsInterestDue = await dbContext.SavingsInterestDueAsync(asset, today, cancellationToken);
+        var fineWeight = await dbContext.MetalHoldings
+            .AsNoTracking()
+            .Where(m => m.AssetId == asset.Id)
+            .Select(m => (decimal?)m.FineWeightGramsPerPiece)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        return asset.ToResponse(transactionCount, terms?.MaturityDate, terms?.Settled, savingsInterestDue);
+        return asset.ToResponse(transactionCount, terms?.MaturityDate, terms?.Settled, savingsInterestDue, fineWeight);
     }
 
     internal static async Task<bool?> SavingsInterestDueAsync(

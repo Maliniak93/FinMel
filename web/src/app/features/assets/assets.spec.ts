@@ -31,6 +31,8 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../shared/format';
 import { toDateOnly } from '../../shared/date-only';
 import { bondResponse } from '../../../testing/bond-fixtures';
+import { metalResponse } from '../../../testing/metal-fixtures';
+import { MetalFormDialog } from '../metals/metal-form-dialog/metal-form-dialog';
 import { BondPurchaseDialog } from '../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
 import { SavingsAccountFormDialog } from '../deposits/savings-account-form-dialog/savings-account-form-dialog';
@@ -154,6 +156,7 @@ describe('Assets', () => {
     depositResponseBody?: unknown,
     savingsAccountBody?: unknown,
     bondBody?: unknown,
+    metalBody?: unknown,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
@@ -164,6 +167,9 @@ describe('Assets', () => {
         return savingsAccountBody
           ? jsonResponse(savingsAccountBody)
           : jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (url.includes('/metals')) {
+        return metalBody ? jsonResponse(metalBody) : jsonResponse({ detail: 'Not found.' }, 404);
       }
       if (url.includes('/bonds')) {
         return bondBody ? jsonResponse(bondBody) : jsonResponse({ detail: 'Not found.' }, 404);
@@ -720,6 +726,62 @@ describe('Assets', () => {
           ),
       ).toBe(true),
     );
+  });
+
+  it('Edit on a PreciousMetal row opens MetalFormDialog, not the asset form', async () => {
+    const metalAsset: AssetResponse = {
+      ...marketAsset,
+      id: '88888888-cccc-8888-cccc-888888888888',
+      assetClass: ASSET_CLASS.PreciousMetal,
+      name: 'Krugerrand',
+      currency: 'PLN',
+      quantity: 2,
+    };
+    const holding = metalResponse({ assetId: metalAsset.id, portfolioId });
+    await setup(
+      jsonResponse([metalAsset]),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+
+    component['openEditDialog'](metalAsset);
+
+    await vi.waitFor(() => expect(dialog.open).toHaveBeenCalled());
+    const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data?: unknown }];
+    expect(dialogType).toBe(MetalFormDialog);
+    expect(dialogType).not.toBe(AssetFormDialog);
+    expect(JSON.stringify(config?.data)).toContain(metalAsset.id);
+  });
+
+  it("multiplies a metal asset's market value by its fine weight per piece", async () => {
+    const instrument: InstrumentDetailsResponse = {
+      id: instrumentId,
+      ticker: 'XAU',
+      name: 'Gold (1 g)',
+      assetClass: 6,
+      quoteCurrency: 'PLN',
+      source: 1,
+      verificationStatus: 0,
+      lastPrice: 500,
+      lastPriceDate: new Date().toISOString().slice(0, 10),
+    };
+    const metalAsset: AssetResponse = {
+      ...marketAsset,
+      assetClass: ASSET_CLASS.PreciousMetal,
+      currency: 'PLN',
+      quantity: 2,
+      fineWeightGramsPerPiece: 31.1,
+    };
+    await setup(jsonResponse([metalAsset]), undefined, jsonResponse(instrument));
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(formatMoney(31100, 'PLN'));
   });
 
   it('Edit on a Bond row opens BondPurchaseDialog, not the asset form', async () => {

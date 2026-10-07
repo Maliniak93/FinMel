@@ -175,6 +175,19 @@ describe('TransactionFormDialog', () => {
     expect(await typeOptionLabels()).toEqual(['Deposit', 'Withdraw']);
   });
 
+  it('offers only Buy/Sell for a precious metal and labels the quantity in pieces and the price per piece', async () => {
+    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.PreciousMetal, type: 0 });
+
+    const fieldLabels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('mat-label'),
+      (label) => (label.textContent ?? '').trim(),
+    );
+    expect(fieldLabels).toContain('Pieces');
+    expect(fieldLabels).toContain('Price per piece');
+    expect(fieldLabels).not.toContain('Quantity');
+    expect(await typeOptionLabels()).toEqual(['Buy', 'Sell']);
+  });
+
   it('preselects the type from dialog data', async () => {
     await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash, type: 3 });
 

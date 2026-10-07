@@ -21,6 +21,9 @@ public sealed class Position : IUserOwned
     public required string Currency { get; set; }
     public required decimal Quantity { get; set; }
 
+    // Market mode multiplier: the price is per quote unit (a gram of metal), the quantity in pieces.
+    public decimal QuoteUnitsPerQuantity { get; set; } = 1m;
+
     // Manual mode only, set together with ManualValueDate.
     public decimal? ManualValueAmount { get; set; }
 

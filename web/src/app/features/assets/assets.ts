@@ -23,6 +23,7 @@ import {
   getApiPortfolioPortfoliosByPortfolioIdAssets,
   getApiPortfolioPortfoliosByPortfolioIdBondsByAssetId,
   getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId,
+  getApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId,
   getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId,
   type AssetResponse,
 } from '../../api/portfolio';
@@ -34,6 +35,7 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { BondPurchaseDialog } from '../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { DepositFormDialog } from '../deposits/deposit-form-dialog/deposit-form-dialog';
 import { SavingsAccountFormDialog } from '../deposits/savings-account-form-dialog/savings-account-form-dialog';
+import { MetalFormDialog } from '../metals/metal-form-dialog/metal-form-dialog';
 import { ASSET_CLASS, assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
@@ -177,7 +179,9 @@ export class Assets {
   }
 
   protected marketValue(asset: AssetResponse, instrument: InstrumentDetailsResponse): number {
-    return Number(asset.quantity) * Number(instrument.lastPrice);
+    const quoteUnitsPerQuantity =
+      asset.fineWeightGramsPerPiece == null ? 1 : Number(asset.fineWeightGramsPerPiece);
+    return Number(asset.quantity) * quoteUnitsPerQuantity * Number(instrument.lastPrice);
   }
 
   protected isDepositDue(asset: AssetResponse): boolean {
@@ -218,6 +222,11 @@ export class Assets {
 
     if (Number(asset.assetClass) === ASSET_CLASS.Bond) {
       void this.openBondEditDialog(asset);
+      return;
+    }
+
+    if (Number(asset.assetClass) === ASSET_CLASS.PreciousMetal) {
+      void this.openMetalEditDialog(asset);
       return;
     }
 
@@ -270,6 +279,29 @@ export class Assets {
     const ref = this.dialog.open(BondPurchaseDialog, {
       width: '560px',
       data: { bond: result.data },
+    });
+    ref.afterClosed().subscribe((saved: boolean | undefined) => {
+      if (saved) {
+        this.assetsResource.reload();
+      }
+    });
+  }
+
+  private async openMetalEditDialog(asset: AssetResponse): Promise<void> {
+    const result = await getApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId({
+      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    });
+    if (result.error || !result.data) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('assets.metalLoadFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    const ref = this.dialog.open(MetalFormDialog, {
+      width: '560px',
+      data: { metal: result.data },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {

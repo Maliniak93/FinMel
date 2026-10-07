@@ -173,14 +173,3 @@ export const etfSearchResult: InstrumentSearchResult = {
   lastPrice: 120,
   lastPriceDate: '2026-08-04',
 };
-
-export const goldSearchResult: InstrumentSearchResult = {
-  id: '99999999-9999-9999-9999-999999999999',
-  ticker: 'XAU',
-  name: 'Gold',
-  assetClass: 6,
-  quoteCurrency: 'PLN',
-  verificationStatus: 0,
-  lastPrice: 400,
-  lastPriceDate: '2026-08-04',
-};

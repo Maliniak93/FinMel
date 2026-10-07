@@ -28,11 +28,11 @@ import {
 import { BondPurchaseDialog } from '../../../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
 import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form-dialog/savings-account-form-dialog';
+import { MetalFormDialog } from '../../../metals/metal-form-dialog/metal-form-dialog';
 import { ASSET_CLASS } from '../../asset-class';
 import { ASSET_FORM, INITIAL_TRANSACTION_KEY } from '../asset-form';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
 import { CashAssetForm } from '../forms/cash-asset-form/cash-asset-form';
-import { GoldAssetForm } from '../forms/gold-asset-form/gold-asset-form';
 import { ManualAssetForm } from '../forms/manual-asset-form/manual-asset-form';
 import { SecurityAssetForm } from '../forms/security-asset-form/security-asset-form';
 
@@ -42,7 +42,7 @@ export interface AssetFormDialogData {
   assetClass?: AssetClass;
 }
 
-type AssetFormKind = 'cash' | 'security' | 'gold' | 'manual';
+type AssetFormKind = 'cash' | 'security' | 'manual';
 
 function formKindFor(assetClass: AssetClass): AssetFormKind {
   switch (Number(assetClass)) {
@@ -52,8 +52,6 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
     case ASSET_CLASS.Etf:
     case ASSET_CLASS.Crypto:
       return 'security';
-    case ASSET_CLASS.PreciousMetal:
-      return 'gold';
     default:
       return 'manual';
   }
@@ -71,7 +69,6 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
     MatSelectModule,
     AssetTypePicker,
     CashAssetForm,
-    GoldAssetForm,
     ManualAssetForm,
     SecurityAssetForm,
     TranslocoPipe,
@@ -145,6 +142,14 @@ export class AssetFormDialog {
     if (Number(assetClass) === ASSET_CLASS.Savings) {
       this.dialog
         .open(SavingsAccountFormDialog, { width: '560px', data: { portfolioId } })
+        .afterClosed()
+        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
+      return;
+    }
+
+    if (Number(assetClass) === ASSET_CLASS.PreciousMetal) {
+      this.dialog
+        .open(MetalFormDialog, { width: '560px', data: { portfolioId } })
         .afterClosed()
         .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
       return;
