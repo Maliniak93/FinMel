@@ -16,6 +16,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
     public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
     public DbSet<TreasuryBond> TreasuryBonds => Set<TreasuryBond>();
+    public DbSet<MetalHolding> MetalHoldings => Set<MetalHolding>();
     public DbSet<SavingsInterestSettlement> SavingsInterestSettlements => Set<SavingsInterestSettlement>();
     public DbSet<BondInterestSettlement> BondInterestSettlements => Set<BondInterestSettlement>();
     public DbSet<BondRedemption> BondRedemptions => Set<BondRedemption>();
@@ -106,6 +107,18 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             savingsAccount.Property(s => s.BankName).HasMaxLength(100);
             savingsAccount.Property(s => s.AnnualInterestRatePercent).HasPrecision(7, 4);
+        });
+
+        modelBuilder.Entity<MetalHolding>(metalHolding =>
+        {
+            // Keyed and FK-cascaded exactly like TermDeposit.
+            metalHolding.HasKey(m => m.AssetId);
+            metalHolding.HasOne<Asset>()
+                .WithOne()
+                .HasForeignKey<MetalHolding>(m => m.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            metalHolding.Property(m => m.FineWeightGramsPerPiece).HasPrecision(18, 8);
         });
 
         modelBuilder.Entity<TreasuryBond>(treasuryBond =>

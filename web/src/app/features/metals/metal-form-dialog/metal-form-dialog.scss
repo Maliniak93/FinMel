@@ -1,0 +1,23 @@
+.metal-form-dialog__field {
+  display: block;
+  width: 100%;
+}
+
+.metal-form-dialog__row {
+  display: flex;
+  gap: 12px;
+
+  .metal-form-dialog__field {
+    flex: 1;
+  }
+}
+
+.metal-form-dialog__section {
+  margin: 0 0 12px;
+  font-size: 1em;
+}
+
+.metal-form-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

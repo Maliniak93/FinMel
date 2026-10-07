@@ -36,6 +36,7 @@
       "cash": "Cash",
       "deposits": "Deposits & savings",
       "bonds": "Bonds",
+      "metals": "Precious metals",
       "settings": "Settings"
     },
     "toggleNavigation": "Toggle navigation",
@@ -118,7 +119,9 @@
     },
     "quantityField": {
       "quantity": "Quantity",
-      "amount": "Amount"
+      "amount": "Amount",
+      "pieces": "Pieces",
+      "pricePerPiece": "Price per piece"
     },
     "depositTermUnit": {
       "days": "Days",
@@ -446,6 +449,7 @@
     "depositLoadFailed": "Failed to load the deposit.",
     "savingsAccountLoadFailed": "Failed to load the savings account.",
     "bondLoadFailed": "Failed to load the bond.",
+    "metalLoadFailed": "Failed to load the precious metal holding.",
     "delete": {
       "title": "Delete this asset?",
       "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
@@ -465,7 +469,6 @@
       "valueRequired": "Value is required.",
       "valuationDateRequired": "Valuation date is required.",
       "cashHint": "Valued automatically from {{ currency }}'s exchange rate — nothing else to fill in. Use \"Add opening deposit\" below to deposit an opening amount.",
-      "goldHint": "Enter the quantity in grams of fine metal — it is priced at the world spot rate in USD, converted to PLN, not at the NBP gold price.",
       "instrument": "Instrument",
       "searchPlaceholder": "Search by ticker or name",
       "verified": "Verified: {{ ticker }} — {{ name }} ({{ currency }})",
@@ -527,6 +530,49 @@
     "deposit": "Deposit",
     "withdraw": "Withdraw",
     "transferWithSavings": "Transfer with savings"
+  },
+  "metals": {
+    "title": "Precious metals",
+    "add": "Add precious metal",
+    "empty": "No precious metals yet. Add a gold or silver holding to see it here.",
+    "loadFailed": "Failed to load precious metals.",
+    "pricesLoadFailed": "Failed to load metal prices.",
+    "prices": "Spot prices",
+    "perGram": "{{ price }} / g",
+    "perOunce": "{{ price }} / oz",
+    "asOf": "as of {{ date }}",
+    "portfolio": "Portfolio",
+    "weightPerPiece": "Weight per piece",
+    "pieces": "Pieces",
+    "totalWeight": "Total fine weight",
+    "valueToday": "Value today",
+    "grams": "{{ value }} g",
+    "ounces": "{{ value }} oz",
+    "buy": "Buy",
+    "sell": "Sell",
+    "metal": {
+      "column": "Metal",
+      "gold": "Gold",
+      "silver": "Silver",
+      "unknown": "Unknown metal"
+    },
+    "form": {
+      "newTitle": "Add precious metal",
+      "editTitle": "Edit precious metal",
+      "fineWeight": "Fine weight per piece",
+      "fineWeightRequired": "Fine weight is required.",
+      "fineWeightPositive": "Fine weight must be greater than 0.",
+      "unit": "Unit",
+      "unitGram": "g",
+      "unitTroyOunce": "oz (troy)",
+      "firstPurchase": "First purchase (optional)",
+      "piecesPositive": "Pieces must be greater than 0.",
+      "pricePerPiece": "Price per piece (PLN)",
+      "pricePerPieceRequired": "Price per piece is required with pieces.",
+      "pricePerPieceNegative": "Price per piece must not be negative.",
+      "purchaseDate": "Purchase date",
+      "purchaseDateInFuture": "The purchase date can't be in the future."
+    }
   },
   "deposits": {
     "title": "Deposits & savings",

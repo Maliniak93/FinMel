@@ -77,6 +77,7 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
                 ValuationMode = p.ValuationMode,
                 Currency = p.Currency,
                 Quantity = p.Quantity,
+                QuoteUnitsPerQuantity = p.QuoteUnitsPerQuantity,
                 InstrumentId = p.InstrumentId,
                 ManualValueAmount = p.ManualValueAmount,
             })

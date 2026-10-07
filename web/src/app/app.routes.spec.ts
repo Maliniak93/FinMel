@@ -11,6 +11,7 @@ import { Bonds } from './features/bonds/bonds';
 import { Cash } from './features/cash/cash';
 import { Dashboard } from './features/dashboard/dashboard';
 import { Deposits } from './features/deposits/deposits';
+import { Metals } from './features/metals/metals';
 import { NotFound } from './features/not-found/not-found';
 import { Portfolios } from './features/portfolios/portfolios';
 import { Settings } from './features/settings/settings';
@@ -55,6 +56,11 @@ describe('app routing (authenticated)', () => {
   it('renders Bonds at /bonds', async () => {
     await harness.navigateByUrl('/bonds', Shell);
     expect(harness.fixture.debugElement.query(By.directive(Bonds))).toBeTruthy();
+  });
+
+  it('renders Metals at /metals', async () => {
+    await harness.navigateByUrl('/metals', Shell);
+    expect(harness.fixture.debugElement.query(By.directive(Metals))).toBeTruthy();
   });
 
   it('renders Settings at /settings', async () => {

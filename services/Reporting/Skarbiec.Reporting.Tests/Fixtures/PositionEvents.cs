@@ -27,6 +27,7 @@ internal static class PositionEvents
             ValuationMode = AssetValuationMode.CurrencyValued,
             Currency = "PLN",
             Quantity = amount,
+            QuoteUnitsPerQuantity = 1m,
             PortfolioIsArchived = portfolioIsArchived,
             IsArchived = false,
             Version = version,

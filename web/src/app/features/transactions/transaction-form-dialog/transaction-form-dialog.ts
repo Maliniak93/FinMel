@@ -27,6 +27,7 @@ import {
   allowedTransactionTypes,
   isPricedTransactionType,
   quantityFieldLabel,
+  unitPriceFieldLabel,
 } from '../transaction-type';
 
 export interface TransactionFormDialogData {
@@ -83,7 +84,10 @@ export class TransactionFormDialog {
     initialValue: this.form.controls.type.value,
   });
   protected readonly isPriced = computed(() => isPricedTransactionType(this.selectedType()));
-  protected readonly quantityLabel = computed(() => quantityFieldLabel(this.selectedType()));
+  protected readonly quantityLabel = computed(() =>
+    quantityFieldLabel(this.selectedType(), this.data.assetClass),
+  );
+  protected readonly unitPriceLabel = unitPriceFieldLabel(this.data.assetClass);
 
   protected async onSubmit(): Promise<void> {
     if (this.submitting()) {

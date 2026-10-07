@@ -1590,6 +1590,154 @@
         }
       }
     },
+    "/api/portfolio/portfolios/{portfolioId}/metals": {
+      "post": {
+        "tags": [
+          "AddMetalEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMetalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/portfolios/{portfolioId}/metals/{assetId}": {
+      "put": {
+        "tags": [
+          "UpdateMetalEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMetalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetalResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "GetMetalEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "portfolioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/metals": {
+      "get": {
+        "tags": [
+          "ListMetalsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MetalResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/savings-accounts": {
       "post": {
         "tags": [
@@ -2213,6 +2361,47 @@
           }
         }
       },
+      "AddMetalRequest": {
+        "required": [
+          "name",
+          "metal",
+          "fineWeight",
+          "weightUnit"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "metal": {
+            "$ref": "#/components/schemas/Metal"
+          },
+          "fineWeight": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "weightUnit": {
+            "$ref": "#/components/schemas/WeightUnit"
+          },
+          "firstPurchase": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FirstPurchaseRequest"
+              }
+            ]
+          }
+        }
+      },
       "AddSavingsAccountRequest": {
         "required": [
           "name",
@@ -2354,6 +2543,15 @@
               "null",
               "boolean"
             ]
+          },
+          "fineWeightGramsPerPiece": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           },
           "isArchived": {
             "type": "boolean"
@@ -3472,6 +3670,107 @@
       "DepositTermUnit": {
         "type": "integer"
       },
+      "FirstPurchaseRequest": {
+        "required": [
+          "pieces",
+          "pricePerPiece",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "pieces": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "pricePerPiece": {
+            "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "Metal": {
+        "type": "integer"
+      },
+      "MetalResponse": {
+        "required": [
+          "assetId",
+          "portfolioId",
+          "portfolioName",
+          "portfolioIsArchived",
+          "isArchived",
+          "name",
+          "metal",
+          "fineWeightGramsPerPiece",
+          "pieces",
+          "totalFineGrams"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioName": {
+            "type": "string"
+          },
+          "portfolioIsArchived": {
+            "type": "boolean"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "metal": {
+            "$ref": "#/components/schemas/Metal"
+          },
+          "fineWeightGramsPerPiece": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "pieces": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalFineGrams": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "OpeningDepositRequest": {
         "required": [
           "amount",
@@ -4504,6 +4803,37 @@
           }
         }
       },
+      "UpdateMetalRequest": {
+        "required": [
+          "name",
+          "metal",
+          "fineWeight",
+          "weightUnit"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "metal": {
+            "$ref": "#/components/schemas/Metal"
+          },
+          "fineWeight": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "weightUnit": {
+            "$ref": "#/components/schemas/WeightUnit"
+          }
+        }
+      },
       "UpdatePortfolioRequest": {
         "required": [
           "name",
@@ -4594,6 +4924,12 @@
             "format": "date"
           }
         }
+      },
+      "WeightUnit": {
+        "enum": [
+          "Gram",
+          "TroyOunce"
+        ]
       }
     }
   },
@@ -4714,6 +5050,18 @@
     },
     {
       "name": "GetBondEarlyRedemptionPreviewEndpoint"
+    },
+    {
+      "name": "AddMetalEndpoint"
+    },
+    {
+      "name": "UpdateMetalEndpoint"
+    },
+    {
+      "name": "GetMetalEndpoint"
+    },
+    {
+      "name": "ListMetalsEndpoint"
     },
     {
       "name": "AddSavingsAccountEndpoint"

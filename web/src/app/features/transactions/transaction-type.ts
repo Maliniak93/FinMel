@@ -16,6 +16,7 @@ const SELL = 1;
 const WITHDRAW = 3;
 
 export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
+export const TRANSACTION_TYPE_SELL: TransactionType = SELL;
 export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
 export const TRANSACTION_TYPE_WITHDRAW: TransactionType = WITHDRAW;
 
@@ -26,10 +27,18 @@ const CASH_LIKE_CLASSES: readonly number[] = [
   ASSET_CLASS.Bond,
 ];
 const CASH_LIKE_TYPES: readonly number[] = [TRANSACTION_TYPE_DEPOSIT, WITHDRAW];
+const METAL_TYPES: readonly number[] = [BUY, SELL];
+
+function isPreciousMetal(assetClass: AssetClass | undefined): boolean {
+  return assetClass !== undefined && Number(assetClass) === ASSET_CLASS.PreciousMetal;
+}
 
 export function allowedTransactionTypes(
   assetClass: AssetClass,
 ): readonly { value: TransactionType; label: string }[] {
+  if (isPreciousMetal(assetClass)) {
+    return TRANSACTION_TYPES.filter((t) => METAL_TYPES.includes(t.value));
+  }
   return CASH_LIKE_CLASSES.includes(Number(assetClass))
     ? TRANSACTION_TYPES.filter((t) => CASH_LIKE_TYPES.includes(t.value))
     : TRANSACTION_TYPES;
@@ -47,8 +56,16 @@ export function isPricedTransactionType(value: TransactionType): boolean {
   return type === BUY || type === SELL;
 }
 
-export function quantityFieldLabel(value: TransactionType): string {
-  return isPricedTransactionType(value)
-    ? 'enums.quantityField.quantity'
-    : 'enums.quantityField.amount';
+// A precious metal's quantity is in pieces, priced per piece.
+export function quantityFieldLabel(value: TransactionType, assetClass?: AssetClass): string {
+  if (!isPricedTransactionType(value)) {
+    return 'enums.quantityField.amount';
+  }
+  return isPreciousMetal(assetClass)
+    ? 'enums.quantityField.pieces'
+    : 'enums.quantityField.quantity';
+}
+
+export function unitPriceFieldLabel(assetClass?: AssetClass): string {
+  return isPreciousMetal(assetClass) ? 'enums.quantityField.pricePerPiece' : 'common.unitPrice';
 }

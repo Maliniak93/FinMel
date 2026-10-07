@@ -437,11 +437,28 @@ if (skipped.has('review')) {
     phase('Verify')
     if (broke()) return await stop('verify', { reason: 'budget' })
 
-    const reverified = await verify(`verify after review fix (round ${round + 1})`)
-    if (!reverified) return await stop('verify', { reason: 'verifier returned no result after a review fix' })
-    if (!reverified.ok) {
-      log('the review fix broke verification - stopping')
-      return await stop('verify', { failures: reverified.failures })
+    for (let fix = 0; ; fix++) {
+      const label = fix ? `verify after review fix (round ${round + 1}, fix ${fix})` : `verify after review fix (round ${round + 1})`
+      const reverified = await verify(label)
+      if (!reverified) return await stop('verify', { reason: 'verifier returned no result after a review fix' })
+      if (reverified.ok) break
+      log(`the review fix broke verification (${reverified.failures.map((f) => f.step).join(', ') || 'unspecified'})`)
+      if (fix >= maxRounds) return await stop('verify', { failures: reverified.failures })
+
+      phase('Implement')
+      if (broke()) return await stop('implement', { reason: 'budget' })
+
+      impl = await implement(`fix verify failures after review fix (round ${round + 1}, fix ${fix + 1})`, [
+        `Fix exactly these verification failures: ${JSON.stringify(reverified.failures)}`,
+        `tests: ${JSON.stringify(tests)}`,
+        'Do not refactor around them. A failure caused by a wrong test is fixed in the test and recorded in `deviations`.',
+      ])
+      if (!impl) return await stop('implement', { reason: 'implementer returned no result on a fix round' })
+      if (impl.status === 'blocked') return await stop('implement', { reason: 'implementer blocked on a fix round' })
+
+      rounds = rounds + 1
+      phase('Verify')
+      if (broke()) return await stop('verify', { reason: 'budget' })
     }
     log('verify green again after the review fix')
   }

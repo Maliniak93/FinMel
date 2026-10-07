@@ -14,13 +14,13 @@ import {
 } from '../../../../../testing/i18n';
 import { client as marketDataClient } from '../../../../api/marketdata/client.gen';
 import { client as portfolioClient } from '../../../../api/portfolio/client.gen';
+import { MetalFormDialog } from '../../../metals/metal-form-dialog/metal-form-dialog';
 import { BondPurchaseDialog } from '../../../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
 import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form-dialog/savings-account-form-dialog';
 import { ASSET_CLASS, ASSET_CLASSES } from '../../asset-class';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
 import { CashAssetForm } from '../forms/cash-asset-form/cash-asset-form';
-import { GoldAssetForm } from '../forms/gold-asset-form/gold-asset-form';
 import { ManualAssetForm } from '../forms/manual-asset-form/manual-asset-form';
 import { SecurityAssetForm } from '../forms/security-asset-form/security-asset-form';
 import {
@@ -49,12 +49,11 @@ import { INSTRUMENT_REQUIRED_MESSAGE } from '../blocks/instrument-picker/instrum
 import { AssetFormDialog, type AssetFormDialogData } from './asset-form-dialog';
 import { provideI18nTesting } from '../../../../core/i18n/testing';
 
-type AssetFormComponent = CashAssetForm | SecurityAssetForm | GoldAssetForm | ManualAssetForm;
+type AssetFormComponent = CashAssetForm | SecurityAssetForm | ManualAssetForm;
 
 const FORM_COMPONENTS: readonly Type<AssetFormComponent>[] = [
   CashAssetForm,
   SecurityAssetForm,
-  GoldAssetForm,
   ManualAssetForm,
 ];
 
@@ -63,7 +62,6 @@ const EXPECTED_FORM: Record<number, Type<AssetFormComponent>> = {
   [ASSET_CLASS.Stock]: SecurityAssetForm,
   [ASSET_CLASS.Etf]: SecurityAssetForm,
   [ASSET_CLASS.Crypto]: SecurityAssetForm,
-  [ASSET_CLASS.PreciousMetal]: GoldAssetForm,
   [ASSET_CLASS.RealEstate]: ManualAssetForm,
   [ASSET_CLASS.Other]: ManualAssetForm,
 };
@@ -156,6 +154,7 @@ describe('AssetFormDialog', () => {
         (c) =>
           c.value !== ASSET_CLASS.Deposit &&
           c.value !== ASSET_CLASS.Savings &&
+          c.value !== ASSET_CLASS.PreciousMetal &&
           c.value !== ASSET_CLASS.Bond,
       )) {
         await pickTile(value);
@@ -257,6 +256,24 @@ describe('AssetFormDialog', () => {
       expect(fixture.debugElement.query(By.directive(CashAssetForm))).toBeNull();
       expect(open).toHaveBeenCalledWith(
         SavingsAccountFormDialog,
+        expect.objectContaining({ data: expect.objectContaining({ portfolioId }) }),
+      );
+      await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('the Precious metal tile opens MetalFormDialog preset to the current portfolio', async () => {
+      await setup({ portfolioId });
+      const matDialog = fixture.debugElement.injector.get(MatDialog);
+      const open = vi
+        .spyOn(matDialog, 'open')
+        .mockReturnValue({ afterClosed: () => of(true) } as unknown as MatDialogRef<unknown>);
+
+      await pickTile(ASSET_CLASS.PreciousMetal);
+
+      expect(renderedForms()).toEqual([]);
+      expect(open).toHaveBeenCalledWith(
+        MetalFormDialog,
         expect.objectContaining({ data: expect.objectContaining({ portfolioId }) }),
       );
       await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));

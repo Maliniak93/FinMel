@@ -43,6 +43,14 @@ export type AddDepositRequest = {
     fundingAssetId?: null | string;
 };
 
+export type AddMetalRequest = {
+    name: string;
+    metal: Metal;
+    fineWeight: number | string;
+    weightUnit: WeightUnit;
+    firstPurchase?: null | FirstPurchaseRequest;
+};
+
 export type AddSavingsAccountRequest = {
     name: string;
     bankName?: null | string;
@@ -69,6 +77,7 @@ export type AssetResponse = {
     depositMaturityDate?: null | string;
     depositSettled?: null | boolean;
     savingsInterestDue?: null | boolean;
+    fineWeightGramsPerPiece?: null | number | string;
     isArchived: boolean;
 };
 
@@ -283,6 +292,27 @@ export type DepositStatus = number;
 
 export type DepositTermUnit = number;
 
+export type FirstPurchaseRequest = {
+    pieces: number | string;
+    pricePerPiece: number | string;
+    date: string;
+};
+
+export type Metal = number;
+
+export type MetalResponse = {
+    assetId: string;
+    portfolioId: string;
+    portfolioName: string;
+    portfolioIsArchived: boolean;
+    isArchived: boolean;
+    name: string;
+    metal: Metal;
+    fineWeightGramsPerPiece: number | string;
+    pieces: number | string;
+    totalFineGrams: number | string;
+};
+
 export type OpeningDepositRequest = {
     amount: number | string;
     date: string;
@@ -482,6 +512,13 @@ export type UpdateDepositRequest = {
     earlyBreakInterestLossPercent?: number | string;
 };
 
+export type UpdateMetalRequest = {
+    name: string;
+    metal: Metal;
+    fineWeight: number | string;
+    weightUnit: WeightUnit;
+};
+
 export type UpdatePortfolioRequest = {
     name: string;
     description?: null | string;
@@ -501,6 +538,8 @@ export type UpdateTransactionRequest = {
     unitPrice: number | string;
     date: string;
 };
+
+export type WeightUnit = 'Gram' | 'TroyOunce';
 
 export type GetApiPortfolioMeData = {
     body?: never;
@@ -1230,6 +1269,78 @@ export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionP
 };
 
 export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses];
+
+export type PostApiPortfolioPortfoliosByPortfolioIdMetalsData = {
+    body: AddMetalRequest;
+    path: {
+        portfolioId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/metals';
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses = {
+    /**
+     * Created
+     */
+    201: MetalResponse;
+};
+
+export type PostApiPortfolioPortfoliosByPortfolioIdMetalsResponse = PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses];
+
+export type GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData = {
+    body?: never;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/metals/{assetId}';
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: MetalResponse;
+};
+
+export type GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses];
+
+export type PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData = {
+    body: UpdateMetalRequest;
+    path: {
+        portfolioId: string;
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/portfolios/{portfolioId}/metals/{assetId}';
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: MetalResponse;
+};
+
+export type PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses];
+
+export type GetApiPortfolioMetalsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/metals';
+};
+
+export type GetApiPortfolioMetalsResponses = {
+    /**
+     * OK
+     */
+    200: Array<MetalResponse>;
+};
+
+export type GetApiPortfolioMetalsResponse = GetApiPortfolioMetalsResponses[keyof GetApiPortfolioMetalsResponses];
 
 export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData = {
     body: AddSavingsAccountRequest;

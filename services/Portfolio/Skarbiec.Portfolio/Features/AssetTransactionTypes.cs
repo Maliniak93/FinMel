@@ -7,10 +7,14 @@ public static class AssetTransactionTypes
 {
     private static readonly TransactionType[] CashLikeTypes = [TransactionType.Deposit, TransactionType.Withdraw];
 
+    private static readonly TransactionType[] MetalTypes = [TransactionType.Buy, TransactionType.Sell];
+
     private static readonly TransactionType[] AllTypes = Enum.GetValues<TransactionType>();
 
     public static IReadOnlyList<TransactionType> Allowed(AssetClass assetClass) =>
-        AssetValuationModes.CurrencyValuedClasses.Contains(assetClass) ? CashLikeTypes : AllTypes;
+        assetClass == AssetClass.PreciousMetal ? MetalTypes
+            : AssetValuationModes.CurrencyValuedClasses.Contains(assetClass) ? CashLikeTypes
+            : AllTypes;
 
     public static bool IsAllowed(AssetClass assetClass, TransactionType type) => Allowed(assetClass).Contains(type);
 }

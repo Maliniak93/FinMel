@@ -209,6 +209,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         InstrumentId = instrumentId,
         Currency = "USD",
         Quantity = 1m,
+        QuoteUnitsPerQuantity = 1m,
         PortfolioIsArchived = false,
         IsArchived = false,
         Version = version,

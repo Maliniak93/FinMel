@@ -56,7 +56,7 @@ public static class ValuationAlgorithm
         var priceIsStale = IsOlderThanThreshold(price.Date, snapshotDate);
         return Line(
             position,
-            valuePln: position.Quantity * price.Close * rate.Value,
+            valuePln: position.Quantity * position.QuoteUnitsPerQuantity * price.Close * rate.Value,
             isStale: priceIsStale || fxIsStale,
             priceUsed: price.Close,
             priceDate: price.Date,

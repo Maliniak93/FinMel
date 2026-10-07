@@ -22,6 +22,8 @@ using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
 using Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
+using Skarbiec.Portfolio.Features.Metals.AddMetal;
+using Skarbiec.Portfolio.Features.Metals.UpdateMetal;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
 using Skarbiec.Portfolio.Features.RestoreAsset;
@@ -78,6 +80,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddScoped<RedeemBondHandler>();
             services.AddScoped<RedeemBondEarlyHandler>();
             services.AddScoped<SwapBondHandler>();
+            services.AddScoped<AddMetalHandler>();
+            services.AddScoped<UpdateMetalHandler>();
             services.AddScoped<AddSavingsAccountHandler>();
             services.AddScoped<UpdateSavingsAccountHandler>();
             services.AddScoped<SettleSavingsInterestHandler>();

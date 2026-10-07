@@ -102,6 +102,25 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/bonds');
   });
 
+  it('offers a "Metale szlachetne" nav item linking to /metals right after Bonds', async () => {
+    const links = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+          'mat-nav-list a',
+        ),
+      );
+    const english = links().map((a) => a.getAttribute('href'));
+    expect(english.indexOf('/metals')).toBe(english.indexOf('/bonds') + 1);
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const link = links().find((a) => (a.textContent ?? '').includes('Metale szlachetne'));
+    expect(link).toBeDefined();
+    expect(link!.getAttribute('href')).toBe('/metals');
+    expect(link!.querySelector('mat-icon')?.textContent?.trim()).toBe('diamond');
+  });
+
   it('switches the navigation to Polish without a reload', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const navLabels = () =>
@@ -114,6 +133,7 @@ describe('Shell', () => {
       'Cash',
       'Deposits & savings',
       'Bonds',
+      'Precious metals',
       'Settings',
     ]);
 

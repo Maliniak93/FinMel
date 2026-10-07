@@ -36,6 +36,7 @@
       "cash": "Gotówka",
       "deposits": "Lokaty i oszczędności",
       "bonds": "Obligacje",
+      "metals": "Metale szlachetne",
       "settings": "Ustawienia"
     },
     "toggleNavigation": "Pokaż lub ukryj nawigację",
@@ -118,7 +119,9 @@
     },
     "quantityField": {
       "quantity": "Ilość",
-      "amount": "Kwota"
+      "amount": "Kwota",
+      "pieces": "Sztuki",
+      "pricePerPiece": "Cena za sztukę"
     },
     "depositTermUnit": {
       "days": "Dni",
@@ -446,6 +449,7 @@
     "depositLoadFailed": "Nie udało się wczytać lokaty.",
     "savingsAccountLoadFailed": "Nie udało się wczytać konta oszczędnościowego.",
     "bondLoadFailed": "Nie udało się wczytać obligacji.",
+    "metalLoadFailed": "Nie udało się wczytać pozycji metalu szlachetnego.",
     "delete": {
       "title": "Usunąć to aktywo?",
       "message": "\"{{ name }}\" zostanie trwale usunięte. Tej operacji nie można cofnąć.",
@@ -465,7 +469,6 @@
       "valueRequired": "Wartość jest wymagana.",
       "valuationDateRequired": "Data wyceny jest wymagana.",
       "cashHint": "Wyceniane automatycznie według kursu waluty {{ currency }} — nic więcej nie trzeba wypełniać. Użyj opcji \"Dodaj wpłatę początkową\" poniżej, aby wpłacić kwotę początkową.",
-      "goldHint": "Podaj ilość w gramach czystego kruszcu — wyceniamy ją po światowej cenie spot w USD, przeliczonej na PLN, a nie po cenie złota NBP.",
       "instrument": "Instrument finansowy",
       "searchPlaceholder": "Szukaj po tickerze lub nazwie",
       "verified": "Zweryfikowano: {{ ticker }} — {{ name }} ({{ currency }})",
@@ -527,6 +530,49 @@
     "deposit": "Wpłata",
     "withdraw": "Wypłata",
     "transferWithSavings": "Przelew z kontem oszczędnościowym"
+  },
+  "metals": {
+    "title": "Metale szlachetne",
+    "add": "Dodaj metal szlachetny",
+    "empty": "Nie masz jeszcze metali szlachetnych. Dodaj złoto lub srebro, aby je tu zobaczyć.",
+    "loadFailed": "Nie udało się wczytać metali szlachetnych.",
+    "pricesLoadFailed": "Nie udało się wczytać cen metali.",
+    "prices": "Ceny spot",
+    "perGram": "{{ price }} / g",
+    "perOunce": "{{ price }} / oz",
+    "asOf": "z dnia {{ date }}",
+    "portfolio": "Portfel",
+    "weightPerPiece": "Waga sztuki",
+    "pieces": "Sztuki",
+    "totalWeight": "Łączna waga kruszcu",
+    "valueToday": "Wartość dziś",
+    "grams": "{{ value }} g",
+    "ounces": "{{ value }} oz",
+    "buy": "Kup",
+    "sell": "Sprzedaj",
+    "metal": {
+      "column": "Metal",
+      "gold": "Złoto",
+      "silver": "Srebro",
+      "unknown": "Nieznany metal"
+    },
+    "form": {
+      "newTitle": "Dodaj metal szlachetny",
+      "editTitle": "Edytuj metal szlachetny",
+      "fineWeight": "Waga kruszcu w sztuce",
+      "fineWeightRequired": "Waga kruszcu jest wymagana.",
+      "fineWeightPositive": "Waga kruszcu musi być większa od 0.",
+      "unit": "Jednostka",
+      "unitGram": "g",
+      "unitTroyOunce": "oz (trojańska)",
+      "firstPurchase": "Pierwszy zakup (opcjonalnie)",
+      "piecesPositive": "Liczba sztuk musi być większa od 0.",
+      "pricePerPiece": "Cena za sztukę (PLN)",
+      "pricePerPieceRequired": "Podaj cenę za sztukę razem z liczbą sztuk.",
+      "pricePerPieceNegative": "Cena za sztukę nie może być ujemna.",
+      "purchaseDate": "Data zakupu",
+      "purchaseDateInFuture": "Data zakupu nie może być w przyszłości."
+    }
   },
   "deposits": {
     "title": "Lokaty i oszczędności",

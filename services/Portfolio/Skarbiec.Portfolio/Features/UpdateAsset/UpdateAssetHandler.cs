@@ -3,6 +3,7 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.Metals;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.MarketData;
 
@@ -43,6 +44,12 @@ public sealed class UpdateAssetHandler(
         if (asset.AssetClass == AssetClass.Savings || request.AssetClass == AssetClass.Savings)
         {
             return SavingsAccountErrors.UseSavingsAccountEndpoints;
+        }
+
+        // The same for a precious metal holding.
+        if (asset.AssetClass == AssetClass.PreciousMetal || request.AssetClass == AssetClass.PreciousMetal)
+        {
+            return MetalErrors.UseMetalEndpoints;
         }
 
         // Each transaction's frozen PLN rate belongs to the asset's currency, so the currency locks once there is one.

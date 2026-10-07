@@ -578,4 +578,48 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(originalName, unchanged.Name);
         Assert.Equal(originalQuantity, unchanged.Quantity);
     }
+
+    [Theory]
+    [InlineData("cash-to-metal")]
+    [InlineData("metal-to-cash")]
+    [InlineData("metal-to-metal")]
+    public async Task Update_ToOrFromPreciousMetal_ReturnsUseMetalEndpoints(string change)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        Guid assetId;
+        AssetClass originalClass;
+        string originalName;
+        AssetClass requestedClass;
+        if (change == "cash-to-metal")
+        {
+            assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken, name: "Wallet");
+            (originalClass, originalName, requestedClass) = (AssetClass.Cash, "Wallet", AssetClass.PreciousMetal);
+        }
+        else
+        {
+            assetId = (await client.AddMetalAsync(portfolioId, cancellationToken)).AssetId;
+            requestedClass = change == "metal-to-cash" ? AssetClass.Cash : AssetClass.PreciousMetal;
+            (originalClass, originalName) = (AssetClass.PreciousMetal, "Maple Leaf 1 oz");
+        }
+
+        // A manual value keeps the request valid for PreciousMetal, so only the metal guard can reject it.
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = requestedClass,
+            Name = "Edited through assets",
+            Currency = "PLN",
+            ManualValue = 1000m,
+            ManualValueDate = new DateOnly(2026, 10, 1)
+        };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        await response.AssertUseMetalEndpointsAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        Assert.Equal(originalClass, unchanged.AssetClass);
+        Assert.Equal(originalName, unchanged.Name);
+    }
 }

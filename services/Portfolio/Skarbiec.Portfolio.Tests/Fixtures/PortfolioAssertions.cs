@@ -121,6 +121,12 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseSavingsAccountEndpointsErrorCode, cancellationToken);
 
+    public const string UseMetalEndpointsErrorCode = "Validation.UseMetalEndpoints";
+
+    public static async Task AssertUseMetalEndpointsAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseMetalEndpointsErrorCode, cancellationToken);
+
     public static async Task AssertUseDepositEndpointsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseDepositEndpointsErrorCode, cancellationToken);

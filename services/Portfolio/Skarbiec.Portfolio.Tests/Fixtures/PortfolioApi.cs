@@ -14,6 +14,9 @@ using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
 using Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
+using Skarbiec.Portfolio.Features.Metals;
+using Skarbiec.Portfolio.Features.Metals.AddMetal;
+using Skarbiec.Portfolio.Features.Metals.UpdateMetal;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
@@ -708,6 +711,76 @@ internal static class PortfolioApi
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
+    }
+
+    public const string AllMetalsUri = "/api/portfolio/metals";
+
+    public static string MetalsUri(Guid portfolioId) =>
+        $"{PortfoliosUri}/{portfolioId}/metals";
+
+    public static string MetalUri(Guid portfolioId, Guid assetId) =>
+        $"{PortfoliosUri}/{portfolioId}/metals/{assetId}";
+
+    public static readonly DateTimeOffset MetalTodayUtc = new(2026, 10, 5, 10, 0, 0, TimeSpan.Zero);
+
+    public static readonly DateOnly MetalPurchaseDate = new(2026, 10, 1);
+
+    public static AddMetalRequest NewMetalRequest(
+        string name = "Maple Leaf 1 oz",
+        Metal metal = Metal.Silver,
+        decimal fineWeight = 1m,
+        WeightUnit weightUnit = WeightUnit.TroyOunce,
+        bool withFirstPurchase = true,
+        decimal pieces = 10m,
+        decimal pricePerPiece = 260.00m,
+        DateOnly? purchaseDate = null) => new()
+        {
+            Name = name,
+            Metal = metal,
+            FineWeight = fineWeight,
+            WeightUnit = weightUnit,
+            FirstPurchase = withFirstPurchase
+                ? new FirstPurchaseRequest { Pieces = pieces, PricePerPiece = pricePerPiece, Date = purchaseDate ?? MetalPurchaseDate }
+                : null
+        };
+
+    public static UpdateMetalRequest NewUpdateMetalRequest(
+        string name = "Gold bar",
+        Metal metal = Metal.Silver,
+        decimal fineWeight = 100m,
+        WeightUnit weightUnit = WeightUnit.Gram) => new()
+        {
+            Name = name,
+            Metal = metal,
+            FineWeight = fineWeight,
+            WeightUnit = weightUnit
+        };
+
+    public static async Task<MetalResponse> AddMetalAsync(
+        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddMetalRequest? request = null)
+    {
+        var response = await client.PostAsJsonAsync(MetalsUri(portfolioId), request ?? NewMetalRequest(), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken))!;
+    }
+
+    public static async Task<(Guid PortfolioId, MetalResponse Metal)> CreatePortfolioWithMetalAsync(
+        this HttpClient client, CancellationToken cancellationToken, AddMetalRequest? request = null, string portfolioName = "Metals")
+    {
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var metal = await client.AddMetalAsync(portfolioId, cancellationToken, request);
+
+        return (portfolioId, metal);
+    }
+
+    public static async Task<MetalResponse> GetMetalAsync(
+        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(MetalUri(portfolioId, assetId), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken))!;
     }
 
     public static string TransferCandidatesUri(string? currency = "PLN", string? assetClass = "Cash")

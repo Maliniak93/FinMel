@@ -23,6 +23,10 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext, TimeProvider t
                 DepositSettled = dbContext.TermDeposits
                     .Where(t => t.AssetId == a.Id)
                     .Select(t => (bool?)(t.SettledOn != null))
+                    .FirstOrDefault(),
+                FineWeightGramsPerPiece = dbContext.MetalHoldings
+                    .Where(m => m.AssetId == a.Id)
+                    .Select(m => (decimal?)m.FineWeightGramsPerPiece)
                     .FirstOrDefault()
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -34,6 +38,7 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext, TimeProvider t
 
         var savingsInterestDue = await dbContext.SavingsInterestDueAsync(row.Asset, WarsawCalendar.Today(timeProvider), cancellationToken);
 
-        return row.Asset.ToResponse(row.TransactionCount, row.DepositMaturityDate, row.DepositSettled, savingsInterestDue);
+        return row.Asset.ToResponse(
+            row.TransactionCount, row.DepositMaturityDate, row.DepositSettled, savingsInterestDue, row.FineWeightGramsPerPiece);
     }
 }

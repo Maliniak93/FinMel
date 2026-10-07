@@ -45,6 +45,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 InstrumentId = instrumentId,
                 Currency = "USD",
                 Quantity = 12m,
+                QuoteUnitsPerQuantity = 1m,
                 ManualValueAmount = null,
                 ManualValueDate = null,
                 PortfolioIsArchived = false,
@@ -67,6 +68,28 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             Assert.False(position.PortfolioIsArchived);
             Assert.Equal(0, position.Version);
             Assert.True(position.UpdatedAt > DateTimeOffset.MinValue);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Consume_EventWithQuoteUnitsPerQuantity_StoresAndUpdatesMultiplier()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var assetId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+
+            await bus.Publish(Event(assetId, portfolioId, userId, quantity: 3m, version: 0, quoteUnitsPerQuantity: 31.1034768m), cancellationToken);
+            var first = await WaitForPositionAsync(provider, assetId, cancellationToken);
+            Assert.Equal(31.1034768m, first.QuoteUnitsPerQuantity);
+
+            await bus.Publish(Event(assetId, portfolioId, userId, quantity: 3m, version: 1, quoteUnitsPerQuantity: 100m), cancellationToken);
+            var second = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+            Assert.Equal(100m, second.QuoteUnitsPerQuantity);
         }, cancellationToken);
     }
 
@@ -263,6 +286,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 InstrumentId = Guid.NewGuid(),
                 Currency = "PLN",
                 Quantity = 10m,
+                QuoteUnitsPerQuantity = 1m,
                 PortfolioIsArchived = false,
                 IsArchived = false,
                 Version = 0,
@@ -432,8 +456,10 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         long version,
         string currency = "PLN",
         bool portfolioIsArchived = false,
-        bool isArchived = false) => new()
+        bool isArchived = false,
+        decimal quoteUnitsPerQuantity = 1m) => new()
         {
+            QuoteUnitsPerQuantity = quoteUnitsPerQuantity,
             IsArchived = isArchived,
             AssetId = assetId,
             PortfolioId = portfolioId,

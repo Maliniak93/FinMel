@@ -46,6 +46,21 @@ public sealed class ValuationAlgorithmTests
         Assert.Equal(1000m, Assert.Single(result.Lines).ValuePln);
     }
 
+    [Fact]
+    public void Market_AppliesQuoteUnitsPerQuantity()
+    {
+        var assetId = Guid.NewGuid();
+        var position = MarketPosition(assetId, AssetClass.PreciousMetal, quantity: 3) with { QuoteUnitsPerQuantity = 31.1034768m };
+        var prices = Prices((InstrumentId, "USD", SnapshotDate, 133.92m));
+        var fx = FxRates(("USDPLN", SnapshotDate, 3.9m));
+
+        var result = ValuationAlgorithm.Calculate([position], prices, fx, SnapshotDate);
+
+        var expected = 3m * 31.1034768m * 133.92m * 3.9m;
+        Assert.Equal(expected, result.TotalPln);
+        Assert.Equal(expected, Assert.Single(result.Lines).ValuePln);
+    }
+
     [Theory]
     [InlineData(3, false)]
     [InlineData(7, false)]

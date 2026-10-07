@@ -31,6 +31,7 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
 
             position.Property(p => p.Currency).HasMaxLength(3);
             position.Property(p => p.Quantity).HasPrecision(18, 8);
+            position.Property(p => p.QuoteUnitsPerQuantity).HasPrecision(18, 8);
             position.Property(p => p.ManualValueAmount).HasPrecision(18, 2);
 
             // No FK, but the archive, restore and delete consumers and the valuation grouping filter on it.
