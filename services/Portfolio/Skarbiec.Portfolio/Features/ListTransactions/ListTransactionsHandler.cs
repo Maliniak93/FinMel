@@ -83,8 +83,8 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                         {
                             TransferId = transferId,
                             Manual = TransferLegs.DirectionOf(t) == TransferDirection.Out
-                                ? TransferRoutes.IsManual(asset.AssetClass, counterpart.AssetClass)
-                                : TransferRoutes.IsManual(counterpart.AssetClass, asset.AssetClass),
+                                ? TransferRoutes.IsDeletable(asset.AssetClass, counterpart.AssetClass)
+                                : TransferRoutes.IsDeletable(counterpart.AssetClass, asset.AssetClass),
                             CounterpartAssetId = counterpart.AssetId,
                             CounterpartAssetName = counterpart.AssetName,
                             CounterpartPortfolioId = counterpart.PortfolioId,

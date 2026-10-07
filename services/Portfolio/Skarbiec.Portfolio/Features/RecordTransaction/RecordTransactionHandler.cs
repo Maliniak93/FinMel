@@ -3,6 +3,7 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.RecordTransaction;
@@ -43,6 +44,13 @@ public sealed class RecordTransactionHandler(
             return TransactionErrors.TypeNotAllowedForClass(request.Type, asset.AssetClass);
         }
 
+        // Only a metal's Buy or Sell moves money through a Cash account.
+        if (request.CashAssetId is not null
+            && (asset.AssetClass != AssetClass.PreciousMetal || request.Type is not (TransactionType.Buy or TransactionType.Sell)))
+        {
+            return TransferErrors.InvalidCounterpart;
+        }
+
         var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
         if (unitPrice.IsFailure)
         {
@@ -71,6 +79,18 @@ public sealed class RecordTransactionHandler(
             return recomputed.Error;
         }
 
+        CashLeg? cashLeg = null;
+        if (request.CashAssetId is { } cashAssetId)
+        {
+            var planned = await PlanCashLegAsync(cashAssetId, asset, transaction, cancellationToken);
+            if (planned.IsFailure)
+            {
+                return planned.Error;
+            }
+
+            cashLeg = planned.Value;
+        }
+
         // Last check before the write: only a valid request on an active portfolio asks MarketData.
         var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
         if (fxRateToPln.IsFailure)
@@ -85,8 +105,93 @@ public sealed class RecordTransactionHandler(
         // The event carries the recomputed quantity, so no consumer has to replay the history.
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (cashLeg is not null)
+        {
+            cashLeg.Cash.Quantity = cashLeg.CashQuantity;
+            dbContext.Transactions.Add(cashLeg.Leg);
 
-        return transaction.ToResponse(asset.Currency);
+            // The Cash publishes in the same save as both legs and the metal's own event.
+            await positionEventPublisher.PublishChangedAsync(cashLeg.Cash, cancellationToken);
+        }
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // A write racing on either asset moved its xmin: nothing is saved, the user retries.
+            return TransactionErrors.ConcurrentModification();
+        }
+
+        return transaction.ToResponse(asset.Currency, cashLeg?.ToTransferResponse(asset, transaction));
+    }
+
+    private async Task<Result<CashLeg>> PlanCashLegAsync(
+        Guid cashAssetId, Asset metal, Transaction metalLeg, CancellationToken cancellationToken)
+    {
+        // Through the tenancy filter: a stranger's Cash gets the same 400 as any unsuitable counterpart.
+        var cash = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == cashAssetId, cancellationToken);
+        var isBuy = metalLeg.Type == TransactionType.Buy;
+
+        if (cash is null
+            || cash.AssetClass != AssetClass.Cash
+            || !(isBuy ? TransferRoutes.IsAllowed(cash.AssetClass, metal.AssetClass) : TransferRoutes.IsAllowed(metal.AssetClass, cash.AssetClass))
+            || cash.Currency != metal.Currency
+            || cash.IsArchived
+            || await dbContext.IsPortfolioArchivedAsync(cash.PortfolioId, cancellationToken))
+        {
+            return TransferErrors.InvalidCounterpart;
+        }
+
+        var transferId = Guid.NewGuid();
+        metalLeg.TransferId = transferId;
+
+        var leg = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            AssetId = cash.Id,
+            Type = isBuy ? TransactionType.Withdraw : TransactionType.Deposit,
+            Quantity = metalLeg.Quantity * metalLeg.UnitPriceAmount,
+            UnitPriceAmount = 1m,
+            FxRateToPln = 1m,
+            Date = metalLeg.Date,
+            TransferId = transferId
+        };
+
+        var cashHistory = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(t => t.AssetId == cash.Id)
+            .ToListAsync(cancellationToken);
+
+        var cashQuantity = TransactionQuantityCalculator.Recompute(
+            [.. cashHistory, leg], _ => TransferErrors.InsufficientFunds);
+        if (cashQuantity.IsFailure)
+        {
+            return cashQuantity.Error;
+        }
+
+        var cashPortfolioName = await dbContext.Portfolios
+            .Where(p => p.Id == cash.PortfolioId)
+            .Select(p => p.Name)
+            .FirstAsync(cancellationToken);
+
+        return new CashLeg(cash, cashPortfolioName, leg, cashQuantity.Value);
+    }
+
+    private sealed record CashLeg(Asset Cash, string CashPortfolioName, Transaction Leg, decimal CashQuantity)
+    {
+        public TransactionTransferResponse ToTransferResponse(Asset metal, Transaction metalLeg) => new()
+        {
+            TransferId = Leg.TransferId!.Value,
+            Manual = TransferLegs.DirectionOf(metalLeg) == TransferDirection.In
+                ? TransferRoutes.IsDeletable(Cash.AssetClass, metal.AssetClass)
+                : TransferRoutes.IsDeletable(metal.AssetClass, Cash.AssetClass),
+            CounterpartAssetId = Cash.Id,
+            CounterpartAssetName = Cash.Name,
+            CounterpartPortfolioId = Cash.PortfolioId,
+            CounterpartPortfolioName = CashPortfolioName,
+            Direction = TransferLegs.DirectionOf(metalLeg)
+        };
     }
 }

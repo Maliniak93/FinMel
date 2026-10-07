@@ -35,6 +35,50 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task MetalBuyWithCash_RemovesBothLegs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateCashAndMetalAsync(cancellationToken);
+        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken);
+        Assert.NotNull(buy.Transfer);
+
+        var response = await client.DeleteAsync(TransferUri(buy.Transfer.TransferId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await client.AssertCashUntouchedAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        var metal = await client.GetAssetAsync(setup.MetalPortfolioId, setup.MetalAssetId, cancellationToken);
+        Assert.Equal(0m, metal.Quantity);
+        Assert.Equal(0, metal.TransactionCount);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+    }
+
+    [Fact]
+    public async Task MetalBuy_LaterSellNeedsIt_Conflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateCashAndMetalAsync(cancellationToken);
+        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken);
+        Assert.NotNull(buy.Transfer);
+        await client.RecordTransactionAsync(
+            setup.MetalPortfolioId, setup.MetalAssetId, TransactionType.Sell, 1m, MetalCashDate.AddDays(1), cancellationToken, unitPrice: 1_300m);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.DeleteAsync(TransferUri(buy.Transfer.TransferId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.OversellsPositionErrorCode, cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+        Assert.Equal(1m, (await client.GetAssetAsync(setup.MetalPortfolioId, setup.MetalAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2_600m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+    }
+
+    [Fact]
     public async Task Delete_DepositRouteTransfer_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

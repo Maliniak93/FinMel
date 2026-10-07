@@ -508,7 +508,11 @@
       "editTitle": "Edytuj transakcję",
       "record": "Zapisz",
       "mustNotBeNegative": "{{ field }} nie może być ujemna.",
-      "dateRequired": "Data jest wymagana."
+      "dateRequired": "Data jest wymagana.",
+      "cashAccount": "Konto gotówkowe",
+      "noCashAccount": "Brak",
+      "cashAmountHint": "Kwota przelewu: {{ amount }}",
+      "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych."
     },
     "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany.",
     "deleteTransfer": {

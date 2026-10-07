@@ -14,8 +14,8 @@ public sealed class DeleteTransferHandler(PortfolioDbContext dbContext, Position
             .ToListAsync(cancellationToken);
 
         // Detach on removal clears the survivor's TransferId, so a lone leg never carries one.
-        var outLeg = legs.SingleOrDefault(t => t.Type == TransactionType.Withdraw);
-        var inLeg = legs.SingleOrDefault(t => t.Type == TransactionType.Deposit);
+        var outLeg = legs.SingleOrDefault(t => TransferLegs.DirectionOf(t) == TransferDirection.Out);
+        var inLeg = legs.SingleOrDefault(t => TransferLegs.DirectionOf(t) == TransferDirection.In);
         if (legs.Count != 2 || outLeg is null || inLeg is null)
         {
             return TransferErrors.NotFound(transferId);
@@ -25,7 +25,7 @@ public sealed class DeleteTransferHandler(PortfolioDbContext dbContext, Position
         var target = await dbContext.Assets.FirstAsync(a => a.Id == inLeg.AssetId, cancellationToken);
 
         // A deposit route belongs to its own entry point.
-        if (!TransferRoutes.IsManual(source.AssetClass, target.AssetClass))
+        if (!TransferRoutes.IsDeletable(source.AssetClass, target.AssetClass))
         {
             return TransferErrors.LegManaged;
         }

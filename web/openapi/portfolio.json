@@ -3923,6 +3923,13 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "cashAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,8 +9,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
+import { map } from 'rxjs';
 
 import {
+  getApiPortfolioTransferCandidates,
   postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
   putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
   type AssetClass,
@@ -23,12 +25,18 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
+import { formatMoney } from '../../../shared/format';
+import { ASSET_CLASS } from '../../assets/asset-class';
 import {
   allowedTransactionTypes,
   isPricedTransactionType,
   quantityFieldLabel,
+  TRANSACTION_TYPE_BUY,
+  TRANSACTION_TYPE_SELL,
   unitPriceFieldLabel,
 } from '../transaction-type';
+
+const CASH_CURRENCY = 'PLN';
 
 export interface TransactionFormDialogData {
   portfolioId: string;
@@ -78,6 +86,7 @@ export class TransactionFormDialog {
       this.data.transaction ? fromDateOnly(this.data.transaction.date) : new Date(),
       [Validators.required],
     ],
+    cashAssetId: [null as string | null],
   });
 
   private readonly selectedType = toSignal(this.form.controls.type.valueChanges, {
@@ -88,6 +97,50 @@ export class TransactionFormDialog {
     quantityFieldLabel(this.selectedType(), this.data.assetClass),
   );
   protected readonly unitPriceLabel = unitPriceFieldLabel(this.data.assetClass);
+
+  // Only a new precious-metal Buy or Sell can move money through a PLN Cash account.
+  private readonly offersCash = !this.isEdit && this.data.assetClass === ASSET_CLASS.PreciousMetal;
+  protected readonly showsCash = computed(
+    () =>
+      this.offersCash &&
+      (this.selectedType() === TRANSACTION_TYPE_BUY ||
+        this.selectedType() === TRANSACTION_TYPE_SELL),
+  );
+  protected readonly cashCurrency = CASH_CURRENCY;
+  protected readonly formatMoney = formatMoney;
+
+  private readonly formValue = toSignal(
+    this.form.valueChanges.pipe(map(() => this.form.getRawValue())),
+    { initialValue: this.form.getRawValue() },
+  );
+
+  // Display only, in whole grosze; the server computes the stored amount.
+  protected readonly cashAmount = computed(() => {
+    const values = this.formValue();
+    const quantity = Number(values.quantity);
+    const unitPrice = Number(values.unitPrice);
+    if (!values.cashAssetId || !Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
+      return null;
+    }
+    return Math.round(quantity * Math.round(unitPrice * 100)) / 100;
+  });
+
+  protected readonly cashCandidatesResource = resource({
+    params: () => (this.offersCash ? { currency: CASH_CURRENCY } : undefined),
+    loader: async ({ params, abortSignal }) => {
+      const result = await getApiPortfolioTransferCandidates({
+        query: { currency: params.currency, assetClass: ASSET_CLASS.Cash },
+        signal: abortSignal,
+      });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ??
+            translate('transactions.form.cashAccountsLoadFailed'),
+        );
+      }
+      return result.data ?? [];
+    },
+  });
 
   protected async onSubmit(): Promise<void> {
     if (this.submitting()) {
@@ -109,6 +162,7 @@ export class TransactionFormDialog {
       unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
       date: toDateOnly(values.date),
     };
+    const cashAssetId = this.showsCash() ? values.cashAssetId : null;
 
     const result = this.data.transaction
       ? await putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById({
@@ -121,7 +175,7 @@ export class TransactionFormDialog {
         })
       : await postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions({
           path: { portfolioId: this.data.portfolioId, assetId: this.data.assetId },
-          body,
+          body: cashAssetId ? { ...body, cashAssetId } : body,
         });
 
     this.submitting.set(false);

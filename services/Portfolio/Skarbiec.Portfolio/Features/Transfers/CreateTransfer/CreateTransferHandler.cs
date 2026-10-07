@@ -26,7 +26,7 @@ public sealed class CreateTransferHandler(
         if (source is null
             || target is null
             || source.Id == target.Id
-            || !TransferRoutes.IsManual(source.AssetClass, target.AssetClass)
+            || !TransferRoutes.IsCreatable(source.AssetClass, target.AssetClass)
             || source.Currency != target.Currency)
         {
             return TransferErrors.InvalidCounterpart;

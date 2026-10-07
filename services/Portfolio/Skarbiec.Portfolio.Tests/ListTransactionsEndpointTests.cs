@@ -202,6 +202,40 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
+    public async Task MetalCashLegs_CarryCounterpartAndDirection()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await client.CreateCashAndMetalAsync(cancellationToken);
+        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken);
+        var sell = await client.RecordMetalTransactionWithCashAsync(
+            setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken,
+            type: TransactionType.Sell, pieces: 1m, pricePerPiece: 1_300m, date: MetalCashDate.AddDays(1));
+
+        var cashLegs = (await client.ListTransactionsAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Items;
+        var withdraw = Assert.Single(cashLegs, t => t.Type == TransactionType.Withdraw);
+        var deposit = Assert.Single(cashLegs, t => t.Type == TransactionType.Deposit && t.Transfer is not null);
+
+        Assert.NotNull(buy.Transfer);
+        Assert.Equal(setup.CashAssetId, buy.Transfer.CounterpartAssetId);
+        Assert.Equal(TransferDirection.In, buy.Transfer.Direction);
+        Assert.True(buy.Transfer.Manual);
+        Assert.NotNull(withdraw.Transfer);
+        Assert.Equal(buy.Transfer.TransferId, withdraw.Transfer.TransferId);
+        Assert.Equal(setup.MetalAssetId, withdraw.Transfer.CounterpartAssetId);
+        Assert.Equal(TransferDirection.Out, withdraw.Transfer.Direction);
+        Assert.True(withdraw.Transfer.Manual);
+        Assert.NotNull(sell.Transfer);
+        Assert.Equal(TransferDirection.Out, sell.Transfer.Direction);
+        Assert.True(sell.Transfer.Manual);
+        Assert.NotNull(deposit.Transfer);
+        Assert.Equal(sell.Transfer.TransferId, deposit.Transfer.TransferId);
+        Assert.Equal(TransferDirection.In, deposit.Transfer.Direction);
+        Assert.True(deposit.Transfer.Manual);
+    }
+
+    [Fact]
     public async Task List_DepositPayoutLegOnSavings_IsNotManual()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
