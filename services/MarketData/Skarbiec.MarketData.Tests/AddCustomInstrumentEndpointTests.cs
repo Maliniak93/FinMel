@@ -131,7 +131,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     }
 
     [Fact]
-    public async Task Add_PreciousMetalClass_ReturnsBadRequest_NbpHasNoArbitraryTickerNotion()
+    public async Task Add_PreciousMetalClass_ReturnsBadRequest_MetalsAreSeededOnly()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -147,7 +147,8 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("NBP", body);
+        Assert.DoesNotContain("PreciousMetal", body);
+        Assert.DoesNotContain("NBP", body);
     }
 
     [Theory]

@@ -6,14 +6,15 @@ namespace Skarbiec.MarketData.Data;
 // Illustrative starter instruments plus the currency catalog; idempotent by natural key, so safe on every startup.
 public static class MarketDataSeeder
 {
-    private static readonly (string Ticker, string Name, PriceSource Source, string QuoteCurrency, AssetClass AssetClass)[] SeedInstruments =
+    // Metals carry their fixed MetalInstruments id and are priced per gram of fine metal, despite the ounce-style tickers.
+    private static readonly (Guid? Id, string Ticker, string Name, PriceSource Source, string QuoteCurrency, AssetClass AssetClass)[] SeedInstruments =
     [
-        // NBP prices 1 gram, not a troy ounce, despite the XAU ticker.
-        ("XAU", "Gold (1 gram, NBP)", PriceSource.Nbp, "PLN", AssetClass.PreciousMetal),
-        ("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", AssetClass.Stock),
-        ("CDR.PL", "CD Projekt", PriceSource.Stooq, "PLN", AssetClass.Stock),
-        ("bitcoin", "Bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
-        ("ethereum", "Ethereum", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
+        (MetalInstruments.Gold, "XAU", "Gold (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal),
+        (MetalInstruments.Silver, "XAG", "Silver (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal),
+        (null, "AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", AssetClass.Stock),
+        (null, "CDR.PL", "CD Projekt", PriceSource.Stooq, "PLN", AssetClass.Stock),
+        (null, "bitcoin", "Bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
+        (null, "ethereum", "Ethereum", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
     ];
 
     // A superset of SupportedCurrencies.All: GBP and CHF are synced though no user can pick them yet.
@@ -37,7 +38,7 @@ public static class MarketDataSeeder
             {
                 db.Instruments.Add(new Instrument
                 {
-                    Id = Guid.NewGuid(),
+                    Id = seed.Id ?? Guid.NewGuid(),
                     Ticker = seed.Ticker,
                     Name = seed.Name,
                     Source = seed.Source,

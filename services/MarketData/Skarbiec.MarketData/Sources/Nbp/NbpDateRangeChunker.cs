@@ -1,6 +1,6 @@
 namespace Skarbiec.MarketData.Sources.Nbp;
 
-// Both NBP range endpoints reject a query wider than their own limit.
+// NBP's range endpoint rejects a query wider than its own limit.
 public static class NbpDateRangeChunker
 {
     public static IEnumerable<(DateOnly From, DateOnly To)> Chunk(DateOnly from, DateOnly to, int maxDaysPerChunk)

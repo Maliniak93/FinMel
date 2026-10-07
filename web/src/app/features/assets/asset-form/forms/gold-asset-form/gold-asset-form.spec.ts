@@ -43,7 +43,7 @@ describe('GoldAssetForm', () => {
     await setup();
 
     expect(renderedText(fixture)).not.toContain('Verify a new ticker');
-    expect(renderedText(fixture)).toContain('Precious metal has no custom-ticker lookup');
+    expect(renderedText(fixture)).toContain('grams of fine metal');
   });
 
   it('refuses to submit without a selected instrument', async () => {
@@ -86,7 +86,7 @@ describe('GoldAssetForm', () => {
         'Instrument',
         'Search by ticker or name',
         'Pick an existing instrument above, or verify a new ticker below — creation is blocked until one is selected.',
-        'Precious metal has no custom-ticker lookup — the seeded gold instrument is already in the dictionary above.',
+        'Enter the quantity in grams of fine metal — it is priced at the world spot rate in USD, converted to PLN, not at the NBP gold price.',
         'Add first transaction',
       ]);
 

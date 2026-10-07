@@ -199,6 +199,28 @@
           }
         }
       }
+    },
+    "/api/marketdata/metal-prices": {
+      "get": {
+        "tags": [
+          "GetMetalPricesEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MetalPriceResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -537,6 +559,72 @@
       "InstrumentVerificationStatus": {
         "type": "integer"
       },
+      "Metal": {
+        "type": "integer"
+      },
+      "MetalPriceResponse": {
+        "required": [
+          "metal",
+          "instrumentId",
+          "isStale"
+        ],
+        "type": "object",
+        "properties": {
+          "metal": {
+            "$ref": "#/components/schemas/Metal"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "pricePerGramUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "usdPlnRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "pricePerGramPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "pricePerTroyOuncePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "isStale": {
+            "type": "boolean"
+          }
+        }
+      },
       "PriceSource": {
         "type": "integer"
       },
@@ -665,6 +753,9 @@
     },
     {
       "name": "GetBondSeriesEndpoint"
+    },
+    {
+      "name": "GetMetalPricesEndpoint"
     }
   ]
 }

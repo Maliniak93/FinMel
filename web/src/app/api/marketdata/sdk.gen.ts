@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { GetApiMarketdataBondSeriesByCodeData, GetApiMarketdataBondSeriesByCodeResponses, GetApiMarketdataBondSeriesData, GetApiMarketdataBondSeriesResponses, GetApiMarketdataInstrumentsByIdData, GetApiMarketdataInstrumentsByIdResponses, GetApiMarketdataInstrumentsSearchData, GetApiMarketdataInstrumentsSearchResponses, GetApiMarketdataSyncStatusData, GetApiMarketdataSyncStatusResponses, PostApiMarketdataInstrumentsData, PostApiMarketdataInstrumentsResponses, PostApiMarketdataSyncTriggerData, PostApiMarketdataSyncTriggerResponses } from './types.gen.js';
+import type { GetApiMarketdataBondSeriesByCodeData, GetApiMarketdataBondSeriesByCodeResponses, GetApiMarketdataBondSeriesData, GetApiMarketdataBondSeriesResponses, GetApiMarketdataInstrumentsByIdData, GetApiMarketdataInstrumentsByIdResponses, GetApiMarketdataInstrumentsSearchData, GetApiMarketdataInstrumentsSearchResponses, GetApiMarketdataMetalPricesData, GetApiMarketdataMetalPricesResponses, GetApiMarketdataSyncStatusData, GetApiMarketdataSyncStatusResponses, PostApiMarketdataInstrumentsData, PostApiMarketdataInstrumentsResponses, PostApiMarketdataSyncTriggerData, PostApiMarketdataSyncTriggerResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -38,3 +38,5 @@ export const getApiMarketdataSyncStatus = <ThrowOnError extends boolean = false>
 export const getApiMarketdataBondSeries = <ThrowOnError extends boolean = false>(options?: Options<GetApiMarketdataBondSeriesData, ThrowOnError>): RequestResult<GetApiMarketdataBondSeriesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiMarketdataBondSeriesResponses, unknown, ThrowOnError>({ url: '/api/marketdata/bond-series', ...options });
 
 export const getApiMarketdataBondSeriesByCode = <ThrowOnError extends boolean = false>(options: Options<GetApiMarketdataBondSeriesByCodeData, ThrowOnError>): RequestResult<GetApiMarketdataBondSeriesByCodeResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiMarketdataBondSeriesByCodeResponses, unknown, ThrowOnError>({ url: '/api/marketdata/bond-series/{code}', ...options });
+
+export const getApiMarketdataMetalPrices = <ThrowOnError extends boolean = false>(options?: Options<GetApiMarketdataMetalPricesData, ThrowOnError>): RequestResult<GetApiMarketdataMetalPricesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiMarketdataMetalPricesResponses, unknown, ThrowOnError>({ url: '/api/marketdata/metal-prices', ...options });

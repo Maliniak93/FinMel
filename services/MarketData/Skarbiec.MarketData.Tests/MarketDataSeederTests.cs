@@ -27,6 +27,29 @@ public sealed class MarketDataSeederTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
+    public async Task Seeds_MetalInstruments_WithFixedIds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var context = CreateDbContext();
+
+        await MarketDataSeeder.SeedAsync(context, cancellationToken);
+        await MarketDataSeeder.SeedAsync(context, cancellationToken);
+
+        var instruments = await context.Instruments.ToListAsync(cancellationToken);
+        var gold = Assert.Single(instruments, i => i.Ticker == "XAU");
+        var silver = Assert.Single(instruments, i => i.Ticker == "XAG");
+        Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Gold), gold.Id);
+        Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Silver), silver.Id);
+        Assert.All([gold, silver], i =>
+        {
+            Assert.Equal(PriceSource.GoldApi, i.Source);
+            Assert.Equal("USD", i.QuoteCurrency);
+            Assert.Equal(AssetClass.PreciousMetal, i.AssetClass);
+        });
+        Assert.DoesNotContain(instruments, i => i.Source.ToString() == "Nbp");
+    }
+
+    [Fact]
     public async Task SeedAsync_WritesNoBootstrapFxRates()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

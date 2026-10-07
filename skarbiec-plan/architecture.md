@@ -57,9 +57,10 @@ flowchart LR
         MQ["RabbitMQ"]
         DB[("PostgreSQL<br/>db per service")]
     end
-    NBP["NBP API<br/>FX, gold"]
-    STOOQ["Stooq<br/>GPW / ETF / metals"]
+    NBP["NBP API<br/>FX"]
+    STOOQ["Stooq<br/>GPW / ETF"]
     CG["CoinGecko<br/>crypto"]
+    GA["gold-api.com<br/>gold / silver spot"]
     MF["Ministry of Finance (gov.pl)<br/>retail treasury bond file"]
 
     U -->|HTTPS| SPA
@@ -70,6 +71,7 @@ flowchart LR
     SVC -->|"jobs, daily"| NBP
     SVC -->|"jobs, daily"| STOOQ
     SVC -->|"jobs, daily"| CG
+    SVC -->|"jobs, daily"| GA
     SVC -->|"jobs, daily"| MF
 ```
 
@@ -97,7 +99,7 @@ flowchart TB
     MD --> MDB[("marketdata_db")]
     RP --> RDB[("reporting_db")]
 
-    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / CoinGecko / MF"]
+    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / CoinGecko / gold-api.com / MF"]
 
     ASPIRE["Aspire dashboard<br/>(traces, logs, metrics)"]
     ASPIRE -.-> GW & ID & PF & MD & RP

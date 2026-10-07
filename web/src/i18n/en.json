@@ -465,7 +465,7 @@
       "valueRequired": "Value is required.",
       "valuationDateRequired": "Valuation date is required.",
       "cashHint": "Valued automatically from {{ currency }}'s exchange rate — nothing else to fill in. Use \"Add opening deposit\" below to deposit an opening amount.",
-      "goldHint": "Precious metal has no custom-ticker lookup — the seeded gold instrument is already in the dictionary above.",
+      "goldHint": "Enter the quantity in grams of fine metal — it is priced at the world spot rate in USD, converted to PLN, not at the NBP gold price.",
       "instrument": "Instrument",
       "searchPlaceholder": "Search by ticker or name",
       "verified": "Verified: {{ ticker }} — {{ name }} ({{ currency }})",

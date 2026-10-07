@@ -7,7 +7,6 @@ public static class NbpSourceExtensions
     public static TBuilder AddNbpSources<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHttpClient<INbpApiClient, NbpApiClient>(client => client.BaseAddress = NbpApiBaseAddress);
-        builder.Services.AddTransient<IPriceSource, NbpPriceSource>();
         builder.Services.AddTransient<IFxRateSource, NbpFxRateSource>();
 
         return builder;

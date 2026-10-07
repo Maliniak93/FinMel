@@ -78,6 +78,19 @@ export type InstrumentSearchResult = {
 
 export type InstrumentVerificationStatus = number;
 
+export type Metal = number;
+
+export type MetalPriceResponse = {
+    metal: Metal;
+    instrumentId: string;
+    date?: null | string;
+    pricePerGramUsd?: null | number | string;
+    usdPlnRate?: null | number | string;
+    pricePerGramPln?: null | number | string;
+    pricePerTroyOuncePln?: null | number | string;
+    isStale: boolean;
+};
+
 export type PriceSource = number;
 
 export type SyncRunStatus = number;
@@ -221,3 +234,19 @@ export type GetApiMarketdataBondSeriesByCodeResponses = {
 };
 
 export type GetApiMarketdataBondSeriesByCodeResponse = GetApiMarketdataBondSeriesByCodeResponses[keyof GetApiMarketdataBondSeriesByCodeResponses];
+
+export type GetApiMarketdataMetalPricesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/marketdata/metal-prices';
+};
+
+export type GetApiMarketdataMetalPricesResponses = {
+    /**
+     * OK
+     */
+    200: Array<MetalPriceResponse>;
+};
+
+export type GetApiMarketdataMetalPricesResponse = GetApiMarketdataMetalPricesResponses[keyof GetApiMarketdataMetalPricesResponses];

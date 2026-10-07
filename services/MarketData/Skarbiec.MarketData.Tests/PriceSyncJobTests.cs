@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
+using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing;
@@ -33,15 +34,15 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var nbpInstrument = NewUsedInstrument(db, "XAU", PriceSource.Nbp, "PLN", AssetClass.PreciousMetal);
+        var goldInstrument = NewUsedInstrument(db, "XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
         var stooqInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
         var coinGeckoInstrument = NewUsedInstrument(db, "bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto);
         await db.SaveChangesAsync(cancellationToken);
 
         IPriceSource[] sources =
         [
-            new ScriptedPriceSource(PriceSource.Nbp, PriceFetchResult<InstrumentQuote>.Success(
-                [new InstrumentQuote(nbpInstrument.Id, Today, 350.12m)])),
+            new ScriptedPriceSource(PriceSource.GoldApi, PriceFetchResult<InstrumentQuote>.Success(
+                [new InstrumentQuote(goldInstrument.Id, Today, 350.12m)])),
             // The middle source errors out entirely; the other two must still sync.
             new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Error("stooq is down")),
             new ScriptedPriceSource(PriceSource.CoinGecko, PriceFetchResult<InstrumentQuote>.Success(
@@ -60,9 +61,32 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
 
         var quotes = await db.PriceQuotes.ToListAsync(cancellationToken);
         Assert.Equal(2, quotes.Count);
-        Assert.Contains(quotes, q => q.InstrumentId == nbpInstrument.Id && q.Close == 350.12m);
+        Assert.Contains(quotes, q => q.InstrumentId == goldInstrument.Id && q.Close == 350.12m);
         Assert.Contains(quotes, q => q.InstrumentId == coinGeckoInstrument.Id && q.Close == 65_000m);
         Assert.DoesNotContain(quotes, q => q.InstrumentId == stooqInstrument.Id);
+    }
+
+    [Fact]
+    public async Task RunAsync_UsedMetal_StoresTodaysGramQuoteFromGoldApi()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var gold = NewUsedInstrument(db, "XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var client = new FakeGoldApiClient().WithPricePerOunce("XAU", 4165.5m, DateTimeOffset.UtcNow);
+        var source = new GoldApiPriceSource(client, NullLogger<GoldApiPriceSource>.Instance);
+
+        var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken);
+
+        var quote = await db.PriceQuotes.SingleAsync(q => q.InstrumentId == gold.Id, cancellationToken);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), quote.Date);
+        Assert.Equal(Math.Round(4165.5m / 31.1034768m, 8), quote.Close);
     }
 
     [Fact]
