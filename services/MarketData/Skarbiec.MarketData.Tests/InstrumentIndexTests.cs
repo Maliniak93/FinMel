@@ -53,7 +53,7 @@ public sealed class InstrumentIndexTests(SkarbiecContainersFixture containers) :
             Id = Guid.NewGuid(),
             Ticker = "AAPL.US",
             Name = "Apple Inc.",
-            Source = PriceSource.Stooq,
+            Source = PriceSource.Yahoo,
             QuoteCurrency = "USD",
             AssetClass = AssetClass.Stock,
         });
@@ -64,7 +64,7 @@ public sealed class InstrumentIndexTests(SkarbiecContainersFixture containers) :
             Id = Guid.NewGuid(),
             Ticker = "AAPL.US",
             Name = "Apple Inc. (duplicate)",
-            Source = PriceSource.Stooq,
+            Source = PriceSource.Yahoo,
             QuoteCurrency = "USD",
             AssetClass = AssetClass.Stock,
         });

@@ -11,7 +11,7 @@ Content-Type: application/json
 }
 
 ### Search instruments
-GET {{baseUrl}}/api/marketdata/instruments/search?q=AAPL&limit=20
+GET {{baseUrl}}/api/marketdata/instruments/search?q=CDR&limit=20
 Authorization: Bearer {{authToken}}
 
 ### Add a custom instrument
@@ -21,10 +21,10 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "source": "Stooq",
-  "ticker": "AAPL.US",
-  "name": "Apple Inc.",
-  "quoteCurrency": "USD",
+  "source": "Yahoo",
+  "ticker": "PKO.WA",
+  "name": "PKO Bank Polski",
+  "quoteCurrency": "PLN",
   "assetClass": "Stock"
 }
 

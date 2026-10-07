@@ -18,7 +18,7 @@ public sealed class GetLatestPricesBatchEndpointTests(SkarbiecContainersFixture 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 5), 160m, cancellationToken);
 
         using var client = Factory.CreateClient();
@@ -39,7 +39,7 @@ public sealed class GetLatestPricesBatchEndpointTests(SkarbiecContainersFixture 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 1), 150m, cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 5), 160m, cancellationToken);
         // A quote after AsOfDate must never be picked, even though it's the newest overall.
@@ -65,7 +65,7 @@ public sealed class GetLatestPricesBatchEndpointTests(SkarbiecContainersFixture 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("MSFT.US", "Microsoft Corp.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("MSFT.US", "Microsoft Corp.", PriceSource.Yahoo, "USD", cancellationToken);
 
         using var client = Factory.CreateClient();
         var response = await client.PostAsJsonAsync(

@@ -12,7 +12,7 @@ public sealed class PriceSourceAbstractionTests
         Id = Guid.NewGuid(),
         Ticker = "AAPL.US",
         Name = "Apple Inc.",
-        Source = PriceSource.Stooq,
+        Source = PriceSource.Yahoo,
         QuoteCurrency = "USD",
         AssetClass = AssetClass.Stock,
     };
@@ -20,7 +20,7 @@ public sealed class PriceSourceAbstractionTests
     [Fact]
     public async Task FetchLatestAsync_HappyPath_ReturnsSuccessWithParsedQuote()
     {
-        var source = new FixturePriceSource(PriceSource.Stooq, RecordedResponse.Read("happy-path.json"));
+        var source = new FixturePriceSource(PriceSource.Yahoo, RecordedResponse.Read("happy-path.json"));
 
         var result = await source.FetchLatestAsync([SampleInstrument], TestContext.Current.CancellationToken);
 
@@ -34,7 +34,7 @@ public sealed class PriceSourceAbstractionTests
     [Fact]
     public async Task FetchLatestAsync_NonTradingDay_ReturnsNoData_NotError()
     {
-        var source = new FixturePriceSource(PriceSource.Stooq, RecordedResponse.Read("empty-day.json"));
+        var source = new FixturePriceSource(PriceSource.Yahoo, RecordedResponse.Read("empty-day.json"));
 
         var result = await source.FetchLatestAsync([SampleInstrument], TestContext.Current.CancellationToken);
 
@@ -45,7 +45,7 @@ public sealed class PriceSourceAbstractionTests
     [Fact]
     public async Task FetchLatestAsync_MalformedPayload_ReturnsErrorResult_DoesNotThrow()
     {
-        var source = new FixturePriceSource(PriceSource.Stooq, RecordedResponse.Read("malformed.json"));
+        var source = new FixturePriceSource(PriceSource.Yahoo, RecordedResponse.Read("malformed.json"));
 
         var result = await source.FetchLatestAsync([SampleInstrument], TestContext.Current.CancellationToken);
 
@@ -59,7 +59,7 @@ public sealed class PriceSourceAbstractionTests
     {
         IPriceSource[] sources =
         [
-            new FixturePriceSource(PriceSource.Stooq, RecordedResponse.Read("happy-path.json")),
+            new FixturePriceSource(PriceSource.Yahoo, RecordedResponse.Read("happy-path.json")),
             new AlwaysNoDataPriceSource(),
         ];
 

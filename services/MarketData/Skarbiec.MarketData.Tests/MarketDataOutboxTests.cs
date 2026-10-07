@@ -52,7 +52,7 @@ public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) 
             Id = Guid.NewGuid(),
             Ticker = "AAPL.US",
             Name = "Apple",
-            Source = PriceSource.Stooq,
+            Source = PriceSource.Yahoo,
             QuoteCurrency = "PLN",
             AssetClass = AssetClass.Stock,
         };
@@ -65,7 +65,7 @@ public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) 
         });
         await db.SaveChangesAsync(cancellationToken);
 
-        var source = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, Today, 100m)]));
 
         var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
@@ -126,7 +126,7 @@ public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) 
             Id = Guid.NewGuid(),
             Ticker = "AAPL.US",
             Name = "Apple",
-            Source = PriceSource.Stooq,
+            Source = PriceSource.Yahoo,
             QuoteCurrency = "PLN",
             AssetClass = AssetClass.Stock,
         };
@@ -140,7 +140,7 @@ public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) 
         await db.SaveChangesAsync(cancellationToken);
 
         // The only source errors out: nothing synced or empty, so the run is Failed, not Partial.
-        var source = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Error("down"));
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Error("down"));
 
         var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await job.RunAsync(cancellationToken);

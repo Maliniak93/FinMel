@@ -44,7 +44,7 @@ public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers)
             Id = Guid.NewGuid(),
             Ticker = "AAPL.US",
             Name = "Apple",
-            Source = PriceSource.Stooq,
+            Source = PriceSource.Yahoo,
             QuoteCurrency = "PLN",
             AssetClass = AssetClass.Stock,
         };
@@ -53,7 +53,7 @@ public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers)
         db.InstrumentUsages.Add(new InstrumentUsage { InstrumentId = instrument.Id, AssetCount = 1, FirstUsedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync(cancellationToken);
 
-        var source = new ScriptedPriceSource(PriceSource.Stooq, PriceFetchResult<InstrumentQuote>.Success(
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
             [new InstrumentQuote(instrument.Id, new DateOnly(2026, 8, 6), 100m)]));
 
         var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);

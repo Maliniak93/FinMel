@@ -11,8 +11,8 @@ public static class MarketDataSeeder
     [
         (MetalInstruments.Gold, "XAU", "Gold (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal),
         (MetalInstruments.Silver, "XAG", "Silver (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal),
-        (null, "AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", AssetClass.Stock),
-        (null, "CDR.PL", "CD Projekt", PriceSource.Stooq, "PLN", AssetClass.Stock),
+        (null, "CDR.WA", "CD Projekt", PriceSource.Yahoo, "PLN", AssetClass.Stock),
+        (null, "VWCE.DE", "Vanguard FTSE All-World UCITS ETF (Acc)", PriceSource.Yahoo, "EUR", AssetClass.Etf),
         (null, "bitcoin", "Bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
         (null, "ethereum", "Ethereum", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
     ];

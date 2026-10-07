@@ -7,7 +7,7 @@ public static class AssetClassPriceSourceMapping
 {
     public static PriceSource? Resolve(AssetClass assetClass) => assetClass switch
     {
-        AssetClass.Stock or AssetClass.Etf => PriceSource.Stooq,
+        AssetClass.Stock or AssetClass.Etf => PriceSource.Yahoo,
         AssetClass.Crypto => PriceSource.CoinGecko,
         AssetClass.PreciousMetal => PriceSource.GoldApi,
         AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.Bond or AssetClass.RealEstate or AssetClass.Other => null,

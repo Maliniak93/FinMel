@@ -2,7 +2,7 @@ namespace Skarbiec.MarketData.Data;
 
 public enum PriceSource
 {
-    Stooq,
+    Yahoo,
     CoinGecko,
     GoldApi,
 }

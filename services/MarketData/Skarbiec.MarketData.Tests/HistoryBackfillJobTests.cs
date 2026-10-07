@@ -24,12 +24,12 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        var instrument = NewInstrument("AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
+        var instrument = NewInstrument("AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
         var quotes = OneYearOfDates().Select(d => new InstrumentQuote(instrument.Id, d, 100m)).ToList();
-        var source = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, cancellationToken);
@@ -88,19 +88,19 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var db = CreateDbContext();
 
-        var instrument = NewInstrument("AAPL.US", PriceSource.Stooq, "USD", AssetClass.Stock);
+        var instrument = NewInstrument("AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
         var dates = OneYearOfDates();
 
         var firstQuotes = dates.Select(d => new InstrumentQuote(instrument.Id, d, 100m)).ToList();
-        var firstSource = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(firstQuotes));
+        var firstSource = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(firstQuotes));
         var firstJob = new HistoryBackfillJob(db, [firstSource], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await firstJob.RunAsync(instrument.Id, cancellationToken);
 
         var secondQuotes = dates.Select(d => new InstrumentQuote(instrument.Id, d, 105m)).ToList();
-        var secondSource = new ScriptedPriceSource(PriceSource.Stooq, historyResult: PriceFetchResult<InstrumentQuote>.Success(secondQuotes));
+        var secondSource = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(secondQuotes));
         var secondJob = new HistoryBackfillJob(db, [secondSource], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await secondJob.RunAsync(instrument.Id, cancellationToken);
 

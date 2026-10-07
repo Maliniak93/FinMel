@@ -21,8 +21,8 @@ using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Sources.MfBonds;
 using Skarbiec.MarketData.Sources.Nbp;
-using Skarbiec.MarketData.Sources.Stooq;
 using Skarbiec.MarketData.Sources.Verification;
+using Skarbiec.MarketData.Sources.Yahoo;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.ServiceDefaults.OpenApi;
 
@@ -45,7 +45,7 @@ if (!OpenApiBuildTime.IsActive)
         });
 
     builder.AddNbpSources();
-    builder.AddStooqSource();
+    builder.AddYahooSource();
     builder.AddCoinGeckoSource();
     builder.AddGoldApiSource();
     builder.AddMfBondSource();

@@ -19,7 +19,7 @@ public sealed class GetInstrumentEndpointTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 4), 212.00m, cancellationToken);
 
         using var client = Factory.CreateClient();
@@ -40,7 +40,7 @@ public sealed class GetInstrumentEndpointTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 3), 210.50m, cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 4), 212.00m, cancellationToken);
 
@@ -53,7 +53,7 @@ public sealed class GetInstrumentEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(instrumentId, body.Id);
         Assert.Equal("AAPL.US", body.Ticker);
         Assert.Equal("USD", body.QuoteCurrency);
-        Assert.Equal(PriceSource.Stooq, body.Source);
+        Assert.Equal(PriceSource.Yahoo, body.Source);
         Assert.Equal(212.00m, body.LastPrice);
         Assert.Equal(new DateOnly(2026, 8, 4), body.LastPriceDate);
     }
@@ -63,7 +63,7 @@ public sealed class GetInstrumentEndpointTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("NEW.US", "Brand New Co.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("NEW.US", "Brand New Co.", PriceSource.Yahoo, "USD", cancellationToken);
 
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await client.GetAsync(InstrumentUri(instrumentId), cancellationToken);

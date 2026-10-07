@@ -36,7 +36,7 @@ Abbreviated format. Status: ✅ accepted / 🕐 pending / ❌ rejected. ADR-001�
 
 ## ADR-007 ✅ Prices only from our own database (jobs in MarketData)
 
-**Decision:** external APIs (NBP, Stooq, CoinGecko) are queried exclusively by Quartz jobs in MarketData; the rest of the system reads via the MarketData API or read models. Narrowed by ADR-018 (ticker verification only).
+**Decision:** external APIs (NBP, Yahoo, CoinGecko) are queried exclusively by Quartz jobs in MarketData; the rest of the system reads via the MarketData API or read models. Narrowed by ADR-018 (ticker verification only).
 
 ## ADR-008 ✅ PLN base currency, `decimal` everywhere
 
@@ -100,7 +100,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 - request-path budget: one attempt, hard timeout (~5 s, linked `CancellationTokenSource`), **no rate-limit retry** — `CoinGeckoPriceSource.FetchWithRateLimitRetryAsync` sleeps for `Retry-After` and retries once, which is right for a job and wrong for a request;
 - verification writes nothing to the database;
 - three outcomes, reusing `PriceFetchResult`'s existing vocabulary rather than a bool: `Success` (≥1 quote) → **Exists**, `NoData` → **DoesNotExist**, `Error` → **Unreachable**. CoinGecko's `{}` already lands on `NoData` and Stooq's 404/challenge page already lands on `Error`, so no price source needs changing for the mapping to be honest.
-**Consequences:** an asset-creation request now depends on a third party's latency (~250 ms CoinGecko; a full timeout for Stooq), bounded by the timeout above; CoinGecko's free tier is exposed to user-driven traffic, mitigated by the dictionary-first short circuit and by the UI verifying on blur/submit rather than per keystroke (the Gateway's 100 req/10 s limit applies too). `DoesNotExist` blocks creation outright; `Unreachable` warns and offers an explicit opt-in that creates the instrument `Unverified` exactly as T2.8 does, so `InstrumentVerificationStatus` keeps a single meaning and `HistoryBackfillJob` remains the thing that resolves it. Known constraint accepted with this ADR: while Stooq stays JS-gated, every Stock/Etf/Bond ticker outside the seeded dictionary resolves to `Unreachable` — repairing or replacing that source is separate work, not part of this exception.
+**Consequences:** an asset-creation request now depends on a third party's latency (~250 ms CoinGecko; a full timeout for Stooq), bounded by the timeout above; CoinGecko's free tier is exposed to user-driven traffic, mitigated by the dictionary-first short circuit and by the UI verifying on blur/submit rather than per keystroke (the Gateway's 100 req/10 s limit applies too). `DoesNotExist` blocks creation outright; `Unreachable` warns and offers an explicit opt-in that creates the instrument `Unverified` exactly as T2.8 does, so `InstrumentVerificationStatus` keeps a single meaning and `HistoryBackfillJob` remains the thing that resolves it. Known constraint: lifted by ADR-029.
 
 ## ADR-019 ✅ Greenfield mode — no backward compatibility until the data matters
 
@@ -186,3 +186,11 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** "Moje obligacje" should show each bond's estimated value today (spec `bond-value-today`). That needs the MF rate of every unsettled period up to the running one, and only MarketData's bond catalog has those rates. Epic decision 3 (#155) keeps purchase and settlement client-mediated, but a list valuation computed in the SPA would put the money math in two places. ADR-021/026 allow three REST uses.
 **Decision:** add a fourth REST use: when `ListBonds` or `GetBond` needs catalog rates, Portfolio makes one call to `POST /internal/bond-series/rates-batch` with the distinct series codes (anonymous, service-only, global data, ADR-027). Unlike ADR-026 it fails soft: MarketData unreachable → the estimate is `null` with the reason `MarketDataUnavailable`, and the list still returns 200, because the estimate is display-only and never written. The loser was a local rate copy in Portfolio fed by a full-state `BondSeriesUpdated` event, which would be Portfolio's first consumer, for one display column (the same trade-off ADR-026 made for FX). Amends ADR-021, ADR-026.
 **Consequences:** bond reads make one extra internal call when a rate is not stored locally. The estimate is never persisted and never reaches Reporting: net worth still values a bond at its book value. Settlement and purchase stay client-mediated.
+
+## ADR-029 ✅ Yahoo Finance replaces Stooq for stocks and ETFs
+
+**Shipped:** 2026-10-07 (spec `yahoo-price-source`, #198).
+
+**Context:** Stooq, the only source for Stock/Etf (ADR-007), sits behind a JavaScript proof-of-work challenge (ADR-018's known constraint), so no stock or ETF has had a quote since 2026-08. The user holds GPW and Xetra listings. Twelve Data's free plan covers practically only US markets; EODHD covers both but costs ~20 €/month (its free tier is 20 calls/day). Yahoo's unofficial `v8/finance/chart` and `v1/finance/search` answer without a key or crumb (probed 2026-10-06: `CDR.WA` in PLN, `VWCE.DE` on XETRA).
+**Decision:** `PriceSource.Yahoo` replaces `PriceSource.Stooq` for Stock and Etf, behind the unchanged `IPriceSource`; the Stooq source, client and fixtures are deleted (ADR-019). Tickers are Yahoo symbols (`CDR.WA`, `VWCE.DE`). The source sends a browser User-Agent and nothing else.
+**Consequences:** an unofficial API can change or rate-limit without notice — a failure surfaces as `PriceFetchResult.Error`, the `SyncRun` turns Partial/Failed and quotes go stale (Reporting already flags a quote older than 7 days); swapping the provider again is one `IPriceSource` (plus the search source of ADR-030). ADR-018's "every Stock/Etf ticker is Unreachable" constraint no longer holds.

@@ -21,7 +21,7 @@ public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
         // An instrument with a quote and an FX rate, so a still-mapped old route would answer 200.
-        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 5), 160m, cancellationToken);
         await seedDb.SeedFxRateAsync("USDPLN", new DateOnly(2026, 8, 7), 4.0m, cancellationToken);
 

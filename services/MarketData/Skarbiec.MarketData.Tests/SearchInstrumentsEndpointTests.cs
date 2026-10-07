@@ -20,7 +20,7 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 3), 210.50m, cancellationToken);
         await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 4), 212.00m, cancellationToken);
 
@@ -41,7 +41,7 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("CDR.PL", "CD Projekt", PriceSource.Stooq, "PLN", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("CDR.PL", "CD Projekt", PriceSource.Yahoo, "PLN", cancellationToken);
 
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await client.GetAsync(SearchInstrumentsUri("CD Proj"), cancellationToken);
@@ -55,7 +55,7 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("NEW.US", "Brand New Co.", PriceSource.Stooq, "USD", cancellationToken);
+        var instrumentId = await seedDb.SeedInstrumentAsync("NEW.US", "Brand New Co.", PriceSource.Yahoo, "USD", cancellationToken);
 
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await client.GetAsync(SearchInstrumentsUri("NEW"), cancellationToken);
@@ -84,7 +84,7 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
         var response = await client.GetAsync(SearchInstrumentsBaseUri, cancellationToken);
@@ -108,7 +108,7 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var seedDb = CreateDbContext();
-        await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Stooq, "USD", cancellationToken);
+        await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
 
         using var userA = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         using var userB = Factory.CreateAuthenticatedClient(Guid.NewGuid());

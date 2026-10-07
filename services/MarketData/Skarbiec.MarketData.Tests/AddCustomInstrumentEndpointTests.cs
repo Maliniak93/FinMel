@@ -19,7 +19,7 @@ namespace Skarbiec.MarketData.Tests;
 public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]
-    public async Task Add_ValidStockTicker_RoutesToStooq_ReturnsCreatedAsVerified()
+    public async Task Add_ValidStockTicker_RoutesToYahoo_ReturnsCreatedAsVerified()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -37,22 +37,22 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         var body = await response.Content.ReadFromJsonAsync<CustomInstrumentResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal("MSFT.US", body.Ticker);
-        Assert.Equal(PriceSource.Stooq, body.Source);
+        Assert.Equal(PriceSource.Yahoo, body.Source);
         Assert.Equal(InstrumentVerificationStatus.Verified, body.VerificationStatus);
         Assert.Equal($"{InstrumentsUri}/{body.Id}", response.Headers.Location?.OriginalString);
-        Assert.Contains((PriceSource.Stooq, "MSFT.US"), Factory.TickerVerifier.Calls);
+        Assert.Contains((PriceSource.Yahoo, "MSFT.US"), Factory.TickerVerifier.Calls);
     }
 
     [Fact]
-    public async Task Add_ValidEtfTicker_RoutesToStooq()
+    public async Task Add_ValidEtfTicker_RoutesToYahoo()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
         var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "VWCE.DE", assetClass: AssetClass.Etf);
 
-        Assert.Equal(PriceSource.Stooq, body.Source);
-        Assert.Contains((PriceSource.Stooq, "VWCE.DE"), Factory.TickerVerifier.Calls);
+        Assert.Equal(PriceSource.Yahoo, body.Source);
+        Assert.Contains((PriceSource.Yahoo, "VWCE.DE"), Factory.TickerVerifier.Calls);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         Assert.Contains((PriceSource.CoinGecko, "solana"), Factory.TickerVerifier.Calls);
     }
 
-    // The same ticker verifies against Stooq but not CoinGecko, so only the class that derives Stooq succeeds.
+    // The same ticker verifies against Yahoo but not CoinGecko, so only the class that derives Yahoo succeeds.
     [Fact]
     public async Task Add_SameTickerString_DifferentClassesRouteToDifferentProviders_CryptoDoesNotSilentlySucceedAsEtf()
     {
@@ -99,7 +99,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         using var cryptoClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         const string ticker = "AMBIGUOUS";
         Factory.TickerVerifier.WithOutcome(PriceSource.CoinGecko, ticker, TickerVerificationOutcome.DoesNotExist);
-        // Stooq isn't scripted for this ticker, so it keeps the fake's default (Exists).
+        // Yahoo isn't scripted for this ticker, so it keeps the fake's default (Exists).
 
         var etfResponse = await stockClient.PostAsJsonAsync(
             InstrumentsUri,
@@ -112,7 +112,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
 
         Assert.Equal(HttpStatusCode.Created, etfResponse.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, cryptoResponse.StatusCode);
-        Assert.Contains((PriceSource.Stooq, ticker), Factory.TickerVerifier.Calls);
+        Assert.Contains((PriceSource.Yahoo, ticker), Factory.TickerVerifier.Calls);
         Assert.Contains((PriceSource.CoinGecko, ticker), Factory.TickerVerifier.Calls);
     }
 
@@ -179,7 +179,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        Factory.TickerVerifier.WithOutcome(PriceSource.Stooq, "GHOST.US", TickerVerificationOutcome.DoesNotExist);
+        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "GHOST.US", TickerVerificationOutcome.DoesNotExist);
         var request = new AddCustomInstrumentRequest
         {
             Ticker = "GHOST.US",
@@ -203,7 +203,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        Factory.TickerVerifier.WithOutcome(PriceSource.Stooq, "DOWN.US", TickerVerificationOutcome.Unreachable);
+        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "DOWN.US", TickerVerificationOutcome.Unreachable);
         var request = new AddCustomInstrumentRequest
         {
             Ticker = "DOWN.US",
@@ -225,7 +225,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        Factory.TickerVerifier.WithOutcome(PriceSource.Stooq, "DOWN.US", TickerVerificationOutcome.Unreachable);
+        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "DOWN.US", TickerVerificationOutcome.Unreachable);
 
         var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "DOWN.US", allowUnverified: true);
 
