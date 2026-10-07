@@ -1,3 +1,5 @@
+@authToken = {{login.response.body.accessToken}}
+
 ### Login
 # @name login
 POST {{baseUrl}}/api/identity/login
@@ -7,8 +9,6 @@ Content-Type: application/json
   "email": "test@skarbiec.local",
   "password": "P@ssw0rd!123"
 }
-
-@authToken = {{login.response.body.accessToken}}
 
 ### Search instruments
 GET {{baseUrl}}/api/marketdata/instruments/search?q=AAPL&limit=20
