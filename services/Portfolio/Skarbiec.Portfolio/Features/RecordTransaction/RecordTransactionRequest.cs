@@ -13,4 +13,7 @@ public sealed record RecordTransactionRequest
     public required decimal UnitPrice { get; init; }
 
     public required DateOnly Date { get; init; }
+
+    /// <summary>A PLN Cash account paying for a precious-metal Buy or receiving a Sell's proceeds of quantity × unit price.</summary>
+    public Guid? CashAssetId { get; init; }
 }

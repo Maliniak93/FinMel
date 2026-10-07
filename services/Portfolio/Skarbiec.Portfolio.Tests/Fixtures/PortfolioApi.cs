@@ -1096,6 +1096,60 @@ internal static class PortfolioApi
         return new CashAndSavings(cashPortfolioId, cashId, savingsPortfolioId, account.AssetId);
     }
 
+    public static readonly DateOnly MetalCashDate = MetalPurchaseDate.AddDays(1);
+
+    public sealed record CashAndMetal(Guid CashPortfolioId, Guid CashAssetId, Guid MetalPortfolioId, Guid MetalAssetId);
+
+    public static async Task<CashAndMetal> CreateCashAndMetalAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal cashBalance = 5_000m,
+        decimal pieces = 0m)
+    {
+        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance);
+        var (metalPortfolioId, metal) = await client.CreatePortfolioWithMetalAsync(
+            cancellationToken,
+            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, withFirstPurchase: pieces > 0m, pieces: pieces),
+            portfolioName: "Metals");
+
+        return new CashAndMetal(cashPortfolioId, cashId, metalPortfolioId, metal.AssetId);
+    }
+
+    public static RecordTransactionRequest NewMetalCashRequest(
+        Guid? cashAssetId,
+        TransactionType type = TransactionType.Buy,
+        decimal pieces = 2m,
+        decimal pricePerPiece = 1_200.00m,
+        DateOnly? date = null) => new()
+        {
+            Type = type,
+            Quantity = pieces,
+            UnitPrice = pricePerPiece,
+            Date = date ?? MetalCashDate,
+            CashAssetId = cashAssetId
+        };
+
+    public static async Task<TransactionResponse> RecordMetalTransactionWithCashAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        Guid cashAssetId,
+        CancellationToken cancellationToken,
+        TransactionType type = TransactionType.Buy,
+        decimal pieces = 2m,
+        decimal pricePerPiece = 1_200.00m,
+        DateOnly? date = null)
+    {
+        var response = await client.PostAsJsonAsync(
+            TransactionsUri(portfolioId, assetId), NewMetalCashRequest(cashAssetId, type, pieces, pricePerPiece, date), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return Assert.Single(
+            (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items,
+            t => t.Type == type && t.Transfer is not null);
+    }
+
     public static async Task<Guid> CreateTransferAsync(
         this HttpClient client, CancellationToken cancellationToken, CreateTransferRequest request)
     {

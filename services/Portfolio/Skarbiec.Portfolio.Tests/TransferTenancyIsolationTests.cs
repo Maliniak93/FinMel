@@ -40,6 +40,52 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
+    public async Task RecordMetalBuy_FundedFromStrangersCash_ReturnsInvalidCounterpartAndWritesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var ownerSetup = await owner.CreateCashAndMetalAsync(cancellationToken);
+        var strangerId = Guid.NewGuid();
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var strangerSetup = await stranger.CreateCashAndMetalAsync(cancellationToken);
+        var ownerBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
+        var strangerBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
+
+        var response = await stranger.PostAsJsonAsync(
+            TransactionsUri(strangerSetup.MetalPortfolioId, strangerSetup.MetalAssetId),
+            NewMetalCashRequest(ownerSetup.CashAssetId),
+            cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(ownerBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
+        Assert.Equal(strangerBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
+        await owner.AssertCashUntouchedAsync(ownerSetup.CashPortfolioId, ownerSetup.CashAssetId, cancellationToken);
+    }
+
+    [Fact]
+    public async Task DeleteMetalTransfer_ByStranger_ReturnsNotFound()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var setup = await owner.CreateCashAndMetalAsync(cancellationToken);
+        var buy = await owner.RecordMetalTransactionWithCashAsync(setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken);
+        Assert.NotNull(buy.Transfer);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var before = await SnapshotUserRowsAsync(ownerId, cancellationToken);
+
+        var response = await stranger.DeleteAsync(TransferUri(buy.Transfer.TransferId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(before, await SnapshotUserRowsAsync(ownerId, cancellationToken));
+        Assert.Equal(2m, (await owner.GetAssetAsync(setup.MetalPortfolioId, setup.MetalAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2_600m, (await owner.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+    }
+
+    [Fact]
     public async Task TransferCandidates_ByStranger_NeverIncludeOwnersAssets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

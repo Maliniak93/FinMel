@@ -344,6 +344,7 @@ export type RecordTransactionRequest = {
     quantity?: number | string;
     unitPrice: number | string;
     date: string;
+    cashAssetId?: null | string;
 };
 
 export type RedeemBondEarlyRequest = {

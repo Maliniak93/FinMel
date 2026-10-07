@@ -508,7 +508,11 @@
       "editTitle": "Edit transaction",
       "record": "Record",
       "mustNotBeNegative": "{{ field }} must not be negative.",
-      "dateRequired": "Date is required."
+      "dateRequired": "Date is required.",
+      "cashAccount": "Cash account",
+      "noCashAccount": "None",
+      "cashAmountHint": "Moves {{ amount }}",
+      "cashAccountsLoadFailed": "Failed to load cash accounts."
     },
     "assetArchivedNotice": "This asset is archived — restore it to make changes.",
     "deleteTransfer": {

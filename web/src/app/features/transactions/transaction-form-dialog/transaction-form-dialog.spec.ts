@@ -54,9 +54,15 @@ describe('TransactionFormDialog', () => {
     await restoreEnglish();
   });
 
-  async function setup(data: TransactionFormDialogData): Promise<void> {
+  async function setup(
+    data: TransactionFormDialogData,
+    respond?: (request: Request) => Response,
+  ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch');
+    if (respond) {
+      fetchSpy.mockImplementation(async (input: RequestInfo | URL) => respond(input as Request));
+    }
 
     await TestBed.configureTestingModule({
       imports: [TransactionFormDialog],
@@ -371,5 +377,99 @@ describe('TransactionFormDialog', () => {
     await switchLanguage(fixture, 'pl');
 
     expect(polishProblems(english, texts())).toEqual([]);
+  });
+  describe('Cash account for a precious metal', () => {
+    const metalAssetId = '44444444-4444-4444-4444-444444444444';
+    const cashAssetId = '55555555-5555-5555-5555-555555555555';
+    const metalData = {
+      portfolioId,
+      assetId: metalAssetId,
+      assetClass: ASSET_CLASS.PreciousMetal,
+    };
+
+    function respond(request: Request): Response {
+      return request.url.includes('/transfer-candidates')
+        ? jsonResponse([
+            {
+              assetId: cashAssetId,
+              portfolioId,
+              name: 'Wallet',
+              portfolioName: 'Main',
+              balance: 5000,
+            },
+          ])
+        : jsonResponse({ ...existingTransaction, assetId: metalAssetId }, 201);
+    }
+
+    function cashSelect(): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector(
+        'mat-select[formcontrolname="cashAssetId"]',
+      );
+    }
+
+    it('sends the chosen cashAssetId and shows quantity times price as a hint', async () => {
+      await setup(metalData, respond);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(cashSelect()).not.toBeNull();
+      const candidatesRequest = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .find((request: Request) => request.url.includes('/transfer-candidates'));
+      expect(candidatesRequest?.url).toContain('assetClass=');
+
+      component['form'].controls.quantity.setValue(2);
+      component['form'].controls.unitPrice.setValue(1200);
+      component['form'].controls.cashAssetId.setValue(cashAssetId);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('2,400');
+
+      await component['onSubmit']();
+
+      const post = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .find(
+          (request: Request) => request.method === 'POST' && request.url.includes('/transactions'),
+        );
+      expect(post).toBeDefined();
+      const body = await post!.json();
+      expect(body.cashAssetId).toBe(cashAssetId);
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
+    });
+
+    it('omits cashAssetId while no account is chosen', async () => {
+      await setup(metalData, respond);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      component['form'].controls.quantity.setValue(1);
+      component['form'].controls.unitPrice.setValue(1200);
+
+      await component['onSubmit']();
+
+      const post = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .find(
+          (request: Request) => request.method === 'POST' && request.url.includes('/transactions'),
+        );
+      const body = await post!.json();
+      expect(body.cashAssetId ?? null).toBeNull();
+    });
+
+    it('has no Cash select for a Stock or for a Dividend', async () => {
+      await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Stock }, respond);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(cashSelect()).toBeNull();
+      fixture.destroy();
+      fetchSpy.mockRestore();
+      TestBed.resetTestingModule();
+
+      await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Etf, type: 4 }, respond);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(cashSelect()).toBeNull();
+    });
   });
 });

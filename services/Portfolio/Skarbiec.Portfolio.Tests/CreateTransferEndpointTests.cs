@@ -73,6 +73,27 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Theory]
+    [InlineData("cash-to-metal")]
+    [InlineData("metal-to-cash")]
+    public async Task MetalRoute_ReturnsBadRequest(string route)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateCashAndMetalAsync(cancellationToken, pieces: 3m);
+        var request = route == "cash-to-metal"
+            ? NewTransferRequest(setup.CashAssetId, setup.MetalAssetId, date: MetalCashDate)
+            : NewTransferRequest(setup.MetalAssetId, setup.CashAssetId, date: MetalCashDate);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(TransfersUri, request, cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+    }
+
+    [Theory]
     [InlineData("cash-to-deposit", true)]
     [InlineData("cash-to-stock", true)]
     [InlineData("eur-cash-to-pln-savings", true)]

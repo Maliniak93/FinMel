@@ -16,7 +16,7 @@ public static class TransferLegs
     }
 
     public static TransferDirection DirectionOf(Transaction leg) =>
-        leg.Type == TransactionType.Withdraw ? TransferDirection.Out : TransferDirection.In;
+        leg.Type is TransactionType.Withdraw or TransactionType.Sell ? TransferDirection.Out : TransferDirection.In;
 
     public static async Task DetachCounterpartsAsync(
         this PortfolioDbContext dbContext, IReadOnlyCollection<Transaction> removed, CancellationToken cancellationToken)

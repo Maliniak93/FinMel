@@ -800,6 +800,37 @@ Content-Type: application/json
   "date": "2026-10-02"
 }
 
+### Buy one piece paid from the Cash account: a linked Cash Withdraw of quantity × unitPrice
+# @name metalBuyWithCash
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addMetal.response.body.assetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": 0,
+  "quantity": 1,
+  "unitPrice": 275.00,
+  "date": "2026-10-03",
+  "cashAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### Sell one piece into the Cash account: a linked Cash Deposit of quantity × unitPrice
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addMetal.response.body.assetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": 1,
+  "quantity": 1,
+  "unitPrice": 280.00,
+  "date": "2026-10-04",
+  "cashAssetId": "{{addFundingCash.response.body.id}}"
+}
+
+### Delete the funded buy: both legs go (409 Conflict.OversellsPosition if a later Sell needs its pieces)
+DELETE {{baseUrl}}/api/portfolio/transfers/{{metalBuyWithCash.response.body.transfer.transferId}}
+Authorization: Bearer {{authToken}}
+
 ### Add a precious metal through the generic assets endpoint (400 Validation.UseMetalEndpoints)
 POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
 Authorization: Bearer {{authToken}}
