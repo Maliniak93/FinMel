@@ -22,6 +22,7 @@ internal static class MarketDataApi
     // Service-only endpoints: anonymous and outside /api/, so the Gateway has no route to them.
     public const string InternalLatestPricesBatchUri = "/internal/prices/latest-batch";
     public const string InternalFxRatesBatchUri = "/internal/fx/latest-batch";
+    public const string InternalInstrumentsBatchUri = "/internal/instruments/batch";
 
     public const string InternalBondSeriesRatesBatchUri = "/internal/bond-series/rates-batch";
 
@@ -89,7 +90,8 @@ internal static class MarketDataApi
         PriceSource source,
         string quoteCurrency,
         CancellationToken cancellationToken,
-        AssetClass assetClass = AssetClass.Stock)
+        AssetClass assetClass = AssetClass.Stock,
+        string? exchange = null)
     {
         var instrument = new Instrument
         {
@@ -99,6 +101,7 @@ internal static class MarketDataApi
             Source = source,
             QuoteCurrency = quoteCurrency,
             AssetClass = assetClass,
+            Exchange = exchange,
         };
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);

@@ -49,6 +49,7 @@ using Skarbiec.Portfolio.Features.SavingsAccounts.ListSavingsAccounts;
 using Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlement;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
+using Skarbiec.Portfolio.Features.Securities.ListSecurities;
 using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 using Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 using Skarbiec.Portfolio.Features.Transfers.ListTransferCandidates;
@@ -85,6 +86,11 @@ if (!OpenApiBuildTime.IsActive)
     });
 
     builder.Services.AddHttpClient<IBondRateLookupClient, MarketDataBondRateLookupClient>(client =>
+    {
+        client.BaseAddress = new Uri("https+http://marketdata-service");
+    });
+
+    builder.Services.AddHttpClient<IInstrumentQuoteLookupClient, MarketDataInstrumentQuoteLookupClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");
     });
@@ -143,6 +149,7 @@ builder.Services.AddScoped<UpdateSavingsAccountHandler>();
 builder.Services.AddScoped<GetSavingsAccountHandler>();
 builder.Services.AddScoped<ListSavingsAccountsHandler>();
 builder.Services.AddScoped<ListCashAccountsHandler>();
+builder.Services.AddScoped<ListSecuritiesHandler>();
 builder.Services.AddScoped<GetSavingsInterestPreviewHandler>();
 builder.Services.AddScoped<SettleSavingsInterestHandler>();
 builder.Services.AddScoped<UndoSavingsInterestSettlementHandler>();
@@ -203,6 +210,7 @@ app.MapUpdateSavingsAccountEndpoint();
 app.MapGetSavingsAccountEndpoint();
 app.MapListSavingsAccountsEndpoint();
 app.MapListCashAccountsEndpoint();
+app.MapListSecuritiesEndpoint();
 app.MapGetSavingsInterestPreviewEndpoint();
 app.MapSettleSavingsInterestEndpoint();
 app.MapUndoSavingsInterestSettlementEndpoint();

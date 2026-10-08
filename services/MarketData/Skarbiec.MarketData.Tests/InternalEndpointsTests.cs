@@ -64,6 +64,27 @@ public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers)
     }
 
     [Fact]
+    public async Task InstrumentsBatch_IsAnonymousAndAbsentFromOpenApi()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Guid instrumentId;
+        await using (var seedDb = CreateDbContext())
+        {
+            instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
+        }
+
+        using var client = Factory.CreateClient();
+        var batch = await client.PostAsJsonAsync(InternalInstrumentsBatchUri, new { instrumentIds = new[] { instrumentId } }, cancellationToken);
+        var openApi = await client.GetAsync(OpenApiDocumentUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, batch.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, openApi.StatusCode);
+        using var document = await JsonDocument.ParseAsync(await openApi.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        var paths = document.RootElement.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
+        Assert.DoesNotContain(InternalInstrumentsBatchUri, paths);
+    }
+
+    [Fact]
     public async Task OpenApiDocument_ContainsNoInternalPaths()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

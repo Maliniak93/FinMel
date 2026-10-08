@@ -641,6 +641,14 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/cash-accounts
 Authorization: Bearer {{authToken}}
 
+### List Stock holdings across portfolios, with value in PLN and unrealised gain — assetClass=Stock|Etf
+GET {{baseUrl}}/api/portfolio/securities?assetClass=Stock
+Authorization: Bearer {{authToken}}
+
+### List ETF holdings across portfolios
+GET {{baseUrl}}/api/portfolio/securities?assetClass=Etf
+Authorization: Bearer {{authToken}}
+
 ### Get a savings account
 GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
 Authorization: Bearer {{authToken}}

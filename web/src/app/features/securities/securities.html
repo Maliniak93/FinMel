@@ -1,0 +1,12 @@
+<div class="securities-page">
+  <h1>{{ 'securities.title' | transloco }}</h1>
+
+  <mat-tab-group>
+    <mat-tab [label]="'securities.tabs.stocks' | transloco">
+      <app-securities-table [assetClass]="stockClass" />
+    </mat-tab>
+    <mat-tab [label]="'securities.tabs.etfs' | transloco">
+      <app-securities-table [assetClass]="etfClass" />
+    </mat-tab>
+  </mat-tab-group>
+</div>

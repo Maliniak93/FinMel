@@ -912,6 +912,34 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
     }
 
+    public const string SecuritiesBaseUri = "/api/portfolio/securities";
+
+    public static string AllSecuritiesUri(AssetClass assetClass) => $"{SecuritiesBaseUri}?assetClass={assetClass}";
+
+    // The instrument must already be scripted in FakeInstrumentLookupClient with the same class and currency.
+    public static async Task<Guid> AddMarketAssetAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        CancellationToken cancellationToken,
+        AssetClass assetClass = AssetClass.Stock,
+        string currency = "PLN",
+        Guid? instrumentId = null,
+        string name = "Market asset")
+    {
+        var request = new AddAssetRequest
+        {
+            AssetClass = assetClass,
+            Name = name,
+            Currency = currency,
+            InstrumentId = instrumentId ?? Guid.NewGuid()
+        };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+    }
+
     public static async Task<(Guid PortfolioId, Guid AssetId)> CreatePortfolioWithAssetAsync(
         this HttpClient client, CancellationToken cancellationToken, string currency = "PLN")
     {

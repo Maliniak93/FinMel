@@ -34,6 +34,7 @@
       "dashboard": "Dashboard",
       "portfolios": "Portfolios",
       "cash": "Cash",
+      "securities": "Stocks & ETFs",
       "deposits": "Deposits & savings",
       "bonds": "Bonds",
       "metals": "Precious metals",
@@ -535,6 +536,38 @@
     "deposit": "Deposit",
     "withdraw": "Withdraw",
     "transferWithSavings": "Transfer with savings"
+  },
+  "securities": {
+    "title": "Stocks & ETFs",
+    "tabs": {
+      "stocks": "Stocks",
+      "etfs": "ETFs"
+    },
+    "add": "Add",
+    "columns": {
+      "instrument": "Instrument",
+      "portfolio": "Portfolio",
+      "quantity": "Quantity",
+      "averageBuyPrice": "Avg. buy price",
+      "price": "Price",
+      "value": "Value",
+      "gain": "Gain/loss"
+    },
+    "total": "Total",
+    "buy": "Buy",
+    "sell": "Sell",
+    "dividend": "Dividend",
+    "transactions": "Transactions",
+    "empty": {
+      "stock": "You have no stocks yet",
+      "etf": "You have no ETFs yet"
+    },
+    "loadFailed": "Failed to load holdings.",
+    "priceUnavailable": {
+      "noQuote": "No quote yet",
+      "fxRateMissing": "No exchange rate",
+      "marketDataUnavailable": "Quotes temporarily unavailable"
+    }
   },
   "metals": {
     "title": "Precious metals",

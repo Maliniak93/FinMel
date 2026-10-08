@@ -14,11 +14,13 @@ export const TRANSACTION_TYPES: readonly { value: TransactionType; label: string
 const BUY = 0;
 const SELL = 1;
 const WITHDRAW = 3;
+const DIVIDEND = 4;
 
 export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
 export const TRANSACTION_TYPE_SELL: TransactionType = SELL;
 export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
 export const TRANSACTION_TYPE_WITHDRAW: TransactionType = WITHDRAW;
+export const TRANSACTION_TYPE_DIVIDEND: TransactionType = DIVIDEND;
 
 const CASH_LIKE_CLASSES: readonly number[] = [
   ASSET_CLASS.Cash,

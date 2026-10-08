@@ -34,6 +34,7 @@
       "dashboard": "Pulpit",
       "portfolios": "Portfele",
       "cash": "Gotówka",
+      "securities": "Akcje i ETF",
       "deposits": "Lokaty i oszczędności",
       "bonds": "Obligacje",
       "metals": "Metale szlachetne",
@@ -535,6 +536,38 @@
     "deposit": "Wpłata",
     "withdraw": "Wypłata",
     "transferWithSavings": "Przelew z kontem oszczędnościowym"
+  },
+  "securities": {
+    "title": "Akcje i ETF",
+    "tabs": {
+      "stocks": "Akcje",
+      "etfs": "ETF"
+    },
+    "add": "Dodaj",
+    "columns": {
+      "instrument": "Instrument",
+      "portfolio": "Portfel",
+      "quantity": "Ilość",
+      "averageBuyPrice": "Śr. cena zakupu",
+      "price": "Kurs",
+      "value": "Wartość",
+      "gain": "Zysk/strata"
+    },
+    "total": "Razem",
+    "buy": "Kup",
+    "sell": "Sprzedaj",
+    "dividend": "Dywidenda",
+    "transactions": "Transakcje",
+    "empty": {
+      "stock": "Nie masz jeszcze akcji",
+      "etf": "Nie masz jeszcze ETF-ów"
+    },
+    "loadFailed": "Nie udało się wczytać pozycji.",
+    "priceUnavailable": {
+      "noQuote": "Brak notowania",
+      "fxRateMissing": "Brak kursu waluty",
+      "marketDataUnavailable": "Notowania chwilowo niedostępne"
+    }
   },
   "metals": {
     "title": "Metale szlachetne",
