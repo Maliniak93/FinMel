@@ -170,6 +170,7 @@ export class Transactions {
       portfolioId: this.portfolioId(),
       assetId: this.assetId(),
       assetClass: this.assetResource.value().assetClass,
+      currency: this.assetResource.value().currency,
     };
   }
 

@@ -835,6 +835,34 @@ Content-Type: application/json
   "cashAssetId": "{{addFundingCash.response.body.id}}"
 }
 
+### Add a PLN stock to trade through the Cash account
+# @name addPlnStock
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Stock",
+  "name": "PLN stock",
+  "currency": "PLN",
+  "manualValue": 1000,
+  "manualValueDate": "2026-10-01"
+}
+
+### Buy 15 shares paid from the Cash account: a linked Cash Withdraw of round(quantity x unitPrice, 2); a Sell or Dividend pays into it
+# @name stockBuyWithCash
+POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addPlnStock.response.body.id}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": 0,
+  "quantity": 15,
+  "unitPrice": 110.00,
+  "date": "2026-10-05",
+  "cashAssetId": "{{addFundingCash.response.body.id}}"
+}
+
 ### Delete the funded buy: both legs go (409 Conflict.OversellsPosition if a later Sell needs its pieces)
 DELETE {{baseUrl}}/api/portfolio/transfers/{{metalBuyWithCash.response.body.transfer.transferId}}
 Authorization: Bearer {{authToken}}

@@ -514,7 +514,12 @@
       "cashAccount": "Cash account",
       "noCashAccount": "None",
       "cashAmountHint": "Moves {{ amount }}",
-      "cashAccountsLoadFailed": "Failed to load cash accounts."
+      "cashAccountsLoadFailed": "Failed to load cash accounts.",
+      "cashAmountTaken": "Will be taken: {{ amount }}",
+      "cashAmountReceived": "Will be received: {{ amount }}",
+      "insufficientFunds": "Not enough funds on the account.",
+      "invalidCashAccount": "This Cash account can't be used for this transaction.",
+      "legManaged": "Edit this transaction on the stock or ETF side."
     },
     "assetArchivedNotice": "This asset is archived — restore it to make changes.",
     "deleteTransfer": {

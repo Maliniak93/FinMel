@@ -120,6 +120,47 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     }
 
     [Fact]
+    public async Task SecurityTrade_PublishesBothAssets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Guid walletId, cashId, brokerageId, stockId;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
+            brokerageId = await CreatePortfolioAsync(arrange.ServiceProvider, "Brokerage", cancellationToken);
+            stockId = await AddManualStockAsync(arrange.ServiceProvider, brokerageId, "Shares", cancellationToken);
+        }
+
+        var positionEventsBefore = await CountPositionEventsAsync(cancellationToken);
+        SaveChanges.Reset();
+
+        await using (var act = Provider.CreateAsyncScope())
+        {
+            var result = await act.ServiceProvider.GetRequiredService<RecordTransactionHandler>()
+                .HandleAsync(brokerageId, stockId, PortfolioApi.NewTradeRequest(cashId), cancellationToken);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+
+        Assert.Equal(1, SaveChanges.Count);
+
+        await using var verify = Provider.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(positionEventsBefore).ToList();
+        Assert.Equal(2, events.Count);
+        var stockEvent = Assert.Single(events, e => e.AssetId == stockId);
+        Assert.Equal(15m, stockEvent.Quantity);
+        Assert.Equal(brokerageId, stockEvent.PortfolioId);
+        var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
+        Assert.Equal(3_350m, cashEvent.Quantity);
+        Assert.Equal(walletId, cashEvent.PortfolioId);
+        var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        Assert.Equal(1_650.00m, Assert.Single(legs, l => l.AssetId == cashId).Quantity);
+    }
+
+    [Fact]
     public async Task DeleteMetalTransfer_PublishesBoth()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

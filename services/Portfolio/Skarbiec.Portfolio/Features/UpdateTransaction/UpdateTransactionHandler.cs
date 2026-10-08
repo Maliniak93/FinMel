@@ -51,7 +51,10 @@ public sealed class UpdateTransactionHandler(
         // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
-            return TransferErrors.LegManaged;
+            // A stock or ETF trade's pair is edited from the security side.
+            return asset.AssetClass is AssetClass.Stock or AssetClass.Etf
+                ? await UpdateTradeAsync(asset, transaction, request, cancellationToken)
+                : TransferErrors.LegManaged;
         }
 
         // A savings interest credit goes only by undoing its settlement, so a settlement never loses its credit.
@@ -120,5 +123,108 @@ public sealed class UpdateTransactionHandler(
         }
 
         return transaction.ToResponse(asset.Currency);
+    }
+
+    private async Task<Result<TransactionResponse>> UpdateTradeAsync(
+        Asset asset, Transaction transaction, UpdateTransactionRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Type != transaction.Type)
+        {
+            return TransferErrors.LegManaged;
+        }
+
+        var cashLeg = await dbContext.Transactions
+            .FirstOrDefaultAsync(t => t.TransferId == transaction.TransferId && t.Id != transaction.Id, cancellationToken);
+        if (cashLeg is null)
+        {
+            return TransferErrors.LegManaged;
+        }
+
+        var cash = await dbContext.Assets.FirstAsync(a => a.Id == cashLeg.AssetId, cancellationToken);
+        if (await dbContext.ReadOnlyErrorAsync(cash, cancellationToken) is { } cashReadOnly)
+        {
+            return cashReadOnly;
+        }
+
+        var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
+        if (unitPrice.IsFailure)
+        {
+            return unitPrice.Error;
+        }
+
+        var securityUnitPrice = TransferLegs.SecurityUnitPrice(request.Type, unitPrice.Value.Amount);
+        var candidate = new Transaction
+        {
+            Id = transaction.Id,
+            AssetId = asset.Id,
+            Type = request.Type,
+            Quantity = request.Quantity,
+            UnitPriceAmount = securityUnitPrice,
+            Date = request.Date
+        };
+
+        var cashAmount = TransferLegs.TradeCashAmount(request.Type, request.Quantity, securityUnitPrice);
+        var cashCandidate = new Transaction
+        {
+            Id = cashLeg.Id,
+            AssetId = cash.Id,
+            Type = cashLeg.Type,
+            Quantity = cashAmount,
+            UnitPriceAmount = 1m,
+            Date = request.Date
+        };
+
+        var securityQuantity = await RecomputeWithAsync(asset.Id, candidate, TransactionErrors.MutationBreaksHistory, cancellationToken);
+        if (securityQuantity.IsFailure)
+        {
+            return securityQuantity.Error;
+        }
+
+        var cashQuantity = await RecomputeWithAsync(cash.Id, cashCandidate, _ => TransferErrors.InsufficientFunds, cancellationToken);
+        if (cashQuantity.IsFailure)
+        {
+            return cashQuantity.Error;
+        }
+
+        var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
+        if (fxRateToPln.IsFailure)
+        {
+            return fxRateToPln.Error;
+        }
+
+        transaction.Quantity = candidate.Quantity;
+        transaction.UnitPriceAmount = candidate.UnitPriceAmount;
+        transaction.FxRateToPln = fxRateToPln.Value;
+        transaction.Date = candidate.Date;
+        cashLeg.Quantity = cashAmount;
+        cashLeg.FxRateToPln = fxRateToPln.Value;
+        cashLeg.Date = request.Date;
+        asset.Quantity = securityQuantity.Value;
+        cash.Quantity = cashQuantity.Value;
+
+        await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
+        await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return TransactionErrors.ConcurrentModification();
+        }
+
+        return transaction.ToResponse(asset.Currency);
+    }
+
+    private async Task<Result<decimal>> RecomputeWithAsync(
+        Guid assetId, Transaction candidate, Func<TransactionType, Error> oversellError, CancellationToken cancellationToken)
+    {
+        var others = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(t => t.AssetId == assetId && t.Id != candidate.Id)
+            .ToListAsync(cancellationToken);
+
+        return TransactionQuantityCalculator.Recompute([.. others, candidate], oversellError);
     }
 }

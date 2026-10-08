@@ -146,6 +146,18 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         return assetResult.Value.Id;
     }
 
+    protected static async Task<Guid> AddManualStockAsync(
+        IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
+    {
+        var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
+            portfolioId,
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            cancellationToken);
+        Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
+
+        return assetResult.Value.Id;
+    }
+
     protected static async Task<Guid> AddAssetWithBuyAsync(
         IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
     {

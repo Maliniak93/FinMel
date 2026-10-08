@@ -153,6 +153,12 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidTransferCounterpartErrorCode, cancellationToken);
 
+    public const string CashLinkNotAllowedErrorCode = "Validation.CashLinkNotAllowed";
+
+    public static async Task AssertCashLinkNotAllowedAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, CashLinkNotAllowedErrorCode, cancellationToken);
+
     public static async Task AssertInsufficientFundsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, InsufficientFundsErrorCode, cancellationToken);

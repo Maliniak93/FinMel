@@ -81,7 +81,6 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
     [InlineData("eur-cash")]
     [InlineData("archived-cash")]
     [InlineData("holding-itself")]
-    [InlineData("stock-buy")]
     public async Task InvalidCounterpart_ReturnsBadRequest(string scenario)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -89,8 +88,6 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await client.CreateCashAndMetalAsync(cancellationToken);
-        var portfolioId = setup.MetalPortfolioId;
-        var assetId = setup.MetalAssetId;
         Guid cashAssetId;
         switch (scenario)
         {
@@ -104,20 +101,15 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
             case "archived-cash":
                 cashAssetId = (await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken, portfolioName: "Old wallet")).CashId;
                 break;
-            case "holding-itself":
-                cashAssetId = setup.MetalAssetId;
-                break;
             default:
-                portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Stocks");
-                assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares");
-                cashAssetId = setup.CashAssetId;
+                cashAssetId = setup.MetalAssetId;
                 break;
         }
 
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(portfolioId, assetId), NewMetalCashRequest(cashAssetId, pieces: 1m, pricePerPiece: 100m), cancellationToken);
+            TransactionsUri(setup.MetalPortfolioId, setup.MetalAssetId), NewMetalCashRequest(cashAssetId, pieces: 1m, pricePerPiece: 100m), cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));

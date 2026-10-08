@@ -53,9 +53,15 @@
       <mat-form-field appearance="outline" class="transaction-form-dialog__field">
         <mat-label>{{ 'transactions.form.cashAccount' | transloco }}</mat-label>
         <mat-select formControlName="cashAssetId" canSelectNullableOptions>
-          <mat-option [value]="null">{{
-            'transactions.form.noCashAccount' | transloco
-          }}</mat-option>
+          @if (isEdit) {
+            <mat-option [value]="data.transaction?.transfer?.counterpartAssetId">{{
+              data.transaction?.transfer?.counterpartAssetName
+            }}</mat-option>
+          } @else {
+            <mat-option [value]="null">{{
+              'transactions.form.noCashAccount' | transloco
+            }}</mat-option>
+          }
           @if (cashCandidatesResource.hasValue()) {
             @for (candidate of cashCandidatesResource.value(); track candidate.assetId) {
               <mat-option [value]="candidate.assetId">
@@ -70,8 +76,7 @@
           <mat-hint>{{ loadError.message }}</mat-hint>
         } @else if (cashAmount(); as amount) {
           <mat-hint>{{
-            'transactions.form.cashAmountHint'
-              | transloco: { amount: formatMoney(amount, cashCurrency) }
+            cashHintKey() | transloco: { amount: formatMoney(amount, cashCurrency) }
           }}</mat-hint>
         }
         @if (form.controls.cashAssetId.hasError('server')) {

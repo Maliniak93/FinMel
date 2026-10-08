@@ -64,10 +64,11 @@ internal static class PortfolioApi
         CancellationToken cancellationToken,
         decimal balance = 5_000m,
         string portfolioName = "Wallet",
-        string name = "Archived cash")
+        string name = "Archived cash",
+        string currency = "PLN")
     {
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
-        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name);
+        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name, currency: currency);
         await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
 
         return (portfolioId, cashId);
@@ -1176,6 +1177,42 @@ internal static class PortfolioApi
         return Assert.Single(
             (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items,
             t => t.Type == type && t.Transfer is not null);
+    }
+
+    public static readonly DateOnly TradeDate = new(2026, 2, 10);
+
+    public sealed record CashAndEtf(Guid CashPortfolioId, Guid CashAssetId, Guid EtfPortfolioId, Guid EtfAssetId);
+
+    public static RecordTransactionRequest NewTradeRequest(
+        Guid? cashAssetId,
+        TransactionType type = TransactionType.Buy,
+        decimal quantity = 15m,
+        decimal unitPrice = 110m,
+        DateOnly? date = null) => new()
+        {
+            Type = type,
+            Quantity = quantity,
+            UnitPrice = unitPrice,
+            Date = date ?? TradeDate,
+            CashAssetId = cashAssetId
+        };
+
+    public static async Task<TransactionResponse> RecordTradeWithCashAsync(
+        this HttpClient client,
+        Guid portfolioId,
+        Guid assetId,
+        Guid cashAssetId,
+        CancellationToken cancellationToken,
+        TransactionType type = TransactionType.Buy,
+        decimal quantity = 15m,
+        decimal unitPrice = 110m,
+        DateOnly? date = null)
+    {
+        var response = await client.PostAsJsonAsync(
+            TransactionsUri(portfolioId, assetId), NewTradeRequest(cashAssetId, type, quantity, unitPrice, date), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!;
     }
 
     public static async Task<Guid> CreateTransferAsync(

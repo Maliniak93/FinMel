@@ -139,6 +139,7 @@ export class SecuritiesTable {
       portfolioId: holding.portfolioId,
       assetId: holding.assetId,
       assetClass: this.assetClass(),
+      currency: holding.currency,
       type,
     };
     this.reloadWhenDone(this.dialog.open(TransactionFormDialog, { width: '480px', data }));

@@ -48,7 +48,10 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
-            return TransferErrors.LegManaged;
+            // A stock or ETF trade's pair is deleted from the security side.
+            return asset.AssetClass is AssetClass.Stock or AssetClass.Etf
+                ? await DeleteTradeAsync(asset, transaction, cancellationToken)
+                : TransferErrors.LegManaged;
         }
 
         // A savings interest credit goes only by undoing its settlement, so a settlement never loses its credit.
@@ -85,5 +88,61 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         }
 
         return Result.Success();
+    }
+
+    private async Task<Result> DeleteTradeAsync(Asset asset, Transaction transaction, CancellationToken cancellationToken)
+    {
+        var cashLeg = await dbContext.Transactions
+            .FirstOrDefaultAsync(t => t.TransferId == transaction.TransferId && t.Id != transaction.Id, cancellationToken);
+        if (cashLeg is null)
+        {
+            return TransferErrors.LegManaged;
+        }
+
+        var cash = await dbContext.Assets.FirstAsync(a => a.Id == cashLeg.AssetId, cancellationToken);
+        if (await dbContext.ReadOnlyErrorAsync(cash, cancellationToken) is { } cashReadOnly)
+        {
+            return cashReadOnly;
+        }
+
+        var securityQuantity = await RecomputeWithoutAsync(transaction, cancellationToken);
+        if (securityQuantity.IsFailure)
+        {
+            return securityQuantity.Error;
+        }
+
+        var cashQuantity = await RecomputeWithoutAsync(cashLeg, cancellationToken);
+        if (cashQuantity.IsFailure)
+        {
+            return cashQuantity.Error;
+        }
+
+        asset.Quantity = securityQuantity.Value;
+        cash.Quantity = cashQuantity.Value;
+        dbContext.Transactions.RemoveRange(transaction, cashLeg);
+
+        await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
+        await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return TransactionErrors.ConcurrentModification();
+        }
+
+        return Result.Success();
+    }
+
+    private async Task<Result<decimal>> RecomputeWithoutAsync(Transaction leg, CancellationToken cancellationToken)
+    {
+        var remaining = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(t => t.AssetId == leg.AssetId && t.Id != leg.Id)
+            .ToListAsync(cancellationToken);
+
+        return TransactionQuantityCalculator.Recompute(remaining, TransactionErrors.MutationBreaksHistory);
     }
 }
