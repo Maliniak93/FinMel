@@ -84,8 +84,9 @@ in `notes` — never invent an API.
 Run them **filtered to the tests you just wrote**:
 `dotnet test services/<Service>/Skarbiec.<Service>.Tests --filter "FullyQualifiedName~<Name>"`
 (frontend: `cd web && npm test -- --watch=false -t "<name>"`). Every new test must fail for the right
-reason. Never run a whole project, a whole suite or `scripts/verify.mjs` — the `verifier` phase does
-that later in the run, and repeating it here only costs time.
+reason. Never run a whole project, a whole suite or `scripts/verify.mjs` — the implementer's full
+verify run does that before it returns, and repeating it here only costs time. Every Bash call running
+`dotnet test` sets Bash `timeout: 600000` — the default 2 minutes cuts a filtered MarketData run.
 
 A **compile failure** because the production API does not exist yet is an acceptable red — say so in
 `notes`, naming the missing type or member. A test that passes on the first run is a bug in the test

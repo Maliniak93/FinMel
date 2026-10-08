@@ -365,15 +365,22 @@ function prepare([number, ...rest]) {
   const dirty = status.out ? status.out.split(/\r?\n/) : [];
   const branchCommands = [];
   let action = "resumed";
+  if (head.out !== target && dirty.length) {
+    return refuseBranch("the working tree holds changes that are not this spec", { files: dirty, next: `commit, stash or discard them, then re-run /build #${n}` });
+  }
+  const masterSync = head.out === "master" ? ["pull", "--ff-only", "origin", "master"] : ["fetch", "origin", "master:master"];
+  branchCommands.push("git fetch origin", ["git", ...masterSync].join(" "));
+  if (!dryRun) {
+    const fetched = git(["fetch", "origin"]);
+    if (!fetched.ok) return refuseBranch(`git fetch origin: ${fetched.err}`);
+    const synced = git(masterSync);
+    if (!synced.ok) {
+      return refuseBranch(`git ${masterSync.join(" ")}: ${synced.err}`, {
+        next: `reset local master to origin/master (git switch master && git reset --hard origin/master) or fix it by hand, then re-run /build #${n}`,
+      });
+    }
+  }
   if (head.out !== target) {
-    if (dirty.length) {
-      return refuseBranch("the working tree holds changes that are not this spec", { files: dirty, next: `commit, stash or discard them, then re-run /build #${n}` });
-    }
-    branchCommands.push("git fetch origin");
-    if (!dryRun) {
-      const fetched = git(["fetch", "origin"]);
-      if (!fetched.ok) return refuseBranch(`git fetch origin: ${fetched.err}`);
-    }
     const exists = git(["rev-parse", "--verify", "--quiet", `refs/heads/${target}`]).ok || git(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${target}`]).ok;
     action = exists ? "switched" : "created";
     const cmd = exists ? "git" : "gh";

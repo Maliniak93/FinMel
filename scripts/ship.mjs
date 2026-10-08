@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Usage: node scripts/ship.mjs <issue> --branch <b> --title <t> --json '<run report>' [--blocked] [--dry-run]
-//   --blocked   only post the report, no git; --dry-run prints the commands and runs the read-only guard only
+//   --blocked   only post the report, no git; --dry-run prints the commands and runs the read-only guards only
+//   a shipping run first needs the tree proven green: node scripts/verify.mjs --all --cache-check
 //   last stdout line: SHIP_RESULT: {...}; exit 0 ok, 2 failed
 
 import { spawnSync } from "node:child_process";
@@ -10,6 +11,9 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
 const BOOLEAN_FLAGS = new Set(["blocked", "dry-run"]);
+const VERIFY_ARGV = ["scripts/verify.mjs", "--all", "--cache-check"];
+const VERIFY_COMMAND = `node ${VERIFY_ARGV.join(" ")}`;
+const NOT_GREEN = "the tree was not proven green by verify.mjs (cache miss)";
 
 function run(cmd, argv) {
   const res = spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
@@ -39,6 +43,21 @@ let exitCode = 2;
 function finish() {
   console.log(`SHIP_RESULT: ${JSON.stringify(result)}`);
   process.exit(exitCode);
+}
+
+function checkVerified() {
+  const res = run(process.execPath, VERIFY_ARGV);
+  const line = res.all.split(/\r?\n/).reverse().find((l) => l.startsWith("VERIFY_RESULT: "));
+  let parsed = null;
+  try {
+    parsed = JSON.parse(line.slice("VERIFY_RESULT: ".length));
+  } catch {
+  }
+  if (res.ok && parsed?.ok === true) return { ok: true };
+  return {
+    ok: false,
+    error: parsed ? `${NOT_GREEN}; run node scripts/verify.mjs --all --fix --cache first` : `${NOT_GREEN}; ${VERIFY_COMMAND} gave no result: ${res.firstErr}`,
+  };
 }
 
 function postReport(report) {
@@ -77,11 +96,27 @@ try {
 
   if (flags["dry-run"]) {
     if (failed) console.log(`guard failed: ${failed.error}`);
+    console.log(`would run: ${VERIFY_COMMAND}`);
+    if (!failed) {
+      const verified = checkVerified();
+      console.log(verified.ok ? "verify cache: green" : `verify cache: ${verified.error}`);
+      if (!verified.ok) failed = { command: VERIFY_COMMAND, error: verified.error };
+    }
     for (const s of steps) console.log(`would run: ${s.cmd} ${s.argv.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ")}`);
     console.log(`would post: gh-project.mjs report ${issue} --json ${JSON.stringify({ ...report, status: "shipped" })}`);
     result = { ok: !failed, dryRun: true, branch, ...(failed ? { failedCommand: failed.command, error: failed.error } : {}) };
     exitCode = failed ? 2 : 0;
     finish();
+  }
+
+  if (!failed) {
+    const verified = checkVerified();
+    if (!verified.ok) {
+      const posted = postReport({ deviations: report.deviations, status: "blocked", stage: "verify", reason: NOT_GREEN });
+      result = { ok: false, branch, reportPosted: posted.ok, failedCommand: VERIFY_COMMAND, error: verified.error };
+      exitCode = 2;
+      finish();
+    }
   }
 
   let prUrl = null;

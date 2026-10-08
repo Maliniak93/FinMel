@@ -4,8 +4,7 @@ export const meta = {
   whenToUse: 'Invoked by /build and /fix after `gh-project.mjs prepare` cut the issue branch (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
     { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; haiku/high on tier 1, sonnet/medium on tier 2 (skippable)' },
-    { title: 'Implement', detail: 'implementer does the work; haiku/high on a tier-1 skip-tests cleanup, opus/medium on tier 1, opus/high on tier 2; its Stop hook runs the affected suites' },
-    { title: 'Verify', detail: 'verifier runs scripts/verify.mjs --fix --cache (a tree the Stop hook already proved green answers from cache); failures loop back to Implement', model: 'haiku' },
+    { title: 'Implement', detail: 'implementer does the work and runs the full scripts/verify.mjs itself with up to 3 fixes; sonnet/medium on tier 1, haiku/high on a tier-1 skip-tests cleanup, sonnet/high on tier 2; a red result escalates once to opus (medium on tier 1, high on tier 2), a second red blocks the run' },
     { title: 'Review', detail: 'reviewer reads scripts/review-diff.mjs against the spec; opus/medium on tier 1, opus/high on tier 2 (skippable)', model: 'claude-opus-5-5' },
   ],
 }
@@ -32,10 +31,21 @@ const TESTS = {
   required: ['tests', 'projects'],
 }
 
+const FAILURES = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: { step: { type: 'string' }, summary: { type: 'string' }, file: { type: 'string' } },
+    required: ['step', 'summary'],
+  },
+}
+
 const IMPL = {
   type: 'object',
   properties: {
     status: { type: 'string', enum: ['done', 'blocked'] },
+    verified: { type: 'boolean' },
+    failures: FAILURES,
     filesTouched: { type: 'array', items: { type: 'string' } },
     projects: { type: 'array', items: { type: 'string' } },
     commandsRun: { type: 'array', items: { type: 'string' } },
@@ -55,23 +65,7 @@ const IMPL = {
       },
     },
   },
-  required: ['status', 'filesTouched', 'projects'],
-}
-
-const VERIFY = {
-  type: 'object',
-  properties: {
-    ok: { type: 'boolean' },
-    failures: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { step: { type: 'string' }, summary: { type: 'string' }, file: { type: 'string' } },
-        required: ['step', 'summary'],
-      },
-    },
-  },
-  required: ['ok', 'failures'],
+  required: ['status', 'verified', 'filesTouched', 'projects'],
 }
 
 const REVIEW = {
@@ -113,15 +107,15 @@ const skipped = new Set((Array.isArray(skip) ? skip : [skip]).map((s) => String(
 const noTests = skipped.has('tests')
 
 const OPUS = 'claude-opus-5-5'
-// A tier-1 skip-tests spec is a mechanical cleanup: Haiku tries first and the first red verify hands it to Opus.
-const cheapStart = noTests && tier === 1
-let model = cheapStart ? 'haiku' : OPUS
-let effort = cheapStart || tier >= 2 ? 'high' : 'medium'
+const startLevel =
+  tier >= 2 ? { model: 'sonnet', effort: 'high' } : noTests ? { model: 'haiku', effort: 'high' } : { model: 'sonnet', effort: 'medium' }
+const escalatedLevel = { model: OPUS, effort: tier >= 2 ? 'high' : 'medium' }
+// Escalation happens once per run; every later implementer call, review fixes included, stays escalated.
+let level = startLevel
 const testWriter = tier >= 2 ? { model: 'sonnet', effort: 'medium' } : { model: 'haiku', effort: 'high' }
 const reviewEffort = tier >= 2 ? 'high' : 'medium'
 
 let rounds = 0
-let escalated = false
 let tests = { tests: [], projects: [], notes: [] }
 let impl = null
 // Every test or design change the implementer made, across all its rounds.
@@ -170,26 +164,52 @@ function stop(stage, extra) {
 
 const OWN =
   'You own the design and the tests: a wrong test or a wrong design decision is yours to fix - list each change in `deviations` with why. Every acceptance criterion must still be proven by a test.'
+const VERIFY_LINE =
+  'Before you return, run the full verification (`scripts/verify.mjs --all`) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it.'
 async function implement(label, lines) {
-  const result = await step('implementer', label, [`Work on the spec at \`${spec}\`. You are already on its branch \`${branch}\`.`].concat(lines, [OWN]), IMPL, { model, effort })
+  const result = await step(
+    'implementer',
+    label,
+    [`Work on the spec at \`${spec}\`. You are already on its branch \`${branch}\`.`].concat(lines, [OWN, VERIFY_LINE]),
+    IMPL,
+    level,
+  )
   if (result && result.deviations) deviations.push(...result.deviations)
   return result
 }
 
-// No project list: the verifier auto-detects the affected areas exactly as the implementer's Stop hook
-// does, so a tree the hook already proved green is a cache hit.
-const verify = (label) =>
-  step('verifier', label, ['Run the verification script and report its VERIFY_RESULT line verbatim.', 'projects: []', 'Fix nothing. Explain nothing.'], VERIFY)
+const failed = (r) => !r || r.status === 'blocked' || r.verified !== true
+const why = (r) => (!r ? 'returned no result' : r.status === 'blocked' ? 'blocked' : 'still red after its fixes')
+const giveUp = (r, reason) => ({ reason, failures: (r && r.failures) || [], notes: (r && r.notes) || [] })
 
-const fixRound = (label, failures) =>
-  implement(label, [
-    `Fix exactly these verification failures: ${JSON.stringify(failures)}`,
-    `tests: ${JSON.stringify(tests)}`,
-    'Do not refactor around them. A failure caused by a wrong test is fixed in the test and recorded in `deviations`.',
-  ])
+// Runs the implementer at the current level and escalates once on a red or blocked result.
+// Returns { impl } or { reason, failures, notes } for the caller's stop('implement').
+async function attempt(label, lines) {
+  const first = await implement(label, lines)
+  if (!failed(first)) return { impl: first }
+  if (level === escalatedLevel) return giveUp(first, `implementer ${why(first)} on the escalated level`)
+
+  log(`${label}: implementer ${why(first)} on ${level.model}/${level.effort} - escalating to ${escalatedLevel.model}/${escalatedLevel.effort}`)
+  level = escalatedLevel
+  rounds = rounds + 1
+  if (broke()) return giveUp(first, 'budget')
+
+  const second = await implement(
+    `${label} (escalated)`,
+    lines.concat([
+      `A previous attempt ${why(first)}. Its tree is still on disk - continue from it rather than starting over.`,
+      first ? `Its last verify failures: ${JSON.stringify(first.failures || [])}` : null,
+      first && first.notes && first.notes.length ? `Its notes: ${JSON.stringify(first.notes)}` : null,
+      first && first.deviations && first.deviations.length ? `Its deviations: ${JSON.stringify(first.deviations)}` : null,
+      first && first.openQuestions && first.openQuestions.length ? `Its open questions: ${JSON.stringify(first.openQuestions)}` : null,
+    ]),
+  )
+  if (!failed(second)) return { impl: second }
+  return giveUp(second, `escalated implementer ${why(second)}`)
+}
 
 log(
-  `Spec ${spec} on ${branch} - tier ${tier}, test-writer ${testWriter.model}/${testWriter.effort}, implementer ${model}/${effort}, reviewer opus/${reviewEffort}, max ${maxRounds} fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`,
+  `Spec ${spec} on ${branch} - tier ${tier}, test-writer ${testWriter.model}/${testWriter.effort}, implementer ${startLevel.model}/${startLevel.effort} escalating once to ${escalatedLevel.model}/${escalatedLevel.effort}, reviewer opus/${reviewEffort} then opus/medium re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`,
 )
 
 // ---------------------------------------------------------------- tests
@@ -232,7 +252,7 @@ if (noTests) {
 phase('Implement')
 if (broke()) return stop('implement', { reason: 'budget' })
 
-impl = await implement(
+const initial = await attempt(
   'implement the spec',
   tests.tests.length
     ? [
@@ -246,53 +266,10 @@ impl = await implement(
       ],
 )
 
-if (!impl) return stop('implement', { reason: 'implementer returned no result' })
-if (impl.status === 'blocked') return stop('implement', { reason: 'implementer blocked', notes: impl.notes || [] })
+if (!initial.impl) return stop('implement', initial)
+impl = initial.impl
 
-log(`implementer touched ${impl.filesTouched.length} file(s)`)
-
-// ---------------------------------------------------------------- verify loop
-
-for (let round = 0; ; round++) {
-  phase('Verify')
-  if (broke()) return stop('verify', { reason: 'budget' })
-
-  const verified = await verify(`verify round ${round + 1}`)
-  if (!verified) return stop('verify', { reason: 'verifier returned no result' })
-
-  if (verified.ok) {
-    log(`verify green after ${rounds} fix round(s)`)
-    break
-  }
-
-  rounds = round + 1
-  log(`verify failed (${verified.failures.map((f) => f.step).join(', ') || 'unspecified'})`)
-
-  if (cheapStart && !escalated) {
-    escalated = true
-    model = OPUS
-    effort = 'high'
-    log('the Haiku cleanup attempt is red - escalating the implementer to opus/high')
-  }
-  // Tier 1 gets one extra round at high effort after escalating; tier 2 gets exactly maxRounds.
-  if (round === maxRounds && tier === 1 && !escalated) {
-    escalated = true
-    model = OPUS
-    effort = 'high'
-    log('tier 1 exhausted its fix rounds - escalating the implementer to opus/high for one final round')
-  }
-  if (round >= (escalated ? maxRounds + 1 : maxRounds)) {
-    log('verify still red after the final round - stopping')
-    return stop('verify', { failures: verified.failures })
-  }
-
-  phase('Implement')
-  if (broke()) return stop('implement', { reason: 'budget' })
-
-  impl = await fixRound(`fix verify failures (round ${round + 1})`, verified.failures)
-  if (!impl) return stop('implement', { reason: 'implementer returned no result on a fix round' })
-  if (impl.status === 'blocked') return stop('implement', { reason: 'implementer blocked on a fix round', notes: impl.notes || [] })
-}
+log(`implementer touched ${impl.filesTouched.length} file(s), verify green`)
 
 // ---------------------------------------------------------------- review loop
 
@@ -300,24 +277,35 @@ if (skipped.has('review')) {
   phase('Review')
   log('Review skipped by request - shipping on a green verify alone')
 } else {
+  let lastFix = null
   for (let round = 0; ; round++) {
     phase('Review')
     if (broke()) return stop('review', { reason: 'budget' })
 
+    const previous = round > 0 ? lastFix : null
     review = await step(
       'reviewer',
-      `adversarial review (round ${round + 1})`,
-      [
-        `Review the change for the spec at \`${spec}\`.`,
-        `It is uncommitted on \`${branch}\`: \`node scripts/review-diff.mjs --stat\` lists it and \`node scripts/review-diff.mjs -- <path>\` shows a file's diff, new untracked files included.`,
-        `tests claimed: ${JSON.stringify(tests.tests)}`,
-        `implementer report: ${JSON.stringify(impl)}`,
-        deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
-        tests.tests.length ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
-        'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',
-      ],
+      previous ? `re-review (round ${round + 1})` : `adversarial review (round ${round + 1})`,
+      previous
+        ? [
+            `Re-review the change for the spec at \`${spec}\` (round ${round + 1}) - see "Re-review" in your agent prompt.`,
+            `It is uncommitted on \`${branch}\`: \`node scripts/review-diff.mjs -- <path>\` shows a file's diff, new untracked files included.`,
+            `blocking findings of the previous round: ${JSON.stringify(previous.blocking)}`,
+            `implementer response: ${JSON.stringify({ notes: previous.impl.notes || [], deviations: previous.impl.deviations || [], filesTouched: previous.impl.filesTouched })}`,
+            'Check only that each finding is resolved (or rebutted with a sound reason in notes) and that the diff of the files touched in that round broke nothing. A full re-review is not your job.',
+            'blocking only for an unresolved finding or a regression in those files. Everything else is minor.',
+          ]
+        : [
+            `Review the change for the spec at \`${spec}\`.`,
+            `It is uncommitted on \`${branch}\`: \`node scripts/review-diff.mjs --stat\` lists it and \`node scripts/review-diff.mjs -- <path>\` shows a file's diff, new untracked files included.`,
+            `tests claimed: ${JSON.stringify(tests.tests)}`,
+            `implementer report: ${JSON.stringify(impl)}`,
+            deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
+            tests.tests.length ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
+            'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',
+          ],
       REVIEW,
-      { model: OPUS, effort: reviewEffort },
+      { model: OPUS, effort: previous ? 'medium' : reviewEffort },
     )
 
     if (!review) return stop('review', { reason: 'reviewer returned no result' })
@@ -334,37 +322,16 @@ if (skipped.has('review')) {
     phase('Implement')
     if (broke()) return stop('implement', { reason: 'budget' })
 
-    impl = await implement(`address blocking findings (round ${round + 1})`, [
+    rounds = rounds + 1
+    const fix = await attempt(`address blocking findings (round ${round + 1})`, [
       `Address exactly these blocking review findings: ${JSON.stringify(blocking)}`,
       `tests: ${JSON.stringify(tests)}`,
-      'A finding you disagree with goes into notes with the reason - do not silently ignore it.',
+      'Change only what the findings name. A finding you disagree with goes into notes with the reason - do not silently ignore it.',
     ])
-
-    if (!impl) return stop('implement', { reason: 'implementer returned no result on a review fix' })
-    if (impl.status === 'blocked') return stop('implement', { reason: 'implementer blocked on a review fix', notes: impl.notes || [] })
-
-    rounds = rounds + 1
-
-    for (let fix = 0; ; fix++) {
-      phase('Verify')
-      if (broke()) return stop('verify', { reason: 'budget' })
-      const label = fix ? `verify after review fix (round ${round + 1}, fix ${fix})` : `verify after review fix (round ${round + 1})`
-      const reverified = await verify(label)
-      if (!reverified) return stop('verify', { reason: 'verifier returned no result after a review fix' })
-      if (reverified.ok) break
-      log(`the review fix broke verification (${reverified.failures.map((f) => f.step).join(', ') || 'unspecified'})`)
-      if (fix >= maxRounds) return stop('verify', { failures: reverified.failures })
-
-      phase('Implement')
-      if (broke()) return stop('implement', { reason: 'budget' })
-
-      impl = await fixRound(`fix verify failures after review fix (round ${round + 1}, fix ${fix + 1})`, reverified.failures)
-      if (!impl) return stop('implement', { reason: 'implementer returned no result on a fix round' })
-      if (impl.status === 'blocked') return stop('implement', { reason: 'implementer blocked on a fix round', notes: impl.notes || [] })
-
-      rounds = rounds + 1
-    }
-    log('verify green again after the review fix')
+    if (!fix.impl) return stop('implement', fix)
+    impl = fix.impl
+    lastFix = { blocking, impl }
+    log(`review fix round ${round + 1} verified green`)
   }
 }
 
