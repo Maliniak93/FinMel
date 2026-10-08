@@ -50,6 +50,7 @@ export class Shell {
     { path: 'dashboard', label: 'shell.nav.dashboard', icon: 'dashboard' },
     { path: 'portfolios', label: 'shell.nav.portfolios', icon: 'account_balance_wallet' },
     { path: 'cash', label: 'shell.nav.cash', icon: 'payments' },
+    { path: 'securities', label: 'shell.nav.securities', icon: 'show_chart' },
     { path: 'deposits', label: 'shell.nav.deposits', icon: 'savings' },
     { path: 'bonds', label: 'shell.nav.bonds', icon: 'receipt_long' },
     { path: 'metals', label: 'shell.nav.metals', icon: 'diamond' },

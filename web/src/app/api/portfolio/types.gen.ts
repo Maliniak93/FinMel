@@ -401,6 +401,40 @@ export type SavingsInterestSettlementResponse = {
     netInterest: number | string;
 };
 
+export type SecuritiesResponse = {
+    holdings: Array<SecurityHoldingResponse>;
+    totals: SecuritiesTotalsResponse;
+};
+
+export type SecuritiesTotalsResponse = {
+    valuePln: number | string;
+    costPln: number | string;
+    unrealizedPlPln: number | string;
+};
+
+export type SecurityHoldingResponse = {
+    assetId: string;
+    portfolioId: string;
+    portfolioName: string;
+    name: string;
+    instrumentId: string;
+    ticker: null | string;
+    exchange: null | string;
+    currency: string;
+    quantity: number | string;
+    averageBuyPrice: null | number | string;
+    costPln: null | number | string;
+    lastPrice: null | number | string;
+    lastPriceDate: null | string;
+    valuePln: null | number | string;
+    unrealizedPl: null | number | string;
+    unrealizedPlPercent: null | number | string;
+    unrealizedPlPln: null | number | string;
+    priceUnavailableReason: null | SecurityPriceUnavailableReason;
+};
+
+export type SecurityPriceUnavailableReason = number;
+
 export type SettleBondInterestRequest = {
     periods: Array<SettleBondPeriodRequest>;
     destinationAssetId?: null | string;
@@ -1430,6 +1464,24 @@ export type GetApiPortfolioCashAccountsResponses = {
 };
 
 export type GetApiPortfolioCashAccountsResponse = GetApiPortfolioCashAccountsResponses[keyof GetApiPortfolioCashAccountsResponses];
+
+export type GetApiPortfolioSecuritiesData = {
+    body?: never;
+    path?: never;
+    query: {
+        assetClass: AssetClass;
+    };
+    url: '/api/portfolio/securities';
+};
+
+export type GetApiPortfolioSecuritiesResponses = {
+    /**
+     * OK
+     */
+    200: SecuritiesResponse;
+};
+
+export type GetApiPortfolioSecuritiesResponse = GetApiPortfolioSecuritiesResponses[keyof GetApiPortfolioSecuritiesResponses];
 
 export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewData = {
     body?: never;

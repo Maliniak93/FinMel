@@ -19,6 +19,25 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return new PortfolioDbContext(options, new StubCurrentUser(userId));
     }
 
+    protected async Task<Guid> AddQuotedHoldingAsync(
+        HttpClient client,
+        Guid portfolioId,
+        CancellationToken cancellationToken,
+        AssetClass assetClass = AssetClass.Stock,
+        string currency = "PLN",
+        string name = "Holding",
+        string ticker = "TICK",
+        decimal? lastPrice = 100m,
+        string? exchange = "XETRA",
+        DateOnly? lastPriceDate = null)
+    {
+        var instrumentId = Guid.NewGuid();
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, assetClass, currency);
+        Factory.InstrumentQuoteLookupClient.WithInstrument(instrumentId, ticker, currency, lastPrice, lastPriceDate, exchange, name);
+
+        return await client.AddMarketAssetAsync(portfolioId, cancellationToken, assetClass, currency, instrumentId, name);
+    }
+
     private protected async Task AssertFundedDepositUnchangedAsync(
         HttpClient client, Guid userId, PortfolioApi.FundedDeposit funded, CancellationToken cancellationToken)
     {

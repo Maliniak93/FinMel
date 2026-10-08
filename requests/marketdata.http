@@ -74,6 +74,14 @@ Content-Type: application/json
   "asOfDate": "2026-08-18"
 }
 
+### Instruments batch (Portfolio's securities list) — ticker, name, exchange, quote currency and the latest close on or before today; unknown ids are skipped
+POST {{marketDataUrl}}/internal/instruments/batch
+Content-Type: application/json
+
+{
+  "instrumentIds": ["{{addCustomInstrument.response.body.id}}"]
+}
+
 ### Latest FX rates batch
 POST {{marketDataUrl}}/internal/fx/latest-batch
 Content-Type: application/json

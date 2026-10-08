@@ -1905,6 +1905,35 @@
         }
       }
     },
+    "/api/portfolio/securities": {
+      "get": {
+        "tags": [
+          "ListSecuritiesEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "assetClass",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecuritiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-preview": {
       "get": {
         "tags": [
@@ -4228,6 +4257,207 @@
           }
         }
       },
+      "SecuritiesResponse": {
+        "required": [
+          "holdings",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityHoldingResponse"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/SecuritiesTotalsResponse"
+          }
+        }
+      },
+      "SecuritiesTotalsResponse": {
+        "required": [
+          "valuePln",
+          "costPln",
+          "unrealizedPlPln"
+        ],
+        "type": "object",
+        "properties": {
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "unrealizedPlPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "SecurityHoldingResponse": {
+        "required": [
+          "assetId",
+          "portfolioId",
+          "portfolioName",
+          "name",
+          "instrumentId",
+          "ticker",
+          "exchange",
+          "currency",
+          "quantity",
+          "averageBuyPrice",
+          "costPln",
+          "lastPrice",
+          "lastPriceDate",
+          "valuePln",
+          "unrealizedPl",
+          "unrealizedPlPercent",
+          "unrealizedPlPln",
+          "priceUnavailableReason"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "portfolioName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ticker": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exchange": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "averageBuyPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastPriceDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "unrealizedPl": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "unrealizedPlPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "unrealizedPlPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "priceUnavailableReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityPriceUnavailableReason"
+              }
+            ]
+          }
+        }
+      },
+      "SecurityPriceUnavailableReason": {
+        "type": "integer"
+      },
       "SettleBondInterestRequest": {
         "required": [
           "periods"
@@ -5084,6 +5314,9 @@
     },
     {
       "name": "ListCashAccountsEndpoint"
+    },
+    {
+      "name": "ListSecuritiesEndpoint"
     },
     {
       "name": "GetSavingsInterestPreviewEndpoint"

@@ -90,6 +90,27 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/cash');
   });
 
+  it('offers a "Stocks & ETFs" nav item linking to /securities right after Cash, "Akcje i ETF" in Polish', async () => {
+    const links = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+          'mat-nav-list a',
+        ),
+      );
+    const english = links().map((a) => a.getAttribute('href'));
+    expect(english.indexOf('/securities')).toBe(english.indexOf('/cash') + 1);
+    expect(links().find((a) => a.getAttribute('href') === '/securities')?.textContent).toContain(
+      'Stocks & ETFs',
+    );
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    expect(links().find((a) => a.getAttribute('href') === '/securities')?.textContent).toContain(
+      'Akcje i ETF',
+    );
+  });
+
   it('offers an "Obligacje" nav item linking to /bonds', async () => {
     await TestBed.inject(LanguageService).setLanguage('pl');
     await fixture.whenStable();
@@ -131,6 +152,7 @@ describe('Shell', () => {
       'Dashboard',
       'Portfolios',
       'Cash',
+      'Stocks & ETFs',
       'Deposits & savings',
       'Bonds',
       'Precious metals',
