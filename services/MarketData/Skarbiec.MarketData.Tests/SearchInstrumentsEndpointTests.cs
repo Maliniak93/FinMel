@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.SearchInstruments;
+using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
@@ -28,12 +29,66 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
         var response = await client.GetAsync(SearchInstrumentsUri("AAPL"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var results = await response.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
-        var match = Assert.Single(results!);
+        var results = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
+        var match = Assert.Single(results);
         Assert.Equal(instrumentId, match.Id);
         Assert.Equal("AAPL.US", match.Ticker);
         Assert.Equal(212.00m, match.LastPrice);
         Assert.Equal(new DateOnly(2026, 8, 4), match.LastPriceDate);
+    }
+
+    [Fact]
+    public async Task Stock_MergesLocalAndProvider()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var seedDb = CreateDbContext();
+        var localId = await seedDb.SeedInstrumentAsync("CDR.WA", "CD Projekt", PriceSource.Yahoo, "PLN", cancellationToken);
+        Factory.InstrumentSearch.WithResults(
+            new InstrumentCandidate("CDR.WA", "CD Projekt", AssetClass.Stock, "GPW", "PLN"),
+            new InstrumentCandidate("CDRL.WA", "CD Projekt Lab", AssetClass.Stock, "GPW", "PLN"));
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync(SearchInstrumentsUri("cdr", assetClass: AssetClass.Stock), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!;
+        Assert.False(body.ProviderUnavailable);
+        Assert.Equal(["CDR.WA", "CDRL.WA"], body.Results.Select(r => r.Ticker));
+        Assert.Equal(localId, body.Results[0].Id);
+        Assert.Null(body.Results[1].Id);
+        Assert.Equal("GPW", body.Results[1].Exchange);
+        Assert.Equal("PLN", body.Results[1].QuoteCurrency);
+    }
+
+    [Fact]
+    public async Task ProviderDown_ReturnsLocalWithFlag()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var seedDb = CreateDbContext();
+        var localId = await seedDb.SeedInstrumentAsync("VWCE.DE", "Vanguard FTSE All-World", PriceSource.Yahoo, "EUR", cancellationToken, AssetClass.Etf);
+        Factory.InstrumentSearch.WithUnavailable();
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync(SearchInstrumentsUri("vwce", assetClass: AssetClass.Etf), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!;
+        Assert.True(body.ProviderUnavailable);
+        Assert.Equal(localId, Assert.Single(body.Results).Id);
+    }
+
+    [Fact]
+    public async Task NonSecurityOrShortQuery_SkipsProvider()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var crypto = await client.GetAsync(SearchInstrumentsUri("bitcoin", assetClass: AssetClass.Crypto), cancellationToken);
+        var shortQuery = await client.GetAsync(SearchInstrumentsUri("c", assetClass: AssetClass.Stock), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, crypto.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, shortQuery.StatusCode);
+        Assert.Empty(Factory.InstrumentSearch.Calls);
     }
 
     [Fact]
@@ -46,8 +101,8 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await client.GetAsync(SearchInstrumentsUri("CD Proj"), cancellationToken);
 
-        var results = await response.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
-        Assert.Equal(instrumentId, Assert.Single(results!).Id);
+        var results = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
+        Assert.Equal(instrumentId, Assert.Single(results).Id);
     }
 
     [Fact]
@@ -60,8 +115,8 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await client.GetAsync(SearchInstrumentsUri("NEW"), cancellationToken);
 
-        var results = await response.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
-        var match = Assert.Single(results!);
+        var results = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
+        var match = Assert.Single(results);
         Assert.Equal(instrumentId, match.Id);
         Assert.Null(match.LastPrice);
         Assert.Null(match.LastPriceDate);
@@ -75,8 +130,8 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
 
         var response = await client.GetAsync(SearchInstrumentsUri("ZZZNOPE"), cancellationToken);
 
-        var results = await response.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
-        Assert.Empty(results!);
+        var results = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
+        Assert.Empty(results);
     }
 
     [Fact]
@@ -89,8 +144,8 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
 
         var response = await client.GetAsync(SearchInstrumentsBaseUri, cancellationToken);
 
-        var results = await response.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
-        Assert.Empty(results!);
+        var results = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
+        Assert.Empty(results);
     }
 
     [Fact]
@@ -116,10 +171,10 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
         var responseA = await userA.GetAsync(SearchInstrumentsUri("AAPL"), cancellationToken);
         var responseB = await userB.GetAsync(SearchInstrumentsUri("AAPL"), cancellationToken);
 
-        var resultsA = await responseA.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
-        var resultsB = await responseB.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
+        var resultsA = (await responseA.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
+        var resultsB = (await responseB.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
 
         Assert.Equal(resultsA, resultsB);
-        Assert.Single(resultsA!);
+        Assert.Single(resultsA);
     }
 }

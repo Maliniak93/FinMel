@@ -377,7 +377,7 @@ describe('AssetFormDialog', () => {
       expect(body).toEqual({
         assetClass: 5,
         name: 'Bitcoin',
-        currency: 'PLN',
+        currency: 'USD',
         instrumentId,
       });
       expect(dialogRef.close).toHaveBeenCalledWith(true);

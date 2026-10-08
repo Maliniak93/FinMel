@@ -12,7 +12,7 @@ using Skarbiec.MarketData.Data;
 namespace Skarbiec.MarketData.Migrations
 {
     [DbContext(typeof(MarketDataDbContext))]
-    [Migration("20261003105350_InitialCreate")]
+    [Migration("20261008134642_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -336,6 +336,10 @@ namespace Skarbiec.MarketData.Migrations
 
                     b.Property<int>("AssetClass")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Exchange")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Name")
                         .IsRequired()

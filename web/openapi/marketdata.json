@@ -19,6 +19,13 @@
             }
           },
           {
+            "name": "assetClass",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -38,10 +45,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/InstrumentSearchResult"
-                  }
+                  "$ref": "#/components/schemas/InstrumentSearchResponse"
                 }
               }
             }
@@ -67,6 +71,16 @@
         "responses": {
           "201": {
             "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomInstrumentResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -229,7 +243,6 @@
         "required": [
           "ticker",
           "name",
-          "quoteCurrency",
           "assetClass"
         ],
         "type": "object",
@@ -245,7 +258,10 @@
           "quoteCurrency": {
             "maxLength": 3,
             "minLength": 3,
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "assetClass": {
             "$ref": "#/components/schemas/AssetClass"
@@ -424,6 +440,7 @@
           "source",
           "quoteCurrency",
           "assetClass",
+          "exchange",
           "verificationStatus"
         ],
         "type": "object",
@@ -447,6 +464,12 @@
           "assetClass": {
             "$ref": "#/components/schemas/AssetClass"
           },
+          "exchange": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "verificationStatus": {
             "$ref": "#/components/schemas/InstrumentVerificationStatus"
           }
@@ -459,6 +482,7 @@
           "name",
           "assetClass",
           "quoteCurrency",
+          "exchange",
           "source",
           "verificationStatus",
           "lastPrice",
@@ -481,6 +505,12 @@
           },
           "quoteCurrency": {
             "type": "string"
+          },
+          "exchange": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "source": {
             "$ref": "#/components/schemas/PriceSource"
@@ -506,6 +536,24 @@
           }
         }
       },
+      "InstrumentSearchResponse": {
+        "required": [
+          "results",
+          "providerUnavailable"
+        ],
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstrumentSearchResult"
+            }
+          },
+          "providerUnavailable": {
+            "type": "boolean"
+          }
+        }
+      },
       "InstrumentSearchResult": {
         "required": [
           "id",
@@ -513,6 +561,7 @@
           "name",
           "assetClass",
           "quoteCurrency",
+          "exchange",
           "verificationStatus",
           "lastPrice",
           "lastPriceDate"
@@ -520,7 +569,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "ticker": {
@@ -535,8 +587,21 @@
           "quoteCurrency": {
             "type": "string"
           },
+          "exchange": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "verificationStatus": {
-            "$ref": "#/components/schemas/InstrumentVerificationStatus"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstrumentVerificationStatus"
+              }
+            ]
           },
           "lastPrice": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",

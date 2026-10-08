@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Sources.Verification;
 using Skarbiec.MarketData.Tests.Fixtures;
@@ -15,6 +16,8 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
     // HTTP slice tests never call a live provider; TickerVerifierTests cover the real verifier.
     public FakeTickerVerifier TickerVerifier { get; } = new();
 
+    public FakeInstrumentSearchSource InstrumentSearch { get; } = new();
+
     public FakeGoldApiClient GoldApi { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -24,6 +27,7 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<ITickerVerifier>(TickerVerifier);
+            services.AddSingleton<IInstrumentSearchSource>(InstrumentSearch);
             services.AddSingleton<IGoldApiClient>(GoldApi);
         });
     }

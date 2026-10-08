@@ -334,6 +334,10 @@ namespace Skarbiec.MarketData.Migrations
                     b.Property<int>("AssetClass")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Exchange")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)

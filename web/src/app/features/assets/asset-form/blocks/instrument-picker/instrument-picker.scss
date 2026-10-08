@@ -3,3 +3,16 @@
 :host {
   display: block;
 }
+
+.asset-form__new-listing {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--mat-sys-primary);
+}
+
+.asset-form__provider-unavailable {
+  margin: -8px 0 8px;
+  font-size: 0.875rem;
+  color: var(--mat-sys-error);
+}

@@ -422,6 +422,40 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
+    public async Task Add_InstrumentClassMismatch_Returns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var instrumentId = Guid.NewGuid();
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Crypto, "PLN");
+        var request = new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Wrong class", Currency = "PLN", InstrumentId = instrumentId };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.Equal("Validation.InstrumentAssetClassMismatch", problem!.Extensions["errorCode"]?.ToString());
+    }
+
+    [Fact]
+    public async Task Add_InstrumentCurrencyMismatch_Returns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var instrumentId = Guid.NewGuid();
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Stock, "EUR");
+        var request = new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Wrong currency", Currency = "PLN", InstrumentId = instrumentId };
+
+        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.Equal("Validation.InstrumentCurrencyMismatch", problem!.Extensions["errorCode"]?.ToString());
+    }
+
+    [Fact]
     public async Task Add_WithNonExistentInstrument_ReturnsBadRequest()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

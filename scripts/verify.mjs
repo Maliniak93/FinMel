@@ -352,6 +352,18 @@ function hashOf(rel) {
   }
 }
 
+function snapshotDir(rel) {
+  const root = path.join(REPO_ROOT, rel);
+  if (!existsSync(root)) return "";
+  const hash = createHash("sha1");
+  const files = readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(root, path.join(e.parentPath, e.name)).replaceAll("\\", "/"))
+    .sort();
+  for (const file of files) hash.update(file).update("\0").update(readFileSync(path.join(root, file))).update("\0");
+  return hash.digest("hex");
+}
+
 // cmd.exe caps a command line at 8191 characters.
 function chunks(list, size = 40) {
   const result = [];
@@ -899,15 +911,18 @@ cache: this exact working tree and scope already passed at ${hit.at} — nothing
     if (!existsSync(openapiDir)) {
       console.log("\nnotice: build-time OpenAPI not set up yet (spec-00) — skipping api check");
     } else {
+      // Compared against the tree before regeneration, not git: the client is legitimately uncommitted until Ship.
+      const before = snapshotDir("web/src/app/api");
       const genResult = await step("api: npm run gen:api", () => runCommand(NPM, ["run", "gen:api"], { cwd: WEB_DIR }));
       if (!genResult.ok) return finish(false, [buildFailure("api", genResult)]);
 
-      const diffResult = await step("api: diff web/src/app/api", () =>
-        runCommand("git", ["diff", "--exit-code", "--", "web/src/app/api"]),
-      );
-      if (!diffResult.ok) {
+      if (snapshotDir("web/src/app/api") !== before) {
         return finish(false, [
-          { step: "api", summary: "generated TS client is out of date; commit the regenerated client", file: "web/src/app/api" },
+          {
+            step: "api",
+            summary: "generated TS client was out of date and has been regenerated; review the diff of web/src/app/api",
+            file: "web/src/app/api",
+          },
         ]);
       }
     }

@@ -50,4 +50,19 @@ public sealed class ArchitectureTests
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    [Fact]
+    public void OnlySearchSlice_DependsOn_InstrumentSearchSource()
+    {
+        var result = Types.InAssembly(typeof(Program).Assembly)
+            .That()
+            .HaveDependencyOn("Skarbiec.MarketData.Sources.IInstrumentSearchSource")
+            .Should()
+            .ResideInNamespaceStartingWith("Skarbiec.MarketData.Sources")
+            .Or()
+            .ResideInNamespaceStartingWith("Skarbiec.MarketData.Features.SearchInstruments")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }

@@ -97,6 +97,7 @@ public partial class InitialCreate : Migration
                 Source = table.Column<int>(type: "integer", nullable: false),
                 QuoteCurrency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
                 AssetClass = table.Column<int>(type: "integer", nullable: false),
+                Exchange = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                 VerificationStatus = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "Verified")
             },
             constraints: table =>

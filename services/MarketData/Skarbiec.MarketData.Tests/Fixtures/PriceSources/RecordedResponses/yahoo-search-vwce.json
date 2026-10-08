@@ -1,0 +1,6 @@
+{"explains":[],"count":4,"quotes":[
+{"exchange":"GER","shortname":"VANGUARD FTSE AW U.ETF USDA","longname":"Vanguard FTSE All-World UCITS ETF","quoteType":"ETF","symbol":"VWCE.DE","index":"quotes","score":100000,"typeDisp":"ETF","isYahooFinance":true},
+{"exchange":"MIL","shortname":"VANGUARD FTSE AW U.ETF USDA","longname":"Vanguard FTSE All-World UCITS ETF","quoteType":"ETF","symbol":"VWCE.MI","index":"quotes","score":90000,"typeDisp":"ETF","isYahooFinance":true},
+{"exchange":"WSE","shortname":"VWCE FUND","quoteType":"MUTUALFUND","symbol":"VWCE.WA","index":"quotes","score":80000,"typeDisp":"Fund","isYahooFinance":true},
+{"exchange":"NMS","shortname":"NOISE","quoteType":"EQUITY","symbol":"NOISE","index":"quotes","score":1,"typeDisp":"Equity","isYahooFinance":true}
+],"news":[]}

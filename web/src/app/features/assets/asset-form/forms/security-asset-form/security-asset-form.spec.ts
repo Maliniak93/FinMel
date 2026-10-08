@@ -1,4 +1,4 @@
-import type { ComponentFixture } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 
 import { client as marketDataClient } from '../../../../../api/marketdata/client.gen';
 import {
@@ -48,18 +48,19 @@ describe('SecurityAssetForm', () => {
     expect(component.form.invalid).toBe(true);
   });
 
-  it('creates a market asset from an autocomplete selection, without copying the quote currency', async () => {
+  it('creates a market asset from an autocomplete selection, taking the quote currency read-only', async () => {
     await setup(3);
 
     await pickInstrument(fixture, etfSearchResult);
 
-    expect(findControl(component.form, 'currency').value).toBe('PLN');
+    expect(findControl(component.form, 'currency').value).toBe('EUR');
+    expect(findControl(component.form, 'currency').disabled).toBe(true);
     expect(findControl(component.form, 'name').value).toBe('Vanguard FTSE All-World');
     expect(component.form.valid).toBe(true);
     expect(component.toBody()).toEqual({
       assetClass: 3,
       name: 'Vanguard FTSE All-World',
-      currency: 'PLN',
+      currency: 'EUR',
       instrumentId,
       initialTransaction: null,
     });
@@ -74,9 +75,14 @@ describe('SecurityAssetForm', () => {
     expect(component.toBody()).toMatchObject({ name: 'My world ETF', instrumentId });
   });
 
-  it('offers the custom-ticker link', async () => {
+  it('offers the custom-ticker link only for Crypto, not for Stock or Etf', async () => {
     await setup(2);
+    expect(renderedText(fixture)).not.toContain('Verify a new ticker');
 
+    TestBed.resetTestingModule();
+    fetchSpy.mockRestore();
+
+    await setup(5);
     expect(renderedText(fixture)).toContain('Verify a new ticker');
   });
 
@@ -91,7 +97,7 @@ describe('SecurityAssetForm', () => {
   });
   describe('in Polish', () => {
     it('renders in Polish', async () => {
-      await setup(2);
+      await setup(5);
       const element = fixture.nativeElement as HTMLElement;
       const texts = () => [
         ...labelsOf(element, 'mat-label'),

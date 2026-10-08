@@ -7,14 +7,14 @@ namespace Skarbiec.MarketData.Data;
 public static class MarketDataSeeder
 {
     // Metals carry their fixed MetalInstruments id and are priced per gram of fine metal, despite the ounce-style tickers.
-    private static readonly (Guid? Id, string Ticker, string Name, PriceSource Source, string QuoteCurrency, AssetClass AssetClass)[] SeedInstruments =
+    private static readonly (Guid? Id, string Ticker, string Name, PriceSource Source, string QuoteCurrency, AssetClass AssetClass, string? Exchange)[] SeedInstruments =
     [
-        (MetalInstruments.Gold, "XAU", "Gold (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal),
-        (MetalInstruments.Silver, "XAG", "Silver (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal),
-        (null, "CDR.WA", "CD Projekt", PriceSource.Yahoo, "PLN", AssetClass.Stock),
-        (null, "VWCE.DE", "Vanguard FTSE All-World UCITS ETF (Acc)", PriceSource.Yahoo, "EUR", AssetClass.Etf),
-        (null, "bitcoin", "Bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
-        (null, "ethereum", "Ethereum", PriceSource.CoinGecko, "USD", AssetClass.Crypto),
+        (MetalInstruments.Gold, "XAU", "Gold (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal, null),
+        (MetalInstruments.Silver, "XAG", "Silver (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal, null),
+        (null, "CDR.WA", "CD Projekt", PriceSource.Yahoo, "PLN", AssetClass.Stock, "GPW"),
+        (null, "VWCE.DE", "Vanguard FTSE All-World UCITS ETF (Acc)", PriceSource.Yahoo, "EUR", AssetClass.Etf, "Xetra"),
+        (null, "bitcoin", "Bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto, null),
+        (null, "ethereum", "Ethereum", PriceSource.CoinGecko, "USD", AssetClass.Crypto, null),
     ];
 
     // A superset of SupportedCurrencies.All: GBP and CHF are synced though no user can pick them yet.
@@ -44,6 +44,7 @@ public static class MarketDataSeeder
                     Source = seed.Source,
                     QuoteCurrency = seed.QuoteCurrency,
                     AssetClass = seed.AssetClass,
+                    Exchange = seed.Exchange,
                     VerificationStatus = InstrumentVerificationStatus.Verified,
                 });
             }
