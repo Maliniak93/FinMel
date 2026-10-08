@@ -36,11 +36,10 @@ as claims: verify each one against the tree.
 
 ## Gather the evidence yourself
 
-1. The change is **staged — not committed — on its `feat/*` branch before you are called**, so
-   `git diff --cached` is the authoritative diff: the index shows brand-new files, which a bare
-   `git diff` never does. Nothing is committed before the review, so `master...HEAD` shows
-   nothing — do not reach for it. Then `git status --porcelain` for anything still unstaged: that
-   belongs to the change too, and you read those files directly.
+1. The change is **uncommitted on its branch** before you are called, so `master...HEAD` shows
+   nothing — do not reach for it. `node scripts/review-diff.mjs --stat` lists the change and
+   `node scripts/review-diff.mjs -- <path>` shows one file's diff, new untracked files included;
+   plain `node scripts/review-diff.mjs` shows everything. Nothing is staged.
 2. Read the spec in full; its **Code map** says where the change was expected to land — a diff far
    outside it is worth a look, not automatically a finding.
 3. Read only the `skarbiec-plan/architecture.md` / `domain.md` / `decisions.md` sections the spec

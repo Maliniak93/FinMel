@@ -6,7 +6,7 @@
 //   edit <n> [--body-file <p>] [--tier 1|2] [--parent <n>] replace the body, or attach the issue to an epic
 //   set <n> <field> <value>                                set one project field
 //   get <n> [--out <path> [--raw]]                         print the issue as JSON, optionally write a local copy
-//   prepare <n> [--tier 1|2] [--skip tests,review]         /build's pre-workflow step
+//   prepare <n> [--tier 1|2] [--skip tests,review] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch, moves the card
 //   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise)
 //   list                                                   every issue on the project as JSON
 //   comment <n> --body-file <path>                         post a comment
@@ -34,7 +34,7 @@ const LABELS = [
   { name: "skip-tests", color: "c5def5", description: "Spec adds or alters no behaviour; /build skips the test phase" },
 ];
 const KINDS = { new: "New", change: "Change", cleanup: "Cleanup", fix: "Fix" };
-const BOOLEAN_FLAGS = new Set(["skip-tests", "epic", "raw"]);
+const BOOLEAN_FLAGS = new Set(["skip-tests", "epic", "raw", "dry-run"]);
 const SKIPPABLE = new Set(["tests", "review"]);
 
 function gh(argv, input) {
@@ -42,6 +42,11 @@ function gh(argv, input) {
   if (res.error) throw new Error(`gh ${argv[0]} ${argv[1] ?? ""}: ${res.error.message}`);
   if (res.status !== 0) throw new Error(`gh ${argv.slice(0, 2).join(" ")}: ${res.stderr.trim()}`);
   return res.stdout.trim();
+}
+
+function git(argv) {
+  const res = spawnSync("git", argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
+  return { ok: !res.error && res.status === 0, out: (res.stdout ?? "").trimEnd(), err: res.error?.message ?? (res.stderr ?? "").trim().split(/\r?\n/)[0] };
 }
 
 function issueUrl(number) {
@@ -306,7 +311,7 @@ function get([number, ...rest]) {
 
 function prepare([number, ...rest]) {
   const n = String(number ?? "").replace(/^#/, "");
-  if (!/^\d+$/.test(n)) throw new Error("usage: prepare <issue number> [--tier 1|2] [--skip tests,review]");
+  if (!/^\d+$/.test(n)) throw new Error("usage: prepare <issue number> [--tier 1|2] [--skip tests,review] [--dry-run]");
   const flags = parseFlags(rest);
   const { result: issue, body } = fetchIssue(n);
   const refuse = (reason, next) => console.log(JSON.stringify({ ok: false, number: issue.number, title: issue.title, reason, next }));
@@ -348,17 +353,54 @@ function prepare([number, ...rest]) {
   const bad = skip.filter((s) => !SKIPPABLE.has(s));
   if (bad.length) return refuse(`cannot skip ${bad.join(", ")} — only tests and review are skippable; verify always runs`, `/build #${n}`);
 
-  const spec = writeCopy(issue, body, `${ISSUES_DIR}/${n}.md`, false);
+  const dryRun = Boolean(flags["dry-run"]);
+  const target = issue.branch;
+  const refuseBranch = (reason, extra = {}) =>
+    console.log(JSON.stringify({ ok: false, stage: "branch", number: issue.number, title: issue.title, reason, ...extra, next: extra.next ?? `fix the cause, then re-run /build #${n}` }));
+
+  const head = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (!head.ok) return refuseBranch(`git rev-parse --abbrev-ref HEAD: ${head.err}`);
+  const status = git(["status", "--porcelain"]);
+  if (!status.ok) return refuseBranch(`git status --porcelain: ${status.err}`);
+  const dirty = status.out ? status.out.split(/\r?\n/) : [];
+  const branchCommands = [];
+  let action = "resumed";
+  if (head.out !== target) {
+    if (dirty.length) {
+      return refuseBranch("the working tree holds changes that are not this spec", { files: dirty, next: `commit, stash or discard them, then re-run /build #${n}` });
+    }
+    branchCommands.push("git fetch origin");
+    if (!dryRun) {
+      const fetched = git(["fetch", "origin"]);
+      if (!fetched.ok) return refuseBranch(`git fetch origin: ${fetched.err}`);
+    }
+    const exists = git(["rev-parse", "--verify", "--quiet", `refs/heads/${target}`]).ok || git(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${target}`]).ok;
+    action = exists ? "switched" : "created";
+    const cmd = exists ? "git" : "gh";
+    const argv = exists ? ["switch", target] : ["issue", "develop", n, "--repo", REPO, "--name", target, "--base", "master", "--checkout"];
+    branchCommands.push([cmd, ...argv].join(" "));
+    if (!dryRun) {
+      const res = spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
+      if (res.error || res.status !== 0) {
+        return refuseBranch(`${cmd} ${argv.join(" ")}: ${res.error?.message ?? res.stderr.trim().split(/\r?\n/)[0]}`);
+      }
+    }
+  }
+
+  const specPath = `${ISSUES_DIR}/${n}.md`;
+  const spec = dryRun ? specPath : writeCopy(issue, body, specPath, false);
   const resumed = issue.status === "In progress";
-  if (!resumed) setField(issue.url, "Status", "In progress");
-  console.log(
-    JSON.stringify({
-      ok: true,
-      resumed,
-      url: issue.url,
-      workflowArgs: { spec, issue: issue.number, branch: issue.branch, title: issue.title, tier, maxRounds: 2, skip },
-    }),
-  );
+  if (!resumed && !dryRun) setField(issue.url, "Status", "In progress");
+  const out = {
+    ok: true,
+    resumed,
+    url: issue.url,
+    branch: { name: target, action },
+    notes: action === "resumed" ? dirty : [],
+    workflowArgs: { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip },
+  };
+  if (dryRun) Object.assign(out, { dryRun: true, branchCommands, cardMove: resumed ? null : "Status -> In progress" });
+  console.log(JSON.stringify(out));
 }
 
 function report([number, ...rest]) {

@@ -111,4 +111,4 @@ otherwise make the JSON your entire final message, with nothing before or after 
 
 `projects` are short verify.mjs names (`Portfolio`, `Reporting`, `MarketData`, `Identity`, `web`).
 `contextFiles` are the existing files the implementer should read first (fixtures you extended, the
-precedent slice or component, the code under test) — at most 15 paths.
+precedent slice or component, the code under test) as `path` or `path:start-end` — at most 15.

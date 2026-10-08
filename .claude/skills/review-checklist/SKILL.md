@@ -11,7 +11,7 @@ agent's report at face value.
 
 ## Gather your own evidence
 1. Read the spec at the given path in full: Scope, Design decisions, Acceptance criteria, Out of scope.
-2. The change is staged — not yet committed — on its `feat/*` branch before you are called, so **`git diff --cached` is the diff under review**: the index shows brand-new files (a bare `git diff` does not, and most of a new slice is new files). `master...HEAD` is empty here; don't reach for it. Then `git status --porcelain`: anything still unstaged is part of the change too, and you read those files directly.
+2. The change is uncommitted on its branch before you are called; `master...HEAD` is empty here. `node scripts/review-diff.mjs --stat` lists it, `node scripts/review-diff.mjs -- <path>` shows a file's diff (new untracked files included), plain `node scripts/review-diff.mjs` shows everything. Nothing is staged.
 3. Read only the `skarbiec-plan/architecture.md`/`domain.md`/`decisions.md` sections the spec names, plus the `.claude/rules/*` files scoped to what the diff touches.
 4. Read the changed files and the tests that claim to prove them.
 5. Run read-only commands to settle a claim instead of guessing: a targeted `dotnet test --filter`, a `grep` for a pattern a hard rule forbids, `ls` for a file the spec says should exist.

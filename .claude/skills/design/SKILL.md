@@ -35,7 +35,7 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
    guesses at today's code produces a Tier-2 mess at implementation time.
    **Every spec gets a `## Code map`** (new behaviour too): ask Explore for the precedent
    slice/component to copy, the test class and `Fixtures/<Service>Api` helpers to extend, and the files
-   that will change — as `path — why` lines — and paste that list into the draft. The test-writer,
+   that will change — as `path:start-end — why` or `path — Member()` lines, 5–15 of them — and paste that list into the draft. The test-writer,
    implementer and reviewer start from it instead of each rediscovering the code, which is where most
    of a build run's tokens went (measure with `node scripts/run-cost.mjs`).
    If Explore finds the change needs another **open** issue merged first, list it under
