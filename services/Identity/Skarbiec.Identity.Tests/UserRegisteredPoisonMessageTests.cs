@@ -5,13 +5,11 @@ using Microsoft.Extensions.Hosting;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Identity.Data;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
-public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class UserRegisteredPoisonMessageTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string QueueName = "user-registered-poison-test";
     private const string ErrorQueueName = $"{QueueName}_error";

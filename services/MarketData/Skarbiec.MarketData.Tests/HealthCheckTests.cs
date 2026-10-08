@@ -1,11 +1,10 @@
 using System.Net;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
+using Skarbiec.Testing.Http;
 
 namespace Skarbiec.MarketData.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class HealthCheckTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]
@@ -13,7 +12,7 @@ public sealed class HealthCheckTests(SkarbiecContainersFixture containers) : Mar
     {
         using var client = Factory.CreateClient();
 
-        var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
+        var response = await client.GetReadyAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

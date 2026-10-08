@@ -21,15 +21,15 @@ xUnit v3 + Testcontainers (PostgreSQL, RabbitMQ). Wiring walkthrough: `Skarbiec.
 
 | Layer | Where | Holds |
 | --- | --- | --- |
-| Cross-service infrastructure | `Skarbiec.Testing` | `SkarbiecContainersFixture` (shared PG + RabbitMQ), `SkarbiecApiFactory<TProgram>`, `ServiceEndpointTests<TProgram>` (factory lifetime + per-test DB reset), `TestJwtIssuer` / `CreateAuthenticatedClient`, `TenancyIsolationTests<TProgram>`, `HostlessOutboxProvider` |
+| Cross-service infrastructure | `Skarbiec.Testing` | `SkarbiecContainers` (assembly-wide PG + RabbitMQ) and `SkarbiecContainersFixture` (a database + vhost per test class), `SkarbiecApiFactory<TProgram>`, `ServiceEndpointTests<TProgram>` (factory lifetime + per-test DB reset), `TestJwtIssuer` / `CreateAuthenticatedClient`, `TenancyIsolationTests<TProgram>`, `HostlessOutboxProvider` |
 | Per-service domain | `<Service>.Tests/Fixtures/` | `<Service>EndpointTests` base binding the factory, `<Service>Api` (route builders + arrange calls), `<Service>Assertions` (invariants asserted from more than one slice), direct-DbContext access for facts HTTP cannot express |
 
 Before adding a helper to a test class, check `Fixtures/` first — and when a fact needs a variant, add a parameter there instead of a private copy.
 
 ## Test class shape
 
-- `[Collection(TestingDefaults.CollectionName)]` + `: <Service>EndpointTests(containers)` + facts. It must **not** declare its own `_factory`, `InitializeAsync`/`DisposeAsync`, or route constants — the base and `<Service>Api` own those. (A service with a single host-backed test class may derive from `ServiceEndpointTests<Program>` directly; extract the per-service base when the second one arrives.)
-- Each test project needs its own one-line `[CollectionDefinition]` — xUnit only discovers it in the assembly under test.
+- `public sealed class XTests(SkarbiecContainersFixture containers) : <Service>EndpointTests(containers)` + facts (no collection attribute: every class gets its own database and RabbitMQ vhost, and classes run in parallel). It must **not** declare its own `_factory`, `InitializeAsync`/`DisposeAsync`, or route constants — the base and `<Service>Api` own those. (A service with a single host-backed test class may derive from `ServiceEndpointTests<Program>` directly; extract the per-service base when the second one arrives.)
+- Each test project registers the containers once with `[assembly: AssemblyFixture(typeof(SkarbiecContainers))]`. A timing-sensitive class (a performance threshold) joins `[Collection(TestingDefaults.SerialCollectionName)]`, a `[CollectionDefinition(..., DisableParallelization = true)]` the project declares itself.
 - Respawn resets the database in `InitializeAsync`, i.e. before **every** `[Fact]` (xUnit builds a fresh class instance per fact). Reset through the factory (`ResetDatabaseAsync()`), never the containers fixture directly — the factory boots the host and applies migrations first, and Respawn needs the schema.
 
 ## Fixture helpers are arrange only

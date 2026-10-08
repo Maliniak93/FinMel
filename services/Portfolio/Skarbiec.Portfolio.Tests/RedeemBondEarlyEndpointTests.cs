@@ -3,7 +3,6 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
@@ -11,7 +10,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 namespace Skarbiec.Portfolio.Tests;
 
 // The early redemption under test is called directly; fixture helpers only arrange.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]

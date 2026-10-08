@@ -4,13 +4,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Skarbiec.Identity.Features.Login;
 using Skarbiec.Identity.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class LoginEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
     [Fact]

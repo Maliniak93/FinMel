@@ -9,7 +9,7 @@ using Skarbiec.Testing.Containers;
 namespace Skarbiec.MarketData.Tests;
 
 // Timed against the handler, not over HTTP, after a warm-up call absorbs JIT and connection-pool cost.
-[Collection(TestingDefaults.CollectionName)]
+[Collection(TestingDefaults.SerialCollectionName)]
 public sealed class SearchInstrumentsPerformanceTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

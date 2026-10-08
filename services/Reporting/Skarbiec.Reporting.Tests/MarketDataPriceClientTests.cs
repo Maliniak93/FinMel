@@ -3,14 +3,12 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Http;
 
 namespace Skarbiec.Reporting.Tests;
 
 // Resolved through Reporting's own IHttpClientFactory registration, so every handler Program.cs adds runs.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class MarketDataPriceClientTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
     [Fact]

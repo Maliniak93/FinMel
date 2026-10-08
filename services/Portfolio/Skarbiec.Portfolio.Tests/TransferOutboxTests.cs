@@ -11,12 +11,10 @@ using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 using Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]

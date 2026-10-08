@@ -9,15 +9,13 @@ using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.MarketData.Tests;
 
 // Builds its own provider so no hosted service starts and the outbox row is never delivered before the assertion reads it.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private static readonly DateOnly Today = new(2026, 8, 6);
 

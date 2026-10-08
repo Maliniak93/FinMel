@@ -17,7 +17,7 @@ using Skarbiec.Testing.Messaging;
 namespace Skarbiec.MarketData.Tests;
 
 // Each fact builds a real outbox-aware IPublishEndpoint through HostlessOutboxProvider, on the DbContext the job runs against.
-[Collection(TestingDefaults.CollectionName)]
+[Collection(TestingDefaults.SerialCollectionName)]
 public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     // An explicit field: the primary constructor parameter also goes to the base constructor, so using it here would trigger CS9107.

@@ -7,15 +7,13 @@ using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
 // Builds its own provider, with no HTTP host, on a queue unique to this class.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string QueueName = "asset-removed-consumer-test";
 

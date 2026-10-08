@@ -18,12 +18,10 @@ using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.MarketData;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]

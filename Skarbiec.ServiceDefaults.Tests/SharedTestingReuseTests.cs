@@ -1,14 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.ServiceDefaults.Tests;
 
 // Never references Identity, yet gets a containers fixture and JWT helper from Skarbiec.Testing; there is no database to reset.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class SharedTestingReuseTests(SkarbiecContainersFixture containers) : IAsyncDisposable
+public sealed class SharedTestingReuseTests(SkarbiecContainersFixture containers) : IAsyncDisposable, IClassFixture<SkarbiecContainersFixture>
 {
     private readonly SampleContainerApiFactory _factory = new(containers);
 

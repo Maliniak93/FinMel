@@ -1,12 +1,10 @@
 using Skarbiec.Identity.Tests.Fixtures;
 using Skarbiec.Identity.Tests.Messaging;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class UserRegisteredDeliveryTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
     [Fact]

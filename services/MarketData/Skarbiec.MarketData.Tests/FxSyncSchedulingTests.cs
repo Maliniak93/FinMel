@@ -14,7 +14,7 @@ using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
+[Collection(TestingDefaults.SerialCollectionName)]
 public sealed class FxSyncSchedulingTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     // An explicit field: the primary constructor parameter also goes to the base constructor, so using it here would trigger CS9107.

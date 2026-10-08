@@ -8,12 +8,10 @@ using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]

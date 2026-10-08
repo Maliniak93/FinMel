@@ -2,7 +2,6 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
@@ -10,7 +9,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 namespace Skarbiec.Portfolio.Tests;
 
 // The DELETE under test is called directly and asserted on the raw response; PortfolioApi helpers only arrange.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class DeletePortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]

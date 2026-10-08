@@ -3,14 +3,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
 // An anonymous /internal endpoint, so every fact calls it with no token, as Portfolio does.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class GetBondSeriesRatesBatchEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

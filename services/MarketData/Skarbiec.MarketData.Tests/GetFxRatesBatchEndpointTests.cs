@@ -2,14 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.MarketData.Features.GetFxRatesBatch;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
 // An anonymous /internal endpoint, so every fact calls it with no token, as Reporting does.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class GetFxRatesBatchEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

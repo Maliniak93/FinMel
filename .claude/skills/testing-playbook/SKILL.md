@@ -17,7 +17,7 @@ which type/member is missing. A new test that passes immediately is a bug in the
 - Unlike production code (extract on the third use), a duplicated **test helper** is extracted on the **second** use — it's plumbing, and copies drift silently. Before adding anything to a test class, check `Fixtures/` first; if it's missing what you need, add it there (a new helper, or a new optional parameter on an existing one), never as a private copy inside the test class.
 
 ## Test class shape
-`[Collection(TestingDefaults.CollectionName)] public sealed class XTests(SkarbiecContainersFixture containers) : <Service>EndpointTests(containers)` with `[Fact]`s only. No local `_factory`, no `InitializeAsync`/`DisposeAsync`, no route constants — the `<Service>EndpointTests` base and `<Service>Api` fixture own those. Name every fact `Method_Scenario_Outcome`.
+`public sealed class XTests(SkarbiecContainersFixture containers) : <Service>EndpointTests(containers)` with `[Fact]`s only (no collection attribute: a database and vhost per class, classes in parallel; timing-sensitive classes use `[Collection(TestingDefaults.SerialCollectionName)]`). No local `_factory`, no `InitializeAsync`/`DisposeAsync`, no route constants — the `<Service>EndpointTests` base and `<Service>Api` fixture own those. Name every fact `Method_Scenario_Outcome`.
 
 ## Calling the system under test
 - Fixture helpers (`<Service>Api`) are **arrange only** and call `EnsureSuccessStatusCode()` internally — use them to set up state the fact doesn't care about (e.g. "a portfolio to add an asset to").

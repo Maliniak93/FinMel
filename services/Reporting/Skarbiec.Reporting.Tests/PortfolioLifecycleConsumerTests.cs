@@ -7,15 +7,13 @@ using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
 // All three consumers share one provider on queue names unique to this class.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string ArchivedQueueName = "portfolio-archived-consumer-test";
     private const string RestoredQueueName = "portfolio-restored-consumer-test";

@@ -4,13 +4,11 @@ using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.GetMetalPrices;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class GetMetalPricesEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     private const string MetalPricesUri = "/api/marketdata/metal-prices";

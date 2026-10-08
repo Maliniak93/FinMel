@@ -15,8 +15,8 @@ using Skarbiec.Testing.Messaging;
 namespace Skarbiec.MarketData.Tests;
 
 // Trace context propagates automatically; nothing in PriceSyncJob sets it.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers)
+[Collection(TestingDefaults.SerialCollectionName)]
+public sealed class PriceSyncJobTraceTests(SkarbiecContainersFixture containers) : IClassFixture<SkarbiecContainersFixture>
 {
     [Fact]
     public async Task RunAsync_SuccessfulRun_PublishActivitySharesTraceWithJobActivity()

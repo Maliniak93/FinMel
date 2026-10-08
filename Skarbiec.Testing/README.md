@@ -6,13 +6,16 @@ Shared slice-test foundation (T0.9): real PostgreSQL + RabbitMQ via Testcontaine
 ## Wiring a service's test project into it
 
 1. Reference this project from `services/<Name>/Skarbiec.<Name>.Tests`.
-2. Add a one-line collection definition (xUnit only discovers `[CollectionDefinition]` classes
-   declared in the assembly under test, so each test project needs its own):
+2. Register the containers once per test assembly (an assembly fixture; the project needs no collection definition):
 
    ```csharp
-   [CollectionDefinition(TestingDefaults.CollectionName)]
-   public sealed class ContainersCollection : ICollectionFixture<SkarbiecContainersFixture>;
+   [assembly: AssemblyFixture(typeof(SkarbiecContainers))]
    ```
+
+   Every test class then gets its own PostgreSQL database and RabbitMQ vhost through the class fixture
+   `SkarbiecContainersFixture` (declared on `ServiceEndpointTests<TProgram>`; add
+   `IClassFixture<SkarbiecContainersFixture>` yourself on a class that takes the fixture without it).
+   Classes run in parallel, so a class never shares data or queues with another.
 
 3. Subclass `SkarbiecApiFactory<TProgram>` with the service's own DB connection-string name:
 
@@ -21,7 +24,7 @@ Shared slice-test foundation (T0.9): real PostgreSQL + RabbitMQ via Testcontaine
        : SkarbiecApiFactory<Program>(containers, "myservice-db");
    ```
 
-4. In each test class: apply `[Collection(TestingDefaults.CollectionName)]`, take
+4. In each test class: take
    `SkarbiecContainersFixture` in the constructor, create the factory from it, and implement
    `IAsyncLifetime` to reset the database before every test (xUnit creates a fresh test-class
    instance per `[Fact]`, so this runs before each one — not once per class). Reset through the
@@ -30,8 +33,7 @@ Shared slice-test foundation (T0.9): real PostgreSQL + RabbitMQ via Testcontaine
    needs the schema to already exist:
 
    ```csharp
-   [Collection(TestingDefaults.CollectionName)]
-   public sealed class SomeEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+   public sealed class SomeEndpointTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
    {
        private readonly MyServiceApiFactory _factory = new(containers);
 
@@ -43,16 +45,20 @@ Shared slice-test foundation (T0.9): real PostgreSQL + RabbitMQ via Testcontaine
    }
    ```
 
+   A timing-sensitive class (a performance threshold) joins a `[Collection(TestingDefaults.SerialCollectionName)]`
+   that the project defines with `[CollectionDefinition(..., DisableParallelization = true)]`; it still gets its
+   own database through the class fixture but runs alone.
+
 5. For tenancy tests (T0.14), mint a token for an arbitrary user without registering/logging in:
 
    ```csharp
    var tokenForUserB = _factory.IssueAccessToken(userB);
    ```
 
-## Why reset per test class instance, not per collection
+## Why reset per test class instance
 
-The containers (and their migrated schema) are shared for the whole assembly run, but the *data*
-must not leak between tests — two facts that both register the same fixed e-mail address must both
+The containers are shared for the whole assembly run and each class owns a database (migrated by the first
+host that boots on it), but the *data* must not leak between the tests of a class — two facts that both register the same fixed e-mail address must both
 succeed. Resetting in the test class's own `IAsyncLifetime.InitializeAsync` achieves that because
 xUnit constructs a new test class instance per `[Fact]`.
 

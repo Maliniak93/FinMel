@@ -2,14 +2,12 @@ using System.Net;
 using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class ListBondSeriesEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     private static readonly string[] OctoberOffer =

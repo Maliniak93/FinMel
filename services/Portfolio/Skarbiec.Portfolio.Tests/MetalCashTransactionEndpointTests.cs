@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
@@ -12,7 +11,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 namespace Skarbiec.Portfolio.Tests;
 
 // The slice under test (record transaction) is called directly; fixture helpers only arrange.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]

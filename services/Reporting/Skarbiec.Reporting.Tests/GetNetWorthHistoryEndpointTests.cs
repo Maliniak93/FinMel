@@ -2,14 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Reporting.Features.GetNetWorthHistory;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingApi;
 
 namespace Skarbiec.Reporting.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
     // The real clock, as in production, so each fact derives its dates from today.

@@ -38,15 +38,13 @@ using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.MarketData;
 using Skarbiec.ServiceDefaults.Authentication;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
 // Builds its own provider so no hosted service starts and the outbox row is never delivered before the assertion reads it.
-[Collection(TestingDefaults.CollectionName)]
-public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containers) : IAsyncLifetime
+public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     protected static readonly Guid UserId = Guid.NewGuid();
 

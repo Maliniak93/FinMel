@@ -13,12 +13,10 @@ using Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlement;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 using Skarbiec.Portfolio.MarketData;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]

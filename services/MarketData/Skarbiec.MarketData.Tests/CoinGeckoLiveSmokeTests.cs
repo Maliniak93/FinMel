@@ -5,13 +5,11 @@ using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
 // Skipped so CI never depends on the live API; remove Skip to run it once locally.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class CoinGeckoLiveSmokeTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact(Skip = "Manual live smoke (T2.5 AC) — hits the real CoinGecko API; run explicitly, don't enable in CI.")]

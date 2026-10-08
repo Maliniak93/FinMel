@@ -4,14 +4,12 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]

@@ -9,15 +9,13 @@ using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Reporting.Valuation;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
 // No positions client is registered at all: values come from the local Position table alone.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string QueueName = "daily-prices-synced-consumer-test";
 

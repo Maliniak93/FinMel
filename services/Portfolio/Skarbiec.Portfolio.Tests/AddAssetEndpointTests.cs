@@ -8,14 +8,12 @@ using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
