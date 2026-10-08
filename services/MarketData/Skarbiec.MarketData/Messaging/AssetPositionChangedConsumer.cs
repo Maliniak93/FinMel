@@ -38,31 +38,50 @@ public sealed class AssetPositionChangedConsumer(
         }
 
         link.InstrumentId = instrumentId;
+        link.FirstTransactionDate = message.FirstTransactionDate;
         link.Version = message.Version;
 
         // Saved first so the recount below sees this link's new state.
         await db.SaveChangesAsync(cancellationToken);
 
-        var newlyUsed = new List<Guid>();
         foreach (var affected in new[] { previousInstrumentId, instrumentId }.OfType<Guid>().Distinct())
         {
-            if (await RecountAsync(affected, cancellationToken))
-            {
-                newlyUsed.Add(affected);
-            }
+            await RecountAsync(affected, cancellationToken);
         }
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // Scheduled after the save, outside the consume transaction; a duplicate enqueue is harmless, as backfill upserts.
-        foreach (var affected in newlyUsed)
+        if (instrumentId is { } heldInstrumentId)
         {
-            await backfillTrigger.EnqueueAsync(affected, cancellationToken);
+            await EnqueueMissingHistoryAsync(heldInstrumentId, cancellationToken);
         }
     }
 
-    // True when the instrument just went from unused to used: the backfill-on-first-use trigger.
-    private async Task<bool> RecountAsync(Guid instrumentId, CancellationToken cancellationToken)
+    // The history window only grows backwards: a backfill is due when a live holding's first transaction predates what is covered.
+    private async Task EnqueueMissingHistoryAsync(Guid instrumentId, CancellationToken cancellationToken)
+    {
+        var required = await db.AssetInstrumentLinks
+            .Where(l => l.InstrumentId == instrumentId && !l.IsRemoved)
+            .MinAsync(l => l.FirstTransactionDate, cancellationToken);
+        if (required is null)
+        {
+            return;
+        }
+
+        var coveredFrom = await db.Instruments
+            .Where(i => i.Id == instrumentId)
+            .Select(i => i.HistoryCoveredFrom)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (coveredFrom is not null && coveredFrom <= required)
+        {
+            return;
+        }
+
+        // Scheduled after the save, outside the consume transaction; a duplicate enqueue is harmless, as backfill upserts.
+        await backfillTrigger.EnqueueAsync(instrumentId, required.Value, cancellationToken);
+    }
+
+    private async Task RecountAsync(Guid instrumentId, CancellationToken cancellationToken)
     {
         var count = await db.AssetInstrumentLinks.CountAsync(
             l => l.InstrumentId == instrumentId && !l.IsRemoved, cancellationToken);
@@ -72,7 +91,7 @@ public sealed class AssetPositionChangedConsumer(
         {
             if (count == 0)
             {
-                return false;
+                return;
             }
 
             // FirstUsedAt is stamped here, once; a later detach-then-reattach reuses this row.
@@ -82,11 +101,9 @@ public sealed class AssetPositionChangedConsumer(
                 AssetCount = count,
                 FirstUsedAt = DateTimeOffset.UtcNow,
             });
-            return true;
+            return;
         }
 
-        var wasUnused = usage.AssetCount == 0;
         usage.AssetCount = count;
-        return wasUnused && count > 0;
     }
 }

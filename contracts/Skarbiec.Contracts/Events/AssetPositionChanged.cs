@@ -23,6 +23,9 @@ public sealed record AssetPositionChanged
 
     public DateOnly? ManualValueDate { get; init; }
 
+    /// <summary>Date of the asset's earliest transaction; null when it has none.</summary>
+    public DateOnly? FirstTransactionDate { get; init; }
+
     /// <summary>The owning portfolio's archived flag at publish time.</summary>
     public required bool PortfolioIsArchived { get; init; }
 

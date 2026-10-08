@@ -13,6 +13,8 @@ public sealed class YahooPriceSource(IYahooApiClient client) : IPriceSource
 
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
+    public int? MaxHistoryDays => null;
+
     // Success while any instrument got a quote, Error only when one failed and none succeeded, NoData otherwise.
     public async Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken)

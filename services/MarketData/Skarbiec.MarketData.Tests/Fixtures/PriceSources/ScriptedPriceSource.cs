@@ -7,15 +7,22 @@ namespace Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 public sealed class ScriptedPriceSource(
     PriceSource source,
     PriceFetchResult<InstrumentQuote>? latestResult = null,
-    PriceFetchResult<InstrumentQuote>? historyResult = null) : IPriceSource
+    PriceFetchResult<InstrumentQuote>? historyResult = null,
+    int? maxHistoryDays = null) : IPriceSource
 {
     public PriceSource Source { get; } = source;
 
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
+    public int? MaxHistoryDays { get; } = maxHistoryDays;
+
     private readonly List<Guid> _latestFetchedInstrumentIds = [];
+    private readonly List<(DateOnly From, DateOnly To)> _historyWindows = [];
 
     public int HistoryFetchCount { get; private set; }
+
+    // The windows the job asked for, since the scripted result ignores them.
+    public IReadOnlyList<(DateOnly From, DateOnly To)> HistoryWindows => _historyWindows;
 
     // The scripted result ignores the arguments, so a "which instruments were asked for" assertion reads them from here.
     public IReadOnlyList<Guid> LatestFetchedInstrumentIds => _latestFetchedInstrumentIds;
@@ -37,6 +44,7 @@ public sealed class ScriptedPriceSource(
         Instrument instrument, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         HistoryFetchCount++;
+        _historyWindows.Add((from, to));
 
         if (historyResult is null)
         {

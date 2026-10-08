@@ -12,7 +12,6 @@ public sealed record AddedInstrument(CustomInstrumentResponse Instrument, bool C
 public sealed class AddCustomInstrumentHandler(
     MarketDataDbContext dbContext,
     ITickerVerifier tickerVerifier,
-    IHistoryBackfillTrigger backfillTrigger,
     IOptions<InstrumentSearchOptions> searchOptions)
 {
     public async Task<Result<AddedInstrument>> HandleAsync(AddCustomInstrumentRequest request, CancellationToken cancellationToken)
@@ -81,8 +80,6 @@ public sealed class AddCustomInstrumentHandler(
 
         dbContext.Instruments.Add(instrument);
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        await backfillTrigger.EnqueueAsync(instrument.Id, cancellationToken);
 
         return new AddedInstrument(instrument.ToResponse(), Created: true);
     }

@@ -18,6 +18,7 @@ public partial class InitialCreate : Migration
             {
                 AssetId = table.Column<Guid>(type: "uuid", nullable: false),
                 InstrumentId = table.Column<Guid>(type: "uuid", nullable: true),
+                FirstTransactionDate = table.Column<DateOnly>(type: "date", nullable: true),
                 Version = table.Column<long>(type: "bigint", nullable: false),
                 IsRemoved = table.Column<bool>(type: "boolean", nullable: false)
             },
@@ -98,7 +99,8 @@ public partial class InitialCreate : Migration
                 QuoteCurrency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
                 AssetClass = table.Column<int>(type: "integer", nullable: false),
                 Exchange = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
-                VerificationStatus = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "Verified")
+                VerificationStatus = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "Verified"),
+                HistoryCoveredFrom = table.Column<DateOnly>(type: "date", nullable: true)
             },
             constraints: table =>
             {

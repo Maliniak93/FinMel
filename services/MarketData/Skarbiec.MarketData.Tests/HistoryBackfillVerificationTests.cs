@@ -29,7 +29,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
-        await job.RunAsync(instrument.Id, cancellationToken);
+        await job.RunAsync(instrument.Id, Today.AddDays(-30), cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
         Assert.Equal(InstrumentVerificationStatus.Verified, stored.VerificationStatus);
@@ -49,7 +49,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
             PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Error("malformed Yahoo history payload: unrecognized header"));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
-        await job.RunAsync(instrument.Id, cancellationToken);
+        await job.RunAsync(instrument.Id, Today.AddDays(-30), cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
         Assert.Equal(InstrumentVerificationStatus.Failed, stored.VerificationStatus);
@@ -68,7 +68,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.NoData());
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
-        await job.RunAsync(instrument.Id, cancellationToken);
+        await job.RunAsync(instrument.Id, Today.AddDays(-30), cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
         Assert.Equal(InstrumentVerificationStatus.Failed, stored.VerificationStatus);
@@ -97,7 +97,7 @@ public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture c
         var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Error("transient failure"));
 
         var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
-        await job.RunAsync(instrument.Id, cancellationToken);
+        await job.RunAsync(instrument.Id, Today.AddDays(-30), cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
         Assert.Equal(InstrumentVerificationStatus.Verified, stored.VerificationStatus);

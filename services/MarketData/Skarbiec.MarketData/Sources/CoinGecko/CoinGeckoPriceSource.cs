@@ -32,6 +32,9 @@ public sealed class CoinGeckoPriceSource : IPriceSource
 
     public TimeSpan RequestDelay => DefaultRequestDelay;
 
+    // The free tier serves only the last 365 days of history.
+    public int? MaxHistoryDays => 365;
+
     public async Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken)
     {

@@ -10,6 +10,8 @@ public sealed class FixturePriceSource(PriceSource source, string rawResponse) :
 
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
+    public int? MaxHistoryDays => null;
+
     public Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken) =>
         Task.FromResult(Parse(rawResponse, instruments));

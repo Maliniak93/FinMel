@@ -11,6 +11,8 @@ public sealed class GatedPriceSource(
 
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
+    public int? MaxHistoryDays => null;
+
     public async Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken)
     {

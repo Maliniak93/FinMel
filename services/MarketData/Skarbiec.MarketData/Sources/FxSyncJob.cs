@@ -21,7 +21,7 @@ public sealed class FxSyncJob(
     public const string ActivitySourceName = "Skarbiec.MarketData.FxSyncJob";
 
     private const string BaseCurrency = "PLN";
-    private const int BackfillDays = 365;
+    private const int FxHistoryDays = 365;
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
@@ -126,7 +126,7 @@ public sealed class FxSyncJob(
             .ToListAsync(cancellationToken);
 
         var to = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-        var from = to.AddDays(-BackfillDays);
+        var from = to.AddDays(-FxHistoryDays);
         var failed = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var code in codes.Where(c => !pairsWithHistory.Contains(Pair(c))))

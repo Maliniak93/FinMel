@@ -7,6 +7,8 @@ public sealed class AssetInstrumentLink
 
     public Guid? InstrumentId { get; set; }
 
+    public DateOnly? FirstTransactionDate { get; set; }
+
     public long Version { get; set; }
     public bool IsRemoved { get; set; }
 }
