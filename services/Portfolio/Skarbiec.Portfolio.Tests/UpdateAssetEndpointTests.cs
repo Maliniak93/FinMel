@@ -143,6 +143,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 5m, new DateOnly(2026, 1, 1), cancellationToken);
         var instrumentId = Guid.NewGuid();
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Stock, "PLN");
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Stock,
@@ -279,6 +280,23 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_InstrumentClassMismatch_Returns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var instrumentId = Guid.NewGuid();
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Crypto, "PLN");
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Wrong class", Currency = "PLN", InstrumentId = instrumentId };
+
+        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.Equal("Validation.InstrumentAssetClassMismatch", problem!.Extensions["errorCode"]?.ToString());
     }
 
     [Fact]

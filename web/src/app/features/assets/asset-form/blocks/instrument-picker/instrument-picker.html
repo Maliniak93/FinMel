@@ -13,20 +13,48 @@
     (optionSelected)="onInstrumentOptionSelected($event)"
   >
     @if (searchResource.hasValue()) {
-      @for (result of searchResource.value(); track result.id) {
+      @for (result of searchResource.value().results; track result.id ?? result.ticker) {
         <mat-option [value]="result">
-          {{ result.ticker }} — {{ result.name }}
+          {{ result.ticker }} · {{ result.name }}
+          @if (result.exchange) {
+            · {{ result.exchange }}
+          }
           @if (result.lastPrice !== null) {
             ({{ formatMoney(result.lastPrice, result.quoteCurrency) }})
+          }
+          @if (result.id === null) {
+            <span class="asset-form__new-listing">{{ 'assets.form.newListing' | transloco }}</span>
           }
         </mat-option>
       }
     }
   </mat-autocomplete>
-  @if (searchResource.isLoading()) {
+  @if (searchResource.isLoading() || candidateSubmitting()) {
     <mat-spinner matSuffix diameter="16" />
   }
 </mat-form-field>
+
+@if (searchResource.hasValue() && searchResource.value().providerUnavailable) {
+  <p class="asset-form__provider-unavailable" role="status">
+    {{ 'assets.form.providerUnavailable' | transloco }}
+  </p>
+}
+
+@if (candidateOutcome() === 'unreachable') {
+  <div class="asset-form__warning" role="alert">
+    <p>{{ candidateMessage() }}</p>
+    <button
+      mat-stroked-button
+      type="button"
+      [disabled]="candidateSubmitting()"
+      (click)="addCandidateAnyway()"
+    >
+      {{ 'assets.form.addAnyway' | transloco }}
+    </button>
+  </div>
+} @else if (candidateOutcome() !== 'idle') {
+  <p class="asset-form__error" role="alert">{{ candidateMessage() }}</p>
+}
 
 @if (selectedInstrument(); as instrument) {
   <p class="asset-form__selected-instrument">
@@ -94,10 +122,6 @@
             {{ 'assets.form.addAnyway' | transloco }}
           </button>
         </div>
-      } @else if (customInstrumentOutcome() === 'conflict') {
-        <p class="asset-form__error" role="alert">
-          {{ customInstrumentMessage() }} {{ 'assets.form.tryAnother' | transloco }}
-        </p>
       } @else if (customInstrumentOutcome() === 'error') {
         <p class="asset-form__error" role="alert">{{ customInstrumentMessage() }}</p>
       }

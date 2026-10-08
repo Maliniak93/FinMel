@@ -11,6 +11,7 @@ public sealed record CustomInstrumentResponse
     public required PriceSource Source { get; init; }
     public required string QuoteCurrency { get; init; }
     public required AssetClass AssetClass { get; init; }
+    public required string? Exchange { get; init; }
     public required InstrumentVerificationStatus VerificationStatus { get; init; }
 }
 
@@ -24,6 +25,7 @@ public static class CustomInstrumentMappingExtensions
         Source = instrument.Source,
         QuoteCurrency = instrument.QuoteCurrency,
         AssetClass = instrument.AssetClass,
+        Exchange = instrument.Exchange,
         VerificationStatus = instrument.VerificationStatus,
     };
 }

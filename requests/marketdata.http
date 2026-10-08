@@ -14,17 +14,19 @@ Content-Type: application/json
 GET {{baseUrl}}/api/marketdata/instruments/search?q=CDR&limit=20
 Authorization: Bearer {{authToken}}
 
-### Add a custom instrument
+### Search ETFs — local matches plus Yahoo listings on the configured exchanges; { results, providerUnavailable }
+GET {{baseUrl}}/api/marketdata/instruments/search?q=vanguard%20all-world&assetClass=Etf&limit=20
+Authorization: Bearer {{authToken}}
+
+### Add a custom instrument — exchange and currency come from the ticker suffix; a known ticker answers 200 with the stored one
 # @name addCustomInstrument
 POST {{baseUrl}}/api/marketdata/instruments
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "source": "Yahoo",
   "ticker": "PKO.WA",
   "name": "PKO Bank Polski",
-  "quoteCurrency": "PLN",
   "assetClass": "Stock"
 }
 

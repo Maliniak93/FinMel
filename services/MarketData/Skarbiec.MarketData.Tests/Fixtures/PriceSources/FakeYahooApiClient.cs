@@ -7,7 +7,35 @@ public sealed class FakeYahooApiClient : IYahooApiClient
     private readonly Dictionary<string, string> _responses = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Exception> _exceptions = new(StringComparer.OrdinalIgnoreCase);
 
+    private string? _searchResponse;
+    private Exception? _searchException;
+
     public int HistoryRequestCount { get; private set; }
+
+    public List<string> SearchQueries { get; } = [];
+
+    public FakeYahooApiClient WithSearchResponse(string rawResponse)
+    {
+        _searchResponse = rawResponse;
+        return this;
+    }
+
+    public FakeYahooApiClient ThrowingOnSearch(Exception exception)
+    {
+        _searchException = exception;
+        return this;
+    }
+
+    public Task<string> SearchAsync(string query, CancellationToken cancellationToken)
+    {
+        SearchQueries.Add(query);
+        if (_searchException is not null)
+        {
+            return Task.FromException<string>(_searchException);
+        }
+
+        return Task.FromResult(_searchResponse ?? throw new InvalidOperationException("FakeYahooApiClient: no search response wired."));
+    }
 
     public FakeYahooApiClient WithResponse(string ticker, string rawResponse)
     {

@@ -144,7 +144,7 @@ export const cryptoAsset: AssetResponse = {
   assetClass: 5,
   valuationMode: 0,
   name: 'Bitcoin',
-  currency: 'PLN',
+  currency: 'USD',
   quantity: 0.5,
   instrumentId,
   transactionCount: 0,
@@ -157,6 +157,7 @@ export const cryptoInstrumentDetails: InstrumentDetailsResponse = {
   name: 'Bitcoin',
   assetClass: 5,
   quoteCurrency: 'USD',
+  exchange: null,
   source: 2,
   verificationStatus: 0,
   lastPrice: 65000,
@@ -172,4 +173,17 @@ export const etfSearchResult: InstrumentSearchResult = {
   verificationStatus: 0,
   lastPrice: 120,
   lastPriceDate: '2026-08-04',
+  exchange: 'Xetra',
+};
+
+export const etfCandidate: InstrumentSearchResult = {
+  id: null,
+  ticker: 'VWCE.DE',
+  name: 'Vanguard FTSE All-World UCITS ETF',
+  assetClass: 3,
+  quoteCurrency: 'EUR',
+  verificationStatus: null,
+  lastPrice: null,
+  lastPriceDate: null,
+  exchange: 'Xetra',
 };

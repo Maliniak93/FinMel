@@ -32,6 +32,7 @@ builder.AddServiceDefaults();
 builder.AddServiceOpenApi();
 
 builder.AddTickerVerification();
+builder.AddInstrumentSearch();
 
 if (!OpenApiBuildTime.IsActive)
 {

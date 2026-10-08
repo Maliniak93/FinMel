@@ -71,15 +71,26 @@ public sealed class AddAssetHandler(
 
         if (request.InstrumentId is { } instrumentId)
         {
-            var lookupStatus = await instrumentLookupClient.CheckAsync(instrumentId, cancellationToken);
-            if (lookupStatus == InstrumentLookupStatus.NotFound)
+            var lookup = await instrumentLookupClient.CheckAsync(instrumentId, cancellationToken);
+            if (lookup.Status == InstrumentLookupStatus.NotFound)
             {
                 return AssetErrors.InstrumentNotFound(instrumentId);
             }
 
-            if (lookupStatus == InstrumentLookupStatus.Unavailable)
+            if (lookup.Status == InstrumentLookupStatus.Unavailable)
             {
                 return AssetErrors.MarketDataUnavailable;
+            }
+
+            // A mismatched instrument would value the asset with another class's or currency's prices.
+            if (lookup.AssetClass != request.AssetClass)
+            {
+                return AssetErrors.InstrumentAssetClassMismatch(instrumentId, lookup.AssetClass, request.AssetClass);
+            }
+
+            if (!string.Equals(lookup.QuoteCurrency, request.Currency, StringComparison.Ordinal))
+            {
+                return AssetErrors.InstrumentCurrencyMismatch(instrumentId, lookup.QuoteCurrency, request.Currency);
             }
 
             asset.InstrumentId = instrumentId;

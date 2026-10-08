@@ -6,4 +6,6 @@ public interface IYahooApiClient
     Task<string> GetLatestAsync(string ticker, CancellationToken cancellationToken);
 
     Task<string> GetHistoryAsync(string ticker, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
+    Task<string> SearchAsync(string query, CancellationToken cancellationToken);
 }

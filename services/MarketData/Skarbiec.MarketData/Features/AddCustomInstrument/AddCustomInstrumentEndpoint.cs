@@ -14,13 +14,18 @@ public static class AddCustomInstrumentEndpoint
         return app;
     }
 
-    private static async Task<Results<Created<CustomInstrumentResponse>, ProblemHttpResult>> HandleAsync(
+    private static async Task<Results<Created<CustomInstrumentResponse>, Ok<CustomInstrumentResponse>, ProblemHttpResult>> HandleAsync(
         AddCustomInstrumentRequest request, AddCustomInstrumentHandler handler, CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(request, cancellationToken);
+        if (result.IsFailure)
+        {
+            return result.Error.ToProblem();
+        }
 
-        return result.IsSuccess
-            ? TypedResults.Created($"/api/marketdata/instruments/{result.Value.Id}", result.Value)
-            : result.Error.ToProblem();
+        var instrument = result.Value.Instrument;
+        return result.Value.Created
+            ? TypedResults.Created($"/api/marketdata/instruments/{instrument.Id}", instrument)
+            : TypedResults.Ok(instrument);
     }
 }

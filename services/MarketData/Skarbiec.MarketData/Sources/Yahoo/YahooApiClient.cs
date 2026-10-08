@@ -13,6 +13,9 @@ public sealed class YahooApiClient(HttpClient httpClient) : IYahooApiClient
             $"v8/finance/chart/{Uri.EscapeDataString(ticker)}?period1={ToUnixSeconds(from)}&period2={ToUnixSeconds(to.AddDays(1))}&interval=1d",
             cancellationToken);
 
+    public Task<string> SearchAsync(string query, CancellationToken cancellationToken) =>
+        GetRawAsync($"v1/finance/search?q={Uri.EscapeDataString(query)}&quotesCount=20&newsCount=0", cancellationToken);
+
     private async Task<string> GetRawAsync(string requestUri, CancellationToken cancellationToken)
     {
         using var response = await httpClient.GetAsync(requestUri, cancellationToken);

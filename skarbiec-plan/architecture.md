@@ -182,6 +182,12 @@ sequenceDiagram
     participant PF as Portfolio
     participant MD as MarketData
 
+    U->>MD: GET instruments/search?q&assetClass (Stock/Etf, ≥ 2 chars)
+    MD->>MD: local matches + IInstrumentSearchSource → provider (~5s, no retry, ADR-030)
+    MD-->>U: local first, then provider candidates (id null); provider down → local + providerUnavailable
+    opt picked a candidate
+        U->>MD: POST instruments {ticker, name, assetClass} — exchange + currency from the suffix, known ticker → 200
+    end
     U->>PF: add asset (ticker T)
     PF->>MD: GET instruments?ticker=T
     alt dictionary hit (Verified)

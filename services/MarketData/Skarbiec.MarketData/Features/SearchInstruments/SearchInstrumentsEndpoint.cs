@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Skarbiec.Contracts;
 
 namespace Skarbiec.MarketData.Features.SearchInstruments;
 
@@ -13,8 +14,8 @@ public static class SearchInstrumentsEndpoint
         return app;
     }
 
-    // Defaulted params, so an omitted ?q= or ?limit= binds instead of failing as missing.
-    private static async Task<Ok<IReadOnlyList<InstrumentSearchResult>>> HandleAsync(
-        SearchInstrumentsHandler handler, CancellationToken cancellationToken, string? q = null, int limit = 20)
-        => TypedResults.Ok(await handler.HandleAsync(q, limit, cancellationToken));
+    // Defaulted params, so an omitted ?q=, ?assetClass= or ?limit= binds instead of failing as missing.
+    private static async Task<Ok<InstrumentSearchResponse>> HandleAsync(
+        SearchInstrumentsHandler handler, CancellationToken cancellationToken, string? q = null, AssetClass? assetClass = null, int limit = 20)
+        => TypedResults.Ok(await handler.HandleAsync(q, assetClass, limit, cancellationToken));
 }

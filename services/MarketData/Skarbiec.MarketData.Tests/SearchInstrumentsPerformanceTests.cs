@@ -37,15 +37,15 @@ public sealed class SearchInstrumentsPerformanceTests(SkarbiecContainersFixture 
         }
 
         await using var queryDb = CreateDbContext();
-        var handler = new SearchInstrumentsHandler(queryDb);
+        var handler = new SearchInstrumentsHandler(queryDb, new FakeInstrumentSearchSource());
 
-        await handler.HandleAsync("SYM", 20, cancellationToken);
+        await handler.HandleAsync("SYM", null, 20, cancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
-        var results = await handler.HandleAsync("SYM", 20, cancellationToken);
+        var results = await handler.HandleAsync("SYM", null, 20, cancellationToken);
         stopwatch.Stop();
 
-        Assert.Equal(20, results.Count);
+        Assert.Equal(20, results.Results.Count);
         Assert.True(
             stopwatch.ElapsedMilliseconds < 100,
             $"SearchInstruments took {stopwatch.ElapsedMilliseconds} ms on 50 seeded instruments, expected < 100 ms.");

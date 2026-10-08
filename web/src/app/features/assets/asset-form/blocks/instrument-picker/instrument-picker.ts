@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, resource, signal } from '@angular/core';
+import { Component, effect, inject, input, PendingTasks, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
@@ -16,8 +16,10 @@ import {
   getApiMarketdataInstrumentsById,
   getApiMarketdataInstrumentsSearch,
   postApiMarketdataInstruments,
+  type AddCustomInstrumentRequest,
   type CustomInstrumentResponse,
   type InstrumentDetailsResponse,
+  type InstrumentSearchResponse,
   type InstrumentSearchResult,
 } from '../../../../../api/marketdata';
 import type { AssetClass } from '../../../../../api/portfolio';
@@ -36,7 +38,12 @@ export function createInstrumentControl(): FormControl<InstrumentOption | null> 
 
 export const INSTRUMENT_REQUIRED_MESSAGE = 'assets.form.instrumentRequired';
 
-type CustomInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'conflict' | 'error';
+type AddInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'error';
+
+type AddInstrumentResult =
+  { instrument: CustomInstrumentResponse } | { outcome: AddInstrumentOutcome; message: string };
+
+const EMPTY_SEARCH: InstrumentSearchResponse = { results: [], providerUnavailable: false };
 
 @Component({
   selector: 'app-instrument-picker',
@@ -54,6 +61,7 @@ type CustomInstrumentOutcome = 'idle' | 'notFound' | 'unreachable' | 'conflict' 
 })
 export class InstrumentPicker {
   private readonly formBuilder = inject(FormBuilder);
+  private readonly pendingTasks = inject(PendingTasks);
 
   readonly control = input.required<FormControl<InstrumentOption | null>>();
   readonly assetClass = input.required<AssetClass>();
@@ -77,16 +85,16 @@ export class InstrumentPicker {
   );
 
   protected readonly searchResource = resource({
-    params: () => ({ query: this.searchQuery() }),
+    params: () => ({ query: this.searchQuery(), assetClass: this.assetClass() }),
     loader: async ({ params, abortSignal }) => {
       if (params.query.trim().length === 0) {
-        return [];
+        return EMPTY_SEARCH;
       }
       const result = await getApiMarketdataInstrumentsSearch({
-        query: { q: params.query },
+        query: { q: params.query, assetClass: params.assetClass },
         signal: abortSignal,
       });
-      return result.error ? [] : (result.data ?? []);
+      return result.error ? EMPTY_SEARCH : (result.data ?? EMPTY_SEARCH);
     },
   });
 
@@ -114,9 +122,14 @@ export class InstrumentPicker {
     }
   });
 
+  protected readonly candidate = signal<InstrumentSearchResult | null>(null);
+  protected readonly candidateSubmitting = signal(false);
+  protected readonly candidateOutcome = signal<AddInstrumentOutcome>('idle');
+  protected readonly candidateMessage = signal<string | null>(null);
+
   protected readonly showCustomInstrumentForm = signal(false);
   protected readonly customInstrumentSubmitting = signal(false);
-  protected readonly customInstrumentOutcome = signal<CustomInstrumentOutcome>('idle');
+  protected readonly customInstrumentOutcome = signal<AddInstrumentOutcome>('idle');
   protected readonly customInstrumentMessage = signal<string | null>(null);
 
   protected readonly customInstrumentForm = this.formBuilder.nonNullable.group({
@@ -133,10 +146,14 @@ export class InstrumentPicker {
   }
 
   protected onInstrumentOptionSelected(event: MatAutocompleteSelectedEvent): void {
-    this.selectInstrument(event.option.value as InstrumentOption);
+    const option = event.option.value as InstrumentOption;
+    if (option.id === null) {
+      void this.addCandidate(option as InstrumentSearchResult);
+      return;
+    }
+    this.selectInstrument(option);
   }
 
-  // The asset keeps its own currency: market valuation converts from the instrument's quote currency.
   private selectInstrument(instrument: InstrumentOption): void {
     this.selectedInstrument.set(instrument);
     this.control().setValue(instrument);
@@ -144,6 +161,45 @@ export class InstrumentPicker {
     const nameControl = this.nameControl();
     if (nameControl && !nameControl.value) {
       nameControl.setValue(instrument.name);
+    }
+  }
+
+  protected async addCandidate(
+    candidate: InstrumentSearchResult,
+    allowUnverified = false,
+  ): Promise<void> {
+    if (this.candidateSubmitting()) {
+      return;
+    }
+
+    this.candidate.set(candidate);
+    this.candidateSubmitting.set(true);
+    this.candidateOutcome.set('idle');
+    this.candidateMessage.set(null);
+
+    const result = await this.postInstrument({
+      ticker: candidate.ticker,
+      name: candidate.name,
+      assetClass: this.assetClass(),
+      allowUnverified,
+    });
+
+    this.candidateSubmitting.set(false);
+
+    if ('instrument' in result) {
+      this.candidate.set(null);
+      this.selectInstrument(result.instrument);
+      return;
+    }
+
+    this.candidateOutcome.set(result.outcome);
+    this.candidateMessage.set(result.message);
+  }
+
+  protected addCandidateAnyway(): void {
+    const candidate = this.candidate();
+    if (candidate) {
+      void this.addCandidate(candidate, true);
     }
   }
 
@@ -168,48 +224,60 @@ export class InstrumentPicker {
     this.customInstrumentMessage.set(null);
 
     const values = this.customInstrumentForm.getRawValue();
-    const result = await postApiMarketdataInstruments({
-      body: {
-        ticker: values.ticker,
-        name: values.name,
-        quoteCurrency: values.quoteCurrency,
-        assetClass: this.assetClass(),
-        allowUnverified,
-      },
+    const result = await this.postInstrument({
+      ticker: values.ticker,
+      name: values.name,
+      quoteCurrency: values.quoteCurrency,
+      assetClass: this.assetClass(),
+      allowUnverified,
     });
 
     this.customInstrumentSubmitting.set(false);
 
-    if (result.error) {
-      const problem = readProblemDetails(result.error);
-      this.customInstrumentMessage.set(
-        problem.detail ?? translate('assets.form.addInstrumentFailed'),
-      );
-      this.customInstrumentOutcome.set(this.classifyCustomInstrumentError(problem));
+    if (!('instrument' in result)) {
+      this.customInstrumentMessage.set(result.message);
+      this.customInstrumentOutcome.set(result.outcome);
       return;
     }
 
     this.customInstrumentOutcome.set('idle');
     this.customInstrumentMessage.set(null);
-    this.selectInstrument(result.data!);
+    this.selectInstrument(result.instrument);
     this.showCustomInstrumentForm.set(false);
     this.customInstrumentForm.reset({ ticker: '', name: '', quoteCurrency: '' });
   }
 
-  private classifyCustomInstrumentError(problem: ApiProblemDetails): CustomInstrumentOutcome {
-    switch (problem.errorCode) {
-      case 'Validation.TickerNotFound':
-        return 'notFound';
-      case 'ServiceUnavailable.TickerVerificationUnreachable':
-        return 'unreachable';
-      case 'Conflict.InstrumentAlreadyExists':
-        return 'conflict';
-      default:
-        return 'error';
+  protected addInstrumentAnyway(): void {
+    void this.submitCustomInstrument(true);
+  }
+
+  // A pending task keeps the app unstable until the instrument is selected.
+  private async postInstrument(body: AddCustomInstrumentRequest): Promise<AddInstrumentResult> {
+    const done = this.pendingTasks.add();
+    try {
+      const result = await postApiMarketdataInstruments({ body });
+      if (result.error) {
+        const problem = readProblemDetails(result.error);
+        return {
+          outcome: this.classifyAddInstrumentError(problem),
+          message: problem.detail ?? translate('assets.form.addInstrumentFailed'),
+        };
+      }
+      return { instrument: result.data! };
+    } finally {
+      done();
     }
   }
 
-  protected addInstrumentAnyway(): void {
-    void this.submitCustomInstrument(true);
+  private classifyAddInstrumentError(problem: ApiProblemDetails): AddInstrumentOutcome {
+    switch (problem.errorCode) {
+      case 'Validation.TickerNotFound':
+      case 'Validation.UnsupportedExchange':
+        return 'notFound';
+      case 'ServiceUnavailable.TickerVerificationUnreachable':
+        return 'unreachable';
+      default:
+        return 'error';
+    }
   }
 }

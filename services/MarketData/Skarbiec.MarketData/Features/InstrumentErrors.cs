@@ -25,8 +25,10 @@ internal static class InstrumentErrors
             "ServiceUnavailable.TickerVerificationUnreachable",
             $"{source} could not be reached to verify '{ticker}' — try again shortly, or add it anyway and it will resolve automatically.");
 
-    public static Error AlreadyExists(PriceSource source, string ticker) =>
-        new("Conflict.InstrumentAlreadyExists", $"An instrument with source '{source}' and ticker '{ticker}' already exists.");
+    public static Error UnsupportedExchange(string ticker) =>
+        new(
+            "Validation.UnsupportedExchange",
+            $"'{ticker}' is not listed on a supported exchange — use a ticker with a configured suffix such as .WA (GPW) or .DE (Xetra).");
 
     public static Error NotFound(Guid id) =>
         new("NotFound.Instrument", $"Instrument '{id}' was not found.");

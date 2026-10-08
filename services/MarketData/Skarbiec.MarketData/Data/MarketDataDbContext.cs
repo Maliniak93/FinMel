@@ -25,6 +25,7 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
             instrument.Property(i => i.Ticker).HasMaxLength(30);
             instrument.Property(i => i.Name).HasMaxLength(200);
             instrument.Property(i => i.QuoteCurrency).HasMaxLength(3);
+            instrument.Property(i => i.Exchange).HasMaxLength(20);
 
             instrument.Property(i => i.VerificationStatus)
                 .HasConversion<string>()

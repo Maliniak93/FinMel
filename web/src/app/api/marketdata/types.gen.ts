@@ -7,7 +7,7 @@ export type ClientOptions = {
 export type AddCustomInstrumentRequest = {
     ticker: string;
     name: string;
-    quoteCurrency: string;
+    quoteCurrency?: null | string;
     assetClass: AssetClass;
     allowUnverified?: boolean;
 };
@@ -50,6 +50,7 @@ export type CustomInstrumentResponse = {
     source: PriceSource;
     quoteCurrency: string;
     assetClass: AssetClass;
+    exchange: null | string;
     verificationStatus: InstrumentVerificationStatus;
 };
 
@@ -59,19 +60,26 @@ export type InstrumentDetailsResponse = {
     name: string;
     assetClass: AssetClass;
     quoteCurrency: string;
+    exchange: null | string;
     source: PriceSource;
     verificationStatus: InstrumentVerificationStatus;
     lastPrice: null | number | string;
     lastPriceDate: null | string;
 };
 
+export type InstrumentSearchResponse = {
+    results: Array<InstrumentSearchResult>;
+    providerUnavailable: boolean;
+};
+
 export type InstrumentSearchResult = {
-    id: string;
+    id: null | string;
     ticker: string;
     name: string;
     assetClass: AssetClass;
     quoteCurrency: string;
-    verificationStatus: InstrumentVerificationStatus;
+    exchange: null | string;
+    verificationStatus: null | InstrumentVerificationStatus;
     lastPrice: null | number | string;
     lastPriceDate: null | string;
 };
@@ -119,6 +127,7 @@ export type GetApiMarketdataInstrumentsSearchData = {
     path?: never;
     query?: {
         q?: string;
+        assetClass?: AssetClass;
         limit?: number | string;
     };
     url: '/api/marketdata/instruments/search';
@@ -128,7 +137,7 @@ export type GetApiMarketdataInstrumentsSearchResponses = {
     /**
      * OK
      */
-    200: Array<InstrumentSearchResult>;
+    200: InstrumentSearchResponse;
 };
 
 export type GetApiMarketdataInstrumentsSearchResponse = GetApiMarketdataInstrumentsSearchResponses[keyof GetApiMarketdataInstrumentsSearchResponses];
@@ -141,6 +150,10 @@ export type PostApiMarketdataInstrumentsData = {
 };
 
 export type PostApiMarketdataInstrumentsResponses = {
+    /**
+     * OK
+     */
+    200: CustomInstrumentResponse;
     /**
      * Created
      */

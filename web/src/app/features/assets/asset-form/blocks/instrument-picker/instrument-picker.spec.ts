@@ -18,7 +18,13 @@ import {
   switchLanguage,
 } from '../../../../../../testing/i18n';
 import { provideI18nTesting } from '../../../../../core/i18n/testing';
-import { etfSearchResult, jsonResponse, renderedText } from '../../testing/asset-form-fixtures';
+import {
+  etfCandidate,
+  etfSearchResult,
+  jsonResponse,
+  renderedText,
+  requestUrl,
+} from '../../testing/asset-form-fixtures';
 import { InstrumentPicker } from './instrument-picker';
 
 type InstrumentOption =
@@ -87,6 +93,7 @@ describe('InstrumentPicker', () => {
         quoteCurrency: 'USD',
         assetClass: 2,
         verificationStatus: 0,
+        exchange: null,
       };
       await setupWithCustomTicker();
       fetchSpy.mockResolvedValue(jsonResponse(created, 201));
@@ -145,6 +152,7 @@ describe('InstrumentPicker', () => {
         quoteCurrency: 'USD',
         assetClass: 2,
         verificationStatus: 1,
+        exchange: null,
       };
       fetchSpy.mockResolvedValueOnce(jsonResponse(unverified, 201));
 
@@ -156,23 +164,85 @@ describe('InstrumentPicker', () => {
       expect(body).not.toHaveProperty('source');
       expect(control.value).toEqual(unverified);
     });
+  });
 
-    it('Conflict: reports it already exists and points at search', async () => {
-      await setupWithCustomTicker();
-      fetchSpy.mockResolvedValue(
-        jsonResponse(
-          {
-            detail: "An instrument with source 'Stooq' and ticker 'MSFT.US' already exists.",
-            errorCode: 'Conflict.InstrumentAlreadyExists',
-          },
-          409,
-        ),
+  describe('searching for an Etf', () => {
+    const created: CustomInstrumentResponse = {
+      id: '99999999-9999-9999-9999-999999999999',
+      ticker: 'VWCE.DE',
+      name: 'Vanguard FTSE All-World UCITS ETF',
+      source: 1,
+      quoteCurrency: 'EUR',
+      assetClass: 3,
+      verificationStatus: 0,
+      exchange: 'Xetra',
+    };
+
+    async function typeAndSearch(providerUnavailable: boolean): Promise<void> {
+      await setup(false);
+      fixture.componentRef.setInput('assetClass', 3);
+      fetchSpy.mockImplementation(async (input: unknown) => {
+        if ((input as Request).method === 'POST') {
+          return jsonResponse(created, 201);
+        }
+        return jsonResponse({ results: [etfCandidate], providerUnavailable });
+      });
+
+      component['instrumentControl'].setValue('vwce');
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('sends the asset class, and picking a "nowy" option posts the instrument once and selects it', async () => {
+      await typeAndSearch(false);
+      const searchRequest = fetchSpy.mock.calls.find(
+        (call: unknown[]) => (call[0] as Request).method === 'GET',
+      )![0];
+      expect(requestUrl(searchRequest)).toContain('assetClass=3');
+      await switchLanguage(fixture, 'pl');
+
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('input')!
+        .dispatchEvent(new Event('focusin'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const option = document.querySelector<HTMLElement>('mat-option')!;
+      expect(option.textContent).toContain('VWCE.DE');
+      expect(option.textContent).toContain('Xetra');
+      expect(option.textContent).toContain('nowy');
+      option.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const posts = fetchSpy.mock.calls.filter(
+        (call: unknown[]) => (call[0] as Request).method === 'POST',
       );
+      expect(posts).toHaveLength(1);
+      const body = await (posts[0][0] as Request).clone().json();
+      expect(body).toMatchObject({
+        ticker: 'VWCE.DE',
+        name: 'Vanguard FTSE All-World UCITS ETF',
+        assetClass: 3,
+      });
+      expect(body).not.toHaveProperty('quoteCurrency');
+      expect(control.value).toEqual(created);
+    });
 
-      await component['submitCustomInstrument']();
+    it('shows the hint when the provider search is unavailable', async () => {
+      await typeAndSearch(true);
+      await switchLanguage(fixture, 'pl');
 
-      expect(component['customInstrumentOutcome']()).toBe('conflict');
-      expect(control.value).toBeNull();
+      expect(renderedText(fixture)).toContain(
+        'Wyszukiwarka giełdowa niedostępna — pokazuję tylko znane instrumenty',
+      );
+    });
+
+    it('shows no hint when the provider answered', async () => {
+      await typeAndSearch(false);
+      await switchLanguage(fixture, 'pl');
+
+      expect(renderedText(fixture)).not.toContain('Wyszukiwarka giełdowa niedostępna');
     });
   });
 
@@ -301,19 +371,6 @@ describe('InstrumentPicker', () => {
       expect(
         polishProblems(['Add anyway'], labelsOf(element, '.asset-form__warning button')),
       ).toEqual([]);
-    });
-
-    it('shows the conflict outcome with a Polish hint after the backend detail', async () => {
-      const detail = "An instrument with source 'Stooq' and ticker 'MSFT.US' already exists.";
-      const element = await submitAfterSwitch(
-        jsonResponse({ detail, errorCode: 'Conflict.InstrumentAlreadyExists' }, 409),
-      );
-
-      expect(component['customInstrumentOutcome']()).toBe('conflict');
-      const [message] = labelsOf(element, '.asset-form__error');
-      expect(message.startsWith(detail)).toBe(true);
-      const hint = message.slice(detail.length).trim();
-      expect(polishProblems(['Try searching for it above instead.'], [hint])).toEqual([]);
     });
 
     it('shows the generic failure fallback in Polish', async () => {

@@ -37,9 +37,14 @@ internal static class MarketDataApi
     public static string InternalFxRateUri(string currency, DateOnly date) =>
         $"/internal/fx/{currency}/rate?date={date:yyyy-MM-dd}";
 
-    public static string SearchInstrumentsUri(string? q = null, int? limit = null)
+    public static string SearchInstrumentsUri(string? q = null, int? limit = null, AssetClass? assetClass = null)
     {
         var parameters = new List<string>();
+        if (assetClass is not null)
+        {
+            parameters.Add($"assetClass={assetClass}");
+        }
+
         if (q is not null)
         {
             parameters.Add($"q={Uri.EscapeDataString(q)}");
@@ -56,9 +61,9 @@ internal static class MarketDataApi
     public static async Task<CustomInstrumentResponse> AddCustomInstrumentAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
-        string ticker = "MSFT.US",
-        string name = "Microsoft Corp.",
-        string quoteCurrency = "USD",
+        string ticker = "CDR.WA",
+        string name = "CD Projekt",
+        string? quoteCurrency = null,
         AssetClass assetClass = AssetClass.Stock,
         bool allowUnverified = false)
     {

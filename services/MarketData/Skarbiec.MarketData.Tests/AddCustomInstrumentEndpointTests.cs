@@ -25,8 +25,8 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var request = new AddCustomInstrumentRequest
         {
-            Ticker = "MSFT.US",
-            Name = "Microsoft Corp.",
+            Ticker = "CDR.WA",
+            Name = "CD Projekt",
             QuoteCurrency = "USD",
             AssetClass = AssetClass.Stock,
         };
@@ -36,11 +36,11 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<CustomInstrumentResponse>(cancellationToken);
         Assert.NotNull(body);
-        Assert.Equal("MSFT.US", body.Ticker);
+        Assert.Equal("CDR.WA", body.Ticker);
         Assert.Equal(PriceSource.Yahoo, body.Source);
         Assert.Equal(InstrumentVerificationStatus.Verified, body.VerificationStatus);
         Assert.Equal($"{InstrumentsUri}/{body.Id}", response.Headers.Location?.OriginalString);
-        Assert.Contains((PriceSource.Yahoo, "MSFT.US"), Factory.TickerVerifier.Calls);
+        Assert.Contains((PriceSource.Yahoo, "CDR.WA"), Factory.TickerVerifier.Calls);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "solana", assetClass: AssetClass.Crypto);
+        var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "solana", quoteCurrency: "USD", assetClass: AssetClass.Crypto);
 
         Assert.Equal(PriceSource.CoinGecko, body.Source);
         Assert.Equal(InstrumentVerificationStatus.Verified, body.VerificationStatus);
@@ -97,7 +97,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         using var stockClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         using var cryptoClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        const string ticker = "AMBIGUOUS";
+        const string ticker = "AMBIGUOUS.DE";
         Factory.TickerVerifier.WithOutcome(PriceSource.CoinGecko, ticker, TickerVerificationOutcome.DoesNotExist);
         // Yahoo isn't scripted for this ticker, so it keeps the fake's default (Exists).
 
@@ -122,12 +122,12 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        await client.AddCustomInstrumentAsync(cancellationToken, ticker: "MSFT.US", name: "Microsoft Corp.");
+        await client.AddCustomInstrumentAsync(cancellationToken, ticker: "CDR.WA", name: "CD Projekt");
 
-        var searchResponse = await client.GetAsync(SearchInstrumentsUri("MSFT"), cancellationToken);
-        var results = await searchResponse.Content.ReadFromJsonAsync<List<InstrumentSearchResult>>(cancellationToken);
+        var searchResponse = await client.GetAsync(SearchInstrumentsUri("CDR"), cancellationToken);
+        var results = await searchResponse.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken);
 
-        Assert.Single(results!);
+        Assert.Single(results!.Results);
     }
 
     [Fact]
@@ -179,10 +179,10 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "GHOST.US", TickerVerificationOutcome.DoesNotExist);
+        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "GHOST.WA", TickerVerificationOutcome.DoesNotExist);
         var request = new AddCustomInstrumentRequest
         {
-            Ticker = "GHOST.US",
+            Ticker = "GHOST.WA",
             Name = "Doesn't exist",
             QuoteCurrency = "USD",
             AssetClass = AssetClass.Stock,
@@ -192,10 +192,10 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("GHOST.US", body);
+        Assert.Contains("GHOST.WA", body);
 
         await using var db = CreateDbContext();
-        Assert.False(await db.Instruments.AnyAsync(i => i.Ticker == "GHOST.US", cancellationToken));
+        Assert.False(await db.Instruments.AnyAsync(i => i.Ticker == "GHOST.WA", cancellationToken));
     }
 
     [Fact]
@@ -203,10 +203,10 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "DOWN.US", TickerVerificationOutcome.Unreachable);
+        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "DOWN.WA", TickerVerificationOutcome.Unreachable);
         var request = new AddCustomInstrumentRequest
         {
-            Ticker = "DOWN.US",
+            Ticker = "DOWN.WA",
             Name = "Provider is down",
             QuoteCurrency = "USD",
             AssetClass = AssetClass.Stock,
@@ -217,7 +217,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
 
         await using var db = CreateDbContext();
-        Assert.False(await db.Instruments.AnyAsync(i => i.Ticker == "DOWN.US", cancellationToken));
+        Assert.False(await db.Instruments.AnyAsync(i => i.Ticker == "DOWN.WA", cancellationToken));
     }
 
     [Fact]
@@ -225,9 +225,9 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "DOWN.US", TickerVerificationOutcome.Unreachable);
+        Factory.TickerVerifier.WithOutcome(PriceSource.Yahoo, "DOWN.WA", TickerVerificationOutcome.Unreachable);
 
-        var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "DOWN.US", allowUnverified: true);
+        var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "DOWN.WA", allowUnverified: true);
 
         Assert.Equal(InstrumentVerificationStatus.Unverified, body.VerificationStatus);
 
@@ -237,22 +237,45 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     }
 
     [Fact]
-    public async Task Add_DuplicateTicker_ReturnsConflict()
+    public async Task Etf_CurrencyFromExchange_IdempotentRepeat()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.AddCustomInstrumentAsync(cancellationToken, ticker: "DUP.US");
-
         var request = new AddCustomInstrumentRequest
         {
-            Ticker = "DUP.US",
-            Name = "Duplicate again",
-            QuoteCurrency = "USD",
-            AssetClass = AssetClass.Stock,
+            Ticker = "VWCE.DE",
+            Name = "Vanguard FTSE All-World UCITS ETF",
+            AssetClass = AssetClass.Etf,
         };
+
+        var first = await client.PostAsJsonAsync(InstrumentsUri, request, cancellationToken);
+        var second = await client.PostAsJsonAsync(InstrumentsUri, request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var created = await first.Content.ReadFromJsonAsync<CustomInstrumentResponse>(cancellationToken);
+        Assert.NotNull(created);
+        Assert.Equal("EUR", created.QuoteCurrency);
+        Assert.Equal("Xetra", created.Exchange);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var repeated = await second.Content.ReadFromJsonAsync<CustomInstrumentResponse>(cancellationToken);
+        Assert.Equal(created.Id, repeated!.Id);
+
+        await using var db = CreateDbContext();
+        Assert.Equal(1, await db.Instruments.CountAsync(i => i.Ticker == "VWCE.DE", cancellationToken));
+    }
+
+    [Fact]
+    public async Task Stock_UnknownSuffix_Returns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var request = new AddCustomInstrumentRequest { Ticker = "AAPL", Name = "Apple", AssetClass = AssetClass.Stock };
+
         var response = await client.PostAsJsonAsync(InstrumentsUri, request, cancellationToken);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>(cancellationToken);
+        Assert.Equal("Validation.UnsupportedExchange", problem!.Extensions["errorCode"]?.ToString());
     }
 
     [Fact]
@@ -273,8 +296,8 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         using var client = Factory.CreateClient();
         var request = new AddCustomInstrumentRequest
         {
-            Ticker = "MSFT.US",
-            Name = "Microsoft Corp.",
+            Ticker = "CDR.WA",
+            Name = "CD Projekt",
             QuoteCurrency = "USD",
             AssetClass = AssetClass.Stock,
         };
@@ -289,7 +312,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var created = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "NEW.US");
+        var created = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "NEW.WA");
 
         await using var db = CreateDbContext();
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == created.Id, cancellationToken);
