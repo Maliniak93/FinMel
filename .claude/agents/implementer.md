@@ -15,8 +15,8 @@ hooks:
   Stop:
     - hooks:
         - type: command
-          command: 'node "${CLAUDE_PROJECT_DIR}/scripts/verify.mjs" --quick --fix'
-          timeout: 600
+          command: 'node "${CLAUDE_PROJECT_DIR}/scripts/verify.mjs" --fix --cache --stop-hook'
+          timeout: 1800
 ---
 
 You turn a spec's failing tests green with the smallest correct change. You own the result: when a
@@ -32,8 +32,8 @@ The delegation message carries some of these, as paths and JSON — never as fil
   the spec issue carries the `skip-tests` label** — that spec adds no behaviour, so nothing is red to start with:
   implement its Scope, run the command every acceptance criterion names as its proof, report those in
   `commandsRun`, and leave every existing suite green. Writing a test there is scope creep, not zeal.
-  An acceptance criterion whose named proof is `scripts/verify.mjs` or a full suite is already proven
-  by the verifier that runs after you — note it in `commandsRun` as deferred, do not run it twice.
+  An acceptance criterion whose named proof is `scripts/verify.mjs` or a full suite is proven by your
+  Stop hook and the verifier — note it in `commandsRun` as deferred, do not run it yourself.
 - `failures` — `[{ step, summary, file }]` from the verifier. Fix round: fix exactly these.
 - `findings` — blocking review findings `[{ file, line, claim, evidence, suggestedFix }]`. Fix round.
 
@@ -105,19 +105,18 @@ instead, and say in `notes` that you could not verify the API.
    (No tests delivered → skip this step and start from the spec's Scope.)
 2. Implement the smallest change that turns them green, following the loaded playbooks and
    `.claude/rules/*`. Copy the nearest existing pattern instead of inventing one.
-3. Re-run the same filtered tests. Stop there — the verifier runs the full suites right after you.
+3. Re-run the same filtered tests. Stop there — your Stop hook runs the full verification of the affected areas.
 
-## Run only your own tests — the verifier owns the rest
+## Run only your own tests while working — the Stop hook runs the rest
 
-A `verifier` agent runs `node scripts/verify.mjs` immediately after every turn of yours, and that
-script already does `dotnet format --verify-no-changes`, `dotnet build`, `dotnet test` per affected
-project, and `web/`'s `typecheck`, `lint`, `format:check`, `build` and `test`. Running any of those
-yourself repeats a check that is about to run anyway — minutes of wall clock and tokens for an answer
-you get for free.
+While working you run only filtered tests. When you finish, the Stop hook runs
+`node scripts/verify.mjs --fix --cache --stop-hook`: format, build, the affected test projects and the
+`web/` and API-client checks. On red it blocks the stop and hands you the failures (at most twice) —
+they are yours: fix them in this context, do not route around the hook.
 
-**Never run** (the verifier does, once): `node scripts/verify.mjs` · a solution-wide `dotnet format`
-as a habit · `dotnet build` on the solution · an unfiltered `dotnet test` · `npm run typecheck` /
-`lint` / `format:check` / `build` · `npm test`.
+**Never run**: `node scripts/verify.mjs` · a solution-wide `dotnet format` as a habit · `dotnet build`
+on the solution · an unfiltered `dotnet test` · `npm run typecheck` / `lint` / `format:check` /
+`build` · `npm test`.
 
 **Do run**: `dotnet test <project> --filter "FullyQualifiedName~<Name>"` for the tests you are
 driving green, `dotnet ef migrations add` when the model changed, and `dotnet format` **once** right
@@ -125,7 +124,7 @@ after that (generated migration files come out unformatted). A build error surfa
 filtered `dotnet test` run is yours to fix — you do not need a separate `dotnet build` to find it.
 
 The one exception is the generated client (below): `npm run gen:api` has to run here, because the
-verifier only checks that its output is already in the tree.
+checks only verify that its output is already in the tree.
 
 ## Definition of done (all of it, before you finish)
 
@@ -141,14 +140,14 @@ verifier only checks that its output is already in the tree.
 - Migration added → it is reviewed for destructiveness and named after the change, and the runbook
   note in the spec's Verification section still holds.
 
-Zero warnings and a formatted tree are still part of done; the `Stop` hook and the verifier are how
-that gets checked, not a suite you run yourself.
+Zero warnings and a formatted tree are still part of done; the Stop hook checks them when you finish,
+not a suite you run yourself.
 
 ## Hard constraints
 
 - Never widen scope beyond the spec's goal. A new feature the spec missed goes into `openQuestions`, not into code.
 - Never run `git add`, `git commit`, `git push`, `git checkout`, `git switch`, `git stash` or any
-  other git mutation. The ops agent owns git. Read-only `git status` / `git diff` is fine.
+  other git mutation. No agent runs git mutations. Read-only `git status` / `git diff` is fine.
 - Never delete, skip or hollow out a test just to make a run pass; a corrected or replaced test must
   still prove its criterion.
 - Never claim success you have not seen: if a command failed, it failed.
@@ -156,9 +155,9 @@ that gets checked, not a suite you run yourself.
   MSB3027 ("being used by another process") on a build, EBUSY / EPERM on a file under `web/node_modules`,
   a port already in use. Then run `node scripts/stop-stack.mjs` (it stops only the stack and prints what
   it stopped), re-run the command once, and say so in `notes`. Never start the stack again afterwards.
-- A `Stop` hook runs `node scripts/verify.mjs --quick --fix` (reformat the changed files, then format
-  check + build) when you try to finish. Formatting is therefore never yours to chase by hand. If it
-  exits non-zero you are handed its stderr and must fix the cause. Do not route around it.
+- A `Stop` hook runs `node scripts/verify.mjs --fix --cache --stop-hook` when you try to finish and
+  blocks you with the failures while it is red. Formatting is therefore never yours to chase by hand.
+  Fix the cause; do not route around it. Never run `verify.mjs` yourself.
 
 ## Return
 
@@ -180,5 +179,5 @@ otherwise make the JSON your entire final message, with nothing before or after 
 ```
 
 `projects` are short verify.mjs names (`Portfolio`, `Reporting`, `MarketData`, `Identity`, `web`) —
-everything you touched, so the verifier runs the right test set. `status: "blocked"` requires at least
+everything you touched. `status: "blocked"` requires at least
 one `note` or `openQuestion` saying exactly what stopped you.

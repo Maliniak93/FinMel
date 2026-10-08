@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--deadline-min N] [--out <file>] [--await <file> [--max-min N]]
+// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--deadline-min N] [--out <file>] [--cache] [--stop-hook] [--await <file> [--max-min N]]
 //   (no flags)        affected .NET test projects and web/api checks, picked from the files changed against master
 //   --quick           format + build only; overrides everything below
 //   --projects a,b    exactly these .NET test projects; web/api still need --web/--api/--all
@@ -9,6 +9,8 @@
 //   --fix             first reformat the changed files (dotnet format, prettier, eslint --fix)
 //   --deadline-min N  wall-clock budget for the whole run (default 60)
 //   --out <file>      also write the result JSON to <file>
+//   --cache           skip the run when the same working tree and scope already passed (green results only, .git/verify-cache.json)
+//   --stop-hook       run as a Claude Code subagent Stop hook: red prints the failures to stderr and exits 2, at most twice per session
 //   --await <file>    do not verify: wait (at most --max-min N, default 9) for a background run's --out file
 
 import { spawn, spawnSync } from "node:child_process";
@@ -28,6 +30,13 @@ const DEFAULT_DEADLINE_MIN = 60;
 
 let deadlineAt = Infinity;
 let outFile = null;
+let cacheCtx = null;
+let stopHookCtx = null;
+const SEP = String.fromCharCode(0);
+const NL = String.fromCharCode(10);
+const CACHE_MAX_ENTRIES = 10;
+const STOP_HOOK_MAX_BLOCKS = 2;
+const STOP_HOOK_MAX_LINES = 20;
 
 function parseArgs(argv) {
   const args = {
@@ -39,6 +48,8 @@ function parseArgs(argv) {
     projects: null,
     deadlineMin: DEFAULT_DEADLINE_MIN,
     out: null,
+    cache: false,
+    stopHook: false,
     await: null,
     maxMin: 9,
   };
@@ -49,6 +60,8 @@ function parseArgs(argv) {
     else if (a === "--web") args.web = true;
     else if (a === "--api") args.api = true;
     else if (a === "--fix") args.fix = true;
+    else if (a === "--cache") args.cache = true;
+    else if (a === "--stop-hook") args.stopHook = true;
     else if (a === "--deadline-min" || a.startsWith("--deadline-min=")) {
       const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
       const n = Number(val);
@@ -576,13 +589,107 @@ function buildFailure(stepName, result) {
   }
 }
 
-function finish(ok, failures) {
+function gitDir() {
+  const out = gitOutput(["rev-parse", "--git-dir"]);
+  return out ? path.resolve(REPO_ROOT, out.trim()) : null;
+}
+
+function gitBuffer(args) {
+  const res = spawnSync("git", args, { cwd: REPO_ROOT, maxBuffer: 1024 * 1024 * 1024 });
+  return res.status === 0 ? res.stdout : null;
+}
+
+function computeFingerprint(scope) {
+  const head = gitBuffer(["rev-parse", "HEAD"]);
+  const diff = gitBuffer(["diff", "HEAD", "--binary"]);
+  const untracked = gitBuffer(["ls-files", "--others", "--exclude-standard", "-z"]);
+  if (!head || !diff || !untracked) return null;
+  const hash = createHash("sha1");
+  hash.update(scope).update(SEP).update(head).update(SEP).update(diff);
+  for (const rel of untracked.toString("utf8").split(SEP).filter(Boolean).sort()) {
+    hash.update(SEP).update(rel).update(SEP);
+    try {
+      hash.update(readFileSync(path.join(REPO_ROOT, rel)));
+    } catch {
+    }
+  }
+  return hash.digest("hex");
+}
+
+function cacheFile() {
+  const dir = gitDir();
+  return dir ? path.join(dir, "verify-cache.json") : null;
+}
+
+function readCache(file) {
+  try {
+    const entries = JSON.parse(readFileSync(file, "utf8"));
+    return Array.isArray(entries) ? entries : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeGreen(ctx, result) {
+  const file = cacheFile();
+  if (!file) return;
+  const entries = readCache(file).filter((e) => e.fingerprint !== ctx.fingerprint);
+  entries.push({ fingerprint: ctx.fingerprint, scope: ctx.scope, at: new Date().toISOString(), result });
+  try {
+    writeFileSync(file, JSON.stringify(entries.slice(-CACHE_MAX_ENTRIES)));
+  } catch (e) {
+    process.stderr.write(`verify.mjs: could not write the cache: ${e.message}
+`);
+  }
+}
+
+function readStopHookSession() {
+  let raw = "";
+  if (!process.stdin.isTTY) {
+    try {
+      raw = readFileSync(0, "utf8");
+    } catch {
+    }
+  }
+  try {
+    // A subagent's Stop payload carries the parent session id, so every implementer of a run would share one counter.
+    const payload = JSON.parse(raw);
+    const id = String(payload.agent_id ?? payload.session_id ?? "");
+    return id.replace(/[^\w.-]/g, "_") || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function readBlocks(file) {
+  try {
+    return Number(JSON.parse(readFileSync(file, "utf8")).blocks) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function reportToStopHook(failures) {
+  const blocks = stopHookCtx.blocks + 1;
+  try {
+    writeFileSync(stopHookCtx.file, JSON.stringify({ blocks }));
+  } catch {
+  }
+  const lines = [
+    `verify.mjs: the change is not green yet — fix these before finishing (block ${blocks} of ${STOP_HOOK_MAX_BLOCKS}):`,
+    ...failures.map((f) => `- ${f.step}: ${f.summary}${f.file ? ` (${f.file})` : ""}`),
+  ];
+  process.stderr.write(`${lines.slice(0, STOP_HOOK_MAX_LINES).map((l) => truncate(l)).join(NL)}${NL}`);
+}
+
+function finish(ok, failures, extra = {}) {
   if (ok) {
     console.log("\nverify.mjs: all checks passed");
   } else {
     console.log(`\nverify.mjs: FAILED at step "${failures[0]?.step}"`);
   }
-  const json = JSON.stringify({ ok, failures });
+  if (ok && cacheCtx && !extra.cached) storeGreen(cacheCtx, { ok, failures });
+  const json = JSON.stringify({ ok, failures, ...extra });
   if (outFile) {
     try {
       writeFileSync(`${outFile}.tmp`, json);
@@ -592,7 +699,9 @@ function finish(ok, failures) {
     }
   }
   console.log(`VERIFY_RESULT: ${json}`);
-  if (!ok) {
+  if (!ok && stopHookCtx) {
+    reportToStopHook(failures);
+  } else if (!ok) {
     const paragraph = failures.map((f) => `[${f.step}] ${f.summary}${f.file ? ` (${f.file})` : ""}`).join(" ");
     process.stderr.write(`verify.mjs failed: ${paragraph}\n`);
   }
@@ -634,6 +743,12 @@ function awaitResult(file, maxMin) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.await) return awaitResult(args.await, args.maxMin);
+  if (args.stopHook) {
+    const file = path.join(gitDir() ?? REPO_ROOT, `verify-stop-${readStopHookSession()}.json`);
+    const blocks = readBlocks(file);
+    if (blocks >= STOP_HOOK_MAX_BLOCKS) return;
+    stopHookCtx = { file, blocks };
+  }
   deadlineAt = Date.now() + args.deadlineMin * 60 * 1000;
   if (args.out) {
     rmSync(args.out, { force: true });
@@ -699,6 +814,27 @@ async function main() {
     const { files, treatAsAll } = getChangedFiles();
     if (treatAsAll) console.log("\nnotice: no master or origin/master ref — --fix skipped");
     else await applyFixes(files);
+  }
+
+  if (args.cache) {
+    const scope = JSON.stringify({
+      quick: args.quick,
+      all: args.all,
+      web: runWeb,
+      api: runApi,
+      projects: selectedRels,
+    });
+    const fingerprint = computeFingerprint(scope);
+    const file = cacheFile();
+    if (fingerprint && file) {
+      const hit = readCache(file).find((e) => e.fingerprint === fingerprint && e.result?.ok === true);
+      if (hit) {
+        console.log(`
+cache: this exact working tree and scope already passed at ${hit.at} — nothing to run`);
+        return finish(true, hit.result.failures ?? [], { cached: true });
+      }
+      cacheCtx = { fingerprint, scope };
+    }
   }
 
   const formatResult = await step("format", () => runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes"]));

@@ -14,7 +14,7 @@ You run the verification script and report exactly what it said. You fix nothing
 
 ## Input
 
-The delegation message may carry `projects` — a JSON list of short names such as `["Portfolio",
+The delegation message may carry `projects` — normally empty (auto-detect), otherwise a JSON list of short names such as `["Portfolio",
 "Reporting", "web"]`. It may also carry a mode word (`quick`, `all`).
 
 ## Run
@@ -24,8 +24,8 @@ last, so run it in the background and wait for its result file — never poll it
 `until`, `pwsh` or by re-reading output. From the repo root:
 
 1. Start it with the Bash tool's `run_in_background: true` (one call):
-   - `projects` given → `node scripts/verify.mjs --fix --out .git/verify-result.json --projects <comma-separated list>`
-   - `projects` empty or absent → `node scripts/verify.mjs --fix --out .git/verify-result.json` (it auto-detects changed areas from git)
+   - `projects` given → `node scripts/verify.mjs --fix --cache --out .git/verify-result.json --projects <comma-separated list>`
+   - `projects` empty or absent → `node scripts/verify.mjs --fix --cache --out .git/verify-result.json` (it auto-detects changed areas from git)
    - mode `quick` → add `--quick`; mode `all` → use `--all` instead of `--projects`
 2. Wait in the foreground (Bash `timeout` 600000): `node scripts/verify.mjs --await .git/verify-result.json`.
    It blocks up to 9 minutes. It prints `VERIFY_RESULT: …` (exit 0 or 2) once the run is done, or
@@ -45,7 +45,8 @@ The script prints a final line:
 VERIFY_RESULT: {"ok":false,"failures":[{"step":"test","summary":"...","file":"..."}]}
 ```
 
-Read that JSON and return it. Exit code 0 means ok, exit code 2 means failure; the same summary also
+Read that JSON and return it. A result with `"cached":true` is a normal pass: the tree was already
+proven green. Exit code 0 means ok, exit code 2 means failure; the same summary also
 goes to stderr. If no `VERIFY_RESULT:` line appears at all, return
 `{ "ok": false, "failures": [{ "step": "build", "summary": "no VERIFY_RESULT line; last output: <last ~10 lines>" }] }`.
 

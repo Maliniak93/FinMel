@@ -32,7 +32,7 @@ No reproduction → stop and say exactly what you tried and what you saw. Do not
 
 ## 2. Localize the root cause
 
-- Facts spread over many files → one `Explore` subagent with a narrow question; read only the files it names.
+- Facts spread over many files → one `Explore` subagent (runs on Haiku) with a narrow question; read only the files it names.
 - Follow the failure to its cause, not its first symptom: a 500 is a symptom, an unregistered handler is a cause;
   a stale dashboard value is a symptom, a consumer that never publishes is a cause.
 - State the root cause with evidence you saw — a quoted line, a test output, a trace. No evidence, no claim.
@@ -49,7 +49,7 @@ In the session scratchpad as `fix-<slug>.md`, from `.claude/skills/design/issue-
 - Goal = expected behaviour, one sentence. **Current behaviour** = the observed symptom and the
   reproduction you ran. Why = the root cause and its evidence.
 - Scope = the files and slices that must change; Out of scope = the neighbouring refactor you were tempted by.
-- Code map = what your localization already found, as `path — why` lines: the file with the root
+- Code map = what your localization already found, as `path:start-end — why` lines: the file with the root
   cause, the test class and `Fixtures/` helpers the reproduction test belongs in, the nearest
   precedent. The build agents start from it instead of re-localizing the bug.
 - Depends on = an open issue that must merge first, if any (rare for a fix).
@@ -95,18 +95,14 @@ instead of creating a duplicate. For a split: the umbrella first (`--epic`), the
 with `--parent <umbrella number>`.
 
 Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the
-previous one has merged. Build exactly as `/build` does: `node scripts/preflight.mjs` first (`"ok": false` → print each failed check as
-`name — detail → fix` and stop, as `/build` does), then `node scripts/gh-project.mjs prepare <number>`, then the
-`Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`. The workflow posts
-its own report on the issue and ships the fix as a PR; report to the user as `/build` does (at most
-10 lines, leading with the `prUrl` — the merge is the user's).
+previous one has merged. Build it exactly as `/build` steps 1–5 do and report as `/build` does.
 
 ## Hard constraints
 
 - Write no production code and no test yourself — the test-writer writes the reproduction test, the implementer
   fixes it, the reviewer checks it. Your only artefact is the issue.
-- Never run `git add`, `git commit`, `git push`, `git switch`, `git checkout`, `git stash` yourself — the
-  workflow's ops agent commits, pushes and opens the PR. Read-only git is fine. Never merge.
+- Never run `git add`, `git commit`, `git push`, `git switch`, `git checkout`, `git stash` yourself — `ship.mjs`
+  commits, pushes and opens the PR. Read-only git is fine. Never merge.
 - A flaky test is a bug in the test or the fixture, not a reason to retry until green — treat it like any other bug.
 - Never widen the fix into cleanup. One cause, one fix, one PR — several causes or a sequenced fix become an
   epic of such parts (3a), never one wide PR.

@@ -29,7 +29,7 @@
 
 ## Code map
 
-<!-- What Explore found, so no build agent has to rediscover it: one line each, `path — why`. Name the precedent slice/component to copy, the test class and the Fixtures/<Service>Api helpers to extend (by member name), and the files expected to change. 5–15 lines; paths that exist today, plus new files marked (new). -->
+<!-- What Explore found, so no build agent has to rediscover it: one line each, `path:start-end — why` or `path — Member()`. Name the precedent slice/component to copy, the test class and the Fixtures/<Service>Api helpers to extend (by member name), and the files expected to change. 5–15 lines; paths that exist today, plus new files marked (new). -->
 
 ## Out of scope
 

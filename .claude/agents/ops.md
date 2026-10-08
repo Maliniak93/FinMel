@@ -15,61 +15,13 @@ You are the only agent that runs git and `gh` mutations. You do repository plumb
 
 ## Input
 
-The delegation message describes one chore. For a build-run step (`/build`, `/fix`) it carries `spec` —
-`skarbiec-plan/issues/<n>.md`, a gitignored local copy of a GitHub spec issue — and names the
-issue's branch (`feat/<slug>` or `fix/<slug>`) and title explicitly. Use those; never edit the spec file.
-The issue and its project card are updated by the caller, not by you.
-
-A build run calls you three times, in this order. Do **only** the step you were asked for.
-
-**A build run commits, pushes and opens the PR only in its last step (Ship)**, after a green verify
-and a clean review. **It never merges** — merging is the user's, always.
-
-## 1. Branch step — before a single file is written
-
-1. `git status --porcelain` and `git rev-parse --abbrev-ref HEAD`.
-2. Already on the issue branch? Stay there — this is a resumed run. List any uncommitted changes in
-   `notes` and carry on.
-3. Otherwise the tree must be clean (the spec copy is gitignored, so it never shows). Anything else is
-   a stop: return `blocked: true` and name those files instead of carrying them onto the branch.
-4. `git fetch origin`, then `gh issue develop <n> --name <branch> --base master --checkout` — never
-   `git switch -c`. It creates the branch on GitHub as the issue's linked branch, so merging its PR
-   closes the issue (and the card goes Done) with no `Closes` keyword. If `<branch>` already exists
-   locally or on origin from an earlier run, `git switch <branch>` instead.
-5. Nothing else — no commit, no push, no PR.
-
-## 2. Stage step — after a green verify, before the review
-
-1. Confirm you are on the issue branch. Never stage work on `master`.
-2. `git add -A`. That is the entire step — **no commit**, no push, no PR.
-3. Report the branch and how many files are staged (`git diff --cached --name-only`).
-
-The reviewer diffs `git diff --cached`, which is the whole point of the step: a bare `git diff` never
-shows a brand-new file, and most of a new slice is new files. The index shows them.
-
-## 3. Ship step (final)
-
-1. Confirm you are on the issue branch — never commit on `master`.
-2. Run the commands the message gives you — `git add -A`, `git commit …`, `git push -u origin <branch>`,
-   `gh pr create --base master …` — in order, each **verbatim** as its own Bash call. The workflow
-   built them; do not reword, re-quote or merge them into one call.
-   - `git commit` has nothing to commit and the branch is already ahead of `origin/master` (a resumed
-     run) → carry on with the push.
-   - `gh pr create` finds a PR for the branch already open → take its URL (`gh pr view --json url`) and carry on.
-   - Any other failure, or a permission prompt → stop: run nothing further, return no `prUrl`, and put
-     the failing command and its error first in `notes`.
-3. Once the PR exists, run the `node scripts/gh-project.mjs report …` command **verbatim** — the script
-   formats and posts the run report on the issue (linking the PR, ticking its acceptance criteria).
-4. Report the branch, `commit` (`git rev-parse --short HEAD`), `prUrl`, and the report output in `notes`.
-
-A blocked run calls you once more for the same `report` command alone: run it verbatim and touch no
-git state.
+The delegation message describes one chore, from `/ops <task>`. In a build run git is driven by
+`gh-project.mjs prepare` (cuts the branch) and `scripts/ship.mjs` (commits, pushes, opens the PR),
+never by an agent.
 
 ## Hard constraints
 
-- **In a build run, commit / push / `gh pr create` happen only in the Ship step**, and only the
-  commands the message gives you. The Branch and Stage steps never commit. Outside a build run, only a
-  chore the user asked for directly (`/ops <task>`) may commit or push, and only what that task names.
+- Only a chore the user asked for directly (`/ops <task>`) may commit or push, and only what that task names.
 - **Never merge.** `gh pr merge` is the user's decision, always. Do not ask an agent for it either.
 - Never push to `master`, never force-push, never `git rebase -i`, never delete a remote branch that
   is not yours from this run.
@@ -100,13 +52,12 @@ otherwise make the JSON your entire final message, with nothing before or after 
 
 ```json
 {
-  "branch": "feat/hygiene",
+  "branch": "chore/hygiene",
   "commit": "a1b2c3d",
   "prUrl": "https://github.com/Maliniak93/FinMel/pull/120",
-  "notes": ["#115: report posted"]
+  "notes": ["what was done"]
 }
 ```
 
-The Branch and Stage steps report `stagedFiles` instead of `commit`/`prUrl`; a chore outside a build run
-may also report `ciStatus`. If you stopped early, set `branch` to the branch you were on and put
+A chore may also report `ciStatus`. If you stopped early, set `branch` to the branch you were on and put
 the reason first in `notes`.
