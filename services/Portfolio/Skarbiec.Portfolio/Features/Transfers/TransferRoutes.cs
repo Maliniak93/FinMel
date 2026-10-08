@@ -39,6 +39,12 @@ public static class TransferRoutes
         // A metal Buy paid from cash and a Sell paid into it, through RecordTransaction's cashAssetId; removed through DeleteTransfer.
         [(AssetClass.Cash, AssetClass.PreciousMetal)] = Access.Delete,
         [(AssetClass.PreciousMetal, AssetClass.Cash)] = Access.Delete,
+
+        // A stock or ETF Buy paid from cash and a Sell or Dividend paid into it, through RecordTransaction's cashAssetId; changed through the stock's own transaction.
+        [(AssetClass.Cash, AssetClass.Stock)] = Access.None,
+        [(AssetClass.Cash, AssetClass.Etf)] = Access.None,
+        [(AssetClass.Stock, AssetClass.Cash)] = Access.None,
+        [(AssetClass.Etf, AssetClass.Cash)] = Access.None,
     };
 
     public static bool IsAllowed(AssetClass source, AssetClass target) => Routes.ContainsKey((source, target));

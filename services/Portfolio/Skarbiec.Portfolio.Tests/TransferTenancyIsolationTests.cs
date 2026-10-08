@@ -65,6 +65,30 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
+    public async Task SecurityTrade_ForeignCash_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var ownerSetup = await CreateCashAndEtfAsync(owner, cancellationToken);
+        var strangerId = Guid.NewGuid();
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var strangerSetup = await CreateCashAndEtfAsync(stranger, cancellationToken);
+        var ownerBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
+        var strangerBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
+
+        var response = await stranger.PostAsJsonAsync(
+            TransactionsUri(strangerSetup.EtfPortfolioId, strangerSetup.EtfAssetId),
+            NewTradeRequest(ownerSetup.CashAssetId),
+            cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(ownerBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
+        Assert.Equal(strangerBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
+        await owner.AssertCashUntouchedAsync(ownerSetup.CashPortfolioId, ownerSetup.CashAssetId, cancellationToken, balance: 2_000m);
+    }
+
+    [Fact]
     public async Task DeleteMetalTransfer_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

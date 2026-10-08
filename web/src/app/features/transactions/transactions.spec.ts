@@ -204,8 +204,14 @@ describe('Transactions', () => {
 
     expect(dialog.open).toHaveBeenCalledTimes(2);
     const [createCall, editCall] = dialog.open.mock.calls;
-    expect(createCall[1].data).toEqual({ portfolioId, assetId, assetClass: 0 });
-    expect(editCall[1].data).toEqual({ portfolioId, assetId, assetClass: 0, transaction });
+    expect(createCall[1].data).toEqual({ portfolioId, assetId, assetClass: 0, currency: 'PLN' });
+    expect(editCall[1].data).toEqual({
+      portfolioId,
+      assetId,
+      assetClass: 0,
+      currency: 'PLN',
+      transaction,
+    });
   });
 
   it('deletes a transaction after confirmation and reloads', async () => {

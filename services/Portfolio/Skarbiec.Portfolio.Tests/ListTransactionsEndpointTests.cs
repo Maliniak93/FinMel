@@ -236,6 +236,32 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
+    public async Task SecurityTrade_ShowsCounterparts()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var setup = await CreateCashAndEtfAsync(client, cancellationToken);
+        await client.RecordTradeWithCashAsync(setup.EtfPortfolioId, setup.EtfAssetId, setup.CashAssetId, cancellationToken);
+
+        var buy = Assert.Single((await client.ListTransactionsAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken)).Items);
+        var withdraw = Assert.Single(
+            (await client.ListTransactionsAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
+
+        Assert.NotNull(buy.Transfer);
+        Assert.Equal(setup.CashAssetId, buy.Transfer.CounterpartAssetId);
+        Assert.Equal(setup.CashPortfolioId, buy.Transfer.CounterpartPortfolioId);
+        Assert.Equal(TransferDirection.In, buy.Transfer.Direction);
+        Assert.False(buy.Transfer.Manual);
+        Assert.NotNull(withdraw.Transfer);
+        Assert.Equal(buy.Transfer.TransferId, withdraw.Transfer.TransferId);
+        Assert.Equal(setup.EtfAssetId, withdraw.Transfer.CounterpartAssetId);
+        Assert.Equal(setup.EtfPortfolioId, withdraw.Transfer.CounterpartPortfolioId);
+        Assert.Equal(TransferDirection.Out, withdraw.Transfer.Direction);
+        Assert.False(withdraw.Transfer.Manual);
+    }
+
+    [Fact]
     public async Task List_DepositPayoutLegOnSavings_IsNotManual()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

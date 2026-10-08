@@ -14,6 +14,6 @@ public sealed record RecordTransactionRequest
 
     public required DateOnly Date { get; init; }
 
-    /// <summary>A PLN Cash account paying for a precious-metal Buy or receiving a Sell's proceeds of quantity × unit price.</summary>
+    /// <summary>A Cash account in the asset's currency paying for a stock, ETF or precious-metal Buy, or receiving a Sell's proceeds or a stock or ETF Dividend.</summary>
     public Guid? CashAssetId { get; init; }
 }

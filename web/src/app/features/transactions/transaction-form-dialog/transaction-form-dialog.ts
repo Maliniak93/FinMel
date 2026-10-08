@@ -12,6 +12,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
+  getApiPortfolioCashAccounts,
   getApiPortfolioTransferCandidates,
   postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
   putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
@@ -32,16 +33,31 @@ import {
   isPricedTransactionType,
   quantityFieldLabel,
   TRANSACTION_TYPE_BUY,
+  TRANSACTION_TYPE_DIVIDEND,
   TRANSACTION_TYPE_SELL,
   unitPriceFieldLabel,
 } from '../transaction-type';
 
-const CASH_CURRENCY = 'PLN';
+const METAL_CASH_CURRENCY = 'PLN';
+
+const CASH_ERROR_KEYS: Record<string, string> = {
+  'Validation.InsufficientFunds': 'transactions.form.insufficientFunds',
+  'Validation.InvalidTransferCounterpart': 'transactions.form.invalidCashAccount',
+  'Conflict.TransferLegManaged': 'transactions.form.legManaged',
+};
+
+interface CashOption {
+  assetId: string;
+  name: string;
+  portfolioName: string;
+  balance: number | string;
+}
 
 export interface TransactionFormDialogData {
   portfolioId: string;
   assetId: string;
   assetClass: AssetClass;
+  currency?: string;
   transaction?: TransactionResponse;
   type?: TransactionType;
 }
@@ -86,7 +102,7 @@ export class TransactionFormDialog {
       this.data.transaction ? fromDateOnly(this.data.transaction.date) : new Date(),
       [Validators.required],
     ],
-    cashAssetId: [null as string | null],
+    cashAssetId: [this.data.transaction?.transfer?.counterpartAssetId ?? (null as string | null)],
   });
 
   private readonly selectedType = toSignal(this.form.controls.type.valueChanges, {
@@ -98,15 +114,37 @@ export class TransactionFormDialog {
   );
   protected readonly unitPriceLabel = unitPriceFieldLabel(this.data.assetClass);
 
-  // Only a new precious-metal Buy or Sell can move money through a PLN Cash account.
-  private readonly offersCash = !this.isEdit && this.data.assetClass === ASSET_CLASS.PreciousMetal;
-  protected readonly showsCash = computed(
-    () =>
-      this.offersCash &&
-      (this.selectedType() === TRANSACTION_TYPE_BUY ||
-        this.selectedType() === TRANSACTION_TYPE_SELL),
-  );
-  protected readonly cashCurrency = CASH_CURRENCY;
+  private readonly isSecurity =
+    this.data.assetClass === ASSET_CLASS.Stock || this.data.assetClass === ASSET_CLASS.Etf;
+  private readonly linkedTransfer = this.data.transaction?.transfer;
+
+  // A new precious-metal trade or stock or ETF trade can move money through a Cash account; an edit only shows the account it is linked to.
+  private readonly offersCash = this.isEdit
+    ? this.isSecurity && !!this.linkedTransfer
+    : (this.isSecurity && !!this.data.currency) ||
+      this.data.assetClass === ASSET_CLASS.PreciousMetal;
+  protected readonly showsCash = computed(() => {
+    if (!this.offersCash) {
+      return false;
+    }
+    const type = this.selectedType();
+    return (
+      type === TRANSACTION_TYPE_BUY ||
+      type === TRANSACTION_TYPE_SELL ||
+      (this.isSecurity && type === TRANSACTION_TYPE_DIVIDEND)
+    );
+  });
+  protected readonly cashCurrency = this.isSecurity
+    ? (this.data.currency ?? METAL_CASH_CURRENCY)
+    : METAL_CASH_CURRENCY;
+  protected readonly cashHintKey = computed(() => {
+    if (!this.isSecurity) {
+      return 'transactions.form.cashAmountHint';
+    }
+    return this.selectedType() === TRANSACTION_TYPE_BUY
+      ? 'transactions.form.cashAmountTaken'
+      : 'transactions.form.cashAmountReceived';
+  });
   protected readonly formatMoney = formatMoney;
 
   private readonly formValue = toSignal(
@@ -122,25 +160,47 @@ export class TransactionFormDialog {
     if (!values.cashAssetId || !Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
       return null;
     }
+    if (values.type === TRANSACTION_TYPE_DIVIDEND) {
+      return Math.round(quantity * 100) / 100;
+    }
     return Math.round(quantity * Math.round(unitPrice * 100)) / 100;
   });
 
   protected readonly cashCandidatesResource = resource({
-    params: () => (this.offersCash ? { currency: CASH_CURRENCY } : undefined),
-    loader: async ({ params, abortSignal }) => {
+    params: () => (this.offersCash && !this.isEdit ? { currency: this.cashCurrency } : undefined),
+    loader: async ({ params, abortSignal }): Promise<CashOption[]> => {
+      const failure = (error: unknown): Error =>
+        new Error(
+          readProblemDetails(error).detail ?? translate('transactions.form.cashAccountsLoadFailed'),
+        );
+
+      if (this.isSecurity) {
+        const result = await getApiPortfolioCashAccounts({ signal: abortSignal });
+        if (result.error) {
+          throw failure(result.error);
+        }
+        return (result.data?.accounts ?? []).filter(
+          (account) => account.currency === params.currency,
+        );
+      }
+
       const result = await getApiPortfolioTransferCandidates({
         query: { currency: params.currency, assetClass: ASSET_CLASS.Cash },
         signal: abortSignal,
       });
       if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('transactions.form.cashAccountsLoadFailed'),
-        );
+        throw failure(result.error);
       }
       return result.data ?? [];
     },
   });
+
+  constructor() {
+    if (this.isEdit && this.offersCash) {
+      this.form.controls.cashAssetId.disable();
+      this.form.controls.type.disable();
+    }
+  }
 
   protected async onSubmit(): Promise<void> {
     if (this.submitting()) {
@@ -193,6 +253,12 @@ export class TransactionFormDialog {
   }
 
   private applyServerErrors(problem: ApiProblemDetails): void {
+    const cashErrorKey = CASH_ERROR_KEYS[problem.errorCode ?? ''];
+    if (cashErrorKey) {
+      this.formError.set(translate(cashErrorKey));
+      return;
+    }
+
     if (applyFieldErrors(this.form, problem)) {
       return;
     }

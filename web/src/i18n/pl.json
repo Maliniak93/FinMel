@@ -514,7 +514,12 @@
       "cashAccount": "Konto gotówkowe",
       "noCashAccount": "Brak",
       "cashAmountHint": "Kwota przelewu: {{ amount }}",
-      "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych."
+      "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych.",
+      "cashAmountTaken": "Zostanie pobrane: {{ amount }}",
+      "cashAmountReceived": "Wpłynie: {{ amount }}",
+      "insufficientFunds": "Za mało środków na koncie.",
+      "invalidCashAccount": "To konto gotówkowe nie pasuje do tej transakcji.",
+      "legManaged": "Edytuj tę transakcję po stronie akcji/ETF."
     },
     "assetArchivedNotice": "To aktywo jest zarchiwizowane — przywróć je, aby wprowadzać zmiany.",
     "deleteTransfer": {
