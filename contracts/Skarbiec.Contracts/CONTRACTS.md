@@ -34,7 +34,9 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
    `Skarbiec.Contracts.Tests` (fixtures `*-with-extra-fields.json`) guard it.
 4. **A `required` member must be in every payload.** System.Text.Json rejects a message missing a
    `required` property, so adding one (e.g. `AssetPositionChanged.IsArchived`, asset-archive) means
-   updating the `*-with-extra-fields.json` fixture in the same change.
+   updating the `*-with-extra-fields.json` fixture in the same change. A nullable, non-`required`
+   member (e.g. `AssetPositionChanged.FirstTransactionDate`, the asset's earliest transaction date)
+   needs no fixture change — a payload without it deserializes it as `null`.
 
 When ADR-019 is revoked (real data in production), the classic discipline comes back: additive
 only, never rename or remove, breaking change → a new `V2` record published alongside the old one.

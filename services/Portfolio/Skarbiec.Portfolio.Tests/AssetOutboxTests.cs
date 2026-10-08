@@ -498,4 +498,24 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.False(await removeDb.Assets.AnyAsync(a => a.Id == assetId, cancellationToken));
         Assert.Equal(assetId, Assert.Single(await removeDb.ReadPublishedAsync<AssetRemoved>(cancellationToken)).AssetId);
     }
+
+    [Fact]
+    public async Task Add_NoTransactions_FirstTransactionDateNull()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = Provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+
+        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        var result = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
+            portfolioResult.Value.Id,
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            cancellationToken);
+        Assert.True(result.IsSuccess);
+
+        var evt = Assert.Single(await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        Assert.Null(evt.FirstTransactionDate);
+    }
 }

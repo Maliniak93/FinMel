@@ -16,4 +16,7 @@ public sealed class Instrument
 
     // Verified by default: only AddCustomInstrument starts an instrument Unverified.
     public InstrumentVerificationStatus VerificationStatus { get; set; } = InstrumentVerificationStatus.Verified;
+
+    // The earliest date a history backfill has covered; null until the first one succeeds.
+    public DateOnly? HistoryCoveredFrom { get; set; }
 }

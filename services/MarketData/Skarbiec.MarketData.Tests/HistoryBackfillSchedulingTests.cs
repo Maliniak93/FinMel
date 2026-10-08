@@ -1,15 +1,18 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Quartz;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
+using Skarbiec.MarketData.Features.AddCustomInstrument;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing;
+using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
@@ -21,7 +24,7 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
     private readonly SkarbiecContainersFixture _containers = containers;
 
     [Fact]
-    public async Task EnqueueAsync_ReturnsBeforeAnyFetch_ThenTheJobFiresOnItsOwnAndBackfillsOneYear()
+    public async Task EnqueueAsync_ReturnsBeforeAnyFetch_ThenTheJobFiresOnItsOwnAndBackfillsFromTheRequestedDate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
@@ -71,7 +74,7 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
         {
             var trigger = host.Services.GetRequiredService<IHistoryBackfillTrigger>();
 
-            await trigger.EnqueueAsync(instrumentId, cancellationToken);
+            await trigger.EnqueueAsync(instrumentId, from, cancellationToken);
             // Scheduling and firing happen on different threads, so right after EnqueueAsync nothing has been fetched.
             Assert.Equal(0, priceSource.HistoryFetchCount);
 
@@ -94,5 +97,27 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
         {
             await host.StopAsync(cancellationToken);
         }
+    }
+
+    // The slice under test is called directly; the fake trigger is the factory's.
+    [Fact]
+    public async Task AddCustomInstrument_DoesNotEnqueue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.PostAsJsonAsync(
+            MarketDataApi.InstrumentsUri,
+            new AddCustomInstrumentRequest
+            {
+                Ticker = "CDR.WA",
+                Name = "CD Projekt",
+                QuoteCurrency = "PLN",
+                AssetClass = AssetClass.Stock,
+            },
+            cancellationToken);
+
+        Assert.True(response.IsSuccessStatusCode);
+        Assert.Empty(Factory.BackfillTrigger.Enqueued);
     }
 }

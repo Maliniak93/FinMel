@@ -33,13 +33,13 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
-    public async Task Consume_FirstAssetForInstrument_SetsUsageToOne_AndEnqueuesBackfillOnce()
+    public async Task Consume_FirstAssetForInstrument_SetsUsageToOne()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var instrumentId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, trigger) =>
+        await RunConsumersAsync(async (provider, _) =>
         {
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(PositionChanged(assetId, instrumentId, version: 0), cancellationToken);
@@ -48,19 +48,18 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
 
             Assert.Equal(1, usage.AssetCount);
             Assert.NotEqual(default, usage.FirstUsedAt);
-            Assert.Equal(1, trigger.CountFor(instrumentId));
         }, cancellationToken);
     }
 
     [Fact]
-    public async Task Consume_SecondAssetForSameInstrument_UsageTwo_NoSecondBackfill()
+    public async Task Consume_SecondAssetForSameInstrument_UsageTwo()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var instrumentId = Guid.NewGuid();
         var firstAssetId = Guid.NewGuid();
         var secondAssetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, trigger) =>
+        await RunConsumersAsync(async (provider, _) =>
         {
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(PositionChanged(firstAssetId, instrumentId, version: 0), cancellationToken);
@@ -70,7 +69,6 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 2);
 
             Assert.Equal(2, usage.AssetCount);
-            Assert.Equal(1, trigger.CountFor(instrumentId));
         }, cancellationToken);
     }
 
@@ -199,22 +197,128 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         }, cancellationToken);
     }
 
-    private static AssetPositionChanged PositionChanged(Guid assetId, Guid instrumentId, long version) => new()
+    [Fact]
+    public async Task FirstHolding_EnqueuesFromFirstTransaction()
     {
-        AssetId = assetId,
-        PortfolioId = Guid.NewGuid(),
-        UserId = Guid.NewGuid(),
-        AssetClass = AssetClass.Stock,
-        ValuationMode = AssetValuationMode.Market,
-        InstrumentId = instrumentId,
-        Currency = "USD",
-        Quantity = 1m,
-        QuoteUnitsPerQuantity = 1m,
-        PortfolioIsArchived = false,
-        IsArchived = false,
-        Version = version,
-        OccurredAtUtc = DateTimeOffset.UtcNow,
-    };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var instrumentId = Guid.NewGuid();
+
+        await RunConsumersAsync(async (provider, trigger) =>
+        {
+            await SeedInstrumentAsync(provider, instrumentId, historyCoveredFrom: null, cancellationToken);
+
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(
+                PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: new DateOnly(2023, 5, 2)),
+                cancellationToken);
+            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+
+            await WaitForEnqueuedAsync(trigger, instrumentId, 1, cancellationToken);
+            Assert.Equal([new DateOnly(2023, 5, 2)], trigger.FromsFor(instrumentId));
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task OlderTransaction_EnqueuesOnlyWhenEarlier()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var instrumentId = Guid.NewGuid();
+
+        await RunConsumersAsync(async (provider, trigger) =>
+        {
+            await SeedInstrumentAsync(provider, instrumentId, historyCoveredFrom: new DateOnly(2023, 5, 2), cancellationToken);
+
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(
+                PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: new DateOnly(2024, 1, 1)),
+                cancellationToken);
+            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+
+            // Nothing signals a skipped enqueue, so give it time to land before asserting it never did.
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+            Assert.Equal(0, trigger.CountFor(instrumentId));
+
+            await bus.Publish(
+                PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: new DateOnly(2022, 11, 15)),
+                cancellationToken);
+            await WaitForEnqueuedAsync(trigger, instrumentId, 1, cancellationToken);
+
+            Assert.Equal([new DateOnly(2022, 11, 15)], trigger.FromsFor(instrumentId));
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task NoTransactions_CountsUsage_NoBackfill()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var instrumentId = Guid.NewGuid();
+
+        await RunConsumersAsync(async (provider, trigger) =>
+        {
+            await SeedInstrumentAsync(provider, instrumentId, historyCoveredFrom: null, cancellationToken);
+
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(
+                PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: null),
+                cancellationToken);
+            var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+
+            // Nothing signals a skipped enqueue, so give it time to land before asserting it never did.
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            Assert.Equal(1, usage.AssetCount);
+            Assert.Equal(0, trigger.CountFor(instrumentId));
+        }, cancellationToken);
+    }
+
+    private static async Task SeedInstrumentAsync(
+        ServiceProvider provider, Guid instrumentId, DateOnly? historyCoveredFrom, CancellationToken cancellationToken)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        db.Instruments.Add(new Instrument
+        {
+            Id = instrumentId,
+            Ticker = $"T{instrumentId:N}"[..12],
+            Name = "Seeded",
+            Source = PriceSource.Yahoo,
+            QuoteCurrency = "USD",
+            AssetClass = AssetClass.Stock,
+            HistoryCoveredFrom = historyCoveredFrom,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task WaitForEnqueuedAsync(
+        FakeHistoryBackfillTrigger trigger, Guid instrumentId, int count, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (DateTimeOffset.UtcNow < deadline && trigger.CountFor(instrumentId) < count)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
+
+        Assert.True(trigger.CountFor(instrumentId) >= count, "The backfill was not enqueued within the deadline.");
+    }
+
+    private static AssetPositionChanged PositionChanged(
+        Guid assetId, Guid instrumentId, long version, DateOnly? firstTransactionDate = null) => new()
+        {
+            AssetId = assetId,
+            PortfolioId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            AssetClass = AssetClass.Stock,
+            ValuationMode = AssetValuationMode.Market,
+            InstrumentId = instrumentId,
+            Currency = "USD",
+            Quantity = 1m,
+            QuoteUnitsPerQuantity = 1m,
+            PortfolioIsArchived = false,
+            IsArchived = false,
+            Version = version,
+            FirstTransactionDate = firstTransactionDate,
+            OccurredAtUtc = DateTimeOffset.UtcNow,
+        };
 
     private async Task RunConsumersAsync(
         Func<ServiceProvider, FakeHistoryBackfillTrigger, Task> action, CancellationToken cancellationToken)

@@ -350,4 +350,54 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.False(fanOut.Single(e => e.AssetId == liveAssetId).IsArchived);
         Assert.True((await dbContext.Assets.SingleAsync(a => a.Id == archivedAssetId, cancellationToken)).IsArchived);
     }
+
+    [Fact]
+    public async Task Archive_FanOut_CarriesFirstTransactionDates()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = Provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+
+        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        var addAssetHandler = scope.ServiceProvider.GetRequiredService<AddAssetHandler>();
+        var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
+
+        var first = await addAssetHandler.HandleAsync(
+            portfolioResult.Value.Id,
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 1", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            cancellationToken);
+        var second = await addAssetHandler.HandleAsync(
+            portfolioResult.Value.Id,
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 2", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            cancellationToken);
+        var third = await addAssetHandler.HandleAsync(
+            portfolioResult.Value.Id,
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 3", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            cancellationToken);
+
+        foreach (var (asset, date) in new[] { (first, new DateOnly(2024, 3, 4)), (first, new DateOnly(2025, 1, 10)), (second, new DateOnly(2023, 5, 2)) })
+        {
+            var recorded = await recordHandler.HandleAsync(
+                portfolioResult.Value.Id, asset.Value.Id,
+                new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = date },
+                cancellationToken);
+            Assert.True(recorded.IsSuccess);
+        }
+
+        // A fresh scope, as in a real request: the dates come from the stored-transaction query, not the change tracker.
+        await using var archiveScope = Provider.CreateAsyncScope();
+        var archiveResult = await archiveScope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
+            .HandleAsync(portfolioResult.Value.Id, cancellationToken);
+        Assert.True(archiveResult.IsSuccess);
+
+        var fanOut = (await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Where(e => e.PortfolioIsArchived)
+            .ToDictionary(e => e.AssetId);
+        Assert.Equal(3, fanOut.Count);
+        Assert.Equal(new DateOnly(2024, 3, 4), fanOut[first.Value.Id].FirstTransactionDate);
+        Assert.Equal(new DateOnly(2023, 5, 2), fanOut[second.Value.Id].FirstTransactionDate);
+        Assert.Null(fanOut[third.Value.Id].FirstTransactionDate);
+    }
 }

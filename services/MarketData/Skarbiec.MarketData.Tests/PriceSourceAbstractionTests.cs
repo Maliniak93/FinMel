@@ -82,6 +82,8 @@ public sealed class PriceSourceAbstractionTests
 
         public TimeSpan RequestDelay => TimeSpan.FromSeconds(2);
 
+        public int? MaxHistoryDays => null;
+
         public Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
             IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken) =>
             Task.FromResult(PriceFetchResult<InstrumentQuote>.NoData());

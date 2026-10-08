@@ -20,6 +20,8 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
 
     public FakeGoldApiClient GoldApi { get; } = new();
 
+    public FakeHistoryBackfillTrigger BackfillTrigger { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -29,6 +31,7 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
             services.AddSingleton<ITickerVerifier>(TickerVerifier);
             services.AddSingleton<IInstrumentSearchSource>(InstrumentSearch);
             services.AddSingleton<IGoldApiClient>(GoldApi);
+            services.AddSingleton<IHistoryBackfillTrigger>(BackfillTrigger);
         });
     }
 }

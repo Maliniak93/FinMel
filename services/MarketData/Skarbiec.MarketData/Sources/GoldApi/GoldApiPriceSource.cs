@@ -13,6 +13,8 @@ public sealed class GoldApiPriceSource(IGoldApiClient client, ILogger<GoldApiPri
 
     public TimeSpan RequestDelay => TimeSpan.Zero;
 
+    public int? MaxHistoryDays => null;
+
     // Success while any instrument got a quote, Error only when every one failed, NoData when none had anything.
     public async Task<PriceFetchResult<InstrumentQuote>> FetchLatestAsync(
         IReadOnlyCollection<Instrument> instruments, CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Skarbiec.MarketData.Data;
@@ -15,23 +16,38 @@ public sealed class HistoryBackfillJob(
 {
     public const string InstrumentIdDataKey = "instrumentId";
 
-    public const string ActivitySourceName = "Skarbiec.MarketData.HistoryBackfillJob";
+    public const string FromDataKey = "from";
 
-    private const int BackfillDays = 365;
+    public const string ActivitySourceName = "Skarbiec.MarketData.HistoryBackfillJob";
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         var instrumentId = Guid.Parse(context.MergedJobDataMap.GetString(InstrumentIdDataKey)!);
-        await RunAsync(instrumentId, cancellationToken);
+        var from = DateOnly.ParseExact(context.MergedJobDataMap.GetString(FromDataKey)!, "O", CultureInfo.InvariantCulture);
+        await RunAsync(instrumentId, from, cancellationToken);
     }
 
     // Quartz-independent entry point, so tests drive a run without faking IJobExecutionContext.
-    public async Task RunAsync(Guid instrumentId, CancellationToken cancellationToken)
+    public async Task RunAsync(Guid instrumentId, DateOnly from, CancellationToken cancellationToken)
     {
         using var activity = ActivitySource.StartActivity("HistoryBackfillJob.Run");
         activity?.SetTag("skarbiec.instrument.id", instrumentId);
+
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var instrument = await db.Instruments.AsNoTracking()
+            .SingleOrDefaultAsync(i => i.Id == instrumentId, cancellationToken);
+
+        // Only the stretch before what is already covered is fetched; the daily sync owns everything after.
+        var to = instrument?.HistoryCoveredFrom?.AddDays(-1) ?? today;
+        if (instrument is not null && from > to)
+        {
+            logger.LogInformation(
+                "HistoryBackfillJob: instrument {InstrumentId} already covered from {CoveredFrom}; nothing to backfill from {From}.",
+                instrumentId, instrument.HistoryCoveredFrom, from);
+            return;
+        }
 
         var run = new SyncRun
         {
@@ -43,17 +59,12 @@ public sealed class HistoryBackfillJob(
         db.SyncRuns.Add(run);
         await db.SaveChangesAsync(cancellationToken);
 
-        var instrument = await db.Instruments.AsNoTracking()
-            .SingleOrDefaultAsync(i => i.Id == instrumentId, cancellationToken);
         if (instrument is null)
         {
             logger.LogWarning("HistoryBackfillJob: instrument {InstrumentId} not found; skipping.", instrumentId);
             await FinishAsync(run, synced: 0, noData: 0, failed: 1, cancellationToken);
             return;
         }
-
-        var to = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-        var from = to.AddDays(-BackfillDays);
 
         var source = priceSources.FirstOrDefault(s => s.Source == instrument.Source);
         if (source is null)
@@ -65,7 +76,21 @@ public sealed class HistoryBackfillJob(
             return;
         }
 
-        var (outcome, quoteCount) = await BackfillInstrumentAsync(source, instrument, from, to, cancellationToken);
+        var fetchFrom = source.MaxHistoryDays is { } maxDays && from < today.AddDays(-maxDays)
+            ? today.AddDays(-maxDays)
+            : from;
+
+        var (outcome, quoteCount) = fetchFrom > to
+            ? (PriceFetchOutcome.NoData, 0)
+            : await BackfillInstrumentAsync(source, instrument, fetchFrom, to, cancellationToken);
+
+        // The requested date, not the clamped one: a source that cannot reach it must not be re-enqueued forever.
+        if (outcome != PriceFetchOutcome.Error)
+        {
+            await db.Instruments
+                .Where(i => i.Id == instrumentId && (i.HistoryCoveredFrom == null || i.HistoryCoveredFrom > from))
+                .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.HistoryCoveredFrom, from), cancellationToken);
+        }
 
         // Only a custom instrument is ever Unverified here; this run resolves it from its own fetch outcome.
         if (instrument.VerificationStatus == InstrumentVerificationStatus.Unverified)
@@ -91,7 +116,7 @@ public sealed class HistoryBackfillJob(
         activity?.SetTag("skarbiec.backfill.quotes", quoteCount);
         logger.LogInformation(
             "HistoryBackfillJob: instrument {InstrumentId} backfilled {QuoteCount} quote(s) for {From}..{To}.",
-            instrumentId, quoteCount, from, to);
+            instrumentId, quoteCount, fetchFrom, to);
     }
 
     private async Task FinishAsync(SyncRun run, int synced, int noData, int failed, CancellationToken cancellationToken)
