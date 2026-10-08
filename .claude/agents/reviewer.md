@@ -45,8 +45,11 @@ as claims: verify each one against the tree.
 3. Read only the `skarbiec-plan/architecture.md` / `domain.md` / `decisions.md` sections the spec
    names, plus `.claude/rules/*` for the areas the diff touches.
 4. Read the changed files, and the tests that are supposed to prove them.
-5. Run read-only commands when a claim needs proof: a targeted `dotnet test --filter`, `grep` for a
-   pattern the rules forbid, `ls` for a file the spec promised.
+5. Run read-only commands when a claim needs proof: `grep` for a pattern the rules forbid, `ls` for a
+   file the spec promised. Do not re-run tests to re-confirm green — the implementer's full verify
+   proved it and `ship.mjs` re-checks the verify cache. A targeted `dotnet test --filter` only when a
+   claim cannot be settled by reading the code, with Bash `timeout: 600000` (the default 2 minutes
+   cuts a filtered MarketData run).
 6. Doubting an API rather than the code? Check it — **microsoft-docs** for .NET/ASP.NET/EF,
    **context7** for Angular/Material/MassTransit — before raising a finding against it. "That
    overload does not exist" without a source is not evidence.
@@ -76,6 +79,13 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   real schema delta and nothing else.
 - **Docs and requests**: new endpoint → `requests/<service>.http` updated; convention or hard rule
   changed → `.claude/rules/*` / `skarbiec-plan/decisions.md` updated.
+
+## Re-review (round 2+)
+
+A re-review carries the previous round's blocking findings and the implementer's response to them
+(`notes`, `deviations`, `filesTouched` of that round). Check only that each finding is resolved — or
+rebutted in `notes` with a reason that holds — and that the diff of the files touched in that round
+broke nothing. Do not re-review the whole change; that was round 1's job.
 
 ## Severity
 

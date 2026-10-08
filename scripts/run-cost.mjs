@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Usage: node scripts/run-cost.mjs [--since YYYY-MM-DD] [--issue <n>] [--runs <N>] [--json] [--sessions]
+// Usage: node scripts/run-cost.mjs [--since YYYY-MM-DD] [--issue <n>] [--runs <N>] [--json] [--sessions] [--timeline]
 //   --since    only runs started on or after this date (default: 30 days before the newest run; --sessions: 30 days ago)
 //   --issue    only runs for this spec issue
 //   --runs     how many of the newest runs to list one by one (default 15)
 //   --json     one JSON object instead of the tables
+//   --timeline per-agent wall time of the newest matching run (respects --issue), with the minutes spent in verify.mjs and dotnet test
 //   --sessions main sessions by first slash command and non-workflow subagents modified since --since, instead of build runs
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -26,15 +27,16 @@ const PRICES = {
 const LONG_PROMPT_TOKENS = 100e3;
 
 function parseArgs(argv) {
-  const args = { since: null, issue: null, runs: 15, json: false, sessions: false };
+  const args = { since: null, issue: null, runs: 15, json: false, sessions: false, timeline: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") args.json = true;
     else if (a === "--sessions") args.sessions = true;
+    else if (a === "--timeline") args.timeline = true;
     else if (a === "--since") args.since = argv[++i];
     else if (a === "--issue") args.issue = Number(String(argv[++i]).replace(/^#/, ""));
     else if (a === "--runs") args.runs = Number(argv[++i]);
-    else throw new Error(`unknown argument '${a}' — usage: run-cost.mjs [--since YYYY-MM-DD] [--issue n] [--runs N] [--json] [--sessions]`);
+    else throw new Error(`unknown argument '${a}' — usage: run-cost.mjs [--since YYYY-MM-DD] [--issue n] [--runs N] [--json] [--sessions] [--timeline]`);
   }
   return args;
 }
@@ -184,6 +186,68 @@ function collectRuns() {
   return runs.sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)));
 }
 
+function agentTimes(file) {
+  const open = new Map();
+  const t = { verifyMs: 0, testMs: 0, hookCancelled: false };
+  for (const line of readFileSync(file, "utf8").split("\n")) {
+    if (!line) continue;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (entry.attachment?.type === "hook_cancelled") t.hookCancelled = true;
+    const ts = Date.parse(entry.timestamp);
+    if (!Array.isArray(entry.message?.content) || Number.isNaN(ts)) continue;
+    for (const block of entry.message.content) {
+      if (block.type === "tool_use" && block.name === "Bash") {
+        const cmd = String(block.input?.command ?? "");
+        const kind = cmd.includes("verify.mjs") ? "verifyMs" : /^\s*(cd\s+[^&;]+(&&|;)\s*)?dotnet test/.test(cmd) ? "testMs" : null;
+        if (kind) open.set(block.id, { kind, ts });
+      } else if (block.type === "tool_result" && open.has(block.tool_use_id)) {
+        const o = open.get(block.tool_use_id);
+        t[o.kind] += Math.max(0, ts - o.ts);
+        open.delete(block.tool_use_id);
+      }
+    }
+  }
+  return t;
+}
+
+function timelineReport(issue) {
+  let best = null;
+  for (const session of dirs(HISTORY)) {
+    const wfDir = path.join(HISTORY, session, "workflows");
+    if (!existsSync(wfDir)) continue;
+    for (const f of readdirSync(wfDir).filter((x) => /^wf_.*\.json$/.test(x))) {
+      const run = readJson(path.join(wfDir, f));
+      if (!run || run.workflowName !== "build-feature" || (issue != null && run.args?.issue !== issue)) continue;
+      if (!best || String(run.timestamp) > String(best.run.timestamp)) best = { run, session, runId: run.runId || f.replace(/\.json$/, "") };
+    }
+  }
+  if (!best) throw new Error(`no build-feature run found${issue != null ? ` for #${issue}` : ""}`);
+  const { run, session, runId } = best;
+  const progress = (run.workflowProgress || []).filter((x) => x.type === "workflow_agent" && x.startedAt).sort((a, b) => a.startedAt - b.startedAt);
+  const end = run.startTime + (run.durationMs || 0);
+  const min = (ms) => Math.round(ms / 600) / 100;
+  const agents = progress.map((a, i) => {
+    const file = path.join(HISTORY, session, "subagents", "workflows", runId, `agent-${a.agentId}.jsonl`);
+    const t = existsSync(file) ? agentTimes(file) : { verifyMs: 0, testMs: 0, hookCancelled: false };
+    return {
+      index: i + 1,
+      label: a.label,
+      agent: a.agentType,
+      model: short(a.model),
+      wallMin: min((progress[i + 1]?.startedAt ?? end) - a.startedAt),
+      verifyMin: min(t.verifyMs),
+      dotnetTestMin: min(t.testMs),
+      notes: t.hookCancelled ? "hook cancelled" : "",
+    };
+  });
+  return { runId, issue: run.args?.issue ?? null, tier: run.args?.tier ?? null, totalMin: min(run.durationMs || 0), agents };
+}
+
 function sessionReport(since) {
   const cutoff = new Date(since);
   const commands = {};
@@ -262,6 +326,31 @@ function table(rows, columns) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!existsSync(HISTORY)) throw new Error(`no Claude Code history for this repo at ${HISTORY}`);
+
+  if (args.timeline) {
+    const report = timelineReport(args.issue);
+    if (args.json) {
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+    console.log(`run ${report.runId} · #${report.issue} tier ${report.tier} · ${report.totalMin.toFixed(1)} min`);
+    console.log(
+      table(
+        report.agents.map((a) => ({
+          "#": a.index,
+          label: a.label,
+          agent: a.agent,
+          model: a.model,
+          "wall min": a.wallMin.toFixed(1),
+          "verify min": a.verifyMin.toFixed(1),
+          "dotnet test min": a.dotnetTestMin.toFixed(1),
+          notes: a.notes,
+        })),
+        ["#", "label", "agent", "model", "wall min", "verify min", "dotnet test min", "notes"],
+      ),
+    );
+    return;
+  }
 
   if (args.sessions) {
     const report = sessionReport(args.since || daysAgo(30));

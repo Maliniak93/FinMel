@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--deadline-min N] [--out <file>] [--cache] [--stop-hook] [--await <file> [--max-min N]]
+// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--jobs N] [--deadline-min N] [--out <file>] [--cache] [--cache-check] [--await <file> [--max-min N]]
 //   (no flags)        affected .NET test projects and web/api checks, picked from the files changed against master
 //   --quick           format + build only; overrides everything below
 //   --projects a,b    exactly these .NET test projects; web/api still need --web/--api/--all
@@ -7,11 +7,12 @@
 //   --api             force the generated TS client check
 //   --all             every test project + web + api
 //   --fix             first reformat the changed files (dotnet format, prettier, eslint --fix)
-//   --deadline-min N  wall-clock budget for the whole run (default 60)
+//   --jobs N          run N .NET test projects at once, alongside the web checks (default 1: sequential, then web)
+//   --deadline-min N  wall-clock budget for the whole run (default 120)
 //   --out <file>      also write the result JSON to <file>
 //   --cache           skip the run when the same working tree and scope already passed (green results only, .git/verify-cache.json)
-//   --stop-hook       run as a Claude Code subagent Stop hook: red prints the failures to stderr and exits 2, at most twice per session
-//   --await <file>    do not verify: wait (at most --max-min N, default 9) for a background run's --out file
+//   --cache-check     run nothing: ok if this exact working tree and scope already passed under --cache, else a "cache" failure (exit 2)
+//   --await <file>    do not verify: wait (at most --max-min N, default 9) for a background run's --out file; VERIFY_PENDING (exit 3) while it runs, exit 2 if it died
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -25,18 +26,17 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const WEB_DIR = path.join(REPO_ROOT, "web");
 const NPM = IS_WIN ? "npm.cmd" : "npm";
 const NPX = IS_WIN ? "npx.cmd" : "npx";
-const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
-const DEFAULT_DEADLINE_MIN = 60;
+const DEFAULT_TIMEOUT_MS = 120 * 60 * 1000;
+const DEFAULT_DEADLINE_MIN = 120;
 
 let deadlineAt = Infinity;
 let outFile = null;
 let cacheCtx = null;
-let stopHookCtx = null;
 const SEP = String.fromCharCode(0);
-const NL = String.fromCharCode(10);
 const CACHE_MAX_ENTRIES = 10;
-const STOP_HOOK_MAX_BLOCKS = 2;
-const STOP_HOOK_MAX_LINES = 20;
+const TEST_PRIORITY = ["portfolio", "reporting", "marketdata", "identity", "gateway"];
+const PID_STALE_GRACE_MS = 5 * 60 * 1000;
+const AWAIT_START_GRACE_MS = 10 * 1000;
 
 function parseArgs(argv) {
   const args = {
@@ -49,9 +49,10 @@ function parseArgs(argv) {
     deadlineMin: DEFAULT_DEADLINE_MIN,
     out: null,
     cache: false,
-    stopHook: false,
+    cacheCheck: false,
     await: null,
     maxMin: 9,
+    jobs: 1,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -61,7 +62,12 @@ function parseArgs(argv) {
     else if (a === "--api") args.api = true;
     else if (a === "--fix") args.fix = true;
     else if (a === "--cache") args.cache = true;
-    else if (a === "--stop-hook") args.stopHook = true;
+    else if (a === "--cache-check") args.cacheCheck = true;
+    else if (a === "--jobs") {
+      const n = Number(argv[++i]);
+      if (!(Number.isInteger(n) && n > 0)) fatal("--jobs requires a positive integer");
+      args.jobs = n;
+    }
     else if (a === "--deadline-min" || a.startsWith("--deadline-min=")) {
       const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
       const n = Number(val);
@@ -365,17 +371,34 @@ function snapshotDir(rel) {
 }
 
 // cmd.exe caps a command line at 8191 characters.
-function chunks(list, size = 40) {
+function chunks(list, maxChars = 7000) {
   const result = [];
-  for (let i = 0; i < list.length; i += size) result.push(list.slice(i, i + size));
+  let current = [];
+  let length = 0;
+  for (const item of list) {
+    if (current.length && length + item.length + 1 > maxChars) {
+      result.push(current);
+      current = [];
+      length = 0;
+    }
+    current.push(item);
+    length += item.length + 1;
+  }
+  if (current.length) result.push(current);
   return result;
+}
+
+function existingCsFiles(changedFiles) {
+  return [...new Set(changedFiles.map(normalizeSlashes))].filter(
+    (f) => f.toLowerCase().endsWith(".cs") && existsSync(path.join(REPO_ROOT, f)),
+  );
 }
 
 const WEB_GENERATED_RE = /^web\/(node_modules|dist|openapi|src\/app\/api)\//i;
 
 async function applyFixes(changedFiles) {
   const existing = [...new Set(changedFiles.map(normalizeSlashes))].filter((f) => existsSync(path.join(REPO_ROOT, f)));
-  const cs = existing.filter((f) => f.toLowerCase().endsWith(".cs"));
+  const cs = existingCsFiles(changedFiles);
   const web = existing.filter((f) => /^web\//i.test(f) && !WEB_GENERATED_RE.test(f)).map((f) => f.slice("web/".length));
   const lintable = web.filter((f) => /\.(ts|html)$/i.test(f));
   const prettierable = web.filter((f) => /\.(ts|html|scss|css|json|md|mjs|js)$/i.test(f));
@@ -409,29 +432,33 @@ function formatDuration(ms) {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-async function step(label, fn) {
-  console.log(`\n==> ${label}`);
+// block: for steps that run concurrently - the whole block is printed in one write when the step ends.
+async function step(label, fn, { block = false } = {}) {
+  const header = `\n==> ${label}`;
+  if (!block) console.log(header);
   const result = await fn();
-  console.log(`    $ ${result.cmdStr}`);
+  const lines = block ? [header] : [];
+  lines.push(`    $ ${result.cmdStr}`);
   if (result.ok) {
-    console.log(`    ok (${formatDuration(result.durationMs)})`);
+    lines.push(`    ok (${formatDuration(result.durationMs)})`);
   } else if (result.timedOut) {
-    console.log(`    FAILED — timed out after ${formatDuration(result.durationMs)}`);
+    lines.push(`    FAILED — timed out after ${formatDuration(result.durationMs)}`);
   } else {
-    console.log(`    FAILED (${formatDuration(result.durationMs)}, exit ${result.status ?? "n/a"})`);
-    printExcerpt(result);
+    lines.push(`    FAILED (${formatDuration(result.durationMs)}, exit ${result.status ?? "n/a"})`, ...excerptLines(result));
   }
+  console.log(lines.join("\n"));
   return result;
 }
 
-function printExcerpt(result, maxLines = 20) {
+function excerptLines(result, maxLines = 20) {
   const combined = `${result.stdout}\n${result.stderr}`;
   const lines = combined
     .split(/\r?\n/)
     .map((l) => l.trimEnd())
     .filter(Boolean);
-  for (const l of lines.slice(0, maxLines)) console.log(`    | ${l}`);
-  if (lines.length > maxLines) console.log(`    | ... (${lines.length - maxLines} more line(s) omitted)`);
+  const shown = lines.slice(0, maxLines).map((l) => `    | ${l}`);
+  if (lines.length > maxLines) shown.push(`    | ... (${lines.length - maxLines} more line(s) omitted)`);
+  return shown;
 }
 
 function truncate(s, max = 300) {
@@ -655,50 +682,63 @@ function storeGreen(ctx, result) {
   }
 }
 
-function readStopHookSession() {
-  let raw = "";
-  if (!process.stdin.isTTY) {
-    try {
-      raw = readFileSync(0, "utf8");
-    } catch {
-    }
-  }
+
+function pidFile() {
+  const dir = gitDir();
+  return dir ? path.join(dir, "verify.pid") : null;
+}
+
+function readPidInfo() {
+  const file = pidFile();
+  if (!file) return null;
   try {
-    // A subagent's Stop payload carries the parent session id, so every implementer of a run would share one counter.
-    const payload = JSON.parse(raw);
-    const id = String(payload.agent_id ?? payload.session_id ?? "");
-    return id.replace(/[^\w.-]/g, "_") || "unknown";
+    const info = JSON.parse(readFileSync(file, "utf8"));
+    return Number.isInteger(info?.pid) ? info : null;
   } catch {
-    return "unknown";
+    return null;
   }
 }
 
-function readBlocks(file) {
+function isAlive(pid) {
   try {
-    return Number(JSON.parse(readFileSync(file, "utf8")).blocks) || 0;
-  } catch {
-    return 0;
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
   }
 }
 
-function reportToStopHook(failures) {
-  const blocks = stopHookCtx.blocks + 1;
-  try {
-    writeFileSync(stopHookCtx.file, JSON.stringify({ blocks }));
-  } catch {
+function formatClock(ms) {
+  return new Date(ms).toLocaleTimeString("en-GB");
+}
+
+function claimPidFile(out) {
+  const file = pidFile();
+  if (!file) return;
+  const previous = readPidInfo();
+  // A pid past its deadline may have been recycled by an unrelated process.
+  const stale = previous && Date.now() > (previous.deadlineAt ?? 0) + PID_STALE_GRACE_MS;
+  if (previous && previous.pid !== process.pid && !stale && isAlive(previous.pid)) {
+    killTree(previous.pid);
+    console.log(`verify.mjs: stopped the previous run (pid ${previous.pid}, started ${formatClock(previous.startedAt)})`);
   }
-  const lines = [
-    `verify.mjs: the change is not green yet — fix these before finishing (block ${blocks} of ${STOP_HOOK_MAX_BLOCKS}):`,
-    ...failures.map((f) => `- ${f.step}: ${f.summary}${f.file ? ` (${f.file})` : ""}`),
-  ];
-  process.stderr.write(`${lines.slice(0, STOP_HOOK_MAX_LINES).map((l) => truncate(l)).join(NL)}${NL}`);
+  try {
+    writeFileSync(file, JSON.stringify({ pid: process.pid, startedAt: Date.now(), deadlineAt, out }));
+  } catch (e) {
+    process.stderr.write(`verify.mjs: could not write the pid file: ${e.message}\n`);
+  }
+}
+
+function releasePidFile() {
+  const file = pidFile();
+  if (file && readPidInfo()?.pid === process.pid) rmSync(file, { force: true });
 }
 
 function finish(ok, failures, extra = {}) {
   if (ok) {
     console.log("\nverify.mjs: all checks passed");
   } else {
-    console.log(`\nverify.mjs: FAILED at step "${failures[0]?.step}"`);
+    console.log(`\nverify.mjs: FAILED at step ${[...new Set(failures.map((f) => `"${f.step}"`))].join(", ")}`);
   }
   if (ok && cacheCtx && !extra.cached) storeGreen(cacheCtx, { ok, failures });
   const json = JSON.stringify({ ok, failures, ...extra });
@@ -710,10 +750,9 @@ function finish(ok, failures, extra = {}) {
       process.stderr.write(`verify.mjs: could not write the --out file: ${e.message}\n`);
     }
   }
+  releasePidFile();
   console.log(`VERIFY_RESULT: ${json}`);
-  if (!ok && stopHookCtx) {
-    reportToStopHook(failures);
-  } else if (!ok) {
+  if (!ok) {
     const paragraph = failures.map((f) => `[${f.step}] ${f.summary}${f.file ? ` (${f.file})` : ""}`).join(" ");
     process.stderr.write(`verify.mjs failed: ${paragraph}\n`);
   }
@@ -726,23 +765,44 @@ function fatal(message) {
   process.exit(process.exitCode);
 }
 
+function printAwaited(json) {
+  let ok = false;
+  try {
+    ok = JSON.parse(json).ok === true;
+  } catch {
+  }
+  console.log(`VERIFY_RESULT: ${json}`);
+  process.exitCode = ok ? 0 : 2;
+}
+
 function awaitResult(file, maxMin) {
-  const giveUpAt = Date.now() + maxMin * 60 * 1000;
+  const startedAt = Date.now();
+  const giveUpAt = startedAt + maxMin * 60 * 1000;
+  const readResult = () => (existsSync(file) ? readFileSync(file, "utf8").trim() : null);
   return new Promise((resolve) => {
     const tick = () => {
-      if (existsSync(file)) {
-        const json = readFileSync(file, "utf8").trim();
-        let ok = false;
-        try {
-          ok = JSON.parse(json).ok === true;
-        } catch {
-        }
-        console.log(`VERIFY_RESULT: ${json}`);
-        process.exitCode = ok ? 0 : 2;
+      const json = readResult();
+      if (json) {
+        printAwaited(json);
         return resolve();
       }
-      if (Date.now() >= giveUpAt) {
-        console.log(`VERIFY_PENDING: no result in ${file} after ${maxMin} min — the run is still going; call --await again`);
+      const now = Date.now();
+      const info = readPidInfo();
+      // A run that was just launched has not written its pid file yet, and a stale one may still be there.
+      const judge = now >= startedAt + AWAIT_START_GRACE_MS || now >= giveUpAt;
+      const gone = !info || !isAlive(info.pid) || now > (info.deadlineAt ?? 0) + PID_STALE_GRACE_MS;
+      if (judge && gone) {
+        const last = readResult();
+        if (last) printAwaited(last);
+        else {
+          const failure = { step: "timeout", summary: "verify.mjs stopped without a result (process gone or deadline passed)" };
+          printAwaited(JSON.stringify({ ok: false, failures: [failure] }));
+        }
+        return resolve();
+      }
+      if (now >= giveUpAt) {
+        const when = info ? ` (started ${formatClock(info.startedAt)}, deadline ${formatClock(info.deadlineAt)})` : "";
+        console.log(`VERIFY_PENDING: ${file} not written yet — verify.mjs is still running${when} — call --await again`);
         process.exitCode = 3;
         return resolve();
       }
@@ -752,28 +812,13 @@ function awaitResult(file, maxMin) {
   });
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.await) return awaitResult(args.await, args.maxMin);
-  if (args.stopHook) {
-    const file = path.join(gitDir() ?? REPO_ROOT, `verify-stop-${readStopHookSession()}.json`);
-    const blocks = readBlocks(file);
-    if (blocks >= STOP_HOOK_MAX_BLOCKS) return;
-    stopHookCtx = { file, blocks };
-  }
-  deadlineAt = Date.now() + args.deadlineMin * 60 * 1000;
-  if (args.out) {
-    rmSync(args.out, { force: true });
-    outFile = args.out;
-  }
-  const serviceNames = discoverServiceNames();
-  const projectMap = buildProjectMap(serviceNames);
+function computeScope(args, serviceNames, projectMap) {
   const allProjectRels = () => [...projectMap.values()].map((v) => v.rel);
-
   let selectedRels;
   let runWeb;
   let runApi;
   let modeDescription;
+  let changed = null;
 
   if (args.all) {
     selectedRels = allProjectRels();
@@ -795,7 +840,8 @@ async function main() {
     runApi = args.api;
     modeDescription = `--projects ${args.projects.join(",")}`;
   } else {
-    const { files, treatAsAll, base } = getChangedFiles();
+    changed = getChangedFiles();
+    const { files, treatAsAll, base } = changed;
     if (treatAsAll) {
       selectedRels = allProjectRels();
       runWeb = true;
@@ -813,43 +859,173 @@ async function main() {
   }
 
   selectedRels = [...new Set(selectedRels)].sort();
+  return { selectedRels, runWeb, runApi, modeDescription, changed };
+}
+
+function lookupCache(args, scope) {
+  const scopeKey = JSON.stringify({
+    quick: args.quick,
+    all: args.all,
+    web: scope.runWeb,
+    api: scope.runApi,
+    projects: scope.selectedRels,
+  });
+  const fingerprint = computeFingerprint(scopeKey);
+  const file = cacheFile();
+  if (!fingerprint || !file) return { scopeKey, fingerprint: null, hit: null };
+  const hit = readCache(file).find((e) => e.fingerprint === fingerprint && e.result?.ok === true) ?? null;
+  return { scopeKey, fingerprint, hit };
+}
+
+function testRank(rel) {
+  const lower = rel.toLowerCase();
+  const i = TEST_PRIORITY.findIndex((name) => lower.includes(`skarbiec.${name}.tests`));
+  return i === -1 ? TEST_PRIORITY.length : i;
+}
+
+// Longest-running projects first, so the pool is not left waiting on one slow project at the end.
+function orderLongestFirst(rels) {
+  return [...rels].sort((a, b) => testRank(a) - testRank(b) || a.localeCompare(b));
+}
+
+async function runPool(items, limit, worker) {
+  let next = 0;
+  const results = [];
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await worker(items[i]);
+    }
+  });
+  await Promise.all(lanes);
+  return results;
+}
+
+async function runDotnetTests(rels, jobs) {
+  const results = await runPool(orderLongestFirst(rels), jobs, async (rel) => {
+    const r = await step(`test: ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]), { block: true });
+    return r.ok ? null : buildFailure("test", r);
+  });
+  return results.filter(Boolean);
+}
+
+async function runWebChecks() {
+  if (!existsSync(WEB_DIR)) {
+    console.log("\nnotice: web/ not found — skipping web checks");
+    return [];
+  }
+  const staticChecks = [
+    ["web-typecheck", ["run", "typecheck"]],
+    ["web-lint", ["run", "lint"]],
+    ["web-format", ["run", "format:check"]],
+  ];
+  const sequentialSteps = [
+    ["web-build", ["run", "build"]],
+    ["web-test", ["test", "--", "--watch=false"]],
+  ];
+
+  console.log("\n==> web checks (typecheck, lint, format:check in parallel; then build, test)");
+  const staticResults = await Promise.all(
+    staticChecks.map(([name, npmArgs]) => step(name, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }), { block: true })),
+  );
+  const staticFailures = staticResults.map((r, i) => (r.ok ? null : buildFailure(staticChecks[i][0], r))).filter(Boolean);
+  if (staticFailures.length) return staticFailures;
+
+  for (const [name, npmArgs] of sequentialSteps) {
+    const r = await step(name, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }), { block: true });
+    if (!r.ok) return [buildFailure(name, r)];
+  }
+  return [];
+}
+
+async function runApiCheck() {
+  const openapiDir = path.join(WEB_DIR, "openapi");
+  if (!existsSync(openapiDir)) {
+    console.log("\nnotice: build-time OpenAPI not set up yet (spec-00) — skipping api check");
+    return null;
+  }
+  // Compared against the tree before regeneration, not git: the client is legitimately uncommitted until Ship.
+  const before = snapshotDir("web/src/app/api");
+  const genResult = await step("api: npm run gen:api", () => runCommand(NPM, ["run", "gen:api"], { cwd: WEB_DIR }));
+  if (!genResult.ok) return buildFailure("api", genResult);
+
+  if (snapshotDir("web/src/app/api") !== before) {
+    return {
+      step: "api",
+      summary: "generated TS client was out of date and has been regenerated; review the diff of web/src/app/api",
+      file: "web/src/app/api",
+    };
+  }
+  return null;
+}
+
+async function checkFormat(args, changed) {
+  const editorConfigChanged = changed?.files.some((f) => /(^|\/)\.editorconfig$/i.test(normalizeSlashes(f)));
+  if (args.all || !changed || changed.treatAsAll || editorConfigChanged) {
+    return step("format", () => runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes"]));
+  }
+  const cs = existingCsFiles(changed.files);
+  if (cs.length === 0) {
+    console.log("\nnotice: no changed .cs files — format check skipped");
+    return { ok: true };
+  }
+  for (const part of chunks(cs)) {
+    const r = await step(`format (${part.length} changed .cs file(s))`, () =>
+      runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes", "--include", ...part]),
+    );
+    if (!r.ok) return r;
+  }
+  return { ok: true };
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.await) return awaitResult(args.await, args.maxMin);
+
+  const serviceNames = discoverServiceNames();
+  const projectMap = buildProjectMap(serviceNames);
+  const scope = computeScope(args, serviceNames, projectMap);
+  const { selectedRels, runWeb, runApi } = scope;
+
+  if (args.cacheCheck) {
+    const { hit } = lookupCache(args, scope);
+    if (hit) return finish(true, [], { cached: true });
+    const summary = "this working tree has no green verify run in the cache — run node scripts/verify.mjs --all --fix --cache";
+    return finish(false, [{ step: "cache", summary }]);
+  }
+
+  deadlineAt = Date.now() + args.deadlineMin * 60 * 1000;
+  claimPidFile(args.out);
+  if (args.out) {
+    rmSync(args.out, { force: true });
+    outFile = args.out;
+  }
 
   console.log("Skarbiec verify.mjs");
-  console.log(`mode: ${modeDescription}`);
+  console.log(`mode: ${scope.modeDescription}`);
   console.log(`quick: ${args.quick ? "yes (stop after build)" : "no"}`);
   console.log(`test projects: ${selectedRels.length ? selectedRels.join(", ") : "(none)"}`);
   console.log(`web checks: ${runWeb ? "yes" : "no"}${args.quick && runWeb ? " (skipped by --quick)" : ""}`);
   console.log(`api check: ${runApi ? "yes" : "no"}${args.quick && runApi ? " (skipped by --quick)" : ""}`);
   console.log(`fix: ${args.fix ? "yes" : "no"} · deadline: ${args.deadlineMin} min`);
 
+  const changed = args.fix || !args.all ? (scope.changed ?? getChangedFiles()) : null;
+
   if (args.fix) {
-    const { files, treatAsAll } = getChangedFiles();
-    if (treatAsAll) console.log("\nnotice: no master or origin/master ref — --fix skipped");
-    else await applyFixes(files);
+    if (changed.treatAsAll) console.log("\nnotice: no master or origin/master ref — --fix skipped");
+    else await applyFixes(changed.files);
   }
 
   if (args.cache) {
-    const scope = JSON.stringify({
-      quick: args.quick,
-      all: args.all,
-      web: runWeb,
-      api: runApi,
-      projects: selectedRels,
-    });
-    const fingerprint = computeFingerprint(scope);
-    const file = cacheFile();
-    if (fingerprint && file) {
-      const hit = readCache(file).find((e) => e.fingerprint === fingerprint && e.result?.ok === true);
-      if (hit) {
-        console.log(`
-cache: this exact working tree and scope already passed at ${hit.at} — nothing to run`);
-        return finish(true, hit.result.failures ?? [], { cached: true });
-      }
-      cacheCtx = { fingerprint, scope };
+    const { scopeKey, fingerprint, hit } = lookupCache(args, scope);
+    if (hit) {
+      console.log(`\ncache: this exact working tree and scope already passed at ${hit.at} — nothing to run`);
+      return finish(true, hit.result.failures ?? [], { cached: true });
     }
+    if (fingerprint) cacheCtx = { fingerprint, scope: scopeKey };
   }
 
-  const formatResult = await step("format", () => runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes"]));
+  const formatResult = await checkFormat(args, changed);
   if (!formatResult.ok) return finish(false, [buildFailure("format", formatResult)]);
 
   let buildResult = await step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
@@ -864,71 +1040,19 @@ cache: this exact working tree and scope already passed at ${hit.at} — nothing
 
   if (args.quick) return finish(true, []);
 
-  for (const rel of selectedRels) {
-    const testResult = await step(`test: ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]));
-    if (!testResult.ok) return finish(false, [buildFailure("test", testResult)]);
+  // Parallel test projects fight over Docker and CPU: Respawn deadlocks and timing-based tests go red, so one at a time unless asked.
+  const [testFailures, webFailures] =
+    args.jobs > 1
+      ? await Promise.all([runDotnetTests(selectedRels, args.jobs), runWeb ? runWebChecks() : []])
+      : [await runDotnetTests(selectedRels, 1), runWeb ? await runWebChecks() : []];
+  const failures = [...testFailures, ...webFailures];
+
+  if (runApi && webFailures.length === 0) {
+    const apiFailure = await runApiCheck();
+    if (apiFailure) failures.push(apiFailure);
   }
 
-  if (runWeb) {
-    if (!existsSync(WEB_DIR)) {
-      console.log("\nnotice: web/ not found — skipping web checks");
-    } else {
-      // Run independent static checks in parallel (typecheck, lint, format:check),
-      // then sequential checks (build, test) that may depend on earlier steps.
-      const staticChecks = [
-        ["web-typecheck", ["run", "typecheck"]],
-        ["web-lint", ["run", "lint"]],
-        ["web-format", ["run", "format:check"]],
-      ];
-      const sequentialSteps = [
-        ["web-build", ["run", "build"]],
-        ["web-test", ["test", "--", "--watch=false"]],
-      ];
-
-      // Run static checks in parallel
-      console.log("\n==> web checks (parallel: typecheck, lint, format:check)");
-      const staticPromises = staticChecks.map(([canonical, npmArgs]) =>
-        step(canonical, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }))
-      );
-      const staticResults = await Promise.all(staticPromises);
-      for (let i = 0; i < staticResults.length; i++) {
-        const r = staticResults[i];
-        if (!r.ok) {
-          return finish(false, [buildFailure(staticChecks[i][0], r)]);
-        }
-      }
-
-      // Run sequential checks (build, test)
-      for (const [canonical, npmArgs] of sequentialSteps) {
-        const r = await step(canonical, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }));
-        if (!r.ok) return finish(false, [buildFailure(canonical, r)]);
-      }
-    }
-  }
-
-  if (runApi) {
-    const openapiDir = path.join(WEB_DIR, "openapi");
-    if (!existsSync(openapiDir)) {
-      console.log("\nnotice: build-time OpenAPI not set up yet (spec-00) — skipping api check");
-    } else {
-      // Compared against the tree before regeneration, not git: the client is legitimately uncommitted until Ship.
-      const before = snapshotDir("web/src/app/api");
-      const genResult = await step("api: npm run gen:api", () => runCommand(NPM, ["run", "gen:api"], { cwd: WEB_DIR }));
-      if (!genResult.ok) return finish(false, [buildFailure("api", genResult)]);
-
-      if (snapshotDir("web/src/app/api") !== before) {
-        return finish(false, [
-          {
-            step: "api",
-            summary: "generated TS client was out of date and has been regenerated; review the diff of web/src/app/api",
-            file: "web/src/app/api",
-          },
-        ]);
-      }
-    }
-  }
-
-  return finish(true, []);
+  return failures.length ? finish(false, failures) : finish(true, []);
 }
 
 main().catch((e) => fatal(`verify.mjs crashed: ${e?.stack ?? e}`));
