@@ -4,7 +4,6 @@ using Skarbiec.Testing.Tenancy;
 
 namespace Skarbiec.Testing.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class NotesTenancyIsolationTests(SkarbiecContainersFixture containers) : TenancyIsolationTests<Program>
 {
     protected override SkarbiecApiFactory<Program> Factory { get; } = new NotesApiFactory(containers);

@@ -2,13 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
 // Proves the unique indexes constrain the database, not just the C# model.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class InstrumentIndexTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

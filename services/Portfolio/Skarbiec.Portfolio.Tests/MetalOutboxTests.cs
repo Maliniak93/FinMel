@@ -6,12 +6,10 @@ using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Metals.AddMetal;
 using Skarbiec.Portfolio.Features.Metals.UpdateMetal;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]

@@ -5,7 +5,6 @@ using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.SearchInstruments;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
@@ -13,7 +12,6 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 namespace Skarbiec.MarketData.Tests;
 
 // The <100 ms check runs against the handler in SearchInstrumentsPerformanceTests, so HTTP overhead is not measured.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

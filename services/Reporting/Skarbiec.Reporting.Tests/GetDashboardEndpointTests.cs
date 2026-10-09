@@ -3,14 +3,12 @@ using System.Net.Http.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingApi;
 
 namespace Skarbiec.Reporting.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
     [Fact]

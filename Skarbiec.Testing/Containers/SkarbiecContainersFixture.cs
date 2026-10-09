@@ -1,55 +1,54 @@
 using Npgsql;
 using Respawn;
-using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
 
 namespace Skarbiec.Testing.Containers;
 
 public sealed class SkarbiecContainersFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
-    private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder("rabbitmq:4-management-alpine").Build();
+    private Respawner? _respawner;
 
-    public string PostgresConnectionString => _postgres.GetConnectionString();
+    public string PostgresConnectionString { get; private set; } = null!;
 
-    public string RabbitMqConnectionString => _rabbitMq.GetConnectionString();
+    public string RabbitMqConnectionString { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbitMq.StartAsync());
+        var containers = SkarbiecContainers.Current;
+        PostgresConnectionString = await containers.CreateDatabaseAsync();
+        RabbitMqConnectionString = await containers.CreateVirtualHostAsync();
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _rabbitMq.DisposeAsync().AsTask());
-    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    // Rebuilt on every call: a Respawner cached before the first migration would miss every table.
     public async Task ResetDatabaseAsync()
     {
         await using var connection = new NpgsqlConnection(PostgresConnectionString);
         await connection.OpenAsync();
 
-        // Respawner.CreateAsync throws when only __EFMigrationsHistory exists, so that case is skipped.
-        await using (var countCommand = connection.CreateCommand())
+        // Cached only once tables exist: a Respawner built before the first migration would miss every table.
+        if (_respawner is null)
         {
-            countCommand.CommandText = """
-                SELECT count(*) FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_name <> '__EFMigrationsHistory'
-                """;
-
-            if ((long)(await countCommand.ExecuteScalarAsync())! == 0)
+            // Respawner.CreateAsync throws when only __EFMigrationsHistory exists, so that case is skipped.
+            await using (var countCommand = connection.CreateCommand())
             {
-                return;
-            }
-        }
+                countCommand.CommandText = """
+                    SELECT count(*) FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name <> '__EFMigrationsHistory'
+                    """;
 
-        var respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"],
-            TablesToIgnore = ["__EFMigrationsHistory"]
-        });
+                if ((long)(await countCommand.ExecuteScalarAsync())! == 0)
+                {
+                    return;
+                }
+            }
+
+            _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
+            {
+                DbAdapter = DbAdapter.Postgres,
+                SchemasToInclude = ["public"],
+                TablesToIgnore = ["__EFMigrationsHistory"]
+            });
+        }
 
         // Retried on deadlock (40P01): a previous host's outbox poller may still be shutting down.
         const int maxAttempts = 3;
@@ -57,7 +56,7 @@ public sealed class SkarbiecContainersFixture : IAsyncLifetime
         {
             try
             {
-                await respawner.ResetAsync(connection);
+                await _respawner.ResetAsync(connection);
                 return;
             }
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.DeadlockDetected && attempt < maxAttempts)

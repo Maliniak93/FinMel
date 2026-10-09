@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.UpdatePortfolio;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Tenancy;
@@ -10,7 +9,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class PortfolioTenancyIsolationTests(SkarbiecContainersFixture containers) : TenancyIsolationTests<Program>
 {
     protected override PortfolioApiFactory Factory { get; } = new(containers);

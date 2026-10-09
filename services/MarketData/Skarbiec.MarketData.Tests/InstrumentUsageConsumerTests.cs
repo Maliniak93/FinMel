@@ -9,14 +9,12 @@ using Skarbiec.MarketData.Messaging;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
 // Builds its own provider, with no HTTP host, on a queue unique to this class.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string PositionChangedQueueName = "instrument-usage-position-changed-test";
     private const string RemovedQueueName = "instrument-usage-removed-test";

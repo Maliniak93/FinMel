@@ -6,7 +6,6 @@ using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingApi;
@@ -15,7 +14,6 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 namespace Skarbiec.Reporting.Tests;
 
 // The dashboard is called directly; each step waits for the previous consume, since the two event types sit on separate queues.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
     [Fact]

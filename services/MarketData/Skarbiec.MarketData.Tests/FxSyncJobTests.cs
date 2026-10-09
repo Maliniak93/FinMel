@@ -6,13 +6,11 @@ using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.MarketData.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     // An explicit field: the primary constructor parameter also goes to the base constructor, so using it here would trigger CS9107.

@@ -3,14 +3,12 @@ using System.Net.Http.Json;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.GetLatestPricesBatch;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 
 namespace Skarbiec.MarketData.Tests;
 
 // An anonymous /internal endpoint, so every fact calls it with no token, as Reporting does.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class GetLatestPricesBatchEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

@@ -1,13 +1,11 @@
 using System.Net;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
 // This host has no scheduler, so SyncTriggerSchedulingTests cover the firing and the double-click guard.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class TriggerSyncEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     private const string TriggerUri = "/api/marketdata/sync/trigger";

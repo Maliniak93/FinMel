@@ -5,15 +5,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Register;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Identity.Tests;
 
 // Builds its own provider so no hosted service starts and the outbox row is never delivered before the assertion reads it.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class UserRegisteredOutboxTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class UserRegisteredOutboxTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private ServiceProvider _provider = null!;
 

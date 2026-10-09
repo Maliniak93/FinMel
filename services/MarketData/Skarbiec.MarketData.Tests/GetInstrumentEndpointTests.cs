@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.GetInstrument;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
@@ -11,7 +10,6 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 namespace Skarbiec.MarketData.Tests;
 
 // One handler backs the authorized public route and its anonymous /internal twin.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class GetInstrumentEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

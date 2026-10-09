@@ -5,14 +5,12 @@ using Microsoft.Extensions.Hosting;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Identity.Data;
 using Skarbiec.ServiceDefaults.Messaging;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Identity.Tests;
 
 // Builds its own provider with a counting consumer on a queue unique to this class.
-[Collection(TestingDefaults.CollectionName)]
-public sealed class UserRegisteredIdempotentConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class UserRegisteredIdempotentConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string QueueName = "user-registered-idempotency-test";
 

@@ -5,7 +5,6 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
@@ -13,7 +12,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 namespace Skarbiec.Portfolio.Tests;
 
 // Creation is under test, so these facts post directly: PortfolioApi.CreatePortfolioAsync asserts success.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class CreatePortfolioEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]

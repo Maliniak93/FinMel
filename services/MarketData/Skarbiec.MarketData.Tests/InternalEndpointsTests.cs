@@ -4,7 +4,6 @@ using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
@@ -12,7 +11,6 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 namespace Skarbiec.MarketData.Tests;
 
 // Every fact calls MarketData directly and asserts on the raw response.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

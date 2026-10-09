@@ -8,7 +8,7 @@ using Skarbiec.Testing.Containers;
 namespace Skarbiec.Reporting.Tests;
 
 // Timed against the handler, not over HTTP, after a warm-up call absorbs JIT and connection-pool cost.
-[Collection(TestingDefaults.CollectionName)]
+[Collection(TestingDefaults.SerialCollectionName)]
 public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
 {
     [Fact]

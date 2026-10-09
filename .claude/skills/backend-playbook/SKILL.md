@@ -65,7 +65,7 @@ Compare `<Service>` against Portfolio/Reporting/MarketData/Identity — every on
 5. CI job + path filter for `services/<Name>/**` in `.github/workflows/ci.yml`.
 6. Docker entry for the service's Dockerfile directory in `.github/dependabot.yml`.
 7. Entry in `web/openapi-ts.config.ts` for hey-api generation.
-8. `[CollectionDefinition(TestingDefaults.CollectionName)]` in the new test project (xUnit only discovers one declared in the assembly under test).
+8. `[assembly: AssemblyFixture(typeof(SkarbiecContainers))]` in the new test project (one `AssemblyFixtures.cs` file).
 9. `requests/<name>.http`.
 
 ## Conventions and ADRs

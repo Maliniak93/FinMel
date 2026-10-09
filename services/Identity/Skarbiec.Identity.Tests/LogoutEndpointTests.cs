@@ -1,14 +1,12 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Skarbiec.Identity.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
 // HandleCookies is off, so each request carries exactly the refresh cookie the test attaches.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class LogoutEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
     [Fact]

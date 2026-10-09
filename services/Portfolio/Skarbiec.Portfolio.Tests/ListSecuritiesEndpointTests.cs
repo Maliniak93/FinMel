@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features.Securities;
 using Skarbiec.Portfolio.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
@@ -11,7 +10,6 @@ using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 namespace Skarbiec.Portfolio.Tests;
 
 // Every fact calls ListSecurities directly; holdings are arranged through the fixture helpers and the fake MarketData clients.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]

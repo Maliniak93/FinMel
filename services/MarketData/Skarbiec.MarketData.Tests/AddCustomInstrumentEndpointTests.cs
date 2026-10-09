@@ -7,7 +7,6 @@ using Skarbiec.MarketData.Features.AddCustomInstrument;
 using Skarbiec.MarketData.Features.SearchInstruments;
 using Skarbiec.MarketData.Sources.Verification;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
@@ -15,7 +14,6 @@ using static Skarbiec.MarketData.Tests.Fixtures.MarketDataApi;
 namespace Skarbiec.MarketData.Tests;
 
 // The outcome comes from the factory's fake verifier; TickerVerifierTests cover the real provider mapping.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]

@@ -8,14 +8,12 @@ using Microsoft.Extensions.Logging;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Register;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.Identity.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
-public sealed class UserRegisteredOutboxDurabilityTests(SkarbiecContainersFixture containers) : IAsyncLifetime
+public sealed class UserRegisteredOutboxDurabilityTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string DurabilityTestQueueName = "user-registered-outbox-durability-test";
 

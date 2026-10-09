@@ -5,12 +5,10 @@ using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class HistoryBackfillVerificationTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);

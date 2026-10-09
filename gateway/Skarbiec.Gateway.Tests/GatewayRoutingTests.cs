@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Skarbiec.Gateway.Tests.Infrastructure;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using LoginRequest = IdentityAssembly::Skarbiec.Identity.Features.Login.LoginRequest;
 using LoginResponse = IdentityAssembly::Skarbiec.Identity.Features.Login.LoginResponse;
@@ -12,8 +11,7 @@ using RegisterRequest = IdentityAssembly::Skarbiec.Identity.Features.Register.Re
 
 namespace Skarbiec.Gateway.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
-public sealed class GatewayRoutingTests : IAsyncLifetime
+public sealed class GatewayRoutingTests : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string Password = "Str0ng!Passw0rd";
 

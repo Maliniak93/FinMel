@@ -1,11 +1,9 @@
 using Quartz;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-[Collection(TestingDefaults.CollectionName)]
 public sealed class QuartzSchemaProvisioningTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     private readonly SkarbiecContainersFixture _containers = containers;

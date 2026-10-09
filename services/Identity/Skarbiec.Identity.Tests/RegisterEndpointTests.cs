@@ -5,14 +5,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Identity.Data;
 using Skarbiec.Identity.Features.Register;
 using Skarbiec.Identity.Tests.Fixtures;
-using Skarbiec.Testing;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Identity.Tests.Fixtures.IdentityApi;
 
 namespace Skarbiec.Identity.Tests;
 
 // Registration is under test, so these facts post to RegisterUri directly: IdentityApi.RegisterAsync asserts 201.
-[Collection(TestingDefaults.CollectionName)]
 public sealed class RegisterEndpointTests(SkarbiecContainersFixture containers) : IdentityEndpointTests(containers)
 {
     [Fact]
