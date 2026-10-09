@@ -59,6 +59,57 @@ public sealed class MarketDataPriceClient(HttpClient httpClient) : IPriceQuoteCl
         return result;
     }
 
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<InstrumentPriceLookup>>> GetPriceHistoryAsync(
+        IReadOnlyList<Guid> instrumentIds, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<Guid, IReadOnlyList<InstrumentPriceLookup>>();
+
+        foreach (var batch in instrumentIds.Distinct().Chunk(BatchSize))
+        {
+            using var response = await httpClient.PostAsJsonAsync(
+                "/internal/prices/history-batch",
+                new PricesHistoryBatchRequest(batch, from, to),
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var body = await response.Content.ReadFromJsonAsync<PricesHistoryBatchResponse>(cancellationToken)
+                ?? throw new InvalidOperationException("MarketData returned an empty prices history response.");
+
+            foreach (var series in body.Series)
+            {
+                result[series.InstrumentId] =
+                    [.. series.Quotes.Select(q => new InstrumentPriceLookup(series.QuoteCurrency, q.Date, q.Close))];
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<FxRateLookup>>> GetFxHistoryAsync(
+        IReadOnlyList<string> pairs, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<string, IReadOnlyList<FxRateLookup>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var batch in pairs.Distinct(StringComparer.OrdinalIgnoreCase).Chunk(BatchSize))
+        {
+            using var response = await httpClient.PostAsJsonAsync(
+                "/internal/fx/history-batch",
+                new FxHistoryBatchRequest(batch, from, to),
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var body = await response.Content.ReadFromJsonAsync<FxHistoryBatchResponse>(cancellationToken)
+                ?? throw new InvalidOperationException("MarketData returned an empty FX history response.");
+
+            foreach (var series in body.Series)
+            {
+                result[series.Pair] = [.. series.Rates.Select(r => new FxRateLookup(r.Date, r.Rate))];
+            }
+        }
+
+        return result;
+    }
+
     private sealed record LatestPricesBatchRequest(IReadOnlyList<Guid> InstrumentIds, DateOnly AsOfDate);
 
     private sealed record LatestPricesBatchResponse
@@ -76,4 +127,26 @@ public sealed class MarketDataPriceClient(HttpClient httpClient) : IPriceQuoteCl
     }
 
     private sealed record FxRateResult(string Pair, DateOnly Date, decimal Rate);
+
+    private sealed record PricesHistoryBatchRequest(IReadOnlyList<Guid> InstrumentIds, DateOnly From, DateOnly To);
+
+    private sealed record PricesHistoryBatchResponse
+    {
+        public required IReadOnlyList<InstrumentQuoteSeriesResult> Series { get; init; }
+    }
+
+    private sealed record InstrumentQuoteSeriesResult(Guid InstrumentId, string QuoteCurrency, IReadOnlyList<HistoryQuoteResult> Quotes);
+
+    private sealed record HistoryQuoteResult(DateOnly Date, decimal Close);
+
+    private sealed record FxHistoryBatchRequest(IReadOnlyList<string> Pairs, DateOnly From, DateOnly To);
+
+    private sealed record FxHistoryBatchResponse
+    {
+        public required IReadOnlyList<FxRateSeriesResult> Series { get; init; }
+    }
+
+    private sealed record FxRateSeriesResult(string Pair, IReadOnlyList<HistoryRateResult> Rates);
+
+    private sealed record HistoryRateResult(DateOnly Date, decimal Rate);
 }

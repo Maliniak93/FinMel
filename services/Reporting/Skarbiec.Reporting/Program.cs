@@ -40,9 +40,10 @@ if (!OpenApiBuildTime.IsActive)
             x.AddConsumer<PortfolioArchivedConsumer>(typeof(PortfolioArchivedConsumerDefinition));
             x.AddConsumer<PortfolioRestoredConsumer>(typeof(PortfolioRestoredConsumerDefinition));
             x.AddConsumer<PortfolioDeletedConsumer>(typeof(PortfolioDeletedConsumerDefinition));
+            x.AddConsumer<PortfolioHistoryRebuildConsumer>(typeof(PortfolioHistoryRebuildConsumerDefinition));
         });
 
-    // The daily prices and FX batch, sent to MarketData's /internal endpoints with no token.
+    // The daily prices and FX batch and their history twins, sent to MarketData's /internal endpoints with no token.
     builder.Services.AddHttpClient<IPriceQuoteClient, MarketDataPriceClient>(client =>
     {
         client.BaseAddress = new Uri("https+http://marketdata-service");

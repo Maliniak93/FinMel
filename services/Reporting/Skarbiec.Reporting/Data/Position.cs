@@ -35,6 +35,15 @@ public sealed class Position : IUserOwned
     // Independent of PortfolioIsArchived; a position is valued only when neither is set.
     public required bool IsArchived { get; set; }
 
+    // End-of-day quantity per transaction date, ascending; empty for a position with no transactions.
+    public List<PositionQuantityPoint> QuantityHistory { get; set; } = [];
+
+    // UTC date of the event that archived the asset; null while it is not archived.
+    public DateOnly? ArchivedOn { get; set; }
+
+    // UTC date the portfolio's archive was first seen, by the portfolio event or this asset's own event.
+    public DateOnly? PortfolioArchivedOn { get; set; }
+
     // The publisher's per-asset counter: an older event is dropped, so a redelivery never resurrects an older quantity.
     public required long Version { get; set; }
 

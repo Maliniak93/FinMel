@@ -26,8 +26,7 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
     {
         var today = Today;
 
-        // Serializes revaluations of one portfolio across queues; released when the inbox transaction ends.
-        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({AdvisoryLockKey(portfolioId)})", cancellationToken);
+        await LockPortfolioAsync(db, portfolioId, cancellationToken);
 
         // IgnoreQueryFilters: a consumer has no request user and writes for the user the event names.
         var positions = await db.Positions
@@ -57,6 +56,10 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    // Serializes writers of one portfolio across queues; released when the inbox transaction ends.
+    public static Task LockPortfolioAsync(ReportingDbContext db, Guid portfolioId, CancellationToken cancellationToken) =>
+        db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({AdvisoryLockKey(portfolioId)})", cancellationToken);
 
     // Stages only, with no I/O, so nothing reaches Postgres for a portfolio until the caller saves.
     public void UpsertPortfolio(

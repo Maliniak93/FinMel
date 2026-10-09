@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.MarketData;
+using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Valuation;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Tenancy;
@@ -201,4 +202,65 @@ internal static class ReportingConsumers
         return await db.ValuationSnapshots.IgnoreQueryFilters()
             .SingleOrDefaultAsync(s => s.PortfolioId == portfolioId && s.Date == date, cancellationToken);
     }
+
+    public static async Task<HistoryRebuildRequest?> GetRebuildRequestAsync(
+        SkarbiecContainersFixture containers, Guid portfolioId, CancellationToken cancellationToken)
+    {
+        await using var db = OpenDbContext(containers);
+        return await db.HistoryRebuildRequests.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(r => r.PortfolioId == portfolioId, cancellationToken);
+    }
+
+    public static async Task<HistoryRebuildRequest> WaitForRebuildRequestAsync(
+        IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken, Func<HistoryRebuildRequest, bool>? predicate = null)
+    {
+        predicate ??= _ => true;
+        var request = await WaitForAsync(
+            provider,
+            (db, ct) => db.HistoryRebuildRequests.IgnoreQueryFilters().SingleOrDefaultAsync(r => r.PortfolioId == portfolioId, ct),
+            r => r is not null && predicate(r),
+            $"A matching HistoryRebuildRequest for portfolio {portfolioId}",
+            cancellationToken);
+
+        return request!;
+    }
+
+    public static Task WaitForNoRebuildRequestAsync(IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken) =>
+        WaitForAsync(
+            provider,
+            (db, ct) => db.HistoryRebuildRequests.IgnoreQueryFilters().AnyAsync(r => r.PortfolioId == portfolioId, ct),
+            stillExists => !stillExists,
+            $"Deleting the HistoryRebuildRequest for portfolio {portfolioId}",
+            cancellationToken);
+
+    public static async Task<List<AssetValuation>> GetAllLinesAsync(
+        SkarbiecContainersFixture containers, Guid portfolioId, CancellationToken cancellationToken)
+    {
+        await using var db = OpenDbContext(containers);
+        return await db.AssetValuations.IgnoreQueryFilters()
+            .Where(l => l.PortfolioId == portfolioId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public static async Task<List<ValuationSnapshot>> GetAllSnapshotsAsync(
+        SkarbiecContainersFixture containers, Guid portfolioId, CancellationToken cancellationToken)
+    {
+        await using var db = OpenDbContext(containers);
+        return await db.ValuationSnapshots.IgnoreQueryFilters()
+            .Where(s => s.PortfolioId == portfolioId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public static Task PublishRebuildRequestedAsync(
+        this IBus bus, Guid portfolioId, Guid userId, CancellationToken cancellationToken, Guid? messageId = null) =>
+        bus.Publish(
+            new PortfolioHistoryRebuildRequested { PortfolioId = portfolioId, UserId = userId },
+            context =>
+            {
+                if (messageId is { } id)
+                {
+                    context.MessageId = id;
+                }
+            },
+            cancellationToken);
 }

@@ -156,6 +156,74 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
     }
 
     [Fact]
+    public async Task Restore_RequestsRebuildFromArchiveDate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 1_000m, portfolioIsArchived: true,
+                portfolioArchivedOn: today.AddDays(-5), quantityHistory: [(today.AddDays(-20), 1_000m)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new PortfolioRestored
+            {
+                PortfolioId = portfolioId,
+                UserId = userId,
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            var positions = await WaitForPositionsAsync(provider, portfolioId, cancellationToken, ps => ps.All(p => !p.PortfolioIsArchived));
+
+            Assert.Equal(today.AddDays(-5), request.FromDate);
+            Assert.Equal(userId, request.UserId);
+            Assert.All(positions, p => Assert.Null(p.PortfolioArchivedOn));
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Archive_StampsPortfolioArchivedOnFromEventDate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 1_000m, quantityHistory: [(today.AddDays(-20), 1_000m)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new PortfolioArchived
+            {
+                PortfolioId = portfolioId,
+                UserId = userId,
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            var positions = await WaitForPositionsAsync(provider, portfolioId, cancellationToken, ps => ps.All(p => p.PortfolioIsArchived));
+
+            Assert.All(positions, p => Assert.Equal(today, p.PortfolioArchivedOn));
+        }, cancellationToken);
+    }
+
+    [Fact]
     public async Task Consume_PortfolioArchived_SetsTodaysSnapshotToZero()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

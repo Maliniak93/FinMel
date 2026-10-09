@@ -14,9 +14,16 @@ public sealed class PortfolioRestoredConsumer(ReportingDbContext db, PortfolioSn
         var cancellationToken = context.CancellationToken;
 
         // No positions means nothing to value: an empty portfolio gets no snapshot, same as the sync.
-        if (!await PortfolioArchiveFlag.ApplyAsync(db, message.PortfolioId, isArchived: false, cancellationToken))
+        var (hasPositions, affectedFrom) = await PortfolioArchiveFlag.ApplyAsync(
+            db, message.PortfolioId, isArchived: false, message.OccurredAtUtc, cancellationToken);
+        if (!hasPositions)
         {
             return;
+        }
+
+        if (affectedFrom is { } from && from < snapshotWriter.Today)
+        {
+            await HistoryRebuildRequests.RequestAsync(db, context, message.PortfolioId, message.UserId, from, cancellationToken);
         }
 
         await snapshotWriter.RevalueTodayAsync(message.PortfolioId, message.UserId, cancellationToken);

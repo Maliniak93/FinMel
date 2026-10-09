@@ -15,7 +15,8 @@ internal static class PositionEvents
         CancellationToken cancellationToken,
         Guid? assetId = null,
         bool portfolioIsArchived = false,
-        long version = 0)
+        long version = 0,
+        IReadOnlyList<QuantityPoint>? quantityHistory = null)
     {
         var id = assetId ?? Guid.NewGuid();
         await bus.Publish(new AssetPositionChanged
@@ -28,7 +29,7 @@ internal static class PositionEvents
             Currency = "PLN",
             Quantity = amount,
             QuoteUnitsPerQuantity = 1m,
-            QuantityHistory = [],
+            QuantityHistory = quantityHistory ?? [],
             PortfolioIsArchived = portfolioIsArchived,
             IsArchived = false,
             Version = version,

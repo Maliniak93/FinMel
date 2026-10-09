@@ -42,4 +42,51 @@ public sealed class MarketDataPriceClientTests(SkarbiecContainersFixture contain
             () => Assert.All(recorder.Requests, r => Assert.Equal(HttpMethod.Post, r.Method)),
             () => Assert.All(recorder.Requests, r => Assert.Null(r.Authorization)));
     }
+
+    [Fact]
+    public async Task FetchHistory_CallsInternalPaths_WithoutAuthorizationHeader()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var instrumentId = Guid.NewGuid();
+        var from = new DateOnly(2026, 8, 1);
+        var to = new DateOnly(2026, 8, 10);
+        var recorder = new HttpRequestRecorder(request => request.RequestUri!.AbsolutePath.EndsWith("/fx/history-batch", StringComparison.Ordinal)
+            ? new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    Series = new[]
+                    {
+                        new { Pair = "USDPLN", Rates = new[] { new { Date = new DateOnly(2026, 7, 31), Rate = 3.9m }, new { Date = new DateOnly(2026, 8, 4), Rate = 4.0m } } },
+                    },
+                }),
+            }
+            : new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    Series = new[]
+                    {
+                        new { InstrumentId = instrumentId, QuoteCurrency = "USD", Quotes = new[] { new { Date = new DateOnly(2026, 7, 30), Close = 150m }, new { Date = new DateOnly(2026, 8, 5), Close = 160m } } },
+                    },
+                }),
+            });
+        await using var host = Factory.WithRecordedOutboundHttp(recorder);
+        await using var scope = host.Services.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IPriceQuoteClient>();
+
+        var prices = await client.GetPriceHistoryAsync([instrumentId], from, to, cancellationToken);
+        var rates = await client.GetFxHistoryAsync(["USDPLN"], from, to, cancellationToken);
+
+        Assert.Multiple(
+            () => Assert.Equal([150m, 160m], prices[instrumentId].Select(p => p.Close)),
+            () => Assert.Equal("USD", prices[instrumentId][0].QuoteCurrency),
+            () => Assert.Equal([new DateOnly(2026, 7, 30), new DateOnly(2026, 8, 5)], prices[instrumentId].Select(p => p.Date)),
+            () => Assert.Equal([3.9m, 4.0m], rates["USDPLN"].Select(r => r.Rate)),
+            () => Assert.Equal(
+                ["/internal/prices/history-batch", "/internal/fx/history-batch"],
+                recorder.Requests.Select(r => r.Uri.AbsolutePath)),
+            () => Assert.All(recorder.Requests, r => Assert.Equal(HttpMethod.Post, r.Method)),
+            () => Assert.All(recorder.Requests, r => Assert.Null(r.Authorization)));
+    }
 }

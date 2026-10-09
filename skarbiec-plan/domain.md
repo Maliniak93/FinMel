@@ -194,7 +194,8 @@ erDiagram
 
 | Entity | Fields | Role |
 |---|---|---|
-| `Position` | copy of the `AssetPositionChanged` payload + `UpdatedAt`; `AssetId` is the primary key | upserted from the inbox; `PortfolioIsArchived` kept current from `Portfolio*` events; `IsArchived` (asset-archive) from the event — valued only when neither flag is set, and an asset archive/restore event revalues today, so its line leaves or rejoins today's snapshot |
+| `Position` | copy of the `AssetPositionChanged` payload + `UpdatedAt`; `AssetId` is the primary key; `QuantityHistory` (`Date, Quantity` points, a JSON complex collection), `ArchivedOn?`, `PortfolioArchivedOn?` | upserted from the inbox; `PortfolioIsArchived` kept current from `Portfolio*` events; `IsArchived` (asset-archive) from the event — valued only when neither flag is set, and an asset archive/restore event revalues today, so its line leaves or rejoins today's snapshot; the archive dates are the UTC date of the archiving event (set by whichever of the asset's and the portfolio's events lands first, cleared on restore) and bound the days the history rebuild values |
+| `HistoryRebuildRequest` | `PortfolioId` (PK), `UserId, FromDate, Revision` | the one pending past-day rebuild of a portfolio (ADR-032): `FromDate` is the earliest affected date still to rewrite, `Revision` is bumped by every request; the rebuild deletes the row only at the revision it read |
 | `ValuationSnapshot` | `Id, UserId, PortfolioId, Date, TotalPln, IsStale` | breakdown is a `GROUP BY AssetClass` over `AssetValuation` lines, not a stored JSON blob; written by the daily sync, and for today also by every position event from the `Latest*` tables (ADR-025); `PortfolioArchived` zeroes today's snapshot, so an archived portfolio drops out of net worth while its earlier snapshots stay |
 | `AssetValuation` | `Id, UserId, PortfolioId, AssetId, Date, AssetClass, Quantity, PriceUsed?, PriceDate?, FxRateUsed?, ValuePln, IsStale`; unique `(AssetId, Date)` | the basis for P/L per asset, emergency fund and goal math, and TWR — nothing needs recomputing from scratch |
 | `LatestInstrumentPrice` | `InstrumentId` (PK), `QuoteCurrency, Date, Close` | last close seen in the daily batch — global reference data, no `UserId` (ADR-025) |
@@ -288,6 +289,8 @@ portfolio value = Σ assets ; net worth = Σ portfolios
 ```
 
 No price for a given day → use the last known one (weekends, holidays); mark `IsStale` when the price or rate used is more than 7 days old. Unchanged by the redesign — only *where* it runs moves, from Reporting querying Portfolio/MarketData live to Reporting valuing its own `Position` rows against a daily price/FX batch.
+
+**History (ADR-032).** A change to the past (a backdated, edited or deleted transaction, a Manual value change, an archive or restore) makes Reporting rewrite every day from the earliest affected date to yesterday for that portfolio. Per day `d`: the quantity is the last `QuantityHistory` point on or before `d`, the price and rate are the last series element on or before `d` (from MarketData's history batches), and the day goes through the same `ValuationAlgorithm`. A Market or Currency-valued position has a line from its first history date, a Manual one from `ManualValueDate` (its stored lines before that date are kept), and none from the day it or its portfolio is archived; a day with no line gets no snapshot, except an archived portfolio's days, which get a zero snapshot. Today is not rebuilt — it stays with the ADR-025 path.
 
 ## Invariants
 

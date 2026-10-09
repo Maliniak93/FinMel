@@ -16,6 +16,9 @@ public sealed class AssetPositionChangedConsumer(
     {
         var message = context.Message;
         var cancellationToken = context.CancellationToken;
+        var occurredOn = HistoryChange.UtcDate(message.OccurredAtUtc);
+
+        DateOnly? earliestAffected;
 
         // IgnoreQueryFilters: a consumer has no request user and writes for the user the event names.
         var position = await db.Positions
@@ -24,6 +27,7 @@ public sealed class AssetPositionChangedConsumer(
 
         if (position is null)
         {
+            earliestAffected = HistoryChange.EarliestAffectedDate(null, message);
             db.Positions.Add(new Position
             {
                 AssetId = message.AssetId,
@@ -41,6 +45,9 @@ public sealed class AssetPositionChangedConsumer(
                 IsArchived = message.IsArchived,
                 Version = message.Version,
                 UpdatedAt = DateTimeOffset.UtcNow,
+                QuantityHistory = ToHistory(message),
+                ArchivedOn = message.IsArchived ? occurredOn : null,
+                PortfolioArchivedOn = message.PortfolioIsArchived ? occurredOn : null,
             });
         }
         else if (message.Version < position.Version)
@@ -52,6 +59,7 @@ public sealed class AssetPositionChangedConsumer(
         }
         else
         {
+            earliestAffected = HistoryChange.EarliestAffectedDate(position, message);
             position.UserId = message.UserId;
             position.PortfolioId = message.PortfolioId;
             position.AssetClass = message.AssetClass;
@@ -66,6 +74,16 @@ public sealed class AssetPositionChangedConsumer(
             position.IsArchived = message.IsArchived;
             position.Version = message.Version;
             position.UpdatedAt = DateTimeOffset.UtcNow;
+            position.QuantityHistory = ToHistory(message);
+
+            // Whichever of this event and the portfolio's own event lands first stamps the portfolio date; the other leaves it.
+            position.ArchivedOn = message.IsArchived ? position.ArchivedOn ?? occurredOn : null;
+            position.PortfolioArchivedOn = message.PortfolioIsArchived ? position.PortfolioArchivedOn ?? occurredOn : null;
+        }
+
+        if (earliestAffected is { } from && from < snapshotWriter.Today)
+        {
+            await HistoryRebuildRequests.RequestAsync(db, context, message.PortfolioId, message.UserId, from, cancellationToken);
         }
 
         // Saved first so the revaluation reads this position, inside the same inbox transaction.
@@ -79,4 +97,7 @@ public sealed class AssetPositionChangedConsumer(
 
         await snapshotWriter.RevalueTodayAsync(message.PortfolioId, message.UserId, cancellationToken);
     }
+
+    private static List<PositionQuantityPoint> ToHistory(AssetPositionChanged message) =>
+        [.. message.QuantityHistory.Select(p => new PositionQuantityPoint { Date = p.Date, Quantity = p.Quantity })];
 }
