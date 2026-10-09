@@ -1,0 +1,139 @@
+name: skarbiec-local
+
+x-dotnet-service: &dotnet-service
+  pull_policy: never
+  environment: &dotnet-env
+    ASPNETCORE_ENVIRONMENT: Development
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://dashboard:18889
+  healthcheck:
+    test:
+      - CMD
+      - bash
+      - -c
+      - exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/ready HTTP/1.0\r\n\r\n' >&3 && head -n1 <&3 | grep -q ' 200'
+    interval: 5s
+    timeout: 5s
+    retries: 24
+    start_period: 20s
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: skarbiec-local-postgres
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4
+    environment:
+      RABBITMQ_DEFAULT_USER: skarbiec
+      RABBITMQ_DEFAULT_PASS: skarbiec-local-rabbitmq
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 15s
+
+  dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    environment:
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888"
+
+  identity:
+    <<: *dotnet-service
+    image: skarbiec-local/identity:latest
+    environment:
+      <<: *dotnet-env
+      OTEL_SERVICE_NAME: identity-service
+      ConnectionStrings__identity-db: Host=postgres;Port=5432;Database=identity_db;Username=identity_user;Password=skarbiec-local-identity
+      ConnectionStrings__rabbitmq: amqp://skarbiec:skarbiec-local-rabbitmq@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  marketdata:
+    <<: *dotnet-service
+    image: skarbiec-local/marketdata:latest
+    environment:
+      <<: *dotnet-env
+      OTEL_SERVICE_NAME: marketdata-service
+      ConnectionStrings__marketdata-db: Host=postgres;Port=5432;Database=marketdata_db;Username=marketdata_user;Password=skarbiec-local-marketdata
+      ConnectionStrings__rabbitmq: amqp://skarbiec:skarbiec-local-rabbitmq@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  portfolio:
+    <<: *dotnet-service
+    image: skarbiec-local/portfolio:latest
+    environment:
+      <<: *dotnet-env
+      OTEL_SERVICE_NAME: portfolio-service
+      ConnectionStrings__portfolio-db: Host=postgres;Port=5432;Database=portfolio_db;Username=portfolio_user;Password=skarbiec-local-portfolio
+      ConnectionStrings__rabbitmq: amqp://skarbiec:skarbiec-local-rabbitmq@rabbitmq:5672
+      services__marketdata-service__http__0: http://marketdata:8080
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      marketdata: { condition: service_healthy }
+
+  reporting:
+    <<: *dotnet-service
+    image: skarbiec-local/reporting:latest
+    environment:
+      <<: *dotnet-env
+      OTEL_SERVICE_NAME: reporting-service
+      ConnectionStrings__reporting-db: Host=postgres;Port=5432;Database=reporting_db;Username=reporting_user;Password=skarbiec-local-reporting
+      ConnectionStrings__rabbitmq: amqp://skarbiec:skarbiec-local-rabbitmq@rabbitmq:5672
+      services__marketdata-service__http__0: http://marketdata:8080
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      marketdata: { condition: service_healthy }
+
+  gateway:
+    <<: *dotnet-service
+    image: skarbiec-local/gateway:latest
+    environment:
+      <<: *dotnet-env
+      OTEL_SERVICE_NAME: gateway
+      ReverseProxy__Clusters__identity-cluster__Destinations__destination1__Address: http://identity:8080
+      ReverseProxy__Clusters__portfolio-cluster__Destinations__destination1__Address: http://portfolio:8080
+      ReverseProxy__Clusters__marketdata-cluster__Destinations__destination1__Address: http://marketdata:8080
+      ReverseProxy__Clusters__reporting-cluster__Destinations__destination1__Address: http://reporting:8080
+    depends_on:
+      identity: { condition: service_healthy }
+      portfolio: { condition: service_healthy }
+      marketdata: { condition: service_healthy }
+      reporting: { condition: service_healthy }
+
+  web:
+    image: skarbiec-local/web:latest
+    pull_policy: never
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      gateway: { condition: service_healthy }
+
+volumes:
+  postgres-data:
+  rabbitmq-data:

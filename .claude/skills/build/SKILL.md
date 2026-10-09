@@ -21,14 +21,16 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
 4. `"ok": true` → call the `Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`
    and wait. (`prepare` already moved the card to In progress; `resumed: true` means a previous run
    left its branch — say so in one line.)
-5. Run the returned `nextCommand` verbatim as ONE Bash call — for `ready` and `blocked` alike — and read its
-   last stdout line, `SHIP_RESULT: <json>`.
+5. Run the returned `nextCommand` verbatim as ONE Bash call with `timeout: 3600000` (a ship rebuilds six
+   compose images; the 2-min default cuts it off after the PR exists) — for `ready` and `blocked` alike — and
+   read its last stdout line, `SHIP_RESULT: <json>`.
 
-## Report (at most 10 lines)
+## Report (at most 11 lines)
 
 - `ready` and SHIP_RESULT `ok` → the `prUrl` (the merge is the user's), the issue `url`, `branch` and
   `commit`, tests (`tests`, or "none — skip-tests"), `filesTouched` count, `rounds`, each of
-  `minorFindings` as `file:line — claim` ("none" when empty).
+  `minorFindings` as `file:line — claim` ("none" when empty), and `images` (the rebuilt compose
+  image `revision` from `scripts/compose.mjs build`, or its `error`; a failed image build does not make the ship fail).
 - `ready` and SHIP_RESULT not `ok` → `failedCommand` and `error`, then the remaining steps to finish by
   hand (commit, push, `gh pr create --base master`); the change is verified and reviewed.
 - `blocked` → `stage`, then `reason`/`failures`/`findings` trimmed to one line each, then: fix the

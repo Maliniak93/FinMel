@@ -114,6 +114,24 @@ MarketData's Quartz job store is not part of its migrations: the scheduler provi
 step — needs `CREATE` on its database (to create schema `quartz`) and on that schema (tables, indexes).
 Locally `marketdata_user` owns `marketdata_db`, which covers both.
 
+## Local: docker compose
+
+The whole stack (Postgres, RabbitMQ, four services, Gateway, Angular app behind nginx, Aspire dashboard) also runs from locally built images, independent of the working tree and of `/build`. Aspire stays the development entry point; this is a side stack for trying a shipped build before its PR is merged.
+
+```bash
+node scripts/compose.mjs build [--ref <ref>]   # six skarbiec-local/* images from a git archive of <ref> (default HEAD)
+node scripts/compose.mjs up                    # docker compose up -d --wait on the built images
+node scripts/compose.mjs down                  # stop and remove the containers, keep the volumes
+node scripts/compose.mjs reset                 # down + remove the volumes (databases and queues gone)
+node scripts/compose.mjs status                # container states and whether each runs the newest image
+```
+
+- Images are built from a commit (`git archive`), never the working tree; each is labelled `org.opencontainers.image.revision=<sha>`. `ship.mjs` runs `build --ref <shipped sha>` after every successful ship; `build` never starts, stops or recreates a container, so a running stack keeps its old image until the next `up` (`status` flags it as outdated). The previous, now-dangling image is removed unless a container still uses it.
+- Ports: app `http://localhost:8080` (nginx: the Angular app, `/api/` proxied to the Gateway), Aspire dashboard `http://localhost:18888`, Postgres `localhost:55432`. RabbitMQ, the services and the Gateway publish no host port, so `/internal` stays unreachable (ADR-027).
+- Services run with `ASPNETCORE_ENVIRONMENT=Development`: startup migrations, the MarketData seed and the Quartz price sync run as under Aspire. Passwords are fixed local-only values (same rationale as above); the JWT key is the committed local-dev one.
+- Volumes `skarbiec-local_postgres-data` and `skarbiec-local_rabbitmq-data` are separate from Aspire's. There is no auto-start: after a reboot the stack stays down until `compose.mjs up`.
+- Requires Docker running. `stop-stack.mjs` only kills host processes, so it leaves this stack alone.
+
 ## Production: docker compose on a VPS (T0.18)
 
 Not built yet — see `skarbiec-plan/zadania/phase-0-platform.md` T0.18.
