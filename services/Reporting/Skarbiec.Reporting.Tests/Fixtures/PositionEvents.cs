@@ -28,6 +28,7 @@ internal static class PositionEvents
             Currency = "PLN",
             Quantity = amount,
             QuoteUnitsPerQuantity = 1m,
+            QuantityHistory = [],
             PortfolioIsArchived = portfolioIsArchived,
             IsArchived = false,
             Version = version,

@@ -2,6 +2,7 @@ using System.Text.Json;
 using MassTransit.EntityFrameworkCoreIntegration;
 using MassTransit.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
@@ -25,4 +26,7 @@ internal static class PortfolioOutboxAssertions
             return document.RootElement.GetProperty("message").Deserialize<T>(Options)!;
         }).ToList();
     }
+
+    public static IReadOnlyList<(DateOnly Date, decimal Quantity)> Points(this AssetPositionChanged evt) =>
+        [.. evt.QuantityHistory.Select(point => (point.Date, point.Quantity))];
 }

@@ -181,6 +181,68 @@ public sealed class TransactionQuantityCalculatorTests
         Assert.Equal(0m, reversed.Value);
     }
 
+    [Fact]
+    public void History_EndOfDayPointPerDate_LastEqualsRecompute()
+    {
+        var random = new Random(42);
+        var allTypes = Enum.GetValues<TransactionType>();
+        var checkedSequences = 0;
+
+        for (var run = 0; run < 200; run++)
+        {
+            var transactions = new List<Transaction>();
+            for (var step = 0; step < 20; step++)
+            {
+                var type = allTypes[random.Next(allTypes.Length)];
+                var quantity = random.Next(0, 20);
+                transactions.Add(NewTransaction(type, quantity, new DateOnly(2026, 1, 1).AddDays(random.Next(0, 10))));
+            }
+
+            var recompute = TransactionQuantityCalculator.Recompute(transactions);
+            if (recompute.IsFailure)
+            {
+                continue;
+            }
+
+            checkedSequences++;
+            var history = TransactionQuantityCalculator.History(transactions);
+
+            Assert.True(history.IsSuccess, history.IsFailure ? history.Error.Code : null);
+            Assert.Equal(
+                transactions.Select(t => t.Date).Distinct().Order().ToList(),
+                history.Value.Select(point => point.Date).ToList());
+            foreach (var point in history.Value)
+            {
+                var endOfDay = transactions.Where(t => t.Date <= point.Date).Sum(t => TransactionQuantityCalculator.QuantityDelta(t));
+                Assert.Equal(endOfDay, point.Quantity);
+            }
+
+            Assert.Equal(recompute.Value, history.Value[^1].Quantity);
+        }
+
+        Assert.True(checkedSequences > 0);
+    }
+
+    [Fact]
+    public void History_SameDayInflowAndOutflow_CollapsesToEndOfDayQuantity()
+    {
+        var day1 = new DateOnly(2026, 1, 1);
+        var day2 = day1.AddDays(1);
+        Transaction[] transactions =
+        [
+            NewTransaction(TransactionType.Buy, 4m, day1),
+            NewTransaction(TransactionType.Sell, 6m, day2),
+            NewTransaction(TransactionType.Buy, 5m, day2)
+        ];
+
+        var result = TransactionQuantityCalculator.History(transactions);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (day1, 4m), (day2, 3m) },
+            result.Value.Select(point => (point.Date, point.Quantity)));
+    }
+
     private static Transaction NewTransaction(TransactionType type, decimal quantity, DateOnly date, Guid? id = null) => new()
     {
         Id = id ?? Guid.NewGuid(),

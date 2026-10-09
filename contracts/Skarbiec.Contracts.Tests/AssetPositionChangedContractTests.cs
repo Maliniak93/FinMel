@@ -30,4 +30,18 @@ public sealed class AssetPositionChangedContractTests
         Assert.Equal(3L, evt.Version);
         Assert.Equal(new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero), evt.OccurredAtUtc);
     }
+
+    [Fact]
+    public void Deserialize_FixtureWithUnknownFields_KeepsEveryQuantityPoint()
+    {
+        var json = File.ReadAllText(Path.Combine("Fixtures", "asset-position-changed-with-extra-fields.json"));
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var evt = JsonSerializer.Deserialize<AssetPositionChanged>(json, options);
+
+        Assert.NotNull(evt);
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2025, 1, 10), 12.5m) },
+            evt.QuantityHistory.Select(point => (point.Date, point.Quantity)));
+    }
 }

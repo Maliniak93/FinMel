@@ -50,13 +50,15 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
 
     private protected SaveChangesCounter SaveChanges { get; } = new();
 
+    private protected TransactionReadCounter TransactionReads { get; } = new();
+
     protected ServiceProvider Provider { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
         Provider = HostlessOutboxProvider.Build<PortfolioDbContext>(containers, services =>
         {
-            services.ConfigureDbContext<PortfolioDbContext>(options => options.AddInterceptors(SaveChanges));
+            services.ConfigureDbContext<PortfolioDbContext>(options => options.AddInterceptors(SaveChanges, TransactionReads));
             services.AddSingleton<ICurrentUser>(new StubCurrentUser(UserId));
             services.AddSingleton<IInstrumentLookupClient>(new FakeInstrumentLookupClient());
             services.AddSingleton<IFxRateLookupClient>(new FakeFxRateLookupClient());
@@ -173,5 +175,34 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         Assert.True(buyResult.IsSuccess);
 
         return assetResult.Value.Id;
+    }
+
+    protected static async Task<(Guid AssetId, IReadOnlyList<Guid> TransactionIds)> AddStockWithTransactionsAsync(
+        IServiceProvider services,
+        Guid portfolioId,
+        string name,
+        IReadOnlyList<(TransactionType Type, decimal Quantity, DateOnly Date)> transactions,
+        CancellationToken cancellationToken)
+    {
+        var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
+            portfolioId,
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            cancellationToken);
+        Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
+
+        var recordHandler = services.GetRequiredService<RecordTransactionHandler>();
+        var transactionIds = new List<Guid>();
+        foreach (var (type, quantity, date) in transactions)
+        {
+            var recorded = await recordHandler.HandleAsync(
+                portfolioId,
+                assetResult.Value.Id,
+                new RecordTransactionRequest { Type = type, Quantity = quantity, UnitPrice = 10m, Date = date },
+                cancellationToken);
+            Assert.True(recorded.IsSuccess, recorded.IsFailure ? recorded.Error.Code : null);
+            transactionIds.Add(recorded.Value.Id);
+        }
+
+        return (assetResult.Value.Id, transactionIds);
     }
 }

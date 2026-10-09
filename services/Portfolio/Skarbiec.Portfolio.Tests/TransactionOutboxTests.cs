@@ -196,4 +196,130 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var afterEarliest = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
         Assert.Equal(new DateOnly(2025, 1, 10), afterEarliest[^1].FirstTransactionDate);
     }
+
+    [Fact]
+    public async Task Record_PublishesQuantityHistory()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
+            (assetId, _) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Shares",
+            [
+                (TransactionType.Buy, 10m, new DateOnly(2024, 3, 4)),
+                (TransactionType.Buy, 5m, new DateOnly(2024, 3, 4)),
+                (TransactionType.Sell, 3m, new DateOnly(2025, 1, 10))
+            ], cancellationToken);
+        }
+
+        await using (var record = Provider.CreateAsyncScope())
+        {
+            var sell = await record.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+                portfolioId, assetId,
+                new RecordTransactionRequest { Type = TransactionType.Sell, Quantity = 2m, UnitPrice = 10m, Date = new DateOnly(2024, 6, 1) },
+                cancellationToken);
+            Assert.True(sell.IsSuccess, sell.IsFailure ? sell.Error.Code : null);
+        }
+
+        await using var verify = Provider.CreateAsyncScope();
+        var events = await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        var last = events[^1];
+        Assert.Equal(10m, last.Quantity);
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2024, 6, 1), 13m), (new DateOnly(2025, 1, 10), 10m) },
+            last.Points());
+        Assert.Equal(last.FirstTransactionDate, last.Points()[0].Date);
+    }
+
+    [Fact]
+    public async Task UpdateDate_RewritesQuantityHistory()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        IReadOnlyList<Guid> transactionIds;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
+            (assetId, transactionIds) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Shares",
+            [
+                (TransactionType.Buy, 10m, new DateOnly(2024, 3, 4)),
+                (TransactionType.Buy, 5m, new DateOnly(2024, 3, 4)),
+                (TransactionType.Sell, 3m, new DateOnly(2025, 1, 10)),
+                (TransactionType.Sell, 2m, new DateOnly(2024, 6, 1))
+            ], cancellationToken);
+        }
+
+        await using (var move = Provider.CreateAsyncScope())
+        {
+            var updateResult = await move.ServiceProvider.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
+                portfolioId, assetId, transactionIds[3],
+                new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 2m, UnitPrice = 10m, Date = new DateOnly(2025, 2, 1) },
+                cancellationToken);
+            Assert.True(updateResult.IsSuccess, updateResult.IsFailure ? updateResult.Error.Code : null);
+        }
+
+        await using var verify = Provider.CreateAsyncScope();
+        var events = await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        var moved = events[^1];
+        Assert.Equal(10m, moved.Quantity);
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2025, 1, 10), 12m), (new DateOnly(2025, 2, 1), 10m) },
+            moved.Points());
+    }
+
+    [Fact]
+    public async Task Delete_RewritesQuantityHistory()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        IReadOnlyList<Guid> transactionIds;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
+            (assetId, transactionIds) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Shares",
+            [
+                (TransactionType.Buy, 10m, new DateOnly(2024, 3, 4)),
+                (TransactionType.Buy, 5m, new DateOnly(2024, 3, 4)),
+                (TransactionType.Sell, 3m, new DateOnly(2025, 1, 10)),
+                (TransactionType.Sell, 2m, new DateOnly(2024, 6, 1))
+            ], cancellationToken);
+        }
+
+        await using (var move = Provider.CreateAsyncScope())
+        {
+            var updateResult = await move.ServiceProvider.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
+                portfolioId, assetId, transactionIds[3],
+                new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 2m, UnitPrice = 10m, Date = new DateOnly(2025, 2, 1) },
+                cancellationToken);
+            Assert.True(updateResult.IsSuccess, updateResult.IsFailure ? updateResult.Error.Code : null);
+        }
+
+        await using (var delete = Provider.CreateAsyncScope())
+        {
+            var deleteResult = await delete.ServiceProvider.GetRequiredService<DeleteTransactionHandler>()
+                .HandleAsync(portfolioId, assetId, transactionIds[3], cancellationToken);
+            Assert.True(deleteResult.IsSuccess, deleteResult.IsFailure ? deleteResult.Error.Code : null);
+        }
+
+        await using var verify = Provider.CreateAsyncScope();
+        var events = await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        var deleted = events[^1];
+        Assert.Equal(12m, deleted.Quantity);
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2025, 1, 10), 12m) },
+            deleted.Points());
+    }
 }

@@ -37,6 +37,9 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
    updating the `*-with-extra-fields.json` fixture in the same change. A nullable, non-`required`
    member (e.g. `AssetPositionChanged.FirstTransactionDate`, the asset's earliest transaction date)
    needs no fixture change — a payload without it deserializes it as `null`.
+   `AssetPositionChanged.QuantityHistory` (`QuantityPoint { Date, Quantity }`) is `required`: the
+   end-of-day quantity on each distinct transaction date, ascending, empty without transactions,
+   its last point equal to `Quantity`.
 
 When ADR-019 is revoked (real data in production), the classic discipline comes back: additive
 only, never rename or remove, breaking change → a new `V2` record published alongside the old one.
