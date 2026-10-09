@@ -1,0 +1,7 @@
+{
+  "instrumentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "from": "2025-03-01",
+  "to": "2025-12-31",
+  "occurredAtUtc": "2026-01-15T10:00:00+00:00",
+  "schemaHint": "this field does not exist yet and must not break deserialization"
+}

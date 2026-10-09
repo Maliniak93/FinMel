@@ -7,7 +7,7 @@ public static class QuoteUpsert
 {
     // Returns the instrument ids that received a quote, so callers can tell which were synced.
     public static async Task<HashSet<Guid>> UpsertInstrumentQuotesAsync(
-        MarketDataDbContext db, IReadOnlyList<InstrumentQuote> quotes, CancellationToken cancellationToken)
+        MarketDataDbContext db, IReadOnlyList<InstrumentQuote> quotes, CancellationToken cancellationToken, bool save = true)
     {
         if (quotes.Count == 0)
         {
@@ -38,7 +38,11 @@ public static class QuoteUpsert
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        if (save)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         return instrumentIds;
     }
 

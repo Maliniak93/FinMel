@@ -21,7 +21,9 @@ internal static class MarketDataApi
 
     // Service-only endpoints: anonymous and outside /api/, so the Gateway has no route to them.
     public const string InternalLatestPricesBatchUri = "/internal/prices/latest-batch";
+    public const string InternalPricesHistoryBatchUri = "/internal/prices/history-batch";
     public const string InternalFxRatesBatchUri = "/internal/fx/latest-batch";
+    public const string InternalFxRatesHistoryBatchUri = "/internal/fx/history-batch";
     public const string InternalInstrumentsBatchUri = "/internal/instruments/batch";
 
     public const string InternalBondSeriesRatesBatchUri = "/internal/bond-series/rates-batch";
