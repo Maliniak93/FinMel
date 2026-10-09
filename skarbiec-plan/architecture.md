@@ -216,7 +216,7 @@ OpenTelemetry in every service (traces, logs, metrics), W3C `traceparent` propag
 
 ## Deployment status
 
-VPS deployment (docker compose) is deferred — `deploy/README.md` documents local Aspire only; the compose/VPS half of `deploy/` doesn't exist yet. Development and CI both run local-only.
+A local docker compose stack exists (`deploy/compose/compose.yaml`, driven by `scripts/compose.mjs`, images rebuilt from the shipped commit by `ship.mjs`) — see `deploy/README.md` "Local: docker compose". VPS deployment is deferred: no registry, no remote host, no Production environment yet. Development and CI both run local-only.
 
 ## What we deliberately do not do
 

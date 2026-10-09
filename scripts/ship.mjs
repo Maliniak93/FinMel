@@ -2,6 +2,7 @@
 // Usage: node scripts/ship.mjs <issue> --branch <b> --title <t> --json '<run report>' [--blocked] [--dry-run]
 //   --blocked   only post the report, no git; --dry-run prints the commands and runs the read-only guards only
 //   a shipping run first needs the tree proven green: node scripts/verify.mjs --all --cache-check
+//   after a successful ship it rebuilds the local compose images from the shipped commit (result.images; never fails the ship)
 //   last stdout line: SHIP_RESULT: {...}; exit 0 ok, 2 failed
 
 import { spawnSync } from "node:child_process";
@@ -60,6 +61,24 @@ function checkVerified() {
   };
 }
 
+function buildImages(ref) {
+  const res = spawnSync(process.execPath, ["scripts/compose.mjs", "build", "--ref", ref], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const line = (res.stdout ?? "").split(/\r?\n/).reverse().find((l) => l.startsWith("COMPOSE_RESULT: "));
+  try {
+    const parsed = JSON.parse(line.slice("COMPOSE_RESULT: ".length));
+    return parsed.ok ? { ok: true, revision: parsed.revision } : { ok: false, error: parsed.error };
+  } catch {
+    const firstErr = (res.stderr ?? "").trim().split(/\r?\n/).find(Boolean);
+    return { ok: false, error: res.error?.message ?? (firstErr || "compose.mjs build gave no result") };
+  }
+}
+
 function postReport(report) {
   const res = run(process.execPath, ["scripts/gh-project.mjs", "report", issue, "--json", JSON.stringify(report)]);
   return res.ok ? { ok: true } : { ok: false, error: res.firstErr };
@@ -103,6 +122,7 @@ try {
       if (!verified.ok) failed = { command: VERIFY_COMMAND, error: verified.error };
     }
     for (const s of steps) console.log(`would run: ${s.cmd} ${s.argv.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ")}`);
+    console.log("would run: node scripts/compose.mjs build --ref <sha>");
     console.log(`would post: gh-project.mjs report ${issue} --json ${JSON.stringify({ ...report, status: "shipped" })}`);
     result = { ok: !failed, dryRun: true, branch, ...(failed ? { failedCommand: failed.command, error: failed.error } : {}) };
     exitCode = failed ? 2 : 0;
@@ -144,6 +164,7 @@ try {
     }
   }
   const sha = run("git", ["rev-parse", "--short", "HEAD"]);
+  const fullSha = run("git", ["rev-parse", "HEAD"]);
 
   const posted = failed
     ? postReport({ deviations: report.deviations, status: "blocked", stage: "ship", reason: `${failed.command}: ${failed.error}` })
@@ -157,6 +178,10 @@ try {
     ...(failed ? { failedCommand: failed.command, error: failed.error } : posted.ok ? {} : { failedCommand: "gh-project.mjs report", error: posted.error }),
   };
   exitCode = result.ok ? 0 : 2;
+
+  if (!failed && posted.ok) {
+    result.images = fullSha.ok ? buildImages(fullSha.out) : { ok: false, error: "git rev-parse HEAD failed" };
+  }
 } catch (err) {
   result = { ...result, ok: false, error: err.message };
   exitCode = 2;

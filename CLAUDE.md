@@ -22,6 +22,7 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | The uncommitted change incl. untracked files, index untouched | `node scripts/review-diff.mjs [--stat] [-- <path>]` |
 | The Ship step: guard lane, commit, push, PR, run report | `node scripts/ship.mjs <n> --branch b --title t --json '…' [--blocked] [--dry-run]` |
 | Delete local branches whose PR is merged (dry run unless `--apply`) | `node scripts/prune-branches.mjs [--apply]` |
+| Local docker compose stack (built from a commit, rebuilt on ship; started/stopped only by the user) | `node scripts/compose.mjs build|up|down|reset|status` |
 | Frontend dev server | `cd web && npm start` |
 | Frontend unit tests (Vitest) | `cd web && npm test` |
 | Regenerate the TS client after an API change — reads the build-time OpenAPI files once spec-00 lands, until then needs the stack running | `cd web && npm run gen:api` |

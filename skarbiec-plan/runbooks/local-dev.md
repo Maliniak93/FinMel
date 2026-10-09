@@ -40,6 +40,8 @@ Starts one PostgreSQL container (a database + a scoped role per service — `ide
 
 Both Postgres and RabbitMQ use named Docker volumes (`.WithDataVolume()`), so stopping and restarting the AppHost keeps existing local data.
 
+To try a shipped build without the working tree, the container stack runs from locally built images: `node scripts/compose.mjs build`, then `up` — see `deploy/README.md` "Local: docker compose". `stop-stack.mjs` and `/build` never touch it.
+
 ## Frontend dev server
 
 ```bash
