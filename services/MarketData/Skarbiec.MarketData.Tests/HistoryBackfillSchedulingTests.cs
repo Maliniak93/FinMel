@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Json;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -64,6 +65,7 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
         builder.Configuration["ConnectionStrings:marketdata-db"] = _containers.PostgresConnectionString;
         builder.Services.AddDbContext<MarketDataDbContext>(o => o.UseNpgsql(_containers.PostgresConnectionString));
         builder.Services.AddSingleton<IPriceSource>(priceSource);
+        builder.Services.AddMassTransit(x => x.UsingInMemory());
         builder.Services.AddMarketDataScheduler(_containers.PostgresConnectionString);
         builder.AddHistoryBackfillJob();
 

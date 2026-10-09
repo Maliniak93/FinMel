@@ -91,6 +91,26 @@ Content-Type: application/json
   "asOfDate": "2026-08-18"
 }
 
+### Prices history batch (Reporting's net worth rebuild) — every quote in From..To plus the last one before From; an instrument without a quote on or before To is absent
+POST {{marketDataUrl}}/internal/prices/history-batch
+Content-Type: application/json
+
+{
+  "instrumentIds": ["{{addCustomInstrument.response.body.id}}"],
+  "from": "2026-01-05",
+  "to": "2026-08-18"
+}
+
+### FX rates history batch — same range rule per pair
+POST {{marketDataUrl}}/internal/fx/history-batch
+Content-Type: application/json
+
+{
+  "pairs": ["USDPLN", "EURPLN"],
+  "from": "2026-01-05",
+  "to": "2026-08-18"
+}
+
 ### Bond series rates batch (Portfolio's value-today estimate) — zero-based periodIndex; unknown codes are skipped
 POST {{marketDataUrl}}/internal/bond-series/rates-batch
 Content-Type: application/json

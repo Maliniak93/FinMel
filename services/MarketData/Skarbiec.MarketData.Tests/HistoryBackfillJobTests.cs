@@ -1,4 +1,6 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
@@ -7,11 +9,15 @@ using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing.Containers;
+using Skarbiec.Testing.Messaging;
 
 namespace Skarbiec.MarketData.Tests;
 
 public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
+    // An explicit field: the primary constructor parameter also goes to the base constructor, so using it in a fact would trigger CS9107.
+    private readonly SkarbiecContainersFixture _containers = containers;
+
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
     private static readonly DateOnly OneYearAgo = Today.AddDays(-365);
 
@@ -20,7 +26,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     public async Task RunAsync_UsdInstrument_BackfillsOneYearOfQuotes_AndWritesNoFxRates()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         db.Instruments.Add(instrument);
@@ -29,7 +38,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var quotes = OneYearOfDates().Select(d => new InstrumentQuote(instrument.Id, d, 100m)).ToList();
         var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
-        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, OneYearAgo, cancellationToken);
 
         var storedQuotes = await db.PriceQuotes.Where(q => q.InstrumentId == instrument.Id).ToListAsync(cancellationToken);
@@ -43,7 +52,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     public async Task RunAsync_WritesSyncRunWithKindBackfill()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
         db.Instruments.Add(instrument);
@@ -52,7 +64,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var quotes = OneYearOfDates().Select(d => new InstrumentQuote(instrument.Id, d, 350m)).ToList();
         var source = new ScriptedPriceSource(PriceSource.GoldApi, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
-        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, OneYearAgo, cancellationToken);
 
         var run = await db.SyncRuns.SingleAsync(cancellationToken);
@@ -63,7 +75,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     public async Task RunAsync_NewlyUsedMetal_BackfillsTodaysQuote()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("XAG", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
         db.Instruments.Add(instrument);
@@ -72,7 +87,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var client = new FakeGoldApiClient().WithPricePerOunce("XAG", 62.2m, DateTimeOffset.UtcNow);
         var source = new GoldApiPriceSource(client, NullLogger<GoldApiPriceSource>.Instance);
 
-        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, OneYearAgo, cancellationToken);
 
         var quote = await db.PriceQuotes.SingleAsync(q => q.InstrumentId == instrument.Id, cancellationToken);
@@ -84,7 +99,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     public async Task RunAsync_CalledTwice_UpsertsInsteadOfDuplicating()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         db.Instruments.Add(instrument);
@@ -94,7 +112,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
 
         var firstQuotes = dates.Select(d => new InstrumentQuote(instrument.Id, d, 100m)).ToList();
         var firstSource = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(firstQuotes));
-        var firstJob = new HistoryBackfillJob(db, [firstSource], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var firstJob = new HistoryBackfillJob(db, [firstSource], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await firstJob.RunAsync(instrument.Id, OneYearAgo, cancellationToken);
 
         // As if two enqueues for the same window raced, so the second run still fetches the stretch the first one stored.
@@ -103,7 +121,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
 
         var secondQuotes = dates.Select(d => new InstrumentQuote(instrument.Id, d, 105m)).ToList();
         var secondSource = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(secondQuotes));
-        var secondJob = new HistoryBackfillJob(db, [secondSource], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var secondJob = new HistoryBackfillJob(db, [secondSource], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await secondJob.RunAsync(instrument.Id, OneYearAgo, cancellationToken);
 
         Assert.Equal(dates.Count, await db.PriceQuotes.CountAsync(q => q.InstrumentId == instrument.Id, cancellationToken));
@@ -117,7 +135,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     public async Task ExtendsWindowBackwards()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         instrument.HistoryCoveredFrom = new DateOnly(2024, 1, 1);
@@ -129,7 +150,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
             .Select(d => new InstrumentQuote(instrument.Id, d, 100m)).ToList();
         var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
-        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, from, cancellationToken);
 
         Assert.Equal([(from, new DateOnly(2023, 12, 31))], source.HistoryWindows);
@@ -143,7 +164,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     public async Task Error_KeepsCoveredFrom()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         instrument.HistoryCoveredFrom = new DateOnly(2024, 1, 1);
@@ -152,7 +176,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
 
         var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Error("transient failure"));
 
-        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, new DateOnly(2023, 6, 1), cancellationToken);
 
         var stored = await db.Instruments.AsNoTracking().SingleAsync(i => i.Id == instrument.Id, cancellationToken);
@@ -163,7 +187,10 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     public async Task ClampedSource_RecordsRequestedFrom()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         var instrument = NewInstrument("bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto);
         db.Instruments.Add(instrument);
@@ -174,7 +201,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
             PriceSource.CoinGecko, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes), maxHistoryDays: 365);
 
         var twoYearsAgo = Today.AddDays(-730);
-        var job = new HistoryBackfillJob(db, [source], TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, twoYearsAgo, cancellationToken);
 
         var window = Assert.Single(source.HistoryWindows);

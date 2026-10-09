@@ -1,16 +1,18 @@
 using System.Diagnostics;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using Quartz;
+using Skarbiec.Contracts.Events;
 using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
 
-// Writes a SyncRun but publishes nothing: one instrument's history gives Reporting nothing new to recompute.
 [DisallowConcurrentExecution]
 public sealed class HistoryBackfillJob(
     MarketDataDbContext db,
     IEnumerable<IPriceSource> priceSources,
+    IPublishEndpoint publishEndpoint,
     TimeProvider timeProvider,
     ILogger<HistoryBackfillJob> logger) : IJob
 {
@@ -85,24 +87,29 @@ public sealed class HistoryBackfillJob(
             : await BackfillInstrumentAsync(source, instrument, fetchFrom, to, cancellationToken);
 
         // The requested date, not the clamped one: a source that cannot reach it must not be re-enqueued forever.
-        if (outcome != PriceFetchOutcome.Error)
+        // Quotes, coverage, verification, the event and the SyncRun all commit in the FinishAsync save below.
+        var tracked = await db.Instruments.SingleAsync(i => i.Id == instrumentId, cancellationToken);
+        if (outcome != PriceFetchOutcome.Error && (tracked.HistoryCoveredFrom is null || tracked.HistoryCoveredFrom > from))
         {
-            await db.Instruments
-                .Where(i => i.Id == instrumentId && (i.HistoryCoveredFrom == null || i.HistoryCoveredFrom > from))
-                .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.HistoryCoveredFrom, from), cancellationToken);
+            tracked.HistoryCoveredFrom = from;
         }
 
         // Only a custom instrument is ever Unverified here; this run resolves it from its own fetch outcome.
-        if (instrument.VerificationStatus == InstrumentVerificationStatus.Unverified)
+        if (tracked.VerificationStatus == InstrumentVerificationStatus.Unverified)
         {
             var verified = outcome == PriceFetchOutcome.Success && quoteCount > 0;
-            await db.Instruments
-                .Where(i => i.Id == instrumentId)
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(
-                        i => i.VerificationStatus,
-                        verified ? InstrumentVerificationStatus.Verified : InstrumentVerificationStatus.Failed),
-                    cancellationToken);
+            tracked.VerificationStatus = verified ? InstrumentVerificationStatus.Verified : InstrumentVerificationStatus.Failed;
+        }
+
+        if (outcome == PriceFetchOutcome.Success)
+        {
+            await publishEndpoint.Publish(new InstrumentHistoryBackfilled
+            {
+                InstrumentId = instrumentId,
+                From = fetchFrom,
+                To = to,
+                OccurredAtUtc = timeProvider.GetUtcNow(),
+            }, cancellationToken);
         }
 
         await FinishAsync(
@@ -145,7 +152,7 @@ public sealed class HistoryBackfillJob(
             return (result.Outcome, 0);
         }
 
-        await QuoteUpsert.UpsertInstrumentQuotesAsync(db, result.Values, cancellationToken);
+        await QuoteUpsert.UpsertInstrumentQuotesAsync(db, result.Values, cancellationToken, save: false);
         return (result.Outcome, result.Values.Count);
     }
 }

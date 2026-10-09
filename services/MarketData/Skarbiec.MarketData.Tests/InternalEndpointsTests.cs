@@ -83,6 +83,37 @@ public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers)
     }
 
     [Fact]
+    public async Task HistoryBatches_AreAnonymousAndAbsentFromOpenApi()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var from = new DateOnly(2026, 1, 5);
+        var to = new DateOnly(2026, 1, 10);
+        using var client = Factory.CreateClient();
+
+        var pricesBatch = await client.PostAsJsonAsync(
+            InternalPricesHistoryBatchUri,
+            new { InstrumentIds = new[] { Guid.NewGuid() }, From = from, To = to },
+            cancellationToken);
+        var fxBatch = await client.PostAsJsonAsync(
+            InternalFxRatesHistoryBatchUri,
+            new { Pairs = new[] { "USDPLN" }, From = from, To = to },
+            cancellationToken);
+        var openApi = await client.GetAsync(OpenApiDocumentUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, pricesBatch.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, fxBatch.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, openApi.StatusCode);
+        using var document = await JsonDocument.ParseAsync(await openApi.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        var paths = document.RootElement.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
+
+        // Guards against a vacuous pass on an empty document.
+        Assert.Contains(SearchInstrumentsBaseUri, paths);
+        Assert.Multiple(
+            () => Assert.DoesNotContain(InternalPricesHistoryBatchUri, paths),
+            () => Assert.DoesNotContain(InternalFxRatesHistoryBatchUri, paths));
+    }
+
+    [Fact]
     public async Task OpenApiDocument_ContainsNoInternalPaths()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
