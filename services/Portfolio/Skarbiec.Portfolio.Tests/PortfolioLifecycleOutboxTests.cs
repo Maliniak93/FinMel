@@ -398,4 +398,56 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         Assert.Equal(new DateOnly(2023, 5, 2), fanOut[second.Value.Id].FirstTransactionDate);
         Assert.Null(fanOut[third.Value.Id].FirstTransactionDate);
     }
+
+    [Fact]
+    public async Task Archive_FanOut_CarriesQuantityHistories()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid firstId;
+        Guid secondId;
+        Guid thirdId;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
+            (firstId, _) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Stock 1",
+            [
+                (TransactionType.Buy, 10m, new DateOnly(2024, 3, 4)),
+                (TransactionType.Sell, 4m, new DateOnly(2025, 1, 10))
+            ], cancellationToken);
+            (secondId, _) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Stock 2",
+            [
+                (TransactionType.Buy, 5m, new DateOnly(2023, 5, 2)),
+                (TransactionType.Buy, 2m, new DateOnly(2023, 5, 2))
+            ], cancellationToken);
+            (thirdId, _) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Stock 3", [], cancellationToken);
+        }
+
+        TransactionReads.Reset();
+
+        await using (var archiveScope = Provider.CreateAsyncScope())
+        {
+            var archiveResult = await archiveScope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
+                .HandleAsync(portfolioId, cancellationToken);
+            Assert.True(archiveResult.IsSuccess, archiveResult.IsFailure ? archiveResult.Error.Code : null);
+        }
+
+        Assert.Equal(1, TransactionReads.Count);
+
+        await using var verify = Provider.CreateAsyncScope();
+        var fanOut = (await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Where(e => e.PortfolioIsArchived)
+            .ToDictionary(e => e.AssetId);
+        Assert.Equal(3, fanOut.Count);
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 10m), (new DateOnly(2025, 1, 10), 6m) },
+            fanOut[firstId].Points());
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2023, 5, 2), 7m) },
+            fanOut[secondId].Points());
+        Assert.Empty(fanOut[thirdId].Points());
+    }
 }

@@ -516,4 +516,19 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var evt = Assert.Single(await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
         Assert.Null(evt.FirstTransactionDate);
     }
+
+    [Fact]
+    public async Task Add_NoTransactions_EmptyQuantityHistory()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = Provider.CreateAsyncScope();
+        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
+        await AddManualStockAsync(scope.ServiceProvider, portfolioId, "Shares", cancellationToken);
+
+        var evt = Assert.Single(await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        Assert.Empty(evt.QuantityHistory);
+    }
 }

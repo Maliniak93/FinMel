@@ -9,6 +9,7 @@ using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.ArchivePortfolio;
 using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
+using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
 using Skarbiec.Portfolio.Features.Deposits.RollOverDeposit;
 using Skarbiec.Portfolio.Features.Deposits.SettleDeposit;
 using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
@@ -360,5 +361,61 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(10_119.83m, terms.Principal);
         Assert.Equal(new DateOnly(2026, 4, 15), terms.StartDate);
         Assert.Null(terms.SettledOn);
+    }
+
+    [Fact]
+    public async Task SettleAndPayOut_PublishQuantityHistory()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        Guid portfolioId;
+        Guid assetId;
+        Guid cashId;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
+                .HandleAsync(new CreatePortfolioRequest { Name = "Deposit outbox portfolio" }, cancellationToken)).Value.Id;
+            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
+                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(startDate: new DateOnly(2026, 1, 1)), cancellationToken);
+            Assert.True(added.IsSuccess);
+            assetId = added.Value.AssetId;
+
+            var cash = await arrange.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
+                portfolioId,
+                new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
+                cancellationToken);
+            Assert.True(cash.IsSuccess);
+            cashId = cash.Value.Id;
+        }
+
+        await using (var settle = Provider.CreateAsyncScope())
+        {
+            var settled = await settle.ServiceProvider.GetRequiredService<SettleDepositHandler>()
+                .HandleAsync(portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
+            Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
+        }
+
+        await using (var payOut = Provider.CreateAsyncScope())
+        {
+            var paidOut = await payOut.ServiceProvider.GetRequiredService<PayOutDepositHandler>()
+                .HandleAsync(portfolioId, assetId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
+            Assert.True(paidOut.IsSuccess, paidOut.IsFailure ? paidOut.Error.Code : null);
+        }
+
+        await using var verify = Provider.CreateAsyncScope();
+        var events = (await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Where(e => e.AssetId == assetId)
+            .ToList();
+        Assert.Equal(3, events.Count);
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2026, 1, 1), 10_000m) },
+            events[0].Points());
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2026, 1, 1), 10_000m), (new DateOnly(2026, 4, 15), 10_119.83m) },
+            events[1].Points());
+        Assert.Equal(
+            new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2026, 1, 1), 10_000m), (new DateOnly(2026, 4, 15), 10_119.83m), (new DateOnly(2026, 4, 18), 0m) },
+            events[2].Points());
     }
 }

@@ -44,6 +44,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Currency = "USD",
                 Quantity = 12m,
                 QuoteUnitsPerQuantity = 1m,
+                QuantityHistory = [],
                 ManualValueAmount = null,
                 ManualValueDate = null,
                 PortfolioIsArchived = false,
@@ -285,6 +286,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Currency = "PLN",
                 Quantity = 10m,
                 QuoteUnitsPerQuantity = 1m,
+                QuantityHistory = [],
                 PortfolioIsArchived = false,
                 IsArchived = false,
                 Version = 0,
@@ -458,6 +460,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         decimal quoteUnitsPerQuantity = 1m) => new()
         {
             QuoteUnitsPerQuantity = quoteUnitsPerQuantity,
+            QuantityHistory = [],
             IsArchived = isArchived,
             AssetId = assetId,
             PortfolioId = portfolioId,

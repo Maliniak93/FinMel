@@ -12,8 +12,8 @@ public sealed class PositionEventPublisher(
 {
     public async Task PublishCreatedAsync(Asset asset, PortfolioEntity portfolio, CancellationToken cancellationToken)
     {
-        var firstDates = await FirstTransactionDatesAsync([asset.Id], cancellationToken);
-        await PublishAsync(asset, portfolio.IsArchived, firstDates.GetValueOrDefault(asset.Id), cancellationToken);
+        var transactions = await LoadTransactionsAsync([asset.Id], cancellationToken);
+        await PublishAsync(asset, portfolio.IsArchived, HistoryOf(transactions, asset.Id), cancellationToken);
     }
 
     public async Task PublishChangedAsync(Asset asset, CancellationToken cancellationToken)
@@ -24,10 +24,10 @@ public sealed class PositionEventPublisher(
             .Select(p => p.IsArchived)
             .FirstAsync(cancellationToken);
 
-        var firstDates = await FirstTransactionDatesAsync([asset.Id], cancellationToken);
+        var transactions = await LoadTransactionsAsync([asset.Id], cancellationToken);
 
         asset.Version++;
-        await PublishAsync(asset, portfolioIsArchived, firstDates.GetValueOrDefault(asset.Id), cancellationToken);
+        await PublishAsync(asset, portfolioIsArchived, HistoryOf(transactions, asset.Id), cancellationToken);
     }
 
     public async Task PublishForEveryAssetAsync(PortfolioEntity portfolio, CancellationToken cancellationToken)
@@ -36,17 +36,17 @@ public sealed class PositionEventPublisher(
             .Where(a => a.PortfolioId == portfolio.Id)
             .ToListAsync(cancellationToken);
 
-        var firstDates = await FirstTransactionDatesAsync([.. assets.Select(a => a.Id)], cancellationToken);
+        var transactions = await LoadTransactionsAsync([.. assets.Select(a => a.Id)], cancellationToken);
 
         foreach (var asset in assets)
         {
             asset.Version++;
-            await PublishAsync(asset, portfolio.IsArchived, firstDates.GetValueOrDefault(asset.Id), cancellationToken);
+            await PublishAsync(asset, portfolio.IsArchived, HistoryOf(transactions, asset.Id), cancellationToken);
         }
     }
 
     // Tracked rows win over stored ones: the event is published before the save that writes them.
-    private async Task<Dictionary<Guid, DateOnly?>> FirstTransactionDatesAsync(
+    private async Task<Dictionary<Guid, List<Transaction>>> LoadTransactionsAsync(
         IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken)
     {
         var tracked = dbContext.ChangeTracker.Entries<Transaction>()
@@ -54,27 +54,32 @@ public sealed class PositionEventPublisher(
             .ToList();
         var trackedIds = tracked.Select(e => e.Entity.Id).ToList();
 
-        var firstDates = await dbContext.Transactions
+        var stored = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => assetIds.Contains(t.AssetId) && !trackedIds.Contains(t.Id))
-            .GroupBy(t => t.AssetId)
-            .Select(g => new { AssetId = g.Key, First = g.Min(t => t.Date) })
-            .ToDictionaryAsync(x => x.AssetId, x => (DateOnly?)x.First, cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        foreach (var entry in tracked.Where(e => e.State != EntityState.Deleted))
+        return stored
+            .Concat(tracked.Where(e => e.State != EntityState.Deleted).Select(e => e.Entity))
+            .GroupBy(t => t.AssetId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private static IReadOnlyList<QuantityPoint> HistoryOf(Dictionary<Guid, List<Transaction>> transactions, Guid assetId)
+    {
+        if (!transactions.TryGetValue(assetId, out var list))
         {
-            var date = entry.Entity.Date;
-            if (!firstDates.TryGetValue(entry.Entity.AssetId, out var first) || first is null || date < first)
-            {
-                firstDates[entry.Entity.AssetId] = date;
-            }
+            return [];
         }
 
-        return firstDates;
+        var history = TransactionQuantityCalculator.History(list);
+        return history.IsSuccess
+            ? history.Value
+            : throw new InvalidOperationException($"Asset {assetId} has an invalid transaction history: {history.Error.Code}.");
     }
 
     private async Task PublishAsync(
-        Asset asset, bool portfolioIsArchived, DateOnly? firstTransactionDate, CancellationToken cancellationToken)
+        Asset asset, bool portfolioIsArchived, IReadOnlyList<QuantityPoint> quantityHistory, CancellationToken cancellationToken)
         // The interceptor stamps Asset.UserId only during SaveChangesAsync, which has not run yet.
         => await publishEndpoint.Publish(new AssetPositionChanged
         {
@@ -89,7 +94,8 @@ public sealed class PositionEventPublisher(
             QuoteUnitsPerQuantity = await QuoteUnitsPerQuantityAsync(asset, cancellationToken),
             ManualValueAmount = asset.ManualValueAmount,
             ManualValueDate = asset.ManualValueDate,
-            FirstTransactionDate = firstTransactionDate,
+            FirstTransactionDate = quantityHistory.Count == 0 ? null : quantityHistory[0].Date,
+            QuantityHistory = quantityHistory,
             PortfolioIsArchived = portfolioIsArchived,
             // The asset's own flag; the portfolio fan-out never changes it.
             IsArchived = asset.IsArchived,
