@@ -15,6 +15,7 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
     public DbSet<ValuationSnapshot> ValuationSnapshots => Set<ValuationSnapshot>();
     public DbSet<LatestInstrumentPrice> LatestInstrumentPrices => Set<LatestInstrumentPrice>();
     public DbSet<LatestFxRate> LatestFxRates => Set<LatestFxRate>();
+    public DbSet<HistoryRebuildRequest> HistoryRebuildRequests => Set<HistoryRebuildRequest>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -36,6 +37,14 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
 
             // No FK, but the archive, restore and delete consumers and the valuation grouping filter on it.
             position.HasIndex(p => p.PortfolioId);
+
+            position.ComplexCollection(p => p.QuantityHistory, history => history.ToJson());
+        });
+
+        modelBuilder.Entity<HistoryRebuildRequest>(request =>
+        {
+            request.HasKey(r => r.PortfolioId);
+            request.Property(r => r.PortfolioId).ValueGeneratedNever();
         });
 
         modelBuilder.Entity<AssetValuation>(line =>

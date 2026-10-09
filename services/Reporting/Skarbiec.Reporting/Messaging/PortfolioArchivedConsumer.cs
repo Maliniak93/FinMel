@@ -15,9 +15,16 @@ public sealed class PortfolioArchivedConsumer(ReportingDbContext db, PortfolioSn
         var cancellationToken = context.CancellationToken;
 
         // No positions means nothing was valued: an empty portfolio gets no snapshot, same as restore.
-        if (!await PortfolioArchiveFlag.ApplyAsync(db, message.PortfolioId, isArchived: true, cancellationToken))
+        var (hasPositions, affectedFrom) = await PortfolioArchiveFlag.ApplyAsync(
+            db, message.PortfolioId, isArchived: true, message.OccurredAtUtc, cancellationToken);
+        if (!hasPositions)
         {
             return;
+        }
+
+        if (affectedFrom is { } from && from < snapshotWriter.Today)
+        {
+            await HistoryRebuildRequests.RequestAsync(db, context, message.PortfolioId, message.UserId, from, cancellationToken);
         }
 
         // RevalueTodayAsync reads only non-archived positions, so this writes a zero snapshot for today.

@@ -67,7 +67,10 @@ internal static class ReportingApi
         DateOnly? manualValueDate = null,
         bool portfolioIsArchived = false,
         long version = 0,
-        bool isArchived = false)
+        bool isArchived = false,
+        IReadOnlyList<(DateOnly Date, decimal Quantity)>? quantityHistory = null,
+        DateOnly? archivedOn = null,
+        DateOnly? portfolioArchivedOn = null)
     {
         db.Positions.Add(new Data.Position
         {
@@ -85,6 +88,28 @@ internal static class ReportingApi
             IsArchived = isArchived,
             Version = version,
             UpdatedAt = DateTimeOffset.UtcNow,
+            QuantityHistory = [.. (quantityHistory ?? []).Select(p => new PositionQuantityPoint { Date = p.Date, Quantity = p.Quantity })],
+            ArchivedOn = archivedOn,
+            PortfolioArchivedOn = portfolioArchivedOn,
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public static async Task SeedHistoryRebuildRequestAsync(
+        this ReportingDbContext db,
+        Guid userId,
+        Guid portfolioId,
+        DateOnly fromDate,
+        CancellationToken cancellationToken,
+        long revision = 1)
+    {
+        db.HistoryRebuildRequests.Add(new HistoryRebuildRequest
+        {
+            PortfolioId = portfolioId,
+            UserId = userId,
+            FromDate = fromDate,
+            Revision = revision,
         });
 
         await db.SaveChangesAsync(cancellationToken);

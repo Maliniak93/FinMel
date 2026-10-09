@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,9 @@ namespace Skarbiec.Reporting.Tests;
 public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string QueueName = "asset-position-changed-consumer-test";
+    private const string ProbeQueueName = "asset-position-changed-rebuild-probe-test";
+
+    private static readonly ConcurrentBag<Guid> RequestedPortfolios = [];
 
     public async ValueTask InitializeAsync() => await MigrateAndResetAsync(containers);
 
@@ -448,6 +452,181 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task PastChange_RequestsRebuildFromEarliestChange()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: [(today.AddDays(-30), 10m)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(
+                Event(assetId, portfolioId, userId, quantity: 15m, version: 1,
+                    history: [(today.AddDays(-30), 10m), (today.AddDays(-10), 15m)]),
+                cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            Assert.Equal(today.AddDays(-10), request.FromDate);
+            Assert.Equal(userId, request.UserId);
+
+            await WaitForAsync(
+                provider,
+                (_, _) => Task.FromResult(RequestedPortfolios.Count(id => id == portfolioId)),
+                count => count >= 1,
+                "The PortfolioHistoryRebuildRequested message",
+                cancellationToken);
+
+            // Nothing signals a duplicate publish, so give one time to land before asserting there is exactly one.
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            Assert.Equal(1, RequestedPortfolios.Count(id => id == portfolioId));
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task PendingRequest_KeepsEarliestFrom()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: [(today.AddDays(-30), 10m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-20), cancellationToken, revision: 3);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(
+                Event(assetId, portfolioId, userId, quantity: 15m, version: 1,
+                    history: [(today.AddDays(-30), 10m), (today.AddDays(-5), 15m)]),
+                cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken, r => r.Revision > 3);
+
+            Assert.Equal(today.AddDays(-20), request.FromDate);
+            Assert.Equal(4, request.Revision);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task TodayOnlyOrNoChange_RequestsNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: [(today.AddDays(-30), 10m)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+
+            await bus.Publish(
+                Event(assetId, portfolioId, userId, quantity: 12m, version: 1,
+                    history: [(today.AddDays(-30), 10m), (today, 12m)]),
+                cancellationToken);
+            await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+
+            await bus.Publish(
+                Event(assetId, portfolioId, userId, quantity: 12m, version: 2,
+                    history: [(today.AddDays(-30), 10m), (today, 12m)]),
+                cancellationToken);
+            await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 2);
+
+            // Nothing signals an absent request, so give a late outbox delivery time to land before asserting none.
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            Assert.Null(await GetRebuildRequestAsync(containers, portfolioId, cancellationToken));
+            Assert.DoesNotContain(portfolioId, RequestedPortfolios);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task AssetRestored_ClearsArchivedOnAndRequestsRebuildFromIt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                isArchived: true, archivedOn: today.AddDays(-5), quantityHistory: [(today.AddDays(-30), 10m)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(
+                Event(assetId, portfolioId, userId, quantity: 10m, version: 1, isArchived: false, history: [(today.AddDays(-30), 10m)]),
+                cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            var position = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+
+            Assert.Equal(today.AddDays(-5), request.FromDate);
+            Assert.Null(position.ArchivedOn);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task AssetArchivedToday_StampsArchivedOnFromEventDateAndRequestsNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: [(today.AddDays(-30), 10m)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(
+                Event(assetId, portfolioId, userId, quantity: 10m, version: 1, isArchived: true, history: [(today.AddDays(-30), 10m)]),
+                cancellationToken);
+
+            var position = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+
+            Assert.Equal(today, position.ArchivedOn);
+            Assert.Null(await GetRebuildRequestAsync(containers, portfolioId, cancellationToken));
+        }, cancellationToken);
+    }
+
     private static AssetPositionChanged Event(
         Guid assetId,
         Guid portfolioId,
@@ -457,10 +636,11 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         string currency = "PLN",
         bool portfolioIsArchived = false,
         bool isArchived = false,
-        decimal quoteUnitsPerQuantity = 1m) => new()
+        decimal quoteUnitsPerQuantity = 1m,
+        IReadOnlyList<(DateOnly Date, decimal Quantity)>? history = null) => new()
         {
             QuoteUnitsPerQuantity = quoteUnitsPerQuantity,
-            QuantityHistory = [],
+            QuantityHistory = [.. (history ?? []).Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             IsArchived = isArchived,
             AssetId = assetId,
             PortfolioId = portfolioId,
@@ -477,12 +657,30 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
     private Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
             containers,
-            x => x.AddConsumer<AssetPositionChangedConsumer>(typeof(TestConsumerDefinition)),
+            x =>
+            {
+                x.AddConsumer<AssetPositionChangedConsumer>(typeof(TestConsumerDefinition));
+                x.AddConsumer<RebuildProbeConsumer>(typeof(RebuildProbeDefinition));
+            },
             action,
             cancellationToken);
 
     private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<AssetPositionChangedConsumer, ReportingDbContext>
     {
         public TestConsumerDefinition() => Endpoint(e => e.Name = QueueName);
+    }
+
+    private sealed class RebuildProbeConsumer : IConsumer<PortfolioHistoryRebuildRequested>
+    {
+        public Task Consume(ConsumeContext<PortfolioHistoryRebuildRequested> context)
+        {
+            RequestedPortfolios.Add(context.Message.PortfolioId);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RebuildProbeDefinition : ConsumerDefinition<RebuildProbeConsumer>
+    {
+        public RebuildProbeDefinition() => Endpoint(e => e.Name = ProbeQueueName);
     }
 }

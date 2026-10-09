@@ -5,11 +5,12 @@ namespace Skarbiec.Reporting.Tests;
 
 public sealed class ArchitectureTests
 {
-    // Global reference data, listed by type so any other entity in the namespace is still forced to be tenant-scoped.
+    // Global reference data and a value stored inside a tenant-scoped row, listed by type so any other entity in the namespace is still forced to be tenant-scoped.
     private static readonly HashSet<Type> GlobalReferenceData =
     [
         typeof(Skarbiec.Reporting.Data.LatestInstrumentPrice),
         typeof(Skarbiec.Reporting.Data.LatestFxRate),
+        typeof(Skarbiec.Reporting.Data.PositionQuantityPoint),
     ];
 
     [Fact]

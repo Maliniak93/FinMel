@@ -126,7 +126,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-021 ✅ Event-carried state transfer for positions; REST narrowed to validation + batch
 
-**Amended by ADR-026, ADR-027.**
+**Amended by ADR-026, ADR-027, ADR-032.**
 
 **Shipped:** 2026-09-22 (spec-02 publishes the events, spec-03 consumes them and deletes the REST query).
 
@@ -159,9 +159,11 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-025 🕐 Reporting revalues today's snapshot on every position event
 
+**Amended by ADR-032.**
+
 **Context:** the dashboard reads `ValuationSnapshot`/`AssetValuation`, and only `DailyPricesSyncedConsumer` wrote them, so the user's own mutations (e.g. adding cash) waited up to a full sync cycle. ADR-015 accepted daily granularity for *prices*. It never meant quantities should lag.
 **Decision:** Reporting stores the last prices and FX rates it fetched in the daily batch (`LatestInstrumentPrice`, `LatestFxRate`: global reference data, no `UserId`). `AssetPositionChanged`, `AssetRemoved`, `PortfolioArchived` and `PortfolioRestored` consumers recompute the affected portfolio's snapshot and lines for today from these local tables, inside the inbox transaction and serialized per portfolio by an advisory lock. No new REST call: ADR-021's two REST uses are unchanged. Amends ADR-015 (the dashboard is consistent with positions within one event delivery; prices stay daily).
-**Consequences:** one valuation writer shared by the sync and the event path. A price or rate never seen by Reporting values at 0 with the stale flag until the next sync. Past snapshots are still not recomputed. Archiving values only non-archived positions, so it writes a zero snapshot for today: an archived portfolio drops out of net worth from the archive date on, and its earlier snapshots stay (spec `archived-portfolio-out-of-net-worth`). Spec: `spec-07-dashboard-instant-revaluation`.
+**Consequences:** one valuation writer shared by the sync and the event path. A price or rate never seen by Reporting values at 0 with the stale flag until the next sync. Archiving values only non-archived positions, so it writes a zero snapshot for today: an archived portfolio drops out of net worth from the archive date on, and its earlier snapshots stay (spec `archived-portfolio-out-of-net-worth`). Spec: `spec-07-dashboard-instant-revaluation`.
 
 ## ADR-026 ✅ Third REST use — Portfolio → MarketData FX rate lookup on the request path
 
@@ -210,3 +212,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** the "Akcje i ETF" page shows each holding's last price, value in PLN and unrealised gain. The cost basis lives in Portfolio's transactions, the prices in MarketData. Computing the gain in the SPA would put money math in two places; Reporting's `AssetValuation` holds value but no cost basis. ADR-028 settled the same trade-off for bond rates.
 **Decision:** `ListSecurities` makes one call to a new `POST /internal/instruments/batch` (ticker, name, exchange, quote currency, last close and its date per id) and one to the existing `POST /internal/fx/latest-batch` for the distinct non-PLN currencies (`MapInternalGroup`, ADR-027). Like ADR-028 it fails soft: MarketData unreachable → the price-dependent fields are `null` with `MarketDataUnavailable` and the list still answers 200. Amends ADR-021, ADR-028.
 **Consequences:** the list makes two extra internal calls per load; nothing is persisted and Reporting keeps valuing positions from its own `Latest*` tables, so the page and net worth can differ by one sync.
+
+## ADR-032 🕐 Reporting rebuilds past valuations from a quantity timeline and MarketData history
+
+**Context:** a backdated transaction, a Manual value change, an archive or a quote backfill changes days Reporting already valued, but Reporting knew only current quantities and ADR-025 never recomputed the past.
+**Decision:** `AssetPositionChanged` carries the asset's end-of-day `QuantityHistory` (ADR-021, no call back to Portfolio). Reporting turns a change to the past into one pending `HistoryRebuildRequest` per portfolio (earliest date wins, revisioned) and an outbox message; a separate consumer rewrites every day of `[from, yesterday]` under the portfolio's advisory lock, fetching price and FX series from MarketData's `/internal/prices/history-batch` and `/internal/fx/history-batch`. Today stays with the ADR-025 path. Archive dates are stamped from the archiving event's `OccurredAtUtc`; a Manual line dated before the current `ManualValueDate` is never rewritten. The loser was a local price/FX copy in Reporting fed by events: no REST, but a second copy of all quote history and a rewritten daily flow. Amends ADR-021 (REST use 2 gains the history batches) and ADR-025.
+**Consequences:** the net-worth series is dense and consistent with transactions; a rebuild depends on MarketData being up and retries until it is; cost is days × positions of one portfolio per rebuild; history older than MarketData's quotes values at 0 with the stale flag.
