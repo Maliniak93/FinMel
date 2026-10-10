@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { REPO_ROOT } from "./helpers.mjs";
@@ -18,6 +18,16 @@ test("the docs skill declares sonnet and medium effort and is manual-only", () =
   assert.match(front, /^model:\s*sonnet\s*$/m);
   assert.match(front, /^effort:\s*medium\s*$/m);
   assert.match(front, /^disable-model-invocation:\s*true\s*$/m);
+});
+
+test("the tracked domain.html export is gone and no tracked file references it", () => {
+  assert.equal(existsSync(path.join(REPO_ROOT, "skarbiec-plan", "domain.html")), false);
+  const refs = spawnSync(
+    "git",
+    ["grep", "-l", "-F", "domain.html", "--", ".", ":(exclude)scripts/docs/wiring.test.mjs"],
+    { cwd: REPO_ROOT, encoding: "utf8" },
+  );
+  assert.equal(refs.stdout.trim(), "");
 });
 
 test("verify.mjs runs a scripts-test step and the check skill lists it", () => {

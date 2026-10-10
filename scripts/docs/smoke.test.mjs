@@ -28,3 +28,37 @@ test("facts on this repository finds every service, an internal edge, an event e
     rmSync(out, { recursive: true, force: true });
   }
 });
+
+test("facts on this repository lists the contract events, the internal message, ten consumers, an ERD per service and RefreshToken without a tenancy filter", () => {
+  const out = mkdtempSync(path.join(os.tmpdir(), "docs-smoke-"));
+  try {
+    const run = runDocs(["facts", "--root", REPO_ROOT, "--out", out]);
+    assert.equal(run.status, 0, run.output);
+
+    const pages = JSON.parse(readFileSync(path.join(out, ".work", "facts.json"), "utf8")).pages;
+    const messages = pages.eventy.facts.messages;
+    assert.deepEqual(
+      messages.filter((m) => m.kind === "event").map((m) => m.name).sort(),
+      [
+        "AssetPositionChanged",
+        "AssetRemoved",
+        "DailyPricesSynced",
+        "InstrumentHistoryBackfilled",
+        "PortfolioArchived",
+        "PortfolioDeleted",
+        "PortfolioRestored",
+        "UserRegistered",
+      ],
+    );
+    assert.equal(messages.find((m) => m.name === "PortfolioHistoryRebuildRequested")?.kind, "internal");
+    assert.equal(messages.flatMap((m) => m.consumers).length, 10);
+
+    const services = pages["bazy-danych"].facts.services;
+    assert.deepEqual(services.map((s) => s.name).sort(), ["Identity", "MarketData", "Portfolio", "Reporting"]);
+    for (const service of services) assert.ok(service.entities.length > 0, `${service.name} has no entities`);
+    const refreshTokens = services.find((s) => s.name === "Identity").entities.find((e) => e.table === "RefreshTokens");
+    assert.equal(refreshTokens?.tenancy, "UserId bez filtra");
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});

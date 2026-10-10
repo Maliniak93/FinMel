@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { extractArchitecture } from "./extract-architecture.mjs";
+import { extractEntities } from "./extract-entities.mjs";
+import { extractEvents } from "./extract-events.mjs";
 
 const STAMP_RE = /<!--\s*facts:(\S+?)\s*-->/;
 
@@ -102,6 +104,102 @@ function renderIndex(facts) {
   return `<h2>Strony przewodnika</h2>\n<ul>\n${items}\n</ul>`;
 }
 
+const mermaidBlock = (diagram) =>
+  `<pre class="mermaid">\n${diagram.replace(/&/g, "&amp;").replace(/</g, "&lt;")}\n</pre>`;
+
+const nodeId = (value) => String(value).replace(/\W/g, "_");
+
+function eventsDiagram(facts) {
+  const lines = ["flowchart LR"];
+  for (const message of facts.messages) {
+    const event = `${nodeId(message.name)}(["${message.name}"])`;
+    lines.push(`  ${event}`);
+    for (const p of message.publishers) lines.push(`  ${nodeId(p.service)}[${p.service}] --> ${nodeId(message.name)}`);
+    for (const c of message.consumers) lines.push(`  ${nodeId(message.name)} --> ${nodeId(c.service)}[${c.service}]`);
+  }
+  return [...new Set(lines)].join("\n");
+}
+
+function renderEventy(facts) {
+  const sections = facts.messages
+    .map((message) => {
+      const properties = message.properties.map((p) => {
+        const nested = p.nested ? ` &rarr; ${p.nested.map((n) => `${code(n.name)}: ${escapeHtml(n.type)}`).join(", ")}` : "";
+        return [code(p.name), escapeHtml(p.type) + nested];
+      });
+      const publishers = message.publishers.length
+        ? message.publishers.map((p) => `${escapeHtml(p.service)} ${code(p.file)}`).join("<br>")
+        : "<em>brak</em>";
+      const consumers = message.consumers.length
+        ? message.consumers
+            .map((c) => `${escapeHtml(c.service)} ${code(c.consumer)}${c.definition ? ` (${code(c.definition)})` : ""}`)
+            .join("<br>")
+        : "<em>brak</em>";
+      const kind = message.kind === "internal" ? "wiadomość wewnętrzna serwisu" : "zdarzenie z kontraktów";
+      return [
+        `<h3>${escapeHtml(message.name)}</h3>`,
+        `<p>${kind}. Publikuje: ${publishers}. Konsumuje: ${consumers}.</p>`,
+        table(["Pole", "Typ"], properties),
+      ].join("\n");
+    })
+    .join("\n");
+  return ["<h2>Przepływ wiadomości</h2>", mermaidBlock(eventsDiagram(facts)), "<h2>Wiadomości</h2>", sections].join("\n");
+}
+
+const erType = (type) => type.replace(/\[\]/g, "Array").replace(/\W/g, "");
+
+function erDiagram(service) {
+  const lines = ["erDiagram"];
+  for (const entity of service.entities) {
+    lines.push(`  ${entity.table} {`);
+    for (const column of entity.columns) {
+      const marks = [entity.key.includes(column.name) ? "PK" : null, entity.foreignKeys.some((f) => f.column === column.name) ? "FK" : null]
+        .filter(Boolean)
+        .join(",");
+      lines.push(`    ${erType(column.type)} ${column.name}${marks ? ` ${marks}` : ""}`);
+    }
+    lines.push("  }");
+  }
+  const tables = new Set(service.entities.map((e) => e.table));
+  for (const entity of service.entities) {
+    for (const fk of entity.foreignKeys.filter((f) => tables.has(f.references))) {
+      lines.push(`  ${fk.references} ||--o{ ${entity.table} : "${fk.column}"`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderBazyDanych(facts) {
+  return facts.services
+    .map((service) => {
+      const rows = service.entities.map((e) => [
+        code(e.table),
+        e.key.map(code).join(", "),
+        e.foreignKeys.map((f) => `${code(f.column)} &rarr; ${code(f.references)}`).join("<br>"),
+        e.tenancy ? (e.tenancy === "UserId bez filtra" ? `<strong>${escapeHtml(e.tenancy)}</strong>` : escapeHtml(e.tenancy)) : "",
+      ]);
+      const mass = service.masstransit
+        ? `<p>MassTransit: ${escapeHtml(service.masstransit.label)} (${service.masstransit.tables.length} tabele).</p>`
+        : "";
+      return [
+        `<h2>${escapeHtml(service.name)}</h2>`,
+        mermaidBlock(erDiagram(service)),
+        table(["Tabela", "Klucz", "Klucze obce", "Tenancy"], rows),
+        mass,
+      ].join("\n");
+    })
+    .join("\n");
+}
+
+const SEQUENCE_DIAGRAMS_REQUIRED = 4;
+
+function validateEventyProse(prose) {
+  const found = prose.match(/sequenceDiagram/g)?.length ?? 0;
+  return found < SEQUENCE_DIAGRAMS_REQUIRED
+    ? `prose fragment holds ${found} sequenceDiagram blocks, at least ${SEQUENCE_DIAGRAMS_REQUIRED} required`
+    : null;
+}
+
 export const PAGES = [
   {
     slug: "index",
@@ -110,6 +208,8 @@ export const PAGES = [
     render: renderIndex,
   },
   { slug: "architektura", title: "Architektura", extract: extractArchitecture, render: renderArchitektura },
+  { slug: "eventy", title: "Eventy i przepływy", extract: extractEvents, render: renderEventy, validateProse: validateEventyProse },
+  { slug: "bazy-danych", title: "Bazy danych", extract: extractEntities, render: renderBazyDanych },
 ];
 
 const STYLE = `

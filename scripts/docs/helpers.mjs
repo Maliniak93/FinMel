@@ -60,12 +60,20 @@ export function readFacts(sb) {
   return JSON.parse(readFileSync(path.join(sb.out, ".work", "facts.json"), "utf8"));
 }
 
+export function sequenceProse(count) {
+  return Array.from(
+    { length: count },
+    (_, i) => `<pre class="mermaid">sequenceDiagram\n  Klient${i}->>Portfolio: kupno</pre>`,
+  ).join("\n");
+}
+
 export function writeProse(sb) {
   const facts = readFacts(sb);
   const dir = path.join(sb.out, ".work", "prose");
   mkdirSync(dir, { recursive: true });
   for (const [slug, page] of Object.entries(facts.pages)) {
-    writeFileSync(path.join(dir, `${slug}.html`), `<!-- facts:${page.hash} -->\n<p>Opis strony ${slug}.</p>\n`);
+    const body = slug === "eventy" ? sequenceProse(4) : `<p>Opis strony ${slug}.</p>`;
+    writeFileSync(path.join(dir, `${slug}.html`), `<!-- facts:${page.hash} -->\n${body}\n`);
   }
 }
 

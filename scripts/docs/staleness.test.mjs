@@ -30,7 +30,7 @@ test("facts reports no stale page on unchanged code, only architektura after a s
 
     const all = runFacts(sb, ["--all"]);
     assert.equal(all.status, 0, all.output);
-    assert.deepEqual([...all.result.stale].sort(), ["architektura", "index"]);
+    assert.deepEqual([...all.result.stale].sort(), ["architektura", "bazy-danych", "eventy", "index"]);
   } finally {
     sb.cleanup();
   }

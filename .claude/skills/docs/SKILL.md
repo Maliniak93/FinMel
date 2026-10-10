@@ -29,6 +29,15 @@ Regenerate the code guide. Talk to the user in Polish; write the prose fragments
      REST is used only for `/internal` lookups and batches while domain facts travel as events: ADR-001
      (4 services), ADR-012 (outbox events with full state), ADR-015, ADR-021 and ADR-027 (`/internal`
      REST, anonymous, no token). Read those ADRs in `skarbiec-plan/decisions.md` before citing them.
+   - `eventy` - why events carry full state (ADR-012, ADR-021) and exactly four
+     `<pre class="mermaid">sequenceDiagram ...</pre>` blocks (`build` fails with fewer than four): (1) buying
+     10 shares for 1 500 PLN through a cash account -> `RecordTransaction` -> `AssetPositionChanged` ->
+     Reporting revalues the dashboard, (2) registration and login, (3) the daily price sync, (4) the
+     net-worth history rebuild. Read the handlers, consumers and jobs involved before drawing a step; the
+     generated flowchart and message tables are not repeated.
+   - `bazy-danych` - one short paragraph per service on what its database holds, the meaning of
+     "filtr tenancy" vs "UserId bez filtra" (ADR-006) and the MassTransit outbox/inbox tables. The
+     generator draws the ERDs.
 4. Run `node scripts/docs.mjs build`. A failure names the page and leaves the previous guide untouched:
    fix the fragment (usually a wrong or missing stamp) and run `build` again.
 5. Report in at most three lines: which pages were rewritten, the path
