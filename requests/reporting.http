@@ -18,7 +18,7 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/reporting/dashboard?portfolioId={{createPortfolio.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### Net worth history — range: 1M | 1Y | YTD (default 1Y), all portfolios
+### Net worth history — range: 1M | 1Y | YTD | MAX (default 1Y), all portfolios; response carries points plus changePln / changePercent (null without two points)
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y
 Authorization: Bearer {{authToken}}
 

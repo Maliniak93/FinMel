@@ -23,39 +23,86 @@
         }}</a>
       </div>
     } @else {
-      <div class="dashboard-page__net-worth-row">
-        <p class="dashboard-page__net-worth">{{ formatMoney(dashboard.netWorthPln) }}</p>
-        @if (dashboard.isStale) {
-          <mat-chip-set>
-            <mat-chip [matTooltip]="'dashboard.staleTooltip' | transloco">
-              {{ 'dashboard.stale' | transloco }}
-            </mat-chip>
-          </mat-chip-set>
-        }
+      <div class="dashboard-page__grid">
+        <div class="dashboard-page__kpis">
+          <mat-card class="dashboard-page__kpi">
+            <mat-card-content>
+              <p class="dashboard-page__kpi-label">{{ 'dashboard.netWorth' | transloco }}</p>
+              <div class="dashboard-page__net-worth-row">
+                <p class="dashboard-page__net-worth">{{ formatMoney(dashboard.netWorthPln) }}</p>
+                @if (dashboard.isStale) {
+                  <mat-chip-set>
+                    <mat-chip [matTooltip]="'dashboard.staleTooltip' | transloco">
+                      {{ 'dashboard.stale' | transloco }}
+                    </mat-chip>
+                  </mat-chip-set>
+                }
+              </div>
+              <p class="dashboard-page__as-of">
+                {{ 'dashboard.asOf' | transloco: { date: formatDate(dashboard.asOf) } }}
+              </p>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="dashboard-page__kpi">
+            <mat-card-content>
+              <p class="dashboard-page__kpi-label">{{ 'dashboard.change' | transloco }}</p>
+              @if (change(); as change) {
+                <p
+                  class="dashboard-page__change"
+                  [class.dashboard-page__change--positive]="change.direction === 'positive'"
+                  [class.dashboard-page__change--negative]="change.direction === 'negative'"
+                >
+                  {{ change.sign }}{{ formatMoney(change.amount) }}
+                  @if (change.percent !== null) {
+                    ({{ change.sign }}{{ formatPercent(change.percent) }})
+                  }
+                  <span class="dashboard-page__change-range">{{ range() }}</span>
+                </p>
+              } @else {
+                <p class="dashboard-page__change">—</p>
+              }
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <mat-card class="dashboard-page__card">
+          <mat-card-content>
+            <h2 class="dashboard-page__card-title">
+              {{ 'dashboard.netWorthHistory' | transloco }}
+            </h2>
+            <app-net-worth-chart
+              [points]="historyPoints()"
+              [(range)]="range"
+              [loading]="historyResource.isLoading()"
+              [loadError]="historyResource.error()?.message ?? null"
+              (retry)="historyResource.reload()"
+            />
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="dashboard-page__card">
+          <mat-card-content>
+            <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
+            <div class="dashboard-page__breakdown">
+              <app-pie-chart [segments]="pieSegments()" class="dashboard-page__chart" />
+
+              <ul class="dashboard-page__legend">
+                @for (entry of dashboard.byAssetClass; track entry.assetClass) {
+                  <li>
+                    <span
+                      class="dashboard-page__swatch"
+                      [style.background]="assetClassColor(entry.assetClass)"
+                    ></span>
+                    {{ assetClassLabel(entry.assetClass) | transloco }} —
+                    {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
+                  </li>
+                }
+              </ul>
+            </div>
+          </mat-card-content>
+        </mat-card>
       </div>
-      <p class="dashboard-page__as-of">
-        {{ 'dashboard.asOf' | transloco: { date: formatDate(dashboard.asOf) } }}
-      </p>
-
-      <div class="dashboard-page__breakdown">
-        <app-pie-chart [segments]="pieSegments()" class="dashboard-page__chart" />
-
-        <ul class="dashboard-page__legend">
-          @for (entry of dashboard.byAssetClass; track entry.assetClass) {
-            <li>
-              <span
-                class="dashboard-page__swatch"
-                [style.background]="assetClassColor(entry.assetClass)"
-              ></span>
-              {{ assetClassLabel(entry.assetClass) | transloco }} —
-              {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
-            </li>
-          }
-        </ul>
-      </div>
-
-      <h2>{{ 'dashboard.netWorthHistory' | transloco }}</h2>
-      <app-net-worth-chart />
     }
   }
 </div>

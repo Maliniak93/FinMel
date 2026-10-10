@@ -4,6 +4,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { provideRouter } from '@angular/router';
 
 import {
+  attributesOf,
   matchesTranslation,
   polishProblems,
   restoreEnglish,
@@ -14,11 +15,11 @@ import {
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
-import type { DashboardResponse } from '../../api/reporting';
+import type { DashboardResponse, NetWorthHistoryResponse } from '../../api/reporting';
 import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatDate } from '../../shared/format';
+import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -45,6 +46,10 @@ const dashboard: DashboardResponse = {
   ],
 };
 
+function normalised(text: string): string {
+  return text.replace(/\s+/g, ' ');
+}
+
 function requestUrl(input: unknown): string {
   return typeof input === 'string' ? input : (input as Request).url;
 }
@@ -66,11 +71,14 @@ describe('Dashboard', () => {
 
   async function setup(
     dashboardResponse: Response,
-    historyResponse = jsonResponse({ range: '1Y', points: [] }),
+    history: Response | ((url: string) => Response) = jsonResponse({ range: '1Y', points: [] }),
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
-      return url.includes('/net-worth-history') ? historyResponse : dashboardResponse;
+      if (!url.includes('/net-worth-history')) {
+        return dashboardResponse;
+      }
+      return typeof history === 'function' ? history(url) : history;
     });
 
     await TestBed.configureTestingModule({
@@ -154,21 +162,107 @@ describe('Dashboard', () => {
     await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
     expect(component['dashboardResource'].error()?.message).toBe('Service unavailable.');
   });
+  function historyWithChange(changePln: number | null, changePercent: number | null) {
+    return jsonResponse({
+      range: '1Y',
+      points: [
+        { date: '2026-07-01', netWorthPln: 1000 },
+        { date: '2026-08-01', netWorthPln: 1250 },
+      ],
+      changePln,
+      changePercent,
+    } satisfies NetWorthHistoryResponse);
+  }
+
+  function changeText(): string {
+    return textOf((fixture.nativeElement as HTMLElement).querySelector('.dashboard-page__change'));
+  }
+
+  it('shows the change for the selected range', async () => {
+    await setup(jsonResponse(dashboard), historyWithChange(250, 25));
+
+    const change = (fixture.nativeElement as HTMLElement).querySelector(
+      '.dashboard-page__change',
+    ) as HTMLElement;
+
+    expect(change.textContent).toContain(formatMoney(250));
+    expect(change.textContent).toContain(formatPercent(25));
+    expect(change.textContent).toContain('1Y');
+    expect(change.classList).toContain('dashboard-page__change--positive');
+    expect(change.classList).not.toContain('dashboard-page__change--negative');
+  });
+
+  it('styles a negative change as negative', async () => {
+    await setup(jsonResponse(dashboard), historyWithChange(-250, -20));
+
+    const change = (fixture.nativeElement as HTMLElement).querySelector(
+      '.dashboard-page__change',
+    ) as HTMLElement;
+
+    expect(change.classList).toContain('dashboard-page__change--negative');
+    expect(change.classList).not.toContain('dashboard-page__change--positive');
+  });
+
+  it('switching the range updates the change', async () => {
+    await setup(jsonResponse(dashboard), (url) =>
+      url.includes('range=1M') ? historyWithChange(40, 4) : historyWithChange(250, 25),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    expect(changeText()).toContain(normalised(formatMoney(250)));
+
+    const monthToggle = [...element.querySelectorAll('mat-button-toggle button')].find(
+      (button) => button.textContent?.trim() === '1M',
+    ) as HTMLButtonElement;
+    monthToggle.click();
+    await fixture.whenStable();
+
+    const historyUrls = fetchSpy.mock.calls
+      .map(([input]: [unknown]) => requestUrl(input))
+      .filter((url: string) => url.includes('/net-worth-history'));
+    expect(historyUrls.at(-1)).toContain('range=1M');
+    expect(changeText()).toContain(normalised(formatMoney(40)));
+    expect(changeText()).toContain('1M');
+  });
+
+  it('surfaces a history load failure in the chart and retries it', async () => {
+    let calls = 0;
+    await setup(jsonResponse(dashboard), () => {
+      calls++;
+      return calls === 1
+        ? jsonResponse({ detail: 'History unavailable.' }, 503)
+        : historyWithChange(250, 25);
+    });
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(textOf(element.querySelector('.net-worth-chart__state p'))).toBe('History unavailable.');
+
+    (element.querySelector('.net-worth-chart__state button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('.net-worth-chart__state')).toBeNull();
+    expect(changeText()).toContain(normalised(formatMoney(250)));
+  });
+
   it('renders in Polish', async () => {
-    await setup(jsonResponse({ ...dashboard, isStale: true } satisfies DashboardResponse));
+    await setup(
+      jsonResponse({ ...dashboard, isStale: true } satisfies DashboardResponse),
+      historyWithChange(250, 25),
+    );
     const element = fixture.nativeElement as HTMLElement;
     const tooltip = () =>
       fixture.debugElement.query(By.css('mat-chip')).injector.get(MatTooltip).message;
     const texts = () => [
-      ...textsOf(element, 'h1, h2'),
+      ...textsOf(element, 'h1'),
+      ...textsOf(element, '.dashboard-page__kpi-label'),
       textOf(element.querySelector('mat-chip')),
       tooltip(),
-      textOf(element.querySelector('.net-worth-chart__empty')),
+      ...attributesOf(element, 'svg.net-worth-chart__svg', 'aria-label'),
     ];
     const asOf = () => textOf(element.querySelector('.dashboard-page__as-of'));
 
     const english = texts();
-    expect(english.slice(0, 3)).toEqual(['Dashboard', 'Net worth history', 'Stale']);
+    expect(english[0]).toBe('Dashboard');
+    expect(english.length).toBeGreaterThanOrEqual(5);
     expect(asOf()).toMatch(/^As of /);
 
     await switchLanguage(fixture, 'pl');

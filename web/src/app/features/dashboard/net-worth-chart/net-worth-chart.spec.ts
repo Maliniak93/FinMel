@@ -2,7 +2,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import {
   attributesOf,
-  matchesTranslation,
   polishProblems,
   restoreEnglish,
   switchLanguage,
@@ -10,146 +9,151 @@ import {
   textsOf,
 } from '../../../../testing/i18n';
 
-import { client as reportingClient } from '../../../api/reporting/client.gen';
 import type { NetWorthHistoryResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
-import { formatDate } from '../../../shared/format';
+import { formatDate, formatMoney } from '../../../shared/format';
 import { NetWorthChart } from './net-worth-chart';
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+function normalised(text: string): string {
+  return text.replace(/\s+/g, ' ');
 }
 
-const history: NetWorthHistoryResponse = {
-  range: '1Y',
-  points: [
-    { date: '2026-06-01', netWorthPln: 10000 },
-    { date: '2026-07-01', netWorthPln: 11000 },
-    { date: '2026-08-01', netWorthPln: 10500 },
-  ],
-};
+type HistoryPoints = NetWorthHistoryResponse['points'];
+
+const yearPoints: HistoryPoints = [
+  { date: '2026-06-01', netWorthPln: 10000 },
+  { date: '2026-07-01', netWorthPln: 11000 },
+  { date: '2026-08-01', netWorthPln: 10500 },
+];
+
+const monthPoints: HistoryPoints = Array.from({ length: 20 }, (_, i) => ({
+  date: `2026-08-${String(i + 1).padStart(2, '0')}`,
+  netWorthPln: 10000 + i * 100,
+}));
 
 describe('NetWorthChart', () => {
   let fixture: ComponentFixture<NetWorthChart>;
-  let component: NetWorthChart;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeAll(() => {
-    reportingClient.setConfig({ baseUrl: 'https://example.test' });
-  });
 
   afterEach(async () => {
-    fetchSpy.mockRestore();
     await restoreEnglish();
   });
 
-  async function setup(response: Response): Promise<void> {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
-
+  async function setup(points: HistoryPoints, range = '1Y'): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       imports: [NetWorthChart],
       providers: [provideI18nTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(NetWorthChart);
-    component = fixture.componentInstance;
+    fixture.componentRef.setInput('points', points);
+    fixture.componentRef.setInput('range', range);
     await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
   }
 
-  it('should create', async () => {
-    await setup(jsonResponse(history));
-    expect(component).toBeTruthy();
+  it('renders axes and gridlines', async () => {
+    const element = await setup(yearPoints);
+
+    const gridlines = element.querySelectorAll('.net-worth-chart__gridline');
+    const yLabels = textsOf(element, '.net-worth-chart__y-label');
+    const xLabels = textsOf(element, '.net-worth-chart__x-label');
+    const area = element.querySelector('path.net-worth-chart__area');
+
+    expect(gridlines.length).toBeGreaterThanOrEqual(4);
+    expect(gridlines.length).toBeLessThanOrEqual(6);
+    expect(yLabels).toHaveLength(gridlines.length);
+    for (const label of yLabels) {
+      expect(label).toMatch(/K/);
+    }
+    expect(xLabels.length).toBeGreaterThanOrEqual(1);
+    expect(xLabels.length).toBeLessThanOrEqual(3);
+    expect(area?.getAttribute('d')).toBeTruthy();
+    expect(element.querySelector('svg')?.getAttribute('aria-label')).toContain(formatMoney(10000));
+    expect(element.querySelector('svg')?.getAttribute('aria-label')).toContain(formatMoney(10500));
   });
 
-  it('requests the default 1Y range on load', async () => {
-    await setup(jsonResponse(history));
+  it('uses day ticks for 1M', async () => {
+    const element = await setup(monthPoints, '1M');
 
-    const url = (fetchSpy.mock.calls[0][0] as Request).url;
-    expect(url).toContain('range=1Y');
+    const xLabels = textsOf(element, '.net-worth-chart__x-label');
+
+    expect(xLabels.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('builds a chart point per history point and shows the latest date as-of', async () => {
-    await setup(jsonResponse(history));
+  it('shows a tooltip for the nearest point', async () => {
+    const element = await setup(yearPoints);
+    const plot = element.querySelector('.net-worth-chart__plot') as SVGElement;
+    plot.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        right: 300,
+        top: 0,
+        bottom: 100,
+        width: 300,
+        height: 100,
+        x: 0,
+        y: 0,
+      }) as DOMRect;
 
-    expect(component['points']()).toHaveLength(3);
-    expect(component['asOf']()).toBe('2026-08-01');
-  });
+    expect(element.querySelector('.net-worth-chart__tooltip')).toBeNull();
+    expect(element.querySelector('.net-worth-chart__guide')).toBeNull();
+    expect(element.querySelector('.net-worth-chart__marker')).toBeNull();
 
-  it('re-requests history with the newly selected range', async () => {
-    await setup(jsonResponse(history));
-    const callsBefore = fetchSpy.mock.calls.length;
-
-    component['setRange']('MAX');
+    plot.dispatchEvent(new MouseEvent('pointermove', { clientX: 0, clientY: 50, bubbles: true }));
     await fixture.whenStable();
 
-    expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
-    const url = (fetchSpy.mock.calls.at(-1)?.[0] as Request).url;
-    expect(url).toContain('range=MAX');
+    const tooltip = textOf(element.querySelector('.net-worth-chart__tooltip'));
+    expect(tooltip).toContain(formatDate('2026-06-01'));
+    expect(tooltip).toContain(normalised(formatMoney(10000)));
+    expect(element.querySelector('.net-worth-chart__guide')).not.toBeNull();
+    expect(element.querySelector('.net-worth-chart__marker')).not.toBeNull();
+
+    plot.dispatchEvent(new MouseEvent('pointermove', { clientX: 300, clientY: 50, bubbles: true }));
+    await fixture.whenStable();
+
+    const lastTooltip = textOf(element.querySelector('.net-worth-chart__tooltip'));
+    expect(lastTooltip).toContain(formatDate('2026-08-01'));
+    expect(lastTooltip).toContain(normalised(formatMoney(10500)));
+
+    plot.dispatchEvent(new MouseEvent('pointerleave', { bubbles: true }));
+    await fixture.whenStable();
+
+    expect(element.querySelector('.net-worth-chart__tooltip')).toBeNull();
+    expect(element.querySelector('.net-worth-chart__guide')).toBeNull();
+    expect(element.querySelector('.net-worth-chart__marker')).toBeNull();
   });
 
-  it('shows a not-enough-data message with fewer than two points', async () => {
-    await setup(
-      jsonResponse({ range: '1Y', points: [{ date: '2026-08-01', netWorthPln: 10000 }] }),
+  it('not enough history', async () => {
+    const element = await setup([{ date: '2026-08-01', netWorthPln: 10000 }]);
+
+    expect(textOf(element.querySelector('.net-worth-chart__empty'))).toBe(
+      'Not enough history to chart yet.',
     );
+    expect(element.querySelector('svg')).toBeNull();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Not enough history to chart yet.');
+    await switchLanguage(fixture, 'pl');
+
+    expect(
+      polishProblems(
+        ['Not enough history to chart yet.'],
+        [textOf(element.querySelector('.net-worth-chart__empty'))],
+      ),
+    ).toEqual([]);
   });
 
-  it('surfaces a load failure through the resource error', async () => {
-    await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
-
-    expect(component['historyResource'].error()?.message).toBe('Service unavailable.');
-  });
   it('renders in Polish', async () => {
-    await setup(jsonResponse(history));
-    const element = fixture.nativeElement as HTMLElement;
+    const element = await setup(yearPoints);
     const labels = () => [
       ...attributesOf(element, 'mat-button-toggle-group', 'aria-label'),
       ...attributesOf(element, 'svg', 'aria-label'),
     ];
-    const asOf = () => textOf(element.querySelector('.net-worth-chart__as-of'));
 
     const english = labels();
-    expect(english).toEqual(['Chart range', 'Net worth history chart']);
-    expect(asOf()).toMatch(/^As of /);
+    expect(english).toHaveLength(2);
 
     await switchLanguage(fixture, 'pl');
 
     expect(polishProblems(english, labels())).toEqual([]);
-    expect(asOf()).not.toMatch(/^As of /);
-    expect(asOf()).toContain(formatDate('2026-08-01'));
-    expect(matchesTranslation('pl', asOf()), `"${asOf()}" is not a pl.json value`).toBe(true);
     expect(textsOf(element, 'mat-button-toggle')).toEqual(['1M', '1Y', 'YTD', 'MAX']);
-  });
-
-  it('renders the not-enough-history message in Polish', async () => {
-    await setup(
-      jsonResponse({ range: '1Y', points: [{ date: '2026-08-01', netWorthPln: 10000 }] }),
-    );
-    const element = fixture.nativeElement as HTMLElement;
-    const message = () => [textOf(element.querySelector('.net-worth-chart__empty'))];
-
-    const english = message();
-    expect(english).toEqual(['Not enough history to chart yet.']);
-
-    await switchLanguage(fixture, 'pl');
-
-    expect(polishProblems(english, message())).toEqual([]);
-  });
-
-  it('renders the load-failure retry button in Polish', async () => {
-    await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
-    const element = fixture.nativeElement as HTMLElement;
-    const buttons = () => textsOf(element, '.net-worth-chart__state button');
-
-    expect(buttons()).toEqual(['Retry']);
-
-    await switchLanguage(fixture, 'pl');
-
-    expect(polishProblems(['Retry'], buttons())).toEqual([]);
   });
 });

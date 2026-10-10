@@ -374,6 +374,9 @@
   },
   "dashboard": {
     "title": "Pulpit",
+    "netWorth": "Wartość majątku",
+    "change": "Zmiana",
+    "allocation": "Struktura majątku",
     "empty": "Nie wprowadzono jeszcze żadnego majątku.",
     "goToPortfolios": "Przejdź do portfeli",
     "stale": "Nieaktualne",
@@ -384,9 +387,8 @@
   },
   "netWorthChart": {
     "rangeLabel": "Zakres wykresu",
-    "chartLabel": "Wykres historii wartości majątku",
+    "chartLabel": "Wykres historii wartości majątku, {{ range }}: od {{ from }} do {{ to }}",
     "notEnoughHistory": "Za mało historii, aby narysować wykres.",
-    "asOf": "Stan na {{ date }}",
     "loadFailed": "Nie udało się wczytać historii wartości majątku."
   },
   "portfolios": {

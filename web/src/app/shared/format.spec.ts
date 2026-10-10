@@ -2,7 +2,13 @@ import { TestBed } from '@angular/core/testing';
 
 import { provideI18nTesting } from '../core/i18n/testing';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../core/i18n/language';
-import { formatDate, formatMoney, formatPercent, formatQuantity } from './format';
+import {
+  formatDate,
+  formatMoney,
+  formatMoneyCompact,
+  formatPercent,
+  formatQuantity,
+} from './format';
 
 const LOCALES = { en: 'en-US', pl: 'pl-PL' } as const;
 
@@ -47,6 +53,30 @@ describe('locale-aware formatters', () => {
     await language.setLanguage('pl');
     expect(formatDate(new Date(2026, 8, 27))).toBe('27 wrz 2026');
     expect(formatDate('2026-09-27')).toBe('27 wrz 2026');
+  });
+
+  it('formatMoneyCompact', async () => {
+    const language = TestBed.inject(LanguageService);
+
+    for (const lang of ['en', 'pl', 'en'] as const) {
+      await language.setLanguage(lang);
+      const locale = LOCALES[lang];
+
+      expect(formatMoneyCompact(250000)).toBe(
+        new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency: 'PLN',
+          notation: 'compact',
+        }).format(250000),
+      );
+      expect(formatMoneyCompact(250000, 'USD')).toBe(
+        new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency: 'USD',
+          notation: 'compact',
+        }).format(250000),
+      );
+    }
   });
 
   it('formats money in the default language (English) before any switch', () => {
