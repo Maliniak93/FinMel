@@ -93,7 +93,11 @@ function build(argv) {
     if (text === null) problems.push(`page ${page.slug}: prose fragment missing (.work/prose/${page.slug}.html)`);
     else if (proseStamp(text) !== pages[page.slug].hash) {
       problems.push(`page ${page.slug}: prose fragment is stale (expected <!-- facts:${pages[page.slug].hash} -->)`);
-    } else prose[page.slug] = text;
+    } else {
+      const invalid = page.validateProse?.(text);
+      if (invalid) problems.push(`page ${page.slug}: ${invalid}`);
+      else prose[page.slug] = text;
+    }
   }
   if (problems.length) fail(problems.join("\n"));
 

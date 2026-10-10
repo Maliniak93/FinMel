@@ -8,7 +8,7 @@ const MAP_RE =
   /(?:\bvar\s+(\w+)\s*=\s*)?(\w+)\s*\.\s*(MapGroup|MapInternalGroup)\s*\(\s*"([^"]*)"\s*\)|(\w+)\s*\.\s*Map(Get|Post|Put|Delete|Patch)\s*\(\s*"([^"]*)"/g;
 const CHAINED_MAP_RE = /^\s*\.\s*Map(Get|Post|Put|Delete|Patch)\s*\(\s*"([^"]*)"/;
 
-function walkFiles(dir, accept) {
+export function walkFiles(dir, accept) {
   const found = [];
   if (!existsSync(dir)) return found;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -22,7 +22,7 @@ function walkFiles(dir, accept) {
   return found;
 }
 
-function readCode(file) {
+export function readCode(file) {
   return readFileSync(file, "utf8")
     .replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)'|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m) => (m[0] === "/" ? " " : m));
 }
@@ -63,7 +63,7 @@ function sortEndpoints(endpoints) {
   return [...endpoints].sort((a, b) => a.path.localeCompare(b.path) || a.verb.localeCompare(b.verb));
 }
 
-function discoverServices(root) {
+export function discoverServices(root) {
   const servicesDir = path.join(root, "services");
   if (!existsSync(servicesDir)) throw new Error(`services folder not found under ${root}`);
   return readdirSync(servicesDir, { withFileTypes: true })
