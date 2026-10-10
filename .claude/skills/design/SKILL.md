@@ -1,7 +1,7 @@
 ---
 name: design
 description: Interview the user about a feature, a change to existing behaviour, or a refactor, then - after approval - publish a build-ready spec as an issue on the FinMel GitHub project. Writes no code.
-argument-hint: "<feature, change or refactor description>"
+argument-hint: "<feature, change or refactor description | idea:<slug>>"
 disable-model-invocation: true
 model: claude-opus-5-5
 effort: xhigh
@@ -10,6 +10,12 @@ effort: xhigh
 Turn `$ARGUMENTS` into a spec that `/build` can execute unattended. The spec is drafted locally,
 discussed until approved, and only then published as a GitHub issue with Status **Todo** on the
 FinMel project. You write a document, never code.
+
+`$ARGUMENTS` = `idea:<slug>` → `node scripts/idea.mjs show <slug>` is the request (shaped by `/idea`):
+its "Decyzje już podjęte" are settled — do not re-ask them; its "Otwarte pytania dla /design" are yours
+to ask or settle; its "Powiązane" names related issues — an open `#n` listed first is the issue to amend
+(**Amending an existing issue** below). After `create`/`edit` publishes, run
+`node scripts/idea.mjs mark <slug> used --issue <n>`.
 
 Three kinds of spec come through here, and they are shaped differently:
 

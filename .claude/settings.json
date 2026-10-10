@@ -41,6 +41,7 @@
       "Bash(node scripts/stop-stack.mjs:*)",
       "Bash(node scripts/preflight.mjs:*)",
       "Bash(node scripts/run-cost.mjs:*)",
+      "Bash(node scripts/idea.mjs:*)",
       "Bash(node scripts/prune-branches.mjs)",
       "Bash(npm run lint:*)",
       "Bash(npm run typecheck:*)",
