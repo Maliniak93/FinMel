@@ -19,6 +19,14 @@ public sealed class DailyPricesSyncedConsumer(
         var snapshotDate = context.Message.SyncDate;
         var cancellationToken = context.CancellationToken;
 
+        var valued = await ValueAsync(snapshotDate, cancellationToken);
+        var requested = await RequestGapsAsync(context, valued, snapshotDate, cancellationToken);
+        await RepublishPendingAsync(context, requested, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<List<(Guid PortfolioId, Guid UserId)>> ValueAsync(DateOnly snapshotDate, CancellationToken cancellationToken)
+    {
         // IgnoreQueryFilters: this consumer values every user's portfolios in one pass; archived ones are excluded.
         var positions = await db.Positions
             .AsNoTracking()
@@ -29,7 +37,7 @@ public sealed class DailyPricesSyncedConsumer(
         if (positions.Count == 0)
         {
             logger.LogInformation("DailyPricesSyncedConsumer: no positions to value for {SnapshotDate}.", snapshotDate);
-            return;
+            return [];
         }
 
         var pricesByInstrument = await FetchPricesAsync(positions, snapshotDate, cancellationToken);
@@ -52,6 +60,7 @@ public sealed class DailyPricesSyncedConsumer(
 
         var computed = 0;
         var failed = 0;
+        List<(Guid PortfolioId, Guid UserId)> valued = [];
 
         foreach (var group in positions.GroupBy(p => p.PortfolioId))
         {
@@ -68,6 +77,7 @@ public sealed class DailyPricesSyncedConsumer(
                     existingSnapshots.GetValueOrDefault(group.Key),
                     existingLines);
                 computed++;
+                valued.Add((group.Key, portfolioPositions[0].UserId));
             }
             catch (Exception ex)
             {
@@ -81,6 +91,62 @@ public sealed class DailyPricesSyncedConsumer(
         logger.LogInformation(
             "DailyPricesSyncedConsumer: snapshot run for {SnapshotDate} finished: {Computed} portfolio(s) computed, {Failed} failed.",
             snapshotDate, computed, failed);
+
+        return valued;
+    }
+
+    private async Task<HashSet<Guid>> RequestGapsAsync(
+        ConsumeContext context,
+        IReadOnlyList<(Guid PortfolioId, Guid UserId)> valued,
+        DateOnly snapshotDate,
+        CancellationToken cancellationToken)
+    {
+        HashSet<Guid> requested = [];
+        if (valued.Count == 0)
+        {
+            return requested;
+        }
+
+        var portfolioIds = valued.Select(v => v.PortfolioId).ToList();
+
+        // IgnoreQueryFilters: the previous snapshots of every user's portfolios are read in one pass.
+        var latestBefore = await db.ValuationSnapshots
+            .IgnoreQueryFilters()
+            .Where(s => portfolioIds.Contains(s.PortfolioId) && s.Date < snapshotDate)
+            .GroupBy(s => s.PortfolioId)
+            .Select(g => new { PortfolioId = g.Key, Latest = g.Max(s => s.Date) })
+            .ToDictionaryAsync(x => x.PortfolioId, x => x.Latest, cancellationToken);
+
+        foreach (var (portfolioId, userId) in valued)
+        {
+            if (latestBefore.TryGetValue(portfolioId, out var latest) && latest < snapshotDate.AddDays(-1))
+            {
+                await HistoryRebuildRequests.RequestAsync(db, context, portfolioId, userId, latest.AddDays(1), cancellationToken);
+                requested.Add(portfolioId);
+            }
+        }
+
+        return requested;
+    }
+
+    // A request whose message exhausted its retries stays pending; the daily sync is the heartbeat that wakes it again.
+    private async Task RepublishPendingAsync(
+        ConsumeContext context, HashSet<Guid> requested, CancellationToken cancellationToken)
+    {
+        // IgnoreQueryFilters: pending requests of every user are re-published in one pass.
+        var pending = await db.HistoryRebuildRequests
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(r => !requested.Contains(r.PortfolioId))
+            .Select(r => new { r.PortfolioId, r.UserId })
+            .ToListAsync(cancellationToken);
+
+        foreach (var request in pending)
+        {
+            await context.Publish(
+                new PortfolioHistoryRebuildRequested { PortfolioId = request.PortfolioId, UserId = request.UserId },
+                cancellationToken);
+        }
     }
 
     private async Task<IReadOnlyDictionary<Guid, InstrumentPriceLookup>> FetchPricesAsync(

@@ -420,6 +420,83 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task Consume_GapSinceLastSnapshot_RequestsRebuildFromDayAfter()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 10);
+        var gapUserId = Guid.NewGuid();
+        var gapPortfolioId = Guid.NewGuid();
+        var freshPortfolioId = Guid.NewGuid();
+        var newPortfolioId = Guid.NewGuid();
+        var archivedPortfolioId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), gapUserId, gapPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedSnapshotAsync(gapUserId, gapPortfolioId, snapshotDate.AddDays(-6), 1_000m, cancellationToken);
+
+            await db.SeedPositionAsync(Guid.NewGuid(), Guid.NewGuid(), freshPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedSnapshotAsync(Guid.NewGuid(), freshPortfolioId, snapshotDate.AddDays(-1), 1_000m, cancellationToken);
+
+            await db.SeedPositionAsync(Guid.NewGuid(), Guid.NewGuid(), newPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+
+            await db.SeedPositionAsync(Guid.NewGuid(), Guid.NewGuid(), archivedPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m,
+                portfolioIsArchived: true);
+            await db.SeedSnapshotAsync(Guid.NewGuid(), archivedPortfolioId, snapshotDate.AddDays(-6), 1_000m, cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, gapPortfolioId, cancellationToken);
+            Assert.Equal(snapshotDate.AddDays(-5), request.FromDate);
+            Assert.Equal(gapUserId, request.UserId);
+
+            Assert.Null(await GetRebuildRequestAsync(containers, freshPortfolioId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, newPortfolioId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, archivedPortfolioId, cancellationToken));
+
+            // The gap request is published by the request itself; the re-publish step must not publish it a second time.
+            var recorder = provider.GetRequiredService<RebuildRequestRecorder>();
+            await recorder.WaitForDeliveryAsync(gapPortfolioId, cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+            Assert.Single(recorder.DeliveredFor(gapPortfolioId));
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Consume_PendingRequest_RepublishesRebuild()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 10);
+        var userId = Guid.NewGuid();
+        var pendingPortfolioId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedHistoryRebuildRequestAsync(userId, pendingPortfolioId, snapshotDate.AddDays(-10), cancellationToken);
+        }
+
+        // No positions at all: the re-publish must not depend on the sync having valued anything.
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
+
+            var recorder = provider.GetRequiredService<RebuildRequestRecorder>();
+            await recorder.WaitForDeliveryAsync(pendingPortfolioId, cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            var republished = Assert.Single(recorder.DeliveredFor(pendingPortfolioId));
+            Assert.Equal(userId, republished.UserId);
+        }, cancellationToken);
+    }
+
     private static async Task PublishSyncAsync(ServiceProvider provider, DateOnly snapshotDate, CancellationToken cancellationToken)
     {
         var bus = provider.GetRequiredService<IBus>();
@@ -437,7 +514,11 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
             containers,
-            x => x.AddConsumer<DailyPricesSyncedConsumer>(typeof(TestConsumerDefinition)),
+            x =>
+            {
+                x.AddConsumer<DailyPricesSyncedConsumer>(typeof(TestConsumerDefinition));
+                x.AddConsumer<RebuildRequestRecorderConsumer>();
+            },
             action,
             cancellationToken,
             priceQuoteClient);
