@@ -26,11 +26,14 @@ test("facts reports no stale page on unchanged code, only architektura after a s
 
     const changed = runFacts(sb);
     assert.equal(changed.status, 0, changed.output);
-    assert.deepEqual(changed.result.stale, ["architektura"]);
+    assert.deepEqual(changed.result.stale, ["architektura", "slabe-punkty"]);
 
     const all = runFacts(sb, ["--all"]);
     assert.equal(all.status, 0, all.output);
-    assert.deepEqual([...all.result.stale].sort(), ["architektura", "bazy-danych", "eventy", "index"]);
+    assert.deepEqual(
+      [...all.result.stale].sort(),
+      ["architektura", "bazy-danych", "eventy", "index", "joby-integracje-frontend", "slabe-punkty"],
+    );
   } finally {
     sb.cleanup();
   }

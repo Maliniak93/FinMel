@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
+import { endpointAnchor, integrationAnchor, jobAnchor, messageAnchor, tableAnchor } from "./anchors.mjs";
 import { extractArchitecture } from "./extract-architecture.mjs";
 import { extractEntities } from "./extract-entities.mjs";
 import { extractEvents } from "./extract-events.mjs";
+import { extractJoby } from "./extract-joby.mjs";
+import { extractWeakPoints } from "./extract-weak-points.mjs";
 
 const STAMP_RE = /<!--\s*facts:(\S+?)\s*-->/;
 
@@ -28,6 +31,10 @@ function table(headers, rows) {
 
 const code = (value) => `<code>${escapeHtml(value)}</code>`;
 
+const anchorSpan = (id) => `<span id="${escapeHtml(id)}"></span>`;
+
+const endpointCell = (e) => `${anchorSpan(endpointAnchor(e.verb, e.path))}${escapeHtml(e.verb)} ${code(e.path)}`;
+
 function clusterService(cluster, services) {
   const key = String(cluster ?? "").replace(/-cluster$/, "").toLowerCase();
   return services.find((s) => s.name.toLowerCase() === key)?.name ?? null;
@@ -48,9 +55,9 @@ function renderArchitektura(facts) {
     .map((service) => {
       const rows = service.slices.map((slice) => [
         code(slice.folder),
-        slice.endpoints.map((e) => `${escapeHtml(e.verb)} ${code(e.path)}`).join("<br>"),
+        slice.endpoints.map(endpointCell).join("<br>"),
       ]);
-      for (const e of service.inlineEndpoints) rows.push([`<em>Program.cs</em>`, `${escapeHtml(e.verb)} ${code(e.path)}`]);
+      for (const e of service.inlineEndpoints) rows.push([`<em>Program.cs</em>`, endpointCell(e)]);
       return `<h3>${escapeHtml(service.name)}</h3>\n${table(["Slice", "Endpointy"], rows)}`;
     })
     .join("\n");
@@ -90,7 +97,7 @@ function renderArchitektura(facts) {
     `<pre class="mermaid">\n${architectureDiagram(facts).replace(/&/g, "&amp;").replace(/</g, "&lt;")}\n</pre>`,
     "<h2>Serwisy, slice'y i endpointy</h2>",
     services,
-    "<h2>REST między serwisami</h2>",
+    '<h2 id="rest">REST między serwisami</h2>',
     rest,
     "<h2>Zdarzenia</h2>",
     events,
@@ -137,13 +144,13 @@ function renderEventy(facts) {
         : "<em>brak</em>";
       const kind = message.kind === "internal" ? "wiadomość wewnętrzna serwisu" : "zdarzenie z kontraktów";
       return [
-        `<h3>${escapeHtml(message.name)}</h3>`,
+        `<h3 id="${escapeHtml(messageAnchor(message.name))}">${escapeHtml(message.name)}</h3>`,
         `<p>${kind}. Publikuje: ${publishers}. Konsumuje: ${consumers}.</p>`,
         table(["Pole", "Typ"], properties),
       ].join("\n");
     })
     .join("\n");
-  return ["<h2>Przepływ wiadomości</h2>", mermaidBlock(eventsDiagram(facts)), "<h2>Wiadomości</h2>", sections].join("\n");
+  return ['<h2 id="przeplyw">Przepływ wiadomości</h2>', mermaidBlock(eventsDiagram(facts)), "<h2>Wiadomości</h2>", sections].join("\n");
 }
 
 const erType = (type) => type.replace(/\[\]/g, "Array").replace(/\W/g, "");
@@ -173,7 +180,7 @@ function renderBazyDanych(facts) {
   return facts.services
     .map((service) => {
       const rows = service.entities.map((e) => [
-        code(e.table),
+        anchorSpan(tableAnchor(service.name, e.table)) + code(e.table),
         e.key.map(code).join(", "),
         e.foreignKeys.map((f) => `${code(f.column)} &rarr; ${code(f.references)}`).join("<br>"),
         e.tenancy ? (e.tenancy === "UserId bez filtra" ? `<strong>${escapeHtml(e.tenancy)}</strong>` : escapeHtml(e.tenancy)) : "",
@@ -200,6 +207,97 @@ function validateEventyProse(prose) {
     : null;
 }
 
+const chainCell = (callers) =>
+  callers.length
+    ? callers
+        .map((c) => `${c.chain.map(code).join(" &rarr; ")}${c.schedule ? ` (${escapeHtml(c.schedule)})` : ""}`)
+        .join("<br>")
+    : "<em>brak</em>";
+
+function routeCalls(route) {
+  if (route.redirectTo !== undefined) return `przekierowanie na ${code(route.redirectTo)}`;
+  if (route.calls.length === 0) return "<em>brak wywołań API</em>";
+  return route.calls
+    .map((call) => {
+      const targets = call.endpoints.length
+        ? call.endpoints
+            .map((e) => `<a href="${escapeHtml(e.link)}">${escapeHtml(e.service)} ${code(e.path)}</a>`)
+            .join(", ")
+        : "<strong>brak endpointu w backendzie</strong>";
+      return `${escapeHtml(call.method)} ${code(call.url)} &rarr; ${targets}`;
+    })
+    .join("<br>");
+}
+
+function renderJoby(facts) {
+  const jobs = facts.jobs.length
+    ? table(
+        ["Klucz", "Klasa", "Harmonogram (efektywny)", "Development", "Domyślny w kodzie", "Klucz konfiguracji"],
+        facts.jobs.map((j) => [
+          anchorSpan(jobAnchor(j.key)) + code(j.key),
+          code(j.class),
+          code(j.schedule),
+          j.developmentCron ? code(j.developmentCron) : "",
+          j.defaultCron ? code(j.defaultCron) : "",
+          j.configKey ? code(j.configKey) : "",
+        ]),
+      )
+    : "<p>Brak jobów Quartz.</p>";
+  const triggers = facts.triggers.length
+    ? table(
+        ["Wyzwalacz", "Kiedy", "Implementuje"],
+        facts.triggers.map((t) => [code(t.class), escapeHtml(t.kind), t.implements.map(code).join(", ")]),
+      )
+    : "<p>Brak wyzwalaczy innych niż cron.</p>";
+  const integrations = facts.integrations.length
+    ? table(
+        ["Klient", "Serwis", "Bazowy URL", "Skąd adres", "Wywołujący (klient → źródło → job)"],
+        facts.integrations.map((i) => [
+          anchorSpan(integrationAnchor(i.client)) + code(i.client),
+          escapeHtml(i.service),
+          code(i.baseUrl),
+          escapeHtml(i.origin) + (i.configKey ? ` ${code(i.configKey)}` : ""),
+          chainCell(i.callers),
+        ]),
+      )
+    : "<p>Brak zewnętrznych klientów HTTP.</p>";
+  const routes = facts.routes.length
+    ? table(
+        ["Trasa", "Komponent", "Wywołania API → endpoint"],
+        facts.routes.map((r) => [code(r.path), r.component ? code(r.component) : "", routeCalls(r)]),
+      )
+    : "<p>Brak tras Angulara.</p>";
+  return [
+    '<h2 id="jobs">Joby Quartz</h2>',
+    jobs,
+    "<h2>Wyzwalacze inne niż cron</h2>",
+    triggers,
+    '<h2 id="integrations">Integracje zewnętrzne</h2>',
+    integrations,
+    '<h2 id="frontend">Frontend: trasy i wywołania API</h2>',
+    routes,
+  ].join("\n");
+}
+
+function renderSlabePunkty(facts) {
+  const rows = facts.items.map((item) => [
+    (item.anchor ? anchorSpan(item.anchor) : "") + escapeHtml(item.severity),
+    escapeHtml(item.title) + (item.reasons ? ` (${escapeHtml(item.reasons.join(", "))})` : ""),
+    item.links.map((l) => `<a href="${escapeHtml(l)}">${escapeHtml(l.replace(/\.html#.*/, ""))}</a>`).join(", "),
+  ]);
+  return [
+    '<h2 id="wykryte">Wykryte automatycznie</h2>',
+    "<p>Informacja z kodu i ADR-ów, nie gotowa specyfikacja.</p>",
+    rows.length ? table(["Rodzaj", "Opis", "Strony"], rows) : "<p>Nic nie wykryto.</p>",
+  ].join("\n");
+}
+
+function validateSlabePunktyProse(prose) {
+  return /<section[^>]*class="[^"]*\bocena-claude\b/.test(prose)
+    ? null
+    : 'prose fragment lacks <section class="ocena-claude"> with the assessment';
+}
+
 export const PAGES = [
   {
     slug: "index",
@@ -210,6 +308,14 @@ export const PAGES = [
   { slug: "architektura", title: "Architektura", extract: extractArchitecture, render: renderArchitektura },
   { slug: "eventy", title: "Eventy i przepływy", extract: extractEvents, render: renderEventy, validateProse: validateEventyProse },
   { slug: "bazy-danych", title: "Bazy danych", extract: extractEntities, render: renderBazyDanych },
+  { slug: "joby-integracje-frontend", title: "Joby, integracje, frontend", extract: extractJoby, render: renderJoby },
+  {
+    slug: "slabe-punkty",
+    title: "Słabe punkty",
+    extract: extractWeakPoints,
+    render: renderSlabePunkty,
+    validateProse: validateSlabePunktyProse,
+  },
 ];
 
 const STYLE = `
@@ -223,6 +329,7 @@ th, td { border: 1px solid #d9dee8; padding: 0.4rem 0.7rem; text-align: left; ve
 th { background: #eef1f6; }
 code { background: #eef1f6; padding: 0 0.25rem; border-radius: 3px; }
 pre.mermaid { background: #fff; border: 1px solid #d9dee8; padding: 1rem; overflow-x: auto; }
+section.ocena-claude { background: #fff7e6; border-left: 4px solid #c77d0a; padding: 0.5rem 1rem; margin: 1rem 0; }
 footer { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; color: #6b7487; font-size: 0.85rem; }
 `;
 

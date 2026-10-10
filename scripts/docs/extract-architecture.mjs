@@ -92,7 +92,7 @@ function extractSlices(service) {
     .sort((a, b) => a.folder.localeCompare(b.folder));
 }
 
-function normalizeRoute(route) {
+export function normalizeRoute(route) {
   return route.split("?")[0].replace(/\{[^}]*\}?/g, "{}").replace(/\/+$/, "");
 }
 
