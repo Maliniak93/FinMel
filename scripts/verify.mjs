@@ -983,6 +983,11 @@ async function runWebChecks() {
   return [];
 }
 
+async function runScriptsTest() {
+  const result = await step("scripts-test", () => runCommand("node", ["--test", "scripts/docs/*.test.mjs"]));
+  return result.ok ? [] : [buildFailure("scripts-test", result)];
+}
+
 async function runApiCheck() {
   const openapiDir = path.join(WEB_DIR, "openapi");
   if (!existsSync(openapiDir)) {
@@ -1087,12 +1092,14 @@ async function main() {
 
   if (args.quick) return finish(true, []);
 
+  const scriptsFailures = await runScriptsTest();
+
   // Parallel test projects fight over Docker and CPU: Respawn deadlocks and timing-based tests go red, so one at a time unless asked.
   const [testFailures, webFailures] =
     args.jobs > 1
       ? await Promise.all([runDotnetTests(selectedRels, args.jobs), runWeb ? runWebChecks() : []])
       : [await runDotnetTests(selectedRels, 1), runWeb ? await runWebChecks() : []];
-  const failures = [...testFailures, ...webFailures];
+  const failures = [...scriptsFailures, ...testFailures, ...webFailures];
 
   if (runApi && webFailures.length === 0) {
     const apiFailure = await runApiCheck();
