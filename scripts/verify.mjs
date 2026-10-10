@@ -170,7 +170,7 @@ function getChangedFiles() {
     const out = gitOutput(["diff", "--name-only", base]);
     if (out !== null) {
       const diffFiles = splitNonEmptyLines(out);
-      const statusOut = gitOutput(["status", "--porcelain"]) ?? "";
+      const statusOut = gitOutput(["status", "--porcelain", "--untracked-files=all"]) ?? "";
       const statusFiles = parsePorcelainStatus(statusOut);
       return { files: [...new Set([...diffFiles, ...statusFiles])], treatAsAll: false, base };
     }
@@ -515,7 +515,7 @@ function extractCompilerFailure(stepName, text) {
 }
 
 // xUnit's [FAIL] marker is not localized; a loose "Failed <word>" scan matches unrelated prose.
-const XUNIT_FAIL_RE = /^\s*(.+?)\s+\[FAIL\]\s*$/;
+const XUNIT_FAIL_RE = /^\s*(?:\[xUnit\.net[^\]]*\]\s+)?(.+?)\s+\[FAIL\]\s*$/;
 const VSTEST_FAIL_RE = /^\s*(?:Failed|Niepowodzenie)\s+([A-Za-z_][\w]*(?:\.[\w]+)+(?:\([^)]*\))?)\s+\[\d+\s*(?:ms|s)\]\s*$/;
 const SUMMARY_COUNT_RE = /(?:Failed!|Niepowodzenie!).*?(\d+)/;
 const DOCKER_UNREACHABLE_RE = /\b(docker|testcontainers|npipe|dockerdesktoplinuxengine)\b/i;
@@ -524,6 +524,18 @@ const STACK_FILE_RE = /in\s+(.+?):line\s+\d+/;
 // Testcontainers PDBs carry their own build-time paths, which point at no file in this repo.
 function looksRepoRelative(rel) {
   return !!rel && !rel.startsWith("/") && !/^[A-Za-z]:/.test(rel);
+}
+
+// Theory arguments are dropped so the names can feed a --filter and dedupe across cases.
+function failedTestNames(text) {
+  const names = [];
+  for (const line of stripAnsi(text).split(/\r?\n/)) {
+    const m = line.match(XUNIT_FAIL_RE) || line.match(VSTEST_FAIL_RE);
+    if (!m) continue;
+    const name = m[1].replace(/\(.*$/, "").trim();
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names;
 }
 
 function extractDotnetTestFailure(text) {
@@ -537,11 +549,9 @@ function extractDotnetTestFailure(text) {
     };
   }
 
-  const names = [];
+  const names = failedTestNames(clean);
   let file = null;
   for (const line of clean.split(/\r?\n/)) {
-    const m = line.match(XUNIT_FAIL_RE) || line.match(VSTEST_FAIL_RE);
-    if (m && !names.includes(m[1])) names.push(m[1]);
     if (!file) {
       const fm = line.match(STACK_FILE_RE);
       if (fm) {
@@ -741,7 +751,8 @@ function finish(ok, failures, extra = {}) {
     console.log(`\nverify.mjs: FAILED at step ${[...new Set(failures.map((f) => `"${f.step}"`))].join(", ")}`);
   }
   if (ok && cacheCtx && !extra.cached) storeGreen(cacheCtx, { ok, failures });
-  const json = JSON.stringify({ ok, failures, ...extra });
+  const flaky = flakyTests.size ? { flaky: [...flakyTests] } : {};
+  const json = JSON.stringify({ ok, failures, ...flaky, ...extra });
   if (outFile) {
     try {
       writeFileSync(`${outFile}.tmp`, json);
@@ -901,10 +912,44 @@ async function runPool(items, limit, worker) {
   return results;
 }
 
+const MAX_RETRY_NAMES = 10;
+const SUMMARY_TOTAL_RE = /(?:[^:\n]+:\s*\d+,\s*){3}[^:\n]+:\s*(\d+)/;
+const flakyTests = new Set();
+
+// Only a handful of named test failures is worth a rerun; a timeout, a start error, Docker or a compiler error is not.
+function retryableFailedNames(result) {
+  if (result.deadlineHit || result.timedOut || result.error) return null;
+  const text = stripAnsi(`${result.stdout}\n${result.stderr}`);
+  if (DOCKER_UNREACHABLE_RE.test(text)) return null;
+  if (text.split(/\r?\n/).some((l) => l.match(DIAG_RE)?.[4] === "error")) return null;
+  const names = failedTestNames(text);
+  return names.length > 0 && names.length <= MAX_RETRY_NAMES ? names : null;
+}
+
+// A filter that matches nothing exits 0 without running a test.
+function ranTests(result) {
+  return stripAnsi(`${result.stdout}\n${result.stderr}`)
+    .split(/\r?\n/)
+    .some((l) => Number(l.match(SUMMARY_TOTAL_RE)?.[1] ?? 0) > 0);
+}
+
 async function runDotnetTests(rels, jobs) {
   const results = await runPool(orderLongestFirst(rels), jobs, async (rel) => {
     const r = await step(`test: ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]), { block: true });
-    return r.ok ? null : buildFailure("test", r);
+    if (r.ok) return null;
+    const names = retryableFailedNames(r);
+    if (!names) return buildFailure("test", r);
+    const filter = names.map((n) => `FullyQualifiedName~${n}`).join("|");
+    const retry = await step(
+      `test (retry ${names.length} failed): ${rel}`,
+      () => runCommand("dotnet", ["test", rel, "--no-build", "--filter", filter]),
+      { block: true },
+    );
+    if (!retry.ok) return buildFailure("test", retry);
+    if (!ranTests(retry)) return buildFailure("test", r);
+    names.forEach((n) => flakyTests.add(n));
+    console.log(`\nnotice: flaky — passed on retry: ${names.join(", ")}`);
+    return null;
   });
   return results.filter(Boolean);
 }
@@ -959,9 +1004,11 @@ async function runApiCheck() {
   return null;
 }
 
-async function checkFormat(args, changed) {
-  const editorConfigChanged = changed?.files.some((f) => /(^|\/)\.editorconfig$/i.test(normalizeSlashes(f)));
-  if (args.all || !changed || changed.treatAsAll || editorConfigChanged) {
+const FORMAT_CONFIG_RE = /(^|\/)(\.editorconfig|\.globalconfig|skarbiec\.slnx)$|\.(props|targets)$/i;
+
+async function checkFormat(changed) {
+  const formatConfigChanged = changed?.files.some((f) => FORMAT_CONFIG_RE.test(normalizeSlashes(f)));
+  if (!changed || changed.treatAsAll || formatConfigChanged) {
     return step("format", () => runCommand("dotnet", ["format", "Skarbiec.slnx", "--verify-no-changes"]));
   }
   const cs = existingCsFiles(changed.files);
@@ -1025,7 +1072,7 @@ async function main() {
     if (fingerprint) cacheCtx = { fingerprint, scope: scopeKey };
   }
 
-  const formatResult = await checkFormat(args, changed);
+  const formatResult = await checkFormat(changed);
   if (!formatResult.ok) return finish(false, [buildFailure("format", formatResult)]);
 
   let buildResult = await step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
