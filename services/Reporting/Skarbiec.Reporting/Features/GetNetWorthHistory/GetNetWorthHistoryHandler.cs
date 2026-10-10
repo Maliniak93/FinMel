@@ -26,12 +26,23 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             .OrderBy(p => p.Date)
             .ToListAsync(cancellationToken);
 
+        decimal? changePln = null;
+        decimal? changePercent = null;
+        if (points.Count >= 2)
+        {
+            var first = points[0].NetWorthPln;
+            changePln = points[^1].NetWorthPln - first;
+            changePercent = first == 0m ? null : Math.Round(changePln.Value / first * 100m, 2);
+        }
+
         return new NetWorthHistoryResponse
         {
             Range = range.ToUpperInvariant(),
             Points = points
                 .Select(p => new NetWorthHistoryPoint { Date = p.Date, NetWorthPln = p.NetWorthPln })
                 .ToList(),
+            ChangePln = changePln,
+            ChangePercent = changePercent,
         };
     }
 

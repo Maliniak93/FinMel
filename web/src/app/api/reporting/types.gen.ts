@@ -35,6 +35,8 @@ export type NetWorthHistoryPoint = {
 export type NetWorthHistoryResponse = {
     range: string;
     points: Array<NetWorthHistoryPoint>;
+    changePln?: null | number | string;
+    changePercent?: null | number | string;
 };
 
 export type GetApiReportingDashboardData = {

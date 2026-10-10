@@ -11,6 +11,25 @@ export function formatMoney(amount: number | string, currency = 'PLN'): string {
   }
 }
 
+export function formatMoneyCompact(
+  amount: number | string,
+  currency = 'PLN',
+  maximumFractionDigits?: number,
+): string {
+  try {
+    return new Intl.NumberFormat(activeLocale(), {
+      style: 'currency',
+      currency,
+      notation: 'compact',
+      ...(maximumFractionDigits === undefined
+        ? {}
+        : { minimumFractionDigits: 0, maximumFractionDigits }),
+    }).format(Number(amount));
+  } catch {
+    return `${amount} ${currency}`;
+  }
+}
+
 export function formatQuantity(quantity: number | string): string {
   return new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 8 }).format(
     Number(quantity),
@@ -47,4 +66,14 @@ export function formatDateTime(value: string | Date | null | undefined): string 
     : new Intl.DateTimeFormat(activeLocale(), { dateStyle: 'medium', timeStyle: 'medium' }).format(
         toDate(value),
       );
+}
+
+export function formatAxisDate(value: Date, unit: 'day' | 'month' | 'year'): string {
+  const options: Intl.DateTimeFormatOptions =
+    unit === 'day'
+      ? { day: 'numeric', month: 'short' }
+      : unit === 'month'
+        ? { month: 'short', year: 'numeric' }
+        : { year: 'numeric' };
+  return new Intl.DateTimeFormat(activeLocale(), options).format(value);
 }

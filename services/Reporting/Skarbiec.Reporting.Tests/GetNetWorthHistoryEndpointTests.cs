@@ -176,6 +176,72 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     }
 
     [Fact]
+    public async Task ReturnsChangeBetweenFirstAndLastPoint()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var firstPortfolioId = Guid.NewGuid();
+        var secondPortfolioId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, firstPortfolioId, Today.AddDays(-30), 600m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, secondPortfolioId, Today.AddDays(-30), 400m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, firstPortfolioId, Today.AddDays(-10), 5000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, firstPortfolioId, Today, 1250m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(NetWorthHistoryUri("1Y"), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(250.00m, body!.ChangePln);
+        Assert.Equal(25.00m, body.ChangePercent);
+    }
+
+    [Fact]
+    public async Task ChangeIsNullWithoutTwoPoints()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, Guid.NewGuid(), Today, 1000m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(NetWorthHistoryUri("1Y"), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Single(body!.Points);
+        Assert.Null(body.ChangePln);
+        Assert.Null(body.ChangePercent);
+    }
+
+    [Fact]
+    public async Task ChangePercentIsNullWhenFirstPointIsZero()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, portfolioId, Today.AddDays(-5), 0m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, portfolioId, Today, 500m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(NetWorthHistoryUri("1Y"), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(500.00m, body!.ChangePln);
+        Assert.Null(body.ChangePercent);
+    }
+
+    [Fact]
     public async Task Get_NeverIncludesAnotherUsersSnapshots()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

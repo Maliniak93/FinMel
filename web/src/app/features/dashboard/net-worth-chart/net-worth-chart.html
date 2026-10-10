@@ -2,7 +2,7 @@
   <mat-button-toggle-group
     class="net-worth-chart__ranges"
     [value]="range()"
-    (change)="setRange($event.value)"
+    (change)="range.set($event.value)"
     [attr.aria-label]="'netWorthChart.rangeLabel' | transloco"
   >
     @for (option of ranges; track option) {
@@ -10,39 +10,96 @@
     }
   </mat-button-toggle-group>
 
-  @if (historyResource.error(); as loadError) {
+  @if (loadError(); as message) {
     <div class="net-worth-chart__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="historyResource.reload()">
+      <p>{{ message }}</p>
+      <button mat-button type="button" (click)="retry.emit()">
         {{ 'common.retry' | transloco }}
       </button>
     </div>
-  } @else if (historyResource.isLoading() && !historyResource.hasValue()) {
+  } @else if (loading()) {
     <div class="net-worth-chart__state">
       <mat-spinner diameter="32" />
     </div>
-  } @else if (points().length < 2) {
-    <p class="net-worth-chart__empty">{{ 'netWorthChart.notEnoughHistory' | transloco }}</p>
+  } @else if (chart(); as view) {
+    <div class="net-worth-chart__canvas">
+      <svg
+        class="net-worth-chart__svg"
+        role="img"
+        [attr.viewBox]="'0 0 ' + width + ' ' + height"
+        [attr.aria-label]="
+          'netWorthChart.chartLabel'
+            | transloco
+              : {
+                  range: range(),
+                  from: formatMoney(view.first.value),
+                  to: formatMoney(view.last.value),
+                }
+        "
+      >
+        @for (tick of view.yTicks; track tick.value) {
+          <line
+            class="net-worth-chart__gridline"
+            [attr.x1]="margin.left"
+            [attr.x2]="margin.left + plotWidth"
+            [attr.y1]="tick.y"
+            [attr.y2]="tick.y"
+          />
+          <text
+            class="net-worth-chart__y-label"
+            text-anchor="end"
+            dominant-baseline="middle"
+            [attr.x]="margin.left - 8"
+            [attr.y]="tick.y"
+          >
+            {{ formatMoneyCompact(tick.value, 'PLN', labelFractionDigits) }}
+          </text>
+        }
+        @for (tick of view.xTicks; track tick.x) {
+          <text
+            class="net-worth-chart__x-label"
+            text-anchor="middle"
+            [attr.x]="tick.x"
+            [attr.y]="margin.top + plotHeight + 18"
+          >
+            {{ formatAxisDate(tick.date, view.xTickUnit) }}
+          </text>
+        }
+        <path class="net-worth-chart__area" [attr.d]="view.areaPath" />
+        <path class="net-worth-chart__line" [attr.d]="view.linePath" />
+        @if (hovered(); as point) {
+          <line
+            class="net-worth-chart__guide"
+            [attr.x1]="point.x"
+            [attr.x2]="point.x"
+            [attr.y1]="margin.top"
+            [attr.y2]="margin.top + plotHeight"
+          />
+          <circle class="net-worth-chart__marker" r="5" [attr.cx]="point.x" [attr.cy]="point.y" />
+        }
+        <rect
+          class="net-worth-chart__plot"
+          [attr.x]="margin.left"
+          [attr.y]="margin.top"
+          [attr.width]="plotWidth"
+          [attr.height]="plotHeight"
+          (pointermove)="onPointerMove($event)"
+          (pointerleave)="onPointerLeave()"
+        />
+      </svg>
+      @if (hovered(); as point) {
+        <div
+          class="net-worth-chart__tooltip"
+          [attr.data-align]="tooltipAlignment(point)"
+          [style.left.%]="(point.x / width) * 100"
+          [style.top.%]="(point.y / height) * 100"
+        >
+          <span class="net-worth-chart__tooltip-date">{{ formatDate(point.date) }}</span>
+          <span class="net-worth-chart__tooltip-value">{{ formatMoney(point.value) }}</span>
+        </div>
+      }
+    </div>
   } @else {
-    <svg
-      [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
-      class="net-worth-chart__svg"
-      role="img"
-      [attr.aria-label]="'netWorthChart.chartLabel' | transloco"
-      preserveAspectRatio="none"
-    >
-      <polyline
-        [attr.points]="linePoints()"
-        fill="none"
-        stroke="var(--mat-sys-primary)"
-        stroke-width="2"
-        vector-effect="non-scaling-stroke"
-      />
-    </svg>
-    @if (asOf(); as date) {
-      <p class="net-worth-chart__as-of">
-        {{ 'netWorthChart.asOf' | transloco: { date: formatDate(date) } }}
-      </p>
-    }
+    <p class="net-worth-chart__empty">{{ 'netWorthChart.notEnoughHistory' | transloco }}</p>
   }
 </div>

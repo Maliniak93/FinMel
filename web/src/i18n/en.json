@@ -374,6 +374,9 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "netWorth": "Net worth",
+    "change": "Change",
+    "allocation": "Allocation",
     "empty": "You haven't entered any wealth yet.",
     "goToPortfolios": "Go to portfolios",
     "stale": "Stale",
@@ -384,9 +387,8 @@
   },
   "netWorthChart": {
     "rangeLabel": "Chart range",
-    "chartLabel": "Net worth history chart",
+    "chartLabel": "Net worth history chart, {{ range }}: from {{ from }} to {{ to }}",
     "notEnoughHistory": "Not enough history to chart yet.",
-    "asOf": "As of {{ date }}",
     "loadFailed": "Failed to load net-worth history."
   },
   "portfolios": {
