@@ -4,6 +4,15 @@
   height: auto;
 }
 
+.pie-chart__segment {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pie-chart__segment--dimmed {
+  opacity: 0.35;
+}
+
 .pie-chart__empty {
   margin: 0;
   opacity: 0.7;

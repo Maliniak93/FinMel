@@ -1,14 +1,35 @@
 <div class="net-worth-chart">
-  <mat-button-toggle-group
-    class="net-worth-chart__ranges"
-    [value]="range()"
-    (change)="range.set($event.value)"
-    [attr.aria-label]="'netWorthChart.rangeLabel' | transloco"
-  >
-    @for (option of ranges; track option) {
-      <mat-button-toggle [value]="option">{{ option }}</mat-button-toggle>
+  <div class="net-worth-chart__controls">
+    <mat-button-toggle-group
+      class="net-worth-chart__ranges"
+      [value]="range()"
+      (change)="range.set($event.value)"
+      [attr.aria-label]="'netWorthChart.rangeLabel' | transloco"
+    >
+      @for (option of ranges; track option) {
+        <mat-button-toggle [value]="option">{{ option }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+
+    @if (classes().length > 0) {
+      <mat-chip-listbox
+        class="net-worth-chart__classes"
+        hideSingleSelectionIndicator
+        [value]="assetClass() ?? allClasses"
+        (change)="onClassChange($event.value)"
+        [attr.aria-label]="'netWorthChart.classFilter' | transloco"
+      >
+        <mat-chip-option [value]="allClasses">{{
+          'netWorthChart.allClasses' | transloco
+        }}</mat-chip-option>
+        @for (option of classes(); track option) {
+          <mat-chip-option [value]="option">{{
+            assetClassLabel(option) | transloco
+          }}</mat-chip-option>
+        }
+      </mat-chip-listbox>
     }
-  </mat-button-toggle-group>
+  </div>
 
   @if (loadError(); as message) {
     <div class="net-worth-chart__state" role="alert">
@@ -22,18 +43,26 @@
       <mat-spinner diameter="32" />
     </div>
   } @else if (chart(); as view) {
+    @let selectedClass = assetClass();
+    @if (selectedClass !== null) {
+      <p class="net-worth-chart__caption">
+        <span class="net-worth-chart__swatch" [style.background]="seriesColor()"></span>
+        {{ assetClassLabel(selectedClass) | transloco }}
+      </p>
+    }
     <div class="net-worth-chart__canvas">
       <svg
         class="net-worth-chart__svg"
         role="img"
         [attr.viewBox]="'0 0 ' + width + ' ' + height"
         [attr.aria-label]="
-          'netWorthChart.chartLabel'
+          chartLabelKey()
             | transloco
               : {
                   range: range(),
                   from: formatMoney(view.first.value),
                   to: formatMoney(view.last.value),
+                  class: classLabelKey() | transloco,
                 }
         "
       >
@@ -65,8 +94,12 @@
             {{ formatAxisDate(tick.date, view.xTickUnit) }}
           </text>
         }
-        <path class="net-worth-chart__area" [attr.d]="view.areaPath" />
-        <path class="net-worth-chart__line" [attr.d]="view.linePath" />
+        <path class="net-worth-chart__area" [attr.d]="view.areaPath" [style.fill]="seriesColor()" />
+        <path
+          class="net-worth-chart__line"
+          [attr.d]="view.linePath"
+          [style.stroke]="seriesColor()"
+        />
         @if (hovered(); as point) {
           <line
             class="net-worth-chart__guide"
@@ -75,7 +108,13 @@
             [attr.y1]="margin.top"
             [attr.y2]="margin.top + plotHeight"
           />
-          <circle class="net-worth-chart__marker" r="5" [attr.cx]="point.x" [attr.cy]="point.y" />
+          <circle
+            class="net-worth-chart__marker"
+            r="5"
+            [attr.cx]="point.x"
+            [attr.cy]="point.y"
+            [style.fill]="seriesColor()"
+          />
         }
         <rect
           class="net-worth-chart__plot"
@@ -94,6 +133,11 @@
           [style.left.%]="(point.x / width) * 100"
           [style.top.%]="(point.y / height) * 100"
         >
+          @if (selectedClass !== null) {
+            <span class="net-worth-chart__tooltip-class">{{
+              assetClassLabel(selectedClass) | transloco
+            }}</span>
+          }
           <span class="net-worth-chart__tooltip-date">{{ formatDate(point.date) }}</span>
           <span class="net-worth-chart__tooltip-value">{{ formatMoney(point.value) }}</span>
         </div>

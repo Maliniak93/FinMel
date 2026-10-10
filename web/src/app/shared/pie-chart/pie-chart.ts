@@ -1,7 +1,8 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 export interface PieChartSegment {
+  readonly key: string;
   readonly label: string;
   readonly percentage: number;
   readonly color: string;
@@ -24,6 +25,8 @@ const CIRCUMFERENCE = 100;
 })
 export class PieChart {
   readonly segments = input.required<readonly PieChartSegment[]>();
+  readonly selected = input<string | null>(null);
+  readonly segmentClick = output<string>();
 
   protected readonly radius = RADIUS;
 

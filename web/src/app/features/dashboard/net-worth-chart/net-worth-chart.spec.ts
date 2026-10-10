@@ -12,10 +12,43 @@ import {
 import type { NetWorthHistoryResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../../shared/format';
+import { ASSET_CLASS } from '../../assets/asset-class';
 import { NetWorthChart } from './net-worth-chart';
 
 function normalised(text: string): string {
   return text.replace(/\s+/g, ' ');
+}
+
+const ETF_COLOUR = /#82c91e|rgb\(130, 201, 30\)/i;
+const CLASSES = [ASSET_CLASS.Etf, ASSET_CLASS.Stock, ASSET_CLASS.Cash];
+
+function paintOf(element: Element | null): string {
+  if (!element) {
+    return '';
+  }
+  const style = getComputedStyle(element);
+  return [
+    element.getAttribute('stroke'),
+    element.getAttribute('fill'),
+    element.getAttribute('style'),
+    style.stroke,
+    style.fill,
+  ].join(' ');
+}
+
+function textOutsideControls(element: HTMLElement): string {
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone
+    .querySelectorAll('mat-chip-listbox, mat-button-toggle-group, svg, .net-worth-chart__tooltip')
+    .forEach((node) => node.remove());
+  return normalised(clone.textContent ?? '');
+}
+
+function hoverPlot(element: HTMLElement, clientX: number): void {
+  const plot = element.querySelector('.net-worth-chart__plot') as SVGElement;
+  plot.getBoundingClientRect = () =>
+    ({ left: 0, right: 300, top: 0, bottom: 100, width: 300, height: 100, x: 0, y: 0 }) as DOMRect;
+  plot.dispatchEvent(new MouseEvent('pointermove', { clientX, clientY: 50, bubbles: true }));
 }
 
 type HistoryPoints = NetWorthHistoryResponse['points'];
@@ -38,7 +71,12 @@ describe('NetWorthChart', () => {
     await restoreEnglish();
   });
 
-  async function setup(points: HistoryPoints, range = '1Y'): Promise<HTMLElement> {
+  async function setup(
+    points: HistoryPoints,
+    range = '1Y',
+    classes?: readonly number[],
+    assetClass?: number | null,
+  ): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       imports: [NetWorthChart],
       providers: [provideI18nTesting()],
@@ -47,6 +85,12 @@ describe('NetWorthChart', () => {
     fixture = TestBed.createComponent(NetWorthChart);
     fixture.componentRef.setInput('points', points);
     fixture.componentRef.setInput('range', range);
+    if (classes) {
+      fixture.componentRef.setInput('classes', classes);
+    }
+    if (assetClass !== undefined) {
+      fixture.componentRef.setInput('assetClass', assetClass);
+    }
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   }
@@ -121,6 +165,34 @@ describe('NetWorthChart', () => {
     expect(element.querySelector('.net-worth-chart__tooltip')).toBeNull();
     expect(element.querySelector('.net-worth-chart__guide')).toBeNull();
     expect(element.querySelector('.net-worth-chart__marker')).toBeNull();
+  });
+
+  it('labels and colours the series with the selected class', async () => {
+    const element = await setup(yearPoints, '1Y', CLASSES, ASSET_CLASS.Etf);
+
+    expect(paintOf(element.querySelector('path.net-worth-chart__line'))).toMatch(ETF_COLOUR);
+    expect(paintOf(element.querySelector('path.net-worth-chart__area'))).toMatch(ETF_COLOUR);
+    expect(textOutsideControls(element)).toContain('ETF');
+    expect(element.querySelector('svg')?.getAttribute('aria-label')).toContain('ETF');
+
+    hoverPlot(element, 0);
+    await fixture.whenStable();
+
+    expect(textOf(element.querySelector('.net-worth-chart__tooltip'))).toMatch(/^ETF/);
+  });
+
+  it('shows no class label or colour without a selected class', async () => {
+    const element = await setup(yearPoints, '1Y', CLASSES, null);
+
+    expect(paintOf(element.querySelector('path.net-worth-chart__line'))).not.toMatch(ETF_COLOUR);
+    expect(paintOf(element.querySelector('path.net-worth-chart__area'))).not.toMatch(ETF_COLOUR);
+    expect(textOutsideControls(element)).not.toContain('ETF');
+    expect(element.querySelector('svg')?.getAttribute('aria-label') ?? '').not.toContain('ETF');
+
+    hoverPlot(element, 0);
+    await fixture.whenStable();
+
+    expect(textOf(element.querySelector('.net-worth-chart__tooltip'))).not.toContain('ETF');
   });
 
   it('not enough history', async () => {

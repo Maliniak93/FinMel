@@ -7,30 +7,21 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
-import { getApiReportingDashboard, getApiReportingNetWorthHistory } from '../../api/reporting';
+import {
+  getApiReportingDashboard,
+  getApiReportingNetWorthHistory,
+  type AssetClass,
+} from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
 import { assetClassLabel } from '../assets/asset-class';
+import { assetClassColor } from './asset-class-color';
 import { CashCard } from './cash-card/cash-card';
 import { PortfoliosCard } from './portfolios-card/portfolios-card';
 import { UpcomingCard } from './upcoming-card/upcoming-card';
 import type { ChartRange } from './net-worth-chart/chart-scale';
 import { NetWorthChart } from './net-worth-chart/net-worth-chart';
-
-// Indexed by AssetClass, so a class keeps its colour whichever classes are present.
-const ASSET_CLASS_COLORS: readonly string[] = [
-  '#4C6EF5',
-  '#22B8CF',
-  '#12B886',
-  '#82C91E',
-  '#FAB005',
-  '#FA5252',
-  '#F76707',
-  '#7048E8',
-  '#868E96',
-  '#E64980',
-];
 
 @Component({
   selector: 'app-dashboard',
@@ -66,11 +57,16 @@ export class Dashboard {
 
   protected readonly range = signal<ChartRange>('1Y');
 
+  protected readonly assetClass = signal<AssetClass | null>(null);
+
   protected readonly historyResource = resource({
-    params: () => ({ range: this.range() }),
+    params: () => ({ range: this.range(), assetClass: this.assetClass() }),
     loader: async ({ params, abortSignal }) => {
       const result = await getApiReportingNetWorthHistory({
-        query: { range: params.range },
+        query:
+          params.assetClass === null
+            ? { range: params.range }
+            : { range: params.range, assetClass: params.assetClass },
         signal: abortSignal,
       });
       if (result.error) {
@@ -118,13 +114,31 @@ export class Dashboard {
       return [];
     }
     return dashboard.byAssetClass.map((entry) => ({
+      key: String(entry.assetClass),
       label: assetClassLabel(entry.assetClass),
       percentage: Number(entry.percentage),
-      color: this.assetClassColor(entry.assetClass),
+      color: assetClassColor(entry.assetClass),
     }));
   });
 
-  protected assetClassColor(assetClass: number): string {
-    return ASSET_CLASS_COLORS[Number(assetClass) % ASSET_CLASS_COLORS.length];
+  protected readonly classes = computed<readonly AssetClass[]>(() =>
+    this.dashboardResource.hasValue()
+      ? this.dashboardResource.value().byAssetClass.map((entry) => entry.assetClass)
+      : [],
+  );
+
+  protected readonly selectedKey = computed(() => {
+    const selected = this.assetClass();
+    return selected === null ? null : String(selected);
+  });
+
+  protected readonly assetClassColor = assetClassColor;
+
+  protected selectClass(assetClass: AssetClass): void {
+    this.assetClass.update((current) => (current === assetClass ? null : assetClass));
+  }
+
+  protected onSegmentClick(key: string): void {
+    this.selectClass(Number(key));
   }
 }

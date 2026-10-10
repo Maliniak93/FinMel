@@ -33,6 +33,15 @@ export const dashboard: DashboardResponse = {
   ],
 };
 
+export const dashboardWithClasses: DashboardResponse = {
+  ...dashboard,
+  byAssetClass: [
+    { assetClass: 3, valuePln: 4000, percentage: 26.67 },
+    { assetClass: 2, valuePln: 6000, percentage: 40 },
+    { assetClass: 0, valuePln: 5000, percentage: 33.33 },
+  ],
+};
+
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -104,6 +113,17 @@ export function mockApi(overrides: Partial<Record<ApiRoute, Responder>> = {}) {
     const responder = routes[route];
     return typeof responder === 'function' ? responder(url) : responder.clone();
   });
+}
+
+export function lastHistoryParams(fetchSpy: ReturnType<typeof mockApi>): URLSearchParams {
+  const url = fetchSpy.mock.calls
+    .map(([input]) => requestUrl(input))
+    .filter((candidate) => candidate.includes(API_PATHS.history))
+    .at(-1);
+  if (url === undefined) {
+    throw new Error('No net-worth history request was made.');
+  }
+  return new URL(url).searchParams;
 }
 
 export async function renderCard<T>(
