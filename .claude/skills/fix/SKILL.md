@@ -1,7 +1,7 @@
 ---
 name: fix
 description: Reproduce a bug, find its root cause, publish a one-criterion fix spec as an issue on the FinMel GitHub project, and (after approval) build it with the same pipeline that ships features. Never patches without a failing reproduction.
-argument-hint: "<bug description, failing test name, verify failure, or log path>"
+argument-hint: "<bug description, failing test name, verify failure, log path, or idea:<slug>>"
 disable-model-invocation: true
 model: claude-opus-5-5
 effort: high
@@ -9,6 +9,10 @@ effort: high
 
 Turn the bug in `$ARGUMENTS` into a verified fix. You diagnose and specify; the pipeline implements,
 so the author of the fix is never its reviewer.
+
+`$ARGUMENTS` = `idea:<slug>` → `node scripts/idea.mjs show <slug>` is the bug report (shaped by `/idea`):
+start the reproduction from its "Kroki reprodukcji"; its "Hipotezy" are unverified; its "Powiązane"
+names related issues. After `create` publishes, run `node scripts/idea.mjs mark <slug> used --issue <n>`.
 
 ## 0. Is it already known?
 
