@@ -102,7 +102,7 @@ public static class ValuationAlgorithm
             PriceUsed = priceUsed,
             PriceDate = priceDate,
             FxRateUsed = fxRateUsed,
-            ValuePln = valuePln,
+            ValuePln = Math.Round(valuePln, 2, MidpointRounding.AwayFromZero),
             IsStale = isStale,
         };
 

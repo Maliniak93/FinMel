@@ -56,7 +56,7 @@ public sealed class ValuationAlgorithmTests
 
         var result = ValuationAlgorithm.Calculate([position], prices, fx, SnapshotDate);
 
-        var expected = 3m * 31.1034768m * 133.92m * 3.9m;
+        var expected = Math.Round(3m * 31.1034768m * 133.92m * 3.9m, 2, MidpointRounding.AwayFromZero);
         Assert.Equal(expected, result.TotalPln);
         Assert.Equal(expected, Assert.Single(result.Lines).ValuePln);
     }
@@ -177,6 +177,31 @@ public sealed class ValuationAlgorithmTests
         var realEstateLine = Assert.Single(result.Lines, l => l.AssetId == realEstateAssetId);
         Assert.Equal(AssetClass.RealEstate, realEstateLine.AssetClass);
         Assert.Equal(300_000m, realEstateLine.ValuePln);
+    }
+
+    [Fact]
+    public void Calculate_RoundsEachLineToTwoDecimals_TotalIsTheirSum()
+    {
+        var threeId = Guid.NewGuid();
+        var oneId = Guid.NewGuid();
+        var midpointId = Guid.NewGuid();
+        var positions = new[]
+        {
+            MarketPosition(threeId, AssetClass.Stock, quantity: 3),
+            MarketPosition(oneId, AssetClass.Stock, quantity: 1),
+            ManualPosition(midpointId, AssetClass.Other, 0.125m, "PLN"),
+        };
+        var prices = Prices((InstrumentId, "USD", SnapshotDate, 33.3333m));
+        var fx = FxRates(("USDPLN", SnapshotDate, 4.0123m));
+
+        var result = ValuationAlgorithm.Calculate(positions, prices, fx, SnapshotDate);
+
+        Assert.Equal(401.23m, Assert.Single(result.Lines, l => l.AssetId == threeId).ValuePln);
+        Assert.Equal(133.74m, Assert.Single(result.Lines, l => l.AssetId == oneId).ValuePln);
+        Assert.Equal(0.13m, Assert.Single(result.Lines, l => l.AssetId == midpointId).ValuePln);
+        Assert.All(result.Lines, l => Assert.Equal(Math.Round(l.ValuePln, 2), l.ValuePln));
+        Assert.Equal(535.10m, result.TotalPln);
+        Assert.Equal(result.Lines.Sum(l => l.ValuePln), result.TotalPln);
     }
 
     [Fact]

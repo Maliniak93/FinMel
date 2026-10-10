@@ -64,6 +64,7 @@ export type GetApiReportingNetWorthHistoryData = {
     query?: {
         range?: string;
         portfolioId?: string;
+        assetClass?: AssetClass;
     };
     url: '/api/reporting/net-worth-history';
 };

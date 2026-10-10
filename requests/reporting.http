@@ -25,3 +25,7 @@ Authorization: Bearer {{authToken}}
 ### Net worth history — one portfolio
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1M&portfolioId={{createPortfolio.response.body.id}}
 Authorization: Bearer {{authToken}}
+
+### Net worth history — one asset class (AssetClass int: 3 = Etf), 0 on days the class was not held
+GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y&assetClass=3
+Authorization: Bearer {{authToken}}
