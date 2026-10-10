@@ -25,7 +25,9 @@ import {
   type Responder,
   cashAccountsResponse,
   dashboard,
+  dashboardWithClasses,
   jsonResponse,
+  lastHistoryParams,
   mockApi,
   portfolioResponse,
   requestUrl,
@@ -97,8 +99,18 @@ describe('Dashboard', () => {
   it('builds pie segments from the asset-class breakdown', async () => {
     await setup(jsonResponse(dashboard));
     expect(component['pieSegments']()).toEqual([
-      { label: assetClassLabel(ASSET_CLASS.Cash), percentage: 33.33, color: '#4C6EF5' },
-      { label: assetClassLabel(ASSET_CLASS.Stock), percentage: 66.67, color: '#12B886' },
+      {
+        key: String(ASSET_CLASS.Cash),
+        label: assetClassLabel(ASSET_CLASS.Cash),
+        percentage: 33.33,
+        color: '#4C6EF5',
+      },
+      {
+        key: String(ASSET_CLASS.Stock),
+        label: assetClassLabel(ASSET_CLASS.Stock),
+        percentage: 66.67,
+        color: '#12B886',
+      },
     ]);
   });
 
@@ -221,6 +233,176 @@ describe('Dashboard', () => {
 
     expect(element.querySelector('.net-worth-chart__state')).toBeNull();
     expect(changeText()).toContain(normalised(formatMoney(250)));
+  });
+
+  function chipOption(element: HTMLElement, label: string): HTMLButtonElement {
+    const option = [
+      ...element.querySelectorAll<HTMLButtonElement>('mat-chip-option button[role="option"]'),
+    ].find((button) => textOf(button) === label);
+    if (!option) {
+      throw new Error(`No class chip labelled "${label}".`);
+    }
+    return option;
+  }
+
+  function selectedChips(element: HTMLElement): string[] {
+    return textsOf(element, 'mat-chip-option button[aria-selected="true"]');
+  }
+
+  function legendButtons(element: HTMLElement): HTMLButtonElement[] {
+    return [...element.querySelectorAll<HTMLButtonElement>('.dashboard-page__legend button')];
+  }
+
+  function legendPressed(element: HTMLElement): boolean[] {
+    return legendButtons(element).map((button) => button.getAttribute('aria-pressed') === 'true');
+  }
+
+  function legendDimmed(element: HTMLElement): boolean[] {
+    return legendButtons(element).map((button) =>
+      button.classList.contains('dashboard-page__legend-item--dimmed'),
+    );
+  }
+
+  function pieCircles(element: HTMLElement): SVGElement[] {
+    return [...element.querySelectorAll<SVGElement>('app-pie-chart circle')];
+  }
+
+  function clickSvg(element: SVGElement): void {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  }
+
+  it('renders class chips in legend order with All selected', async () => {
+    await setup(jsonResponse(dashboardWithClasses));
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(textsOf(element, 'mat-chip-option')).toEqual(['All', 'ETF', 'Stock', 'Cash']);
+    expect(selectedChips(element)).toEqual(['All']);
+    expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
+  });
+
+  it('filtering by a class requests its series and labels the change', async () => {
+    await setup(jsonResponse(dashboardWithClasses), (url) =>
+      url.includes('assetClass=3') ? historyWithChange(40, 4) : historyWithChange(250, 25),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    const segmentsBefore = component['pieSegments']();
+
+    chipOption(element, 'ETF').click();
+    await fixture.whenStable();
+
+    expect(lastHistoryParams(fetchSpy).get('assetClass')).toBe('3');
+    expect(changeText()).toContain(normalised(formatMoney(40)));
+
+    const changeElement = element.querySelector('.dashboard-page__value .dashboard-page__change');
+    const classLabel = changeElement?.querySelector('.dashboard-page__change-class');
+    const rangeLabel = changeElement?.querySelector('.dashboard-page__change-range');
+    expect(classLabel).toBeTruthy();
+    expect(rangeLabel).toBeTruthy();
+    expect(textOf(classLabel)).toBe('ETF');
+    expect(textOf(rangeLabel)).toBe('1Y');
+    expect(
+      (classLabel as Element).compareDocumentPosition(rangeLabel as Element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    expect(textOf(element.querySelector('.dashboard-page__net-worth'))).toBe(
+      normalised(formatMoney(15000)),
+    );
+    expect(component['pieSegments']()).toEqual(segmentsBefore);
+  });
+
+  it('switching the range keeps the class filter', async () => {
+    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
+    const element = fixture.nativeElement as HTMLElement;
+
+    chipOption(element, 'ETF').click();
+    await fixture.whenStable();
+
+    const monthToggle = [...element.querySelectorAll('mat-button-toggle button')].find(
+      (button) => button.textContent?.trim() === '1M',
+    ) as HTMLButtonElement;
+    monthToggle.click();
+    await fixture.whenStable();
+
+    const params = lastHistoryParams(fetchSpy);
+    expect(params.get('range')).toBe('1M');
+    expect(params.get('assetClass')).toBe('3');
+    expect(selectedChips(element)).toEqual(['ETF']);
+  });
+
+  it('the legend toggles the class filter', async () => {
+    await setup(jsonResponse(dashboardWithClasses));
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(legendButtons(element).map((button) => button.getAttribute('type'))).toEqual([
+      'button',
+      'button',
+      'button',
+    ]);
+    expect(legendPressed(element)).toEqual([false, false, false]);
+
+    legendButtons(element)[0].click();
+    await fixture.whenStable();
+
+    expect(selectedChips(element)).toEqual(['ETF']);
+    expect(legendPressed(element)).toEqual([true, false, false]);
+    expect(legendDimmed(element)).toEqual([false, true, true]);
+
+    legendButtons(element)[0].click();
+    await fixture.whenStable();
+
+    expect(selectedChips(element)).toEqual(['All']);
+    expect(legendPressed(element)).toEqual([false, false, false]);
+    expect(legendDimmed(element)).toEqual([false, false, false]);
+  });
+
+  it('deselecting the class chip returns to All', async () => {
+    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
+    const element = fixture.nativeElement as HTMLElement;
+
+    chipOption(element, 'ETF').click();
+    await fixture.whenStable();
+    chipOption(element, 'ETF').click();
+    await fixture.whenStable();
+
+    expect(selectedChips(element)).toEqual(['All']);
+    expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
+    expect(legendPressed(element)).toEqual([false, false, false]);
+  });
+
+  it('a donut segment click toggles the class filter', async () => {
+    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
+    const element = fixture.nativeElement as HTMLElement;
+
+    clickSvg(pieCircles(element)[0]);
+    await fixture.whenStable();
+
+    expect(selectedChips(element)).toEqual(['ETF']);
+    expect(lastHistoryParams(fetchSpy).get('assetClass')).toBe('3');
+
+    clickSvg(pieCircles(element)[0]);
+    await fixture.whenStable();
+
+    expect(selectedChips(element)).toEqual(['All']);
+    expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
+  });
+
+  it('renders the class filter in Polish', async () => {
+    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
+    const element = fixture.nativeElement as HTMLElement;
+    chipOption(element, 'ETF').click();
+    await fixture.whenStable();
+
+    const english = textsOf(element, 'mat-chip-option');
+    expect(english).toEqual(['All', 'ETF', 'Stock', 'Cash']);
+
+    await switchLanguage(fixture, 'pl');
+
+    const polish = textsOf(element, 'mat-chip-option');
+    expect(polish).toEqual(['Wszystko', 'ETF', 'Akcje', 'Gotówka']);
+    expect(polishProblems(english, polish, ['ETF'])).toEqual([]);
+    expect(textsOf(element, '.dashboard-page__value .dashboard-page__kpi-label')[1]).toBe('Zmiana');
+    expect(textOf(element.querySelector('.dashboard-page__change-class'))).toBe('ETF');
   });
 
   it('renders in Polish', async () => {

@@ -55,6 +55,12 @@
                   @if (change.percent !== null) {
                     ({{ change.sign }}{{ formatPercent(change.percent) }})
                   }
+                  @let selectedClass = assetClass();
+                  @if (selectedClass !== null) {
+                    <span class="dashboard-page__change-class">{{
+                      assetClassLabel(selectedClass) | transloco
+                    }}</span>
+                  }
                   <span class="dashboard-page__change-range">{{ range() }}</span>
                 </p>
               } @else {
@@ -68,17 +74,32 @@
           <mat-card-content>
             <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
             <div class="dashboard-page__breakdown">
-              <app-pie-chart [segments]="pieSegments()" class="dashboard-page__chart" />
+              <app-pie-chart
+                [segments]="pieSegments()"
+                [selected]="selectedKey()"
+                (segmentClick)="onSegmentClick($event)"
+                class="dashboard-page__chart"
+              />
 
               <ul class="dashboard-page__legend">
                 @for (entry of dashboard.byAssetClass; track entry.assetClass) {
                   <li>
-                    <span
-                      class="dashboard-page__swatch"
-                      [style.background]="assetClassColor(entry.assetClass)"
-                    ></span>
-                    {{ assetClassLabel(entry.assetClass) | transloco }} —
-                    {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
+                    <button
+                      type="button"
+                      class="dashboard-page__legend-item"
+                      [class.dashboard-page__legend-item--dimmed]="
+                        assetClass() !== null && assetClass() !== entry.assetClass
+                      "
+                      [attr.aria-pressed]="assetClass() === entry.assetClass"
+                      (click)="selectClass(entry.assetClass)"
+                    >
+                      <span
+                        class="dashboard-page__swatch"
+                        [style.background]="assetClassColor(entry.assetClass)"
+                      ></span>
+                      {{ assetClassLabel(entry.assetClass) | transloco }} —
+                      {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
+                    </button>
                   </li>
                 }
               </ul>
@@ -94,6 +115,8 @@
             <app-net-worth-chart
               [points]="historyPoints()"
               [(range)]="range"
+              [classes]="classes()"
+              [(assetClass)]="assetClass"
               [loading]="historyResource.isLoading()"
               [loadError]="historyResource.error()?.message ?? null"
               (retry)="historyResource.reload()"

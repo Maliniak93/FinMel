@@ -410,6 +410,9 @@
   },
   "netWorthChart": {
     "rangeLabel": "Zakres wykresu",
+    "classFilter": "Klasa aktywów",
+    "allClasses": "Wszystko",
+    "chartLabelForClass": "Wykres historii wartości, {{ class }}, {{ range }}: od {{ from }} do {{ to }}",
     "chartLabel": "Wykres historii wartości majątku, {{ range }}: od {{ from }} do {{ to }}",
     "notEnoughHistory": "Za mało historii, aby narysować wykres.",
     "loadFailed": "Nie udało się wczytać historii wartości majątku."

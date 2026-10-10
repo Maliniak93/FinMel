@@ -1,11 +1,14 @@
-import { Component, computed, input, model, output, signal } from '@angular/core';
+import { Component, computed, input, model, output, signal, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatChipListbox, MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import type { NetWorthHistoryPoint } from '../../../api/reporting';
+import type { AssetClass, NetWorthHistoryPoint } from '../../../api/reporting';
 import { fromDateOnly } from '../../../shared/date-only';
+import { assetClassLabel } from '../../assets/asset-class';
+import { assetClassColor } from '../asset-class-color';
 import {
   formatAxisDate,
   formatDate,
@@ -15,6 +18,7 @@ import {
 import { niceTicks, xTickUnit, xTicks, type ChartRange } from './chart-scale';
 
 const RANGES: readonly ChartRange[] = ['1M', '1Y', 'YTD', 'MAX'];
+const ALL_CLASSES = 'all';
 
 const WIDTH = 640;
 const HEIGHT = 280;
@@ -33,18 +37,31 @@ interface ChartPoint {
 
 @Component({
   selector: 'app-net-worth-chart',
-  imports: [MatButtonModule, MatButtonToggleModule, MatProgressSpinnerModule, TranslocoPipe],
+  imports: [
+    MatButtonModule,
+    MatButtonToggleModule,
+    MatChipsModule,
+    MatProgressSpinnerModule,
+    TranslocoPipe,
+  ],
   templateUrl: './net-worth-chart.html',
   styleUrl: './net-worth-chart.scss',
 })
 export class NetWorthChart {
   readonly points = input<readonly NetWorthHistoryPoint[]>([]);
   readonly range = model<ChartRange>('1Y');
+  readonly classes = input<readonly AssetClass[]>([]);
+  readonly assetClass = model<AssetClass | null>(null);
   readonly loading = input(false);
   readonly loadError = input<string | null>(null);
   readonly retry = output<void>();
 
+  private readonly listbox = viewChild(MatChipListbox);
+
   protected readonly ranges = RANGES;
+  protected readonly allClasses = ALL_CLASSES;
+  protected readonly assetClassLabel = assetClassLabel;
+  protected readonly assetClassColor = assetClassColor;
   protected readonly width = WIDTH;
   protected readonly height = HEIGHT;
   protected readonly margin = MARGIN;
@@ -55,6 +72,20 @@ export class NetWorthChart {
   protected readonly formatMoneyCompact = formatMoneyCompact;
   protected readonly formatAxisDate = formatAxisDate;
   protected readonly labelFractionDigits = Y_LABEL_FRACTION_DIGITS;
+
+  protected readonly seriesColor = computed(() => {
+    const selected = this.assetClass();
+    return selected === null ? null : assetClassColor(selected);
+  });
+
+  protected readonly chartLabelKey = computed(() =>
+    this.assetClass() === null ? 'netWorthChart.chartLabel' : 'netWorthChart.chartLabelForClass',
+  );
+
+  protected readonly classLabelKey = computed(() => {
+    const selected = this.assetClass();
+    return selected === null ? '' : assetClassLabel(selected);
+  });
 
   private readonly hoveredIndex = signal<number | null>(null);
 
@@ -112,6 +143,16 @@ export class NetWorthChart {
     const index = this.hoveredIndex();
     return chart && index !== null ? chart.coordinates[index] : null;
   });
+
+  protected onClassChange(value: AssetClass | typeof ALL_CLASSES | undefined): void {
+    const next = typeof value === 'number' ? value : null;
+    this.assetClass.set(next);
+    const listbox = this.listbox();
+    if (next === null && listbox) {
+      // The All chip cannot be deselected: reselect it when the user clicked it while selected.
+      listbox.value = ALL_CLASSES;
+    }
+  }
 
   protected tooltipAlignment(point: ChartPoint): 'start' | 'center' | 'end' {
     const ratio = (point.x - MARGIN.left) / PLOT_WIDTH;

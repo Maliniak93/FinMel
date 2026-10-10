@@ -2,8 +2,35 @@
   display: block;
 }
 
-.net-worth-chart__ranges {
+.net-worth-chart__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
   margin-bottom: 12px;
+}
+
+.net-worth-chart__classes {
+  min-width: 0;
+}
+
+.net-worth-chart__caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.net-worth-chart__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.net-worth-chart__tooltip-class {
+  font-weight: 600;
 }
 
 .net-worth-chart__canvas {

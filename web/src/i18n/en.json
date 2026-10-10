@@ -410,6 +410,9 @@
   },
   "netWorthChart": {
     "rangeLabel": "Chart range",
+    "classFilter": "Asset class",
+    "allClasses": "All",
+    "chartLabelForClass": "Net worth history chart for {{ class }}, {{ range }}: from {{ from }} to {{ to }}",
     "chartLabel": "Net worth history chart, {{ range }}: from {{ from }} to {{ to }}",
     "notEnoughHistory": "Not enough history to chart yet.",
     "loadFailed": "Failed to load net-worth history."

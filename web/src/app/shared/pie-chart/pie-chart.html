@@ -6,8 +6,11 @@
     [attr.aria-label]="'pieChart.ariaLabel' | transloco"
   >
     <g transform="rotate(-90 18 18)">
-      @for (segment of rendered(); track segment.label) {
+      @for (segment of rendered(); track segment.key) {
         <circle
+          class="pie-chart__segment"
+          [class.pie-chart__segment--dimmed]="selected() !== null && selected() !== segment.key"
+          (click)="segmentClick.emit(segment.key)"
           cx="18"
           cy="18"
           [attr.r]="radius"
