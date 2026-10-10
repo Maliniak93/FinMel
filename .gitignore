@@ -39,3 +39,5 @@ web/openapi-ts-error-*.log
 skarbiec-plan/issues/
 # Saved /idea prompts (scripts/idea.mjs; always in the main checkout)
 skarbiec-plan/prompts/
+# Generated local code guide (scripts/docs.mjs, /docs)
+skarbiec-plan/przewodnik/
