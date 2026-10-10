@@ -12,6 +12,9 @@ import { readProblemDetails } from '../../core/auth/problem-details';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
 import { assetClassLabel } from '../assets/asset-class';
+import { CashCard } from './cash-card/cash-card';
+import { PortfoliosCard } from './portfolios-card/portfolios-card';
+import { UpcomingCard } from './upcoming-card/upcoming-card';
 import type { ChartRange } from './net-worth-chart/chart-scale';
 import { NetWorthChart } from './net-worth-chart/net-worth-chart';
 
@@ -41,6 +44,9 @@ const ASSET_CLASS_COLORS: readonly string[] = [
     TranslocoPipe,
     NetWorthChart,
     PieChart,
+    PortfoliosCard,
+    CashCard,
+    UpcomingCard,
   ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',

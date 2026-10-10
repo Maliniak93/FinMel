@@ -383,7 +383,30 @@
     "staleTooltip": "At least one portfolio's valuation hasn't refreshed in a while — this total may be out of date.",
     "asOf": "As of {{ date }}",
     "netWorthHistory": "Net worth history",
-    "loadFailed": "Failed to load dashboard."
+    "loadFailed": "Failed to load dashboard.",
+    "portfolios": {
+      "title": "Portfolios",
+      "empty": "No active portfolios with a value yet.",
+      "loadFailed": "Failed to load portfolios."
+    },
+    "cash": {
+      "title": "Cash",
+      "empty": "No cash accounts yet.",
+      "loadFailed": "Failed to load cash."
+    },
+    "upcoming": {
+      "title": "Upcoming",
+      "empty": "Nothing in the next 30 days.",
+      "loadFailed": "Failed to load upcoming dates.",
+      "kind": {
+        "depositDue": "Deposit due",
+        "depositMaturing": "Deposit matures",
+        "bondMatured": "Bond matured",
+        "bondMaturing": "Bond matures",
+        "bondInterestDue": "Bond interest due, periods: {{ count }}",
+        "savingsInterestDue": "Savings interest due, months: {{ count }}"
+      }
+    }
   },
   "netWorthChart": {
     "rangeLabel": "Chart range",

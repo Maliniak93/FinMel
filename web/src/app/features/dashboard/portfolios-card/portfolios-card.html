@@ -1,0 +1,32 @@
+<mat-card class="portfolios-card">
+  <mat-card-content>
+    <h2 class="portfolios-card__title">{{ 'dashboard.portfolios.title' | transloco }}</h2>
+
+    @if (loadError(); as error) {
+      <div class="portfolios-card__state" role="alert">
+        <p>{{ error.message }}</p>
+        <button mat-button type="button" (click)="reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (loading() && !ready()) {
+      <div class="portfolios-card__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (rows().length === 0) {
+      <p class="portfolios-card__empty">{{ 'dashboard.portfolios.empty' | transloco }}</p>
+    } @else {
+      <ul class="portfolios-card__list">
+        @for (row of rows(); track row.id) {
+          <li class="portfolios-card__row">
+            <a class="portfolios-card__name" [routerLink]="['/portfolios', row.id, 'assets']">{{
+              row.name
+            }}</a>
+            <span class="portfolios-card__value">{{ formatMoney(row.entry.valuePln) }}</span>
+            <span class="portfolios-card__share">{{ formatPercent(row.entry.percentage) }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </mat-card-content>
+</mat-card>

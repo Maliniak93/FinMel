@@ -27,6 +27,7 @@ public sealed record DashboardPortfolioValue
 {
     public required Guid PortfolioId { get; init; }
     public required decimal ValuePln { get; init; }
+    public required decimal Percentage { get; init; }
     public required DateOnly SnapshotDate { get; init; }
     public required bool IsStale { get; init; }
 }

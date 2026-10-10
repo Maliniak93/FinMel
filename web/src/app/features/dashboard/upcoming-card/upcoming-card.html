@@ -1,0 +1,35 @@
+<mat-card class="upcoming-card">
+  <mat-card-content>
+    <h2 class="upcoming-card__title">{{ 'dashboard.upcoming.title' | transloco }}</h2>
+
+    @if (loadError(); as error) {
+      <div class="upcoming-card__state" role="alert">
+        <p>{{ error.message }}</p>
+        <button mat-button type="button" (click)="reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (loading() && !ready()) {
+      <div class="upcoming-card__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (items().length === 0) {
+      <p class="upcoming-card__empty">{{ 'dashboard.upcoming.empty' | transloco }}</p>
+    } @else {
+      <ul class="upcoming-card__list">
+        @for (item of items(); track $index) {
+          <li class="upcoming-card__row" [class.upcoming-card__row--action]="item.actionNeeded">
+            <span class="upcoming-card__date">{{ item.date ? formatDate(item.date) : '' }}</span>
+            <a class="upcoming-card__name" [routerLink]="item.link">{{ item.name }}</a>
+            <span class="upcoming-card__kind">{{
+              'dashboard.upcoming.kind.' + item.kind | transloco: { count: item.count }
+            }}</span>
+            <span class="upcoming-card__amount">{{
+              item.amount === null ? '' : formatMoney(item.amount, item.currency)
+            }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </mat-card-content>
+</mat-card>

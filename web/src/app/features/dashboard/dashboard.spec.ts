@@ -20,38 +20,19 @@ import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-const dashboard: DashboardResponse = {
-  netWorthPln: 15000,
-  asOf: '2026-08-09',
-  isStale: false,
-  byAssetClass: [
-    { assetClass: 0, valuePln: 5000, percentage: 33.33 },
-    { assetClass: 2, valuePln: 10000, percentage: 66.67 },
-  ],
-  byPortfolio: [
-    {
-      portfolioId: '11111111-1111-1111-1111-111111111111',
-      valuePln: 15000,
-      snapshotDate: '2026-08-09',
-      isStale: false,
-    },
-  ],
-};
+import {
+  type ApiRoute,
+  type Responder,
+  cashAccountsResponse,
+  dashboard,
+  jsonResponse,
+  mockApi,
+  portfolioResponse,
+  requestUrl,
+} from './testing/dashboard-fixtures';
 
 function normalised(text: string): string {
   return text.replace(/\s+/g, ' ');
-}
-
-function requestUrl(input: unknown): string {
-  return typeof input === 'string' ? input : (input as Request).url;
 }
 
 describe('Dashboard', () => {
@@ -71,15 +52,10 @@ describe('Dashboard', () => {
 
   async function setup(
     dashboardResponse: Response,
-    history: Response | ((url: string) => Response) = jsonResponse({ range: '1Y', points: [] }),
+    history: Responder = jsonResponse({ range: '1Y', points: [] }),
+    cards: Partial<Record<ApiRoute, Responder>> = {},
   ): Promise<void> {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = requestUrl(input);
-      if (!url.includes('/net-worth-history')) {
-        return dashboardResponse;
-      }
-      return typeof history === 'function' ? history(url) : history;
-    });
+    fetchSpy = mockApi({ ...cards, dashboard: dashboardResponse, history });
 
     await TestBed.configureTestingModule({
       imports: [Dashboard],
@@ -175,7 +151,11 @@ describe('Dashboard', () => {
   }
 
   function changeText(): string {
-    return textOf((fixture.nativeElement as HTMLElement).querySelector('.dashboard-page__change'));
+    return textOf(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '.dashboard-page__value .dashboard-page__change',
+      ),
+    );
   }
 
   it('shows the change for the selected range', async () => {
@@ -314,5 +294,73 @@ describe('Dashboard', () => {
       [],
     );
     expect(textOf(element.querySelector('.dashboard-page__state p'))).toBe('Service unavailable.');
+  });
+
+  it('the value card holds net worth and change', async () => {
+    await setup(
+      jsonResponse({ ...dashboard, isStale: true } satisfies DashboardResponse),
+      historyWithChange(250, 25),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    const value = element.querySelector('.dashboard-page__value') as HTMLElement;
+
+    expect(element.querySelectorAll('.dashboard-page__value')).toHaveLength(1);
+    expect(value.textContent).toContain(formatMoney(15000));
+    expect(value.querySelector('.dashboard-page__as-of')).not.toBeNull();
+    expect(value.textContent).toContain('Stale');
+    expect(changeText()).toContain(normalised(formatMoney(250)));
+    expect(changeText()).toContain('1Y');
+  });
+
+  it('the value card shows the dash when history fails', async () => {
+    await setup(jsonResponse(dashboard), jsonResponse({ detail: 'History unavailable.' }, 503));
+    const value = (fixture.nativeElement as HTMLElement).querySelector(
+      '.dashboard-page__value',
+    ) as HTMLElement;
+
+    expect(value.textContent).toContain(formatMoney(15000));
+    expect(textOf(value.querySelector('.dashboard-page__change'))).toBe('—');
+  });
+
+  it('orders the cards value, allocation, chart, portfolios, cash, upcoming', async () => {
+    await setup(jsonResponse(dashboard));
+    const element = fixture.nativeElement as HTMLElement;
+
+    const expected = [
+      element.querySelector('.dashboard-page__value'),
+      element.querySelector('app-pie-chart'),
+      element.querySelector('app-net-worth-chart'),
+      element.querySelector('app-portfolios-card'),
+      element.querySelector('app-cash-card'),
+      element.querySelector('app-upcoming-card'),
+    ];
+    const ordered = [
+      ...element.querySelectorAll(
+        '.dashboard-page__value, app-pie-chart, app-net-worth-chart, app-portfolios-card, app-cash-card, app-upcoming-card',
+      ),
+    ];
+
+    expect(ordered).toHaveLength(6);
+    expected.forEach((node, index) => expect(ordered[index]).toBe(node));
+    expect(element.querySelectorAll('mat-button-toggle-group')).toHaveLength(1);
+    expect(element.querySelector('app-net-worth-chart mat-button-toggle-group')).not.toBeNull();
+  });
+
+  it('a failing card does not break the dashboard', async () => {
+    await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
+      bonds: jsonResponse({ detail: 'Bonds unavailable.' }, 503),
+      portfolios: jsonResponse([portfolioResponse()]),
+      cash: jsonResponse(cashAccountsResponse([{ currency: 'PLN', balance: 1000 }])),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const upcoming = element.querySelector('app-upcoming-card') as HTMLElement;
+
+    expect(upcoming.textContent).toContain('Bonds unavailable.');
+    expect(upcoming.querySelector('button')).not.toBeNull();
+    expect(element.querySelector('.dashboard-page__value')).not.toBeNull();
+    expect(element.querySelector('app-pie-chart')).not.toBeNull();
+    expect(element.querySelector('app-net-worth-chart')).not.toBeNull();
+    expect(element.querySelector('app-portfolios-card')?.textContent).toContain('Retirement');
+    expect(element.querySelector('app-cash-card')?.textContent).toContain(formatMoney(1000, 'PLN'));
   });
 });

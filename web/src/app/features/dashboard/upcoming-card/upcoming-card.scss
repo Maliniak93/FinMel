@@ -1,0 +1,65 @@
+.upcoming-card__title {
+  margin: 0 0 12px;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.upcoming-card__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.upcoming-card__empty {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.upcoming-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upcoming-card__row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+  grid-template-areas:
+    'date name amount'
+    'date kind amount';
+  column-gap: 16px;
+}
+
+.upcoming-card__date {
+  grid-area: date;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.upcoming-card__name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upcoming-card__kind {
+  grid-area: kind;
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.upcoming-card__row--action .upcoming-card__kind {
+  color: var(--mat-sys-error);
+}
+
+.upcoming-card__amount {
+  grid-area: amount;
+  align-self: center;
+  font-weight: 500;
+}
