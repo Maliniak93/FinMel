@@ -55,6 +55,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "assetClass",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
           }
         ],
         "responses": {

@@ -14,9 +14,14 @@ internal static class ReportingApi
     public static string DashboardUri_ForPortfolio(Guid portfolioId) =>
         $"{DashboardUri}?portfolioId={portfolioId}";
 
-    public static string NetWorthHistoryUri(string? range = null, Guid? portfolioId = null)
+    public static string NetWorthHistoryUri(string? range = null, Guid? portfolioId = null, AssetClass? assetClass = null)
     {
         var parameters = new List<string>();
+        if (assetClass is not null)
+        {
+            parameters.Add($"assetClass={assetClass}");
+        }
+
         if (range is not null)
         {
             parameters.Add($"range={Uri.EscapeDataString(range)}");

@@ -7,8 +7,13 @@ namespace Skarbiec.Reporting.Features.GetNetWorthHistory;
 public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvider timeProvider)
 {
     public async Task<Result<NetWorthHistoryResponse>> HandleAsync(
-        string range, Guid? portfolioId, CancellationToken cancellationToken)
+        string range, Guid? portfolioId, AssetClass? assetClass, CancellationToken cancellationToken)
     {
+        if (assetClass is { } requestedClass && !Enum.IsDefined(requestedClass))
+        {
+            return NetWorthHistoryErrors.InvalidAssetClass(requestedClass);
+        }
+
         var startResult = ResolveRangeStart(range);
         if (startResult.IsFailure)
         {
@@ -25,6 +30,22 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             .Select(g => new { Date = g.Key, NetWorthPln = g.Sum(s => s.TotalPln) })
             .OrderBy(p => p.Date)
             .ToListAsync(cancellationToken);
+
+        if (assetClass is { } filterClass)
+        {
+            var classTotals = await db.AssetValuations
+                .AsNoTracking()
+                .Where(v => v.AssetClass == filterClass)
+                .Where(v => portfolioId == null || v.PortfolioId == portfolioId)
+                .Where(v => start == null || v.Date >= start)
+                .GroupBy(v => v.Date)
+                .Select(g => new { Date = g.Key, ValuePln = g.Sum(v => v.ValuePln) })
+                .ToDictionaryAsync(t => t.Date, t => t.ValuePln, cancellationToken);
+
+            points = points
+                .Select(p => new { p.Date, NetWorthPln = classTotals.GetValueOrDefault(p.Date) })
+                .ToList();
+        }
 
         decimal? changePln = null;
         decimal? changePercent = null;

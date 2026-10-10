@@ -515,6 +515,47 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             cancellationToken);
     }
 
+    [Fact]
+    public async Task Rebuild_StoredSnapshotTotalEqualsSumOfStoredLines()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var assetIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+
+        await using (var db = OpenDbContext(containers))
+        {
+            foreach (var assetId in assetIds)
+            {
+                await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                    assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 33.3333m,
+                    quantityHistory: [(today.AddDays(-20), 33.3333m)]);
+            }
+
+            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-3), cancellationToken);
+        }
+
+        var client = new FakePriceQuoteClient().WithFxHistory("USDPLN", (today.AddDays(-6), 4.0123m));
+
+        await RunConsumerAsync(client, async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+
+            for (var offset = 3; offset >= 1; offset--)
+            {
+                var date = today.AddDays(-offset);
+                var lines = await GetLinesAsync(containers, portfolioId, date, cancellationToken);
+                var snapshot = await GetSnapshotAsync(containers, portfolioId, date, cancellationToken);
+
+                Assert.Equal(3, lines.Count);
+                Assert.NotNull(snapshot);
+                Assert.Equal(lines.Sum(l => l.ValuePln), snapshot.TotalPln);
+            }
+        }, cancellationToken);
+    }
+
     private Task RunConsumerAsync(
         IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
