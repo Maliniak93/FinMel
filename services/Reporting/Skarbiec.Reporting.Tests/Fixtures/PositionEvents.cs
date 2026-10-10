@@ -38,4 +38,13 @@ internal static class PositionEvents
 
         return id;
     }
+
+    public static AssetRemoved AssetRemovedEvent(Guid assetId, Guid portfolioId, Guid userId, bool cascadedFromPortfolio = false) => new()
+    {
+        AssetId = assetId,
+        PortfolioId = portfolioId,
+        UserId = userId,
+        OccurredAtUtc = DateTimeOffset.UtcNow,
+        CascadedFromPortfolio = cascadedFromPortfolio,
+    };
 }

@@ -10,7 +10,7 @@ Target state (the approved redesign, Część II). Four services + gateway — S
 | **Identity** | registration, login, refresh/logout | `identity_db` | `UserRegistered` | — |
 | **Portfolio** | portfolios, assets (3 valuation modes), transactions = source of truth for quantity | `portfolio_db` | `AssetPositionChanged`, `AssetRemoved`, `PortfolioArchived`, `PortfolioRestored`, `PortfolioDeleted` | — |
 | **MarketData** | currency catalog, instruments, FX rates, quotes, sync jobs, ticker verification (ADR-018) | `marketdata_db` | `DailyPricesSynced` | `AssetPositionChanged`, `AssetRemoved` (→ `InstrumentUsage`) |
-| **Reporting** | positions read model with a quantity timeline, valuations (snapshots + per-asset lines) incl. the past-day history rebuild (ADR-032), dashboard, history, insights (allocation, rebalancing, emergency fund, goals) | `reporting_db` | later: `AllocationDriftDetected`, `EmergencyFundBelowThreshold` | `AssetPositionChanged`, `AssetRemoved`, `Portfolio*`, `DailyPricesSynced` |
+| **Reporting** | positions read model with a quantity timeline, valuations (snapshots + per-asset lines) incl. the past-day history rebuild (ADR-032), dashboard, history, insights (allocation, rebalancing, emergency fund, goals) | `reporting_db` | later: `AllocationDriftDetected`, `EmergencyFundBelowThreshold` | `AssetPositionChanged`, `AssetRemoved`, `Portfolio*`, `DailyPricesSynced`, `InstrumentHistoryBackfilled` |
 
 Angular talks only to the Gateway (ADR-013).
 
@@ -153,6 +153,7 @@ sequenceDiagram
     MD-->>RP: batch prices/rates
     RP->>RP: keep them in LatestInstrumentPrice / LatestFxRate
     RP->>RP: value local Positions → AssetValuation lines +<br/>ValuationSnapshot (last-known price, stale > 7 days)
+    RP->>RP: request a rebuild for each portfolio whose last snapshot is older than yesterday +<br/>re-publish every pending rebuild request
 ```
 
 ### Sequence: position change → history rebuild

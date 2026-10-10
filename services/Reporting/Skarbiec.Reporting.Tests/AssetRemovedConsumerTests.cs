@@ -2,12 +2,12 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Contracts;
-using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Reporting.Tests.Fixtures.PositionEvents;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
@@ -22,34 +22,33 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
-    public async Task Consume_AssetRemoved_DeletesPositionAndKeepsValuationHistory()
+    public async Task Consume_RequestsRebuildFromEarliestLine()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var earliestLine = today.AddDays(-30);
         var assetId = Guid.NewGuid();
         var portfolioId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var valuationDate = new DateOnly(2026, 8, 1);
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken);
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, valuationDate, 1_000m, cancellationToken);
+            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, portfolioId, assetId, earliestLine, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-10), 1_000m, cancellationToken, quantity: 1_000m);
         }
 
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(Removed(assetId, portfolioId, userId), cancellationToken);
+            await bus.Publish(AssetRemovedEvent(assetId, portfolioId, userId), cancellationToken);
 
             await WaitForPositionGoneAsync(provider, assetId, cancellationToken);
 
-            await using var scope = provider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-            var lines = await db.AssetValuations.IgnoreQueryFilters()
-                .Where(l => l.AssetId == assetId)
-                .ToListAsync(cancellationToken);
-
-            Assert.Single(lines);
+            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            Assert.Equal(earliestLine, request.FromDate);
+            Assert.Equal(userId, request.UserId);
         }, cancellationToken);
     }
 
@@ -80,7 +79,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(Removed(removedAssetId, portfolioId, userId), cancellationToken);
+            await bus.Publish(AssetRemovedEvent(removedAssetId, portfolioId, userId), cancellationToken);
 
             await WaitForPositionGoneAsync(provider, removedAssetId, cancellationToken);
 
@@ -118,7 +117,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(Removed(assetId, portfolioId, userId), cancellationToken);
+            await bus.Publish(AssetRemovedEvent(assetId, portfolioId, userId), cancellationToken);
 
             await WaitForPositionGoneAsync(provider, assetId, cancellationToken);
 
@@ -149,6 +148,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
             await db.SeedPositionAsync(siblingAssetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 2_000m);
 
+            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, today.AddDays(-30), 1_000m, cancellationToken, quantity: 1_000m);
             await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
             await db.SeedValuationLineAsync(userId, portfolioId, siblingAssetId, today, 2_000m, cancellationToken, quantity: 2_000m);
             await db.SeedSnapshotAsync(userId, portfolioId, today, 3_000m, cancellationToken);
@@ -157,7 +157,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(Removed(removedAssetId, portfolioId, userId, cascadedFromPortfolio: true), cancellationToken);
+            await bus.Publish(AssetRemovedEvent(removedAssetId, portfolioId, userId, cascadedFromPortfolio: true), cancellationToken);
 
             // Removal and any revaluation commit together, so once the Position is gone the rows are final.
             await WaitForPositionGoneAsync(provider, removedAssetId, cancellationToken);
@@ -170,17 +170,10 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
             Assert.Equal(2, todaysLines.Count);
             Assert.Contains(todaysLines, l => l.AssetId == removedAssetId && l.ValuePln == 1_000m);
             Assert.Contains(todaysLines, l => l.AssetId == siblingAssetId && l.ValuePln == 2_000m);
+
+            Assert.Null(await GetRebuildRequestAsync(containers, portfolioId, cancellationToken));
         }, cancellationToken);
     }
-
-    private static AssetRemoved Removed(Guid assetId, Guid portfolioId, Guid userId, bool cascadedFromPortfolio = false) => new()
-    {
-        AssetId = assetId,
-        PortfolioId = portfolioId,
-        UserId = userId,
-        OccurredAtUtc = DateTimeOffset.UtcNow,
-        CascadedFromPortfolio = cascadedFromPortfolio,
-    };
 
     private Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(

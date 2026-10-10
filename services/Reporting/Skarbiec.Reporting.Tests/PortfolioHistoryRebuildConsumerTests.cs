@@ -8,6 +8,7 @@ using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Reporting.Tests.Fixtures.PositionEvents;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
@@ -454,6 +455,66 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task Rebuild_RemovedAsset_DropsItsLines()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var portfolioId = Guid.NewGuid();
+        var removedAssetId = Guid.NewGuid();
+        var keptAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(removedAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
+                quantityHistory: [(today.AddDays(-30), 100m)]);
+            await db.SeedPositionAsync(keptAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
+                quantityHistory: [(today.AddDays(-30), 200m)]);
+
+            for (var offset = 30; offset >= 1; offset--)
+            {
+                var date = today.AddDays(-offset);
+                await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, date, 100m, cancellationToken, quantity: 100m);
+                await db.SeedValuationLineAsync(userId, portfolioId, keptAssetId, date, 200m, cancellationToken, quantity: 200m);
+                await db.SeedSnapshotAsync(userId, portfolioId, date, 300m, cancellationToken);
+            }
+        }
+
+        await RunAsync(
+            containers,
+            x =>
+            {
+                x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedTestDefinition));
+                x.AddConsumer<PortfolioHistoryRebuildConsumer>(typeof(TestConsumerDefinition));
+            },
+            async provider =>
+            {
+                await provider.GetRequiredService<IBus>().Publish(AssetRemovedEvent(removedAssetId, portfolioId, userId), cancellationToken);
+
+                // The request AssetRemoved leaves behind is rebuilt; the rebuild deletes the removed asset's lines in the same commit.
+                await WaitForAsync(
+                    provider,
+                    (db, ct) => db.AssetValuations.IgnoreQueryFilters().AnyAsync(l => l.AssetId == removedAssetId, ct),
+                    stillExists => !stillExists,
+                    $"Rebuilding away the lines of removed asset {removedAssetId}",
+                    cancellationToken);
+
+                var lines = await GetAllLinesAsync(containers, portfolioId, cancellationToken);
+                Assert.DoesNotContain(lines, l => l.AssetId == removedAssetId);
+                Assert.Equal(30, lines.Count(l => l.Date < today));
+
+                var snapshots = (await GetAllSnapshotsAsync(containers, portfolioId, cancellationToken))
+                    .Where(s => s.Date < today)
+                    .ToList();
+                Assert.Equal(30, snapshots.Count);
+                Assert.All(snapshots, s => Assert.Equal(200m, s.TotalPln));
+            },
+            cancellationToken);
+    }
+
     private Task RunConsumerAsync(
         IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
@@ -466,5 +527,10 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
     private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<PortfolioHistoryRebuildConsumer, ReportingDbContext>
     {
         public TestConsumerDefinition() => Endpoint(e => e.Name = QueueName);
+    }
+
+    private sealed class AssetRemovedTestDefinition : IdempotentConsumerDefinition<AssetRemovedConsumer, ReportingDbContext>
+    {
+        public AssetRemovedTestDefinition() => Endpoint(e => e.Name = "portfolio-history-rebuild-asset-removed-test");
     }
 }
