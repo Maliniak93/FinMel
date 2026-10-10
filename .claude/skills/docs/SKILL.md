@@ -38,6 +38,14 @@ Regenerate the code guide. Talk to the user in Polish; write the prose fragments
    - `bazy-danych` - one short paragraph per service on what its database holds, the meaning of
      "filtr tenancy" vs "UserId bez filtra" (ADR-006) and the MassTransit outbox/inbox tables. The
      generator draws the ERDs.
+   - `joby-integracje-frontend` - for each job say in plain Polish when it runs (translate the effective cron,
+     mention that Development runs more often), which external API it fetches and why some work runs only
+     on demand or at startup; one paragraph on how the UI reaches the backend (routes -> generated client ->
+     Gateway, ADR-013). Read the job and source classes before describing them; the tables are not repeated.
+   - `slabe-punkty` - information for a human deciding on an `/idea`, never a ready spec. The prose must
+     contain `<section class="ocena-claude">` (`build` fails without it) holding your own assessment of
+     complex or duplicated areas, each point linking to the page it concerns (`<a href="eventy.html#...">`);
+     keep it visibly separate from the generated, deterministic list below it and say which is which.
 4. Run `node scripts/docs.mjs build`. A failure names the page and leaves the previous guide untouched:
    fix the fragment (usually a wrong or missing stamp) and run `build` again.
 5. Report in at most three lines: which pages were rewritten, the path

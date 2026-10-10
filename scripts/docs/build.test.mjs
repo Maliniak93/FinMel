@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { makeSandbox, prosePath, readFacts, runBuild, runFacts, sequenceProse, snapshot, writeProse } from "./helpers.mjs";
 
-const SLUGS = ["architektura", "bazy-danych", "eventy", "index"];
+const SLUGS = ["architektura", "bazy-danych", "eventy", "index", "joby-integracje-frontend", "slabe-punkty"];
 const LIVE = [...SLUGS.map((slug) => `${slug}.html`), "mermaid.min.js", "manifest.json"];
 
 function readyToBuild() {
@@ -15,7 +15,7 @@ function readyToBuild() {
   return sb;
 }
 
-test("build writes the four pages, mermaid and manifest, and only inside --out", () => {
+test("build writes the six pages, mermaid and manifest, each nav listing all six, and only inside --out", () => {
   const sb = readyToBuild();
   try {
     const rootBefore = snapshot(sb.root, { skip: [".git"] });
@@ -82,6 +82,13 @@ function assertBuildFailsAndKeepsLive(mutate, page = "architektura") {
     sb.cleanup();
   }
 }
+
+test("build fails naming Słabe punkty when its prose lacks the ocena-claude section and leaves the guide untouched", () => {
+  assertBuildFailsAndKeepsLive((sb) => {
+    const hash = readFacts(sb).pages["slabe-punkty"].hash;
+    writeFileSync(prosePath(sb, "slabe-punkty"), `<!-- facts:${hash} -->\n<p>Bez sekcji oceny.</p>\n`);
+  }, "slabe-punkty");
+});
 
 test("build with a missing prose fragment fails naming the page and leaves the previous guide untouched", () => {
   assertBuildFailsAndKeepsLive((sb) => rmSync(prosePath(sb, "architektura")));

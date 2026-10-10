@@ -72,7 +72,9 @@ export function writeProse(sb) {
   const dir = path.join(sb.out, ".work", "prose");
   mkdirSync(dir, { recursive: true });
   for (const [slug, page] of Object.entries(facts.pages)) {
-    const body = slug === "eventy" ? sequenceProse(4) : `<p>Opis strony ${slug}.</p>`;
+    const body = slug === "eventy" ? sequenceProse(4)
+      : slug === "slabe-punkty" ? `<section class="ocena-claude"><p>Ocena Claude.</p></section>`
+      : `<p>Opis strony ${slug}.</p>`;
     writeFileSync(path.join(dir, `${slug}.html`), `<!-- facts:${page.hash} -->\n${body}\n`);
   }
 }
@@ -108,4 +110,35 @@ export function serviceOf(facts, name) {
 
 export function byJson(items) {
   return [...items].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+}
+
+export function pageOf(facts, slug) {
+  const page = facts.pages[slug];
+  if (!page) throw new Error(`page "${slug}" missing from facts`);
+  return page.facts;
+}
+
+export function section(pageFacts, key) {
+  const list = pageFacts[key];
+  if (!Array.isArray(list)) throw new Error(`facts list "${key}" missing`);
+  return list;
+}
+
+export function strings(node) {
+  if (typeof node === "string") return [node];
+  if (Array.isArray(node)) return node.flatMap(strings);
+  if (node && typeof node === "object") return Object.values(node).flatMap(strings);
+  return [];
+}
+
+export const mentions = (node, text) => strings(node).some((s) => s.includes(text));
+
+export const hasToken = (node, name) => strings(node).some((s) => s.split(/[./\\]/).includes(name));
+
+export function inOrderTokens(node, names) {
+  let next = 0;
+  for (const value of strings(node)) {
+    if (next < names.length && value.split(/[./\\]/).includes(names[next])) next++;
+  }
+  return next === names.length;
 }

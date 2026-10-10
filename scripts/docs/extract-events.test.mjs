@@ -53,7 +53,7 @@ test("each message lists its properties, publishers and production consumers, wi
       { name: "Date", type: "DateOnly" },
       { name: "Kind", type: "PriceSyncKind" },
     ],
-    publishers: [{ service: "MarketData", file: "Jobs/PriceSyncJob.cs" }],
+    publishers: [{ service: "MarketData", file: "Sources/PriceSyncJob.cs" }],
     consumers: [{ service: "Reporting", consumer: "DailyPricesSyncedConsumer", definition: null }],
   }));
   assert.deepEqual(normalize(byName("PortfolioArchived")), normalize({
