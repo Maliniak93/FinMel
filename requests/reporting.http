@@ -10,7 +10,7 @@ Content-Type: application/json
   "password": "P@ssw0rd!123"
 }
 
-### Dashboard — all portfolios
+### Dashboard — all portfolios (byPortfolio rows carry percentage of net worth)
 GET {{baseUrl}}/api/reporting/dashboard
 Authorization: Bearer {{authToken}}
 

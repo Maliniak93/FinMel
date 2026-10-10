@@ -30,6 +30,7 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
             {
                 PortfolioId = s.PortfolioId,
                 ValuePln = s.TotalPln,
+                Percentage = netWorthPln == 0m ? 0m : Math.Round(s.TotalPln / netWorthPln * 100m, 2),
                 SnapshotDate = s.Date,
                 IsStale = s.IsStale,
             })

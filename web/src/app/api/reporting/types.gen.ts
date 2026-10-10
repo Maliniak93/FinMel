@@ -15,6 +15,7 @@ export type DashboardAssetClassValue = {
 export type DashboardPortfolioValue = {
     portfolioId: string;
     valuePln: number | string;
+    percentage: number | string;
     snapshotDate: string;
     isStale: boolean;
 };

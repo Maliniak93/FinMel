@@ -1,0 +1,35 @@
+<mat-card class="cash-card">
+  <mat-card-content>
+    <h2 class="cash-card__title">
+      <a routerLink="/cash">{{ 'dashboard.cash.title' | transloco }}</a>
+    </h2>
+
+    @if (cashResource.error(); as loadError) {
+      <div class="cash-card__state" role="alert">
+        <p>{{ loadError.message }}</p>
+        <button mat-button type="button" (click)="cashResource.reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (cashResource.isLoading() && !cashResource.hasValue()) {
+      <div class="cash-card__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (cashResource.hasValue()) {
+      @if (cashResource.value().totals.length === 0) {
+        <p class="cash-card__empty">{{ 'dashboard.cash.empty' | transloco }}</p>
+      } @else {
+        <ul class="cash-card__list">
+          @for (total of cashResource.value().totals; track total.currency) {
+            <li class="cash-card__row">
+              <span>{{ total.currency }}</span>
+              <span class="cash-card__balance">{{
+                formatMoney(total.balance, total.currency)
+              }}</span>
+            </li>
+          }
+        </ul>
+      }
+    }
+  </mat-card-content>
+</mat-card>

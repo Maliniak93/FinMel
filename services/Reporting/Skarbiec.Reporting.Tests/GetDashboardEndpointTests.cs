@@ -195,4 +195,51 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(0m, body!.NetWorthPln);
         Assert.Empty(body.ByAssetClass);
     }
+
+    [Fact]
+    public async Task ByPortfolioCarriesPercentage()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var largeId = Guid.NewGuid();
+        var smallId = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, largeId, snapshotDate, 750m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, smallId, snapshotDate, 250m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(75.00m, Assert.Single(body!.ByPortfolio, p => p.PortfolioId == largeId).Percentage);
+        Assert.Equal(25.00m, Assert.Single(body.ByPortfolio, p => p.PortfolioId == smallId).Percentage);
+    }
+
+    [Fact]
+    public async Task ByPortfolioPercentageIsZeroWhenNetWorthIsZero()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, Guid.NewGuid(), snapshotDate, 0m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Guid.NewGuid(), snapshotDate, 0m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0m, body!.NetWorthPln);
+        Assert.Equal(2, body.ByPortfolio.Count);
+        Assert.All(body.ByPortfolio, p => Assert.Equal(0m, p.Percentage));
+    }
 }

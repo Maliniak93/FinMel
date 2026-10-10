@@ -364,6 +364,7 @@ describe('Portfolios', () => {
           {
             portfolioId: portfolio.id,
             valuePln: 12345.67,
+            percentage: 100,
             snapshotDate: '2026-08-10',
             isStale: false,
           },

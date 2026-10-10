@@ -383,7 +383,30 @@
     "staleTooltip": "Wycena co najmniej jednego portfela od dawna się nie odświeżyła — ta suma może być nieaktualna.",
     "asOf": "Stan na {{ date }}",
     "netWorthHistory": "Historia wartości majątku",
-    "loadFailed": "Nie udało się wczytać pulpitu."
+    "loadFailed": "Nie udało się wczytać pulpitu.",
+    "portfolios": {
+      "title": "Portfele",
+      "empty": "Brak aktywnych portfeli z wartością.",
+      "loadFailed": "Nie udało się wczytać portfeli."
+    },
+    "cash": {
+      "title": "Gotówka",
+      "empty": "Brak kont gotówkowych.",
+      "loadFailed": "Nie udało się wczytać gotówki."
+    },
+    "upcoming": {
+      "title": "Nadchodzące",
+      "empty": "Nic w ciągu najbliższych 30 dni.",
+      "loadFailed": "Nie udało się wczytać nadchodzących terminów.",
+      "kind": {
+        "depositDue": "Lokata do rozliczenia",
+        "depositMaturing": "Lokata zapada",
+        "bondMatured": "Obligacja zapadła",
+        "bondMaturing": "Obligacja zapada",
+        "bondInterestDue": "Odsetki od obligacji do rozliczenia, okresy: {{ count }}",
+        "savingsInterestDue": "Odsetki od oszczędności do rozliczenia, miesiące: {{ count }}"
+      }
+    }
   },
   "netWorthChart": {
     "rangeLabel": "Zakres wykresu",

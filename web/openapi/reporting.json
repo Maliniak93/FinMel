@@ -110,6 +110,7 @@
         "required": [
           "portfolioId",
           "valuePln",
+          "percentage",
           "snapshotDate",
           "isStale"
         ],
@@ -120,6 +121,14 @@
             "format": "uuid"
           },
           "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "percentage": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
