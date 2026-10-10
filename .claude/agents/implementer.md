@@ -78,6 +78,13 @@ cannot decide from the spec's goal at all.
 - Pipe long command output through a filter (`| tail -40`, `| grep -E "FAIL|error"`) instead of
   reading all of it.
 
+## Edit with the tools, not scripts
+
+This machine is Windows with Git Bash and has **no Python** — `python`/`python3` fails. Change code with
+`Edit` / `Write`, one exact replacement at a time; never `python -`, multi-line `sed -i`, or a throwaway
+Node script that rewrites files. To see why a test fails, read its assertion message and stack trace
+from a filtered `dotnet test` run — never patch production code to dump exceptions to a file.
+
 ## Look an API up instead of remembering it
 
 .NET 10 and Angular 22 are newer than your training data, and a plausible-looking API that does not
@@ -133,6 +140,8 @@ API client, not just what you touched:
    `VERIFY_PENDING: …` (exit 3) means still running — call `--await` again, as often as it takes (a
    full run takes 10–20 min). `VERIFY_RESULT: {"ok":…,"failures":[{step,summary,file?}]}` is the
    answer (exit 0 green, 2 red). Never poll with `sleep`, loops or by re-reading output.
+   Failed tests are retried once; a `flaky: [names]` list on a green result means they passed on the
+   retry — the run is green, so do not chase them; mention them in `notes`.
 3. Red → fix the cause in this context and start again from 1. **At most 3 fixes.** Still red after
    the 3rd → stop and return `verified: false` with the last `failures`; a stronger model takes over
    from your tree.
