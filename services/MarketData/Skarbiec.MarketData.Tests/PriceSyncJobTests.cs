@@ -26,7 +26,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
     private static readonly DateOnly Today = new(2026, 8, 3);
 
     [Fact]
-    public async Task RunAsync_MiddleSourceFails_OtherTwoSynced_RunRecordedAsPartial()
+    public async Task RunAsync_OneSourceFails_OtherSynced_RunRecordedAsPartial()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
@@ -36,17 +36,14 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
 
         var goldInstrument = NewUsedInstrument(db, "XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
         var yahooInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
-        var coinGeckoInstrument = NewUsedInstrument(db, "bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto);
         await db.SaveChangesAsync(cancellationToken);
 
         IPriceSource[] sources =
         [
             new ScriptedPriceSource(PriceSource.GoldApi, PriceFetchResult<InstrumentQuote>.Success(
                 [new InstrumentQuote(goldInstrument.Id, Today, 350.12m)])),
-            // The middle source errors out entirely; the other two must still sync.
+            // One source errors out entirely; the other must still sync.
             new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Error("yahoo is down")),
-            new ScriptedPriceSource(PriceSource.CoinGecko, PriceFetchResult<InstrumentQuote>.Success(
-                [new InstrumentQuote(coinGeckoInstrument.Id, Today, 65_000m)])),
         ];
 
         var job = new PriceSyncJob(db, sources, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
@@ -54,15 +51,14 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
 
         var run = await db.SyncRuns.SingleAsync(cancellationToken);
         Assert.Equal(SyncRunStatus.Partial, run.Status);
-        Assert.Equal(2, run.SyncedCount);
+        Assert.Equal(1, run.SyncedCount);
         Assert.Equal(1, run.FailedCount);
         Assert.Equal(0, run.NoDataCount);
         Assert.NotNull(run.FinishedAt);
 
         var quotes = await db.PriceQuotes.ToListAsync(cancellationToken);
-        Assert.Equal(2, quotes.Count);
+        Assert.Single(quotes);
         Assert.Contains(quotes, q => q.InstrumentId == goldInstrument.Id && q.Close == 350.12m);
-        Assert.Contains(quotes, q => q.InstrumentId == coinGeckoInstrument.Id && q.Close == 65_000m);
         Assert.DoesNotContain(quotes, q => q.InstrumentId == yahooInstrument.Id);
     }
 

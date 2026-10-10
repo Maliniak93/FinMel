@@ -20,26 +20,25 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+        var instrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Etf, "PLN");
         // The asset has a transaction, so its currency is locked; the update keeps PLN and changes everything else.
         var request = new UpdateAssetRequest
         {
-            AssetClass = AssetClass.Crypto,
+            AssetClass = AssetClass.Etf,
             Name = "Renamed",
             Currency = "PLN",
-            ManualValue = 42.42m,
-            ManualValueDate = new DateOnly(2026, 6, 15)
+            InstrumentId = instrumentId
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.Equal(AssetClass.Crypto, body!.AssetClass);
+        Assert.Equal(AssetClass.Etf, body!.AssetClass);
+        Assert.Equal(instrumentId, body.InstrumentId);
         Assert.Equal("Renamed", body.Name);
         Assert.Equal("PLN", body.Currency);
         Assert.Equal(3m, body.Quantity);
-        Assert.Equal(42.42m, body.ManualValue);
-        Assert.Equal(new DateOnly(2026, 6, 15), body.ManualValueDate);
     }
 
     [Theory]
@@ -55,9 +54,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         {
             AssetClass = AssetClass.Cash,
             Name = $"Cash in {currency}",
-            Currency = currency,
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = currency
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -77,9 +74,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         {
             AssetClass = AssetClass.Cash,
             Name = "Swiss cash",
-            Currency = "CHF",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = "CHF"
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -94,26 +89,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Update_WithNegativeManualValue_ReturnsBadRequest()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-        var request = new UpdateAssetRequest
-        {
-            AssetClass = AssetClass.Cash,
-            Name = "Still here",
-            Currency = "PLN",
-            ManualValue = -10m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
-        };
-
-        var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Update_NonExistentAsset_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -123,9 +98,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         {
             AssetClass = AssetClass.Cash,
             Name = "Missing",
-            Currency = "PLN",
-            ManualValue = 1m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = "PLN"
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, Guid.NewGuid()), request, cancellationToken);
@@ -134,7 +107,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Update_SwitchManualAssetToMarket_NullsManualValueAndKeepsTransactions()
+    public async Task Update_ChangeInstrument_KeepsTransactionsAndQuantity()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -155,8 +128,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Equal(instrumentId, body!.InstrumentId);
-        Assert.Null(body.ManualValue);
-        Assert.Null(body.ManualValueDate);
         // The switch to Market must not disturb the quantity the earlier Buy produced.
         Assert.Equal(5m, body.Quantity);
 
@@ -165,7 +136,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Update_SwitchMarketAssetBackToManual_ClearsInstrumentId()
+    public async Task Update_SwitchMarketAssetToCash_ClearsInstrumentId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -178,21 +149,18 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Cash,
-            Name = "Back to manual",
-            Currency = "PLN",
-            ManualValue = 250m,
-            ManualValueDate = new DateOnly(2026, 2, 1)
+            Name = "Back to cash",
+            Currency = "PLN"
         };
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Null(body!.InstrumentId);
-        Assert.Equal(250m, body.ManualValue);
     }
 
     [Fact]
-    public async Task Update_SwitchManualCashToCurrencyValued_ClearsManualValueAndSetsModeQuantityFromTransaction()
+    public async Task Update_SwitchMarketAssetToCashWithDeposit_SetsCurrencyValuedModeAndQuantityFromTransaction()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -210,8 +178,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Equal(AssetValuationMode.CurrencyValued, body!.ValuationMode);
-        Assert.Null(body.ManualValue);
-        Assert.Null(body.ManualValueDate);
         Assert.Null(body.InstrumentId);
         Assert.Equal(500m, body.Quantity);
     }
@@ -222,7 +188,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock, manualValue: 100m);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
         var request = new UpdateAssetRequest
         {
@@ -237,8 +203,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
         Assert.Equal(AssetClass.Stock, unchanged.AssetClass);
         Assert.Equal("Shares", unchanged.Name);
-        Assert.Equal(AssetValuationMode.Manual, unchanged.ValuationMode);
-        Assert.Equal(100m, unchanged.ManualValue);
+        Assert.Equal(AssetValuationMode.Market, unchanged.ValuationMode);
         Assert.Equal(3m, unchanged.Quantity);
     }
 
@@ -248,7 +213,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Parked money", assetClass: AssetClass.Stock, manualValue: 100m);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Parked money", assetClass: AssetClass.Stock);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Deposit, 200m, new DateOnly(2026, 1, 2), cancellationToken, unitPrice: 1m);
         var request = new UpdateAssetRequest
@@ -268,7 +233,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Update_NonCurrencyValuedClassWithNeitherInstrumentIdNorManualValue_ReturnsBadRequest()
+    public async Task Update_MarketClassWithoutInstrumentId_ReturnsBadRequest()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -287,7 +252,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
         var instrumentId = Guid.NewGuid();
-        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Crypto, "PLN");
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Etf, "PLN");
         var request = new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Wrong class", Currency = "PLN", InstrumentId = instrumentId };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -338,9 +303,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         {
             AssetClass = AssetClass.Cash,
             Name = "Wrong parent",
-            Currency = "PLN",
-            ManualValue = 1m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = "PLN"
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(otherPortfolioId, assetId), request, cancellationToken);
@@ -354,15 +317,14 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Locked", manualValue: 100m, currency: "PLN");
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Locked", currency: "PLN");
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Stock,
             Name = "Locked",
             Currency = "EUR",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "EUR")
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -380,14 +342,13 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Free", manualValue: 100m, currency: "PLN");
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Free", currency: "PLN");
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Stock,
             Name = "Free",
             Currency = "EUR",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "EUR")
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -405,7 +366,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Euro stock", manualValue: 100m, currency: "EUR");
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Euro stock", currency: "EUR");
         await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
         var request = new UpdateAssetRequest
@@ -413,8 +374,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
             AssetClass = AssetClass.Stock,
             Name = "Euro stock",
             Currency = "USD",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "USD")
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -450,7 +410,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
         await client.ArchiveAssetAsync(portfolioId, assetId, cancellationToken);
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-        var request = new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", ManualValue = 1m, ManualValueDate = new DateOnly(2026, 1, 1) };
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
 
@@ -463,15 +423,14 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Before archive", manualValue: 100m);
+        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Before archive");
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
         var request = new UpdateAssetRequest
         {
             AssetClass = AssetClass.Stock,
             Name = "After archive",
             Currency = "PLN",
-            ManualValue = 999m,
-            ManualValueDate = new DateOnly(2026, 6, 1)
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN")
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);
@@ -479,7 +438,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
         var unchanged = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
         Assert.Equal("Before archive", unchanged.Name);
-        Assert.Equal(100m, unchanged.ManualValue);
     }
 
     [Theory]
@@ -621,14 +579,13 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
             (originalClass, originalName) = (AssetClass.PreciousMetal, "Maple Leaf 1 oz");
         }
 
-        // A manual value keeps the request valid for PreciousMetal, so only the metal guard can reject it.
+        // An instrument keeps the request valid for PreciousMetal, so only the metal guard can reject it.
         var request = new UpdateAssetRequest
         {
             AssetClass = requestedClass,
             Name = "Edited through assets",
             Currency = "PLN",
-            ManualValue = 1000m,
-            ManualValueDate = new DateOnly(2026, 10, 1)
+            InstrumentId = requestedClass == AssetClass.PreciousMetal ? Guid.NewGuid() : null
         };
 
         var response = await client.PutAsJsonAsync(AssetUri(portfolioId, assetId), request, cancellationToken);

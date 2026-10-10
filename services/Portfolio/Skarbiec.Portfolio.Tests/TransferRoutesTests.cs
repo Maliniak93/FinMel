@@ -50,7 +50,6 @@ public sealed class TransferRoutesTests
     [InlineData(AssetClass.Cash, AssetClass.Cash)]
     [InlineData(AssetClass.Deposit, AssetClass.Deposit)]
     [InlineData(AssetClass.Savings, AssetClass.Savings)]
-    [InlineData(AssetClass.Cash, AssetClass.Crypto)]
     [InlineData(AssetClass.Stock, AssetClass.Deposit)]
     [InlineData(AssetClass.Savings, AssetClass.Deposit)]
     public void IsAllowed_SameClassSecuritiesOrSavingsDepositPair_IsRejected(AssetClass source, AssetClass target)

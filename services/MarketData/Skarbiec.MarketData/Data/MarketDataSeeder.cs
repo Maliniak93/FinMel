@@ -13,8 +13,6 @@ public static class MarketDataSeeder
         (MetalInstruments.Silver, "XAG", "Silver (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal, null),
         (null, "CDR.WA", "CD Projekt", PriceSource.Yahoo, "PLN", AssetClass.Stock, "GPW"),
         (null, "VWCE.DE", "Vanguard FTSE All-World UCITS ETF (Acc)", PriceSource.Yahoo, "EUR", AssetClass.Etf, "Xetra"),
-        (null, "bitcoin", "Bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto, null),
-        (null, "ethereum", "Ethereum", PriceSource.CoinGecko, "USD", AssetClass.Crypto, null),
     ];
 
     // A superset of SupportedCurrencies.All: GBP and CHF are synced though no user can pick them yet.

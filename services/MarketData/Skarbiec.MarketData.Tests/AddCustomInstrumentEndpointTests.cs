@@ -76,45 +76,6 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     }
 
     [Fact]
-    public async Task Add_ValidCoinGeckoId_RoutesToCoinGecko_ReturnsCreatedAsVerified()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-
-        var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "solana", quoteCurrency: "USD", assetClass: AssetClass.Crypto);
-
-        Assert.Equal(PriceSource.CoinGecko, body.Source);
-        Assert.Equal(InstrumentVerificationStatus.Verified, body.VerificationStatus);
-        Assert.Contains((PriceSource.CoinGecko, "solana"), Factory.TickerVerifier.Calls);
-    }
-
-    // The same ticker verifies against Yahoo but not CoinGecko, so only the class that derives Yahoo succeeds.
-    [Fact]
-    public async Task Add_SameTickerString_DifferentClassesRouteToDifferentProviders_CryptoDoesNotSilentlySucceedAsEtf()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var stockClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        using var cryptoClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        const string ticker = "AMBIGUOUS.DE";
-        Factory.TickerVerifier.WithOutcome(PriceSource.CoinGecko, ticker, TickerVerificationOutcome.DoesNotExist);
-        // Yahoo isn't scripted for this ticker, so it keeps the fake's default (Exists).
-
-        var etfResponse = await stockClient.PostAsJsonAsync(
-            InstrumentsUri,
-            new AddCustomInstrumentRequest { Ticker = ticker, Name = "Ambiguous as ETF", QuoteCurrency = "USD", AssetClass = AssetClass.Etf },
-            cancellationToken);
-        var cryptoResponse = await cryptoClient.PostAsJsonAsync(
-            InstrumentsUri,
-            new AddCustomInstrumentRequest { Ticker = ticker, Name = "Ambiguous as crypto", QuoteCurrency = "USD", AssetClass = AssetClass.Crypto },
-            cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, etfResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, cryptoResponse.StatusCode);
-        Assert.Contains((PriceSource.Yahoo, ticker), Factory.TickerVerifier.Calls);
-        Assert.Contains((PriceSource.CoinGecko, ticker), Factory.TickerVerifier.Calls);
-    }
-
-    [Fact]
     public async Task Add_MakesInstrumentImmediatelyFindableBySearch()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -152,8 +113,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     [Theory]
     [InlineData(AssetClass.Cash)]
     [InlineData(AssetClass.Deposit)]
-    [InlineData(AssetClass.RealEstate)]
-    [InlineData(AssetClass.Other)]
+    [InlineData(AssetClass.Savings)]
     public async Task Add_AssetClassWithNoMarketProvider_ReturnsBadRequest(AssetClass assetClass)
     {
         var cancellationToken = TestContext.Current.CancellationToken;

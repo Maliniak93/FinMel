@@ -23,10 +23,9 @@ public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) 
                 Id = assetId,
                 PortfolioId = portfolioId,
                 AssetClass = AssetClass.Stock,
-                ValuationMode = AssetValuationMode.Manual,
+                ValuationMode = AssetValuationMode.Market,
                 Name = "Test stock",
-                Currency = "PLN",
-                ManualValueDate = new DateOnly(2026, 1, 1)
+                Currency = "PLN"
             });
             await seedContext.SaveChangesAsync(cancellationToken);
         }

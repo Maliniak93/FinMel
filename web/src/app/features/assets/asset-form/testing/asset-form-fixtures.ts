@@ -124,43 +124,29 @@ export const cashAsset: AssetResponse = {
   isArchived: false,
 };
 
-export const realEstateAsset: AssetResponse = {
-  id: '55555555-5555-5555-5555-555555555555',
-  portfolioId,
-  assetClass: 7,
-  valuationMode: 1,
-  name: 'Apartment',
-  currency: 'PLN',
-  quantity: 0,
-  manualValue: 650000,
-  manualValueDate: '2020-06-15',
-  transactionCount: 0,
-  isArchived: false,
-};
-
-export const cryptoAsset: AssetResponse = {
+export const stockAsset: AssetResponse = {
   id: '44444444-4444-4444-4444-444444444444',
   portfolioId,
-  assetClass: 5,
+  assetClass: 2,
   valuationMode: 0,
-  name: 'Bitcoin',
+  name: 'Apple',
   currency: 'USD',
-  quantity: 0.5,
+  quantity: 5,
   instrumentId,
   transactionCount: 0,
   isArchived: false,
 };
 
-export const cryptoInstrumentDetails: InstrumentDetailsResponse = {
+export const stockInstrumentDetails: InstrumentDetailsResponse = {
   id: instrumentId,
-  ticker: 'bitcoin',
-  name: 'Bitcoin',
-  assetClass: 5,
+  ticker: 'AAPL',
+  name: 'Apple',
+  assetClass: 2,
   quoteCurrency: 'USD',
   exchange: null,
-  source: 2,
+  source: 0,
   verificationStatus: 0,
-  lastPrice: 65000,
+  lastPrice: 190,
   lastPriceDate: '2026-08-04',
 };
 

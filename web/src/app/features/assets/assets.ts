@@ -40,15 +40,7 @@ import { ASSET_CLASS, assetClassLabel } from './asset-class';
 import { AssetFormDialog } from './asset-form/asset-form-dialog/asset-form-dialog';
 import { VALUATION_MODE } from './asset-valuation-mode';
 
-const STALE_MANUAL_VALUE_MONTHS = 6;
-
 const STALE_PRICE_DAYS = 7;
-
-function isStale(manualValueDate: string): boolean {
-  const threshold = new Date();
-  threshold.setMonth(threshold.getMonth() - STALE_MANUAL_VALUE_MONTHS);
-  return new Date(manualValueDate) < threshold;
-}
 
 function isPriceStale(lastPriceDate: string | null | undefined): boolean {
   if (!lastPriceDate) {
@@ -109,7 +101,7 @@ export class Assets {
     'quantity',
     'currency',
     'value',
-    'manualValueDate',
+    'valuedOn',
     ...(this.isArchived() ? [] : ['actions']),
   ]);
 
@@ -165,7 +157,6 @@ export class Assets {
   });
 
   protected readonly assetClassLabel = assetClassLabel;
-  protected readonly isStale = isStale;
   protected readonly isPriceStale = isPriceStale;
   protected readonly formatMoney = formatMoney;
   protected readonly formatQuantity = formatQuantity;

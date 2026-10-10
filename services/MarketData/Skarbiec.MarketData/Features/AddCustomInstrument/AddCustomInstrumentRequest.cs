@@ -12,7 +12,7 @@ public sealed record AddCustomInstrumentRequest : IValidatableObject
     [Required, MaxLength(200)]
     public required string Name { get; init; }
 
-    /// <summary>Required for Crypto; ignored for Stock and Etf, whose currency comes from the exchange the ticker suffix names.</summary>
+    /// <summary>Ignored for Stock and Etf, whose currency comes from the exchange the ticker suffix names.</summary>
     [StringLength(3, MinimumLength = 3)]
     public string? QuoteCurrency { get; init; }
 

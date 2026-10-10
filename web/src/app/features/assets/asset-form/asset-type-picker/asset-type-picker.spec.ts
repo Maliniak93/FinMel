@@ -31,7 +31,7 @@ describe('AssetTypePicker', () => {
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
     );
 
-    expect(tiles).toHaveLength(10);
+    expect(tiles).toHaveLength(7);
     tiles.forEach((tile, index) => {
       expect(tile.textContent).toContain(
         TestBed.inject(TranslocoService).translate(ASSET_CLASSES[index].label),
@@ -76,7 +76,7 @@ describe('AssetTypePicker', () => {
     const tiles = () => labelsOf(fixture.nativeElement as HTMLElement, 'button');
 
     const english = tiles();
-    expect(english).toHaveLength(10);
+    expect(english).toHaveLength(7);
 
     await switchLanguage(fixture, 'pl');
 

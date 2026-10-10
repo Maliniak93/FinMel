@@ -54,16 +54,9 @@ public sealed class HistoryChangePropertyTests
     {
         var random = new Random(seed);
         var history = RandomHistory(random);
-        var manual = random.Next(2) == 0;
-        var manualDate = Origin.AddDays(random.Next(0, 60));
+        var incoming = Incoming(history: history);
 
-        var incoming = manual
-            ? Incoming(history: [], valuationMode: AssetValuationMode.Manual, assetClass: AssetClass.RealEstate, manualAmount: 100m, manualDate: manualDate)
-            : Incoming(history: history);
-
-        var expected = manual ? manualDate : history[0].Date;
-
-        Assert.Equal(expected, HistoryChange.EarliestAffectedDate(null, incoming));
+        Assert.Equal(history[0].Date, HistoryChange.EarliestAffectedDate(null, incoming));
     }
 
     [Theory]
@@ -84,26 +77,6 @@ public sealed class HistoryChangePropertyTests
         };
 
         var expected = oldHistory[0].Date < newHistory[0].Date ? oldHistory[0].Date : newHistory[0].Date;
-
-        Assert.Equal(expected, HistoryChange.EarliestAffectedDate(stored, incoming));
-    }
-
-    [Theory]
-    [MemberData(nameof(Seeds))]
-    public void EarliestAffectedDate_ManualValueChanged_IsEarlierOfOldAndNewManualDate(int seed)
-    {
-        var random = new Random(seed);
-        var oldDate = Origin.AddDays(random.Next(0, 60));
-        var oldAmount = 1_000m * random.Next(1, 5);
-        var newDate = random.Next(2) == 0 ? oldDate : Origin.AddDays(random.Next(0, 60));
-        var newAmount = random.Next(2) == 0 ? oldAmount : 1_000m * random.Next(1, 5);
-
-        var stored = Stored(history: [], valuationMode: AssetValuationMode.Manual, assetClass: AssetClass.RealEstate, manualAmount: oldAmount, manualDate: oldDate);
-        var incoming = Incoming(history: [], valuationMode: AssetValuationMode.Manual, assetClass: AssetClass.RealEstate, manualAmount: newAmount, manualDate: newDate);
-
-        DateOnly? expected = oldDate == newDate && oldAmount == newAmount
-            ? null
-            : (oldDate < newDate ? oldDate : newDate);
 
         Assert.Equal(expected, HistoryChange.EarliestAffectedDate(stored, incoming));
     }
@@ -197,8 +170,6 @@ public sealed class HistoryChangePropertyTests
         AssetClass assetClass = AssetClass.Cash,
         Guid? instrumentId = null,
         string currency = "PLN",
-        decimal? manualAmount = null,
-        DateOnly? manualDate = null,
         bool isArchived = false,
         bool portfolioIsArchived = false,
         DateOnly? archivedOn = null,
@@ -212,8 +183,6 @@ public sealed class HistoryChangePropertyTests
             InstrumentId = instrumentId,
             Currency = currency,
             Quantity = history.Count > 0 ? history[^1].Quantity : 0m,
-            ManualValueAmount = manualAmount,
-            ManualValueDate = manualDate,
             PortfolioIsArchived = portfolioIsArchived,
             IsArchived = isArchived,
             Version = 0,
@@ -229,8 +198,6 @@ public sealed class HistoryChangePropertyTests
         AssetClass assetClass = AssetClass.Cash,
         Guid? instrumentId = null,
         string currency = "PLN",
-        decimal? manualAmount = null,
-        DateOnly? manualDate = null,
         bool isArchived = false,
         bool portfolioIsArchived = false,
         DateTimeOffset? occurredAt = null) => new()
@@ -244,8 +211,6 @@ public sealed class HistoryChangePropertyTests
             Currency = currency,
             Quantity = history.Count > 0 ? history[^1].Quantity : 0m,
             QuoteUnitsPerQuantity = 1m,
-            ManualValueAmount = manualAmount,
-            ManualValueDate = manualDate,
             QuantityHistory = [.. history.Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             PortfolioIsArchived = portfolioIsArchived,
             IsArchived = isArchived,

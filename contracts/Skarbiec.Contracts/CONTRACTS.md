@@ -17,6 +17,7 @@ over time is suspended while ADR-019 (greenfield mode) holds — see the rules b
 These wire-versioning rules govern the **event/DTO records** (e.g. `UserRegistered`), not the
 shared primitives (`Money`, `AssetClass`, `AssetValuationMode`, `TreasuryBondType`, `SupportedCurrencies`,
 `Result`/`Result<T>`/`Error`) — those never go on the wire and version like any other C# type.
+`AssetClass` and `AssetValuationMode` carry explicit member values (the ints are stored; removed members leave gaps) — never renumber them.
 `TreasuryBondType` is the MF retail bond type (`Ots … Rod`); its member order is the order MarketData lists
 the bond offer in, so reordering it reorders the offer. `Metal` and `MetalInstruments` pin each precious metal
 to its seeded MarketData instrument id, so changing an id orphans every stored reference to it.

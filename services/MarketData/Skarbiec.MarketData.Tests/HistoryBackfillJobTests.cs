@@ -192,13 +192,13 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var instrument = NewInstrument("bitcoin", PriceSource.CoinGecko, "USD", AssetClass.Crypto);
+        var instrument = NewInstrument("AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
         var quotes = new[] { new InstrumentQuote(instrument.Id, Today.AddDays(-365), 100m) };
         var source = new ScriptedPriceSource(
-            PriceSource.CoinGecko, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes), maxHistoryDays: 365);
+            PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes), maxHistoryDays: 365);
 
         var twoYearsAgo = Today.AddDays(-730);
         var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);

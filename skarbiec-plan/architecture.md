@@ -25,7 +25,7 @@ Angular talks only to the Gateway (ADR-013).
 
 | Event | Payload | Published when |
 |---|---|---|
-| `AssetPositionChanged` | `AssetId, PortfolioId, UserId, AssetClass, ValuationMode, InstrumentId?, Currency, Quantity, ManualValueAmount?, ManualValueDate?, FirstTransactionDate?, QuantityHistory (end-of-day `(Date, Quantity)` per transaction date), PortfolioIsArchived, IsArchived, Version` | after **every** position mutation: add/update asset, record/update/delete transaction, archive/restore the asset (`IsArchived`, asset-archive) or its portfolio (fan-out) |
+| `AssetPositionChanged` | `AssetId, PortfolioId, UserId, AssetClass, ValuationMode, InstrumentId?, Currency, Quantity, FirstTransactionDate?, QuantityHistory (end-of-day `(Date, Quantity)` per transaction date), PortfolioIsArchived, IsArchived, Version` | after **every** position mutation: add/update asset, record/update/delete transaction, archive/restore the asset (`IsArchived`, asset-archive) or its portfolio (fan-out) |
 | `AssetRemoved` | `AssetId, PortfolioId, UserId, CascadedFromPortfolio` | remove asset (its transactions go with it); also one per asset on portfolio delete, flagged `CascadedFromPortfolio` so Reporting skips the revaluation (spec-08) |
 | `PortfolioArchived` / `PortfolioRestored` / `PortfolioDeleted` | `PortfolioId, UserId` | the matching slice (`Restore` is a new slice — no "unarchive" exists today); `PortfolioDeleted` cascades to the assets and their transactions and is accompanied by one `AssetRemoved` per asset (spec-08) |
 | `DailyPricesSynced` | as today, plus `Kind: Prices \| Fx` | end of a sync job |
@@ -60,7 +60,6 @@ flowchart LR
     end
     NBP["NBP API<br/>FX"]
     STOOQ["Stooq<br/>GPW / ETF"]
-    CG["CoinGecko<br/>crypto"]
     GA["gold-api.com<br/>gold / silver spot"]
     MF["Ministry of Finance (gov.pl)<br/>retail treasury bond file"]
 
@@ -71,7 +70,6 @@ flowchart LR
     SVC --> DB
     SVC -->|"jobs, daily"| NBP
     SVC -->|"jobs, daily"| STOOQ
-    SVC -->|"jobs, daily"| CG
     SVC -->|"jobs, daily"| GA
     SVC -->|"jobs, daily"| MF
 ```
@@ -100,7 +98,7 @@ flowchart TB
     MD --> MDB[("marketdata_db")]
     RP --> RDB[("reporting_db")]
 
-    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / CoinGecko / gold-api.com / MF"]
+    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / gold-api.com / MF"]
 
     ASPIRE["Aspire dashboard<br/>(traces, logs, metrics)"]
     ASPIRE -.-> GW & ID & PF & MD & RP
@@ -139,7 +137,7 @@ sequenceDiagram
     autonumber
     participant Q as Quartz in MarketData
     participant MD as MarketData
-    participant EXT as NBP / Stooq / CoinGecko
+    participant EXT as NBP / Stooq
     participant MQ as RabbitMQ
     participant RP as Reporting
 

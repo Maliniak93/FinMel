@@ -1,8 +1,8 @@
 namespace Skarbiec.MarketData.Data;
 
+// The ints are stored: keep them pinned.
 public enum PriceSource
 {
-    Yahoo,
-    CoinGecko,
-    GoldApi,
+    Yahoo = 0,
+    GoldApi = 2,
 }

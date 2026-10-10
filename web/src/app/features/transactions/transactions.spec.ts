@@ -41,12 +41,10 @@ const asset: AssetResponse = {
   id: assetId,
   portfolioId,
   assetClass: 2,
-  valuationMode: 1,
+  valuationMode: 0,
   name: 'Apple',
   currency: 'USD',
   quantity: 10,
-  manualValue: 1000,
-  manualValueDate: '2020-01-01',
   transactionCount: 1,
   isArchived: false,
 };
@@ -193,8 +191,6 @@ describe('Transactions', () => {
       valuationMode: 2,
       name: 'Checking account',
       currency: 'PLN',
-      manualValue: null,
-      manualValueDate: null,
     };
     await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(cashAsset));
     dialog.open.mockReturnValue({ afterClosed: () => of(false) });
@@ -438,8 +434,6 @@ describe('Transactions', () => {
       name: 'Cash account',
       currency: 'PLN',
       quantity: 4000,
-      manualValue: null,
-      manualValueDate: null,
     };
     const plainTopUp: TransactionResponse = {
       ...transaction,
@@ -548,8 +542,6 @@ describe('Transactions', () => {
       name: 'Cash account',
       currency: 'PLN',
       quantity: 3000,
-      manualValue: null,
-      manualValueDate: null,
     };
     const manualLeg = {
       ...transaction,
@@ -688,8 +680,6 @@ describe('Transactions', () => {
       name: 'Savings account',
       currency: 'PLN',
       quantity: 10033.29,
-      manualValue: null,
-      manualValueDate: null,
     };
     const opening: TransactionResponse = {
       ...transaction,
@@ -762,8 +752,6 @@ describe('Transactions', () => {
       name: 'Term deposit',
       currency: 'PLN',
       quantity: 10000,
-      manualValue: null,
-      manualValueDate: null,
     };
     const openingDeposit: TransactionResponse = {
       ...transaction,
@@ -961,8 +949,6 @@ describe('Transactions', () => {
         valuationMode: 2,
         name: 'Term deposit',
         currency: 'PLN',
-        manualValue: null,
-        manualValueDate: null,
       };
       await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(deposit));
       const element = fixture.nativeElement as HTMLElement;

@@ -26,9 +26,16 @@ public sealed class AssetValuationModesTests
     }
 
     [Fact]
-    public void Savings_IsAppendedWithStableValue()
+    public void EnumValues_ArePinned()
     {
+        Assert.Equal(0, (int)AssetClass.Cash);
+        Assert.Equal(1, (int)AssetClass.Deposit);
+        Assert.Equal(2, (int)AssetClass.Stock);
+        Assert.Equal(3, (int)AssetClass.Etf);
+        Assert.Equal(4, (int)AssetClass.Bond);
+        Assert.Equal(6, (int)AssetClass.PreciousMetal);
         Assert.Equal(9, (int)AssetClass.Savings);
-        Assert.Equal(8, (int)AssetClass.Other);
+        Assert.Equal(0, (int)AssetValuationMode.Market);
+        Assert.Equal(2, (int)AssetValuationMode.CurrencyValued);
     }
 }

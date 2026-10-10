@@ -49,8 +49,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Quantity = 12m,
                 QuoteUnitsPerQuantity = 1m,
                 QuantityHistory = [],
-                ManualValueAmount = null,
-                ManualValueDate = null,
                 PortfolioIsArchived = false,
                 IsArchived = false,
                 Version = 0,
@@ -66,8 +64,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             Assert.Equal(instrumentId, position.InstrumentId);
             Assert.Equal("USD", position.Currency);
             Assert.Equal(12m, position.Quantity);
-            Assert.Null(position.ManualValueAmount);
-            Assert.Null(position.ManualValueDate);
             Assert.False(position.PortfolioIsArchived);
             Assert.Equal(0, position.Version);
             Assert.True(position.UpdatedAt > DateTimeOffset.MinValue);

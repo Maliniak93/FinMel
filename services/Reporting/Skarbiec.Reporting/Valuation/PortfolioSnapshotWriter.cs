@@ -82,7 +82,6 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
                 Quantity = p.Quantity,
                 QuoteUnitsPerQuantity = p.QuoteUnitsPerQuantity,
                 InstrumentId = p.InstrumentId,
-                ManualValueAmount = p.ManualValueAmount,
             })
             .ToList();
 

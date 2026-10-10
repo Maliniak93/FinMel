@@ -44,8 +44,8 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
                 instrumentId: stockInstrumentId, currency: "PLN", quantity: 10m);
 
             await db.SeedPositionAsync(assetBId, userBId, portfolioBId, cancellationToken,
-                assetClass: AssetClass.RealEstate, valuationMode: AssetValuationMode.Manual,
-                currency: "PLN", quantity: 0m, manualValueAmount: 300_000m);
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 300_000m);
         }
 
         var priceQuoteClient = new FakePriceQuoteClient()
@@ -141,7 +141,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var stockInstrumentId = Guid.NewGuid();
 
         var marketAssetId = Guid.NewGuid();
-        var manualAssetId = Guid.NewGuid();
+        var plnCashAssetId = Guid.NewGuid();
         var cashAssetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
@@ -150,9 +150,9 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
                 instrumentId: stockInstrumentId, currency: "PLN", quantity: 10m);
 
-            await db.SeedPositionAsync(manualAssetId, userId, portfolioId, cancellationToken,
-                assetClass: AssetClass.RealEstate, valuationMode: AssetValuationMode.Manual,
-                currency: "PLN", quantity: 0m, manualValueAmount: 300_000m);
+            await db.SeedPositionAsync(plnCashAssetId, userId, portfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 300_000m);
 
             await db.SeedPositionAsync(cashAssetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
@@ -183,9 +183,9 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             Assert.Equal(snapshotDate, marketLine.PriceDate);
             Assert.Equal(1_500m, marketLine.ValuePln);
 
-            var manualLine = Assert.Single(lines, l => l.AssetId == manualAssetId);
-            Assert.Null(manualLine.PriceUsed);
-            Assert.Equal(300_000m, manualLine.ValuePln);
+            var plnCashLine = Assert.Single(lines, l => l.AssetId == plnCashAssetId);
+            Assert.Null(plnCashLine.PriceUsed);
+            Assert.Equal(300_000m, plnCashLine.ValuePln);
 
             var cashLine = Assert.Single(lines, l => l.AssetId == cashAssetId);
             Assert.Equal(4.30m, cashLine.FxRateUsed);
@@ -253,8 +253,8 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         await using (var db = OpenDbContext(containers))
         {
             await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
-                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.Manual,
-                currency: "PLN", quantity: 0m, manualValueAmount: 42m);
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 42m);
         }
 
         await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>

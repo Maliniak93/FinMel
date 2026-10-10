@@ -22,7 +22,7 @@ public static class ValuationAlgorithm
             {
                 AssetValuationMode.Market => ValueMarketAsset(position, pricesByInstrument, fxRatesByPair, snapshotDate),
                 AssetValuationMode.CurrencyValued => ValueCurrencyValuedAsset(position, fxRatesByPair, snapshotDate),
-                _ => ValueManualAsset(position, fxRatesByPair, snapshotDate),
+                _ => throw new ArgumentOutOfRangeException(nameof(positions), position.ValuationMode, "Unmapped AssetValuationMode."),
             });
         }
 
@@ -61,18 +61,6 @@ public static class ValuationAlgorithm
             priceUsed: price.Close,
             priceDate: price.Date,
             fxRateUsed: rate);
-    }
-
-    private static ValuedPosition ValueManualAsset(
-        ValuationPosition position,
-        IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
-        DateOnly snapshotDate)
-    {
-        var (rate, fxIsStale) = ResolveFxRate(position.Currency, fxRatesByPair, snapshotDate);
-
-        return rate is null
-            ? Line(position, valuePln: 0m, isStale: true)
-            : Line(position, (position.ManualValueAmount ?? 0m) * rate.Value, fxIsStale, fxRateUsed: rate);
     }
 
     // Currency-valued: Quantity is the amount held in Currency, converted like the other modes.

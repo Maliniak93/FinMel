@@ -148,24 +148,15 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
-    [Theory]
-    [InlineData("deposit-type")]
-    [InlineData("crypto")]
-    public async Task LinkNotAllowed_Returns400(string scenario)
+    [Fact]
+    public async Task LinkNotAllowed_Returns400()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        var portfolioId = setup.EtfPortfolioId;
-        var assetId = setup.EtfAssetId;
+        var (portfolioId, assetId) = (setup.EtfPortfolioId, setup.EtfAssetId);
         var request = NewTradeRequest(setup.CashAssetId, TransactionType.Deposit, quantity: 5m, unitPrice: 1m);
-        if (scenario == "crypto")
-        {
-            assetId = await AddQuotedHoldingAsync(
-                client, portfolioId, cancellationToken, AssetClass.Crypto, "EUR", name: "Bitcoin", ticker: "BTC-EUR");
-            request = NewTradeRequest(setup.CashAssetId, quantity: 1m, unitPrice: 100m);
-        }
 
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 

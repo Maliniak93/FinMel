@@ -56,7 +56,7 @@ public sealed class TickerVerifier : ITickerVerifier
             Name = ticker,
             Source = source,
             QuoteCurrency = string.Empty,
-            AssetClass = AssetClass.Other,
+            AssetClass = AssetClass.Stock,
         };
 
         PriceFetchResult<InstrumentQuote> result;

@@ -33,7 +33,6 @@ import { ASSET_CLASS } from '../../asset-class';
 import { ASSET_FORM, INITIAL_TRANSACTION_KEY } from '../asset-form';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
 import { CashAssetForm } from '../forms/cash-asset-form/cash-asset-form';
-import { ManualAssetForm } from '../forms/manual-asset-form/manual-asset-form';
 import { SecurityAssetForm } from '../forms/security-asset-form/security-asset-form';
 
 export interface AssetFormDialogData {
@@ -42,18 +41,15 @@ export interface AssetFormDialogData {
   assetClass?: AssetClass;
 }
 
-type AssetFormKind = 'cash' | 'security' | 'manual';
+type AssetFormKind = 'cash' | 'security';
 
 function formKindFor(assetClass: AssetClass): AssetFormKind {
   switch (Number(assetClass)) {
-    case ASSET_CLASS.Cash:
-      return 'cash';
     case ASSET_CLASS.Stock:
     case ASSET_CLASS.Etf:
-    case ASSET_CLASS.Crypto:
       return 'security';
     default:
-      return 'manual';
+      return 'cash';
   }
 }
 
@@ -69,7 +65,6 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
     MatSelectModule,
     AssetTypePicker,
     CashAssetForm,
-    ManualAssetForm,
     SecurityAssetForm,
     TranslocoPipe,
   ],

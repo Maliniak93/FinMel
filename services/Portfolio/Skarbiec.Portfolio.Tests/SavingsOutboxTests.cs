@@ -55,7 +55,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal("PLN", evt.Currency);
         Assert.Equal(10_000m, evt.Quantity);
         Assert.Null(evt.InstrumentId);
-        Assert.Null(evt.ManualValueAmount);
         Assert.False(evt.PortfolioIsArchived);
     }
 

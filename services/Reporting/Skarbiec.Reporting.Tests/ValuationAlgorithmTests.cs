@@ -120,47 +120,15 @@ public sealed class ValuationAlgorithmTests
     }
 
     [Fact]
-    public void Calculate_ManualAssetInForeignCurrency_ConvertsAtSnapshotDateRate()
-    {
-        var assetId = Guid.NewGuid();
-        var positions = new[] { ManualPosition(assetId, AssetClass.RealEstate, 50_000m, "EUR") };
-        var fx = FxRates(("EURPLN", SnapshotDate, 4.3m));
-
-        var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), fx, SnapshotDate);
-
-        Assert.Equal(215_000m, result.TotalPln);
-        Assert.False(result.IsStale);
-
-        var line = Assert.Single(result.Lines);
-        Assert.Equal(215_000m, line.ValuePln);
-        Assert.Null(line.PriceUsed);
-        Assert.Null(line.PriceDate);
-        Assert.Equal(4.3m, line.FxRateUsed);
-    }
-
-    [Fact]
-    public void Calculate_ManualAssetInBaseCurrency_UsesValueDirectly()
-    {
-        var assetId = Guid.NewGuid();
-        var positions = new[] { ManualPosition(assetId, AssetClass.Other, 12_345.67m, "PLN") };
-
-        var result = ValuationAlgorithm.Calculate(positions, ImmutablePrices(), FxRates(), SnapshotDate);
-
-        Assert.Equal(12_345.67m, result.TotalPln);
-        Assert.False(result.IsStale);
-        Assert.Equal(12_345.67m, Assert.Single(result.Lines).ValuePln);
-    }
-
-    [Fact]
-    public void Calculate_MixOfMarketAndManualAcrossAssetClasses_ProducesOneLineEachSummingToTheTotal()
+    public void Calculate_MixOfMarketAndCurrencyValuedAcrossAssetClasses_ProducesOneLineEachSummingToTheTotal()
     {
         var stockInstrumentId = Guid.NewGuid();
         var stockAssetId = Guid.NewGuid();
-        var realEstateAssetId = Guid.NewGuid();
+        var cashAssetId = Guid.NewGuid();
         var positions = new ValuationPosition[]
         {
             new() { AssetId = stockAssetId, AssetClass = AssetClass.Stock, ValuationMode = AssetValuationMode.Market, Currency = "PLN", Quantity = 2, InstrumentId = stockInstrumentId },
-            new() { AssetId = realEstateAssetId, AssetClass = AssetClass.RealEstate, ValuationMode = AssetValuationMode.Manual, Currency = "PLN", Quantity = 0, ManualValueAmount = 300_000m },
+            new() { AssetId = cashAssetId, AssetClass = AssetClass.Cash, ValuationMode = AssetValuationMode.CurrencyValued, Currency = "PLN", Quantity = 300_000m },
         };
         var prices = Prices((stockInstrumentId, "PLN", SnapshotDate, 150m));
 
@@ -174,9 +142,9 @@ public sealed class ValuationAlgorithmTests
         Assert.Equal(AssetClass.Stock, stockLine.AssetClass);
         Assert.Equal(300m, stockLine.ValuePln);
 
-        var realEstateLine = Assert.Single(result.Lines, l => l.AssetId == realEstateAssetId);
-        Assert.Equal(AssetClass.RealEstate, realEstateLine.AssetClass);
-        Assert.Equal(300_000m, realEstateLine.ValuePln);
+        var cashLine = Assert.Single(result.Lines, l => l.AssetId == cashAssetId);
+        Assert.Equal(AssetClass.Cash, cashLine.AssetClass);
+        Assert.Equal(300_000m, cashLine.ValuePln);
     }
 
     [Fact]
@@ -189,7 +157,7 @@ public sealed class ValuationAlgorithmTests
         {
             MarketPosition(threeId, AssetClass.Stock, quantity: 3),
             MarketPosition(oneId, AssetClass.Stock, quantity: 1),
-            ManualPosition(midpointId, AssetClass.Other, 0.125m, "PLN"),
+            CurrencyValuedPosition(midpointId, AssetClass.Cash, 0.125m, "PLN"),
         };
         var prices = Prices((InstrumentId, "USD", SnapshotDate, 33.3333m));
         var fx = FxRates(("USDPLN", SnapshotDate, 4.0123m));
@@ -205,17 +173,15 @@ public sealed class ValuationAlgorithmTests
     }
 
     [Fact]
-    public void Calculate_ThreeValuationModes_ProducesOneLineEach()
+    public void Calculate_MarketAndCurrencyValuedModes_ProducesOneLineEach()
     {
         var marketAssetId = Guid.NewGuid();
-        var manualAssetId = Guid.NewGuid();
         var cashAssetId = Guid.NewGuid();
         var stockInstrumentId = Guid.NewGuid();
 
         var positions = new ValuationPosition[]
         {
             new() { AssetId = marketAssetId, AssetClass = AssetClass.Stock, ValuationMode = AssetValuationMode.Market, Currency = "PLN", Quantity = 10, InstrumentId = stockInstrumentId },
-            new() { AssetId = manualAssetId, AssetClass = AssetClass.RealEstate, ValuationMode = AssetValuationMode.Manual, Currency = "PLN", Quantity = 0, ManualValueAmount = 300_000m },
             new() { AssetId = cashAssetId, AssetClass = AssetClass.Cash, ValuationMode = AssetValuationMode.CurrencyValued, Currency = "EUR", Quantity = 1_000m },
         };
 
@@ -224,8 +190,8 @@ public sealed class ValuationAlgorithmTests
 
         var result = ValuationAlgorithm.Calculate(positions, prices, fx, SnapshotDate);
 
-        Assert.Equal(3, result.Lines.Count);
-        Assert.Equal(1_500m + 300_000m + 4_300m, result.TotalPln);
+        Assert.Equal(2, result.Lines.Count);
+        Assert.Equal(1_500m + 4_300m, result.TotalPln);
         Assert.False(result.IsStale);
 
         var marketLine = Assert.Single(result.Lines, l => l.AssetId == marketAssetId);
@@ -233,12 +199,6 @@ public sealed class ValuationAlgorithmTests
         Assert.Equal(150m, marketLine.PriceUsed);
         Assert.Equal(SnapshotDate, marketLine.PriceDate);
         Assert.False(marketLine.IsStale);
-
-        var manualLine = Assert.Single(result.Lines, l => l.AssetId == manualAssetId);
-        Assert.Equal(300_000m, manualLine.ValuePln);
-        Assert.Null(manualLine.PriceUsed);
-        Assert.Null(manualLine.PriceDate);
-        Assert.False(manualLine.IsStale);
 
         var cashLine = Assert.Single(result.Lines, l => l.AssetId == cashAssetId);
         Assert.Equal(4_300m, cashLine.ValuePln);
@@ -317,16 +277,6 @@ public sealed class ValuationAlgorithmTests
         Currency = "PLN",
         Quantity = quantity,
         InstrumentId = InstrumentId,
-    };
-
-    private static ValuationPosition ManualPosition(Guid assetId, AssetClass assetClass, decimal manualValue, string currency) => new()
-    {
-        AssetId = assetId,
-        AssetClass = assetClass,
-        ValuationMode = AssetValuationMode.Manual,
-        Currency = currency,
-        Quantity = 0,
-        ManualValueAmount = manualValue,
     };
 
     private static ValuationPosition CurrencyValuedPosition(Guid assetId, AssetClass assetClass, decimal quantity, string currency) => new()

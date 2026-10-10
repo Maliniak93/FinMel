@@ -37,11 +37,11 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var addAssetHandler = scope.ServiceProvider.GetRequiredService<AddAssetHandler>();
         await addAssetHandler.HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN" },
             cancellationToken);
         await addAssetHandler.HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN" },
             cancellationToken);
 
         var archiveResult = await scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
@@ -71,11 +71,11 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var addAssetHandler = scope.ServiceProvider.GetRequiredService<AddAssetHandler>();
         await addAssetHandler.HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN" },
             cancellationToken);
         await addAssetHandler.HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN" },
             cancellationToken);
         await scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
             .HandleAsync(portfolioResult.Value.Id, cancellationToken);
@@ -106,7 +106,7 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
         var positionEventsBefore = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
         Assert.Single(positionEventsBefore);
@@ -133,7 +133,7 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
 
         var archiveHandler = scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>();
@@ -251,12 +251,12 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         {
             ("AddAsset", async s => (await s.GetRequiredService<AddAssetHandler>().HandleAsync(
                 portfolioId,
-                new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "New cash", Currency = "PLN", ManualValue = 100m, ManualValueDate = new DateOnly(2026, 1, 1) },
+                new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "New cash", Currency = "PLN" },
                 cancellationToken)).Error),
             ("UpdateAsset", async s => (await s.GetRequiredService<UpdateAssetHandler>().HandleAsync(
                 portfolioId,
                 assetId,
-                new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", ManualValue = 1m, ManualValueDate = new DateOnly(2026, 1, 3) },
+                new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
                 cancellationToken)).Error),
             ("RecordTransaction", async s => (await s.GetRequiredService<RecordTransactionHandler>().HandleAsync(
                 portfolioId,
@@ -364,15 +364,15 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
 
         var first = await addAssetHandler.HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 1", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 1", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var second = await addAssetHandler.HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 2", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 2", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var third = await addAssetHandler.HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 3", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 3", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
 
         foreach (var (asset, date) in new[] { (first, new DateOnly(2024, 3, 4)), (first, new DateOnly(2025, 1, 10)), (second, new DateOnly(2023, 5, 2)) })

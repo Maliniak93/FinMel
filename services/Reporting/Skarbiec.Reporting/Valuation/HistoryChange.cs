@@ -9,13 +9,13 @@ public static class HistoryChange
 {
     public static DateOnly? EarliestAffectedDate(Position? stored, AssetPositionChanged incoming)
     {
-        var newStart = Start(incoming.ValuationMode, incoming.QuantityHistory.Select(p => p.Date), incoming.ManualValueDate);
+        var newStart = Start(incoming.QuantityHistory.Select(p => p.Date));
         if (stored is null)
         {
             return newStart;
         }
 
-        var oldStart = Start(stored.ValuationMode, stored.QuantityHistory.Select(p => p.Date), stored.ManualValueDate);
+        var oldStart = Start(stored.QuantityHistory.Select(p => p.Date));
         var candidates = new List<DateOnly?>();
 
         if (stored.AssetClass != incoming.AssetClass
@@ -27,11 +27,6 @@ public static class HistoryChange
         }
 
         candidates.Add(FirstQuantityDifference(stored.QuantityHistory, incoming.QuantityHistory));
-
-        if (stored.ManualValueAmount != incoming.ManualValueAmount || stored.ManualValueDate != incoming.ManualValueDate)
-        {
-            candidates.Add(Earlier(stored.ManualValueDate, incoming.ManualValueDate));
-        }
 
         if (stored.IsArchived != incoming.IsArchived)
         {
@@ -48,10 +43,7 @@ public static class HistoryChange
 
     public static DateOnly UtcDate(DateTimeOffset occurredAtUtc) => DateOnly.FromDateTime(occurredAtUtc.UtcDateTime);
 
-    private static DateOnly? Start(AssetValuationMode mode, IEnumerable<DateOnly> historyDates, DateOnly? manualValueDate) =>
-        mode == AssetValuationMode.Manual
-            ? manualValueDate
-            : historyDates.Select(d => (DateOnly?)d).Min();
+    private static DateOnly? Start(IEnumerable<DateOnly> historyDates) => historyDates.Select(d => (DateOnly?)d).Min();
 
     // A series is 0 before its first point, so the first difference is always at a point of one of the two.
     private static DateOnly? FirstQuantityDifference(

@@ -879,7 +879,6 @@ internal static class PortfolioApi
         CancellationToken cancellationToken,
         string name = "Test asset",
         AssetClass assetClass = AssetClass.Stock,
-        decimal manualValue = 0m,
         string currency = "PLN")
     {
         var request = new AddAssetRequest
@@ -887,8 +886,7 @@ internal static class PortfolioApi
             AssetClass = assetClass,
             Name = name,
             Currency = currency,
-            ManualValue = manualValue,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            InstrumentId = AssetValuationModes.SupportsCurrencyValued(assetClass) ? null : FakeInstrumentLookupClient.IdFor(assetClass, currency)
         };
 
         var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);

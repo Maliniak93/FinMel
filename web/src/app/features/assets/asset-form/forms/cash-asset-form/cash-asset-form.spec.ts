@@ -10,7 +10,6 @@ import {
 import {
   cashAsset,
   findControl,
-  hasControl,
   mountAssetForm,
   renderedText,
   showValidationErrors,
@@ -59,11 +58,10 @@ describe('CashAssetForm', () => {
     });
   });
 
-  it('shows the currency-valued hint and no manual-value or instrument fields', async () => {
+  it('shows the currency-valued hint and no instrument fields', async () => {
     await setup(0);
 
     expect(renderedText(fixture)).toContain('Valued automatically from');
-    expect(hasControl(component.form, 'manualValue')).toBe(false);
     expect(renderedText(fixture)).not.toContain('Instrument');
   });
 

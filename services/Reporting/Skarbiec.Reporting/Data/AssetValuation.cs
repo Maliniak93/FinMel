@@ -17,7 +17,7 @@ public sealed class AssetValuation : IUserOwned
     public required AssetClass AssetClass { get; set; }
     public required decimal Quantity { get; set; }
 
-    // Market mode only; null for manual and currency-valued lines, and for a market asset with no quote.
+    // Market mode only; null for currency-valued lines, and for a market asset with no quote.
     public decimal? PriceUsed { get; set; }
 
     // The date of PriceUsed: how far back the last-known fallback reached.

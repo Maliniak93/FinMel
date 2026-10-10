@@ -15,10 +15,6 @@ public sealed class Asset : IUserOwned
 
     public required AssetValuationMode ValuationMode { get; set; }
 
-    public decimal? ManualValueAmount { get; set; }
-
-    public DateOnly? ManualValueDate { get; set; }
-
     public Guid? InstrumentId { get; set; }
 
     // App-managed rather than xmin, which does not move when only the portfolio's archive flag changes.

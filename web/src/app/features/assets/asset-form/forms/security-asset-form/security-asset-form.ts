@@ -4,7 +4,6 @@ import { FormBuilder } from '@angular/forms';
 import { translate } from '@jsverse/transloco';
 
 import type { AssetClass, AssetResponse } from '../../../../../api/portfolio';
-import { ASSET_CLASS } from '../../../asset-class';
 import { ASSET_FORM, assetFormBody, type AssetForm, type AssetFormBody } from '../../asset-form';
 import {
   AssetBasicsFields,
@@ -35,9 +34,6 @@ export class SecurityAssetForm implements AssetForm, OnInit {
   readonly asset = input<AssetResponse>();
 
   protected readonly isEdit = computed(() => !!this.asset());
-  protected readonly allowCustomTicker = computed(
-    () => Number(this.assetClass()) === ASSET_CLASS.Crypto,
-  );
 
   readonly form = this.formBuilder.nonNullable.group({
     basics: createAssetBasicsGroup(this.formBuilder),

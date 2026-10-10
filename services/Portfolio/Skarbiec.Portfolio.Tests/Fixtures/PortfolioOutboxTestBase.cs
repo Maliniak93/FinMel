@@ -146,12 +146,12 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         return assetResult.Value.Id;
     }
 
-    protected static async Task<Guid> AddManualStockAsync(
+    protected static async Task<Guid> AddStockAsync(
         IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioId,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 
@@ -163,7 +163,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioId,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess);
 
@@ -186,7 +186,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioId,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 

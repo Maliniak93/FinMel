@@ -23,8 +23,6 @@ public sealed class AssetPositionChangedContractTests
         Assert.Equal("USD", evt.Currency);
         Assert.Equal(12.5m, evt.Quantity);
         Assert.Equal(1m, evt.QuoteUnitsPerQuantity);
-        Assert.Null(evt.ManualValueAmount);
-        Assert.Null(evt.ManualValueDate);
         Assert.False(evt.PortfolioIsArchived);
         Assert.True(evt.IsArchived);
         Assert.Equal(3L, evt.Version);

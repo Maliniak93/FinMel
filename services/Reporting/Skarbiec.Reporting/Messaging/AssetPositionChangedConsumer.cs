@@ -39,8 +39,6 @@ public sealed class AssetPositionChangedConsumer(
                 Currency = message.Currency,
                 Quantity = message.Quantity,
                 QuoteUnitsPerQuantity = message.QuoteUnitsPerQuantity,
-                ManualValueAmount = message.ManualValueAmount,
-                ManualValueDate = message.ManualValueDate,
                 PortfolioIsArchived = message.PortfolioIsArchived,
                 IsArchived = message.IsArchived,
                 Version = message.Version,
@@ -68,8 +66,6 @@ public sealed class AssetPositionChangedConsumer(
             position.Currency = message.Currency;
             position.Quantity = message.Quantity;
             position.QuoteUnitsPerQuantity = message.QuoteUnitsPerQuantity;
-            position.ManualValueAmount = message.ManualValueAmount;
-            position.ManualValueDate = message.ManualValueDate;
             position.PortfolioIsArchived = message.PortfolioIsArchived;
             position.IsArchived = message.IsArchived;
             position.Version = message.Version;

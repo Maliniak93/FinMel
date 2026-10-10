@@ -96,29 +96,12 @@ public sealed class UpdateAssetHandler(
             }
 
             asset.InstrumentId = instrumentId;
-            asset.ManualValueAmount = null;
-            asset.ManualValueDate = null;
             asset.ValuationMode = AssetValuationMode.Market;
-        }
-        else if (request.ManualValue is { } manualAmount)
-        {
-            var manualValue = Money.Create(manualAmount, request.Currency);
-            if (manualValue.IsFailure)
-            {
-                return manualValue.Error;
-            }
-
-            asset.ManualValueAmount = manualValue.Value.Amount;
-            asset.ManualValueDate = request.ManualValueDate;
-            asset.InstrumentId = null;
-            asset.ValuationMode = AssetValuationMode.Manual;
         }
         else
         {
-            // Currency-valued: clear both other modes' fields so a switch leaves no stale data.
+            // Currency-valued: clear the instrument so a switch leaves no stale data.
             asset.InstrumentId = null;
-            asset.ManualValueAmount = null;
-            asset.ManualValueDate = null;
             asset.ValuationMode = AssetValuationMode.CurrencyValued;
         }
 
