@@ -163,7 +163,7 @@ function render(specs, facts, allPrs) {
     const next = nextUp(specs);
     out.push(
       next.length
-        ? `**Next up:** ${next.map((s) => `\`/build #${s.number}\` ${s.title} (tier ${s.tier ?? "?"}${s.via ? `, ${s.via}` : ""})`).join(" · ")}`
+        ? `**Next up:** ${next.map((s) => `\`/build #${s.number}\`${s.via ? ` or \`node scripts/epic.mjs ${s.via.replace("epic #", "")}\`` : ""} ${s.title} (tier ${s.tier ?? "?"}${s.via ? `, ${s.via}` : ""})`).join(" · ")}`
         : "**Next up:** nothing in Todo — `/design` something.",
     );
     const wrong = mismatches(specs, facts, allPrs);
