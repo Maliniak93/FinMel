@@ -10,15 +10,15 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task List_ReturnsSameCurrencyClassAssetsInActivePortfolios()
+    public async Task List_ReturnsSameCurrencyClassActiveAssets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 5_000m);
-        await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, currency: "EUR", name: "EUR cash");
-        await client.AddAssetAsync(walletId, cancellationToken, name: "PLN shares", assetClass: AssetClass.Stock);
-        await client.AddDepositAsync(walletId, cancellationToken, NewDepositRequest(name: "PLN deposit"));
+        var brokerageId = await client.CreateAccountAsync(cancellationToken, name: "Brokerage");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
+        await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "EUR cash");
+        await client.AddAssetAsync(brokerageId, cancellationToken, name: "PLN shares", assetClass: AssetClass.Stock);
+        await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "PLN deposit"));
         await client.AddArchivedCashAssetAsync(cancellationToken);
 
         var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
@@ -28,8 +28,6 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         var candidate = Assert.Single(candidates);
         Assert.Equal(cashId, candidate.GetProperty("assetId").GetGuid());
         Assert.Equal("Cash account", candidate.GetProperty("name").GetString());
-        Assert.Equal(walletId, candidate.GetProperty("portfolioId").GetGuid());
-        Assert.Equal("Wallet", candidate.GetProperty("portfolioName").GetString());
         Assert.Equal(5_000m, candidate.GetProperty("balance").GetDecimal());
     }
 
@@ -38,9 +36,8 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var liveId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Live cash");
-        var archivedId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Archived cash");
+        var liveId = await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Live cash");
+        var archivedId = await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Archived cash");
         await client.ArchiveAssetAsync(archivedId, cancellationToken);
 
         var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
@@ -66,23 +63,21 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
     }
 
     [Fact]
-    public async Task List_OrdersByPortfolioNameThenAssetName()
+    public async Task List_OrdersByAssetName()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var zuluId = await client.CreatePortfolioAsync(cancellationToken, name: "Zulu");
-        var alphaId = await client.CreatePortfolioAsync(cancellationToken, name: "Alpha");
-        await client.AddCashAssetAsync(zuluId, cancellationToken, name: "A cash");
-        await client.AddCashAssetAsync(alphaId, cancellationToken, name: "Z cash");
-        await client.AddCashAssetAsync(alphaId, cancellationToken, name: "B cash");
+        await client.AddCashAssetAsync(cancellationToken, name: "A cash");
+        await client.AddCashAssetAsync(cancellationToken, name: "Z cash");
+        await client.AddCashAssetAsync(cancellationToken, name: "B cash");
 
         var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var listed = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray()
-            .Select(c => $"{c.GetProperty("portfolioName").GetString()}/{c.GetProperty("name").GetString()}")
+            .Select(c => c.GetProperty("name").GetString())
             .ToList();
-        Assert.Equal(["Alpha/B cash", "Alpha/Z cash", "Zulu/A cash"], listed);
+        Assert.Equal(["A cash", "B cash", "Z cash"], listed);
     }
 
     [Fact]
@@ -90,8 +85,7 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken);
+        await client.AddCashAssetWithBalanceAsync(cancellationToken);
         // Control: the same request with a supported currency is answered.
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken)).StatusCode);
 

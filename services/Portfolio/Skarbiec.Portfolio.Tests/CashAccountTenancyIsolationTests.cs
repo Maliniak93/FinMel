@@ -15,11 +15,9 @@ public sealed class CashAccountTenancyIsolationTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var ownerPortfolioId = await owner.CreatePortfolioAsync(cancellationToken);
-        await owner.AddCashAssetWithBalanceAsync(ownerPortfolioId, cancellationToken, name: "Owner's cash");
+        await owner.AddCashAssetWithBalanceAsync(cancellationToken, name: "Owner's cash");
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
-        await stranger.AddCashAssetWithBalanceAsync(strangerPortfolioId, cancellationToken, balance: 10m, name: "Stranger's own");
+        await stranger.AddCashAssetWithBalanceAsync(cancellationToken, balance: 10m, name: "Stranger's own");
 
         var response = await stranger.GetAsync(AllCashAccountsUri, cancellationToken);
 

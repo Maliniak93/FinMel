@@ -11,9 +11,8 @@ public sealed class ListSavingsAccountsHandler(PortfolioDbContext dbContext, Tim
         var rows = await (
                 from terms in dbContext.SavingsAccounts.AsNoTracking()
                 join asset in dbContext.Assets on terms.AssetId equals asset.Id
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
-                orderby portfolio.Name, asset.Name
-                select new { Terms = terms, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
+                orderby asset.Name
+                select new { Terms = terms, Asset = asset })
             .ToListAsync(cancellationToken);
 
         var interest = await dbContext.LoadSavingsInterestStatusAsync(
@@ -21,7 +20,7 @@ public sealed class ListSavingsAccountsHandler(PortfolioDbContext dbContext, Tim
 
         return rows
             .Select(r => r.Terms.ToResponse(
-                r.Asset, r.PortfolioName, r.PortfolioIsArchived, interest.GetValueOrDefault(r.Asset.Id, SavingsInterestStatus.None)))
+                r.Asset, interest.GetValueOrDefault(r.Asset.Id, SavingsInterestStatus.None)))
             .ToList();
     }
 }

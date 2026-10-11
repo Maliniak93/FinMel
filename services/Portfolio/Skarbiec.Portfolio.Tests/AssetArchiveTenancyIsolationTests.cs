@@ -13,7 +13,7 @@ public sealed class AssetArchiveTenancyIsolationTests(SkarbiecContainersFixture 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await owner.CreateAccountWithAssetAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.PostAsync(ArchiveAssetUri(assetId), content: null, cancellationToken);
@@ -27,7 +27,7 @@ public sealed class AssetArchiveTenancyIsolationTests(SkarbiecContainersFixture 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await owner.CreateAccountWithAssetAsync(cancellationToken);
         await owner.ArchiveAssetAsync(assetId, cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -38,14 +38,13 @@ public sealed class AssetArchiveTenancyIsolationTests(SkarbiecContainersFixture 
     }
 
     [Fact]
-    public async Task Archive_AssetUnderStrangersOwnPortfolio_ReturnsNotFound()
+    public async Task Archive_AssetUnderStrangersOwnAccount_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (ownerPortfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (ownerAccountId, assetId) = await owner.CreateAccountWithAssetAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var response = await stranger.PostAsync(ArchiveAssetUri(assetId), content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -53,15 +52,14 @@ public sealed class AssetArchiveTenancyIsolationTests(SkarbiecContainersFixture 
     }
 
     [Fact]
-    public async Task Restore_AssetUnderStrangersOwnPortfolio_ReturnsNotFound()
+    public async Task Restore_AssetUnderStrangersOwnAccount_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (ownerPortfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (ownerAccountId, assetId) = await owner.CreateAccountWithAssetAsync(cancellationToken);
         await owner.ArchiveAssetAsync(assetId, cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var response = await stranger.PostAsync(RestoreAssetUri(assetId), content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

@@ -49,7 +49,6 @@ const CASH_ERROR_KEYS: Record<string, string> = {
 interface CashOption {
   assetId: string;
   name: string;
-  portfolioName: string;
   balance: number | string;
 }
 

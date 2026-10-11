@@ -29,7 +29,7 @@ import {
   jsonResponse,
   lastHistoryParams,
   mockApi,
-  portfolioResponse,
+  accountResponse,
   requestUrl,
 } from './testing/dashboard-fixtures';
 
@@ -139,7 +139,7 @@ describe('Dashboard', () => {
         asOf: null,
         isStale: false,
         byAssetClass: [],
-        byPortfolio: [],
+        byAccount: [],
       } satisfies DashboardResponse),
     );
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -442,7 +442,7 @@ describe('Dashboard', () => {
         asOf: null,
         isStale: false,
         byAssetClass: [],
-        byPortfolio: [],
+        byAccount: [],
       } satisfies DashboardResponse),
     );
     const element = fixture.nativeElement as HTMLElement;
@@ -453,11 +453,7 @@ describe('Dashboard', () => {
     ];
 
     const english = texts();
-    expect(english).toEqual([
-      'Dashboard',
-      "You haven't entered any wealth yet.",
-      'Go to portfolios',
-    ]);
+    expect(english).toEqual(['Dashboard', "You haven't entered any wealth yet.", 'Go to accounts']);
 
     await switchLanguage(fixture, 'pl');
 
@@ -504,7 +500,7 @@ describe('Dashboard', () => {
     expect(textOf(value.querySelector('.dashboard-page__change'))).toBe('—');
   });
 
-  it('orders the cards value, allocation, chart, portfolios, cash, upcoming', async () => {
+  it('orders the cards value, allocation, chart, accounts, cash, upcoming', async () => {
     await setup(jsonResponse(dashboard));
     const element = fixture.nativeElement as HTMLElement;
 
@@ -512,13 +508,13 @@ describe('Dashboard', () => {
       element.querySelector('.dashboard-page__value'),
       element.querySelector('app-pie-chart'),
       element.querySelector('app-net-worth-chart'),
-      element.querySelector('app-portfolios-card'),
+      element.querySelector('app-accounts-card'),
       element.querySelector('app-cash-card'),
       element.querySelector('app-upcoming-card'),
     ];
     const ordered = [
       ...element.querySelectorAll(
-        '.dashboard-page__value, app-pie-chart, app-net-worth-chart, app-portfolios-card, app-cash-card, app-upcoming-card',
+        '.dashboard-page__value, app-pie-chart, app-net-worth-chart, app-accounts-card, app-cash-card, app-upcoming-card',
       ),
     ];
 
@@ -531,7 +527,7 @@ describe('Dashboard', () => {
   it('a failing card does not break the dashboard', async () => {
     await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
       bonds: jsonResponse({ detail: 'Bonds unavailable.' }, 503),
-      portfolios: jsonResponse([portfolioResponse()]),
+      accounts: jsonResponse([accountResponse({ name: 'Retirement' })]),
       cash: jsonResponse(cashAccountsResponse([{ currency: 'PLN', balance: 1000 }])),
     });
     const element = fixture.nativeElement as HTMLElement;
@@ -542,7 +538,7 @@ describe('Dashboard', () => {
     expect(element.querySelector('.dashboard-page__value')).not.toBeNull();
     expect(element.querySelector('app-pie-chart')).not.toBeNull();
     expect(element.querySelector('app-net-worth-chart')).not.toBeNull();
-    expect(element.querySelector('app-portfolios-card')?.textContent).toContain('Retirement');
+    expect(element.querySelector('app-accounts-card')?.textContent).toContain('Retirement');
     expect(element.querySelector('app-cash-card')?.textContent).toContain(formatMoney(1000, 'PLN'));
   });
 });

@@ -1,20 +1,14 @@
 import { Component, computed, inject, resource, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import {
-  MAT_DIALOG_DATA,
-  MatDialog,
-  MatDialogModule,
-  MatDialogRef,
-} from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioPortfolios,
+  getApiPortfolioAccounts,
   postApiPortfolioAssets,
   putApiPortfolioAssetsById,
   type AssetClass,
@@ -25,20 +19,15 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../../core/auth/problem-details';
-import { BondPurchaseDialog } from '../../../bonds/bond-purchase-dialog/bond-purchase-dialog';
-import { DepositFormDialog } from '../../../deposits/deposit-form-dialog/deposit-form-dialog';
-import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form-dialog/savings-account-form-dialog';
-import { MetalFormDialog } from '../../../metals/metal-form-dialog/metal-form-dialog';
+import { ACCOUNT_TYPE } from '../../../accounts/account-type';
 import { ASSET_CLASS } from '../../asset-class';
 import { ASSET_FORM, INITIAL_TRANSACTION_KEY } from '../asset-form';
-import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
 import { CashAssetForm } from '../forms/cash-asset-form/cash-asset-form';
 import { SecurityAssetForm } from '../forms/security-asset-form/security-asset-form';
 
 export interface AssetFormDialogData {
-  portfolioId?: string;
+  assetClass: AssetClass;
   asset?: AssetResponse;
-  assetClass?: AssetClass;
 }
 
 type AssetFormKind = 'cash' | 'security';
@@ -60,10 +49,8 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
     MatButtonModule,
     MatDialogModule,
     MatFormFieldModule,
-    MatIconModule,
     MatProgressSpinnerModule,
     MatSelectModule,
-    AssetTypePicker,
     CashAssetForm,
     SecurityAssetForm,
     TranslocoPipe,
@@ -73,90 +60,42 @@ function formKindFor(assetClass: AssetClass): AssetFormKind {
 })
 export class AssetFormDialog {
   private readonly dialogRef = inject(MatDialogRef<AssetFormDialog>);
-  private readonly dialog = inject(MatDialog);
   protected readonly data = inject<AssetFormDialogData>(MAT_DIALOG_DATA);
 
   protected readonly isEdit = !!this.data.asset;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
-  protected readonly presetClass = this.data.assetClass !== undefined;
-  protected readonly choosesPortfolio = !this.data.asset && !this.data.portfolioId;
+  protected readonly kind = formKindFor(this.data.assetClass);
+  protected readonly choosesAccount = !this.data.asset && this.kind === 'security';
 
-  protected readonly portfolioForm = new FormGroup({
-    portfolioId: new FormControl('', {
+  protected readonly accountForm = new FormGroup({
+    accountId: new FormControl('', {
       nonNullable: true,
-      validators: this.choosesPortfolio ? [Validators.required] : [],
+      validators: this.choosesAccount ? [Validators.required] : [],
     }),
   });
 
-  protected readonly portfoliosResource = resource({
-    params: () => (this.choosesPortfolio ? {} : undefined),
+  protected readonly accountsResource = resource({
+    params: () => (this.choosesAccount ? {} : undefined),
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfolios({ signal: abortSignal });
+      const result = await getApiPortfolioAccounts({ signal: abortSignal });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('deposits.form.portfoliosLoadFailed'),
+          readProblemDetails(result.error).detail ?? translate('assets.form.accountsLoadFailed'),
         );
       }
-      return (result.data ?? []).filter((portfolio) => !portfolio.isArchived);
+      return (result.data ?? []).filter(
+        (account) => !account.isArchived && Number(account.type) === ACCOUNT_TYPE.Brokerage,
+      );
     },
   });
 
-  private readonly assetClass = signal<AssetClass | null>(
-    this.data.asset?.assetClass ?? this.data.assetClass ?? null,
+  protected readonly noAccounts = computed(
+    () => this.accountsResource.hasValue() && this.accountsResource.value().length === 0,
   );
-  protected readonly selection = computed(() => {
-    const assetClass = this.assetClass();
-    return assetClass === null ? null : { assetClass, kind: formKindFor(assetClass) };
-  });
 
   private readonly activeForm = viewChild(ASSET_FORM);
-
-  protected pick(assetClass: AssetClass): void {
-    this.formError.set(null);
-    const portfolioId = this.targetPortfolioId();
-
-    if (Number(assetClass) === ASSET_CLASS.Deposit) {
-      this.dialog
-        .open(DepositFormDialog, { width: '560px', data: { portfolioId } })
-        .afterClosed()
-        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
-      return;
-    }
-
-    if (Number(assetClass) === ASSET_CLASS.Bond) {
-      this.dialog
-        .open(BondPurchaseDialog, { width: '560px', data: { portfolioId } })
-        .afterClosed()
-        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
-      return;
-    }
-
-    if (Number(assetClass) === ASSET_CLASS.Savings) {
-      this.dialog
-        .open(SavingsAccountFormDialog, { width: '560px', data: { portfolioId } })
-        .afterClosed()
-        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
-      return;
-    }
-
-    if (Number(assetClass) === ASSET_CLASS.PreciousMetal) {
-      this.dialog
-        .open(MetalFormDialog, { width: '560px', data: { portfolioId } })
-        .afterClosed()
-        .subscribe((saved: boolean | undefined) => this.dialogRef.close(!!saved));
-      return;
-    }
-
-    this.assetClass.set(assetClass);
-  }
-
-  protected back(): void {
-    this.formError.set(null);
-    this.assetClass.set(null);
-  }
 
   // A native submit: the FormGroups live in the child forms, so there is no [formGroup] here to raise (ngSubmit).
   protected submit(event: Event): void {
@@ -176,10 +115,9 @@ export class AssetFormDialog {
       return;
     }
 
-    const portfolioId = this.targetPortfolioId();
-    if (active.form.invalid || !portfolioId) {
+    if (active.form.invalid || this.accountForm.invalid) {
       active.form.markAllAsTouched();
-      this.portfolioForm.markAllAsTouched();
+      this.accountForm.markAllAsTouched();
       return;
     }
 
@@ -193,7 +131,9 @@ export class AssetFormDialog {
           body,
         })
       : await postApiPortfolioAssets({
-          body: { ...body, portfolioId },
+          body: this.choosesAccount
+            ? { ...body, accountId: this.accountForm.controls.accountId.value }
+            : body,
         });
 
     this.submitting.set(false);
@@ -208,14 +148,6 @@ export class AssetFormDialog {
 
   protected cancel(): void {
     this.dialogRef.close(false);
-  }
-
-  private targetPortfolioId(): string | undefined {
-    return (
-      this.data.portfolioId ??
-      this.data.asset?.portfolioId ??
-      (this.portfolioForm.controls.portfolioId.value || undefined)
-    );
   }
 
   private applyServerErrors(form: FormGroup, problem: ApiProblemDetails): void {

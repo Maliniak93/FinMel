@@ -11,15 +11,7 @@ import {
   findControl,
   hasControl,
   jsonResponse,
-  requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
-import {
-  archivedPortfolio,
-  reservePortfolio,
-  reservePortfolioId,
-  savingsPortfolio,
-  savingsPortfolioId,
-} from '../../deposits/testing/deposit-fixtures';
 import { MetalFormDialog, type MetalFormDialogData } from './metal-form-dialog';
 
 describe('MetalFormDialog', () => {
@@ -46,10 +38,7 @@ describe('MetalFormDialog', () => {
     writeResponse: () => Response = () => jsonResponse(metalResponse(), 201),
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      if (method(input) === 'GET' && /\/api\/portfolio\/portfolios(\?|$)/.test(requestUrl(input))) {
-        return jsonResponse([savingsPortfolio, archivedPortfolio, reservePortfolio]);
-      }
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
       return writeResponse();
     });
 
@@ -92,7 +81,6 @@ describe('MetalFormDialog', () => {
     it('POSTs gold, a 1 oz weight and the first purchase, and closes with true', async () => {
       await setup({});
       await fill({
-        portfolioId: reservePortfolioId,
         metal: METAL.Gold,
         name: 'Krugerrand',
         fineWeight: 1,
@@ -108,7 +96,6 @@ describe('MetalFormDialog', () => {
       expect(request.method).toBe('POST');
       expect(request.url).toContain(`/api/portfolio/metals`);
       expect(await request.json()).toEqual({
-        portfolioId: reservePortfolioId,
         name: 'Krugerrand',
         metal: METAL.Gold,
         fineWeight: 1,
@@ -118,8 +105,8 @@ describe('MetalFormDialog', () => {
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
-    it('preset to a portfolio omits the first purchase when no pieces are entered', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+    it('omits the first purchase when no pieces are entered', async () => {
+      await setup({});
       await fill({ metal: METAL.Silver, name: 'Silver bar', fineWeight: 100, weightUnit: 'Gram' });
 
       await component['onSubmit']();
@@ -128,7 +115,6 @@ describe('MetalFormDialog', () => {
       expect(request.url).toContain(`/api/portfolio/metals`);
       const body = await request.json();
       expect(body).not.toHaveProperty('firstPurchase');
-      expect(body.portfolioId).toBe(savingsPortfolioId);
       expect(body).toMatchObject({ metal: METAL.Silver, fineWeight: 100, weightUnit: 'Gram' });
     });
 
@@ -137,7 +123,7 @@ describe('MetalFormDialog', () => {
       ['fineWeight', 0],
       ['fineWeight', -1],
     ])('an invalid %s (%s) blocks submit', async (field, value) => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
       await fill({ metal: METAL.Gold, name: 'Coin', fineWeight: 1, weightUnit: 'Gram' });
 
       await fill({ [field]: value });
@@ -164,7 +150,7 @@ describe('MetalFormDialog', () => {
       expect(findControl(form(), 'metal').value).toBe(METAL.Gold);
       expect(Number(findControl(form(), 'fineWeight').value)).toBe(100);
       expect(findControl(form(), 'weightUnit').value).toBe('Gram');
-      for (const absent of ['portfolioId', 'pieces', 'pricePerPiece', 'purchaseDate']) {
+      for (const absent of ['pieces', 'pricePerPiece', 'purchaseDate']) {
         expect(hasControl(form(), absent)).toBe(false);
       }
 

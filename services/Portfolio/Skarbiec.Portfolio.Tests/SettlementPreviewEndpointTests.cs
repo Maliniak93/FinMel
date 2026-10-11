@@ -15,7 +15,7 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         // 10 000.00 at 6 % from 2026-01-15 for 3 months → matures 2026-04-15: gross 147.95, tax 28.12, net 119.83.
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
 
         var response = await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
 
@@ -35,7 +35,7 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         // Warsaw 2026-04-14 12:00 — the day before the 2026-04-15 maturity.
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 4, 14, 10, 0, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
 
         var response = await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
 
@@ -48,7 +48,7 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
 
         var response = await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
@@ -62,8 +62,8 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
 
         var response = await client.GetAsync(DepositSettlementPreviewUri(cashId), cancellationToken);
 

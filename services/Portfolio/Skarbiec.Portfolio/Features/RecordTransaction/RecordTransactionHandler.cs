@@ -99,7 +99,7 @@ public sealed class RecordTransactionHandler(
             cashLeg = planned.Value;
         }
 
-        // Last check before the write: only a valid request on an active portfolio asks MarketData.
+        // Last check before the write: only a valid request on an active asset asks MarketData.
         var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
         if (fxRateToPln.IsFailure)
         {
@@ -159,8 +159,7 @@ public sealed class RecordTransactionHandler(
             || cash.AssetClass != AssetClass.Cash
             || !(isBuy ? TransferRoutes.IsAllowed(cash.AssetClass, holding.AssetClass) : TransferRoutes.IsAllowed(holding.AssetClass, cash.AssetClass))
             || cash.Currency != holding.Currency
-            || cash.IsArchived
-            || await dbContext.IsPortfolioArchivedAsync(cash.PortfolioId, cancellationToken))
+            || cash.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
         }
@@ -195,15 +194,10 @@ public sealed class RecordTransactionHandler(
             return cashQuantity.Error;
         }
 
-        var cashPortfolioName = await dbContext.Portfolios
-            .Where(p => p.Id == cash.PortfolioId)
-            .Select(p => p.Name)
-            .FirstAsync(cancellationToken);
-
-        return new CashLeg(cash, cashPortfolioName, leg, cashQuantity.Value);
+        return new CashLeg(cash, leg, cashQuantity.Value);
     }
 
-    private sealed record CashLeg(Asset Cash, string CashPortfolioName, Transaction Leg, decimal CashQuantity)
+    private sealed record CashLeg(Asset Cash, Transaction Leg, decimal CashQuantity)
     {
         public TransactionTransferResponse ToTransferResponse(Asset metal, Transaction metalLeg) => new()
         {
@@ -213,8 +207,6 @@ public sealed class RecordTransactionHandler(
                 : TransferRoutes.IsDeletable(metal.AssetClass, Cash.AssetClass),
             CounterpartAssetId = Cash.Id,
             CounterpartAssetName = Cash.Name,
-            CounterpartPortfolioId = Cash.PortfolioId,
-            CounterpartPortfolioName = CashPortfolioName,
             Direction = TransferLegs.DirectionOf(metalLeg)
         };
     }

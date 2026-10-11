@@ -6,7 +6,6 @@ using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.AddAsset;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlement;
@@ -25,13 +24,11 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         var cancellationToken = TestContext.Current.CancellationToken;
 
         await using var scope = Provider.CreateAsyncScope();
-        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Savings outbox portfolio" }, cancellationToken)).Value.Id;
 
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId), cancellationToken);
+            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(), cancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, SaveChanges.Count);
@@ -48,21 +45,20 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
 
         var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
         Assert.Equal(assetId, evt.AssetId);
-        Assert.Equal(portfolioId, evt.PortfolioId);
+        Assert.Null(evt.AccountId);
         Assert.Equal(UserId, evt.UserId);
         Assert.Equal(AssetClass.Savings, evt.AssetClass);
         Assert.Equal(AssetValuationMode.CurrencyValued, evt.ValuationMode);
         Assert.Equal("PLN", evt.Currency);
         Assert.Equal(10_000m, evt.Quantity);
         Assert.Null(evt.InstrumentId);
-        Assert.False(evt.PortfolioIsArchived);
     }
 
     [Fact]
     public async Task SettleSavingsInterest_PublishesPositionChanged()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (portfolioId, assetId) = await ArrangeInterestAccountAsync(cancellationToken);
+        var assetId = await ArrangeInterestAccountAsync(cancellationToken);
         SaveChanges.Reset();
 
         await using (var act = Provider.CreateAsyncScope())
@@ -103,7 +99,7 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
     public async Task UndoSavingsInterestSettlement_PublishesPositionChanged()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (portfolioId, assetId) = await ArrangeInterestAccountAsync(cancellationToken);
+        var assetId = await ArrangeInterestAccountAsync(cancellationToken);
         await using (var settle = Provider.CreateAsyncScope())
         {
             var settled = await settle.ServiceProvider.GetRequiredService<SettleSavingsInterestHandler>().HandleAsync(
@@ -142,17 +138,15 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(1, await verifyDb.Transactions.CountAsync(t => t.AssetId == assetId, cancellationToken));
     }
 
-    private async Task<(Guid PortfolioId, Guid AssetId)> ArrangeInterestAccountAsync(CancellationToken cancellationToken)
+    private async Task<Guid> ArrangeInterestAccountAsync(CancellationToken cancellationToken)
     {
         await using var arrange = Provider.CreateAsyncScope();
-        var portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Interest outbox portfolio" }, cancellationToken)).Value.Id;
         var added = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>().HandleAsync(
-            PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId, annualInterestRatePercent: 5m, openingDate: new DateOnly(2026, 1, 1)),
+            PortfolioApi.NewSavingsAccountRequest(annualInterestRatePercent: 5m, openingDate: new DateOnly(2026, 1, 1)),
             cancellationToken);
         Assert.True(added.IsSuccess);
 
-        return (portfolioId, added.Value.AssetId);
+        return added.Value.AssetId;
     }
 
     [Fact]
@@ -161,11 +155,9 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         var cancellationToken = TestContext.Current.CancellationToken;
 
         await using var scope = Provider.CreateAsyncScope();
-        var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Empty savings outbox portfolio" }, cancellationToken)).Value.Id;
 
         var result = await scope.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId, withOpeningDeposit: false), cancellationToken);
+            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
 
         Assert.True(result.IsSuccess);
         await using var verify = Provider.CreateAsyncScope();
@@ -181,14 +173,11 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid portfolioId;
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-                .HandleAsync(new CreatePortfolioRequest { Name = "Update savings outbox portfolio" }, cancellationToken)).Value.Id;
             var added = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-                .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId), cancellationToken);
+                .HandleAsync(PortfolioApi.NewSavingsAccountRequest(), cancellationToken);
             Assert.True(added.IsSuccess);
             assetId = added.Value.AssetId;
         }

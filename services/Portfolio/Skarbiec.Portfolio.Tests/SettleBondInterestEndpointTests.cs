@@ -5,6 +5,7 @@ using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -22,7 +23,7 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         Factory.Clock.SetUtcNow(EdoYearOneEndedUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
 
         var response = await client.SettleBondInterestRawAsync(bond.AssetId, [(1, null)], null, cancellationToken);
 
@@ -60,7 +61,6 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         await client.RedeemBondEarlyAsync(
             assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
@@ -136,23 +136,32 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
     }
 
     [Fact]
-    public async Task Settle_CouponTaxExempt_PaysGross()
+    public async Task IkeAccount_NoTax()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest(taxExempt: true));
+        var ike = await client.CreateFundedBondAsync(
+            cancellationToken, request: NewRorBondRequest(), wrapper: TaxWrapper.Ike, accountName: "Obligacje IKE");
+        var regular = await client.CreateFundedBondAsync(
+            cancellationToken, request: NewRorBondRequest(), wrapper: TaxWrapper.Regular, accountName: "Obligacje");
 
-        var response = await client.SettleBondInterestRawAsync(
-            funded.Bond.AssetId, [(1, null)], funded.CashAssetId, cancellationToken);
+        var ikeResponse = await client.SettleBondInterestRawAsync(ike.Bond.AssetId, [(1, null)], ike.CashAssetId, cancellationToken);
+        var regularResponse = await client.SettleBondInterestRawAsync(regular.Bond.AssetId, [(1, null)], regular.CashAssetId, cancellationToken);
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, ikeResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, regularResponse.StatusCode);
         await using var dbContext = CreateDbContext(userId);
-        var settlement = await dbContext.Set<BondInterestSettlement>().SingleAsync(s => s.AssetId == funded.Bond.AssetId, cancellationToken);
-        Assert.Equal(16.50m, settlement.GrossInterest);
-        Assert.Equal(0m, settlement.Tax);
-        Assert.Equal(1_016.50m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
+        var ikeSettlement = await dbContext.Set<BondInterestSettlement>().SingleAsync(s => s.AssetId == ike.Bond.AssetId, cancellationToken);
+        var regularSettlement = await dbContext.Set<BondInterestSettlement>().SingleAsync(s => s.AssetId == regular.Bond.AssetId, cancellationToken);
+        Assert.Equal(16.50m, ikeSettlement.GrossInterest);
+        Assert.Equal(0m, ikeSettlement.Tax);
+        Assert.Equal(16.50m, regularSettlement.GrossInterest);
+        Assert.Equal(3.14m, regularSettlement.Tax);
+        Assert.Equal(1_016.50m, (await client.GetAssetAsync(ike.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(TaxWrapper.Ike, (await client.GetBondAsync(ike.Bond.AssetId, cancellationToken)).TaxWrapper);
+        Assert.Equal(TaxWrapper.Regular, (await client.GetBondAsync(regular.Bond.AssetId, cancellationToken)).TaxWrapper);
     }
 
     public static TheoryData<string, HttpStatusCode, string> InvalidRequests() => new()
@@ -178,7 +187,6 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateFundedBondAsync(
             cancellationToken, request: capitalising ? NewBondRequest() : NewRorBondRequest());
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         (int PeriodIndex, decimal? RatePercent)[] periods = [(1, null)];
         Guid? destination = funded.CashAssetId;
@@ -201,7 +209,7 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
                 destination = null;
                 break;
             case "stock as destination":
-                destination = await client.AddAssetAsync(await client.CreatePortfolioAsync(cancellationToken, name: "Stocks"), cancellationToken);
+                destination = await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken, name: "Stocks"), cancellationToken);
                 break;
             case "archived bond":
                 await client.ArchiveAssetAsync(assetId, cancellationToken);

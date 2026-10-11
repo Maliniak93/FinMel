@@ -24,8 +24,8 @@ export interface UpcomingItem {
   link: '/deposits' | '/bonds';
 }
 
-function isActive(item: { isArchived: boolean; portfolioIsArchived: boolean }): boolean {
-  return !item.isArchived && !item.portfolioIsArchived;
+function isActive(item: { isArchived: boolean }): boolean {
+  return !item.isArchived;
 }
 
 function compareItems(a: UpcomingItem, b: UpcomingItem): number {

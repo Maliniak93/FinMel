@@ -47,6 +47,7 @@ public static class BondValuation
     // catalogRates is keyed by the 1-based period index, as BondPeriod.Index.
     public static BondValuationOutcome Today(
         TreasuryBond bond,
+        bool taxExempt,
         IReadOnlyCollection<BondInterestSettlement> settlements,
         IReadOnlyDictionary<int, decimal> catalogRates,
         DateOnly today)
@@ -85,7 +86,7 @@ public static class BondValuation
         var unsettledCoupons = isCoupon
             ? periods
                 .Where(p => p.End <= today && !settled.ContainsKey(p.Index))
-                .Select(p => BondInterestMath.Settle(bond.Type, rates.GetRange(0, p.Index), p.Start, p.End, count, bond.TaxExempt))
+                .Select(p => BondInterestMath.Settle(bond.Type, rates.GetRange(0, p.Index), p.Start, p.End, count, taxExempt))
                 .ToList()
             : [];
         var couponsPerBond = unsettledCoupons.Sum(c => c.Gross) / count;
@@ -99,7 +100,7 @@ public static class BondValuation
             interestPerBond = isCoupon
                 ? 0m
                 : periods.Sum(p => BondInterestMath.PerBond(bond.Type, rates.GetRange(0, p.Index), p.Start, p.End));
-            redemptionProceeds = BondRedemptionMath.AtMaturity(interestPerBond, bond.PurchasePricePerBond, count, bond.TaxExempt).Proceeds;
+            redemptionProceeds = BondRedemptionMath.AtMaturity(interestPerBond, bond.PurchasePricePerBond, count, taxExempt).Proceeds;
         }
         else
         {
@@ -114,7 +115,7 @@ public static class BondValuation
                 bond.EarlyRedemptionFeePerBond,
                 bond.PurchasePricePerBond,
                 count,
-                bond.TaxExempt);
+                taxExempt);
 
             // Early redemption of an OTS pays no interest, yet it still accrues day by day.
             interestPerBond = bond.Type is TreasuryBondType.Ots

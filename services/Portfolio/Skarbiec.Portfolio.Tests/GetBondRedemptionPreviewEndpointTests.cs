@@ -16,7 +16,6 @@ public sealed class GetBondRedemptionPreviewEndpointTests(SkarbiecContainersFixt
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateSettledTosAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
 

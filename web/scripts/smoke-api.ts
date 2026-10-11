@@ -1,7 +1,7 @@
 import { client as identityClient } from '../src/app/api/identity/client.gen.js';
 import { postApiIdentityLogin, postApiIdentityRegister } from '../src/app/api/identity/sdk.gen.js';
 import { client as portfolioClient } from '../src/app/api/portfolio/client.gen.js';
-import { getApiPortfolioPortfolios } from '../src/app/api/portfolio/sdk.gen.js';
+import { getApiPortfolioAccounts } from '../src/app/api/portfolio/sdk.gen.js';
 
 const gatewayUrl = process.env['SKARBIEC_GATEWAY_URL'] ?? 'http://localhost:60684';
 
@@ -24,15 +24,15 @@ async function main(): Promise<void> {
     throw new Error(`login failed: ${JSON.stringify(login.error)}`);
   }
 
-  const list = await getApiPortfolioPortfolios({
+  const list = await getApiPortfolioAccounts({
     headers: { Authorization: `Bearer ${login.data.accessToken}` },
   });
   if (list.error) {
-    throw new Error(`listPortfolios failed: ${JSON.stringify(list.error)}`);
+    throw new Error(`listAccounts failed: ${JSON.stringify(list.error)}`);
   }
 
   console.log(
-    `smoke OK — listPortfolios through the Gateway returned ${list.data?.length ?? 0} portfolio(s)`,
+    `smoke OK — listAccounts through the Gateway returned ${list.data?.length ?? 0} account(s)`,
   );
 }
 

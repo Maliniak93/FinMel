@@ -18,7 +18,7 @@ import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart
 import { assetClassLabel } from '../assets/asset-class';
 import { assetClassColor } from './asset-class-color';
 import { CashCard } from './cash-card/cash-card';
-import { PortfoliosCard } from './portfolios-card/portfolios-card';
+import { AccountsCard } from './accounts-card/accounts-card';
 import { UpcomingCard } from './upcoming-card/upcoming-card';
 import type { ChartRange } from './net-worth-chart/chart-scale';
 import { NetWorthChart } from './net-worth-chart/net-worth-chart';
@@ -35,7 +35,7 @@ import { NetWorthChart } from './net-worth-chart/net-worth-chart';
     TranslocoPipe,
     NetWorthChart,
     PieChart,
-    PortfoliosCard,
+    AccountsCard,
     CashCard,
     UpcomingCard,
   ],

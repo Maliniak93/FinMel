@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Contracts;
-using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
@@ -21,12 +20,12 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
 
         using var client = Factory.CreateAuthenticatedClient(userId);
         await client.WaitUntilReadyAsync(cancellationToken);
 
-        await Bus.PublishCashPositionAsync(userId, portfolioId, 500m, cancellationToken);
+        await Bus.PublishCashPositionAsync(userId, accountId, 500m, cancellationToken);
 
         using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 500m, cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
@@ -34,7 +33,7 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(500m, body!.NetWorthPln);
         Assert.False(body.IsStale);
-        Assert.Equal(portfolioId, Assert.Single(body.ByPortfolio).PortfolioId);
+        Assert.Equal(accountId, Assert.Single(body.ByAccount).AccountId);
         Assert.Equal(AssetClass.Cash, Assert.Single(body.ByAssetClass).AssetClass);
     }
 
@@ -62,112 +61,40 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
         Assert.Equal(HttpStatusCode.OK, userBResponse.StatusCode);
         Assert.Equal(0m, userBBody!.NetWorthPln);
         Assert.Null(userBBody.AsOf);
-        Assert.Empty(userBBody.ByPortfolio);
+        Assert.Empty(userBBody.ByAccount);
         Assert.Empty(userBBody.ByAssetClass);
-    }
-
-    [Fact]
-    public async Task ArchivePortfolio_DropsItFromNetWorth()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var scenario = new ArchiveScenario(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        using var client = Factory.CreateAuthenticatedClient(scenario.UserId);
-        await ArrangeTwoPortfoliosAsync(client, scenario, cancellationToken);
-
-        await PublishArchiveFanOutAsync(scenario, cancellationToken);
-        await WaitForPositionAsync(Factory.Services, scenario.ArchivedAssetId, cancellationToken, p => p.PortfolioIsArchived);
-        await PublishPortfolioArchivedAsync(scenario, cancellationToken);
-
-        using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 500m, cancellationToken);
-        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(500m, body!.NetWorthPln);
-    }
-
-    [Fact]
-    public async Task ArchivePortfolio_EventsOutOfOrder_DropsItFromNetWorth()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var scenario = new ArchiveScenario(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        using var client = Factory.CreateAuthenticatedClient(scenario.UserId);
-        await ArrangeTwoPortfoliosAsync(client, scenario, cancellationToken);
-
-        await PublishPortfolioArchivedAsync(scenario, cancellationToken);
-        await WaitForPositionAsync(Factory.Services, scenario.ArchivedAssetId, cancellationToken, p => p.PortfolioIsArchived);
-        await PublishArchiveFanOutAsync(scenario, cancellationToken);
-        await WaitForPositionAsync(Factory.Services, scenario.ArchivedAssetId, cancellationToken, p => p.Version == 1);
-
-        using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 500m, cancellationToken);
-        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(500m, body!.NetWorthPln);
     }
 
     // The intermediate 500 is asserted too, or an archive that dropped nothing would pass.
     [Fact]
-    public async Task RestorePortfolio_BringsItBackIntoNetWorth()
+    public async Task ArchivedAsset_LeavesNetWorth_AndRestoreBringsItBack()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var scenario = new ArchiveScenario(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        using var client = Factory.CreateAuthenticatedClient(scenario.UserId);
-        await ArrangeTwoPortfoliosAsync(client, scenario, cancellationToken);
-
-        await PublishArchiveFanOutAsync(scenario, cancellationToken);
-        await WaitForPositionAsync(Factory.Services, scenario.ArchivedAssetId, cancellationToken, p => p.PortfolioIsArchived);
-        await PublishPortfolioArchivedAsync(scenario, cancellationToken);
-        using (var archived = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 500m, cancellationToken))
+        var userId = Guid.NewGuid();
+        var archivedAccountId = Guid.NewGuid();
+        var archivedAssetId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+        await Bus.PublishCashPositionAsync(userId, archivedAccountId, 1_000m, cancellationToken, assetId: archivedAssetId);
+        await Bus.PublishCashPositionAsync(userId, Guid.NewGuid(), 500m, cancellationToken);
+        using (var both = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 1_500m, cancellationToken))
         {
-            var archivedBody = await archived.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
-            Assert.Equal(500m, archivedBody!.NetWorthPln);
+            Assert.Equal(1_500m, (await both.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken))!.NetWorthPln);
         }
 
-        // Portfolio's restore: the fan-out with the flag cleared, plus PortfolioRestored.
         await Bus.PublishCashPositionAsync(
-            scenario.UserId, scenario.ArchivedPortfolioId, 1_000m, cancellationToken,
-            assetId: scenario.ArchivedAssetId, portfolioIsArchived: false, version: 2);
-        await Bus.Publish(new PortfolioRestored
+            userId, archivedAccountId, 1_000m, cancellationToken, assetId: archivedAssetId, version: 1, isArchived: true);
+        using (var archived = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 500m, cancellationToken))
         {
-            PortfolioId = scenario.ArchivedPortfolioId,
-            UserId = scenario.UserId,
-            OccurredAtUtc = DateTimeOffset.UtcNow,
-        }, cancellationToken);
+            Assert.Equal(500m, (await archived.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken))!.NetWorthPln);
+        }
 
-        using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 1_500m, cancellationToken);
-        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+        await Bus.PublishCashPositionAsync(
+            userId, archivedAccountId, 1_000m, cancellationToken, assetId: archivedAssetId, version: 2, isArchived: false);
+        using var restored = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 1_500m, cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(1_500m, body!.NetWorthPln);
+        Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
     }
 
     private IBus Bus => Factory.Services.GetRequiredService<IBus>();
-
-    private async Task ArrangeTwoPortfoliosAsync(HttpClient client, ArchiveScenario scenario, CancellationToken cancellationToken)
-    {
-        await client.WaitUntilReadyAsync(cancellationToken);
-
-        await Bus.PublishCashPositionAsync(
-            scenario.UserId, scenario.ArchivedPortfolioId, 1_000m, cancellationToken, assetId: scenario.ArchivedAssetId);
-        await Bus.PublishCashPositionAsync(scenario.UserId, Guid.NewGuid(), 500m, cancellationToken);
-
-        using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 1_500m, cancellationToken);
-        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
-        Assert.Equal(1_500m, body!.NetWorthPln);
-    }
-
-    private Task PublishArchiveFanOutAsync(ArchiveScenario scenario, CancellationToken cancellationToken) =>
-        Bus.PublishCashPositionAsync(
-            scenario.UserId, scenario.ArchivedPortfolioId, 1_000m, cancellationToken,
-            assetId: scenario.ArchivedAssetId, portfolioIsArchived: true, version: 1);
-
-    private Task PublishPortfolioArchivedAsync(ArchiveScenario scenario, CancellationToken cancellationToken) =>
-        Bus.Publish(new PortfolioArchived
-        {
-            PortfolioId = scenario.ArchivedPortfolioId,
-            UserId = scenario.UserId,
-            OccurredAtUtc = DateTimeOffset.UtcNow,
-        }, cancellationToken);
-
-    private sealed record ArchiveScenario(Guid UserId, Guid ArchivedPortfolioId, Guid ArchivedAssetId);
 }

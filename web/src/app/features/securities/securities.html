@@ -3,10 +3,10 @@
 
   <mat-tab-group>
     <mat-tab [label]="'securities.tabs.stocks' | transloco">
-      <app-securities-table [assetClass]="stockClass" />
+      <app-securities-table [assetClass]="stockClass" [account]="account()" />
     </mat-tab>
     <mat-tab [label]="'securities.tabs.etfs' | transloco">
-      <app-securities-table [assetClass]="etfClass" />
+      <app-securities-table [assetClass]="etfClass" [account]="account()" />
     </mat-tab>
   </mat-tab-group>
 </div>

@@ -85,8 +85,7 @@ describe('enum label maps', () => {
       manual: false,
       counterpartAssetId: '11111111-1111-1111-1111-111111111111',
       counterpartAssetName: 'Term deposit',
-      counterpartPortfolioId: '22222222-2222-2222-2222-222222222222',
-      counterpartPortfolioName: 'Savings',
+      counterpartAccountName: 'Savings',
     };
 
     const out = transferLabel({ ...base, direction: TRANSFER_DIRECTION.Out });

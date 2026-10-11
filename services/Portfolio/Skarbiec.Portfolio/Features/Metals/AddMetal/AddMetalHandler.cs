@@ -12,18 +12,6 @@ public sealed class AddMetalHandler(
 {
     public async Task<Result<MetalResponse>> HandleAsync(AddMetalRequest request, CancellationToken cancellationToken)
     {
-        var portfolioId = request.PortfolioId;
-        var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
-        if (portfolio is null)
-        {
-            return PortfolioErrors.NotFound(portfolioId);
-        }
-
-        if (portfolio.IsArchived)
-        {
-            return PortfolioErrors.Archived(portfolioId);
-        }
-
         if (request.FirstPurchase is { } purchase && purchase.Date > WarsawCalendar.Today(timeProvider))
         {
             return MetalErrors.PurchaseDateInFuture;
@@ -32,7 +20,6 @@ public sealed class AddMetalHandler(
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
-            PortfolioId = portfolioId,
             AssetClass = AssetClass.PreciousMetal,
             Name = request.Name,
             Currency = Money.BaseCurrency,
@@ -84,10 +71,10 @@ public sealed class AddMetalHandler(
             dbContext.Transactions.Add(buy);
         }
 
-        await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
+        await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return holding.ToResponse(asset, portfolio.Name, portfolio.IsArchived);
+        return holding.ToResponse(asset);
     }
 }

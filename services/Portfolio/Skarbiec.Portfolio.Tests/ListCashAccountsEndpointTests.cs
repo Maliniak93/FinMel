@@ -12,43 +12,38 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class ListCashAccountsEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task List_ReturnsCashAccountsAcrossPortfoliosWithBalance()
+    public async Task List_ReturnsCashAccountsByNameWithBalance()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var zetaId = await client.CreatePortfolioAsync(cancellationToken, name: "Zeta");
-        var zetaB = await client.AddCashAssetWithBalanceAsync(zetaId, cancellationToken, balance: 300m, name: "B wallet");
-        var zetaA = await client.AddCashAssetWithBalanceAsync(zetaId, cancellationToken, balance: 120.50m, currency: "EUR", name: "A wallet");
-        await client.AddAssetAsync(zetaId, cancellationToken, name: "Some stock");
-        var alphaId = await client.CreatePortfolioAsync(cancellationToken, name: "Alpha");
-        var alphaCash = await client.AddCashAssetWithBalanceAsync(alphaId, cancellationToken, balance: 75m, name: "Z wallet");
-        await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, portfolioName: "Savings home");
+        var cashB = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 300m, name: "B wallet");
+        var cashA = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 120.50m, currency: "EUR", name: "A wallet");
+        await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken), cancellationToken, name: "Some stock");
+        var cashZ = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 75m, name: "Z wallet");
+        await client.AddSavingsAccountAsync(cancellationToken);
 
         var response = await client.GetAsync(AllCashAccountsUri, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var listed = (await response.Content.ReadFromJsonAsync<CashAccountsResponse>(cancellationToken))!.Accounts;
-        Assert.Equal([alphaCash, zetaA, zetaB], listed.Select(a => a.AssetId).ToArray());
-        var first = listed[0];
-        Assert.Equal(alphaId, first.PortfolioId);
-        Assert.Equal("Alpha", first.PortfolioName);
-        Assert.Equal("Z wallet", first.Name);
-        Assert.Equal("PLN", first.Currency);
-        Assert.Equal(75m, first.Balance);
-        Assert.Equal("EUR", listed[1].Currency);
-        Assert.Equal(120.50m, listed[1].Balance);
-        Assert.Equal(300m, listed[2].Balance);
+        Assert.Equal([cashA, cashB, cashZ], listed.Select(a => a.AssetId).ToArray());
+        var last = listed[2];
+        Assert.Equal("Z wallet", last.Name);
+        Assert.Equal("PLN", last.Currency);
+        Assert.Equal(75m, last.Balance);
+        Assert.Equal("EUR", listed[0].Currency);
+        Assert.Equal(120.50m, listed[0].Balance);
+        Assert.Equal(300m, listed[1].Balance);
     }
 
     [Fact]
-    public async Task List_ArchivedAccountOrPortfolio_Excluded()
+    public async Task List_ArchivedCash_Excluded()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Live");
-        var live = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m, name: "Live cash");
-        var archived = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 200m, name: "Archived cash");
+        var live = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 100m, name: "Live cash");
+        var archived = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 200m, name: "Archived cash");
         await client.ArchiveAssetAsync(archived, cancellationToken);
         await client.AddArchivedCashAssetAsync(cancellationToken, balance: 400m);
 
@@ -67,11 +62,10 @@ public sealed class ListCashAccountsEndpointTests(SkarbiecContainersFixture cont
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100.10m, currency: "USD", name: "USD wallet");
-        await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 50.25m, currency: "EUR", name: "EUR wallet");
-        await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 1_000.10m, name: "PLN one");
-        await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 200.20m, name: "PLN two");
+        await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 100.10m, currency: "USD", name: "USD wallet");
+        await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 50.25m, currency: "EUR", name: "EUR wallet");
+        await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 1_000.10m, name: "PLN one");
+        await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 200.20m, name: "PLN two");
 
         var response = await client.GetAsync(AllCashAccountsUri, cancellationToken);
 
@@ -86,8 +80,8 @@ public sealed class ListCashAccountsEndpointTests(SkarbiecContainersFixture cont
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.AddAssetAsync(portfolioId, cancellationToken);
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.AddAssetAsync(accountId, cancellationToken);
 
         var response = await client.GetAsync(AllCashAccountsUri, cancellationToken);
 

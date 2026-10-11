@@ -29,16 +29,16 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
             await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-5), cancellationToken);
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today, 999m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, today, 999m, cancellationToken, quantity: 1_000m);
             await db.SeedSnapshotAsync(userId, today, 999m, cancellationToken);
         }
 
@@ -54,7 +54,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
                 var date = today.AddDays(-offset);
                 var expectedRate = offset >= 4 ? 4.0m : 4.5m;
 
-                var line = Assert.Single(await GetLinesAsync(containers, portfolioId, date, cancellationToken));
+                var line = Assert.Single(await GetLinesAsync(containers, accountId, date, cancellationToken));
                 Assert.Equal(1_000m * expectedRate, line.ValuePln);
                 Assert.Equal(expectedRate, line.FxRateUsed);
                 Assert.False(line.IsStale);
@@ -66,7 +66,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             }
 
             Assert.Null(await GetSnapshotAsync(containers, userId, today.AddDays(-6), cancellationToken));
-            Assert.Equal(999m, Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken)).ValuePln);
+            Assert.Equal(999m, Assert.Single(await GetLinesAsync(containers, accountId, today, cancellationToken)).ValuePln);
             Assert.Equal(999m, (await GetSnapshotAsync(containers, userId, today, cancellationToken))!.TotalPln);
         }, cancellationToken);
     }
@@ -77,17 +77,17 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
                 quantityHistory: [(today.AddDays(-8), 100m)]);
             for (var offset = 20; offset >= 9; offset--)
             {
-                await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-offset), 100m, cancellationToken, quantity: 100m);
+                await db.SeedValuationLineAsync(userId, accountId, assetId, today.AddDays(-offset), 100m, cancellationToken, quantity: 100m);
                 await db.SeedSnapshotAsync(userId, today.AddDays(-offset), 100m, cancellationToken);
             }
 
@@ -99,7 +99,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
             await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
 
-            var lines = await GetAllLinesAsync(containers, portfolioId, cancellationToken);
+            var lines = await GetAllLinesAsync(containers, accountId, cancellationToken);
             var snapshots = await GetAllSnapshotsAsync(containers, userId, cancellationToken);
 
             var expectedDates = Enumerable.Range(1, 8).Select(offset => today.AddDays(-offset)).Order().ToList();
@@ -110,63 +110,21 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
-    public async Task Rebuild_ArchivedPortfolio_ZeroFromArchiveDate()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var today = Today;
-        var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
-        var assetId = Guid.NewGuid();
-
-        await using (var db = OpenDbContext(containers))
-        {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
-                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
-                portfolioIsArchived: true, portfolioArchivedOn: today.AddDays(-5), quantityHistory: [(today.AddDays(-20), 100m)]);
-            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-10), cancellationToken);
-        }
-
-        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
-        {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
-
-            for (var offset = 10; offset >= 6; offset--)
-            {
-                var date = today.AddDays(-offset);
-                Assert.Equal(100m, Assert.Single(await GetLinesAsync(containers, portfolioId, date, cancellationToken)).ValuePln);
-                Assert.Equal(100m, (await GetSnapshotAsync(containers, userId, date, cancellationToken))!.TotalPln);
-            }
-
-            for (var offset = 5; offset >= 1; offset--)
-            {
-                var date = today.AddDays(-offset);
-                Assert.Empty(await GetLinesAsync(containers, portfolioId, date, cancellationToken));
-
-                var snapshot = await GetSnapshotAsync(containers, userId, date, cancellationToken);
-                Assert.NotNull(snapshot);
-                Assert.Equal(0m, snapshot.TotalPln);
-                Assert.False(snapshot.IsStale);
-            }
-        }, cancellationToken);
-    }
-
-    [Fact]
     public async Task Rebuild_ArchivedAsset_NoLineFromArchiveDate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var archivedAssetId = Guid.NewGuid();
         var keptAssetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(archivedAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(archivedAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
                 isArchived: true, archivedOn: today.AddDays(-5), quantityHistory: [(today.AddDays(-20), 100m)]);
-            await db.SeedPositionAsync(keptAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(keptAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
                 quantityHistory: [(today.AddDays(-20), 200m)]);
             await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-8), cancellationToken);
@@ -180,14 +138,14 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             for (var offset = 8; offset >= 6; offset--)
             {
                 var date = today.AddDays(-offset);
-                Assert.Equal(2, (await GetLinesAsync(containers, portfolioId, date, cancellationToken)).Count);
+                Assert.Equal(2, (await GetLinesAsync(containers, accountId, date, cancellationToken)).Count);
                 Assert.Equal(300m, (await GetSnapshotAsync(containers, userId, date, cancellationToken))!.TotalPln);
             }
 
             for (var offset = 5; offset >= 1; offset--)
             {
                 var date = today.AddDays(-offset);
-                var line = Assert.Single(await GetLinesAsync(containers, portfolioId, date, cancellationToken));
+                var line = Assert.Single(await GetLinesAsync(containers, accountId, date, cancellationToken));
                 Assert.Equal(keptAssetId, line.AssetId);
                 Assert.Equal(200m, (await GetSnapshotAsync(containers, userId, date, cancellationToken))!.TotalPln);
             }
@@ -200,17 +158,17 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioAId = Guid.NewGuid();
-        var portfolioBId = Guid.NewGuid();
+        var accountAId = Guid.NewGuid();
+        var accountBId = Guid.NewGuid();
         var assetAId = Guid.NewGuid();
         var assetBId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetAId, userId, portfolioAId, cancellationToken,
+            await db.SeedPositionAsync(assetAId, userId, accountAId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
                 quantityHistory: [(today.AddDays(-20), 100m)]);
-            await db.SeedPositionAsync(assetBId, userId, portfolioBId, cancellationToken,
+            await db.SeedPositionAsync(assetBId, userId, accountBId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
                 quantityHistory: [(today.AddDays(-20), 200m)]);
             await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-10), cancellationToken, revision: 1);
@@ -229,7 +187,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
                     new AssetPositionChanged
                     {
                         AssetId = assetAId,
-                        PortfolioId = portfolioAId,
+                        AccountId = accountAId,
                         UserId = userId,
                         AssetClass = AssetClass.Cash,
                         ValuationMode = AssetValuationMode.CurrencyValued,
@@ -241,7 +199,6 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
                             new QuantityPoint { Date = today.AddDays(-20), Quantity = 100m },
                             new QuantityPoint { Date = today.AddDays(-5), Quantity = 150m },
                         ],
-                        PortfolioIsArchived = false,
                         IsArchived = false,
                         Version = 1,
                         OccurredAtUtc = DateTimeOffset.UtcNow,
@@ -260,8 +217,8 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
 
                     var lines = await GetUserLinesAsync(containers, userId, date, cancellationToken);
                     Assert.Equal(2, lines.Count);
-                    Assert.Equal(portfolioAId, lines.Single(l => l.AssetId == assetAId).PortfolioId);
-                    Assert.Equal(portfolioBId, lines.Single(l => l.AssetId == assetBId).PortfolioId);
+                    Assert.Equal(accountAId, lines.Single(l => l.AssetId == assetAId).AccountId);
+                    Assert.Equal(accountBId, lines.Single(l => l.AssetId == assetBId).AccountId);
                     Assert.Equal(expectedA, lines.Single(l => l.AssetId == assetAId).ValuePln);
                     Assert.Equal(200m, lines.Single(l => l.AssetId == assetBId).ValuePln);
 
@@ -281,15 +238,15 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-3), 999m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, today.AddDays(-3), 999m, cancellationToken);
             await db.SeedSnapshotAsync(userId, today.AddDays(-3), 999m, cancellationToken);
         }
 
@@ -303,7 +260,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             Assert.Equal(0, client.HistoryCalls);
-            Assert.Equal(999m, Assert.Single(await GetAllLinesAsync(containers, portfolioId, cancellationToken)).ValuePln);
+            Assert.Equal(999m, Assert.Single(await GetAllLinesAsync(containers, accountId, cancellationToken)).ValuePln);
             Assert.Equal(999m, Assert.Single(await GetAllSnapshotsAsync(containers, userId, cancellationToken)).TotalPln);
         }, cancellationToken);
     }
@@ -314,12 +271,12 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
             await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-3), cancellationToken);
@@ -360,12 +317,12 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
             await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-3), cancellationToken, revision: 1);
@@ -405,15 +362,15 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-3), 999m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, today.AddDays(-3), 999m, cancellationToken);
             await db.SeedSnapshotAsync(userId, today.AddDays(-3), 999m, cancellationToken);
             await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-5), cancellationToken);
         }
@@ -437,7 +394,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             var request = await GetRebuildRequestAsync(containers, userId, cancellationToken);
             Assert.NotNull(request);
             Assert.Equal(today.AddDays(-5), request.FromDate);
-            Assert.Equal(999m, Assert.Single(await GetAllLinesAsync(containers, portfolioId, cancellationToken)).ValuePln);
+            Assert.Equal(999m, Assert.Single(await GetAllLinesAsync(containers, accountId, cancellationToken)).ValuePln);
             Assert.Equal(999m, Assert.Single(await GetAllSnapshotsAsync(containers, userId, cancellationToken)).TotalPln);
         }, cancellationToken);
     }
@@ -449,22 +406,22 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var today = Today;
         var userAId = Guid.NewGuid();
         var userBId = Guid.NewGuid();
-        var portfolioAId = Guid.NewGuid();
-        var portfolioBId = Guid.NewGuid();
+        var accountAId = Guid.NewGuid();
+        var accountBId = Guid.NewGuid();
         var assetAId = Guid.NewGuid();
         var assetBId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetAId, userAId, portfolioAId, cancellationToken,
+            await db.SeedPositionAsync(assetAId, userAId, accountAId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
                 quantityHistory: [(today.AddDays(-20), 100m)]);
             await db.SeedHistoryRebuildRequestAsync(userAId, today.AddDays(-5), cancellationToken);
 
-            await db.SeedPositionAsync(assetBId, userBId, portfolioBId, cancellationToken,
+            await db.SeedPositionAsync(assetBId, userBId, accountBId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
                 quantityHistory: [(today.AddDays(-20), 200m)]);
-            await db.SeedValuationLineAsync(userBId, portfolioBId, assetBId, today.AddDays(-3), 777m, cancellationToken);
+            await db.SeedValuationLineAsync(userBId, accountBId, assetBId, today.AddDays(-3), 777m, cancellationToken);
             await db.SeedSnapshotAsync(userBId, today.AddDays(-3), 777m, cancellationToken);
             await db.SeedHistoryRebuildRequestAsync(userBId, today.AddDays(-5), cancellationToken, revision: 2);
         }
@@ -479,7 +436,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             Assert.All(snapshotsA, s => Assert.Equal(100m, s.TotalPln));
             Assert.All(snapshotsA, s => Assert.Equal(userAId, s.UserId));
 
-            var lineB = Assert.Single(await GetAllLinesAsync(containers, portfolioBId, cancellationToken));
+            var lineB = Assert.Single(await GetAllLinesAsync(containers, accountBId, cancellationToken));
             Assert.Equal(777m, lineB.ValuePln);
             var snapshotB = Assert.Single(await GetAllSnapshotsAsync(containers, userBId, cancellationToken));
             Assert.Equal(777m, snapshotB.TotalPln);
@@ -497,24 +454,24 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var removedAssetId = Guid.NewGuid();
         var keptAssetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(removedAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(removedAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
                 quantityHistory: [(today.AddDays(-30), 100m)]);
-            await db.SeedPositionAsync(keptAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(keptAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
                 quantityHistory: [(today.AddDays(-30), 200m)]);
 
             for (var offset = 30; offset >= 1; offset--)
             {
                 var date = today.AddDays(-offset);
-                await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, date, 100m, cancellationToken, quantity: 100m);
-                await db.SeedValuationLineAsync(userId, portfolioId, keptAssetId, date, 200m, cancellationToken, quantity: 200m);
+                await db.SeedValuationLineAsync(userId, accountId, removedAssetId, date, 100m, cancellationToken, quantity: 100m);
+                await db.SeedValuationLineAsync(userId, accountId, keptAssetId, date, 200m, cancellationToken, quantity: 200m);
                 await db.SeedSnapshotAsync(userId, date, 300m, cancellationToken);
             }
         }
@@ -528,7 +485,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             },
             async provider =>
             {
-                await provider.GetRequiredService<IBus>().Publish(AssetRemovedEvent(removedAssetId, portfolioId, userId), cancellationToken);
+                await provider.GetRequiredService<IBus>().Publish(AssetRemovedEvent(removedAssetId, accountId, userId), cancellationToken);
 
                 // The request AssetRemoved leaves behind is rebuilt; the rebuild deletes the removed asset's lines in the same commit.
                 await WaitForAsync(
@@ -538,7 +495,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
                     $"Rebuilding away the lines of removed asset {removedAssetId}",
                     cancellationToken);
 
-                var lines = await GetAllLinesAsync(containers, portfolioId, cancellationToken);
+                var lines = await GetAllLinesAsync(containers, accountId, cancellationToken);
                 Assert.DoesNotContain(lines, l => l.AssetId == removedAssetId);
                 Assert.Equal(30, lines.Count(l => l.Date < today));
 
@@ -557,14 +514,14 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
 
         await using (var db = OpenDbContext(containers))
         {
             foreach (var assetId in assetIds)
             {
-                await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+                await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                     assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 33.3333m,
                     quantityHistory: [(today.AddDays(-20), 33.3333m)]);
             }
@@ -582,7 +539,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
             for (var offset = 3; offset >= 1; offset--)
             {
                 var date = today.AddDays(-offset);
-                var lines = await GetLinesAsync(containers, portfolioId, date, cancellationToken);
+                var lines = await GetLinesAsync(containers, accountId, date, cancellationToken);
                 var snapshot = await GetSnapshotAsync(containers, userId, date, cancellationToken);
 
                 Assert.Equal(3, lines.Count);

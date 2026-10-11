@@ -63,7 +63,7 @@
                 @if (candidatesResource.hasValue()) {
                   @for (candidate of candidatesResource.value(); track candidate.assetId) {
                     <mat-option [value]="candidate.assetId">
-                      {{ candidate.name }} — {{ candidate.portfolioName }}
+                      {{ candidate.name }}
                     </mat-option>
                   }
                 }

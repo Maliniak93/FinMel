@@ -58,10 +58,11 @@ export class SecuritiesTable {
   private readonly dialog = inject(MatDialog);
 
   readonly assetClass = input.required<AssetClass>();
+  readonly account = input<string>();
 
   protected readonly displayedColumns = [
     'instrument',
-    'portfolio',
+    'account',
     'quantity',
     'averageBuyPrice',
     'price',
@@ -90,6 +91,17 @@ export class SecuritiesTable {
         result.data ?? { holdings: [], totals: { valuePln: 0, costPln: 0, unrealizedPlPln: 0 } }
       );
     },
+  });
+
+  protected readonly footerColumns = computed(() => (this.account() ? [] : this.displayedColumns));
+
+  protected readonly holdings = computed(() => {
+    if (!this.holdingsResource.hasValue()) {
+      return [];
+    }
+    const account = this.account();
+    const holdings = this.holdingsResource.value().holdings;
+    return account ? holdings.filter((holding) => holding.accountId === account) : holdings;
   });
 
   protected readonly formatMoney = formatMoney;
@@ -126,7 +138,7 @@ export class SecuritiesTable {
   }
 
   protected transactionsLink(holding: SecurityHoldingResponse): string[] {
-    return ['/portfolios', holding.portfolioId, 'assets', holding.assetId, 'transactions'];
+    return ['/assets', holding.assetId, 'transactions'];
   }
 
   protected openAddDialog(): void {

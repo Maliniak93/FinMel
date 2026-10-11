@@ -1,5 +1,6 @@
 using System.Net;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -20,7 +21,6 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateSettledTosAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var tosId = funded.Bond.AssetId;
 
         var response = await client.SwapBondRawAsync(tosId, NewSwapBody(10, funded.CashAssetId), cancellationToken);
@@ -28,14 +28,14 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
         Assert.True(response.IsSuccessStatusCode, $"Swap answered {(int)response.StatusCode}.");
 
         var edo = await client.FindSwappedBondAsync(tosId, cancellationToken);
-        Assert.Equal(portfolioId, edo.PortfolioId);
+        Assert.Equal(funded.BondAccountId, edo.AccountId);
         Assert.Equal(TreasuryBondType.Edo, edo.Type);
         Assert.Equal("EDO1036", edo.SeriesCode);
         Assert.Equal(TosMaturityDate, edo.PurchaseDate);
         Assert.Equal(10, edo.BondCount);
         Assert.Equal(99.90m, edo.PurchasePricePerBond);
         Assert.Equal(999.00m, edo.BookValue);
-        Assert.False(edo.TaxExempt);
+        Assert.Equal(TaxWrapper.Regular, edo.TaxWrapper);
         Assert.Equal(tosId, edo.SwappedFrom!.AssetId);
         Assert.Equal("TOS1029", edo.SwappedFrom.Name);
 
@@ -143,7 +143,6 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
                 break;
         }
 
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         var body = NewSwapBody(10, funded.CashAssetId);
         switch (scenario)
@@ -168,7 +167,7 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
                 break;
             case "stock as destination":
                 body = NewSwapBody(
-                    10, await client.AddAssetAsync(await client.CreatePortfolioAsync(cancellationToken, name: "Stocks"), cancellationToken));
+                    10, await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken, name: "Stocks"), cancellationToken));
                 break;
             case "archived bond":
                 await client.ArchiveAssetAsync(assetId, cancellationToken);

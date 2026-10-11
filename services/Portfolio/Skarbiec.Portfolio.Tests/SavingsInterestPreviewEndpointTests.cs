@@ -14,7 +14,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         var response = await client.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
 
@@ -36,7 +36,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberLastDayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         var response = await client.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
 
@@ -49,7 +49,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(NovemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
 
@@ -63,7 +63,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest(taxExempt: true));
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest(taxExempt: true));
 
         var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
 
@@ -78,7 +78,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(NovemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+        var account = await client.AddSavingsAccountAsync(
             cancellationToken, NewInterestAccountRequest(annualInterestRatePercent: 0m));
 
         var response = await client.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
@@ -91,8 +91,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
 
         var response = await client.GetAsync(SavingsInterestPreviewUri(cashId), cancellationToken);
 
@@ -135,11 +134,11 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(
             deposit.AssetId, cancellationToken, NewSettleRequest(grossInterest: 0m, tax: 0m));
-        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(annualInterestRatePercent: 5m, withOpeningDeposit: false), portfolioName: "Wallet");
+        var account = await client.AddSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(annualInterestRatePercent: 5m, withOpeningDeposit: false));
         await client.PayOutDepositAsync(
             deposit.AssetId, account.AssetId, cancellationToken, new DateOnly(2026, 9, 16));
 

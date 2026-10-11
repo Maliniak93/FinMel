@@ -99,7 +99,7 @@ public sealed class HistoryRebuildConsumer(
             : await priceQuoteClient.GetFxHistoryAsync(pairs, from, to, cancellationToken);
 
         var days = HistoryRebuild.Compute(positions, priceSeries, fxSeries, from, to);
-        var portfolioByAsset = positions.ToDictionary(p => p.AssetId, p => p.PortfolioId);
+        var accountByAsset = positions.ToDictionary(p => p.AssetId, p => p.AccountId);
 
         // IgnoreQueryFilters: the rows being replaced belong to the request's user, not to a request user.
         await db.AssetValuations
@@ -115,7 +115,7 @@ public sealed class HistoryRebuildConsumer(
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            PortfolioId = portfolioByAsset[line.AssetId],
+            AccountId = accountByAsset[line.AssetId],
             AssetId = line.AssetId,
             Date = day.Date,
             AssetClass = line.AssetClass,

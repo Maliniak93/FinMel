@@ -14,7 +14,7 @@ public sealed class UpdateBondHandler(
     public async Task<Result<BondResponse>> HandleAsync(
         Guid assetId, UpdateBondRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's bond, a non-bond asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's bond, a non-bond asset all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
         var terms = asset is null
@@ -26,13 +26,7 @@ public sealed class UpdateBondHandler(
             return BondErrors.NotFound(assetId);
         }
 
-        var portfolio = await dbContext.Portfolios
-            .AsNoTracking()
-            .Where(p => p.Id == asset.PortfolioId)
-            .Select(p => new { p.Name, p.IsArchived })
-            .FirstAsync(cancellationToken);
-
-        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
             return readOnly;
         }
@@ -54,8 +48,7 @@ public sealed class UpdateBondHandler(
                 || request.PurchasePricePerBond != terms.PurchasePricePerBond
                 || request.PurchaseDate != terms.PurchaseDate
                 || request.SeriesCode != terms.SeriesCode
-                || request.Type != terms.Type
-                || request.TaxExempt != terms.TaxExempt))
+                || request.Type != terms.Type))
         {
             return BondErrors.FromSwap;
         }
@@ -75,7 +68,7 @@ public sealed class UpdateBondHandler(
         {
             fundingAsset = await dbContext.Assets.FirstAsync(a => a.Id == fundingLeg.AssetId, cancellationToken);
 
-            // The Cash side is read-only while it or its portfolio is archived, so its leg cannot be rewritten.
+            // The Cash side is read-only while it or its account is archived, so its leg cannot be rewritten.
             if (await dbContext.ReadOnlyErrorAsync(fundingAsset, cancellationToken) is { } fundingReadOnly)
             {
                 return fundingReadOnly;
@@ -150,7 +143,6 @@ public sealed class UpdateBondHandler(
         terms.FirstPeriodRatePercent = request.FirstPeriodRatePercent;
         terms.MarginPercent = request.MarginPercent;
         terms.EarlyRedemptionFeePerBond = request.EarlyRedemptionFeePerBond;
-        terms.TaxExempt = request.TaxExempt;
         terms.MaturityDate = BondSchedule.MaturityDate(request.Type, request.PurchaseDate);
 
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);

@@ -12,7 +12,7 @@ public sealed class Position : IUserOwned
     // Set by the consumers from the event, not stamped by UserOwnedSaveInterceptor.
     public Guid UserId { get; set; }
 
-    public required Guid PortfolioId { get; set; }
+    public Guid? AccountId { get; set; }
     public required AssetClass AssetClass { get; set; }
     public required AssetValuationMode ValuationMode { get; set; }
 
@@ -24,10 +24,7 @@ public sealed class Position : IUserOwned
     // Market mode multiplier: the price is per quote unit (a gram of metal), the quantity in pieces.
     public decimal QuoteUnitsPerQuantity { get; set; } = 1m;
 
-    // Kept current by both the per-asset fan-out and the archive and restore consumers.
-    public required bool PortfolioIsArchived { get; set; }
-
-    // Independent of PortfolioIsArchived; a position is valued only when neither is set.
+    // A position is valued unless this is set.
     public required bool IsArchived { get; set; }
 
     // End-of-day quantity per transaction date, ascending; empty for a position with no transactions.
@@ -35,9 +32,6 @@ public sealed class Position : IUserOwned
 
     // UTC date of the event that archived the asset; null while it is not archived.
     public DateOnly? ArchivedOn { get; set; }
-
-    // UTC date the portfolio's archive was first seen, by the portfolio event or this asset's own event.
-    public DateOnly? PortfolioArchivedOn { get; set; }
 
     // The publisher's per-asset counter: an older event is dropped, so a redelivery never resurrects an older quantity.
     public required long Version { get; set; }

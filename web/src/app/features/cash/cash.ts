@@ -50,7 +50,7 @@ import {
 export class Cash {
   private readonly dialog = inject(MatDialog);
 
-  protected readonly displayedColumns = ['name', 'portfolio', 'currency', 'balance', 'actions'];
+  protected readonly displayedColumns = ['name', 'currency', 'balance', 'actions'];
 
   protected readonly cashResource = resource({
     loader: async ({ abortSignal }) => {
@@ -67,7 +67,7 @@ export class Cash {
   protected readonly withdrawType = TRANSACTION_TYPE_WITHDRAW;
 
   protected transactionsLink(account: CashAccountResponse): string[] {
-    return ['/portfolios', account.portfolioId, 'assets', account.assetId, 'transactions'];
+    return ['/assets', account.assetId, 'transactions'];
   }
 
   protected openAddDialog(): void {

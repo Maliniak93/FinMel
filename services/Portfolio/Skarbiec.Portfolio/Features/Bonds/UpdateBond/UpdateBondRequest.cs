@@ -34,9 +34,6 @@ public sealed record UpdateBondRequest : IValidatableObject
     [Range(typeof(decimal), "0", "100")]
     public required decimal EarlyRedemptionFeePerBond { get; init; }
 
-    /// <summary>IKE/IKZE: no Belka tax.</summary>
-    public bool TaxExempt { get; init; }
-
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         BondTermsValidation.Validate(
             validationContext,

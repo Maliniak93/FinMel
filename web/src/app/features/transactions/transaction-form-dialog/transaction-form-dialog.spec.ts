@@ -24,7 +24,6 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-const portfolioId = '22222222-2222-2222-2222-222222222222';
 const assetId = '11111111-1111-1111-1111-111111111111';
 const assetClass = ASSET_CLASS.Etf;
 
@@ -390,9 +389,7 @@ describe('TransactionFormDialog', () => {
         ? jsonResponse([
             {
               assetId: cashAssetId,
-              portfolioId,
               name: 'Wallet',
-              portfolioName: 'Main',
               balance: 5000,
             },
           ])
@@ -479,16 +476,12 @@ describe('TransactionFormDialog', () => {
           accounts: [
             {
               assetId: eurCashId,
-              portfolioId,
-              portfolioName: 'Main',
               name: 'Broker cash',
               currency: 'EUR',
               balance: 2000,
             },
             {
               assetId: plnCashId,
-              portfolioId,
-              portfolioName: 'Main',
               name: 'Zloty cash',
               currency: 'PLN',
               balance: 9000,
@@ -598,8 +591,7 @@ describe('TransactionFormDialog', () => {
           manual: false,
           counterpartAssetId: eurCashId,
           counterpartAssetName: 'Broker cash',
-          counterpartPortfolioId: portfolioId,
-          counterpartPortfolioName: 'Main',
+          counterpartAccountName: 'Main',
           direction: 0,
         },
       };

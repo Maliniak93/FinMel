@@ -10,39 +10,18 @@ namespace Skarbiec.Portfolio.Features;
 public sealed class PositionEventPublisher(
     PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, TimeProvider timeProvider)
 {
-    public async Task PublishCreatedAsync(Asset asset, PortfolioEntity portfolio, CancellationToken cancellationToken)
+    public async Task PublishCreatedAsync(Asset asset, CancellationToken cancellationToken)
     {
         var transactions = await LoadTransactionsAsync([asset.Id], cancellationToken);
-        await PublishAsync(asset, portfolio.IsArchived, HistoryOf(transactions, asset.Id), cancellationToken);
+        await PublishAsync(asset, HistoryOf(transactions, asset.Id), cancellationToken);
     }
 
     public async Task PublishChangedAsync(Asset asset, CancellationToken cancellationToken)
     {
-        var portfolioIsArchived = await dbContext.Portfolios
-            .AsNoTracking()
-            .Where(p => p.Id == asset.PortfolioId)
-            .Select(p => p.IsArchived)
-            .FirstAsync(cancellationToken);
-
         var transactions = await LoadTransactionsAsync([asset.Id], cancellationToken);
 
         asset.Version++;
-        await PublishAsync(asset, portfolioIsArchived, HistoryOf(transactions, asset.Id), cancellationToken);
-    }
-
-    public async Task PublishForEveryAssetAsync(PortfolioEntity portfolio, CancellationToken cancellationToken)
-    {
-        var assets = await dbContext.Assets
-            .Where(a => a.PortfolioId == portfolio.Id)
-            .ToListAsync(cancellationToken);
-
-        var transactions = await LoadTransactionsAsync([.. assets.Select(a => a.Id)], cancellationToken);
-
-        foreach (var asset in assets)
-        {
-            asset.Version++;
-            await PublishAsync(asset, portfolio.IsArchived, HistoryOf(transactions, asset.Id), cancellationToken);
-        }
+        await PublishAsync(asset, HistoryOf(transactions, asset.Id), cancellationToken);
     }
 
     // Tracked rows win over stored ones: the event is published before the save that writes them.
@@ -79,12 +58,12 @@ public sealed class PositionEventPublisher(
     }
 
     private async Task PublishAsync(
-        Asset asset, bool portfolioIsArchived, IReadOnlyList<QuantityPoint> quantityHistory, CancellationToken cancellationToken)
+        Asset asset, IReadOnlyList<QuantityPoint> quantityHistory, CancellationToken cancellationToken)
         // The interceptor stamps Asset.UserId only during SaveChangesAsync, which has not run yet.
         => await publishEndpoint.Publish(new AssetPositionChanged
         {
             AssetId = asset.Id,
-            PortfolioId = asset.PortfolioId,
+            AccountId = asset.AccountId,
             UserId = dbContext.CurrentUserId,
             AssetClass = asset.AssetClass,
             ValuationMode = asset.ValuationMode,
@@ -94,8 +73,6 @@ public sealed class PositionEventPublisher(
             QuoteUnitsPerQuantity = await QuoteUnitsPerQuantityAsync(asset, cancellationToken),
             FirstTransactionDate = quantityHistory.Count == 0 ? null : quantityHistory[0].Date,
             QuantityHistory = quantityHistory,
-            PortfolioIsArchived = portfolioIsArchived,
-            // The asset's own flag; the portfolio fan-out never changes it.
             IsArchived = asset.IsArchived,
             Version = asset.Version,
             OccurredAtUtc = timeProvider.GetUtcNow()

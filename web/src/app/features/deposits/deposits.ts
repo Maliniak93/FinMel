@@ -66,7 +66,6 @@ export class Deposits {
   protected readonly displayedColumns = [
     'name',
     'bankName',
-    'portfolio',
     'principal',
     'rate',
     'startDate',
@@ -184,7 +183,7 @@ export class Deposits {
     const done = await confirmSetAssetArchived(
       this.dialog,
       this.snackBar,
-      { portfolioId: deposit.portfolioId, assetId: deposit.assetId, name: deposit.name },
+      { assetId: deposit.assetId, name: deposit.name },
       archive,
     );
     if (done) {

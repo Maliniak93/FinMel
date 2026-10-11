@@ -17,15 +17,12 @@ public sealed class ListTransferCandidatesHandler(PortfolioDbContext dbContext)
 
         IReadOnlyList<TransferCandidateResponse> candidates = await (
                 from asset in dbContext.Assets.AsNoTracking()
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
-                where asset.AssetClass == assetClass && asset.Currency == currency && !asset.IsArchived && !portfolio.IsArchived
-                orderby portfolio.Name, asset.Name
+                where asset.AssetClass == assetClass && asset.Currency == currency && !asset.IsArchived
+                orderby asset.Name
                 select new TransferCandidateResponse
                 {
                     AssetId = asset.Id,
                     Name = asset.Name,
-                    PortfolioId = portfolio.Id,
-                    PortfolioName = portfolio.Name,
                     Balance = asset.Quantity
                 })
             .ToListAsync(cancellationToken);

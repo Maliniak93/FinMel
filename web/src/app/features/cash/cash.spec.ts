@@ -17,8 +17,6 @@ import { Cash } from './cash';
 
 const plnWallet = {
   assetId: '11111111-1111-1111-1111-111111111111',
-  portfolioId: '22222222-2222-2222-2222-222222222222',
-  portfolioName: 'Alpha',
   name: 'PLN wallet',
   currency: 'PLN',
   balance: 1200.3,
@@ -26,8 +24,6 @@ const plnWallet = {
 
 const eurWallet = {
   assetId: '33333333-3333-3333-3333-333333333333',
-  portfolioId: '44444444-4444-4444-4444-444444444444',
-  portfolioName: 'Zeta',
   name: 'EUR wallet',
   currency: 'EUR',
   balance: 50.25,
@@ -110,11 +106,9 @@ describe('Cash', () => {
 
     expect(rows()).toHaveLength(2);
     const pln = rowFor('PLN wallet').textContent ?? '';
-    expect(pln).toContain('Alpha');
     expect(pln).toContain('PLN');
     expect(pln).toContain(formatMoney(1200.3, 'PLN'));
     const eur = rowFor('EUR wallet').textContent ?? '';
-    expect(eur).toContain('Zeta');
     expect(eur).toContain('EUR');
     expect(eur).toContain(formatMoney(50.25, 'EUR'));
 
@@ -134,9 +128,7 @@ describe('Cash', () => {
     const link = rowFor('EUR wallet').querySelector<HTMLAnchorElement>('a');
 
     expect(link?.textContent).toContain('EUR wallet');
-    expect(link?.getAttribute('href')).toBe(
-      `/portfolios/${eurWallet.portfolioId}/assets/${eurWallet.assetId}/transactions`,
-    );
+    expect(link?.getAttribute('href')).toBe(`/assets/${eurWallet.assetId}/transactions`);
   });
 
   it('shows the empty state', async () => {
@@ -182,7 +174,6 @@ describe('Cash', () => {
     const [component, config] = dialog.open.mock.calls[0];
     expect(component).toBe(AssetFormDialog);
     expect(config.data.assetClass).toBe(ASSET_CLASS.Cash);
-    expect(config.data.portfolioId).toBeUndefined();
     await vi.waitFor(() => expect(cashListCalls()).toBeGreaterThan(before));
   }
 

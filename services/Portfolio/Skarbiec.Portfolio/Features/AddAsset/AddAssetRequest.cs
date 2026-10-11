@@ -6,7 +6,7 @@ namespace Skarbiec.Portfolio.Features.AddAsset;
 
 public sealed record AddAssetRequest : IValidatableObject
 {
-    public required Guid PortfolioId { get; init; }
+    public Guid? AccountId { get; init; }
 
     public required AssetClass AssetClass { get; init; }
 

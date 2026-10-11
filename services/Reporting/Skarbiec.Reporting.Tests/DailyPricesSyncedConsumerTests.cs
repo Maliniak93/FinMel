@@ -31,19 +31,19 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var stockInstrumentId = Guid.NewGuid();
 
         var userAId = Guid.NewGuid();
-        var portfolioAId = Guid.NewGuid();
+        var accountAId = Guid.NewGuid();
         var assetAId = Guid.NewGuid();
         var userBId = Guid.NewGuid();
-        var portfolioBId = Guid.NewGuid();
+        var accountBId = Guid.NewGuid();
         var assetBId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetAId, userAId, portfolioAId, cancellationToken,
+            await db.SeedPositionAsync(assetAId, userAId, accountAId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
                 instrumentId: stockInstrumentId, currency: "PLN", quantity: 10m);
 
-            await db.SeedPositionAsync(assetBId, userBId, portfolioBId, cancellationToken,
+            await db.SeedPositionAsync(assetBId, userBId, accountBId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "PLN", quantity: 300_000m);
         }
@@ -67,54 +67,21 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Consume_DailyPricesSynced_SkipsArchivedPortfolios()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var snapshotDate = new DateOnly(2026, 8, 10);
-        var userId = Guid.NewGuid();
-        var archivedPortfolioId = Guid.NewGuid();
-        var archivedAssetId = Guid.NewGuid();
-
-        await using (var db = OpenDbContext(containers))
-        {
-            await db.SeedPositionAsync(archivedAssetId, userId, archivedPortfolioId, cancellationToken,
-                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
-                currency: "PLN", quantity: 1_000m, portfolioIsArchived: true);
-        }
-
-        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
-        {
-            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
-
-            // Nothing to wait on for a portfolio that must never get a snapshot, so give the consumer a full run's time.
-            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
-
-            await using var scope = provider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
-
-            Assert.False(await db.ValuationSnapshots.IgnoreQueryFilters()
-                .AnyAsync(s => s.UserId == userId, cancellationToken));
-            Assert.False(await db.AssetValuations.IgnoreQueryFilters()
-                .AnyAsync(l => l.AssetId == archivedAssetId, cancellationToken));
-        }, cancellationToken);
-    }
-
-    [Fact]
     public async Task Consume_SkipsArchivedAssets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var archivedAssetId = Guid.NewGuid();
         var liveAssetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(archivedAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(archivedAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "PLN", quantity: 1_000m, isArchived: true);
-            await db.SeedPositionAsync(liveAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(liveAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "PLN", quantity: 50m);
         }
@@ -126,7 +93,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             var snapshot = await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
 
             Assert.Equal(50m, snapshot.TotalPln);
-            var line = Assert.Single(await GetLinesAsync(containers, portfolioId, snapshotDate, cancellationToken));
+            var line = Assert.Single(await GetLinesAsync(containers, accountId, snapshotDate, cancellationToken));
             Assert.Equal(liveAssetId, line.AssetId);
         }, cancellationToken);
     }
@@ -137,7 +104,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var stockInstrumentId = Guid.NewGuid();
 
         var marketAssetId = Guid.NewGuid();
@@ -146,15 +113,15 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(marketAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(marketAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
                 instrumentId: stockInstrumentId, currency: "PLN", quantity: 10m);
 
-            await db.SeedPositionAsync(plnCashAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(plnCashAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "PLN", quantity: 300_000m);
 
-            await db.SeedPositionAsync(cashAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(cashAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "EUR", quantity: 1_000m);
         }
@@ -172,7 +139,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
             var lines = await db.AssetValuations.IgnoreQueryFilters()
-                .Where(l => l.PortfolioId == portfolioId && l.Date == snapshotDate)
+                .Where(l => l.AccountId == accountId && l.Date == snapshotDate)
                 .ToListAsync(cancellationToken);
 
             Assert.Equal(3, lines.Count);
@@ -201,7 +168,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 20);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
 
         var staleInstrumentId = Guid.NewGuid();
         var staleAssetId = Guid.NewGuid();
@@ -210,11 +177,11 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(staleAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(staleAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
                 instrumentId: staleInstrumentId, currency: "PLN", quantity: 1m);
 
-            await db.SeedPositionAsync(freshAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(freshAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Etf, valuationMode: AssetValuationMode.Market,
                 instrumentId: freshInstrumentId, currency: "PLN", quantity: 1m);
         }
@@ -233,7 +200,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
             var lines = await db.AssetValuations.IgnoreQueryFilters()
-                .Where(l => l.PortfolioId == portfolioId && l.Date == snapshotDate)
+                .Where(l => l.AccountId == accountId && l.Date == snapshotDate)
                 .ToListAsync(cancellationToken);
 
             Assert.True(Assert.Single(lines, l => l.AssetId == staleAssetId).IsStale);
@@ -247,12 +214,12 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 11);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "PLN", quantity: 42m);
         }
@@ -301,12 +268,12 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "EUR", quantity: 100m);
         }
@@ -339,15 +306,15 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var instrumentId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(Guid.NewGuid(), userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
                 instrumentId: instrumentId, currency: "USD", quantity: 2m);
-            await db.SeedPositionAsync(Guid.NewGuid(), userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "EUR", quantity: 100m);
         }
@@ -386,12 +353,12 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var snapshotDate = new DateOnly(2026, 8, 10);
         var newerDate = snapshotDate.AddDays(2);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var instrumentId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(Guid.NewGuid(), userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
                 instrumentId: instrumentId, currency: "USD", quantity: 2m);
 
@@ -447,7 +414,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
 
             await db.SeedPositionAsync(Guid.NewGuid(), archivedUserId, Guid.NewGuid(), cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m,
-                portfolioIsArchived: true);
+                isArchived: true);
             await db.SeedSnapshotAsync(archivedUserId, snapshotDate.AddDays(-6), 1_000m, cancellationToken);
         }
 

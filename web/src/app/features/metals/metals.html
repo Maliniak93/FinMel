@@ -67,11 +67,6 @@
         </td>
       </ng-container>
 
-      <ng-container matColumnDef="portfolio">
-        <th mat-header-cell *matHeaderCellDef>{{ 'metals.portfolio' | transloco }}</th>
-        <td mat-cell *matCellDef="let holding">{{ holding.portfolioName }}</td>
-      </ng-container>
-
       <ng-container matColumnDef="metal">
         <th mat-header-cell *matHeaderCellDef>{{ 'metals.metal.column' | transloco }}</th>
         <td mat-cell *matCellDef="let holding">{{ metalLabel(holding.metal) | transloco }}</td>

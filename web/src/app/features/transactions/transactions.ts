@@ -14,7 +14,7 @@ import { firstValueFrom } from 'rxjs';
 import {
   deleteApiPortfolioAssetsByAssetIdTransactionsById,
   deleteApiPortfolioTransfersByTransferId,
-  getApiPortfolioPortfoliosById,
+  getApiPortfolioAccountsById,
   getApiPortfolioAssetsById,
   getApiPortfolioAssetsByAssetIdTransactions,
   type TransactionResponse,
@@ -22,7 +22,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatDate, formatMoney, formatMonth, formatQuantity } from '../../shared/format';
-import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
+import { ASSET_CLASS, assetClassLabel, assetClassPage } from '../assets/asset-class';
 import {
   TransactionFormDialog,
   type TransactionFormDialogData,
@@ -52,14 +52,13 @@ export class Transactions {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly portfolioId = input.required<string>();
   readonly assetId = input.required<string>();
 
   protected readonly pageIndex = signal(0);
   protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
 
   protected readonly assetResource = resource({
-    params: () => ({ portfolioId: this.portfolioId(), assetId: this.assetId() }),
+    params: () => ({ assetId: this.assetId() }),
     loader: async ({ params, abortSignal }) => {
       const result = await getApiPortfolioAssetsById({
         path: { id: params.assetId },
@@ -74,16 +73,19 @@ export class Transactions {
     },
   });
 
-  protected readonly portfolioResource = resource({
-    params: () => ({ portfolioId: this.portfolioId() }),
+  protected readonly accountResource = resource({
+    params: () => {
+      const accountId = this.assetResource.hasValue() ? this.assetResource.value().accountId : null;
+      return accountId ? { accountId } : undefined;
+    },
     loader: async ({ params, abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosById({
-        path: { id: params.portfolioId },
+      const result = await getApiPortfolioAccountsById({
+        path: { id: params.accountId },
         signal: abortSignal,
       });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? translate('transactions.portfolioLoadFailed'),
+          readProblemDetails(result.error).detail ?? translate('transactions.accountLoadFailed'),
         );
       }
       return result.data;
@@ -91,7 +93,13 @@ export class Transactions {
   });
 
   protected readonly isArchived = computed(
-    () => this.portfolioResource.hasValue() && this.portfolioResource.value().isArchived,
+    () => this.accountResource.hasValue() && this.accountResource.value().isArchived,
+  );
+
+  protected readonly backPath = computed(() =>
+    this.assetResource.hasValue()
+      ? assetClassPage(this.assetResource.value().assetClass)
+      : '/dashboard',
   );
 
   protected readonly isTermDeposit = computed(
@@ -119,7 +127,6 @@ export class Transactions {
 
   protected readonly transactionsResource = resource({
     params: () => ({
-      portfolioId: this.portfolioId(),
       assetId: this.assetId(),
       page: this.pageIndex() + 1,
       pageSize: this.pageSize(),

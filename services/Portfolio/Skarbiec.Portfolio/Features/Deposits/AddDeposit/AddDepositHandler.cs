@@ -15,22 +15,9 @@ public sealed class AddDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         AddDepositRequest request, CancellationToken cancellationToken)
     {
-        var portfolioId = request.PortfolioId;
-        var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
-        if (portfolio is null)
-        {
-            return PortfolioErrors.NotFound(portfolioId);
-        }
-
-        if (portfolio.IsArchived)
-        {
-            return PortfolioErrors.Archived(portfolioId);
-        }
-
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
-            PortfolioId = portfolioId,
             AssetClass = AssetClass.Deposit,
             Name = request.Name,
             Currency = request.Currency,
@@ -100,7 +87,7 @@ public sealed class AddDepositHandler(
         dbContext.Transactions.Add(opening);
         dbContext.TermDeposits.Add(terms);
 
-        await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
+        await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
 
         if (funding is not null)
         {
@@ -124,7 +111,7 @@ public sealed class AddDepositHandler(
 
         var fundingSource = funding is null ? null : new DepositFundingSource(funding.Source.Id, funding.Source.Name);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), fundingSource, payout: null);
+        return terms.ToResponse(asset, WarsawCalendar.Today(timeProvider), fundingSource, payout: null);
     }
 
     private async Task<Result<FundingTransfer>> PlanFundingAsync(
@@ -135,8 +122,7 @@ public sealed class AddDepositHandler(
         if (source is null
             || !TransferRoutes.IsAllowed(source.AssetClass, deposit.AssetClass)
             || source.Currency != deposit.Currency
-            || source.IsArchived
-            || await dbContext.IsPortfolioArchivedAsync(source.PortfolioId, cancellationToken))
+            || source.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
         }

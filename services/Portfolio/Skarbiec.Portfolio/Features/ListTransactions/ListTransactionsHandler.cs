@@ -49,15 +49,15 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                 from leg in dbContext.Transactions.AsNoTracking()
                 where leg.TransferId != null && transferIds.Contains(leg.TransferId.Value) && leg.AssetId != assetId
                 join counterpartAsset in dbContext.Assets on leg.AssetId equals counterpartAsset.Id
-                join counterpartPortfolio in dbContext.Portfolios on counterpartAsset.PortfolioId equals counterpartPortfolio.Id
+                join account in dbContext.Accounts on counterpartAsset.AccountId equals (Guid?)account.Id into accounts
+                from counterpartAccount in accounts.DefaultIfEmpty()
                 select new
                 {
                     TransferId = leg.TransferId!.Value,
                     AssetId = counterpartAsset.Id,
                     AssetName = counterpartAsset.Name,
                     counterpartAsset.AssetClass,
-                    PortfolioId = counterpartPortfolio.Id,
-                    PortfolioName = counterpartPortfolio.Name
+                    AccountName = counterpartAccount.Name
                 })
             .ToDictionaryAsync(c => c.TransferId, cancellationToken);
 
@@ -87,8 +87,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                                 : TransferRoutes.IsDeletable(counterpart.AssetClass, asset.AssetClass),
                             CounterpartAssetId = counterpart.AssetId,
                             CounterpartAssetName = counterpart.AssetName,
-                            CounterpartPortfolioId = counterpart.PortfolioId,
-                            CounterpartPortfolioName = counterpart.PortfolioName,
+                            CounterpartAccountName = counterpart.AccountName,
                             Direction = TransferLegs.DirectionOf(t)
                         }
                         : null,

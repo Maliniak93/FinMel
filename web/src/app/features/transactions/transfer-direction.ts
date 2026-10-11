@@ -8,16 +8,14 @@ export const TRANSFER_DIRECTION = {
 
 export function transferLabel(transfer: TransactionTransferResponse): {
   key: string;
-  params: { asset: string; portfolio: string };
+  params: { asset: string; account: string };
 } {
+  const direction = Number(transfer.direction) === TRANSFER_DIRECTION.Out ? 'out' : 'in';
+  const account = transfer.counterpartAccountName ?? '';
   return {
-    key:
-      Number(transfer.direction) === TRANSFER_DIRECTION.Out
-        ? 'enums.transferDirection.out'
-        : 'enums.transferDirection.in',
-    params: {
-      asset: transfer.counterpartAssetName,
-      portfolio: transfer.counterpartPortfolioName,
-    },
+    key: account
+      ? `enums.transferDirection.${direction}WithAccount`
+      : `enums.transferDirection.${direction}`,
+    params: { asset: transfer.counterpartAssetName, account },
   };
 }

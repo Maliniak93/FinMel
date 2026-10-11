@@ -39,12 +39,11 @@ public static class HistoryRebuild
                 }
             }
 
-            var archivedPortfolio = states.Any(s => s.IsPortfolioArchivedOn(day));
             var valued = new List<ValuationPosition>();
             foreach (var state in states)
             {
                 var quantity = state.QuantityOn(day);
-                if (state.IsPortfolioArchivedOn(day) || state.IsArchivedOn(day))
+                if (state.IsArchivedOn(day))
                 {
                     continue;
                 }
@@ -57,7 +56,7 @@ public static class HistoryRebuild
 
             var lines = ValuationAlgorithm.Calculate(valued, prices, fxRates, day).Lines;
 
-            if (lines.Count == 0 && !archivedPortfolio)
+            if (lines.Count == 0)
             {
                 continue;
             }
@@ -77,8 +76,6 @@ public static class HistoryRebuild
     private sealed class PositionState(Position position)
     {
         private int _next;
-
-        public bool IsPortfolioArchivedOn(DateOnly day) => position.PortfolioArchivedOn is { } archivedOn && day >= archivedOn;
 
         public bool IsArchivedOn(DateOnly day) => position.ArchivedOn is { } archivedOn && day >= archivedOn;
 

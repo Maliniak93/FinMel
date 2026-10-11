@@ -33,9 +33,9 @@ internal static class BondReadModel
         var row = await (
                 from terms in dbContext.TreasuryBonds.AsNoTracking()
                 join asset in dbContext.Assets.AsNoTracking() on terms.AssetId equals asset.Id
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
+                join account in dbContext.Accounts.AsNoTracking() on asset.AccountId equals (Guid?)account.Id
                 where asset.Id == assetId
-                select new { Terms = terms, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
+                select new { Terms = terms, Asset = asset, Account = account })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (row is null)
@@ -52,8 +52,7 @@ internal static class BondReadModel
 
         var response = row.Terms.ToResponse(
             row.Asset,
-            row.PortfolioName,
-            row.PortfolioIsArchived,
+            row.Account,
             today,
             funding,
             settlements,

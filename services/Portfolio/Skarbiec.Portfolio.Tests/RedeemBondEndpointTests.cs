@@ -1,5 +1,6 @@
 using System.Net;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -20,7 +21,6 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateSettledTosAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         Assert.Equal(1_137.90m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
 
@@ -71,9 +71,9 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
     }
 
     [Theory]
-    [InlineData(false, 0.19, 999.81)]
-    [InlineData(true, 0, 1_000.00)]
-    public async Task Redeem_SwapBought_TaxesDiscount(bool taxExempt, double expectedTax, double expectedProceeds)
+    [InlineData(TaxWrapper.Regular, 0.19, 999.81)]
+    [InlineData(TaxWrapper.Ike, 0, 1_000.00)]
+    public async Task Redeem_SwapBought_TaxesDiscount(TaxWrapper wrapper, double expectedTax, double expectedProceeds)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var tax = (decimal)expectedTax;
@@ -81,8 +81,7 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         Factory.Clock.SetUtcNow(AfterRorMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var funded = await client.CreateSettledRorAsync(cancellationToken, taxExempt: taxExempt);
-        var portfolioId = funded.BondPortfolioId;
+        var funded = await client.CreateSettledRorAsync(cancellationToken, wrapper: wrapper);
         var assetId = funded.Bond.AssetId;
         var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
 
@@ -129,7 +128,6 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         await client.RedeemBondEarlyAsync(assetId, earlyDate, 4, funded.CashAssetId, cancellationToken);
         Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
@@ -185,7 +183,6 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
                 break;
         }
 
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         var destination = funded.CashAssetId;
         switch (scenario)
@@ -194,7 +191,7 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
                 await client.RedeemBondAsync(assetId, destination, cancellationToken);
                 break;
             case "stock as destination":
-                destination = await client.AddAssetAsync(await client.CreatePortfolioAsync(cancellationToken, name: "Stocks"), cancellationToken);
+                destination = await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken, name: "Stocks"), cancellationToken);
                 break;
             case "archived bond":
                 await client.ArchiveAssetAsync(assetId, cancellationToken);

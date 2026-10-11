@@ -48,7 +48,7 @@ export class Shell {
 
   protected readonly navLinks = [
     { path: 'dashboard', label: 'shell.nav.dashboard', icon: 'dashboard' },
-    { path: 'portfolios', label: 'shell.nav.portfolios', icon: 'account_balance_wallet' },
+    { path: 'accounts', label: 'shell.nav.accounts', icon: 'account_balance_wallet' },
     { path: 'cash', label: 'shell.nav.cash', icon: 'payments' },
     { path: 'securities', label: 'shell.nav.securities', icon: 'show_chart' },
     { path: 'deposits', label: 'shell.nav.deposits', icon: 'savings' },

@@ -10,19 +10,19 @@ internal static class PositionEvents
     public static async Task<Guid> PublishCashPositionAsync(
         this IBus bus,
         Guid userId,
-        Guid portfolioId,
+        Guid? accountId,
         decimal amount,
         CancellationToken cancellationToken,
         Guid? assetId = null,
-        bool portfolioIsArchived = false,
         long version = 0,
+        bool isArchived = false,
         IReadOnlyList<QuantityPoint>? quantityHistory = null)
     {
         var id = assetId ?? Guid.NewGuid();
         await bus.Publish(new AssetPositionChanged
         {
             AssetId = id,
-            PortfolioId = portfolioId,
+            AccountId = accountId,
             UserId = userId,
             AssetClass = AssetClass.Cash,
             ValuationMode = AssetValuationMode.CurrencyValued,
@@ -30,8 +30,7 @@ internal static class PositionEvents
             Quantity = amount,
             QuoteUnitsPerQuantity = 1m,
             QuantityHistory = quantityHistory ?? [],
-            PortfolioIsArchived = portfolioIsArchived,
-            IsArchived = false,
+            IsArchived = isArchived,
             Version = version,
             OccurredAtUtc = DateTimeOffset.UtcNow,
         }, cancellationToken);
@@ -39,12 +38,11 @@ internal static class PositionEvents
         return id;
     }
 
-    public static AssetRemoved AssetRemovedEvent(Guid assetId, Guid portfolioId, Guid userId, bool cascadedFromPortfolio = false) => new()
+    public static AssetRemoved AssetRemovedEvent(Guid assetId, Guid? accountId, Guid userId) => new()
     {
         AssetId = assetId,
-        PortfolioId = portfolioId,
+        AccountId = accountId,
         UserId = userId,
         OccurredAtUtc = DateTimeOffset.UtcNow,
-        CascadedFromPortfolio = cascadedFromPortfolio,
     };
 }

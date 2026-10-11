@@ -11,7 +11,7 @@ describe('ConfirmDialog', () => {
   let component: ConfirmDialog;
   let dialogRef: { close: ReturnType<typeof vi.fn> };
   const data: ConfirmDialogData = {
-    title: 'Archive portfolio?',
+    title: 'Archive account?',
     message: 'This hides it from the list.',
   };
 
@@ -68,7 +68,7 @@ describe('ConfirmDialog', () => {
       expect(looksLikeTranslationKey(polish)).toBe(false);
       expect(isTranslationIn('pl', polish), `"${polish}" is not a pl.json value`).toBe(true);
     }
-    expect(textOf(element.querySelector('h2'))).toBe('Archive portfolio?');
+    expect(textOf(element.querySelector('h2'))).toBe('Archive account?');
     expect(element.textContent).toContain('This hides it from the list.');
   });
 });

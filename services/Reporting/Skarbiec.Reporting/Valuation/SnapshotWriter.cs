@@ -32,7 +32,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => p.UserId == userId && !p.PortfolioIsArchived && !p.IsArchived)
+            .Where(p => p.UserId == userId && !p.IsArchived)
             .ToListAsync(cancellationToken);
 
         var pricesByInstrument = await LoadLatestPricesAsync(positions, cancellationToken);
@@ -86,11 +86,11 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
 
         var result = ValuationAlgorithm.Calculate(valuationPositions, pricesByInstrument, fxRatesByPair, snapshotDate);
 
-        var portfolioByAsset = positions.ToDictionary(p => p.AssetId, p => p.PortfolioId);
+        var accountByAsset = positions.ToDictionary(p => p.AssetId, p => p.AccountId);
 
         foreach (var valued in result.Lines)
         {
-            UpsertLine(portfolioByAsset[valued.AssetId], userId, valued, snapshotDate, existingLines);
+            UpsertLine(accountByAsset[valued.AssetId], userId, valued, snapshotDate, existingLines);
         }
 
         if (existingSnapshot is not null)
@@ -112,7 +112,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
     }
 
     private void UpsertLine(
-        Guid portfolioId,
+        Guid? accountId,
         Guid userId,
         ValuedPosition valued,
         DateOnly snapshotDate,
@@ -135,7 +135,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            PortfolioId = portfolioId,
+            AccountId = accountId,
             AssetId = valued.AssetId,
             Date = snapshotDate,
             AssetClass = valued.AssetClass,

@@ -10,7 +10,7 @@ Content-Type: application/json
   "password": "P@ssw0rd!123"
 }
 
-### Dashboard — the user's latest snapshot (byPortfolio rows carry percentage of net worth)
+### Dashboard — the user's latest snapshot (byAccount rows carry percentage of net worth; accountId null = assets outside accounts)
 GET {{baseUrl}}/api/reporting/dashboard
 Authorization: Bearer {{authToken}}
 

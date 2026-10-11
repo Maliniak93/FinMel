@@ -5,9 +5,6 @@ namespace Skarbiec.Portfolio.Features.SavingsAccounts;
 public sealed record SavingsAccountResponse
 {
     public required Guid AssetId { get; init; }
-    public required Guid PortfolioId { get; init; }
-    public required string PortfolioName { get; init; }
-    public required bool PortfolioIsArchived { get; init; }
 
     public required bool IsArchived { get; init; }
 
@@ -31,12 +28,9 @@ public sealed record SavingsAccountResponse
 public static class SavingsAccountMappingExtensions
 {
     public static SavingsAccountResponse ToResponse(
-        this SavingsAccount terms, Asset asset, string portfolioName, bool portfolioIsArchived, SavingsInterestStatus interest) => new()
+        this SavingsAccount terms, Asset asset, SavingsInterestStatus interest) => new()
         {
             AssetId = asset.Id,
-            PortfolioId = asset.PortfolioId,
-            PortfolioName = portfolioName,
-            PortfolioIsArchived = portfolioIsArchived,
             IsArchived = asset.IsArchived,
             Name = asset.Name,
             BankName = terms.BankName,

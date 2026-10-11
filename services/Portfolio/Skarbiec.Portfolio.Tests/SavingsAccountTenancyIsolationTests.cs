@@ -18,9 +18,9 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        await owner.AddSavingsAccountAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await stranger.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(name: "Stranger's own"));
+        await stranger.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(name: "Stranger's own"));
 
         var response = await stranger.GetAsync(AllSavingsAccountsUri, cancellationToken);
 
@@ -35,15 +35,11 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (ownerPortfolioId, account) = await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await owner.AddSavingsAccountAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.GetAsync(SavingsAccountUri(account.AssetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.GetAsync(SavingsAccountUri(account.AssetId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        var response = await stranger.GetAsync(SavingsAccountUri(account.AssetId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -52,39 +48,16 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (ownerPortfolioId, account) = await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await owner.AddSavingsAccountAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var payload = NewUpdateSavingsAccountRequest(name: "Stranger's edit");
 
-        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(SavingsAccountUri(account.AssetId), payload, cancellationToken);
-        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(SavingsAccountUri(account.AssetId), payload, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        var response = await stranger.PutAsJsonAsync(SavingsAccountUri(account.AssetId), payload, cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var unchanged = await owner.GetSavingsAccountAsync(account.AssetId, cancellationToken);
         Assert.Equal("Savings account", unchanged.Name);
         Assert.Equal(5.25m, unchanged.AnnualInterestRatePercent);
         Assert.Equal(10_000m, unchanged.Balance);
-    }
-
-    [Fact]
-    public async Task Add_IntoStrangersPortfolio_ReturnsNotFoundAndWritesNothing()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
-        var ownerId = Guid.NewGuid();
-        using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var ownerPortfolioId = await owner.CreatePortfolioAsync(cancellationToken);
-        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-
-        var response = await stranger.PostAsJsonAsync(AllSavingsAccountsUri, NewSavingsAccountRequest() with { PortfolioId = ownerPortfolioId }, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        await using var dbContext = CreateDbContext(ownerId);
-        Assert.Equal(0, await dbContext.Set<SavingsAccount>().IgnoreQueryFilters().CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Transactions.IgnoreQueryFilters().CountAsync(cancellationToken));
     }
 
     [Fact]
@@ -94,7 +67,7 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var (_, account) = await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await owner.AddSavingsAccountAsync(cancellationToken);
 
         await using var strangerDb = CreateDbContext(Guid.NewGuid());
         Assert.False(await strangerDb.Set<SavingsAccount>().AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
@@ -109,26 +82,22 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         Factory.Clock.SetUtcNow(OctoberEndedUtc);
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var (ownerPortfolioId, account) = await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await owner.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
         await owner.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
         var settlementId = await owner.GetLastSettlementIdAsync(account.AssetId, cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        foreach (var portfolioId in new[] { ownerPortfolioId, strangerPortfolioId })
-        {
-            var preview = await stranger.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
-            var settle = await stranger.PostAsJsonAsync(
-                SavingsInterestSettlementsUri(account.AssetId),
-                NewSettleInterestBody(OctoberEnd, 42.61m, 8.10m),
-                cancellationToken);
-            var undo = await stranger.DeleteAsync(
-                SavingsInterestSettlementUri(account.AssetId, settlementId), cancellationToken);
+        var preview = await stranger.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
+        var settle = await stranger.PostAsJsonAsync(
+            SavingsInterestSettlementsUri(account.AssetId),
+            NewSettleInterestBody(OctoberEnd, 42.61m, 8.10m),
+            cancellationToken);
+        var undo = await stranger.DeleteAsync(
+            SavingsInterestSettlementUri(account.AssetId, settlementId), cancellationToken);
 
-            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, settle.StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, undo.StatusCode);
-        }
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, settle.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, undo.StatusCode);
 
         Assert.Equal(1, await CountSavingsSettlementsAsync(ownerId, cancellationToken, account.AssetId));
         var unchanged = await owner.GetSavingsAccountAsync(account.AssetId, cancellationToken);
@@ -143,7 +112,7 @@ public sealed class SavingsAccountTenancyIsolationTests(SkarbiecContainersFixtur
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var (portfolioId, account) = await owner.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await owner.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
         await owner.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
 
         Assert.Equal(0, await CountSavingsSettlementsAsync(Guid.NewGuid(), cancellationToken));

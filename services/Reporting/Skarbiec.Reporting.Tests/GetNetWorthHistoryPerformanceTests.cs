@@ -59,9 +59,9 @@ public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        Guid[] portfolioIds = [Guid.NewGuid(), Guid.NewGuid()];
-        var etfAssetIds = portfolioIds.Select(_ => Guid.NewGuid()).ToArray();
-        var cashAssetIds = portfolioIds.Select(_ => Guid.NewGuid()).ToArray();
+        Guid[] accountIds = [Guid.NewGuid(), Guid.NewGuid()];
+        var etfAssetIds = accountIds.Select(_ => Guid.NewGuid()).ToArray();
+        var cashAssetIds = accountIds.Select(_ => Guid.NewGuid()).ToArray();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         await using (var seedDb = CreateDbContext(userId))
@@ -74,13 +74,13 @@ public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture
                     Id = Guid.NewGuid(),
                     UserId = userId,
                     Date = date,
-                    TotalPln = portfolioIds.Length * (1000m + i + 500m),
+                    TotalPln = accountIds.Length * (1000m + i + 500m),
                     IsStale = false,
                 });
-                for (var p = 0; p < portfolioIds.Length; p++)
+                for (var p = 0; p < accountIds.Length; p++)
                 {
-                    seedDb.AssetValuations.Add(NewLine(userId, portfolioIds[p], etfAssetIds[p], date, 1000m + i, AssetClass.Etf));
-                    seedDb.AssetValuations.Add(NewLine(userId, portfolioIds[p], cashAssetIds[p], date, 500m, AssetClass.Cash));
+                    seedDb.AssetValuations.Add(NewLine(userId, accountIds[p], etfAssetIds[p], date, 1000m + i, AssetClass.Etf));
+                    seedDb.AssetValuations.Add(NewLine(userId, accountIds[p], cashAssetIds[p], date, 500m, AssetClass.Cash));
                 }
             }
 
@@ -103,11 +103,11 @@ public sealed class GetNetWorthHistoryPerformanceTests(SkarbiecContainersFixture
             $"GetNetWorthHistory with an asset class took {stopwatch.ElapsedMilliseconds} ms on a seeded year, expected < 1000 ms.");
     }
 
-    private static AssetValuation NewLine(Guid userId, Guid portfolioId, Guid assetId, DateOnly date, decimal valuePln, AssetClass assetClass) => new()
+    private static AssetValuation NewLine(Guid userId, Guid accountId, Guid assetId, DateOnly date, decimal valuePln, AssetClass assetClass) => new()
     {
         Id = Guid.NewGuid(),
         UserId = userId,
-        PortfolioId = portfolioId,
+        AccountId = accountId,
         AssetId = assetId,
         Date = date,
         AssetClass = assetClass,

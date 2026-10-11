@@ -55,7 +55,7 @@ export function usesTermsRate(bond: BondResponse, periodIndex: number | string):
 }
 
 export function canSettle(bond: BondResponse): boolean {
-  return Number(bond.duePeriodCount) > 0 && !bond.isArchived && !bond.portfolioIsArchived;
+  return Number(bond.duePeriodCount) > 0 && !bond.isArchived;
 }
 
 export function isRedeemed(bond: BondResponse): boolean {
@@ -63,9 +63,7 @@ export function isRedeemed(bond: BondResponse): boolean {
 }
 
 export function canRedeem(bond: BondResponse): boolean {
-  return (
-    Number(bond.status) === BOND_STATUS.Matured && !bond.isArchived && !bond.portfolioIsArchived
-  );
+  return Number(bond.status) === BOND_STATUS.Matured && !bond.isArchived;
 }
 
 export function canEarlyRedeem(bond: BondResponse): boolean {
@@ -73,8 +71,7 @@ export function canEarlyRedeem(bond: BondResponse): boolean {
   return (
     (status === BOND_STATUS.Active || status === BOND_STATUS.InterestDue) &&
     Number(bond.bondCount) > 0 &&
-    !bond.isArchived &&
-    !bond.portfolioIsArchived
+    !bond.isArchived
   );
 }
 

@@ -19,7 +19,7 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
         var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -59,7 +59,7 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(OctoberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         Assert.Equal(SeptemberEnd, await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken));
         var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
@@ -80,7 +80,7 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         var response = await client.PostAsJsonAsync(
             SavingsInterestSettlementsUri(account.AssetId),
@@ -107,7 +107,7 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Factory.Clock.SetUtcNow(OctoberEndedUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         var response = await client.PostAsJsonAsync(
             SavingsInterestSettlementsUri(account.AssetId),
@@ -148,7 +148,7 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         var response = await client.PostAsJsonAsync(
             SavingsInterestSettlementsUri(account.AssetId),
@@ -164,7 +164,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         { "nothing due", PortfolioAssertions.SavingsInterestNotDueErrorCode },
         { "same period settled twice", PortfolioAssertions.SavingsInterestPeriodMismatchErrorCode },
         { "a later period than the next due one", PortfolioAssertions.SavingsInterestPeriodMismatchErrorCode },
-        { "archived portfolio", PortfolioAssertions.PortfolioArchivedErrorCode },
     };
 
     [Theory]
@@ -176,7 +175,7 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         Factory.Clock.SetUtcNow(scenario == "nothing due" ? SeptemberLastDayUtc : OctoberEndedUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
         var periodEnd = SeptemberEnd;
         var settledBefore = 0;
 
@@ -188,9 +187,6 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
                 break;
             case "a later period than the next due one":
                 periodEnd = OctoberEnd;
-                break;
-            case "archived portfolio":
-                await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
                 break;
         }
 
@@ -220,7 +216,7 @@ public sealed class SettleSavingsInterestEndpointTests(SkarbiecContainersFixture
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var request = NewInterestAccountRequest() with { Currency = "EUR" };
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, request);
+        var account = await client.AddSavingsAccountAsync(cancellationToken, request);
 
         await client.SettleSavingsInterestAsync(account.AssetId, SeptemberEnd, 41.10m, 7.81m, cancellationToken);
 

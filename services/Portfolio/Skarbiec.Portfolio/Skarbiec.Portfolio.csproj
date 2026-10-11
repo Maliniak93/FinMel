@@ -18,11 +18,6 @@
     <ProjectReference Include="..\..\..\Skarbiec.ServiceDefaults\Skarbiec.ServiceDefaults.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- "Portfolio" the type collides with the Skarbiec.Portfolio namespace segment (CS0118), hence a project-wide alias. -->
-    <Using Include="Skarbiec.Portfolio.Data.Portfolio" Alias="PortfolioEntity" />
-  </ItemGroup>
-
   <PropertyGroup>
     <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
     <OpenApiDocumentsDirectory>$(MSBuildThisFileDirectory)../../../web/openapi</OpenApiDocumentsDirectory>

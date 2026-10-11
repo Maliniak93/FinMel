@@ -12,9 +12,10 @@ public sealed class ListBondsHandler(PortfolioDbContext dbContext, IBondRateLook
         var rows = await (
                 from terms in dbContext.TreasuryBonds.AsNoTracking()
                 join asset in dbContext.Assets on terms.AssetId equals asset.Id
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
+                join account in dbContext.Accounts.AsNoTracking() on asset.AccountId equals (Guid?)account.Id
+                where !account.IsArchived
                 orderby terms.MaturityDate, asset.Name
-                select new { Terms = terms, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
+                select new { Terms = terms, Asset = asset, Account = account })
             .ToListAsync(cancellationToken);
 
         var today = WarsawCalendar.Today(timeProvider);
@@ -33,8 +34,7 @@ public sealed class ListBondsHandler(PortfolioDbContext dbContext, IBondRateLook
                 List<BondInterestSettlement> bondSettlements = [.. settlements[r.Asset.Id]];
                 var response = r.Terms.ToResponse(
                     r.Asset,
-                    r.PortfolioName,
-                    r.PortfolioIsArchived,
+                    r.Account,
                     today,
                     funding.GetValueOrDefault(r.Asset.Id),
                     bondSettlements,

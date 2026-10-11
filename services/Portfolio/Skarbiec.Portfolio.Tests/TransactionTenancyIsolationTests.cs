@@ -15,7 +15,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
     public async Task Put_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (ownerPortfolioId, ownerAssetId, transactionId) = await CreateOwnedTransactionAsync(cancellationToken);
+        var (ownerAccountId, ownerAssetId, transactionId) = await CreateOwnedTransactionAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.PutAsJsonAsync(
@@ -28,7 +28,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
     public async Task Delete_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (ownerPortfolioId, ownerAssetId, transactionId) = await CreateOwnedTransactionAsync(cancellationToken);
+        var (ownerAccountId, ownerAssetId, transactionId) = await CreateOwnedTransactionAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.DeleteAsync(TransactionUri(ownerAssetId, transactionId), cancellationToken);
@@ -43,7 +43,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
         await CreateOwnedTransactionAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (strangerPortfolioId, strangerAssetId) = await stranger.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (strangerAccountId, strangerAssetId) = await stranger.CreateAccountWithAssetAsync(cancellationToken);
 
         var page = await stranger.ListTransactionsAsync(strangerAssetId, cancellationToken);
 
@@ -51,13 +51,13 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
     }
 
     [Fact]
-    public async Task Put_TransactionUnderStrangersOwnPortfolioAndAsset_ReturnsNotFound()
+    public async Task Put_TransactionUnderStrangersOwnAccountAndAsset_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var (_, _, transactionId) = await CreateOwnedTransactionAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (strangerPortfolioId, strangerAssetId) = await stranger.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (strangerAccountId, strangerAssetId) = await stranger.CreateAccountWithAssetAsync(cancellationToken);
 
         var response = await stranger.PutAsJsonAsync(
             TransactionUri(strangerAssetId, transactionId), UpdatePayload(), cancellationToken);
@@ -66,27 +66,27 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
     }
 
     [Fact]
-    public async Task Delete_TransactionUnderStrangersOwnPortfolioAndAsset_ReturnsNotFound()
+    public async Task Delete_TransactionUnderStrangersOwnAccountAndAsset_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var (_, _, transactionId) = await CreateOwnedTransactionAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (strangerPortfolioId, strangerAssetId) = await stranger.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (strangerAccountId, strangerAssetId) = await stranger.CreateAccountWithAssetAsync(cancellationToken);
 
         var response = await stranger.DeleteAsync(TransactionUri(strangerAssetId, transactionId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private async Task<(Guid PortfolioId, Guid AssetId, Guid TransactionId)> CreateOwnedTransactionAsync(CancellationToken cancellationToken)
+    private async Task<(Guid accountId, Guid AssetId, Guid TransactionId)> CreateOwnedTransactionAsync(CancellationToken cancellationToken)
     {
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await owner.CreateAccountWithAssetAsync(cancellationToken);
         var transactionId = await owner.RecordTransactionAsync(
             assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
 
-        return (portfolioId, assetId, transactionId);
+        return (accountId, assetId, transactionId);
     }
 
     private static UpdateTransactionRequest UpdatePayload() => new()

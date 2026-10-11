@@ -25,10 +25,9 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 5_000m);
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
         var date = DateOnly.Parse(payoutDate, CultureInfo.InvariantCulture);
 
         var response = await client.PostAsJsonAsync(
@@ -77,38 +76,29 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
     [InlineData("active", PortfolioAssertions.DepositNotSettledErrorCode)]
     [InlineData("due", PortfolioAssertions.DepositNotSettledErrorCode)]
     [InlineData("paid-out", PortfolioAssertions.DepositAlreadyPaidOutErrorCode)]
-    [InlineData("archived-portfolio", PortfolioAssertions.PortfolioArchivedErrorCode)]
     public async Task PayOut_InvalidState_ReturnsConflict(string invalidCase, string errorCode)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Current accounts");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Current account");
-        Guid portfolioId;
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Current account");
         Guid depositId;
         switch (invalidCase)
         {
             case "active":
                 // Starts 2026-04-01 for 3 months — matures 2026-07-01, after today.
-                (portfolioId, var active) = await client.CreatePortfolioWithDepositAsync(
+                var active = await client.AddDepositAsync(
                     cancellationToken, NewDepositRequest(startDate: new DateOnly(2026, 4, 1)));
                 depositId = active.AssetId;
                 break;
             case "due":
-                (portfolioId, var due) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+                var due = await client.AddDepositAsync(cancellationToken);
                 depositId = due.AssetId;
                 break;
             case "paid-out":
                 var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
-                (portfolioId, depositId) = (paidOut.DepositPortfolioId, paidOut.Deposit.AssetId);
-                break;
-            case "archived-portfolio":
-                (portfolioId, var settled) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-                depositId = settled.AssetId;
-                await client.SettleDepositAsync(depositId, cancellationToken);
-                await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+                depositId = paidOut.Deposit.AssetId;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null);
@@ -133,9 +123,8 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Current accounts");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Current account");
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Current account");
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
         await client.ArchiveAssetAsync(deposit.AssetId, cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
@@ -156,9 +145,9 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
-        var (cashPortfolioId, cashId) = await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken);
+        var cashId = await client.AddArchivedCashAssetAsync(cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -175,10 +164,10 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
     [InlineData("date-in-future")]
     [InlineData("eur-cash")]
     [InlineData("stock")]
-    [InlineData("archived-portfolio-cash")]
+    [InlineData("archived-cash")]
     [InlineData("deposit-itself")]
     [InlineData("eur-savings")]
-    [InlineData("archived-portfolio-savings")]
+    [InlineData("archived-savings")]
     public async Task PayOut_InvalidInput_ReturnsBadRequest(string invalidCase)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -186,23 +175,22 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetAsync(walletId, cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
         var request = invalidCase switch
         {
             "date-before-settled-on" => NewPayOutRequest(cashId, new DateOnly(2026, 4, 14)),
             "date-in-future" => NewPayOutRequest(cashId, new DateOnly(2026, 4, 21)),
             "eur-cash" => NewPayOutRequest(
-                await client.AddCashAssetAsync(walletId, cancellationToken, currency: "EUR", name: "EUR account")),
-            "stock" => NewPayOutRequest(await client.AddAssetAsync(walletId, cancellationToken, name: "Some stock")),
-            "archived-portfolio-cash" => NewPayOutRequest((await client.AddArchivedCashAssetAsync(cancellationToken)).CashId),
+                await client.AddCashAssetAsync(cancellationToken, currency: "EUR", name: "EUR account")),
+            "stock" => NewPayOutRequest(
+                await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken), cancellationToken, name: "Some stock")),
+            "archived-cash" => NewPayOutRequest(await client.AddArchivedCashAssetAsync(cancellationToken)),
             "deposit-itself" => NewPayOutRequest(deposit.AssetId),
             "eur-savings" => NewPayOutRequest(
-                (await client.AddSavingsAccountAsync(
-                    walletId, cancellationToken, NewSavingsAccountRequest(currency: "EUR", withOpeningDeposit: false))).AssetId),
-            "archived-portfolio-savings" => NewPayOutRequest((await client.AddArchivedSavingsAccountAsync(cancellationToken)).SavingsId),
+                (await client.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(currency: "EUR", withOpeningDeposit: false))).AssetId),
+            "archived-savings" => NewPayOutRequest(await client.AddArchivedSavingsAccountAsync(cancellationToken)),
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
@@ -234,12 +222,11 @@ public sealed class PayOutDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
-        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+        var account = await client.AddSavingsAccountAsync(
             cancellationToken,
-            NewSavingsAccountRequest(openingAmount: 500m, openingDate: new DateOnly(2026, 4, 1)),
-            portfolioName: "Wallet");
+            NewSavingsAccountRequest(openingAmount: 500m, openingDate: new DateOnly(2026, 4, 1)));
         var date = new DateOnly(2026, 4, 18);
 
         var response = await client.PostAsJsonAsync(

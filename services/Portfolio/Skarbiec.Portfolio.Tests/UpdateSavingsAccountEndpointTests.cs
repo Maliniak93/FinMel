@@ -19,7 +19,7 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await client.AddSavingsAccountAsync(cancellationToken);
 
         var response = await client.PutAsJsonAsync(
             SavingsAccountUri(account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
@@ -54,8 +54,8 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
         var payload = NewUpdateSavingsAccountRequest();
 
         var forDeposit = await client.PutAsJsonAsync(SavingsAccountUri(deposit.AssetId), payload, cancellationToken);
@@ -69,30 +69,12 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
     }
 
     [Fact]
-    public async Task Update_ArchivedPortfolio_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-
-        var response = await client.PutAsJsonAsync(
-            SavingsAccountUri(account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
-
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
-        Assert.Equal("Savings account", unchanged.Name);
-        Assert.Equal(5.25m, unchanged.AnnualInterestRatePercent);
-    }
-
-    [Fact]
     public async Task Update_ArchivedAccount_Returns409()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await client.AddSavingsAccountAsync(cancellationToken);
         await client.ArchiveAssetAsync(account.AssetId, cancellationToken);
 
         var response = await client.PutAsJsonAsync(
@@ -114,7 +96,7 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await client.AddSavingsAccountAsync(cancellationToken);
         var payload = invalidCase switch
         {
             "name-empty" => NewUpdateSavingsAccountRequest(name: ""),

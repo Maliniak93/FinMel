@@ -2,13 +2,13 @@ export const BOND_STATUS = { Active: 0, InterestDue: 1, Matured: 2, Redeemed: 3 
 export const BOND_REDEMPTION_KIND = { Maturity: 0, Swap: 1, Early: 2 } as const;
 export const BOND_PERIOD_STATE = { Upcoming: 0, Due: 1, Settled: 2 } as const;
 
-export const bondPortfolioId = '22222222-2222-2222-2222-222222222222';
+export const bondAccountId = '22222222-2222-2222-2222-222222222222';
 
 export interface BondFixture {
   assetId: string;
-  portfolioId: string;
-  portfolioName: string;
-  portfolioIsArchived: boolean;
+  accountId: string;
+  accountName: string;
+  taxWrapper: number;
   isArchived: boolean;
   name: string;
   seriesCode: string;
@@ -19,7 +19,6 @@ export interface BondFixture {
   firstPeriodRatePercent: number;
   marginPercent: number | null;
   earlyRedemptionFeePerBond: number;
-  taxExempt: boolean;
   maturityDate: string;
   nominalValue: number;
   bookValue: number;
@@ -77,9 +76,9 @@ export interface BondPeriodFixture {
 export function bondResponse(overrides: Partial<BondFixture> = {}): BondFixture {
   return {
     assetId: '66666666-6666-6666-6666-666666666666',
-    portfolioId: bondPortfolioId,
-    portfolioName: 'Bonds',
-    portfolioIsArchived: false,
+    accountId: bondAccountId,
+    accountName: 'Obligacje',
+    taxWrapper: 0,
     isArchived: false,
     name: 'Edo purchase',
     seriesCode: 'EDO1036',
@@ -90,7 +89,6 @@ export function bondResponse(overrides: Partial<BondFixture> = {}): BondFixture 
     firstPeriodRatePercent: 5.35,
     marginPercent: 2,
     earlyRedemptionFeePerBond: 3,
-    taxExempt: false,
     maturityDate: '2036-10-01',
     nominalValue: 5000,
     bookValue: 5000,
@@ -334,15 +332,11 @@ export const cashCandidates = [
   {
     assetId: fundingCashId,
     name: 'Wallet cash',
-    portfolioId: '22222222-2222-2222-2222-222222222221',
-    portfolioName: 'Wallet',
     balance: 1000,
   },
   {
     assetId: otherCashId,
     name: 'Other cash',
-    portfolioId: '22222222-2222-2222-2222-222222222221',
-    portfolioName: 'Wallet',
     balance: 50,
   },
 ];

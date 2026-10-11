@@ -12,9 +12,8 @@ public sealed class GetMetalHandler(PortfolioDbContext dbContext)
         var row = await (
                 from holding in dbContext.MetalHoldings.AsNoTracking()
                 join asset in dbContext.Assets on holding.AssetId equals asset.Id
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
                 where asset.Id == assetId
-                select new { Holding = holding, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
+                select new { Holding = holding, Asset = asset })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (row is null)
@@ -22,6 +21,6 @@ public sealed class GetMetalHandler(PortfolioDbContext dbContext)
             return MetalErrors.NotFound(assetId);
         }
 
-        return row.Holding.ToResponse(row.Asset, row.PortfolioName, row.PortfolioIsArchived);
+        return row.Holding.ToResponse(row.Asset);
     }
 }

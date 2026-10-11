@@ -20,7 +20,6 @@ import {
   plnSavingsCandidate,
   requestMethod,
   requestedCandidateClasses,
-  savingsPortfolioId,
   transferCandidateRequests,
   transferCandidatesFor,
   type TransferCandidateFixture,
@@ -35,7 +34,6 @@ import { PayoutDestinationField } from './payout-destination-field';
     <app-payout-destination-field
       [formControl]="control"
       [currency]="currency"
-      [portfolioId]="portfolioId"
       [offerKeep]="offerKeep"
     />
   `,
@@ -43,7 +41,6 @@ import { PayoutDestinationField } from './payout-destination-field';
 class HostComponent {
   control = new FormControl<string | null>(null);
   currency = 'PLN';
-  portfolioId = savingsPortfolioId;
   offerKeep = false;
 }
 
@@ -97,7 +94,7 @@ describe('PayoutDestinationField', () => {
   }
 
   function optionText(candidate: TransferCandidateFixture, currency = 'PLN'): string {
-    return `${candidate.name} — ${candidate.portfolioName} (${formatMoney(candidate.balance, currency)})`;
+    return `${candidate.name} (${formatMoney(candidate.balance, currency)})`;
   }
 
   it('lists the PLN Cash and PLN savings candidates in two groups, then "New savings account…"', async () => {
@@ -149,7 +146,7 @@ describe('PayoutDestinationField', () => {
     expect(dialog.open).not.toHaveBeenCalled();
   });
 
-  it('picking "New savings account…" opens the account dialog for the deposit currency and portfolio', async () => {
+  it('picking "New savings account…" opens the account dialog for the deposit currency', async () => {
     await setup();
     dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
 
@@ -159,7 +156,7 @@ describe('PayoutDestinationField', () => {
     expect(dialog.open).toHaveBeenCalledWith(
       SavingsAccountFormDialog,
       expect.objectContaining({
-        data: expect.objectContaining({ currency: 'PLN', portfolioId: savingsPortfolioId }),
+        data: expect.objectContaining({ currency: 'PLN' }),
       }),
     );
   });
@@ -176,8 +173,6 @@ describe('PayoutDestinationField', () => {
         {
           assetId: created.assetId,
           name: created.name,
-          portfolioId: created.portfolioId,
-          portfolioName: created.portfolioName,
           balance: 0,
         },
       ];

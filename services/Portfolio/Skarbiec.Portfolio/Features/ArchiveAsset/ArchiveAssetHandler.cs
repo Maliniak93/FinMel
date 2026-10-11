@@ -10,7 +10,7 @@ public sealed class ArchiveAssetHandler(
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid assetId, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first, so a stranger never learns the portfolio's archived state.
+        // Tenancy-scoped lookup first, so a stranger never learns an account's archived state.
         var asset = await dbContext.Assets
             .FirstOrDefaultAsync(a => a.Id == assetId, cancellationToken);
 
@@ -19,10 +19,10 @@ public sealed class ArchiveAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        // An archived portfolio is read-only as a whole, the asset's own flag included.
-        if (await dbContext.IsPortfolioArchivedAsync(asset.PortfolioId, cancellationToken))
+        // An archived account is read-only as a whole.
+        if (await dbContext.AccountArchivedErrorAsync(asset, cancellationToken) is { } accountArchived)
         {
-            return PortfolioErrors.Archived(asset.PortfolioId);
+            return accountArchived;
         }
 
         // Already archived: 200 with no event, since a repeated click moves nothing.

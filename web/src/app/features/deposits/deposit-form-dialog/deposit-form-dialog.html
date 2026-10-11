@@ -26,25 +26,6 @@
       }
     </mat-form-field>
 
-    @if (choosesPortfolio) {
-      <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>{{ 'deposits.portfolio' | transloco }}</mat-label>
-        <mat-select formControlName="portfolioId">
-          @if (portfoliosResource.hasValue()) {
-            @for (portfolio of portfoliosResource.value(); track portfolio.id) {
-              <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
-            }
-          }
-        </mat-select>
-        @if (portfoliosResource.error(); as loadError) {
-          <mat-hint>{{ loadError.message }}</mat-hint>
-        }
-        @if (form.controls.portfolioId.hasError('required')) {
-          <mat-error>{{ 'deposits.form.portfolioRequired' | transloco }}</mat-error>
-        }
-      </mat-form-field>
-    }
-
     @if (!isEdit) {
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
         <mat-label>{{ 'common.currency' | transloco }}</mat-label>
@@ -67,7 +48,7 @@
           @if (fundingCandidatesResource.hasValue()) {
             @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
               <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
+                {{ candidate.name }} ({{
                   formatMoney(candidate.balance, form.controls.currency.value)
                 }})
               </mat-option>

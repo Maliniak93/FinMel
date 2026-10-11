@@ -152,20 +152,20 @@ internal static class ReportingConsumers
             cancellationToken);
 
     public static Task<List<Position>> WaitForPositionsAsync(
-        IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken, Func<List<Position>, bool> predicate) =>
+        IServiceProvider provider, Guid accountId, CancellationToken cancellationToken, Func<List<Position>, bool> predicate) =>
         WaitForAsync(
             provider,
-            (db, ct) => db.Positions.IgnoreQueryFilters().Where(p => p.PortfolioId == portfolioId).ToListAsync(ct),
+            (db, ct) => db.Positions.IgnoreQueryFilters().Where(p => p.AccountId == accountId).ToListAsync(ct),
             positions => positions.Count > 0 && predicate(positions),
-            $"The expected state of the Positions for portfolio {portfolioId}",
+            $"The expected state of the Positions for account {accountId}",
             cancellationToken);
 
-    public static Task WaitForNoPositionsAsync(IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken) =>
+    public static Task WaitForNoPositionsAsync(IServiceProvider provider, Guid accountId, CancellationToken cancellationToken) =>
         WaitForAsync(
             provider,
-            (db, ct) => db.Positions.IgnoreQueryFilters().AnyAsync(p => p.PortfolioId == portfolioId, ct),
+            (db, ct) => db.Positions.IgnoreQueryFilters().AnyAsync(p => p.AccountId == accountId, ct),
             stillExists => !stillExists,
-            $"Deleting the Positions for portfolio {portfolioId}",
+            $"Deleting the Positions for account {accountId}",
             cancellationToken);
 
     public static async Task<ValuationSnapshot> WaitForSnapshotAsync(
@@ -188,11 +188,11 @@ internal static class ReportingConsumers
     }
 
     public static async Task<List<AssetValuation>> GetLinesAsync(
-        SkarbiecContainersFixture containers, Guid portfolioId, DateOnly date, CancellationToken cancellationToken)
+        SkarbiecContainersFixture containers, Guid accountId, DateOnly date, CancellationToken cancellationToken)
     {
         await using var db = OpenDbContext(containers);
         return await db.AssetValuations.IgnoreQueryFilters()
-            .Where(l => l.PortfolioId == portfolioId && l.Date == date)
+            .Where(l => l.AccountId == accountId && l.Date == date)
             .ToListAsync(cancellationToken);
     }
 
@@ -235,11 +235,11 @@ internal static class ReportingConsumers
             cancellationToken);
 
     public static async Task<List<AssetValuation>> GetAllLinesAsync(
-        SkarbiecContainersFixture containers, Guid portfolioId, CancellationToken cancellationToken)
+        SkarbiecContainersFixture containers, Guid accountId, CancellationToken cancellationToken)
     {
         await using var db = OpenDbContext(containers);
         return await db.AssetValuations.IgnoreQueryFilters()
-            .Where(l => l.PortfolioId == portfolioId)
+            .Where(l => l.AccountId == accountId)
             .ToListAsync(cancellationToken);
     }
 

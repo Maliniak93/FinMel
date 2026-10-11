@@ -17,12 +17,12 @@ public sealed class SecuritiesTenancyIsolationTests(SkarbiecContainersFixture co
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var ownerPortfolioId = await owner.CreatePortfolioAsync(cancellationToken);
-        var ownerAsset = await AddQuotedHoldingAsync(owner, ownerPortfolioId, cancellationToken, name: "Owner's stock", ticker: "OWN");
+        var ownerAccountId = await owner.CreateAccountAsync(cancellationToken);
+        var ownerAsset = await AddQuotedHoldingAsync(owner, ownerAccountId, cancellationToken, name: "Owner's stock", ticker: "OWN");
         await owner.RecordTransactionAsync(ownerAsset, TransactionType.Buy, 5m, new DateOnly(2026, 1, 5), cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
-        var strangerAsset = await AddQuotedHoldingAsync(stranger, strangerPortfolioId, cancellationToken, name: "Stranger's stock", ticker: "MINE");
+        var strangerAccountId = await stranger.CreateAccountAsync(cancellationToken);
+        var strangerAsset = await AddQuotedHoldingAsync(stranger, strangerAccountId, cancellationToken, name: "Stranger's stock", ticker: "MINE");
 
         var response = await stranger.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
 

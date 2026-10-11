@@ -21,7 +21,7 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type {
   AssetResponse,
   PagedResponseOfTransactionResponse,
-  PortfolioResponse,
+  AccountResponse,
   TransactionResponse,
 } from '../../api/portfolio';
 import { Transactions } from './transactions';
@@ -34,12 +34,12 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-const portfolioId = '22222222-2222-2222-2222-222222222222';
+const accountId = '22222222-2222-2222-2222-222222222222';
 const assetId = '11111111-1111-1111-1111-111111111111';
 
 const asset: AssetResponse = {
   id: assetId,
-  portfolioId,
+  accountId,
   assetClass: 2,
   valuationMode: 0,
   name: 'Apple',
@@ -49,13 +49,12 @@ const asset: AssetResponse = {
   isArchived: false,
 };
 
-const portfolio: PortfolioResponse = {
-  id: portfolioId,
+const account: AccountResponse = {
+  id: accountId,
   name: 'Retirement',
-  description: null,
-  currency: 'PLN',
+  type: 0,
+  wrapper: 0,
   isArchived: false,
-  assetCount: 1,
 };
 
 const transaction: TransactionResponse = {
@@ -99,14 +98,14 @@ describe('Transactions', () => {
   async function setup(
     transactionsResponse: Response,
     assetResponse = jsonResponse(asset),
-    portfolioResponse = jsonResponse(portfolio),
+    accountResponse = jsonResponse(account),
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
       if (url.includes('/transactions')) {
         return transactionsResponse;
       }
-      return url.includes('/assets') ? assetResponse : portfolioResponse.clone();
+      return url.includes('/assets') ? assetResponse : accountResponse.clone();
     });
     dialog = { open: vi.fn() };
     snackBar = { open: vi.fn() };
@@ -122,7 +121,6 @@ describe('Transactions', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(Transactions);
-    fixture.componentRef.setInput('portfolioId', portfolioId);
     fixture.componentRef.setInput('assetId', assetId);
     component = fixture.componentInstance;
     await fixture.whenStable();
@@ -131,6 +129,23 @@ describe('Transactions', () => {
   it('should create', async () => {
     await setup(jsonResponse(pagedResponse([transaction])));
     expect(component).toBeTruthy();
+  });
+
+  it.each([
+    [0, '/cash'],
+    [1, '/deposits'],
+    [2, '/securities'],
+    [3, '/securities'],
+    [4, '/bonds'],
+    [6, '/metals'],
+    [9, '/deposits'],
+  ])('links back to the class page of an asset of class %i', async (assetClass, path) => {
+    await setup(jsonResponse(pagedResponse([transaction])), jsonResponse({ ...asset, assetClass }));
+
+    const back = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'a.transactions-page__back',
+    );
+    expect(back?.getAttribute('href')).toBe(path);
   });
 
   it('loads the asset and its transactions into their resources', async () => {
@@ -302,9 +317,9 @@ describe('Transactions', () => {
     expect(unpricedCells[4]).toBe('—');
   });
 
-  describe('archived portfolio is read-only', () => {
-    const archivedPortfolio: PortfolioResponse = { ...portfolio, isArchived: true };
-    const archivedNotice = /This portfolio is archived\W+restore it to make changes/;
+  describe('archived account is read-only', () => {
+    const archivedAccount: AccountResponse = { ...account, isArchived: true };
+    const archivedNotice = /This account is archived\W+restore it to make changes/;
 
     function pageText(): string {
       return (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -327,11 +342,11 @@ describe('Transactions', () => {
       return overlayContainer.getContainerElement().textContent ?? '';
     }
 
-    it('archived portfolio is read-only: no record / edit / delete actions, archived notice shown', async () => {
+    it('archived account is read-only: no record / edit / delete actions, archived notice shown', async () => {
       await setup(
         jsonResponse(pagedResponse([transaction])),
         jsonResponse(asset),
-        jsonResponse(archivedPortfolio),
+        jsonResponse(archivedAccount),
       );
 
       expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
@@ -343,11 +358,11 @@ describe('Transactions', () => {
       expect(menuText).not.toContain('Delete');
     });
 
-    it('archived portfolio is read-only: the empty state offers no record button', async () => {
+    it('archived account is read-only: the empty state offers no record button', async () => {
       await setup(
         jsonResponse(pagedResponse([])),
         jsonResponse(asset),
-        jsonResponse(archivedPortfolio),
+        jsonResponse(archivedAccount),
       );
 
       expect(pageText()).toMatch(archivedNotice);
@@ -356,7 +371,7 @@ describe('Transactions', () => {
       expect(buttons.some((text) => text.includes('Record your first transaction'))).toBe(false);
     });
 
-    it('archived portfolio is read-only: an active portfolio keeps its actions and shows no notice', async () => {
+    it('archived account is read-only: an active account keeps its actions and shows no notice', async () => {
       await setup(jsonResponse(pagedResponse([transaction])));
 
       expect(pageText()).not.toMatch(archivedNotice);
@@ -398,7 +413,7 @@ describe('Transactions', () => {
 
       expect(fixture.nativeElement.querySelectorAll('tbody tr.mat-mdc-row').length).toBe(1);
       expect(pageText()).toMatch(assetNotice);
-      expect(pageText()).not.toMatch(/This portfolio is archived/);
+      expect(pageText()).not.toMatch(/This account is archived/);
       expect(pageButtonTexts().some((text) => text.includes('New transaction'))).toBe(false);
 
       const menuText = await rowMenuText();
@@ -456,8 +471,7 @@ describe('Transactions', () => {
       transfer: {
         counterpartAssetId: '77777777-7777-7777-7777-777777777777',
         counterpartAssetName: 'Term deposit',
-        counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
-        counterpartPortfolioName: 'Savings',
+        counterpartAccountName: 'Savings',
         direction: TRANSFER_DIRECTION.Out,
       },
     } as TransactionResponse;
@@ -468,8 +482,7 @@ describe('Transactions', () => {
       transfer: {
         counterpartAssetId: assetId,
         counterpartAssetName: 'Cash account',
-        counterpartPortfolioId: portfolioId,
-        counterpartPortfolioName: 'Wallet',
+        counterpartAccountName: 'Wallet',
         direction: TRANSFER_DIRECTION.In,
       },
     } as TransactionResponse;
@@ -521,7 +534,7 @@ describe('Transactions', () => {
       expect(menuText).toContain('Delete');
     });
 
-    it('labels the In leg "Transfer from <asset> (<portfolio>)"', async () => {
+    it('labels the In leg "Transfer from <asset> (<account>)"', async () => {
       await setup(jsonResponse(pagedResponse([inLeg, plainTopUp])), jsonResponse(cashAsset));
       fixture.detectChanges();
       await fixture.whenStable();
@@ -556,8 +569,7 @@ describe('Transactions', () => {
         manual: true,
         counterpartAssetId: '77777777-7777-7777-7777-777777777777',
         counterpartAssetName: 'Savings account',
-        counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
-        counterpartPortfolioName: 'Savings',
+        counterpartAccountName: 'Savings',
         direction: 0,
       },
     } as TransactionResponse;
@@ -799,8 +811,7 @@ describe('Transactions', () => {
       transfer: {
         counterpartAssetId: '77777777-7777-7777-7777-777777777777',
         counterpartAssetName: 'Term deposit',
-        counterpartPortfolioId: '88888888-8888-8888-8888-888888888888',
-        counterpartPortfolioName: 'Savings',
+        counterpartAccountName: 'Savings',
         direction: 0,
       },
     } as TransactionResponse;
@@ -843,7 +854,7 @@ describe('Transactions', () => {
 
       const english = await texts();
       expect(english).toEqual([
-        'Assets',
+        'Back',
         'New transaction',
         'Date',
         'Type',
@@ -881,7 +892,7 @@ describe('Transactions', () => {
       expect(matchesTranslation('pl', label), `"${label}" is not a pl.json value`).toBe(true);
     });
 
-    it('renders the transfer label in Polish, with direction, asset and portfolio', async () => {
+    it('renders the transfer label in Polish, with direction, asset and account', async () => {
       await setup(jsonResponse(pagedResponse([outLeg, inLeg])));
       const element = fixture.nativeElement as HTMLElement;
       const transfers = () => labelsOf(element, '.transactions-page__transfer');
@@ -927,14 +938,14 @@ describe('Transactions', () => {
       await setup(
         jsonResponse(pagedResponse([transaction])),
         jsonResponse(asset),
-        jsonResponse({ ...portfolio, isArchived: true }),
+        jsonResponse({ ...account, isArchived: true }),
       );
       const element = fixture.nativeElement as HTMLElement;
       const notice = () => labelsOf(element, '.transactions-page__archived-notice');
 
       const english = notice();
       expect(english).toHaveLength(1);
-      expect(english[0]).toMatch(/^This portfolio is archived/);
+      expect(english[0]).toMatch(/^This account is archived/);
 
       await switchLanguage(fixture, 'pl');
 

@@ -25,15 +25,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
       },
       {
-        path: 'portfolios',
-        loadComponent: () => import('./features/portfolios/portfolios').then((m) => m.Portfolios),
+        path: 'accounts',
+        loadComponent: () => import('./features/accounts/accounts').then((m) => m.Accounts),
       },
       {
-        path: 'portfolios/:portfolioId/assets',
-        loadComponent: () => import('./features/assets/assets').then((m) => m.Assets),
-      },
-      {
-        path: 'portfolios/:portfolioId/assets/:assetId/transactions',
+        path: 'assets/:assetId/transactions',
         loadComponent: () =>
           import('./features/transactions/transactions').then((m) => m.Transactions),
       },

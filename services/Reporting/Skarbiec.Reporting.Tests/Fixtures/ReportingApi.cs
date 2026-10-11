@@ -51,37 +51,33 @@ internal static class ReportingApi
         this ReportingDbContext db,
         Guid assetId,
         Guid userId,
-        Guid portfolioId,
+        Guid? accountId,
         CancellationToken cancellationToken,
         AssetClass assetClass = AssetClass.Stock,
         AssetValuationMode valuationMode = AssetValuationMode.CurrencyValued,
         Guid? instrumentId = null,
         string currency = "PLN",
         decimal quantity = 1m,
-        bool portfolioIsArchived = false,
         long version = 0,
         bool isArchived = false,
         IReadOnlyList<(DateOnly Date, decimal Quantity)>? quantityHistory = null,
-        DateOnly? archivedOn = null,
-        DateOnly? portfolioArchivedOn = null)
+        DateOnly? archivedOn = null)
     {
         db.Positions.Add(new Data.Position
         {
             AssetId = assetId,
             UserId = userId,
-            PortfolioId = portfolioId,
+            AccountId = accountId,
             AssetClass = assetClass,
             ValuationMode = valuationMode,
             InstrumentId = instrumentId,
             Currency = currency,
             Quantity = quantity,
-            PortfolioIsArchived = portfolioIsArchived,
             IsArchived = isArchived,
             Version = version,
             UpdatedAt = DateTimeOffset.UtcNow,
             QuantityHistory = [.. (quantityHistory ?? []).Select(p => new PositionQuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             ArchivedOn = archivedOn,
-            PortfolioArchivedOn = portfolioArchivedOn,
         });
 
         await db.SaveChangesAsync(cancellationToken);
@@ -107,7 +103,7 @@ internal static class ReportingApi
     public static async Task SeedValuationLineAsync(
         this ReportingDbContext db,
         Guid userId,
-        Guid portfolioId,
+        Guid? accountId,
         Guid assetId,
         DateOnly date,
         decimal valuePln,
@@ -123,7 +119,7 @@ internal static class ReportingApi
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            PortfolioId = portfolioId,
+            AccountId = accountId,
             AssetId = assetId,
             Date = date,
             AssetClass = assetClass,

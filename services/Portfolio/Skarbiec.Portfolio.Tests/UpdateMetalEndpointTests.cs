@@ -18,7 +18,7 @@ public sealed class UpdateMetalEndpointTests(SkarbiecContainersFixture container
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, metal) = await client.CreatePortfolioWithMetalAsync(
+        var metal = await client.AddMetalAsync(
             cancellationToken, NewMetalRequest(name: "Krugerrand", metal: Metal.Gold, pieces: 2m));
 
         var response = await client.PutAsJsonAsync(
@@ -37,30 +37,12 @@ public sealed class UpdateMetalEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Update_ArchivedPortfolio_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(MetalTodayUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, metal) = await client.CreatePortfolioWithMetalAsync(cancellationToken);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-
-        var response = await client.PutAsJsonAsync(
-            MetalUri(metal.AssetId), NewUpdateMetalRequest(), cancellationToken);
-
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetMetalAsync(metal.AssetId, cancellationToken);
-        Assert.Equal("Maple Leaf 1 oz", unchanged.Name);
-        Assert.Equal(31.10347680m, unchanged.FineWeightGramsPerPiece);
-    }
-
-    [Fact]
     public async Task Update_ArchivedHolding_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, metal) = await client.CreatePortfolioWithMetalAsync(cancellationToken);
+        var metal = await client.AddMetalAsync(cancellationToken);
         await client.ArchiveAssetAsync(metal.AssetId, cancellationToken);
 
         var response = await client.PutAsJsonAsync(

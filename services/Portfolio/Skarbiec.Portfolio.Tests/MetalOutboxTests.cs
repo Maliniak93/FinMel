@@ -17,11 +17,10 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var scope = Provider.CreateAsyncScope();
-        var portfolioId = await CreatePortfolioAsync(scope.ServiceProvider, "Metal outbox portfolio", cancellationToken);
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddMetalHandler>()
-            .HandleAsync(PortfolioApi.NewMetalRequest(portfolioId: portfolioId), cancellationToken);
+            .HandleAsync(PortfolioApi.NewMetalRequest(), cancellationToken);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Equal(1, SaveChanges.Count);
@@ -38,7 +37,7 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
 
         var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
         Assert.Equal(assetId, evt.AssetId);
-        Assert.Equal(portfolioId, evt.PortfolioId);
+        Assert.Null(evt.AccountId);
         Assert.Equal(UserId, evt.UserId);
         Assert.Equal(AssetClass.PreciousMetal, evt.AssetClass);
         Assert.Equal(AssetValuationMode.Market, evt.ValuationMode);
@@ -51,13 +50,11 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
     public async Task UpdateMetal_PublishesPositionChangedWithNewFineWeight()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Guid portfolioId;
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            portfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Metal update portfolio", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddMetalHandler>().HandleAsync(
-                PortfolioApi.NewMetalRequest(portfolioId: portfolioId, metal: Metal.Gold), cancellationToken);
+                PortfolioApi.NewMetalRequest(metal: Metal.Gold), cancellationToken);
             assetId = added.Value.AssetId;
         }
 
@@ -85,8 +82,7 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var scope = Provider.CreateAsyncScope();
-        var portfolioId = await CreatePortfolioAsync(scope.ServiceProvider, "Plain portfolio", cancellationToken);
-        await AddCashWithBalanceAsync(scope.ServiceProvider, portfolioId, 100m, cancellationToken);
+        await AddCashWithBalanceAsync(scope.ServiceProvider, 100m, cancellationToken);
 
         await using var verify = Provider.CreateAsyncScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();

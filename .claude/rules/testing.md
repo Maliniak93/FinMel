@@ -39,7 +39,7 @@ They `EnsureSuccessStatusCode`. A test asserting on endpoint X **calls X directl
 ## Tenancy isolation
 
 - A flat, top-level resource: inherit `TenancyIsolationTests<TProgram>` and supply only how to create, locate and list that one resource. The four facts (stranger's GET/PUT/DELETE all 404 — never 403, which leaks existence — plus absence from the stranger's listing) then come for free.
-- A nested resource (asset under portfolio, transaction under asset) cannot use the template as-is: reimplement the same four facts **plus** the sneaky paths — a stranger's parent id in the route, the owner's parent id with a stranger's token, and a cross-owner id pair.
+- A nested resource (asset under account, transaction under asset) cannot use the template as-is: reimplement the same four facts **plus** the sneaky paths — a stranger's parent id in the route, the owner's parent id with a stranger's token, and a cross-owner id pair.
 
 ## Messaging and background work
 

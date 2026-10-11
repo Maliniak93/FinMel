@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Metals;
@@ -68,6 +69,11 @@ public sealed class UpdateAssetHandler(
         if (disallowed is { } disallowedType)
         {
             return TransactionErrors.TypeNotAllowedForClass(disallowedType, request.AssetClass);
+        }
+
+        if (await dbContext.CheckClassChangeAsync(asset, request.AssetClass, cancellationToken) is { } placement)
+        {
+            return placement;
         }
 
         // Switching modes leaves the transactions untouched; only the valuation fields below move.

@@ -15,6 +15,6 @@ public static class ListAssetsEndpoint
     }
 
     private static async Task<Results<Ok<IReadOnlyList<AssetResponse>>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, ListAssetsHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, cancellationToken)).ToHttpResult();
+        ListAssetsHandler handler, CancellationToken cancellationToken, Guid? accountId = null)
+        => (await handler.HandleAsync(accountId, cancellationToken)).ToHttpResult();
 }

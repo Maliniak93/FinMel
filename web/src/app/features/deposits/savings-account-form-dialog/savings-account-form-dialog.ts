@@ -1,4 +1,4 @@
-import { Component, inject, resource, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormControl,
@@ -19,7 +19,6 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioPortfolios,
   postApiPortfolioSavingsAccounts,
   putApiPortfolioSavingsAccountsByAssetId,
   type SavingsAccountResponse,
@@ -34,7 +33,6 @@ import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currenci
 import { toDateOnly } from '../../../shared/date-only';
 
 export interface SavingsAccountFormDialogData {
-  portfolioId?: string;
   account?: SavingsAccountResponse;
   currency?: string;
 }
@@ -44,7 +42,6 @@ interface SavingsAccountForm {
   bankName: FormControl<string>;
   annualInterestRatePercent: FormControl<number | null>;
   taxExempt: FormControl<boolean>;
-  portfolioId?: FormControl<string>;
   currency?: FormControl<string>;
   openingAmount?: FormControl<number | null>;
   openingDate?: FormControl<Date | null>;
@@ -90,8 +87,6 @@ export class SavingsAccountFormDialog {
   private readonly account = this.data.account;
   protected readonly isEdit = !!this.account;
   protected readonly isPayoutTarget = !this.account && !!this.data.currency;
-  protected readonly choosesPortfolio =
-    !this.account && (!this.data.portfolioId || this.isPayoutTarget);
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
@@ -114,10 +109,6 @@ export class SavingsAccountFormDialog {
     ...(this.account
       ? {}
       : {
-          portfolioId: new FormControl(this.data.portfolioId ?? '', {
-            nonNullable: true,
-            validators: [Validators.required],
-          }),
           currency: new FormControl(
             { value: this.data.currency ?? DEFAULT_CURRENCY, disabled: this.isPayoutTarget },
             { nonNullable: true, validators: [Validators.required] },
@@ -129,20 +120,6 @@ export class SavingsAccountFormDialog {
                 openingDate: new FormControl<Date | null>(new Date(), [openingDateValid]),
               }),
         }),
-  });
-
-  protected readonly portfoliosResource = resource({
-    params: () => (this.choosesPortfolio ? {} : undefined),
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfolios({ signal: abortSignal });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('deposits.form.portfoliosLoadFailed'),
-        );
-      }
-      return (result.data ?? []).filter((portfolio) => !portfolio.isArchived);
-    },
   });
 
   constructor() {
@@ -188,7 +165,6 @@ export class SavingsAccountFormDialog {
       : await postApiPortfolioSavingsAccounts({
           body: {
             ...terms,
-            portfolioId: values.portfolioId!,
             currency: values.currency!,
             ...(isBlank(values.openingAmount)
               ? {}

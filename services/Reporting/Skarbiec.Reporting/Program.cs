@@ -37,9 +37,6 @@ if (!OpenApiBuildTime.IsActive)
             x.AddConsumer<DailyPricesSyncedConsumer>(typeof(DailyPricesSyncedConsumerDefinition));
             x.AddConsumer<AssetPositionChangedConsumer>(typeof(AssetPositionChangedConsumerDefinition));
             x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedConsumerDefinition));
-            x.AddConsumer<PortfolioArchivedConsumer>(typeof(PortfolioArchivedConsumerDefinition));
-            x.AddConsumer<PortfolioRestoredConsumer>(typeof(PortfolioRestoredConsumerDefinition));
-            x.AddConsumer<PortfolioDeletedConsumer>(typeof(PortfolioDeletedConsumerDefinition));
             x.AddConsumer<HistoryRebuildConsumer>(typeof(HistoryRebuildConsumerDefinition));
             x.AddConsumer<InstrumentHistoryBackfilledConsumer>(typeof(InstrumentHistoryBackfilledConsumerDefinition));
         });

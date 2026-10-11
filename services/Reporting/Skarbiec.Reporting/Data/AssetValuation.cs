@@ -3,7 +3,7 @@ using Skarbiec.ServiceDefaults.Tenancy;
 
 namespace Skarbiec.Reporting.Data;
 
-// History, not current state: AssetRemoved keeps these lines and only PortfolioDeleted sweeps them.
+// History, not current state: AssetRemoved keeps these lines.
 public sealed class AssetValuation : IUserOwned
 {
     public required Guid Id { get; init; }
@@ -11,7 +11,7 @@ public sealed class AssetValuation : IUserOwned
     // Set by the consumer from the Position row, not stamped by UserOwnedSaveInterceptor.
     public Guid UserId { get; set; }
 
-    public required Guid PortfolioId { get; init; }
+    public Guid? AccountId { get; init; }
     public required Guid AssetId { get; init; }
     public required DateOnly Date { get; init; }
     public required AssetClass AssetClass { get; set; }

@@ -85,9 +85,9 @@ public sealed record BondSwapSourceResponse
 public sealed record BondResponse
 {
     public required Guid AssetId { get; init; }
-    public required Guid PortfolioId { get; init; }
-    public required string PortfolioName { get; init; }
-    public required bool PortfolioIsArchived { get; init; }
+    public required Guid AccountId { get; init; }
+    public required string AccountName { get; init; }
+    public required TaxWrapper TaxWrapper { get; init; }
 
     public required bool IsArchived { get; init; }
 
@@ -106,7 +106,6 @@ public sealed record BondResponse
     /// <summary>PLN per bond.</summary>
     public required decimal EarlyRedemptionFeePerBond { get; init; }
 
-    public required bool TaxExempt { get; init; }
     public required DateOnly MaturityDate { get; init; }
 
     /// <summary>Bond count × 100 PLN.</summary>
@@ -148,8 +147,7 @@ public static class BondMappingExtensions
     public static BondResponse ToResponse(
         this TreasuryBond terms,
         Asset asset,
-        string portfolioName,
-        bool portfolioIsArchived,
+        Account account,
         DateOnly today,
         DepositFundingSource? funding,
         IReadOnlyCollection<BondInterestSettlement> settlements,
@@ -175,9 +173,9 @@ public static class BondMappingExtensions
         return new BondResponse
         {
             AssetId = asset.Id,
-            PortfolioId = asset.PortfolioId,
-            PortfolioName = portfolioName,
-            PortfolioIsArchived = portfolioIsArchived,
+            AccountId = account.Id,
+            AccountName = account.Name,
+            TaxWrapper = account.Wrapper,
             IsArchived = asset.IsArchived,
             Name = asset.Name,
             SeriesCode = terms.SeriesCode,
@@ -188,7 +186,6 @@ public static class BondMappingExtensions
             FirstPeriodRatePercent = terms.FirstPeriodRatePercent,
             MarginPercent = terms.MarginPercent,
             EarlyRedemptionFeePerBond = terms.EarlyRedemptionFeePerBond,
-            TaxExempt = terms.TaxExempt,
             MaturityDate = terms.MaturityDate,
             NominalValue = terms.BondCount * NominalPerBond,
             BookValue = asset.Quantity,

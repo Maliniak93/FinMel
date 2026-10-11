@@ -115,21 +115,19 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         switch (scenario)
         {
             case "pln-cash":
-                cashAssetId = await client.AddCashAssetWithBalanceAsync(setup.CashPortfolioId, cancellationToken, currency: "PLN", name: "Zloty cash");
+                cashAssetId = await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "PLN", name: "Zloty cash");
                 break;
             case "savings":
-                cashAssetId = (await client.CreatePortfolioWithSavingsAccountAsync(
-                    cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).Account.AssetId;
+                cashAssetId = (await client.AddSavingsAccountAsync(
+                    cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).AssetId;
                 break;
             case "archived-cash":
-                cashAssetId = (await client.AddArchivedCashAssetInLivePortfolioAsync(
-                    cancellationToken, portfolioName: "Old wallet", currency: "EUR")).CashId;
+                cashAssetId = await client.AddArchivedCashAssetAsync(cancellationToken, currency: "EUR");
                 break;
             default:
                 using (var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid()))
                 {
-                    var strangerWalletId = await stranger.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-                    cashAssetId = await stranger.AddCashAssetWithBalanceAsync(strangerWalletId, cancellationToken, currency: "EUR");
+                    cashAssetId = await stranger.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR");
                 }
 
                 break;
@@ -155,7 +153,7 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        var (portfolioId, assetId) = (setup.EtfPortfolioId, setup.EtfAssetId);
+        var assetId = setup.EtfAssetId;
         var request = NewTradeRequest(setup.CashAssetId, TransactionType.Deposit, quantity: 5m, unitPrice: 1m);
 
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);

@@ -16,7 +16,7 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         Assert.False((await client.GetDepositAsync(deposit.AssetId, cancellationToken)).IsArchived);
         await client.ArchiveAssetAsync(deposit.AssetId, cancellationToken);
 
@@ -34,7 +34,7 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         // Warsaw 2026-04-15 12:00 — two weeks past this deposit's 2026-04-01 maturity, so it is Due.
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 4, 15, 10, 0, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(
+        var deposit = await client.AddDepositAsync(
             cancellationToken, NewDepositRequest(capitalization: DepositCapitalization.Monthly, principal: 12_000m, startDate: new DateOnly(2026, 1, 1)));
 
         var response = await client.GetAsync(DepositUri(deposit.AssetId), cancellationToken);
@@ -43,8 +43,6 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal(deposit.AssetId, body.AssetId);
-        Assert.Equal(portfolioId, body.PortfolioId);
-        Assert.Equal("Savings", body.PortfolioName);
         Assert.Equal(12_000m, body.Principal);
         Assert.Equal(DepositCapitalization.Monthly, body.Capitalization);
         Assert.Equal(new DateOnly(2026, 4, 1), body.MaturityDate);
@@ -61,7 +59,7 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(
             deposit.AssetId, cancellationToken, NewSettleRequest(settledOn: new DateOnly(2026, 4, 17), grossInterest: 150.00m, tax: 28.50m));
 
@@ -82,8 +80,8 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
 
         var response = await client.GetAsync(DepositUri(cashId), cancellationToken);
 

@@ -14,17 +14,12 @@ import {
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
 import {
-  archivedPortfolio,
   CAPITALIZATION,
   depositResponse,
   eurCashCandidate,
   pickSelectOption,
   plnCashCandidate,
-  reservePortfolio,
-  reservePortfolioId,
   rolledOverDeposit,
-  savingsPortfolio,
-  savingsPortfolioId,
   selectOptionLabels,
   selectTriggerState,
   TERM_UNIT,
@@ -67,9 +62,6 @@ describe('DepositFormDialog', () => {
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      if (method(input) === 'GET' && /\/api\/portfolio\/portfolios(\?|$)/.test(requestUrl(input))) {
-        return jsonResponse([savingsPortfolio, archivedPortfolio, reservePortfolio]);
-      }
       if (
         method(input) === 'GET' &&
         requestUrl(input).includes('/api/portfolio/transfer-candidates')
@@ -164,7 +156,7 @@ describe('DepositFormDialog', () => {
     ['name', ''],
   ])('an invalid %s (%s) blocks submit', async (field, value) => {
     await setup({});
-    await fill({ ...validTerms, portfolioId: savingsPortfolioId, currency: 'PLN' });
+    await fill({ ...validTerms, currency: 'PLN' });
 
     await fill({ [field]: value });
     await component['onSubmit']();
@@ -176,7 +168,7 @@ describe('DepositFormDialog', () => {
 
   it('a term above 120 months or 3650 days blocks submit', async () => {
     await setup({});
-    await fill({ ...validTerms, portfolioId: savingsPortfolioId, currency: 'PLN' });
+    await fill({ ...validTerms, currency: 'PLN' });
 
     await fill({ termLength: 121, termUnit: TERM_UNIT.Months });
     await component['onSubmit']();
@@ -190,19 +182,9 @@ describe('DepositFormDialog', () => {
     expect(writeRequests()).toHaveLength(1);
   });
 
-  it('offers only the non-archived portfolios on create', async () => {
+  it('create POSTs the terms and closes with true', async () => {
     await setup({});
-
-    const labels = await optionLabels('portfolioId');
-
-    expect(labels).toContain('Savings');
-    expect(labels).toContain('Reserve');
-    expect(labels).not.toContain('Old savings');
-  });
-
-  it('create POSTs the terms to the chosen portfolio and closes with true', async () => {
-    await setup({});
-    await fill({ ...validTerms, portfolioId: reservePortfolioId, currency: 'EUR' });
+    await fill({ ...validTerms, currency: 'EUR' });
 
     await component['onSubmit']();
 
@@ -210,7 +192,6 @@ describe('DepositFormDialog', () => {
     expect(request.method).toBe('POST');
     expect(request.url).toContain(`/api/portfolio/deposits`);
     expect(await request.json()).toEqual({
-      portfolioId: reservePortfolioId,
       name: 'Term deposit',
       bankName: 'Test bank',
       currency: 'EUR',
@@ -226,8 +207,8 @@ describe('DepositFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
-  it('create preset to a portfolio (from the asset type picker) POSTs to that portfolio', async () => {
-    await setup({ portfolioId: savingsPortfolioId });
+  it('create POSTs the tax exemption', async () => {
+    await setup({});
     await fill({ ...validTerms, currency: 'PLN', taxExempt: true });
 
     await component['onSubmit']();
@@ -237,11 +218,11 @@ describe('DepositFormDialog', () => {
     expect(request.url).toContain(`/api/portfolio/deposits`);
     const body = await request.json();
     expect(body.taxExempt).toBe(true);
-    expect(body.portfolioId).toBe(savingsPortfolioId);
+    expect(body).not.toHaveProperty('accountId');
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
-  it('edit pre-fills the terms and PUTs them without portfolio or currency', async () => {
+  it('edit pre-fills the terms and PUTs them without currency', async () => {
     const deposit = depositResponse({
       name: 'Existing deposit',
       capitalization: CAPITALIZATION.Monthly,
@@ -257,7 +238,6 @@ describe('DepositFormDialog', () => {
     expect(findControl(form(), 'capitalization').value).toBe(CAPITALIZATION.Monthly);
     expect(findControl(form(), 'taxExempt').value).toBe(true);
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('mat-select[formcontrolname="portfolioId"]')).toBeNull();
     expect(element.querySelector('mat-select[formcontrolname="currency"]')).toBeNull();
     expect(renderedText(fixture)).toContain(mediumDate(2026, 4, 15));
 
@@ -268,7 +248,6 @@ describe('DepositFormDialog', () => {
     expect(request.method).toBe('PUT');
     expect(request.url).toContain(`/api/portfolio/deposits/${deposit.assetId}`);
     const body = await request.json();
-    expect(body).not.toHaveProperty('portfolioId');
     expect(body).not.toHaveProperty('currency');
     expect(body).toEqual({
       name: 'Existing deposit',
@@ -344,7 +323,7 @@ describe('DepositFormDialog', () => {
         400,
       ),
     );
-    await fill({ ...validTerms, portfolioId: savingsPortfolioId, currency: 'PLN' });
+    await fill({ ...validTerms, currency: 'PLN' });
 
     await component['onSubmit']();
 
@@ -359,20 +338,20 @@ describe('DepositFormDialog', () => {
     await setup({}, () =>
       jsonResponse(
         {
-          detail: 'This portfolio is archived.',
-          errorCode: 'Conflict.PortfolioArchived',
+          detail: 'This asset is archived.',
+          errorCode: 'Conflict.AssetArchived',
         },
         409,
       ),
     );
-    await fill({ ...validTerms, portfolioId: savingsPortfolioId, currency: 'PLN' });
+    await fill({ ...validTerms, currency: 'PLN' });
 
     await component['onSubmit']();
     fixture.detectChanges();
     await fixture.whenStable();
 
     const banner = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
-    expect(banner?.textContent).toContain('This portfolio is archived.');
+    expect(banner?.textContent).toContain('This asset is archived.');
     expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
@@ -403,7 +382,7 @@ describe('DepositFormDialog', () => {
     }
 
     it('defaults to new money and lists the Cash candidates of the chosen currency with balances', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
 
       expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
       const requests = candidateRequests();
@@ -416,13 +395,12 @@ describe('DepositFormDialog', () => {
       expect(labels[0]).toContain('New money');
       const plnLabel = labels.find((label) => label.includes(plnCashCandidate.name));
       expect(plnLabel).toBeDefined();
-      expect(plnLabel).toContain(plnCashCandidate.portfolioName);
       expect(plnLabel).toMatch(balancePattern(plnCashCandidate.balance));
       expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
     });
 
     it('reloads the candidates when the currency changes and resets a choice no longer listed', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
       await fill({ fundingAssetId: plnCashCandidate.assetId });
 
       await fill({ currency: 'EUR' });
@@ -436,7 +414,7 @@ describe('DepositFormDialog', () => {
     });
 
     it('a principal above the selected balance blocks submit', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
       await fill({ ...validTerms, currency: 'PLN', fundingAssetId: plnCashCandidate.assetId });
 
       await fill({ principal: plnCashCandidate.balance + 0.01 });
@@ -452,7 +430,7 @@ describe('DepositFormDialog', () => {
     });
 
     it('new money puts no cap on the principal', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
       expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
       await fill({ ...validTerms, currency: 'PLN', principal: 1_000_000 });
 
@@ -465,7 +443,7 @@ describe('DepositFormDialog', () => {
     });
 
     it('create POSTs the chosen funding source as fundingAssetId', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
       await fill({
         ...validTerms,
         currency: 'PLN',
@@ -486,7 +464,7 @@ describe('DepositFormDialog', () => {
     });
 
     it('a server 400 InsufficientFunds lands on the principal', async () => {
-      await setup({ portfolioId: savingsPortfolioId }, () =>
+      await setup({}, () =>
         jsonResponse(
           {
             title: 'Validation Failed',
@@ -545,7 +523,7 @@ describe('DepositFormDialog', () => {
     });
 
     it('sourceOfFunds_NewMoneyChosen_ShowsNewMoneyInTrigger', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
 
       expect(selectTriggerState(fixture, 'fundingAssetId')).toEqual({
         triggerText: 'New money (from outside)',
@@ -604,7 +582,6 @@ describe('DepositFormDialog', () => {
         'New deposit',
         'Name',
         'Bank',
-        'Portfolio',
         'Currency',
         'Source of funds',
         'Principal',
@@ -633,7 +610,6 @@ describe('DepositFormDialog', () => {
       const english = errors();
       expect(english).toEqual([
         'Name is required.',
-        'Portfolio is required.',
         'Principal is required.',
         'Term is required.',
         'Interest rate is required.',
@@ -661,7 +637,6 @@ describe('DepositFormDialog', () => {
       expect(english).toEqual([
         'Name is too long.',
         'Bank name is too long.',
-        'Portfolio is required.',
         'Principal must be greater than 0.',
         'Start date is required.',
         'Term is at most 120.',
@@ -673,11 +648,11 @@ describe('DepositFormDialog', () => {
 
       const polish = errors();
       expect(polishProblems(english, polish)).toEqual([]);
-      expect(polish[5]).toContain('120');
+      expect(polish[4]).toContain('120');
     });
 
     it('shows the source-balance validation in Polish, with the balance in the active format', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({});
       await fill({ fundingAssetId: plnCashCandidate.assetId, principal: 6000 });
       await touchAll();
 

@@ -61,17 +61,17 @@ describe('upcomingItems', () => {
       ],
       [
         bondResponse({
-          name: 'Archived-portfolio bond',
+          name: 'Archived bond',
           status: BOND_STATUS.Matured,
-          portfolioIsArchived: true,
+          isArchived: true,
         }),
       ],
       [
         savingsAccountResponse({
-          name: 'Archived-portfolio savings',
+          name: 'Archived savings',
           interestDue: true,
           duePeriodCount: 1,
-          portfolioIsArchived: true,
+          isArchived: true,
         }),
       ],
       TODAY,

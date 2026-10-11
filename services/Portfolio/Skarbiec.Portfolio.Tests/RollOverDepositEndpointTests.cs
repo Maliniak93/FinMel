@@ -21,7 +21,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(
+        var deposit = await client.AddDepositAsync(
             cancellationToken, NewDepositRequest(earlyBreakInterestLossPercent: 50m));
         var openingId = Assert.Single((await client.ListTransactionsAsync(deposit.AssetId, cancellationToken)).Items).Id;
         var preview = await client.GetSettlementPreviewAsync(deposit.AssetId, cancellationToken);
@@ -78,7 +78,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             .WithRate("EUR", new DateOnly(2026, 4, 20), 4.10m);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken, NewDepositRequest(currency: "EUR"));
+        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(currency: "EUR"));
 
         var response = await client.PostAsJsonAsync(
             RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
@@ -103,7 +103,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(
             deposit.AssetId,
             cancellationToken,
@@ -146,7 +146,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken, NewDepositRequest(termLength: 1));
+        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(termLength: 1));
         Assert.Equal(new DateOnly(2026, 2, 15), deposit.MaturityDate);
         var preview = await client.GetSettlementPreviewAsync(deposit.AssetId, cancellationToken);
 
@@ -173,7 +173,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
     [Theory]
     [InlineData("active", PortfolioAssertions.DepositNotDueErrorCode)]
     [InlineData("paid-out", PortfolioAssertions.DepositAlreadyPaidOutErrorCode)]
-    [InlineData("archived-portfolio", PortfolioAssertions.PortfolioArchivedErrorCode)]
     [InlineData("archived-asset", PortfolioAssertions.AssetArchivedErrorCode)]
     [InlineData("settled-with-amounts", PortfolioAssertions.DepositAlreadySettledErrorCode)]
     [InlineData("settled-with-gross-only", PortfolioAssertions.DepositAlreadySettledErrorCode)]
@@ -184,29 +183,22 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Factory.Clock.SetUtcNow(invalidCase == "active" ? BeforeDefaultMaturityUtc : AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        Guid portfolioId;
         Guid assetId;
         object body;
         switch (invalidCase)
         {
             case "active":
-                (portfolioId, var active) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+                var active = await client.AddDepositAsync(cancellationToken);
                 assetId = active.AssetId;
                 body = NewRollOverRequest();
                 break;
             case "paid-out":
                 var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
-                (portfolioId, assetId) = (paidOut.DepositPortfolioId, paidOut.Deposit.AssetId);
+                assetId = paidOut.Deposit.AssetId;
                 body = SettledRollOverBody();
                 break;
-            case "archived-portfolio":
-                (portfolioId, var archived) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-                assetId = archived.AssetId;
-                await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-                body = NewRollOverRequest();
-                break;
             case "archived-asset":
-                (portfolioId, var shelved) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+                var shelved = await client.AddDepositAsync(cancellationToken);
                 assetId = shelved.AssetId;
                 await client.ArchiveAssetAsync(assetId, cancellationToken);
                 body = NewRollOverRequest();
@@ -214,7 +206,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             case "settled-with-amounts":
             case "settled-with-gross-only":
             case "settled-with-tax-only":
-                (portfolioId, var settled) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+                var settled = await client.AddDepositAsync(cancellationToken);
                 assetId = settled.AssetId;
                 await client.SettleDepositAsync(assetId, cancellationToken);
                 body = invalidCase switch
@@ -255,7 +247,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         object body = invalidCase switch
         {
             "gross-missing" => NewRollOverRequest(grossInterest: null),
@@ -295,8 +287,8 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
 
         var unknown = await client.PostAsJsonAsync(RollOverDepositUri(Guid.NewGuid()), NewRollOverRequest(), cancellationToken);
         var cash = await client.PostAsJsonAsync(RollOverDepositUri(cashId), NewRollOverRequest(), cancellationToken);
@@ -318,9 +310,8 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetAsync(walletId, cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
 
         // Period 1 → 2: 10 119.83 from 2026-04-15 to 2026-07-15 at 5.5 %.
         var first = await client.PostAsJsonAsync(RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);

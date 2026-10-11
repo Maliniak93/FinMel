@@ -190,10 +190,48 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("PortfolioOutboxState", (string)null);
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.Account", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Wrapper")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Accounts");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Asset", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("AssetClass")
@@ -214,9 +252,6 @@ namespace Skarbiec.Portfolio.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("PortfolioId")
-                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 8)
@@ -239,9 +274,9 @@ namespace Skarbiec.Portfolio.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InstrumentId");
+                    b.HasIndex("AccountId");
 
-                    b.HasIndex("PortfolioId");
+                    b.HasIndex("InstrumentId");
 
                     b.ToTable("Assets");
                 });
@@ -383,40 +418,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasKey("AssetId");
 
                     b.ToTable("MetalHoldings");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.Portfolio", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("Portfolios");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsAccount", b =>
@@ -628,9 +629,6 @@ namespace Skarbiec.Portfolio.Migrations
 
                     b.Property<Guid?>("SwappedFromAssetId")
                         .HasColumnType("uuid");
-
-                    b.Property<bool>("TaxExempt")
-                        .HasColumnType("boolean");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");

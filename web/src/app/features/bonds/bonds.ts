@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -11,4 +11,6 @@ import { MyBonds } from './my-bonds/my-bonds';
   templateUrl: './bonds.html',
   styleUrl: './bonds.scss',
 })
-export class Bonds {}
+export class Bonds {
+  readonly account = input<string>();
+}

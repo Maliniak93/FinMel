@@ -41,7 +41,7 @@ internal static class BondEarlyRedemptionPlanning
         bool forWrite,
         CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's bond, a non-bond asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's bond, a non-bond asset all end in 404.
         var bond = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
         var terms = bond is null
@@ -121,7 +121,7 @@ internal static class BondEarlyRedemptionPlanning
             terms.EarlyRedemptionFeePerBond,
             terms.PurchasePricePerBond,
             bondCount,
-            terms.TaxExempt);
+            await dbContext.IsTaxExemptAsync(bond, cancellationToken));
 
         // c_{k−1}: the interest already credited to each bond; 0 for a coupon type, whose coupons left for Cash.
         var capitalisedPerBond = BondSchedule.IsCoupon(terms.Type)

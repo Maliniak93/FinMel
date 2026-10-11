@@ -12,20 +12,19 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task List_AcrossPortfolios_ReturnsProjectionAndStatus()
+    public async Task List_ReturnsProjectionAndStatus()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         // Warsaw 2026-04-16 12:00.
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 4, 16, 10, 0, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         // Matures 2026-04-15 — yesterday.
-        var (savingsId, matured) = await client.CreatePortfolioWithDepositAsync(
-            cancellationToken, NewDepositRequest(name: "Matured deposit"), portfolioName: "Savings");
+        var matured = await client.AddDepositAsync(
+            cancellationToken, NewDepositRequest(name: "Matured deposit"));
         // Matures 2026-05-16 — next month: 12 000.00 at 6 % for 30 days → gross 59.18, tax 11.25, net 47.93.
-        var (reserveId, running) = await client.CreatePortfolioWithDepositAsync(
+        var running = await client.AddDepositAsync(
             cancellationToken,
-            NewDepositRequest(name: "Running deposit", principal: 12_000m, startDate: new DateOnly(2026, 4, 16), termLength: 1),
-            portfolioName: "Reserve");
+            NewDepositRequest(name: "Running deposit", principal: 12_000m, startDate: new DateOnly(2026, 4, 16), termLength: 1));
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
@@ -35,9 +34,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(2, deposits.Count);
 
         var due = Assert.Single(deposits, d => d.AssetId == matured.AssetId);
-        Assert.Equal(savingsId, due.PortfolioId);
-        Assert.Equal("Savings", due.PortfolioName);
-        Assert.False(due.PortfolioIsArchived);
         Assert.Equal("Matured deposit", due.Name);
         Assert.Equal(new DateOnly(2026, 4, 15), due.MaturityDate);
         Assert.Equal(147.95m, due.Projection.GrossInterest);
@@ -47,8 +43,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(DepositStatus.Due, due.Status);
 
         var active = Assert.Single(deposits, d => d.AssetId == running.AssetId);
-        Assert.Equal(reserveId, active.PortfolioId);
-        Assert.Equal("Reserve", active.PortfolioName);
         Assert.Equal(new DateOnly(2026, 5, 16), active.MaturityDate);
         Assert.Equal(59.18m, active.Projection.GrossInterest);
         Assert.Equal(11.25m, active.Projection.Tax);
@@ -63,9 +57,9 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, settledDeposit) = await client.CreatePortfolioWithDepositAsync(
+        var settledDeposit = await client.AddDepositAsync(
             cancellationToken, NewDepositRequest(name: "Settled deposit"));
-        var dueDeposit = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Due deposit"));
+        var dueDeposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Due deposit"));
         await client.SettleDepositAsync(
             settledDeposit.AssetId,
             cancellationToken,
@@ -98,7 +92,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 4, 14, 22, 30, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (_, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
@@ -116,7 +110,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         // Warsaw 2026-04-14 23:30 (CEST).
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 4, 14, 21, 30, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        await client.AddDepositAsync(cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
@@ -125,22 +119,20 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
-    public async Task List_DepositInArchivedPortfolioAndOtherAssets_ListsOnlyDepositsWithArchivedFlag()
+    public async Task List_DepositAndOtherAssets_ListsOnlyDeposits()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken, portfolioName: "Old savings");
-        await client.AddCashAssetAsync(portfolioId, cancellationToken);
-        await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        await client.AddCashAssetAsync(cancellationToken);
+        await client.AddAssetAsync(accountId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var listed = Assert.Single((await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken))!);
         Assert.Equal(deposit.AssetId, listed.AssetId);
-        Assert.Equal("Old savings", listed.PortfolioName);
-        Assert.True(listed.PortfolioIsArchived);
     }
 
     [Fact]
@@ -148,9 +140,8 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var live = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Live deposit"));
-        var archived = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Archived deposit"));
+        var live = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Live deposit"));
+        var archived = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Archived deposit"));
         await client.ArchiveAssetAsync(archived.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
@@ -160,7 +151,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(2, listed.Count);
         Assert.False(listed.Single(d => d.AssetId == live.AssetId).IsArchived);
         Assert.True(listed.Single(d => d.AssetId == archived.AssetId).IsArchived);
-        Assert.False(listed.Single(d => d.AssetId == archived.AssetId).PortfolioIsArchived);
     }
 
     [Fact]
@@ -168,8 +158,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        await client.AddCashAssetAsync(cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
@@ -193,8 +182,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await client.CreateFundedDepositAsync(cancellationToken);
-        var unfunded = await client.AddDepositAsync(
-            funded.DepositPortfolioId, cancellationToken, NewDepositRequest(name: "New money deposit"));
+        var unfunded = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "New money deposit"));
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
@@ -222,8 +210,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
-        var settledOnly = await client.AddDepositAsync(
-            paidOut.DepositPortfolioId, cancellationToken, NewDepositRequest(name: "Settled deposit"));
+        var settledOnly = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Settled deposit"));
         await client.SettleDepositAsync(settledOnly.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);

@@ -10,7 +10,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 {
     public Guid CurrentUserId => currentUser.UserId;
 
-    public DbSet<PortfolioEntity> Portfolios => Set<PortfolioEntity>();
+    public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
@@ -28,14 +28,14 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<PortfolioEntity>(portfolio =>
+        modelBuilder.Entity<Account>(account =>
         {
-            portfolio.Property(p => p.Name).HasMaxLength(200);
-            portfolio.Property(p => p.Description).HasMaxLength(1000);
-            portfolio.Property(p => p.Currency).HasMaxLength(3);
+            account.Property(a => a.Name).HasMaxLength(200);
+            account.Property(a => a.Type).HasConversion<string>().HasMaxLength(20);
+            account.Property(a => a.Wrapper).HasConversion<string>().HasMaxLength(20);
 
             // Case-sensitive exact match on Postgres's default collation; the client trims before submit.
-            portfolio.HasIndex(p => new { p.UserId, p.Name }).IsUnique();
+            account.HasIndex(a => new { a.UserId, a.Name }).IsUnique();
         });
 
         modelBuilder.Entity<Asset>(asset =>
@@ -44,8 +44,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             asset.Property(a => a.Currency).HasMaxLength(3);
             asset.Property(a => a.Quantity).HasPrecision(18, 8);
 
-            // No FK, but every asset query filters by PortfolioId.
-            asset.HasIndex(a => a.PortfolioId);
+            // No FK, but every account-filtered asset query reads AccountId.
+            asset.HasIndex(a => a.AccountId);
 
             // No FK to MarketData either; indexed for the same reason.
             asset.HasIndex(a => a.InstrumentId);
@@ -138,7 +138,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
         modelBuilder.Entity<SavingsInterestSettlement>(settlement =>
         {
-            // No FK to the asset or the credit: RemoveAsset and DeletePortfolio delete the rows explicitly.
+            // No FK to the asset or the credit: RemoveAsset deletes the rows explicitly.
             settlement.HasIndex(s => new { s.AssetId, s.PeriodEnd }).IsUnique();
 
             // Update/DeleteTransaction ask whether a transaction is a settlement's managed credit.
@@ -150,7 +150,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
         modelBuilder.Entity<BondInterestSettlement>(settlement =>
         {
-            // No FK to the asset, the credit or the transfer: RemoveAsset and DeletePortfolio delete the rows explicitly.
+            // No FK to the asset, the credit or the transfer: RemoveAsset deletes the rows explicitly.
             settlement.HasIndex(s => new { s.AssetId, s.PeriodIndex }).IsUnique();
 
             // ListTransactions marks a credit with its period through this column.
@@ -163,7 +163,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
         modelBuilder.Entity<BondRedemption>(redemption =>
         {
-            // No FK to the asset, the swap target or the transactions: RemoveAsset and DeletePortfolio delete the rows explicitly.
+            // No FK to the asset, the swap target or the transactions: RemoveAsset deletes the rows explicitly.
             // Not unique: early redemptions take a holding apart over time; the asset row's xmin guards a racing second one.
             redemption.HasIndex(r => r.AssetId);
 

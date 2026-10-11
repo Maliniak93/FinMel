@@ -18,8 +18,8 @@
     @if (dashboard.asOf === null) {
       <div class="dashboard-page__state">
         <p>{{ 'dashboard.empty' | transloco }}</p>
-        <a mat-flat-button color="primary" routerLink="/portfolios">{{
-          'dashboard.goToPortfolios' | transloco
+        <a mat-flat-button color="primary" routerLink="/accounts">{{
+          'dashboard.goToAccounts' | transloco
         }}</a>
       </div>
     } @else {
@@ -125,7 +125,7 @@
         </mat-card>
 
         <div class="dashboard-page__summary">
-          <app-portfolios-card />
+          <app-accounts-card />
           <app-cash-card />
           <app-upcoming-card />
         </div>

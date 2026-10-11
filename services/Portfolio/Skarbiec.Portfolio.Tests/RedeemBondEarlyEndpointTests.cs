@@ -20,7 +20,6 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
 
         var response = await client.RedeemBondEarlyRawAsync(
@@ -73,7 +72,6 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateRorWithThreeMonthsSettledAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
 
@@ -133,7 +131,6 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken, settleYearOne: scenario != "unsettled-earlier-period");
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
 

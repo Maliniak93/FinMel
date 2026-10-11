@@ -13,7 +13,7 @@ import { Dashboard } from './features/dashboard/dashboard';
 import { Deposits } from './features/deposits/deposits';
 import { Metals } from './features/metals/metals';
 import { NotFound } from './features/not-found/not-found';
-import { Portfolios } from './features/portfolios/portfolios';
+import { Accounts } from './features/accounts/accounts';
 import { Settings } from './features/settings/settings';
 import { Shell } from './layout/shell/shell';
 import { provideI18nTesting } from './core/i18n/testing';
@@ -38,9 +38,9 @@ describe('app routing (authenticated)', () => {
     expect(harness.fixture.debugElement.query(By.directive(Dashboard))).toBeTruthy();
   });
 
-  it('renders Portfolios at /portfolios', async () => {
-    await harness.navigateByUrl('/portfolios', Shell);
-    expect(harness.fixture.debugElement.query(By.directive(Portfolios))).toBeTruthy();
+  it('renders Accounts at /accounts', async () => {
+    await harness.navigateByUrl('/accounts', Shell);
+    expect(harness.fixture.debugElement.query(By.directive(Accounts))).toBeTruthy();
   });
 
   it('renders Cash at /cash', async () => {

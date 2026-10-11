@@ -16,8 +16,8 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var retirementId = Guid.NewGuid();
-        var savingsId = Guid.NewGuid();
+        var brokerageId = Guid.NewGuid();
+        var bondsId = Guid.NewGuid();
         var olderDate = new DateOnly(2026, 7, 31);
         var snapshotDate = new DateOnly(2026, 8, 1);
 
@@ -25,13 +25,13 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         {
             await db.SeedSnapshotAsync(userId, olderDate, 9_999m, cancellationToken);
             await db.SeedValuationLineAsync(
-                userId, retirementId, Guid.NewGuid(), olderDate, 9_999m, cancellationToken, assetClass: AssetClass.Stock);
+                userId, brokerageId, Guid.NewGuid(), olderDate, 9_999m, cancellationToken, assetClass: AssetClass.Stock);
 
             await db.SeedSnapshotAsync(userId, snapshotDate, 1500m, cancellationToken);
             await db.SeedValuationLineAsync(
-                userId, retirementId, Guid.NewGuid(), snapshotDate, 1000m, cancellationToken, assetClass: AssetClass.Stock);
+                userId, brokerageId, Guid.NewGuid(), snapshotDate, 1000m, cancellationToken, assetClass: AssetClass.Stock);
             await db.SeedValuationLineAsync(
-                userId, savingsId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Cash);
+                userId, bondsId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Cash);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -43,9 +43,9 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(snapshotDate, body.AsOf);
         Assert.False(body.IsStale);
 
-        Assert.Equal(2, body.ByPortfolio.Count);
-        Assert.Equal(1000m, Assert.Single(body.ByPortfolio, p => p.PortfolioId == retirementId).ValuePln);
-        Assert.Equal(500m, Assert.Single(body.ByPortfolio, p => p.PortfolioId == savingsId).ValuePln);
+        Assert.Equal(2, body.ByAccount.Count);
+        Assert.Equal(1000m, Assert.Single(body.ByAccount, p => p.AccountId == brokerageId).ValuePln);
+        Assert.Equal(500m, Assert.Single(body.ByAccount, p => p.AccountId == bondsId).ValuePln);
 
         Assert.Equal(2, body.ByAssetClass.Count);
         var stock = Assert.Single(body.ByAssetClass, c => c.AssetClass == AssetClass.Stock);
@@ -91,7 +91,7 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Null(body.AsOf);
         Assert.False(body.IsStale);
         Assert.Empty(body.ByAssetClass);
-        Assert.Empty(body.ByPortfolio);
+        Assert.Empty(body.ByAccount);
     }
 
     [Fact]
@@ -115,12 +115,41 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
 
         Assert.Equal(0m, body!.NetWorthPln);
         Assert.Null(body.AsOf);
-        Assert.Empty(body.ByPortfolio);
+        Assert.Empty(body.ByAccount);
         Assert.Empty(body.ByAssetClass);
     }
 
     [Fact]
-    public async Task ByPortfolioCarriesPercentage()
+    public async Task ByAccount_IncludesOutsideAccounts()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var brokerageId = Guid.NewGuid();
+        var bondsId = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, snapshotDate, 1_800m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, brokerageId, Guid.NewGuid(), snapshotDate, 1_000m, cancellationToken, assetClass: AssetClass.Stock);
+            await db.SeedValuationLineAsync(userId, bondsId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Bond);
+            await db.SeedValuationLineAsync(userId, null, Guid.NewGuid(), snapshotDate, 300m, cancellationToken, assetClass: AssetClass.Cash);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(3, body!.ByAccount.Count);
+        Assert.Equal(1_000m, Assert.Single(body.ByAccount, a => a.AccountId == brokerageId).ValuePln);
+        Assert.Equal(500m, Assert.Single(body.ByAccount, a => a.AccountId == bondsId).ValuePln);
+        Assert.Equal(300m, Assert.Single(body.ByAccount, a => a.AccountId == null).ValuePln);
+        Assert.Equal(body.NetWorthPln, body.ByAccount.Sum(a => a.ValuePln));
+    }
+
+    [Fact]
+    public async Task ByAccountCarriesPercentage()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
@@ -140,12 +169,12 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(75.00m, Assert.Single(body!.ByPortfolio, p => p.PortfolioId == largeId).Percentage);
-        Assert.Equal(25.00m, Assert.Single(body.ByPortfolio, p => p.PortfolioId == smallId).Percentage);
+        Assert.Equal(75.00m, Assert.Single(body!.ByAccount, p => p.AccountId == largeId).Percentage);
+        Assert.Equal(25.00m, Assert.Single(body.ByAccount, p => p.AccountId == smallId).Percentage);
     }
 
     [Fact]
-    public async Task ByPortfolioPercentageIsZeroWhenNetWorthIsZero()
+    public async Task ByAccountPercentageIsZeroWhenNetWorthIsZero()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
@@ -164,7 +193,7 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(0m, body!.NetWorthPln);
-        Assert.Equal(2, body.ByPortfolio.Count);
-        Assert.All(body.ByPortfolio, p => Assert.Equal(0m, p.Percentage));
+        Assert.Equal(2, body.ByAccount.Count);
+        Assert.All(body.ByAccount, p => Assert.Equal(0m, p.Percentage));
     }
 }

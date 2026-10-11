@@ -4,9 +4,12 @@ using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
+using Skarbiec.Portfolio.Features.Accounts.ArchiveAccount;
+using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
+using Skarbiec.Portfolio.Features.Accounts.DeleteAccount;
+using Skarbiec.Portfolio.Features.Accounts.RestoreAccount;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.ArchiveAsset;
-using Skarbiec.Portfolio.Features.ArchivePortfolio;
 using Skarbiec.Portfolio.Features.Bonds.AddBond;
 using Skarbiec.Portfolio.Features.Bonds.RedeemBond;
 using Skarbiec.Portfolio.Features.Bonds.RedeemBondEarly;
@@ -14,8 +17,6 @@ using Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
 using Skarbiec.Portfolio.Features.Bonds.SwapBond;
 using Skarbiec.Portfolio.Features.Bonds.UndoBondInterestSettlement;
 using Skarbiec.Portfolio.Features.Bonds.UpdateBond;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
-using Skarbiec.Portfolio.Features.DeletePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
 using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
@@ -27,7 +28,6 @@ using Skarbiec.Portfolio.Features.Metals.UpdateMetal;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
 using Skarbiec.Portfolio.Features.RestoreAsset;
-using Skarbiec.Portfolio.Features.RestorePortfolio;
 using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
 using Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlement;
@@ -66,7 +66,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddSingleton<IInstrumentQuoteLookupClient>(new FakeInstrumentQuoteLookupClient());
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<PositionEventPublisher>();
-            services.AddScoped<CreatePortfolioHandler>();
+            services.AddScoped<CreateAccountHandler>();
             services.AddScoped<AddAssetHandler>();
             services.AddScoped<UpdateAssetHandler>();
             services.AddScoped<RecordTransactionHandler>();
@@ -91,11 +91,11 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddScoped<SettleDepositHandler>();
             services.AddScoped<PayOutDepositHandler>();
             services.AddScoped<RollOverDepositHandler>();
-            services.AddScoped<ArchivePortfolioHandler>();
-            services.AddScoped<RestorePortfolioHandler>();
+            services.AddScoped<ArchiveAccountHandler>();
+            services.AddScoped<RestoreAccountHandler>();
             services.AddScoped<ArchiveAssetHandler>();
             services.AddScoped<RestoreAssetHandler>();
-            services.AddScoped<DeletePortfolioHandler>();
+            services.AddScoped<DeleteAccountHandler>();
             services.AddScoped<CreateTransferHandler>();
             services.AddScoped<DeleteTransferHandler>();
         });
@@ -118,20 +118,25 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             .ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Count;
     }
 
-    protected static async Task<Guid> CreatePortfolioAsync(IServiceProvider services, string name, CancellationToken cancellationToken)
+    protected static async Task<Guid> CreateAccountAsync(
+        IServiceProvider services,
+        string name,
+        CancellationToken cancellationToken,
+        AccountType type = AccountType.Brokerage,
+        TaxWrapper wrapper = TaxWrapper.Regular)
     {
-        var result = await services.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = name }, cancellationToken);
+        var result = await services.GetRequiredService<CreateAccountHandler>()
+            .HandleAsync(new CreateAccountRequest { Name = name, Type = type, Wrapper = wrapper }, cancellationToken);
         Assert.True(result.IsSuccess);
 
         return result.Value.Id;
     }
 
     protected static async Task<Guid> AddCashWithBalanceAsync(
-        IServiceProvider services, Guid portfolioId, decimal balance, CancellationToken cancellationToken)
+        IServiceProvider services, decimal balance, CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 
@@ -145,10 +150,10 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
     }
 
     protected static async Task<Guid> AddStockAsync(
-        IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
+        IServiceProvider services, Guid accountId, string name, CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 
@@ -156,10 +161,10 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
     }
 
     protected static async Task<Guid> AddAssetWithBuyAsync(
-        IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
+        IServiceProvider services, Guid accountId, string name, CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess);
 
@@ -174,13 +179,13 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
 
     protected static async Task<(Guid AssetId, IReadOnlyList<Guid> TransactionIds)> AddStockWithTransactionsAsync(
         IServiceProvider services,
-        Guid portfolioId,
+        Guid accountId,
         string name,
         IReadOnlyList<(TransactionType Type, decimal Quantity, DateOnly Date)> transactions,
         CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 

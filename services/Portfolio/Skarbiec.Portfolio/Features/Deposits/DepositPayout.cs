@@ -22,8 +22,7 @@ internal static class DepositPayout
         if (destination is null
             || !TransferRoutes.IsAllowed(deposit.AssetClass, destination.AssetClass)
             || destination.Currency != deposit.Currency
-            || destination.IsArchived
-            || await dbContext.IsPortfolioArchivedAsync(destination.PortfolioId, cancellationToken))
+            || destination.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
         }

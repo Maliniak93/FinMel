@@ -34,9 +34,6 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
             position.Property(p => p.Quantity).HasPrecision(18, 8);
             position.Property(p => p.QuoteUnitsPerQuantity).HasPrecision(18, 8);
 
-            // No FK, but the archive, restore and delete consumers and the valuation grouping filter on it.
-            position.HasIndex(p => p.PortfolioId);
-
             position.ComplexCollection(p => p.QuantityHistory, history => history.ToJson());
         });
 

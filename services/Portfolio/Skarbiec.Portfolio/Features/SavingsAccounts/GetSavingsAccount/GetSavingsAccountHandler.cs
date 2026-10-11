@@ -13,9 +13,8 @@ public sealed class GetSavingsAccountHandler(PortfolioDbContext dbContext, TimeP
         var row = await (
                 from terms in dbContext.SavingsAccounts.AsNoTracking()
                 join asset in dbContext.Assets on terms.AssetId equals asset.Id
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
                 where asset.Id == assetId
-                select new { Terms = terms, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
+                select new { Terms = terms, Asset = asset })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (row is null)
@@ -25,6 +24,6 @@ public sealed class GetSavingsAccountHandler(PortfolioDbContext dbContext, TimeP
 
         var interest = await dbContext.LoadSavingsInterestStatusAsync(assetId, WarsawCalendar.Today(timeProvider), cancellationToken);
 
-        return row.Terms.ToResponse(row.Asset, row.PortfolioName, row.PortfolioIsArchived, interest);
+        return row.Terms.ToResponse(row.Asset, interest);
     }
 }

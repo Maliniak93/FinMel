@@ -104,7 +104,7 @@ npm run lint         # ESLint (angular-eslint)
 npm run format       # prettier --write .
 npm run format:check # prettier --check .
 npm run typecheck    # tsc --noEmit over src/app/api + scripts
-npm run smoke:api    # register -> login -> list portfolios through the Gateway (needs the stack running)
+npm run smoke:api    # register -> login -> list accounts through the Gateway (needs the stack running)
 ```
 
 ### Regenerating the TypeScript API client

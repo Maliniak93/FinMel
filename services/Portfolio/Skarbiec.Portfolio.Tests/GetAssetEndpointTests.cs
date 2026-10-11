@@ -17,8 +17,8 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares");
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Shares");
 
         var response = await client.GetAsync(AssetUri(assetId), cancellationToken);
 
@@ -33,7 +33,6 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
         var response = await client.GetAsync(AssetUri(Guid.NewGuid()), cancellationToken);
 
@@ -45,7 +44,7 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1), cancellationToken);
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 2), cancellationToken);
 
@@ -61,15 +60,13 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var ownerId = Guid.NewGuid();
-        var (portfolioId, assetId) = (Guid.NewGuid(), Guid.NewGuid());
+        var assetId = Guid.NewGuid();
 
         await using (var seedContext = CreateDbContext(ownerId))
         {
-            seedContext.Portfolios.Add(new PortfolioEntity { Id = portfolioId, Name = "Legacy account", Currency = "PLN" });
             seedContext.Assets.Add(new Asset
             {
                 Id = assetId,
-                PortfolioId = portfolioId,
                 AssetClass = AssetClass.Cash,
                 ValuationMode = AssetValuationMode.CurrencyValued,
                 Name = "Legacy GBP cash",

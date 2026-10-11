@@ -65,9 +65,7 @@
           @if (cashCandidatesResource.hasValue()) {
             @for (candidate of cashCandidatesResource.value(); track candidate.assetId) {
               <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
-                  formatMoney(candidate.balance, cashCurrency)
-                }})
+                {{ candidate.name }} ({{ formatMoney(candidate.balance, cashCurrency) }})
               </mat-option>
             }
           }

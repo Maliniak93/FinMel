@@ -44,7 +44,6 @@ export class Metals {
 
   protected readonly displayedColumns = [
     'name',
-    'portfolio',
     'metal',
     'weightPerPiece',
     'pieces',
@@ -119,11 +118,11 @@ export class Metals {
   }
 
   protected isReadOnly(holding: MetalResponse): boolean {
-    return holding.isArchived || holding.portfolioIsArchived;
+    return holding.isArchived;
   }
 
   protected transactionsLink(holding: MetalResponse): string[] {
-    return ['/portfolios', holding.portfolioId, 'assets', holding.assetId, 'transactions'];
+    return ['/assets', holding.assetId, 'transactions'];
   }
 
   protected openAddDialog(): void {
