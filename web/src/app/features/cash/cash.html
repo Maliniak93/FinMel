@@ -34,11 +34,6 @@
         </td>
       </ng-container>
 
-      <ng-container matColumnDef="portfolio">
-        <th mat-header-cell *matHeaderCellDef>{{ 'cash.portfolio' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">{{ account.portfolioName }}</td>
-      </ng-container>
-
       <ng-container matColumnDef="currency">
         <th mat-header-cell *matHeaderCellDef>{{ 'common.currency' | transloco }}</th>
         <td mat-cell *matCellDef="let account">{{ account.currency }}</td>

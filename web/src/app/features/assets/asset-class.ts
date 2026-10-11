@@ -24,3 +24,17 @@ export const ASSET_CLASS = {
 export function assetClassLabel(value: AssetClass): string {
   return ASSET_CLASSES.find((c) => c.value === Number(value))?.label ?? 'enums.assetClass.unknown';
 }
+
+const ASSET_CLASS_PAGES: Record<number, string> = {
+  [ASSET_CLASS.Cash]: '/cash',
+  [ASSET_CLASS.Deposit]: '/deposits',
+  [ASSET_CLASS.Stock]: '/securities',
+  [ASSET_CLASS.Etf]: '/securities',
+  [ASSET_CLASS.Bond]: '/bonds',
+  [ASSET_CLASS.PreciousMetal]: '/metals',
+  [ASSET_CLASS.Savings]: '/deposits',
+};
+
+export function assetClassPage(value: AssetClass): string {
+  return ASSET_CLASS_PAGES[Number(value)] ?? '/dashboard';
+}

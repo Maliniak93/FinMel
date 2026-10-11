@@ -28,21 +28,21 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         var today = Today;
         var earliestLine = today.AddDays(-30);
         var assetId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, earliestLine, 1_000m, cancellationToken, quantity: 1_000m);
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-10), 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, earliestLine, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, today.AddDays(-10), 1_000m, cancellationToken, quantity: 1_000m);
         }
 
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(AssetRemovedEvent(assetId, portfolioId, userId), cancellationToken);
+            await bus.Publish(AssetRemovedEvent(assetId, accountId, userId), cancellationToken);
 
             await WaitForPositionGoneAsync(provider, assetId, cancellationToken);
 
@@ -59,27 +59,27 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         var today = Today;
         var yesterday = today.AddDays(-1);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var removedAssetId = Guid.NewGuid();
         var keptAssetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(removedAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(removedAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
-            await db.SeedPositionAsync(keptAssetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(keptAssetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 2_000m);
 
-            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, yesterday, 1_000m, cancellationToken, quantity: 1_000m);
-            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
-            await db.SeedValuationLineAsync(userId, portfolioId, keptAssetId, today, 2_000m, cancellationToken, quantity: 2_000m);
+            await db.SeedValuationLineAsync(userId, accountId, removedAssetId, yesterday, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, accountId, removedAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, accountId, keptAssetId, today, 2_000m, cancellationToken, quantity: 2_000m);
             await db.SeedSnapshotAsync(userId, today, 3_000m, cancellationToken);
         }
 
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(AssetRemovedEvent(removedAssetId, portfolioId, userId), cancellationToken);
+            await bus.Publish(AssetRemovedEvent(removedAssetId, accountId, userId), cancellationToken);
 
             await WaitForPositionGoneAsync(provider, removedAssetId, cancellationToken);
 
@@ -88,11 +88,11 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
             Assert.Equal(2_000m, snapshot.TotalPln);
             Assert.Equal(userId, snapshot.UserId);
 
-            var todaysLine = Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
+            var todaysLine = Assert.Single(await GetLinesAsync(containers, accountId, today, cancellationToken));
             Assert.Equal(keptAssetId, todaysLine.AssetId);
             Assert.Equal(2_000m, todaysLine.ValuePln);
 
-            var yesterdaysLine = Assert.Single(await GetLinesAsync(containers, portfolioId, yesterday, cancellationToken));
+            var yesterdaysLine = Assert.Single(await GetLinesAsync(containers, accountId, yesterday, cancellationToken));
             Assert.Equal(removedAssetId, yesterdaysLine.AssetId);
         }, cancellationToken);
     }
@@ -103,21 +103,21 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, today, 1_000m, cancellationToken, quantity: 1_000m);
             await db.SeedSnapshotAsync(userId, today, 1_000m, cancellationToken);
         }
 
         await RunConsumerAsync(async provider =>
         {
             var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(AssetRemovedEvent(assetId, portfolioId, userId), cancellationToken);
+            await bus.Publish(AssetRemovedEvent(assetId, accountId, userId), cancellationToken);
 
             await WaitForPositionGoneAsync(provider, assetId, cancellationToken);
 
@@ -126,52 +126,7 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
             Assert.Equal(0m, snapshot.TotalPln);
             Assert.Equal(userId, snapshot.UserId);
 
-            Assert.Empty(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
-        }, cancellationToken);
-    }
-
-    // PortfolioDeletedConsumer sweeps on its own queue, so a revaluation here could resurrect a zero snapshot after it.
-    [Fact]
-    public async Task Consume_CascadedFromPortfolio_RemovesPositionWithoutRevaluing()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var today = Today;
-        var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
-        var removedAssetId = Guid.NewGuid();
-        var siblingAssetId = Guid.NewGuid();
-
-        await using (var db = OpenDbContext(containers))
-        {
-            await db.SeedPositionAsync(removedAssetId, userId, portfolioId, cancellationToken,
-                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
-            await db.SeedPositionAsync(siblingAssetId, userId, portfolioId, cancellationToken,
-                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 2_000m);
-
-            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, today.AddDays(-30), 1_000m, cancellationToken, quantity: 1_000m);
-            await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
-            await db.SeedValuationLineAsync(userId, portfolioId, siblingAssetId, today, 2_000m, cancellationToken, quantity: 2_000m);
-            await db.SeedSnapshotAsync(userId, today, 3_000m, cancellationToken);
-        }
-
-        await RunConsumerAsync(async provider =>
-        {
-            var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(AssetRemovedEvent(removedAssetId, portfolioId, userId, cascadedFromPortfolio: true), cancellationToken);
-
-            // Removal and any revaluation commit together, so once the Position is gone the rows are final.
-            await WaitForPositionGoneAsync(provider, removedAssetId, cancellationToken);
-
-            var snapshot = await GetSnapshotAsync(containers, userId, today, cancellationToken);
-            Assert.NotNull(snapshot);
-            Assert.Equal(3_000m, snapshot.TotalPln);
-
-            var todaysLines = await GetLinesAsync(containers, portfolioId, today, cancellationToken);
-            Assert.Equal(2, todaysLines.Count);
-            Assert.Contains(todaysLines, l => l.AssetId == removedAssetId && l.ValuePln == 1_000m);
-            Assert.Contains(todaysLines, l => l.AssetId == siblingAssetId && l.ValuePln == 2_000m);
-
-            Assert.Null(await GetRebuildRequestAsync(containers, userId, cancellationToken));
+            Assert.Empty(await GetLinesAsync(containers, accountId, today, cancellationToken));
         }, cancellationToken);
     }
 

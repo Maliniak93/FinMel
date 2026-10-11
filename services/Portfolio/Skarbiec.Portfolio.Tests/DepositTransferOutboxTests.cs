@@ -25,14 +25,10 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid savingsId;
-        Guid walletId;
         Guid cashId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
         }
 
         int positionEventsBefore;
@@ -48,7 +44,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
-                PortfolioApi.NewDepositRequest(portfolioId: savingsId, principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+                PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
             depositId = result.Value.AssetId;
         }
@@ -61,12 +57,12 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(2, events.Count);
         var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
         Assert.Equal(4_000m, cashEvent.Quantity);
-        Assert.Equal(walletId, cashEvent.PortfolioId);
+        Assert.Null(cashEvent.AccountId);
         Assert.Equal(AssetClass.Cash, cashEvent.AssetClass);
         Assert.Equal(UserId, cashEvent.UserId);
         var depositEvent = Assert.Single(events, e => e.AssetId == depositId);
         Assert.Equal(1_000m, depositEvent.Quantity);
-        Assert.Equal(savingsId, depositEvent.PortfolioId);
+        Assert.Null(depositEvent.AccountId);
         Assert.Equal(AssetClass.Deposit, depositEvent.AssetClass);
 
         var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
@@ -81,16 +77,13 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid savingsId;
         Guid cashId;
         Guid depositId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
-                PortfolioApi.NewDepositRequest(portfolioId: savingsId, principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+                PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -136,16 +129,13 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid savingsId;
         Guid cashId;
         Guid depositId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
-                PortfolioApi.NewDepositRequest(portfolioId: savingsId, principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+                PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -182,17 +172,13 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid savingsId;
-        Guid walletId;
         Guid cashId;
         Guid depositId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: savingsId), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -221,13 +207,13 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(2, events.Count);
         var depositEvent = Assert.Single(events, e => e.AssetId == depositId);
         Assert.Equal(0m, depositEvent.Quantity);
-        Assert.Equal(savingsId, depositEvent.PortfolioId);
+        Assert.Null(depositEvent.AccountId);
         Assert.Equal(AssetClass.Deposit, depositEvent.AssetClass);
         Assert.Equal(UserId, depositEvent.UserId);
         Assert.True(depositEvent.Version > eventsBefore.Where(e => e.AssetId == depositId).Max(e => e.Version));
         var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
         Assert.Equal(15_119.83m, cashEvent.Quantity);
-        Assert.Equal(walletId, cashEvent.PortfolioId);
+        Assert.Null(cashEvent.AccountId);
         Assert.Equal(AssetClass.Cash, cashEvent.AssetClass);
         Assert.True(cashEvent.Version > eventsBefore.Where(e => e.AssetId == cashId).Max(e => e.Version));
 
@@ -246,21 +232,16 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
     public async Task SettleDepositIntoSavings_PublishesBothPositions()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-
-        Guid depositPortfolioId;
         Guid depositId;
-        Guid savingsPortfolioId;
         Guid savingsId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            savingsPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
             var account = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-                .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: savingsPortfolioId, withOpeningDeposit: false), cancellationToken);
+                .HandleAsync(PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
             Assert.True(account.IsSuccess, account.IsFailure ? account.Error.Code : null);
             savingsId = account.Value.AssetId;
-            depositPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Deposits", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: depositPortfolioId), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -286,7 +267,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         Assert.Equal(AssetClass.Deposit, depositEvent.AssetClass);
         var savingsEvent = Assert.Single(events, e => e.AssetId == savingsId);
         Assert.Equal(10_119.83m, savingsEvent.Quantity);
-        Assert.Equal(savingsPortfolioId, savingsEvent.PortfolioId);
+        Assert.Null(savingsEvent.AccountId);
         Assert.Equal(AssetClass.Savings, savingsEvent.AssetClass);
         var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
@@ -299,16 +280,14 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid savingsId;
         Guid stockId;
         Guid depositId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var brokerId = await CreatePortfolioAsync(arrange.ServiceProvider, "Broker", cancellationToken);
+            var brokerId = await CreateAccountAsync(arrange.ServiceProvider, "Broker", cancellationToken);
             stockId = await AddAssetWithBuyAsync(arrange.ServiceProvider, brokerId, "Some stock", cancellationToken);
-            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: savingsId), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -343,17 +322,13 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid savingsId;
-        Guid walletId;
         Guid cashId;
         Guid depositId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-            savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: savingsId), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
             var settled = await arrange.ServiceProvider.GetRequiredService<SettleDepositHandler>()
@@ -391,7 +366,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
             Assert.True(depositEvent.Version > eventsBefore.Where(e => e.AssetId == depositId).Max(e => e.Version));
             var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
             Assert.Equal(15_119.83m, cashEvent.Quantity);
-            Assert.Equal(walletId, cashEvent.PortfolioId);
+            Assert.Null(cashEvent.AccountId);
             Assert.True(cashEvent.Version > eventsBefore.Where(e => e.AssetId == cashId).Max(e => e.Version));
 
             var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);

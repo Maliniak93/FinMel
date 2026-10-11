@@ -32,13 +32,13 @@
   "shell": {
     "nav": {
       "dashboard": "Dashboard",
-      "portfolios": "Portfolios",
       "cash": "Cash",
       "securities": "Stocks & ETFs",
       "deposits": "Deposits & savings",
       "bonds": "Bonds",
       "metals": "Precious metals",
-      "settings": "Settings"
+      "settings": "Settings",
+      "accounts": "Accounts"
     },
     "toggleNavigation": "Toggle navigation",
     "logOut": "Log out",
@@ -138,8 +138,10 @@
       "paidOut": "Paid out"
     },
     "transferDirection": {
-      "out": "Transfer to {{ asset }} ({{ portfolio }})",
-      "in": "Transfer from {{ asset }} ({{ portfolio }})"
+      "out": "Transfer to {{ asset }}",
+      "in": "Transfer from {{ asset }}",
+      "outWithAccount": "Transfer to {{ asset }} ({{ account }})",
+      "inWithAccount": "Transfer from {{ asset }} ({{ account }})"
     },
     "syncRunStatus": {
       "running": "Running",
@@ -166,6 +168,17 @@
       "edo": "10-year inflation-indexed",
       "ros": "6-year family",
       "rod": "12-year family"
+    },
+    "accountType": {
+      "brokerage": "Brokerage",
+      "bonds": "Bonds",
+      "unknown": "Unknown"
+    },
+    "taxWrapper": {
+      "regular": "Regular",
+      "ike": "IKE",
+      "ikze": "IKZE",
+      "unknown": "Unknown"
     }
   },
   "bonds": {
@@ -212,7 +225,6 @@
       "count": "Count",
       "bookValue": "Book value",
       "maturityDate": "Matures",
-      "portfolio": "Portfolio",
       "showRedeemed": "Show redeemed",
       "swappedFrom": "from swap: {{ name }}",
       "partiallyRedeemed": "partially redeemed",
@@ -222,7 +234,8 @@
       "estimateUnavailable": {
         "rateMissing": "No MF rate for the current period",
         "marketDataUnavailable": "Valuation temporarily unavailable"
-      }
+      },
+      "account": "Account"
     },
     "status": {
       "active": "Active",
@@ -241,9 +254,6 @@
       "series": "Series from the offer",
       "manual": "Enter manually",
       "offerLoadFailed": "Failed to load the offer for this date.",
-      "portfolio": "Portfolio",
-      "portfolioRequired": "Portfolio is required.",
-      "portfoliosLoadFailed": "Failed to load portfolios.",
       "nameRequired": "Name is required.",
       "nameTooLong": "Name is too long.",
       "seriesCode": "Series code",
@@ -263,13 +273,16 @@
       "marginRange": "Enter a margin between 0 and 100.",
       "fee": "Early redemption fee per bond",
       "feeRange": "Enter a fee between 0 and 100.",
-      "taxExempt": "IKE/IKZE (no Belka tax)",
       "sourceOfFunds": "Source of funds",
       "newMoney": "New money (from outside)",
       "fundingLoadFailed": "Failed to load the sources of funds.",
       "exceedsBalance": "The cost is above the source's balance ({{ balance }}).",
       "insufficientFunds": "The source of funds cannot cover this purchase.",
-      "cost": "Cost"
+      "cost": "Cost",
+      "account": "Account",
+      "accountRequired": "Choose an account.",
+      "accountsLoadFailed": "Failed to load accounts.",
+      "noBondsAccount": "You have no Bonds account yet — create one on the Accounts page."
     },
     "settle": {
       "action": "Settle interest",
@@ -375,17 +388,11 @@
     "change": "Change",
     "allocation": "Allocation",
     "empty": "You haven't entered any wealth yet.",
-    "goToPortfolios": "Go to portfolios",
     "stale": "Stale",
-    "staleTooltip": "At least one portfolio's valuation hasn't refreshed in a while — this total may be out of date.",
+    "staleTooltip": "At least one holding's valuation hasn't refreshed in a while — this total may be out of date.",
     "asOf": "As of {{ date }}",
     "netWorthHistory": "Net worth history",
     "loadFailed": "Failed to load dashboard.",
-    "portfolios": {
-      "title": "Portfolios",
-      "empty": "No active portfolios with a value yet.",
-      "loadFailed": "Failed to load portfolios."
-    },
     "cash": {
       "title": "Cash",
       "empty": "No cash accounts yet.",
@@ -403,6 +410,13 @@
         "bondInterestDue": "Bond interest due, periods: {{ count }}",
         "savingsInterestDue": "Savings interest due, months: {{ count }}"
       }
+    },
+    "goToAccounts": "Go to accounts",
+    "accounts": {
+      "title": "Accounts",
+      "empty": "No active accounts with a value yet.",
+      "outside": "Outside accounts",
+      "loadFailed": "Failed to load accounts."
     }
   },
   "netWorthChart": {
@@ -414,74 +428,10 @@
     "notEnoughHistory": "Not enough history to chart yet.",
     "loadFailed": "Failed to load net-worth history."
   },
-  "portfolios": {
-    "title": "Portfolios",
-    "showArchived": "Show archived",
-    "newPortfolio": "New portfolio",
-    "empty": "You don't have any portfolios yet.",
-    "createFirst": "Create your first portfolio",
-    "totalValue": "Total value",
-    "noValuationYet": "No valuation yet",
-    "actionsFor": "Actions for {{ name }}",
-    "loadFailed": "Failed to load portfolios.",
-    "valuesLoadFailed": "Failed to load portfolio values.",
-    "archive": {
-      "title": "Archive this portfolio?",
-      "message": "\"{{ name }}\" will be hidden from your default list — nothing is deleted, and you can still see it by toggling \"Show archived\".",
-      "failed": "Failed to archive portfolio."
-    },
-    "restore": {
-      "title": "Restore this portfolio?",
-      "message": "\"{{ name }}\" will return to your default list.",
-      "failed": "Failed to restore portfolio."
-    },
-    "delete": {
-      "title": "Delete this portfolio?",
-      "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
-      "messageWithAssets": "\"{{ name }}\" and its {{ count }} asset(s), with all their transactions, will be permanently deleted. This can't be undone.",
-      "failed": "Failed to delete portfolio."
-    },
-    "form": {
-      "editTitle": "Edit portfolio",
-      "nameRequired": "Name is required.",
-      "nameTooLong": "Name is too long.",
-      "descriptionTooLong": "Description is too long.",
-      "currencyRequired": "Currency is required.",
-      "legacyCurrency": "{{ currency }} — outside the supported set, kept until you choose one below",
-      "legacyCurrencyHint": "This portfolio's currency isn't PLN, EUR or USD. Saving without changing it will be rejected — pick a supported currency to update it.",
-      "duplicateName": "A portfolio with this name already exists."
-    }
-  },
   "assets": {
-    "title": "Assets",
-    "titleWithName": "Assets — {{ name }}",
     "newAsset": "New asset",
-    "archivedNotice": "This portfolio is archived — restore it to make changes.",
-    "empty": "This portfolio doesn't have any assets yet.",
-    "addFirst": "Add your first asset",
-    "class": "Class",
     "quantity": "Quantity",
-    "value": "Value",
-    "valuedOn": "Valued on",
-    "maturedOn": "Matured on {{ date }}",
-    "interestToSettle": "Interest to settle",
-    "due": "Due",
-    "noPriceYet": "No price yet",
-    "priceStaleTooltip": "This instrument's price is more than 7 days old.",
-    "portfolioLoadFailed": "Failed to load portfolio.",
-    "loadFailed": "Failed to load assets.",
-    "depositLoadFailed": "Failed to load the deposit.",
-    "savingsAccountLoadFailed": "Failed to load the savings account.",
-    "bondLoadFailed": "Failed to load the bond.",
-    "metalLoadFailed": "Failed to load the precious metal holding.",
-    "delete": {
-      "title": "Delete this asset?",
-      "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
-      "messageWithTransactions": "\"{{ name }}\" and its {{ count }} transaction(s) will be permanently deleted. This can't be undone.",
-      "failed": "Failed to delete asset."
-    },
     "form": {
-      "backToTypes": "Back to asset types",
       "editTitle": "Edit asset",
       "nameRequired": "Name is required.",
       "nameTooLong": "Name is too long.",
@@ -505,8 +455,10 @@
       "verifyAndAdd": "Verify and add",
       "instrumentRequired": "Verify a ticker, or pick one from search, before creating this asset.",
       "addInstrumentFailed": "Failed to add instrument.",
-      "portfolio": "Portfolio",
-      "portfolioRequired": "Choose a portfolio."
+      "account": "Account",
+      "accountRequired": "Choose an account.",
+      "accountsLoadFailed": "Failed to load accounts.",
+      "noBrokerageAccount": "You have no Brokerage account yet — create one on the Accounts page."
     }
   },
   "transactions": {
@@ -520,7 +472,6 @@
     "valuePln": "Value (PLN)",
     "actionsFor": "Actions for {{ type }} on {{ date }}",
     "assetLoadFailed": "Failed to load asset.",
-    "portfolioLoadFailed": "Failed to load portfolio.",
     "loadFailed": "Failed to load transactions.",
     "delete": {
       "title": "Delete this transaction?",
@@ -548,15 +499,17 @@
       "title": "Delete this transfer?",
       "message": "Both sides of this transfer of {{ quantity }} — here and in \"{{ counterpart }}\" — will be permanently deleted. This can't be undone.",
       "failed": "Failed to delete the transfer."
-    }
+    },
+    "back": "Back",
+    "accountArchivedNotice": "This account is archived — restore it to make changes.",
+    "accountLoadFailed": "Failed to load account."
   },
   "cash": {
     "title": "Cash",
-    "portfolio": "Portfolio",
     "balance": "Balance",
     "totals": "Totals",
     "totalLine": "{{ currency }}: {{ amount }}",
-    "empty": "No cash accounts yet. Add a Cash asset to a portfolio to see it here.",
+    "empty": "No cash accounts yet. Add a Cash asset to see it here.",
     "loadFailed": "Failed to load cash accounts.",
     "add": "Add cash account",
     "deposit": "Deposit",
@@ -572,12 +525,12 @@
     "add": "Add",
     "columns": {
       "instrument": "Instrument",
-      "portfolio": "Portfolio",
       "quantity": "Quantity",
       "averageBuyPrice": "Avg. buy price",
       "price": "Price",
       "value": "Value",
-      "gain": "Gain/loss"
+      "gain": "Gain/loss",
+      "account": "Account"
     },
     "total": "Total",
     "buy": "Buy",
@@ -605,7 +558,6 @@
     "perGram": "{{ price }} / g",
     "perOunce": "{{ price }} / oz",
     "asOf": "as of {{ date }}",
-    "portfolio": "Portfolio",
     "weightPerPiece": "Weight per piece",
     "pieces": "Pieces",
     "totalWeight": "Total fine weight",
@@ -648,14 +600,12 @@
     "empty": "You don't have any term deposits yet.",
     "addFirst": "Add your first deposit",
     "bank": "Bank",
-    "portfolio": "Portfolio",
     "principal": "Principal",
     "rate": "Rate",
     "start": "Start",
     "maturity": "Maturity",
     "netProfit": "Net profit",
     "finalAmount": "Final amount",
-    "archivedMarker": "(archived)",
     "settleMaturity": "Settle maturity",
     "settleMaturityOf": "Settle maturity of {{ name }}",
     "payOutAction": "Pay out",
@@ -693,7 +643,6 @@
       "nameRequired": "Name is required.",
       "nameTooLong": "Name is too long.",
       "bankNameTooLong": "Bank name is too long.",
-      "portfolioRequired": "Portfolio is required.",
       "currencyRequired": "Currency is required.",
       "sourceOfFunds": "Source of funds",
       "newMoney": "New money (from outside)",
@@ -711,7 +660,6 @@
       "earlyBreakLoss": "Interest lost on early break (%)",
       "earlyBreakRequired": "Early-break loss is required.",
       "earlyBreakRange": "Early-break loss must be between 0 and 100.",
-      "portfoliosLoadFailed": "Failed to load portfolios.",
       "fundingLoadFailed": "Failed to load the sources of funds.",
       "insufficientFunds": "The source of funds cannot cover this principal."
     },
@@ -820,6 +768,43 @@
       "title": "Restore \"{{ name }}\"?",
       "message": "It counts toward net worth again from today.",
       "failed": "Failed to restore."
+    }
+  },
+  "accounts": {
+    "title": "Accounts",
+    "showArchived": "Show archived",
+    "newAccount": "New account",
+    "empty": "You don't have any accounts yet.",
+    "createFirst": "Create your first account",
+    "type": "Type",
+    "wrapper": "Tax wrapper",
+    "value": "Value",
+    "noValuationYet": "No valuation yet",
+    "loadFailed": "Failed to load accounts.",
+    "valuesLoadFailed": "Failed to load account values.",
+    "filteredNotice": "Showing one account only.",
+    "showAll": "Show all",
+    "archive": {
+      "title": "Archive this account?",
+      "message": "\"{{ name }}\" will become read-only and hidden from the default list — you can still see it by toggling \"Show archived\".",
+      "failed": "Failed to archive account."
+    },
+    "restore": {
+      "title": "Restore this account?",
+      "message": "\"{{ name }}\" will return to your default list and accept changes again.",
+      "failed": "Failed to restore account."
+    },
+    "delete": {
+      "title": "Delete this account?",
+      "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete account."
+    },
+    "form": {
+      "editTitle": "Edit account",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name is too long.",
+      "duplicateName": "An account with this name already exists.",
+      "fixedHint": "The type and tax wrapper can't be changed after the account is created."
     }
   }
 }

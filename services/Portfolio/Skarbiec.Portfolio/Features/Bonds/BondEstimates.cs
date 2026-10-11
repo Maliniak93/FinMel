@@ -37,7 +37,9 @@ internal static class BondEstimates
                     : v.NeedsCatalog && lookup.Status == BondRateLookupStatus.Unavailable
                         ? BondValuationOutcome.Unavailable(BondEstimateUnavailableReason.MarketDataUnavailable)
                     : BondValuation.Today(
-                        v.Bond.Terms, v.Bond.Settlements, lookup.Rates?.GetValueOrDefault(v.Bond.Terms.SeriesCode) ?? NoRates, today);
+                        v.Bond.Terms,
+                        BondTaxExemption.IsExempt(v.Bond.Response.TaxWrapper),
+                        v.Bond.Settlements, lookup.Rates?.GetValueOrDefault(v.Bond.Terms.SeriesCode) ?? NoRates, today);
 
                 return v.Bond.Response with { Estimate = outcome.Estimate, EstimateUnavailableReason = outcome.Reason };
             })

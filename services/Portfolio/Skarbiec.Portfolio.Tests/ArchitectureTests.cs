@@ -40,9 +40,9 @@ public sealed class ArchitectureTests
     }
 
     [Fact]
-    public void PortfolioEntities_ExposeNoDenormalizedCounters()
+    public void AccountAndAssetEntities_ExposeNoDenormalizedCounters()
     {
-        Assert.Null(typeof(PortfolioEntity).GetProperty("AssetCount"));
+        Assert.Null(typeof(Account).GetProperty("AssetCount"));
         Assert.Null(typeof(Asset).GetProperty("TransactionCount"));
     }
 }

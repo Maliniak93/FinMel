@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Metals;
@@ -17,18 +18,6 @@ public sealed class AddAssetHandler(
 {
     public async Task<Result<AssetResponse>> HandleAsync(AddAssetRequest request, CancellationToken cancellationToken)
     {
-        var portfolioId = request.PortfolioId;
-        var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
-        if (portfolio is null)
-        {
-            return PortfolioErrors.NotFound(portfolioId);
-        }
-
-        if (portfolio.IsArchived)
-        {
-            return PortfolioErrors.Archived(portfolioId);
-        }
-
         // A Deposit-class asset is a term deposit: it carries terms, so only AddDeposit creates one.
         if (request.AssetClass == AssetClass.Deposit)
         {
@@ -59,10 +48,16 @@ public sealed class AddAssetHandler(
             return TransactionErrors.TypeNotAllowedForClass(initial.Type, request.AssetClass);
         }
 
+        var account = await dbContext.ResolveAsync(request.AssetClass, request.AccountId, cancellationToken);
+        if (account.IsFailure)
+        {
+            return account.Error;
+        }
+
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
-            PortfolioId = portfolioId,
+            AccountId = account.Value?.Id,
             AssetClass = request.AssetClass,
             Name = request.Name,
             Currency = request.Currency,
@@ -145,7 +140,7 @@ public sealed class AddAssetHandler(
         }
 
         // The initial transaction is already folded into asset.Quantity, so a consumer sees the real opening state.
-        await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
+        await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

@@ -20,7 +20,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         var openingId = Assert.Single((await client.ListTransactionsAsync(deposit.AssetId, cancellationToken)).Items).Id;
         var previewResponse = await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
         Assert.Equal(HttpStatusCode.OK, previewResponse.StatusCode);
@@ -63,7 +63,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         var request = NewSettleRequest(settledOn: new DateOnly(2026, 4, 17), grossInterest: 150.00m, tax: 28.50m);
 
         var response = await client.PostAsJsonAsync(SettleDepositUri(deposit.AssetId), request, cancellationToken);
@@ -93,7 +93,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
             SettleDepositUri(deposit.AssetId), NewSettleRequest(grossInterest: 0m, tax: 0m), cancellationToken);
@@ -119,7 +119,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
             .WithRate("EUR", new DateOnly(2026, 4, 17), 4.25m);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken, NewDepositRequest(currency: "EUR"));
+        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(currency: "EUR"));
 
         var response = await client.PostAsJsonAsync(
             SettleDepositUri(deposit.AssetId), NewSettleRequest(settledOn: new DateOnly(2026, 4, 17)), cancellationToken);
@@ -144,7 +144,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         // Warsaw 2026-04-14 12:00 — the day before the 2026-04-15 maturity.
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 4, 14, 10, 0, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         // settledOn is today and after the start: valid on its own, so only the maturity rule can reject it.
         var request = NewSettleRequest(settledOn: new DateOnly(2026, 4, 14));
 
@@ -166,7 +166,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         // Today is Warsaw 2026-04-20; the deposit started 2026-01-15.
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         var request = invalidCase switch
         {
             "tax-over-gross" => NewSettleRequest(grossInterest: 147.95m, tax: 147.96m),
@@ -189,7 +189,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -213,7 +213,7 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         await client.ArchiveAssetAsync(deposit.AssetId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(SettleDepositUri(deposit.AssetId), NewSettleRequest(), cancellationToken);
@@ -229,8 +229,8 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var (cashPortfolioId, cashId) = await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddArchivedCashAssetAsync(cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -243,28 +243,13 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
-    public async Task Settle_ArchivedPortfolio_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-
-        var response = await client.PostAsJsonAsync(SettleDepositUri(deposit.AssetId), NewSettleRequest(), cancellationToken);
-
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        await client.AssertDepositUnsettledAsync(deposit.AssetId, cancellationToken);
-    }
-
-    [Fact]
     public async Task Settle_NonDepositAsset_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, _) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var _ = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(SettleDepositUri(cashId), NewSettleRequest(), cancellationToken);
 
@@ -282,9 +267,8 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetAsync(walletId, cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
         var settledOn = new DateOnly(2026, 4, 15);
 
         var response = await client.PostAsJsonAsync(
@@ -336,10 +320,10 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
     [Theory]
     [InlineData("eur-cash")]
     [InlineData("stock")]
-    [InlineData("archived-portfolio-cash")]
+    [InlineData("archived-cash")]
     [InlineData("strangers-cash")]
     [InlineData("eur-savings")]
-    [InlineData("archived-portfolio-savings")]
+    [InlineData("archived-savings")]
     [InlineData("strangers-savings")]
     public async Task Settle_InvalidDestination_ReturnsBadRequestAndSettlesNothing(string invalidCase)
     {
@@ -347,20 +331,20 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var (destinationClient, destinationPortfolioId, destinationId) = invalidCase switch
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var (destinationClient, destinationId) = invalidCase switch
         {
-            "eur-cash" => await ArrangeOwnAsync(client, (c, p) => c.AddCashAssetAsync(p, cancellationToken, currency: "EUR", name: "EUR account")),
-            "stock" => await ArrangeOwnAsync(client, (c, p) => c.AddAssetAsync(p, cancellationToken, name: "Some stock")),
-            "archived-portfolio-cash" => await ArrangeArchivedAsync(client),
-            "strangers-cash" => await ArrangeOwnAsync(stranger, (c, p) => c.AddCashAssetAsync(p, cancellationToken)),
-            "eur-savings" => await ArrangeOwnAsync(
-                client, async (c, p) => (await c.AddSavingsAccountAsync(
-                    p, cancellationToken, NewSavingsAccountRequest(currency: "EUR", withOpeningDeposit: false))).AssetId),
-            "archived-portfolio-savings" => await ArrangeArchivedSavingsAsync(client),
-            "strangers-savings" => await ArrangeOwnAsync(
-                stranger, async (c, p) => (await c.AddSavingsAccountAsync(
-                    p, cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).AssetId),
+            "eur-cash" => (client, await client.AddCashAssetAsync(cancellationToken, currency: "EUR", name: "EUR account")),
+            "stock" => (client, await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken), cancellationToken, name: "Some stock")),
+            "archived-cash" => (client, await client.AddArchivedCashAssetAsync(cancellationToken)),
+            "strangers-cash" => (stranger, await stranger.AddCashAssetAsync(cancellationToken)),
+            "eur-savings" => (
+                client,
+                (await client.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(currency: "EUR", withOpeningDeposit: false))).AssetId),
+            "archived-savings" => (client, await client.AddArchivedSavingsAccountAsync(cancellationToken)),
+            "strangers-savings" => (
+                stranger,
+                (await stranger.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).AssetId),
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
@@ -370,26 +354,8 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         await client.AssertDepositUnsettledAsync(deposit.AssetId, cancellationToken);
         var destination = await destinationClient.GetAssetAsync(destinationId, cancellationToken);
-        Assert.Equal(invalidCase == "archived-portfolio-cash" ? 5_000m : 0m, destination.Quantity);
-        Assert.Equal(invalidCase == "archived-portfolio-cash" ? 1 : 0, destination.TransactionCount);
-
-        async Task<(HttpClient, Guid, Guid)> ArrangeOwnAsync(HttpClient owner, Func<HttpClient, Guid, Task<Guid>> addAsset)
-        {
-            var walletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-            return (owner, walletId, await addAsset(owner, walletId));
-        }
-
-        async Task<(HttpClient, Guid, Guid)> ArrangeArchivedAsync(HttpClient owner)
-        {
-            var (archivedId, cashId) = await owner.AddArchivedCashAssetAsync(cancellationToken);
-            return (owner, archivedId, cashId);
-        }
-
-        async Task<(HttpClient, Guid, Guid)> ArrangeArchivedSavingsAsync(HttpClient owner)
-        {
-            var (archivedId, savingsId) = await owner.AddArchivedSavingsAccountAsync(cancellationToken);
-            return (owner, archivedId, savingsId);
-        }
+        Assert.Equal(invalidCase == "archived-cash" ? 5_000m : 0m, destination.Quantity);
+        Assert.Equal(invalidCase == "archived-cash" ? 1 : 0, destination.TransactionCount);
     }
 
     [Fact]
@@ -399,9 +365,9 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName: "Wallet");
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var account = await client.AddSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false));
         var settledOn = new DateOnly(2026, 4, 15);
 
         var response = await client.PostAsJsonAsync(

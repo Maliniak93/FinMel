@@ -18,8 +18,8 @@ public sealed record SecuritiesResponse
 public sealed record SecurityHoldingResponse
 {
     public required Guid AssetId { get; init; }
-    public required Guid PortfolioId { get; init; }
-    public required string PortfolioName { get; init; }
+    public required Guid AccountId { get; init; }
+    public required string AccountName { get; init; }
     public required string Name { get; init; }
     public required Guid InstrumentId { get; init; }
     public required string? Ticker { get; init; }

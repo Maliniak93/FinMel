@@ -24,8 +24,6 @@ import { SavingsTransferDialog } from '../savings-transfer-dialog/savings-transf
 import { SettleSavingsInterestDialog } from '../settle-savings-interest-dialog/settle-savings-interest-dialog';
 import {
   activeSavingsAccount,
-  archivedPortfolioSavingsAccount,
-  archivedPortfolioDueSavingsAccount,
   archivedSavingsAccount,
   dueSavingsAccount,
   manyMonthsDueSavingsAccount,
@@ -41,11 +39,7 @@ describe('SavingsAccounts', () => {
   let dialog: { open: ReturnType<typeof vi.fn> };
   let snackBar: { open: ReturnType<typeof vi.fn> };
 
-  const defaultAccounts = [
-    activeSavingsAccount,
-    taxFreeEurSavingsAccount,
-    archivedPortfolioSavingsAccount,
-  ];
+  const defaultAccounts = [activeSavingsAccount, taxFreeEurSavingsAccount];
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
@@ -129,14 +123,13 @@ describe('SavingsAccounts', () => {
     return labels;
   }
 
-  it('lists every account with its bank, portfolio, balance and rate', async () => {
+  it('lists every account with its bank, balance and rate', async () => {
     await setup();
 
-    expect(rows()).toHaveLength(3);
+    expect(rows()).toHaveLength(2);
     for (const account of [activeSavingsAccount, taxFreeEurSavingsAccount]) {
       const text = rowFor(account.name).textContent ?? '';
       expect(text).toContain(account.bankName!);
-      expect(text).toContain(account.portfolioName);
       expect(text).toContain(formatMoney(account.balance, account.currency));
     }
     expect(rowFor('Emergency fund').textContent).toMatch(/4[.,]5\s*%/);
@@ -156,16 +149,7 @@ describe('SavingsAccounts', () => {
     const link = rowFor('Emergency fund').querySelector<HTMLAnchorElement>('a');
 
     expect(link?.textContent).toContain('Emergency fund');
-    expect(link?.getAttribute('href')).toBe(
-      `/portfolios/${activeSavingsAccount.portfolioId}/assets/${activeSavingsAccount.assetId}/transactions`,
-    );
-  });
-
-  it('hides every action on an account of an archived portfolio', async () => {
-    await setup();
-
-    expect(rowFor('Frozen account').querySelectorAll('button')).toHaveLength(0);
-    expect(rowFor('Emergency fund').querySelectorAll('button').length).toBeGreaterThan(0);
+    expect(link?.getAttribute('href')).toBe(`/assets/${activeSavingsAccount.assetId}/transactions`);
   });
 
   it('Add opens the savings-account form for a new account and reloads after a save', async () => {
@@ -471,14 +455,6 @@ describe('SavingsAccounts', () => {
       expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
       expect(writes()).toHaveLength(0);
     });
-
-    it('a row of an archived portfolio has neither the settle nor the undo icon', async () => {
-      await setup([archivedPortfolioDueSavingsAccount]);
-
-      const row = rowFor('Frozen due account');
-      expect(settleButton(row)).toBeUndefined();
-      expect(undoButton(row)).toBeUndefined();
-    });
   });
 
   describe('transfer', () => {
@@ -489,14 +465,13 @@ describe('SavingsAccounts', () => {
           /transfer/i.test(button.getAttribute('aria-label') ?? ''),
       );
 
-    it('every active row carries the Transfer icon, an archived-portfolio row does not', async () => {
+    it('every active row carries the Transfer icon', async () => {
       await setup();
 
       for (const name of ['Emergency fund', 'IKE savings']) {
         expect(transferButton(rowFor(name))).toBeDefined();
         expect(rowFor(name).textContent).toContain('swap_horiz');
       }
-      expect(transferButton(rowFor('Frozen account'))).toBeUndefined();
     });
 
     it('opens the transfer dialog with that account and reloads after a successful transfer', async () => {

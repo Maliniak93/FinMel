@@ -19,7 +19,6 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
-  getApiPortfolioPortfolios,
   getApiPortfolioTransferCandidates,
   postApiPortfolioDeposits,
   putApiPortfolioDepositsByAssetId,
@@ -47,7 +46,6 @@ import {
 } from '../deposit-terms';
 
 export interface DepositFormDialogData {
-  portfolioId?: string;
   deposit?: DepositResponse;
 }
 
@@ -85,7 +83,6 @@ export class DepositFormDialog {
   private readonly deposit = this.data.deposit;
   protected readonly isEdit = !!this.deposit;
   private readonly isRolledOver = Number(this.deposit?.rolloverCount ?? 0) > 0;
-  protected readonly choosesPortfolio = !this.deposit && !this.data.portfolioId;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
@@ -113,10 +110,6 @@ export class DepositFormDialog {
   protected readonly form = this.formBuilder.nonNullable.group({
     name: [this.deposit?.name ?? '', [Validators.required, Validators.maxLength(200)]],
     bankName: [this.deposit?.bankName ?? '', [Validators.maxLength(100)]],
-    portfolioId: [
-      { value: this.data.portfolioId ?? '', disabled: this.isEdit },
-      [Validators.required],
-    ],
     currency: [
       { value: this.deposit?.currency ?? DEFAULT_CURRENCY, disabled: this.isEdit },
       [Validators.required],
@@ -171,20 +164,6 @@ export class DepositFormDialog {
       return null;
     }
     return depositMaturityDate(startDate, length, termUnit);
-  });
-
-  protected readonly portfoliosResource = resource({
-    params: () => (this.choosesPortfolio ? {} : undefined),
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfolios({ signal: abortSignal });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('deposits.form.portfoliosLoadFailed'),
-        );
-      }
-      return (result.data ?? []).filter((portfolio) => !portfolio.isArchived);
-    },
   });
 
   private readonly selectedCurrency = computed(() => this.formValue().currency);
@@ -274,7 +253,6 @@ export class DepositFormDialog {
       : await postApiPortfolioDeposits({
           body: {
             ...terms,
-            portfolioId: values.portfolioId,
             currency: values.currency,
             fundingAssetId: values.fundingAssetId ?? undefined,
           },

@@ -4,15 +4,13 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
-import type { CashAccountsResponse, PortfolioResponse } from '../../../api/portfolio';
+import type { AccountResponse, CashAccountsResponse } from '../../../api/portfolio';
 import { client as reportingClient } from '../../../api/reporting/client.gen';
 import type { DashboardResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { toDateOnly } from '../../../shared/date-only';
 
 export const RETIREMENT_ID = '11111111-1111-1111-1111-111111111111';
-export const SAVINGS_ID = '33333333-3333-3333-3333-333333333333';
-export const ARCHIVED_ID = '44444444-4444-4444-4444-444444444444';
 
 export const dashboard: DashboardResponse = {
   netWorthPln: 15000,
@@ -22,9 +20,9 @@ export const dashboard: DashboardResponse = {
     { assetClass: 0, valuePln: 5000, percentage: 33.33 },
     { assetClass: 2, valuePln: 10000, percentage: 66.67 },
   ],
-  byPortfolio: [
+  byAccount: [
     {
-      portfolioId: RETIREMENT_ID,
+      accountId: RETIREMENT_ID,
       valuePln: 15000,
       snapshotDate: '2026-08-09',
       isStale: false,
@@ -53,14 +51,13 @@ export function requestUrl(input: unknown): string {
   return typeof input === 'string' ? input : (input as Request).url;
 }
 
-export function portfolioResponse(overrides: Partial<PortfolioResponse> = {}): PortfolioResponse {
+export function accountResponse(overrides: Partial<AccountResponse> = {}): AccountResponse {
   return {
     id: RETIREMENT_ID,
     name: 'Retirement',
-    description: null,
-    currency: 'PLN',
+    type: 0,
+    wrapper: 0,
     isArchived: false,
-    assetCount: 1,
     ...overrides,
   };
 }
@@ -78,7 +75,7 @@ export function dateOnlyFromToday(days: number): string {
 export const API_PATHS = {
   dashboard: '/api/reporting/dashboard',
   history: '/net-worth-history',
-  portfolios: '/api/portfolio/portfolios',
+  accounts: '/api/portfolio/accounts',
   cash: '/api/portfolio/cash-accounts',
   deposits: '/api/portfolio/deposits',
   bonds: '/api/portfolio/bonds',
@@ -93,7 +90,7 @@ export type Responder = Response | ((url: string) => Response);
 const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   dashboard: jsonResponse(dashboard),
   history: jsonResponse({ range: '1Y', points: [] }),
-  portfolios: jsonResponse([]),
+  accounts: jsonResponse([]),
   cash: jsonResponse(cashAccountsResponse([])),
   deposits: jsonResponse([]),
   bonds: jsonResponse([]),

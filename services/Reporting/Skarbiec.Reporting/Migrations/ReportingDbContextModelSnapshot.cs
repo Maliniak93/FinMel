@@ -197,6 +197,9 @@ namespace Skarbiec.Reporting.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("AssetClass")
                         .HasColumnType("integer");
 
@@ -212,9 +215,6 @@ namespace Skarbiec.Reporting.Migrations
 
                     b.Property<bool>("IsStale")
                         .HasColumnType("boolean");
-
-                    b.Property<Guid>("PortfolioId")
-                        .HasColumnType("uuid");
 
                     b.Property<DateOnly?>("PriceDate")
                         .HasColumnType("date");
@@ -305,6 +305,9 @@ namespace Skarbiec.Reporting.Migrations
                     b.Property<Guid>("AssetId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateOnly?>("ArchivedOn")
                         .HasColumnType("date");
 
@@ -320,15 +323,6 @@ namespace Skarbiec.Reporting.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateOnly?>("PortfolioArchivedOn")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("PortfolioId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("PortfolioIsArchived")
                         .HasColumnType("boolean");
 
                     b.Property<decimal>("Quantity")
@@ -365,8 +359,6 @@ namespace Skarbiec.Reporting.Migrations
                         });
 
                     b.HasKey("AssetId");
-
-                    b.HasIndex("PortfolioId");
 
                     b.ToTable("Positions");
                 });

@@ -9,7 +9,7 @@ public sealed class UpdateMetalHandler(PortfolioDbContext dbContext, PositionEve
     public async Task<Result<MetalResponse>> HandleAsync(
         Guid assetId, UpdateMetalRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's holding, a non-metal asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's holding, a non-metal asset both end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.PreciousMetal, cancellationToken);
         var holding = asset is null
@@ -21,13 +21,7 @@ public sealed class UpdateMetalHandler(PortfolioDbContext dbContext, PositionEve
             return MetalErrors.NotFound(assetId);
         }
 
-        var portfolio = await dbContext.Portfolios
-            .AsNoTracking()
-            .Where(p => p.Id == asset.PortfolioId)
-            .Select(p => new { p.Name, p.IsArchived })
-            .FirstAsync(cancellationToken);
-
-        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
             return readOnly;
         }
@@ -42,6 +36,6 @@ public sealed class UpdateMetalHandler(PortfolioDbContext dbContext, PositionEve
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return holding.ToResponse(asset, portfolio.Name, portfolio.IsArchived);
+        return holding.ToResponse(asset);
     }
 }

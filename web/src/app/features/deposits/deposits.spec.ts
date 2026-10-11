@@ -36,7 +36,6 @@ import { SettleDepositDialog } from './settle-deposit-dialog/settle-deposit-dial
 import {
   activeDeposit,
   archivedDueDeposit,
-  archivedPortfolioDeposit,
   archivedSettledDeposit,
   dueDeposit,
   paidOutDeposit,
@@ -66,9 +65,7 @@ describe('Deposits', () => {
     await restoreEnglish();
   });
 
-  async function setup(
-    deposits: DepositResponse[] = [activeDeposit, dueDeposit, archivedPortfolioDeposit],
-  ): Promise<void> {
+  async function setup(deposits: DepositResponse[] = [activeDeposit, dueDeposit]): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const request = input as Request;
       if (request.method === 'DELETE') {
@@ -182,7 +179,7 @@ describe('Deposits', () => {
 
       expect(tabFor(/term deposits/i).getAttribute('aria-selected')).toBe('true');
       expect(tabFor(/savings accounts/i).getAttribute('aria-selected')).toBe('false');
-      expect(rows()).toHaveLength(3);
+      expect(rows()).toHaveLength(2);
       expect((fixture.nativeElement as HTMLElement).textContent).not.toContain(
         activeSavingsAccount.name,
       );
@@ -212,11 +209,10 @@ describe('Deposits', () => {
   it('lists every deposit with its terms and projection columns', async () => {
     await setup();
 
-    expect(rows()).toHaveLength(3);
+    expect(rows()).toHaveLength(2);
     for (const deposit of [activeDeposit, dueDeposit]) {
       const text = rowFor(deposit.name).textContent ?? '';
       expect(text).toContain(deposit.bankName!);
-      expect(text).toContain(deposit.portfolioName);
       expect(text).toContain(formatMoney(deposit.principal, deposit.currency));
       expect(text).toContain(formatMoney(deposit.projection.netInterest, deposit.currency));
       expect(text).toContain(formatMoney(deposit.projection.finalAmount, deposit.currency));
@@ -299,13 +295,6 @@ describe('Deposits', () => {
     expect(
       fetchSpy.mock.calls.some((call: unknown[]) => (call[0] as Request).method === 'DELETE'),
     ).toBe(false);
-  });
-
-  it('hides Edit / Delete on a deposit of an archived portfolio', async () => {
-    await setup();
-
-    expect(rowFor('Archived deposit').querySelectorAll('button')).toHaveLength(0);
-    expect(rowFor('Running deposit').querySelectorAll('button').length).toBeGreaterThan(0);
   });
 
   it('only the Due row carries the settle button', async () => {
@@ -707,7 +696,7 @@ describe('Deposits', () => {
     }
 
     it('renders in Polish', async () => {
-      await setup([dueDeposit, settledDeposit, archivedPortfolioDeposit]);
+      await setup([dueDeposit, settledDeposit]);
       const element = fixture.nativeElement as HTMLElement;
       const texts = async () => [
         ...labelsOf(element, 'h1'),
@@ -723,7 +712,6 @@ describe('Deposits', () => {
         'Add deposit',
         'Name',
         'Bank',
-        'Portfolio',
         'Principal',
         'Rate',
         'Start',
@@ -764,23 +752,6 @@ describe('Deposits', () => {
 
       expect(polishProblems(english, labels())).toEqual([]);
       expect(labels()[0]).toContain('Matured deposit');
-    });
-
-    it('renders the archived-portfolio marker in Polish', async () => {
-      await setup([archivedPortfolioDeposit]);
-      const element = fixture.nativeElement as HTMLElement;
-      const marker = () => textOf(element.querySelector('.deposits-page__muted'));
-
-      expect(marker()).toBe('(archived)');
-
-      await switchLanguage(fixture, 'pl');
-
-      const text = marker();
-      expect(text).not.toBe('(archived)');
-      expect(
-        matchesTranslation('pl', text) || matchesTranslation('pl', text.replace(/^\(|\)$/g, '')),
-        `"${text}" is not a pl.json value`,
-      ).toBe(true);
     });
 
     it('renders the empty state in Polish', async () => {

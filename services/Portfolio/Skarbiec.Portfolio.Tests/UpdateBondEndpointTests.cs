@@ -76,31 +76,13 @@ public sealed class UpdateBondEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
         await client.ArchiveAssetAsync(bond.AssetId, cancellationToken);
         var request = NewBondRequest(name: "After archive", bondCount: 10).ToUpdateRequest();
 
         var response = await client.PutAsJsonAsync(BondUri(bond.AssetId), request, cancellationToken);
 
         await response.AssertAssetArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetBondAsync(bond.AssetId, cancellationToken);
-        Assert.Equal("EDO1036", unchanged.Name);
-        Assert.Equal(50, unchanged.BondCount);
-    }
-
-    [Fact]
-    public async Task Update_ArchivedPortfolio_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-        var request = NewBondRequest(name: "After archive", bondCount: 10).ToUpdateRequest();
-
-        var response = await client.PutAsJsonAsync(BondUri(bond.AssetId), request, cancellationToken);
-
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
         var unchanged = await client.GetBondAsync(bond.AssetId, cancellationToken);
         Assert.Equal("EDO1036", unchanged.Name);
         Assert.Equal(50, unchanged.BondCount);
@@ -130,7 +112,6 @@ public sealed class UpdateBondEndpointTests(SkarbiecContainersFixture containers
         Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 3, 1, 10, 0, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await client.CreateFundedBondAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         await client.RedeemBondEarlyAsync(assetId, new DateOnly(2027, 3, 1), 3, funded.CashAssetId, cancellationToken);
         var request = NewBondRequest(bondCount: 40).ToUpdateRequest();

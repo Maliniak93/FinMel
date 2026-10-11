@@ -21,17 +21,13 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 2, 1, 10, 0, 0, TimeSpan.Zero));
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
 
-        var response = await client.PostAsJsonAsync(AllDepositsUri, NewDepositRequest() with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllDepositsUri, NewDepositRequest(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal(DepositUri(body.AssetId), response.Headers.Location?.OriginalString);
-        Assert.Equal(portfolioId, body.PortfolioId);
-        Assert.Equal("Savings", body.PortfolioName);
-        Assert.False(body.PortfolioIsArchived);
         Assert.Equal("Term deposit", body.Name);
         Assert.Equal("Test bank", body.BankName);
         Assert.Equal("PLN", body.Currency);
@@ -78,10 +74,9 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithRate("EUR", new DateOnly(2026, 1, 15), 4.25m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(currency: "EUR") with { PortfolioId = portfolioId }, cancellationToken);
+            AllDepositsUri, NewDepositRequest(currency: "EUR"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
@@ -110,7 +105,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var valid = NewDepositRequest();
         var request = invalidCase switch
         {
@@ -129,7 +123,7 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
-        var response = await client.PostAsJsonAsync(AllDepositsUri, request with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllDepositsUri, request, cancellationToken);
 
         await response.AssertFieldValidationErrorAsync(field, cancellationToken);
         await using var dbContext = CreateDbContext(userId);
@@ -149,7 +143,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var valid = NewDepositRequest();
         var request = boundaryCase switch
         {
@@ -162,27 +155,9 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
             _ => throw new ArgumentOutOfRangeException(nameof(boundaryCase), boundaryCase, null)
         };
 
-        var response = await client.PostAsJsonAsync(AllDepositsUri, request with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllDepositsUri, request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Add_ArchivedPortfolio_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-
-        var response = await client.PostAsJsonAsync(AllDepositsUri, NewDepositRequest() with { PortfolioId = portfolioId }, cancellationToken);
-
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
     }
 
     [Fact]
@@ -191,12 +166,10 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 5_000m);
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
 
         var response = await client.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: cashId) with { PortfolioId = savingsId }, cancellationToken);
+            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
@@ -242,14 +215,12 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
         var startDate = new DateOnly(2026, 1, 15);
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 1_000m, toppedUpOn: startDate);
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 1_000m, toppedUpOn: startDate);
 
         var response = await client.PostAsJsonAsync(
             AllDepositsUri,
-            NewDepositRequest(principal: 1_000m, startDate: startDate, fundingAssetId: cashId) with { PortfolioId = savingsId },
+            NewDepositRequest(principal: 1_000m, startDate: startDate, fundingAssetId: cashId),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -272,29 +243,27 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var accountId = await client.CreateAccountAsync(cancellationToken, name: "Wallet");
         // A valid PLN Cash source next to the invalid one: the rejection is about the chosen source.
-        await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Valid cash");
+        await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Valid cash");
         var sourceId = invalidCase switch
         {
-            "stock" => await client.AddAssetAsync(walletId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock),
-            "eur-cash" => await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, currency: "EUR", name: "EUR cash"),
-            "archived-cash" => (await client.AddArchivedCashAssetAsync(cancellationToken)).CashId,
-            "deposit-asset" => (await client.AddDepositAsync(walletId, cancellationToken, NewDepositRequest(name: "Other deposit"))).AssetId,
+            "stock" => await client.AddAssetAsync(accountId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock),
+            "eur-cash" => await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "EUR cash"),
+            "archived-cash" => await client.AddArchivedCashAssetAsync(cancellationToken),
+            "deposit-asset" => (await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Other deposit"))).AssetId,
             "unknown-id" => Guid.NewGuid(),
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: sourceId) with { PortfolioId = savingsId }, cancellationToken);
+            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: sourceId), cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
         await using var dbContext = CreateDbContext(userId);
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
     }
 
     [Fact]
@@ -303,18 +272,16 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
-        var (walletId, cashId) = await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken);
+        var cashId = await client.AddArchivedCashAssetAsync(cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: cashId) with { PortfolioId = savingsId }, cancellationToken);
+            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
         await client.AssertCashUntouchedAsync(cashId, cancellationToken);
         await using var dbContext = CreateDbContext(userId);
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
     }
 
     [Fact]
@@ -323,18 +290,15 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 5_000m);
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
 
         var response = await client.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(principal: 5_000.01m, fundingAssetId: cashId) with { PortfolioId = savingsId }, cancellationToken);
+            AllDepositsUri, NewDepositRequest(principal: 5_000.01m, fundingAssetId: cashId), cancellationToken);
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
         await client.AssertCashUntouchedAsync(cashId, cancellationToken);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Set<TermDeposit>().CountAsync(cancellationToken));
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == savingsId, cancellationToken));
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
@@ -344,14 +308,11 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(
-            walletId, cancellationToken, balance: 5_000m, toppedUpOn: new DateOnly(2026, 2, 1));
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m, toppedUpOn: new DateOnly(2026, 2, 1));
 
         var response = await client.PostAsJsonAsync(
             AllDepositsUri,
-            NewDepositRequest(principal: 1_000m, startDate: new DateOnly(2026, 1, 15), fundingAssetId: cashId) with { PortfolioId = savingsId },
+            NewDepositRequest(principal: 1_000m, startDate: new DateOnly(2026, 1, 15), fundingAssetId: cashId),
             cancellationToken);
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
@@ -361,33 +322,14 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
     }
 
     [Fact]
-    public async Task Add_FundedIntoArchivedPortfolio_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken);
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
-        await client.ArchivePortfolioAsync(savingsId, cancellationToken);
-
-        var response = await client.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: cashId) with { PortfolioId = savingsId }, cancellationToken);
-
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        await client.AssertCashUntouchedAsync(cashId, cancellationToken);
-    }
-
-    [Fact]
     public async Task Add_WithoutFundingSource_HasNoTransferOrFundingAsset()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken);
-        var savingsId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken);
 
-        var response = await client.PostAsJsonAsync(AllDepositsUri, NewDepositRequest() with { PortfolioId = savingsId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllDepositsUri, NewDepositRequest(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
@@ -402,25 +344,12 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
     }
 
     [Fact]
-    public async Task Add_ForNonExistentPortfolio_ReturnsNotFound()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        // Control: the same request into a real portfolio is accepted.
-        await client.CreatePortfolioWithDepositAsync(cancellationToken);
-
-        var response = await client.PostAsJsonAsync(AllDepositsUri, NewDepositRequest() with { PortfolioId = Guid.NewGuid() }, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Add_WithoutToken_ReturnsUnauthorized()
     {
         using var client = Factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest() with { PortfolioId = Guid.NewGuid() }, TestContext.Current.CancellationToken);
+            AllDepositsUri, NewDepositRequest(), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

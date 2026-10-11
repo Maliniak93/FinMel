@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -12,13 +14,13 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task List_AcrossPortfolios_OrdersByMaturityDateThenName()
+    public async Task List_AcrossAccounts_OrdersByMaturityDateThenName()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var firstId = await client.CreatePortfolioAsync(cancellationToken, name: "First");
-        var secondId = await client.CreatePortfolioAsync(cancellationToken, name: "Second");
+        var firstId = await client.CreateAccountAsync(cancellationToken, name: "First", type: AccountType.Bonds);
+        var secondId = await client.CreateAccountAsync(cancellationToken, name: "Second", type: AccountType.Bonds);
         var september = new DateOnly(2026, 9, 1);
         await client.AddBondAsync(firstId, cancellationToken, NewBondRequest(name: "Zeta", seriesCode: "OTS1226", type: TreasuryBondType.Ots, purchaseDate: september));
         await client.AddBondAsync(secondId, cancellationToken, NewBondRequest(name: "Edo long"));
@@ -31,11 +33,53 @@ public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers)
         var bonds = await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken);
         Assert.NotNull(bonds);
         Assert.Equal(["Alpha", "Zeta", "Ror", "Edo long"], bonds.Select(b => b.Name));
-        Assert.Equal(secondId, bonds[0].PortfolioId);
-        Assert.Equal("Second", bonds[0].PortfolioName);
-        Assert.Equal(firstId, bonds[1].PortfolioId);
-        Assert.Equal("First", bonds[1].PortfolioName);
+        Assert.Equal(secondId, bonds[0].AccountId);
+        Assert.Equal("Second", bonds[0].AccountName);
+        Assert.Equal(firstId, bonds[1].AccountId);
+        Assert.Equal("First", bonds[1].AccountName);
         Assert.Equal(new DateOnly(2026, 12, 1), bonds[0].MaturityDate);
+    }
+
+    [Fact]
+    public async Task ReturnsAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ikeId = await client.CreateAccountAsync(cancellationToken, "Obligacje IKE", AccountType.Bonds, TaxWrapper.Ike);
+        var bond = await client.AddBondAsync(ikeId, cancellationToken, NewBondRequest(name: "Edo IKE"));
+
+        var response = await client.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bonds = await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken);
+        var listed = Assert.Single(bonds!);
+        Assert.Equal(bond.AssetId, listed.AssetId);
+        Assert.Equal(ikeId, listed.AccountId);
+        Assert.Equal("Obligacje IKE", listed.AccountName);
+        Assert.Equal(TaxWrapper.Ike, listed.TaxWrapper);
+    }
+
+    [Fact]
+    public async Task ReturnsAccount_SkipsArchivedAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var closed = await client.CreateSettledTosAsync(cancellationToken);
+        await client.RedeemBondAsync(closed.Bond.AssetId, closed.CashAssetId, cancellationToken);
+        await client.ArchiveAccountAsync(closed.BondAccountId, cancellationToken);
+        var liveAccountId = await client.CreateAccountAsync(cancellationToken, name: "Live", type: AccountType.Bonds);
+        var live = await client.AddBondAsync(liveAccountId, cancellationToken, NewTosBondRequest() with { Name = "Tos live" });
+
+        var response = await client.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bonds = await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken);
+        var listed = Assert.Single(bonds!);
+        Assert.Equal(live.AssetId, listed.AssetId);
+        Assert.Equal(liveAccountId, listed.AccountId);
+        Assert.Equal("Live", listed.AccountName);
     }
 
     [Fact]
@@ -45,11 +89,11 @@ public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers)
         Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
         Factory.BondRateLookupClient.WithRates("EDO1036", (2, 4.00m));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.AddBondAsync(portfolioId, cancellationToken, NewEdoEarlyBondRequest(bondCount: 10) with { Name = "Edo A" });
-        await client.AddBondAsync(portfolioId, cancellationToken, NewEdoEarlyBondRequest(bondCount: 5) with { Name = "Edo B" });
+        var accountId = await client.CreateAccountAsync(cancellationToken, type: AccountType.Bonds);
+        await client.AddBondAsync(accountId, cancellationToken, NewEdoEarlyBondRequest(bondCount: 10) with { Name = "Edo A" });
+        await client.AddBondAsync(accountId, cancellationToken, NewEdoEarlyBondRequest(bondCount: 5) with { Name = "Edo B" });
         await client.AddBondAsync(
-            portfolioId, cancellationToken, NewTosBondRequest() with { Name = "Tos", PurchaseDate = new DateOnly(2026, 1, 15) });
+            accountId, cancellationToken, NewTosBondRequest() with { Name = "Tos", PurchaseDate = new DateOnly(2026, 1, 15) });
 
         var response = await client.GetAsync(AllBondsUri, cancellationToken);
 
@@ -70,7 +114,7 @@ public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers)
         Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
         Factory.BondRateLookupClient.WithUnavailable();
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.CreatePortfolioWithBondAsync(cancellationToken, NewEdoEarlyBondRequest());
+        await client.CreateAccountWithBondAsync(cancellationToken, NewEdoEarlyBondRequest());
 
         var response = await client.GetAsync(AllBondsUri, cancellationToken);
 

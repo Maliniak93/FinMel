@@ -20,18 +20,18 @@ public sealed class ListSecuritiesHandler(
 
         var assets = await (
                 from asset in dbContext.Assets.AsNoTracking()
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
+                join account in dbContext.Accounts.AsNoTracking() on asset.AccountId equals (Guid?)account.Id
                 where asset.AssetClass == assetClass
                     && asset.ValuationMode == AssetValuationMode.Market
                     && asset.InstrumentId != null
                     && !asset.IsArchived
-                    && !portfolio.IsArchived
-                orderby portfolio.Name, asset.Name
+                    && !account.IsArchived
+                orderby account.Name, asset.Name
                 select new
                 {
                     AssetId = asset.Id,
-                    PortfolioId = portfolio.Id,
-                    PortfolioName = portfolio.Name,
+                    AccountId = account.Id,
+                    AccountName = account.Name,
                     asset.Name,
                     InstrumentId = asset.InstrumentId!.Value,
                     asset.Currency
@@ -52,7 +52,7 @@ public sealed class ListSecuritiesHandler(
 
         var holdings = assets
             .Select(a => ToHolding(
-                a.AssetId, a.PortfolioId, a.PortfolioName, a.Name, a.InstrumentId, a.Currency,
+                a.AssetId, a.AccountId, a.AccountName, a.Name, a.InstrumentId, a.Currency,
                 SecurityCostBasis.Compute(transactions[a.AssetId]), quotes))
             .ToList();
 
@@ -70,8 +70,8 @@ public sealed class ListSecuritiesHandler(
 
     private static SecurityHoldingResponse ToHolding(
         Guid assetId,
-        Guid portfolioId,
-        string portfolioName,
+        Guid accountId,
+        string accountName,
         string name,
         Guid instrumentId,
         string currency,
@@ -100,8 +100,8 @@ public sealed class ListSecuritiesHandler(
         var holding = new SecurityHoldingResponse
         {
             AssetId = assetId,
-            PortfolioId = portfolioId,
-            PortfolioName = portfolioName,
+            AccountId = accountId,
+            AccountName = accountName,
             Name = name,
             InstrumentId = instrumentId,
             Ticker = instrument?.Ticker,

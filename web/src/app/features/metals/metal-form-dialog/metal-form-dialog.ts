@@ -1,4 +1,4 @@
-import { Component, inject, resource, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormControl,
@@ -18,7 +18,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioPortfolios,
   postApiPortfolioMetals,
   putApiPortfolioMetalsByAssetId,
   type Metal,
@@ -35,7 +34,6 @@ import { toDateOnly } from '../../../shared/date-only';
 import { METAL, METALS } from '../metal';
 
 export interface MetalFormDialogData {
-  portfolioId?: string;
   metal?: MetalResponse;
 }
 
@@ -44,7 +42,6 @@ interface MetalForm {
   name: FormControl<string>;
   fineWeight: FormControl<number | null>;
   weightUnit: FormControl<WeightUnit>;
-  portfolioId?: FormControl<string>;
   pieces?: FormControl<number | null>;
   pricePerPiece?: FormControl<number | null>;
   purchaseDate?: FormControl<Date | null>;
@@ -104,7 +101,6 @@ export class MetalFormDialog {
 
   private readonly holding = this.data.metal;
   protected readonly isEdit = !!this.holding;
-  protected readonly choosesPortfolio = !this.holding && !this.data.portfolioId;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
@@ -129,14 +125,6 @@ export class MetalFormDialog {
       nonNullable: true,
       validators: [Validators.required],
     }),
-    ...(this.choosesPortfolio
-      ? {
-          portfolioId: new FormControl('', {
-            nonNullable: true,
-            validators: [Validators.required],
-          }),
-        }
-      : {}),
     ...(this.holding
       ? {}
       : {
@@ -144,20 +132,6 @@ export class MetalFormDialog {
           pricePerPiece: new FormControl<number | null>(null, [pricePerPieceValid]),
           purchaseDate: new FormControl<Date | null>(new Date(), [purchaseDateValid]),
         }),
-  });
-
-  protected readonly portfoliosResource = resource({
-    params: () => (this.choosesPortfolio ? {} : undefined),
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfolios({ signal: abortSignal });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('deposits.form.portfoliosLoadFailed'),
-        );
-      }
-      return (result.data ?? []).filter((portfolio) => !portfolio.isArchived);
-    },
   });
 
   constructor() {
@@ -204,7 +178,6 @@ export class MetalFormDialog {
       : await postApiPortfolioMetals({
           body: {
             ...product,
-            portfolioId: this.data.portfolioId ?? values.portfolioId!,
             ...(isBlank(values.pieces)
               ? {}
               : {

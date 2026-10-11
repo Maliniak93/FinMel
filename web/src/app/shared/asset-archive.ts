@@ -11,7 +11,6 @@ import { readProblemDetails } from '../core/auth/problem-details';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
 
 export interface ArchivableAsset {
-  portfolioId: string;
   assetId: string;
   name: string;
 }

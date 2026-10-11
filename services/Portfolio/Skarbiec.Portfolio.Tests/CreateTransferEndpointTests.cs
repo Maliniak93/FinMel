@@ -110,12 +110,12 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         {
             "cash-to-deposit" => NewTransferRequest(
                 setup.CashAssetId,
-                (await client.AddDepositAsync(setup.SavingsPortfolioId, cancellationToken, NewDepositRequest(name: "Other deposit"))).AssetId),
+                (await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Other deposit"))).AssetId),
             "cash-to-stock" => NewTransferRequest(
                 setup.CashAssetId,
-                await client.AddAssetAsync(setup.CashPortfolioId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock)),
+                await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken), cancellationToken, name: "Shares", assetClass: AssetClass.Stock)),
             "eur-cash-to-pln-savings" => NewTransferRequest(
-                await client.AddCashAssetWithBalanceAsync(setup.CashPortfolioId, cancellationToken, currency: "EUR", name: "EUR cash"),
+                await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "EUR cash"),
                 setup.SavingsAssetId,
                 amount: 100m),
             "same-asset" => NewTransferRequest(setup.CashAssetId, setup.CashAssetId),
@@ -180,20 +180,20 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
     [Theory]
     [InlineData("source")]
     [InlineData("target")]
-    public async Task Create_ArchivedPortfolio_ReturnsConflict(string archivedSide)
+    public async Task Create_ArchivedAsset_ReturnsConflict(string archivedSide)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
-        await client.ArchivePortfolioAsync(archivedSide == "source" ? setup.CashPortfolioId : setup.SavingsPortfolioId, cancellationToken);
+        await client.ArchiveAssetAsync(archivedSide == "source" ? setup.CashAssetId : setup.SavingsAssetId, cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
             TransfersUri, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId), cancellationToken);
 
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        await response.AssertAssetArchivedConflictAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
     }
 }

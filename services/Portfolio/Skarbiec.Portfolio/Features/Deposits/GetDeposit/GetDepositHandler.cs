@@ -12,9 +12,8 @@ public sealed class GetDepositHandler(PortfolioDbContext dbContext, TimeProvider
         var row = await (
                 from terms in dbContext.TermDeposits.AsNoTracking()
                 join asset in dbContext.Assets on terms.AssetId equals asset.Id
-                join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
                 where asset.Id == assetId
-                select new { Terms = terms, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
+                select new { Terms = terms, Asset = asset })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (row is null)
@@ -26,6 +25,6 @@ public sealed class GetDepositHandler(PortfolioDbContext dbContext, TimeProvider
         var payout = await dbContext.LoadPayoutAsync(assetId, cancellationToken);
 
         return row.Terms.ToResponse(
-            row.Asset, row.PortfolioName, row.PortfolioIsArchived, WarsawCalendar.Today(timeProvider), funding, payout);
+            row.Asset, WarsawCalendar.Today(timeProvider), funding, payout);
     }
 }

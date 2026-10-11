@@ -28,21 +28,21 @@ public sealed class InstrumentHistoryBackfilledConsumerTests(SkarbiecContainersF
         var instrumentXId = Guid.NewGuid();
         var instrumentYId = Guid.NewGuid();
         var userAId = Guid.NewGuid();
-        var portfolioAId = Guid.NewGuid();
+        var accountAId = Guid.NewGuid();
         var userBId = Guid.NewGuid();
-        var portfolioBId = Guid.NewGuid();
+        var accountBId = Guid.NewGuid();
         var userCId = Guid.NewGuid();
-        var portfolioCId = Guid.NewGuid();
+        var accountCId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(Guid.NewGuid(), userAId, portfolioAId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), userAId, accountAId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market, instrumentId: instrumentXId,
                 currency: "PLN", quantity: 10m, quantityHistory: [(today.AddDays(-100), 10m)]);
-            await db.SeedPositionAsync(Guid.NewGuid(), userBId, portfolioBId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), userBId, accountBId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market, instrumentId: instrumentXId,
                 currency: "PLN", quantity: 5m, quantityHistory: [(today.AddDays(-60), 5m)]);
-            await db.SeedPositionAsync(Guid.NewGuid(), userCId, portfolioCId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), userCId, accountCId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market, instrumentId: instrumentYId,
                 currency: "PLN", quantity: 3m, quantityHistory: [(today.AddDays(-100), 3m)]);
         }
@@ -71,16 +71,16 @@ public sealed class InstrumentHistoryBackfilledConsumerTests(SkarbiecContainersF
         var today = Today;
         var instrumentId = Guid.NewGuid();
         var lateUserId = Guid.NewGuid();
-        var latePortfolioId = Guid.NewGuid();
+        var lateAccountId = Guid.NewGuid();
         var earlyUserId = Guid.NewGuid();
-        var earlyPortfolioId = Guid.NewGuid();
+        var earlyAccountId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(Guid.NewGuid(), lateUserId, latePortfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), lateUserId, lateAccountId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market, instrumentId: instrumentId,
                 currency: "PLN", quantity: 10m, quantityHistory: [(today.AddDays(-40), 10m)]);
-            await db.SeedPositionAsync(Guid.NewGuid(), earlyUserId, earlyPortfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), earlyUserId, earlyAccountId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market, instrumentId: instrumentId,
                 currency: "PLN", quantity: 5m, quantityHistory: [(today.AddDays(-100), 5m)]);
         }
@@ -104,11 +104,11 @@ public sealed class InstrumentHistoryBackfilledConsumerTests(SkarbiecContainersF
         var today = Today;
         var instrumentId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(Guid.NewGuid(), userId, portfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
                 assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market, instrumentId: instrumentId,
                 currency: "PLN", quantity: 10m, quantityHistory: [(today.AddDays(-100), 10m)]);
         }

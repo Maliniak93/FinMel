@@ -12,16 +12,7 @@ import {
   hasControl,
   jsonResponse,
   renderedText,
-  requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
-import {
-  archivedPortfolio,
-  reservePortfolio,
-  reservePortfolioId,
-  savingsPortfolio,
-  savingsPortfolioId,
-  selectOptionLabels,
-} from '../testing/deposit-fixtures';
 import { savingsAccountResponse } from '../testing/savings-account-fixtures';
 import {
   SavingsAccountFormDialog,
@@ -52,10 +43,7 @@ describe('SavingsAccountFormDialog', () => {
     writeResponse: () => Response = () => jsonResponse(savingsAccountResponse(), 201),
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      if (method(input) === 'GET' && /\/api\/portfolio\/portfolios(\?|$)/.test(requestUrl(input))) {
-        return jsonResponse([savingsPortfolio, archivedPortfolio, reservePortfolio]);
-      }
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
       return writeResponse();
     });
 
@@ -110,16 +98,6 @@ describe('SavingsAccountFormDialog', () => {
   };
 
   describe('create', () => {
-    it('offers only the non-archived portfolios', async () => {
-      await setup({});
-
-      const labels = await selectOptionLabels(fixture, 'portfolioId');
-
-      expect(labels).toContain('Savings');
-      expect(labels).toContain('Reserve');
-      expect(labels).not.toContain('Old savings');
-    });
-
     it('defaults the opening deposit date to today', async () => {
       await setup({});
 
@@ -132,7 +110,6 @@ describe('SavingsAccountFormDialog', () => {
       await setup({});
       await fill({
         ...validTerms,
-        portfolioId: reservePortfolioId,
         currency: 'EUR',
         taxExempt: true,
         openingAmount: 10000,
@@ -145,7 +122,6 @@ describe('SavingsAccountFormDialog', () => {
       expect(request.method).toBe('POST');
       expect(request.url).toContain(`/api/portfolio/savings-accounts`);
       expect(await request.json()).toEqual({
-        portfolioId: reservePortfolioId,
         name: 'Savings account',
         bankName: 'Test bank',
         currency: 'EUR',
@@ -158,7 +134,7 @@ describe('SavingsAccountFormDialog', () => {
 
     it('sends the opening deposit only when an amount is entered', async () => {
       await setup({});
-      await fill({ ...validTerms, portfolioId: savingsPortfolioId });
+      await fill(validTerms);
 
       await component['onSubmit']();
 
@@ -167,24 +143,7 @@ describe('SavingsAccountFormDialog', () => {
       expect(request.url).toContain(`/api/portfolio/savings-accounts`);
       const body = await request.json();
       expect(body).not.toHaveProperty('openingDeposit');
-      expect(body.portfolioId).toBe(savingsPortfolioId);
       expect(body).toMatchObject({ name: 'Savings account', currency: 'PLN', taxExempt: false });
-      expect(dialogRef.close).toHaveBeenCalledWith(true);
-    });
-
-    it('preset to a portfolio (from the asset type picker) POSTs to that portfolio', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
-      await fill({ ...validTerms, openingAmount: 500 });
-
-      await component['onSubmit']();
-
-      const [request] = writeRequests();
-      expect(request.method).toBe('POST');
-      expect(request.url).toContain(`/api/portfolio/savings-accounts`);
-      const body = await request.json();
-      expect(body.portfolioId).toBe(savingsPortfolioId);
-      expect(body.openingDeposit.amount).toBe(500);
-      expect(body.openingDeposit.date).toBe(toDateOnly(new Date()));
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
@@ -196,7 +155,7 @@ describe('SavingsAccountFormDialog', () => {
       ['openingAmount', -10],
     ])('an invalid %s (%s) blocks submit', async (field, value) => {
       await setup({});
-      await fill({ ...validTerms, portfolioId: savingsPortfolioId, openingAmount: 1000 });
+      await fill({ ...validTerms, openingAmount: 1000 });
 
       await fill({ [field]: value });
       await component['onSubmit']();
@@ -208,7 +167,7 @@ describe('SavingsAccountFormDialog', () => {
 
     it('a rate of exactly 0 and exactly 100 is accepted', async () => {
       await setup({});
-      await fill({ ...validTerms, portfolioId: savingsPortfolioId });
+      await fill(validTerms);
 
       await fill({ annualInterestRatePercent: 0 });
       await component['onSubmit']();
@@ -222,7 +181,6 @@ describe('SavingsAccountFormDialog', () => {
       await setup({});
       await fill({
         ...validTerms,
-        portfolioId: savingsPortfolioId,
         openingAmount: 1000,
         openingDate: daysFromToday(1),
       });
@@ -248,7 +206,7 @@ describe('SavingsAccountFormDialog', () => {
           400,
         ),
       );
-      await fill({ ...validTerms, portfolioId: savingsPortfolioId });
+      await fill(validTerms);
 
       await component['onSubmit']();
 
@@ -261,18 +219,18 @@ describe('SavingsAccountFormDialog', () => {
     it('an error with no matching field lands on the banner', async () => {
       await setup({}, () =>
         jsonResponse(
-          { detail: 'This portfolio is archived.', errorCode: 'Conflict.PortfolioArchived' },
+          { detail: 'This asset is archived.', errorCode: 'Conflict.AssetArchived' },
           409,
         ),
       );
-      await fill({ ...validTerms, portfolioId: savingsPortfolioId });
+      await fill(validTerms);
 
       await component['onSubmit']();
       fixture.detectChanges();
       await fixture.whenStable();
 
       const banner = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
-      expect(banner?.textContent).toContain('This portfolio is archived.');
+      expect(banner?.textContent).toContain('This asset is archived.');
       expect(dialogRef.close).not.toHaveBeenCalled();
     });
   });
@@ -291,12 +249,11 @@ describe('SavingsAccountFormDialog', () => {
       expect(findControl(form(), 'bankName').value).toBe('Old bank');
       expect(Number(findControl(form(), 'annualInterestRatePercent').value)).toBe(4);
       expect(findControl(form(), 'taxExempt').value).toBe(true);
-      for (const absent of ['portfolioId', 'currency', 'openingAmount', 'openingDate']) {
+      for (const absent of ['currency', 'openingAmount', 'openingDate']) {
         expect(hasControl(form(), absent)).toBe(false);
       }
       const element = fixture.nativeElement as HTMLElement;
       expect(element.querySelector('mat-select[formcontrolname="currency"]')).toBeNull();
-      expect(element.querySelector('mat-select[formcontrolname="portfolioId"]')).toBeNull();
 
       await fill({ name: 'Renamed account', annualInterestRatePercent: 3.5, taxExempt: false });
       await component['onSubmit']();
@@ -329,7 +286,6 @@ describe('SavingsAccountFormDialog', () => {
   describe('payout target mode', () => {
     const payoutData: SavingsAccountFormDialogData = {
       currency: 'PLN',
-      portfolioId: savingsPortfolioId,
     };
 
     async function render(): Promise<void> {
@@ -354,17 +310,6 @@ describe('SavingsAccountFormDialog', () => {
       ).toBeNull();
     });
 
-    it('defaults the portfolio to the given one and still offers the other active portfolios', async () => {
-      await setup(payoutData);
-      await render();
-
-      expect(findControl(form(), 'portfolioId').value).toBe(savingsPortfolioId);
-      const labels = await selectOptionLabels(fixture, 'portfolioId');
-      expect(labels).toContain('Savings');
-      expect(labels).toContain('Reserve');
-      expect(labels).not.toContain('Old savings');
-    });
-
     it('hides the opening deposit', async () => {
       await setup(payoutData);
       await render();
@@ -376,7 +321,7 @@ describe('SavingsAccountFormDialog', () => {
       expect(element.querySelector('[formcontrolname="openingDate"]')).toBeNull();
     });
 
-    it('POSTs in the given currency to the default portfolio, with no opening deposit, and closes with the created account', async () => {
+    it('POSTs in the given currency, with no opening deposit, and closes with the created account', async () => {
       const created = savingsAccountResponse({ assetId: 'abababab-abab-abab-abab-abababababab' });
       await setup(payoutData, () => jsonResponse(created, 201));
       await render();
@@ -394,7 +339,6 @@ describe('SavingsAccountFormDialog', () => {
       const body = await request.json();
       expect(body).not.toHaveProperty('openingDeposit');
       expect(body).toMatchObject({
-        portfolioId: savingsPortfolioId,
         name: 'Savings account',
         currency: 'PLN',
       });
@@ -402,27 +346,9 @@ describe('SavingsAccountFormDialog', () => {
       expect(dialogRef.close).toHaveBeenCalledWith(created);
     });
 
-    it('creates the account in another portfolio when one is picked', async () => {
-      await setup(payoutData);
-      await render();
-      await fill({
-        name: 'Savings account',
-        annualInterestRatePercent: 5.25,
-        portfolioId: reservePortfolioId,
-      });
-
-      await component['onSubmit']();
-
-      const [request] = writeRequests();
-      expect(request.url).toContain(`/api/portfolio/savings-accounts`);
-      const body = await request.json();
-      expect(body.portfolioId).toBe(reservePortfolioId);
-      expect(body.currency).toBe('PLN');
-    });
-
     it('plain create mode still closes with true', async () => {
       await setup({});
-      await fill({ ...validTerms, portfolioId: savingsPortfolioId });
+      await fill(validTerms);
 
       await component['onSubmit']();
 

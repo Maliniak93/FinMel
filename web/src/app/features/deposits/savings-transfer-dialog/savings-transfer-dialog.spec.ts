@@ -26,7 +26,6 @@ import {
   selectOptionLabels,
   transferCandidateRequests,
   transferCandidatesFor,
-  walletPortfolioId,
   writeRequests,
   type TransferCandidateFixture,
 } from '../testing/deposit-fixtures';
@@ -51,8 +50,6 @@ describe('SavingsTransferDialog', () => {
 
   const cash: CashAccountResponse = {
     assetId: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    portfolioId: walletPortfolioId,
-    portfolioName: 'Wallet',
     name: 'PLN wallet',
     currency: 'PLN',
     balance: 1200,
@@ -143,7 +140,6 @@ describe('SavingsTransferDialog', () => {
     const labels = await selectOptionLabels(fixture, 'cashAssetId');
     const label = labels.find((text) => text.includes(plnCashCandidate.name));
     expect(label).toBeDefined();
-    expect(label).toContain(plnCashCandidate.portfolioName);
     expect(label!.replace(/\s+/g, ' ')).toContain(
       formatMoney(plnCashCandidate.balance, 'PLN').replace(/\s+/g, ' '),
     );

@@ -1,34 +1,8 @@
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 
-import type { DepositResponse, PortfolioResponse } from '../../../api/portfolio';
+import type { DepositResponse } from '../../../api/portfolio';
 import { requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
-
-export const savingsPortfolioId = '22222222-2222-2222-2222-222222222222';
-export const reservePortfolioId = '33333333-3333-3333-3333-333333333333';
-export const archivedPortfolioId = '44444444-4444-4444-4444-444444444444';
-
-export const savingsPortfolio: PortfolioResponse = {
-  id: savingsPortfolioId,
-  name: 'Savings',
-  description: null,
-  currency: 'PLN',
-  isArchived: false,
-  assetCount: 1,
-};
-
-export const reservePortfolio: PortfolioResponse = {
-  ...savingsPortfolio,
-  id: reservePortfolioId,
-  name: 'Reserve',
-};
-
-export const archivedPortfolio: PortfolioResponse = {
-  ...savingsPortfolio,
-  id: archivedPortfolioId,
-  name: 'Old savings',
-  isArchived: true,
-};
 
 export const TERM_UNIT = { Days: 0, Months: 1 } as const;
 export const CAPITALIZATION = { AtMaturity: 0, Monthly: 1, Quarterly: 2, Yearly: 3 } as const;
@@ -37,9 +11,6 @@ export const DEPOSIT_STATUS = { Active: 0, Due: 1, Settled: 2, PaidOut: 3 } as c
 export function depositResponse(overrides: Partial<DepositResponse> = {}): DepositResponse {
   return {
     assetId: '11111111-1111-1111-1111-111111111111',
-    portfolioId: savingsPortfolioId,
-    portfolioName: 'Savings',
-    portfolioIsArchived: false,
     isArchived: false,
     name: 'Term deposit',
     bankName: 'Test bank',
@@ -68,8 +39,6 @@ export function depositResponse(overrides: Partial<DepositResponse> = {}): Depos
 
 export const activeDeposit: DepositResponse = depositResponse({
   assetId: '55555555-5555-5555-5555-555555555555',
-  portfolioId: reservePortfolioId,
-  portfolioName: 'Reserve',
   name: 'Running deposit',
   bankName: 'Bank A',
   principal: 12000,
@@ -92,15 +61,6 @@ export const dueDeposit: DepositResponse = depositResponse({
   name: 'Matured deposit',
   bankName: 'Bank B',
   status: DEPOSIT_STATUS.Due,
-});
-
-export const archivedPortfolioDeposit: DepositResponse = depositResponse({
-  assetId: '77777777-7777-7777-7777-777777777777',
-  portfolioId: archivedPortfolioId,
-  portfolioName: 'Old savings',
-  portfolioIsArchived: true,
-  name: 'Archived deposit',
-  bankName: 'Bank C',
 });
 
 export const archivedDueDeposit: DepositResponse = depositResponse({
@@ -187,26 +147,18 @@ export const rolledOverDeposit: DepositResponse = depositResponse({
 export interface TransferCandidateFixture {
   assetId: string;
   name: string;
-  portfolioId: string;
-  portfolioName: string;
   balance: number;
 }
-
-export const walletPortfolioId = '99999999-9999-9999-9999-999999999999';
 
 export const plnCashCandidate: TransferCandidateFixture = {
   assetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   name: 'Cash account',
-  portfolioId: walletPortfolioId,
-  portfolioName: 'Wallet',
   balance: 5000,
 };
 
 export const eurCashCandidate: TransferCandidateFixture = {
   assetId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
   name: 'EUR account',
-  portfolioId: walletPortfolioId,
-  portfolioName: 'Wallet',
   balance: 2500,
 };
 
@@ -215,21 +167,15 @@ export const transferCandidatesByCurrency: Record<string, TransferCandidateFixtu
   EUR: [eurCashCandidate],
 };
 
-export const reserveSavingsPortfolioId = '12121212-1212-1212-1212-121212121212';
-
 export const plnSavingsCandidate: TransferCandidateFixture = {
   assetId: 'cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd',
   name: 'Emergency fund',
-  portfolioId: reserveSavingsPortfolioId,
-  portfolioName: 'Reserve savings',
   balance: 750,
 };
 
 export const eurSavingsCandidate: TransferCandidateFixture = {
   assetId: 'efefefef-efef-efef-efef-efefefefefef',
   name: 'EUR savings',
-  portfolioId: reserveSavingsPortfolioId,
-  portfolioName: 'Reserve savings',
   balance: 300,
 };
 

@@ -4,21 +4,23 @@
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
-    @if (choosesPortfolio) {
+    @if (choosesAccount) {
       <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
-        <mat-label>{{ 'bonds.purchase.portfolio' | transloco }}</mat-label>
-        <mat-select formControlName="portfolioId">
-          @if (portfoliosResource.hasValue()) {
-            @for (portfolio of portfoliosResource.value(); track portfolio.id) {
-              <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
+        <mat-label>{{ 'bonds.purchase.account' | transloco }}</mat-label>
+        <mat-select formControlName="accountId">
+          @if (accountsResource.hasValue()) {
+            @for (account of accountsResource.value(); track account.id) {
+              <mat-option [value]="account.id">{{ account.name }}</mat-option>
             }
           }
         </mat-select>
-        @if (portfoliosResource.error(); as loadError) {
+        @if (accountsResource.error(); as loadError) {
           <mat-hint>{{ loadError.message }}</mat-hint>
+        } @else if (accountsResource.hasValue() && accountsResource.value().length === 0) {
+          <mat-hint>{{ 'bonds.purchase.noBondsAccount' | transloco }}</mat-hint>
         }
-        @if (form.controls.portfolioId.hasError('required')) {
-          <mat-error>{{ 'bonds.purchase.portfolioRequired' | transloco }}</mat-error>
+        @if (form.controls.accountId.hasError('required')) {
+          <mat-error>{{ 'bonds.purchase.accountRequired' | transloco }}</mat-error>
         }
       </mat-form-field>
     }
@@ -164,10 +166,6 @@
       }
     </mat-form-field>
 
-    <mat-slide-toggle formControlName="taxExempt" class="bond-purchase-dialog__toggle">
-      {{ 'bonds.purchase.taxExempt' | transloco }}
-    </mat-slide-toggle>
-
     @if (!isEdit) {
       <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
         <mat-label>{{ 'bonds.purchase.sourceOfFunds' | transloco }}</mat-label>
@@ -176,9 +174,7 @@
           @if (fundingCandidatesResource.hasValue()) {
             @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
               <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
-                  formatMoney(candidate.balance, currency)
-                }})
+                {{ candidate.name }} ({{ formatMoney(candidate.balance, currency) }})
               </mat-option>
             }
           }

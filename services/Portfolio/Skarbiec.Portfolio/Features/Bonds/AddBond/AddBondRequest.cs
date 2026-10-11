@@ -5,7 +5,7 @@ namespace Skarbiec.Portfolio.Features.Bonds.AddBond;
 
 public sealed record AddBondRequest : IValidatableObject
 {
-    public required Guid PortfolioId { get; init; }
+    public Guid? AccountId { get; init; }
 
     [Required, MaxLength(200)]
     public required string Name { get; init; }
@@ -35,9 +35,6 @@ public sealed record AddBondRequest : IValidatableObject
     /// <summary>PLN per bond.</summary>
     [Range(typeof(decimal), "0", "100")]
     public required decimal EarlyRedemptionFeePerBond { get; init; }
-
-    /// <summary>IKE/IKZE: no Belka tax.</summary>
-    public bool TaxExempt { get; init; }
 
     /// <summary>The Cash asset the purchase is paid from; omitted for new money from outside the app.</summary>
     public Guid? FundingAssetId { get; init; }

@@ -25,9 +25,6 @@ public sealed record DepositProjectionResponse
 public sealed record DepositResponse
 {
     public required Guid AssetId { get; init; }
-    public required Guid PortfolioId { get; init; }
-    public required string PortfolioName { get; init; }
-    public required bool PortfolioIsArchived { get; init; }
 
     public required bool IsArchived { get; init; }
 
@@ -69,8 +66,6 @@ public static class DepositMappingExtensions
     public static DepositResponse ToResponse(
         this TermDeposit terms,
         Asset asset,
-        string portfolioName,
-        bool portfolioIsArchived,
         DateOnly today,
         DepositFundingSource? funding,
         DepositPayoutInfo? payout)
@@ -89,9 +84,6 @@ public static class DepositMappingExtensions
         return new DepositResponse
         {
             AssetId = asset.Id,
-            PortfolioId = asset.PortfolioId,
-            PortfolioName = portfolioName,
-            PortfolioIsArchived = portfolioIsArchived,
             IsArchived = asset.IsArchived,
             Name = asset.Name,
             BankName = terms.BankName,

@@ -15,7 +15,7 @@ public sealed class BondValuationTests
         var today = new DateOnly(2025, 5, 13);
         var catalog = new Dictionary<int, decimal> { [2] = 4.00m };
 
-        var outcome = BondValuation.Today(bond, settlements, catalog, today);
+        var outcome = BondValuation.Today(bond, taxExempt: false, settlements, catalog, today);
 
         Assert.Null(outcome.Reason);
         var estimate = Assert.IsType<BondEstimateResponse>(outcome.Estimate);
@@ -35,7 +35,7 @@ public sealed class BondValuationTests
         var today = new DateOnly(2026, 9, 25);
         var catalog = new Dictionary<int, decimal> { [2] = 5.00m, [3] = 4.50m };
 
-        var outcome = BondValuation.Today(bond, settlements, catalog, today);
+        var outcome = BondValuation.Today(bond, taxExempt: false, settlements, catalog, today);
 
         Assert.Null(outcome.Reason);
         var estimate = Assert.IsType<BondEstimateResponse>(outcome.Estimate);
@@ -52,14 +52,14 @@ public sealed class BondValuationTests
         var bond = NewBond(TreasuryBondType.Edo, new DateOnly(2024, 3, 1), bondCount: 10, firstPeriodRate: 5.35m, fee: 3.00m);
         var settlements = new[] { NewSettlement(bond, 1, 5.35m, 53.50m) };
 
-        var outcome = BondValuation.Today(bond, settlements, new Dictionary<int, decimal>(), new DateOnly(2025, 5, 13));
+        var outcome = BondValuation.Today(bond, taxExempt: false, settlements, new Dictionary<int, decimal>(), new DateOnly(2025, 5, 13));
 
         Assert.Null(outcome.Estimate);
         Assert.Equal(BondEstimateUnavailableReason.RateMissing, outcome.Reason);
     }
 
     internal static TreasuryBond NewBond(
-        TreasuryBondType type, DateOnly purchaseDate, int bondCount, decimal firstPeriodRate, decimal fee, decimal price = 100m, bool taxExempt = false) => new()
+        TreasuryBondType type, DateOnly purchaseDate, int bondCount, decimal firstPeriodRate, decimal fee, decimal price = 100m) => new()
         {
             AssetId = Guid.NewGuid(),
             SeriesCode = "TEST0000",
@@ -69,7 +69,6 @@ public sealed class BondValuationTests
             PurchasePricePerBond = price,
             FirstPeriodRatePercent = firstPeriodRate,
             EarlyRedemptionFeePerBond = fee,
-            TaxExempt = taxExempt,
             MaturityDate = BondSchedule.MaturityDate(type, purchaseDate)
         };
 

@@ -36,7 +36,8 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
 4. **A `required` member must be in every payload.** System.Text.Json rejects a message missing a
    `required` property, so adding one (e.g. `AssetPositionChanged.IsArchived`, asset-archive) means
    updating the `*-with-extra-fields.json` fixture in the same change. A nullable, non-`required`
-   member (e.g. `AssetPositionChanged.FirstTransactionDate`, the asset's earliest transaction date)
+   member (e.g. `AssetPositionChanged.FirstTransactionDate`, the asset's earliest transaction date, or
+   `AssetPositionChanged.AccountId`, null for an asset in no account)
    needs no fixture change — a payload without it deserializes it as `null`.
    `AssetPositionChanged.QuantityHistory` (`QuantityPoint { Date, Quantity }`) is `required`: the
    end-of-day quantity on each distinct transaction date, ascending, empty without transactions,

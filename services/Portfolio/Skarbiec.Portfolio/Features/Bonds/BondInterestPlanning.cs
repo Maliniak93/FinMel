@@ -20,7 +20,7 @@ internal static class BondInterestPlanning
         DateOnly today,
         CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's bond, a non-bond asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's bond, a non-bond asset all end in 404.
         var bond = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
         var terms = bond is null
@@ -98,13 +98,13 @@ internal static class BondInterestPlanning
                 || destination.AssetClass != AssetClass.Cash
                 || !TransferRoutes.IsAllowed(bond.AssetClass, destination.AssetClass)
                 || destination.Currency != bond.Currency
-                || destination.IsArchived
-                || await dbContext.IsPortfolioArchivedAsync(destination.PortfolioId, cancellationToken))
+                || destination.IsArchived)
             {
                 return TransferErrors.InvalidCounterpart;
             }
         }
 
+        var taxExempt = await dbContext.IsTaxExemptAsync(bond, cancellationToken);
         var planned = new List<PlannedBondPeriod>(periods.Count);
         for (var i = 0; i < periods.Count; i++)
         {
@@ -113,7 +113,7 @@ internal static class BondInterestPlanning
             rates.Add(rate);
 
             var amounts = BondInterestMath.Settle(
-                terms.Type, rates, period.Start, period.End, terms.BondCount, terms.TaxExempt);
+                terms.Type, rates, period.Start, period.End, terms.BondCount, taxExempt);
             planned.Add(new PlannedBondPeriod(period, rate, terms.BondCount, amounts));
         }
 

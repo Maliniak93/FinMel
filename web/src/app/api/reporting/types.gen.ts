@@ -6,18 +6,18 @@ export type ClientOptions = {
 
 export type AssetClass = number;
 
-export type DashboardAssetClassValue = {
-    assetClass: AssetClass;
-    valuePln: number | string;
-    percentage: number | string;
-};
-
-export type DashboardPortfolioValue = {
-    portfolioId: string;
+export type DashboardAccountValue = {
+    accountId?: null | string;
     valuePln: number | string;
     percentage: number | string;
     snapshotDate: string;
     isStale: boolean;
+};
+
+export type DashboardAssetClassValue = {
+    assetClass: AssetClass;
+    valuePln: number | string;
+    percentage: number | string;
 };
 
 export type DashboardResponse = {
@@ -25,7 +25,7 @@ export type DashboardResponse = {
     asOf: null | string;
     isStale: boolean;
     byAssetClass: Array<DashboardAssetClassValue>;
-    byPortfolio: Array<DashboardPortfolioValue>;
+    byAccount: Array<DashboardAccountValue>;
 };
 
 export type NetWorthHistoryPoint = {

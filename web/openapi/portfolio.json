@@ -25,16 +25,16 @@
         }
       }
     },
-    "/api/portfolio/portfolios": {
+    "/api/portfolio/accounts": {
       "post": {
         "tags": [
-          "CreatePortfolioEndpoint"
+          "CreateAccountEndpoint"
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreatePortfolioRequest"
+                "$ref": "#/components/schemas/CreateAccountRequest"
               }
             }
           },
@@ -46,7 +46,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortfolioResponse"
+                  "$ref": "#/components/schemas/AccountResponse"
                 }
               }
             }
@@ -55,17 +55,7 @@
       },
       "get": {
         "tags": [
-          "ListPortfoliosEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "includeArchived",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          }
+          "ListAccountsEndpoint"
         ],
         "responses": {
           "200": {
@@ -75,7 +65,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PortfolioResponse"
+                    "$ref": "#/components/schemas/AccountResponse"
                   }
                 }
               }
@@ -84,10 +74,10 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{id}": {
+    "/api/portfolio/accounts/{id}": {
       "put": {
         "tags": [
-          "UpdatePortfolioEndpoint"
+          "UpdateAccountEndpoint"
         ],
         "parameters": [
           {
@@ -104,7 +94,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdatePortfolioRequest"
+                "$ref": "#/components/schemas/UpdateAccountRequest"
               }
             }
           },
@@ -116,7 +106,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortfolioResponse"
+                  "$ref": "#/components/schemas/AccountResponse"
                 }
               }
             }
@@ -125,7 +115,7 @@
       },
       "get": {
         "tags": [
-          "GetPortfolioEndpoint"
+          "GetAccountEndpoint"
         ],
         "parameters": [
           {
@@ -144,7 +134,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortfolioResponse"
+                  "$ref": "#/components/schemas/AccountResponse"
                 }
               }
             }
@@ -153,7 +143,7 @@
       },
       "delete": {
         "tags": [
-          "DeletePortfolioEndpoint"
+          "DeleteAccountEndpoint"
         ],
         "parameters": [
           {
@@ -173,10 +163,10 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{id}/archive": {
+    "/api/portfolio/accounts/{id}/archive": {
       "post": {
         "tags": [
-          "ArchivePortfolioEndpoint"
+          "ArchiveAccountEndpoint"
         ],
         "parameters": [
           {
@@ -195,7 +185,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortfolioResponse"
+                  "$ref": "#/components/schemas/AccountResponse"
                 }
               }
             }
@@ -203,10 +193,10 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{id}/restore": {
+    "/api/portfolio/accounts/{id}/restore": {
       "post": {
         "tags": [
-          "RestorePortfolioEndpoint"
+          "RestoreAccountEndpoint"
         ],
         "parameters": [
           {
@@ -225,7 +215,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortfolioResponse"
+                  "$ref": "#/components/schemas/AccountResponse"
                 }
               }
             }
@@ -267,9 +257,8 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
+            "name": "accountId",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1807,16 +1796,49 @@
   },
   "components": {
     "schemas": {
+      "AccountResponse": {
+        "required": [
+          "id",
+          "name",
+          "type",
+          "wrapper",
+          "isArchived"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/AccountType"
+          },
+          "wrapper": {
+            "$ref": "#/components/schemas/TaxWrapper"
+          },
+          "isArchived": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AccountType": {
+        "type": "integer"
+      },
       "AddAssetRequest": {
         "required": [
-          "portfolioId",
           "assetClass",
           "name"
         ],
         "type": "object",
         "properties": {
-          "portfolioId": {
-            "type": "string",
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "assetClass": {
@@ -1850,7 +1872,6 @@
       },
       "AddBondRequest": {
         "required": [
-          "portfolioId",
           "name",
           "seriesCode",
           "type",
@@ -1862,8 +1883,11 @@
         ],
         "type": "object",
         "properties": {
-          "portfolioId": {
-            "type": "string",
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "name": {
@@ -1932,9 +1956,6 @@
             ],
             "format": "double"
           },
-          "taxExempt": {
-            "type": "boolean"
-          },
           "fundingAssetId": {
             "type": [
               "null",
@@ -1946,7 +1967,6 @@
       },
       "AddDepositRequest": {
         "required": [
-          "portfolioId",
           "name",
           "currency",
           "principal",
@@ -1958,10 +1978,6 @@
         ],
         "type": "object",
         "properties": {
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "name": {
             "maxLength": 200,
             "type": "string"
@@ -2040,7 +2056,6 @@
       },
       "AddMetalRequest": {
         "required": [
-          "portfolioId",
           "name",
           "metal",
           "fineWeight",
@@ -2048,10 +2063,6 @@
         ],
         "type": "object",
         "properties": {
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "name": {
             "maxLength": 200,
             "type": "string"
@@ -2086,17 +2097,12 @@
       },
       "AddSavingsAccountRequest": {
         "required": [
-          "portfolioId",
           "name",
           "currency",
           "annualInterestRatePercent"
         ],
         "type": "object",
         "properties": {
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "name": {
             "maxLength": 200,
             "type": "string"
@@ -2142,7 +2148,6 @@
       "AssetResponse": {
         "required": [
           "id",
-          "portfolioId",
           "assetClass",
           "valuationMode",
           "name",
@@ -2157,8 +2162,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "portfolioId": {
-            "type": "string",
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "assetClass": {
@@ -2655,9 +2663,9 @@
       "BondResponse": {
         "required": [
           "assetId",
-          "portfolioId",
-          "portfolioName",
-          "portfolioIsArchived",
+          "accountId",
+          "accountName",
+          "taxWrapper",
           "isArchived",
           "name",
           "seriesCode",
@@ -2667,7 +2675,6 @@
           "purchasePricePerBond",
           "firstPeriodRatePercent",
           "earlyRedemptionFeePerBond",
-          "taxExempt",
           "maturityDate",
           "nominalValue",
           "bookValue",
@@ -2682,15 +2689,15 @@
             "type": "string",
             "format": "uuid"
           },
-          "portfolioId": {
+          "accountId": {
             "type": "string",
             "format": "uuid"
           },
-          "portfolioName": {
+          "accountName": {
             "type": "string"
           },
-          "portfolioIsArchived": {
-            "type": "boolean"
+          "taxWrapper": {
+            "$ref": "#/components/schemas/TaxWrapper"
           },
           "isArchived": {
             "type": "boolean"
@@ -2748,9 +2755,6 @@
               "string"
             ],
             "format": "double"
-          },
-          "taxExempt": {
-            "type": "boolean"
           },
           "maturityDate": {
             "type": "string",
@@ -2920,8 +2924,6 @@
       "CashAccountResponse": {
         "required": [
           "assetId",
-          "portfolioId",
-          "portfolioName",
           "name",
           "currency",
           "balance"
@@ -2931,13 +2933,6 @@
           "assetId": {
             "type": "string",
             "format": "uuid"
-          },
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "portfolioName": {
-            "type": "string"
           },
           "name": {
             "type": "string"
@@ -2996,9 +2991,11 @@
           }
         }
       },
-      "CreatePortfolioRequest": {
+      "CreateAccountRequest": {
         "required": [
-          "name"
+          "name",
+          "type",
+          "wrapper"
         ],
         "type": "object",
         "properties": {
@@ -3006,15 +3003,11 @@
             "maxLength": 200,
             "type": "string"
           },
-          "description": {
-            "maxLength": 1000,
-            "type": [
-              "null",
-              "string"
-            ]
+          "type": {
+            "$ref": "#/components/schemas/AccountType"
           },
-          "currency": {
-            "type": "string"
+          "wrapper": {
+            "$ref": "#/components/schemas/TaxWrapper"
           }
         }
       },
@@ -3121,9 +3114,6 @@
       "DepositResponse": {
         "required": [
           "assetId",
-          "portfolioId",
-          "portfolioName",
-          "portfolioIsArchived",
           "isArchived",
           "name",
           "currency",
@@ -3145,16 +3135,6 @@
           "assetId": {
             "type": "string",
             "format": "uuid"
-          },
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "portfolioName": {
-            "type": "string"
-          },
-          "portfolioIsArchived": {
-            "type": "boolean"
           },
           "isArchived": {
             "type": "boolean"
@@ -3381,9 +3361,6 @@
       "MetalResponse": {
         "required": [
           "assetId",
-          "portfolioId",
-          "portfolioName",
-          "portfolioIsArchived",
           "isArchived",
           "name",
           "metal",
@@ -3396,16 +3373,6 @@
           "assetId": {
             "type": "string",
             "format": "uuid"
-          },
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "portfolioName": {
-            "type": "string"
-          },
-          "portfolioIsArchived": {
-            "type": "boolean"
           },
           "isArchived": {
             "type": "boolean"
@@ -3520,45 +3487,6 @@
           "date": {
             "type": "string",
             "format": "date"
-          }
-        }
-      },
-      "PortfolioResponse": {
-        "required": [
-          "id",
-          "name",
-          "currency",
-          "isArchived",
-          "assetCount"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "currency": {
-            "type": "string"
-          },
-          "isArchived": {
-            "type": "boolean"
-          },
-          "assetCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
           }
         }
       },
@@ -3694,9 +3622,6 @@
       "SavingsAccountResponse": {
         "required": [
           "assetId",
-          "portfolioId",
-          "portfolioName",
-          "portfolioIsArchived",
           "isArchived",
           "name",
           "currency",
@@ -3711,16 +3636,6 @@
           "assetId": {
             "type": "string",
             "format": "uuid"
-          },
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "portfolioName": {
-            "type": "string"
-          },
-          "portfolioIsArchived": {
-            "type": "boolean"
           },
           "isArchived": {
             "type": "boolean"
@@ -3954,8 +3869,8 @@
       "SecurityHoldingResponse": {
         "required": [
           "assetId",
-          "portfolioId",
-          "portfolioName",
+          "accountId",
+          "accountName",
           "name",
           "instrumentId",
           "ticker",
@@ -3978,11 +3893,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "portfolioId": {
+          "accountId": {
             "type": "string",
             "format": "uuid"
           },
-          "portfolioName": {
+          "accountName": {
             "type": "string"
           },
           "name": {
@@ -4313,6 +4228,9 @@
           }
         }
       },
+      "TaxWrapper": {
+        "type": "integer"
+      },
       "TransactionResponse": {
         "required": [
           "id",
@@ -4402,8 +4320,6 @@
           "manual",
           "counterpartAssetId",
           "counterpartAssetName",
-          "counterpartPortfolioId",
-          "counterpartPortfolioName",
           "direction"
         ],
         "type": "object",
@@ -4422,12 +4338,11 @@
           "counterpartAssetName": {
             "type": "string"
           },
-          "counterpartPortfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "counterpartPortfolioName": {
-            "type": "string"
+          "counterpartAccountName": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "direction": {
             "$ref": "#/components/schemas/TransferDirection"
@@ -4441,8 +4356,6 @@
         "required": [
           "assetId",
           "name",
-          "portfolioId",
-          "portfolioName",
           "balance"
         ],
         "type": "object",
@@ -4452,13 +4365,6 @@
             "format": "uuid"
           },
           "name": {
-            "type": "string"
-          },
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "portfolioName": {
             "type": "string"
           },
           "balance": {
@@ -4476,6 +4382,18 @@
       },
       "TreasuryBondType": {
         "type": "integer"
+      },
+      "UpdateAccountRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        }
       },
       "UpdateAssetRequest": {
         "required": [
@@ -4582,9 +4500,6 @@
               "string"
             ],
             "format": "double"
-          },
-          "taxExempt": {
-            "type": "boolean"
           }
         }
       },
@@ -4697,29 +4612,6 @@
           }
         }
       },
-      "UpdatePortfolioRequest": {
-        "required": [
-          "name",
-          "currency"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "maxLength": 200,
-            "type": "string"
-          },
-          "description": {
-            "maxLength": 1000,
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "currency": {
-            "type": "string"
-          }
-        }
-      },
       "UpdateSavingsAccountRequest": {
         "required": [
           "name",
@@ -4801,25 +4693,25 @@
       "name": "Skarbiec.Portfolio"
     },
     {
-      "name": "CreatePortfolioEndpoint"
+      "name": "CreateAccountEndpoint"
     },
     {
-      "name": "ListPortfoliosEndpoint"
+      "name": "ListAccountsEndpoint"
     },
     {
-      "name": "UpdatePortfolioEndpoint"
+      "name": "UpdateAccountEndpoint"
     },
     {
-      "name": "GetPortfolioEndpoint"
+      "name": "GetAccountEndpoint"
     },
     {
-      "name": "DeletePortfolioEndpoint"
+      "name": "DeleteAccountEndpoint"
     },
     {
-      "name": "ArchivePortfolioEndpoint"
+      "name": "ArchiveAccountEndpoint"
     },
     {
-      "name": "RestorePortfolioEndpoint"
+      "name": "RestoreAccountEndpoint"
     },
     {
       "name": "AddAssetEndpoint"

@@ -6,7 +6,6 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-// A cascaded removal leaves history to PortfolioDeleted's sweep and skips revaluation so it never races it.
 public sealed class AssetRemovedConsumer(ReportingDbContext db, SnapshotWriter snapshotWriter) : IConsumer<AssetRemoved>
 {
     public async Task Consume(ConsumeContext<AssetRemoved> context)
@@ -24,29 +23,21 @@ public sealed class AssetRemovedConsumer(ReportingDbContext db, SnapshotWriter s
             return;
         }
 
-        if (!message.CascadedFromPortfolio)
-        {
-            // IgnoreQueryFilters: a consumer has no request user.
-            var earliestLine = await db.AssetValuations
-                .IgnoreQueryFilters()
-                .Where(l => l.AssetId == message.AssetId)
-                .MinAsync(l => (DateOnly?)l.Date, cancellationToken);
+        // IgnoreQueryFilters: a consumer has no request user.
+        var earliestLine = await db.AssetValuations
+            .IgnoreQueryFilters()
+            .Where(l => l.AssetId == message.AssetId)
+            .MinAsync(l => (DateOnly?)l.Date, cancellationToken);
 
-            if (earliestLine is { } from && from < snapshotWriter.Today)
-            {
-                await HistoryRebuildRequests.RequestAsync(db, context, message.UserId, from, cancellationToken);
-            }
+        if (earliestLine is { } from && from < snapshotWriter.Today)
+        {
+            await HistoryRebuildRequests.RequestAsync(db, context, message.UserId, from, cancellationToken);
         }
 
         db.Positions.Remove(position);
 
         // Saved first so the revaluation skips this position, inside the same inbox transaction.
         await db.SaveChangesAsync(cancellationToken);
-
-        if (message.CascadedFromPortfolio || position.PortfolioIsArchived)
-        {
-            return;
-        }
 
         await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
     }

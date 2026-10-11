@@ -20,16 +20,13 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Metals");
 
-        var response = await client.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllMetalsUri, NewMetalRequest(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal(MetalUri(body.AssetId), response.Headers.Location?.OriginalString);
-        Assert.Equal(portfolioId, body.PortfolioId);
-        Assert.Equal("Metals", body.PortfolioName);
         Assert.Equal("Maple Leaf 1 oz", body.Name);
         Assert.Equal(Metal.Silver, body.Metal);
         Assert.Equal(31.10347680m, body.FineWeightGramsPerPiece);
@@ -68,11 +65,10 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
             AllMetalsUri,
-            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram, withFirstPurchase: false) with { PortfolioId = portfolioId },
+            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram, withFirstPurchase: false),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -97,7 +93,6 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var request = invalidCase switch
         {
             "weight-zero" => NewMetalRequest(fineWeight: 0m),
@@ -110,7 +105,7 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
-        var response = await client.PostAsJsonAsync(AllMetalsUri, request with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllMetalsUri, request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await using var dbContext = CreateDbContext(userId);
@@ -120,30 +115,12 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
-    public async Task Add_ArchivedPortfolio_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(MetalTodayUtc);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-
-        var response = await client.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { PortfolioId = portfolioId }, cancellationToken);
-
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Set<MetalHolding>().CountAsync(cancellationToken));
-    }
-
-    [Fact]
     public async Task Add_WithoutToken_ReturnsUnauthorized()
     {
         using var client = Factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            AllMetalsUri, NewMetalRequest() with { PortfolioId = Guid.NewGuid() }, TestContext.Current.CancellationToken);
+            AllMetalsUri, NewMetalRequest(), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

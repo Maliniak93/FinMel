@@ -15,7 +15,7 @@ public sealed class AssetPositionChangedContractTests
 
         Assert.NotNull(evt);
         Assert.Equal(Guid.Parse("3fa85f64-5717-4562-b3fc-2c963f66afa6"), evt.AssetId);
-        Assert.Equal(Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7"), evt.PortfolioId);
+        Assert.Equal(Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7"), evt.AccountId);
         Assert.Equal(Guid.Parse("9c858901-8a57-4791-81fe-4c455b099bc9"), evt.UserId);
         Assert.Equal(AssetClass.Stock, evt.AssetClass);
         Assert.Equal(AssetValuationMode.Market, evt.ValuationMode);
@@ -23,7 +23,6 @@ public sealed class AssetPositionChangedContractTests
         Assert.Equal("USD", evt.Currency);
         Assert.Equal(12.5m, evt.Quantity);
         Assert.Equal(1m, evt.QuoteUnitsPerQuantity);
-        Assert.False(evt.PortfolioIsArchived);
         Assert.True(evt.IsArchived);
         Assert.Equal(3L, evt.Version);
         Assert.Equal(new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero), evt.OccurredAtUtc);
@@ -41,5 +40,18 @@ public sealed class AssetPositionChangedContractTests
         Assert.Equal(
             new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2025, 1, 10), 12.5m) },
             evt.QuantityHistory.Select(point => (point.Date, point.Quantity)));
+    }
+
+    [Fact]
+    public void Deserialize_WithoutAccountId_LeavesItNull()
+    {
+        var json = File.ReadAllText(Path.Combine("Fixtures", "asset-position-changed-with-extra-fields.json"))
+            .Replace("\"accountId\"", "\"unrelatedId\"", StringComparison.Ordinal);
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var evt = JsonSerializer.Deserialize<AssetPositionChanged>(json, options);
+
+        Assert.NotNull(evt);
+        Assert.Null(evt.AccountId);
     }
 }

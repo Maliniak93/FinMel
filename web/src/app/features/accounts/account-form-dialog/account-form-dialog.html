@@ -1,0 +1,58 @@
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'accounts.form.editTitle' : 'accounts.newAccount') | transloco }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" class="account-form-dialog__field">
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
+      <input matInput type="text" formControlName="name" autocomplete="off" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>{{ 'accounts.form.nameRequired' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>{{ 'accounts.form.nameTooLong' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('server')) {
+        <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="account-form-dialog__field">
+      <mat-label>{{ 'accounts.type' | transloco }}</mat-label>
+      <mat-select formControlName="type">
+        @for (type of types; track type.value) {
+          <mat-option [value]="type.value">{{ type.label | transloco }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="account-form-dialog__field">
+      <mat-label>{{ 'accounts.wrapper' | transloco }}</mat-label>
+      <mat-select formControlName="wrapper">
+        @for (wrapper of wrappers; track wrapper.value) {
+          <mat-option [value]="wrapper.value">{{ wrapper.label | transloco }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (isEdit) {
+      <p class="account-form-dialog__hint">{{ 'accounts.form.fixedHint' | transloco }}</p>
+    }
+
+    @if (formError()) {
+      <p class="account-form-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

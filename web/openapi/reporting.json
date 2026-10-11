@@ -66,6 +66,47 @@
       "AssetClass": {
         "type": "integer"
       },
+      "DashboardAccountValue": {
+        "required": [
+          "valuePln",
+          "percentage",
+          "snapshotDate",
+          "isStale"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "percentage": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "snapshotDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "isStale": {
+            "type": "boolean"
+          }
+        }
+      },
       "DashboardAssetClassValue": {
         "required": [
           "assetClass",
@@ -95,52 +136,13 @@
           }
         }
       },
-      "DashboardPortfolioValue": {
-        "required": [
-          "portfolioId",
-          "valuePln",
-          "percentage",
-          "snapshotDate",
-          "isStale"
-        ],
-        "type": "object",
-        "properties": {
-          "portfolioId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "valuePln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "percentage": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "snapshotDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "isStale": {
-            "type": "boolean"
-          }
-        }
-      },
       "DashboardResponse": {
         "required": [
           "netWorthPln",
           "asOf",
           "isStale",
           "byAssetClass",
-          "byPortfolio"
+          "byAccount"
         ],
         "type": "object",
         "properties": {
@@ -168,10 +170,10 @@
               "$ref": "#/components/schemas/DashboardAssetClassValue"
             }
           },
-          "byPortfolio": {
+          "byAccount": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DashboardPortfolioValue"
+              "$ref": "#/components/schemas/DashboardAccountValue"
             }
           }
         }

@@ -1,0 +1,41 @@
+<mat-card class="accounts-card">
+  <mat-card-content>
+    <h2 class="accounts-card__title">{{ 'dashboard.accounts.title' | transloco }}</h2>
+
+    @if (loadError(); as error) {
+      <div class="accounts-card__state" role="alert">
+        <p>{{ error.message }}</p>
+        <button mat-button type="button" (click)="reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (loading() && !ready()) {
+      <div class="accounts-card__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (rows().length === 0) {
+      <p class="accounts-card__empty">{{ 'dashboard.accounts.empty' | transloco }}</p>
+    } @else {
+      <ul class="accounts-card__list">
+        @for (row of rows(); track row.id) {
+          <li class="accounts-card__row">
+            @if (row.id !== null && row.path !== null) {
+              <a
+                class="accounts-card__name"
+                [routerLink]="row.path"
+                [queryParams]="{ account: row.id }"
+                >{{ row.name }}</a
+              >
+            } @else {
+              <span class="accounts-card__name">{{
+                'dashboard.accounts.outside' | transloco
+              }}</span>
+            }
+            <span class="accounts-card__value">{{ formatMoney(row.entry.valuePln) }}</span>
+            <span class="accounts-card__share">{{ formatPercent(row.entry.percentage) }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </mat-card-content>
+</mat-card>

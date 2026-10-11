@@ -17,7 +17,6 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         await client.SettleBondInterestAsync(assetId, [(1, null), (2, 3.75m), (3, 3.75m)], funded.CashAssetId, cancellationToken);
         var latestId = await client.GetLastBondSettlementIdAsync(assetId, cancellationToken);
@@ -47,7 +46,7 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
         Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 10, 2, 10, 0, 0, TimeSpan.Zero));
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
         await client.SettleBondInterestAsync(bond.AssetId, [(1, null)], null, cancellationToken);
         var settlementId = await client.GetLastBondSettlementIdAsync(bond.AssetId, cancellationToken);
 
@@ -67,7 +66,6 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         await client.SettleBondInterestAsync(assetId, [(1, null)], funded.CashAssetId, cancellationToken);
         var firstId = await client.GetLastBondSettlementIdAsync(assetId, cancellationToken);
@@ -88,7 +86,6 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         await client.SettleBondInterestAsync(assetId, [(1, null)], funded.CashAssetId, cancellationToken);
         var settlementId = await client.GetLastBondSettlementIdAsync(assetId, cancellationToken);
@@ -113,7 +110,6 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         var settlementId = await client.GetLastBondSettlementIdAsync(assetId, cancellationToken);
         await client.RedeemBondEarlyAsync(
@@ -135,7 +131,6 @@ public sealed class UndoBondInterestSettlementEndpointTests(SkarbiecContainersFi
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateSettledTosAsync(cancellationToken);
-        var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
         var latestId = await client.GetLastBondSettlementIdAsync(assetId, cancellationToken);
         await client.RedeemBondAsync(assetId, funded.CashAssetId, cancellationToken);

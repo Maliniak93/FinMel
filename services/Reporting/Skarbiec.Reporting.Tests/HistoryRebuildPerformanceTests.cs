@@ -30,7 +30,7 @@ public sealed class HistoryRebuildPerformanceTests(SkarbiecContainersFixture con
         var today = Today;
         var from = today.AddDays(-Days);
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var client = new FakePriceQuoteClient();
 
         await using (var db = OpenDbContext(containers))
@@ -38,7 +38,7 @@ public sealed class HistoryRebuildPerformanceTests(SkarbiecContainersFixture con
             for (var i = 0; i < 10; i++)
             {
                 var instrumentId = Guid.NewGuid();
-                await db.SeedPositionAsync(Guid.NewGuid(), userId, portfolioId, cancellationToken,
+                await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
                     assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market, instrumentId: instrumentId,
                     currency: "USD", quantity: 30m,
                     quantityHistory: [(from, 10m), (from.AddDays(400), 20m), (from.AddDays(800), 30m)]);
@@ -47,7 +47,7 @@ public sealed class HistoryRebuildPerformanceTests(SkarbiecContainersFixture con
 
             for (var i = 0; i < 10; i++)
             {
-                await db.SeedPositionAsync(Guid.NewGuid(), userId, portfolioId, cancellationToken,
+                await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
                     assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                     currency: i % 2 == 0 ? "EUR" : "USD", quantity: 5_000m,
                     quantityHistory: [(from.AddDays(i), 1_000m), (from.AddDays(500), 5_000m)]);

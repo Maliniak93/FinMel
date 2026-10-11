@@ -15,18 +15,6 @@ public sealed class AddSavingsAccountHandler(
     public async Task<Result<SavingsAccountResponse>> HandleAsync(
         AddSavingsAccountRequest request, CancellationToken cancellationToken)
     {
-        var portfolioId = request.PortfolioId;
-        var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
-        if (portfolio is null)
-        {
-            return PortfolioErrors.NotFound(portfolioId);
-        }
-
-        if (portfolio.IsArchived)
-        {
-            return PortfolioErrors.Archived(portfolioId);
-        }
-
         if (request.OpeningDeposit is { } openingDeposit && openingDeposit.Date > WarsawCalendar.Today(timeProvider))
         {
             return SavingsAccountErrors.OpeningDepositDateInFuture;
@@ -35,7 +23,6 @@ public sealed class AddSavingsAccountHandler(
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
-            PortfolioId = portfolioId,
             AssetClass = AssetClass.Savings,
             Name = request.Name,
             Currency = request.Currency,
@@ -88,13 +75,13 @@ public sealed class AddSavingsAccountHandler(
             dbContext.Transactions.Add(opening);
         }
 
-        await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
+        await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // An opening deposit dated in an earlier month makes that month Due at once.
         var interest = await dbContext.LoadSavingsInterestStatusAsync(asset.Id, WarsawCalendar.Today(timeProvider), cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, interest);
+        return terms.ToResponse(asset, interest);
     }
 }

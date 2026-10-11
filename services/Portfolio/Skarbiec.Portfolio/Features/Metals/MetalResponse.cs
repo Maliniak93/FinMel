@@ -6,9 +6,6 @@ namespace Skarbiec.Portfolio.Features.Metals;
 public sealed record MetalResponse
 {
     public required Guid AssetId { get; init; }
-    public required Guid PortfolioId { get; init; }
-    public required string PortfolioName { get; init; }
-    public required bool PortfolioIsArchived { get; init; }
 
     public required bool IsArchived { get; init; }
 
@@ -27,12 +24,9 @@ public sealed record MetalResponse
 public static class MetalMappingExtensions
 {
     public static MetalResponse ToResponse(
-        this MetalHolding holding, Asset asset, string portfolioName, bool portfolioIsArchived) => new()
+        this MetalHolding holding, Asset asset) => new()
         {
             AssetId = asset.Id,
-            PortfolioId = asset.PortfolioId,
-            PortfolioName = portfolioName,
-            PortfolioIsArchived = portfolioIsArchived,
             IsArchived = asset.IsArchived,
             Name = asset.Name,
             Metal = holding.Metal,

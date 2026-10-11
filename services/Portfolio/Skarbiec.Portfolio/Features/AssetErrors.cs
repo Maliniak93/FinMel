@@ -7,6 +7,9 @@ internal static class AssetErrors
     public static Error NotFound(Guid id) =>
         new("NotFound.Asset", $"Asset '{id}' was not found.");
 
+    public static Error AssetArchived(Guid id) =>
+        new("Conflict.AssetArchived", $"Asset '{id}' is archived — restore it to make changes.");
+
     public static Error InstrumentNotFound(Guid instrumentId) =>
         new("Validation.InstrumentNotFound", $"Instrument '{instrumentId}' was not found in MarketData.");
 

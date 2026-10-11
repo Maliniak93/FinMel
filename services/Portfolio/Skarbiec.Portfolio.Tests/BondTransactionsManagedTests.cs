@@ -18,7 +18,7 @@ public sealed class BondTransactionsManagedTests(SkarbiecContainersFixture conta
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
         var request = new RecordTransactionRequest { Type = type, Quantity = 500m, UnitPrice = 1m, Date = new DateOnly(2026, 10, 2) };
 
         var response = await client.PostAsJsonAsync(TransactionsUri(bond.AssetId), request, cancellationToken);
@@ -33,7 +33,7 @@ public sealed class BondTransactionsManagedTests(SkarbiecContainersFixture conta
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
         var openingId = Assert.Single((await client.ListTransactionsAsync(bond.AssetId, cancellationToken)).Items).Id;
         var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 9_000m, UnitPrice = 1m, Date = DefaultBondPurchaseDate };
 
@@ -49,7 +49,7 @@ public sealed class BondTransactionsManagedTests(SkarbiecContainersFixture conta
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
         var openingId = Assert.Single((await client.ListTransactionsAsync(bond.AssetId, cancellationToken)).Items).Id;
 
         var response = await client.DeleteAsync(TransactionUri(bond.AssetId, openingId), cancellationToken);

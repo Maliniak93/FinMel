@@ -25,8 +25,8 @@ const PRICE_UNAVAILABLE_REASON = {
 
 const vwce = {
   assetId: '11111111-1111-1111-1111-111111111111',
-  portfolioId: '22222222-2222-2222-2222-222222222222',
-  portfolioName: 'Alpha',
+  accountId: '22222222-2222-2222-2222-222222222222',
+  accountName: 'XTB IKE',
   name: 'Vanguard FTSE All-World',
   instrumentId: '33333333-3333-3333-3333-333333333333',
   ticker: 'VWCE',
@@ -45,8 +45,8 @@ const vwce = {
 
 const cdr = {
   assetId: '44444444-4444-4444-4444-444444444444',
-  portfolioId: '55555555-5555-5555-5555-555555555555',
-  portfolioName: 'Zeta',
+  accountId: '55555555-5555-5555-5555-555555555555',
+  accountName: 'XTB zwykly',
   name: 'CD Projekt',
   instrumentId: '66666666-6666-6666-6666-666666666666',
   ticker: 'CDR',
@@ -222,7 +222,7 @@ describe('Securities page', () => {
     const headers = Array.from(element().querySelectorAll('th')).map(textOf);
     for (const header of [
       'Instrument',
-      'Portfel',
+      'Rachunek',
       'Ilość',
       'Śr. cena zakupu',
       'Kurs',
@@ -234,7 +234,7 @@ describe('Securities page', () => {
     expect(rows()).toHaveLength(2);
     const text = textOf(rowFor('Vanguard FTSE All-World'));
     expect(text).toContain('VWCE · XETRA');
-    expect(text).toContain('Alpha');
+    expect(text).toContain('XTB IKE');
     expect(text).toContain(formatQuantity(15));
     expect(text).toContain(money(110, 'EUR'));
     expect(text).toContain(money(120, 'EUR'));
@@ -334,9 +334,33 @@ describe('Securities page', () => {
     const items = await rowMenuItems(fixture, rowFor('Vanguard FTSE All-World'));
     const link = items.find((item) => /transakcje/i.test(textOf(item)));
 
-    expect(link?.getAttribute('href')).toBe(
-      `/portfolios/${vwce.portfolioId}/assets/${vwce.assetId}/transactions`,
-    );
+    expect(link?.getAttribute('href')).toBe(`/assets/${vwce.assetId}/transactions`);
+  });
+
+  it('shows a Rachunek column with the account name of each holding', async () => {
+    await setup();
+
+    const headers = Array.from(element().querySelectorAll('th'), (th) => textOf(th));
+    expect(headers).toContain('Rachunek');
+    expect(textOf(rowFor('Vanguard FTSE All-World'))).toContain('XTB IKE');
+    expect(textOf(rowFor('CD Projekt'))).toContain('XTB zwykly');
+  });
+
+  it('filters the holdings by the account query parameter', async () => {
+    await setup();
+
+    fixture.componentRef.setInput('account', cdr.accountId);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(rows().map((row) => textOf(row))).toHaveLength(1);
+    expect(textOf(rowFor('CD Projekt'))).toContain('XTB zwykly');
+  });
+
+  it('shows every holding when no account is selected', async () => {
+    await setup();
+
+    expect(rows()).toHaveLength(2);
   });
 
   it('adds a holding of the tab class and reloads the tab', async () => {

@@ -3,7 +3,6 @@ using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.AddAsset;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
@@ -22,10 +21,9 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var scope = Provider.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
-        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
 
         var transactionResult = await scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
@@ -47,10 +45,9 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var scope = Provider.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
-        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var buyResult = await scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
             assetResult.Value.Id,
@@ -77,10 +74,9 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var scope = Provider.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
-        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
         await recordHandler.HandleAsync(
@@ -111,10 +107,9 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var scope = Provider.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
-        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
 
@@ -152,10 +147,9 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var scope = Provider.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
-        var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-            .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
         var earliest = await recordHandler.HandleAsync(
@@ -194,13 +188,12 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid portfolioId;
+        Guid accountId;
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-                .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
-            (assetId, _) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Shares",
+            accountId = await CreateAccountAsync(arrange.ServiceProvider, "Outbox test account", cancellationToken);
+            (assetId, _) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, accountId, "Shares",
             [
                 (TransactionType.Buy, 10m, new DateOnly(2024, 3, 4)),
                 (TransactionType.Buy, 5m, new DateOnly(2024, 3, 4)),
@@ -233,14 +226,13 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid portfolioId;
+        Guid accountId;
         Guid assetId;
         IReadOnlyList<Guid> transactionIds;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-                .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
-            (assetId, transactionIds) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Shares",
+            accountId = await CreateAccountAsync(arrange.ServiceProvider, "Outbox test account", cancellationToken);
+            (assetId, transactionIds) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, accountId, "Shares",
             [
                 (TransactionType.Buy, 10m, new DateOnly(2024, 3, 4)),
                 (TransactionType.Buy, 5m, new DateOnly(2024, 3, 4)),
@@ -273,14 +265,13 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        Guid portfolioId;
+        Guid accountId;
         Guid assetId;
         IReadOnlyList<Guid> transactionIds;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
-                .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
-            (assetId, transactionIds) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, portfolioId, "Shares",
+            accountId = await CreateAccountAsync(arrange.ServiceProvider, "Outbox test account", cancellationToken);
+            (assetId, transactionIds) = await AddStockWithTransactionsAsync(arrange.ServiceProvider, accountId, "Shares",
             [
                 (TransactionType.Buy, 10m, new DateOnly(2024, 3, 4)),
                 (TransactionType.Buy, 5m, new DateOnly(2024, 3, 4)),

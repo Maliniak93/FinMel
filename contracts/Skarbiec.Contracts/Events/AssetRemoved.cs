@@ -4,10 +4,7 @@ namespace Skarbiec.Contracts.Events;
 public sealed record AssetRemoved
 {
     public required Guid AssetId { get; init; }
-    public required Guid PortfolioId { get; init; }
+    public Guid? AccountId { get; init; }
     public required Guid UserId { get; init; }
     public required DateTimeOffset OccurredAtUtc { get; init; }
-
-    /// <summary>Part of a portfolio delete: a PortfolioDeleted for the same portfolio is published in the same transaction.</summary>
-    public required bool CascadedFromPortfolio { get; init; }
 }

@@ -38,8 +38,8 @@ public sealed class BondValuationPropertyTests
             bondCount,
             firstPeriodRate: random.Next(0, 2_001) / 100m,
             fee: random.Next(0, 1_001) / 100m,
-            price: 100m - random.Next(0, 1_001) / 100m,
-            taxExempt: random.Next(2) == 0);
+            price: 100m - random.Next(0, 1_001) / 100m);
+        var taxExempt = random.Next(2) == 0;
 
         var catalog = new Dictionary<int, decimal>();
         var rates = new List<decimal>();
@@ -50,7 +50,7 @@ public sealed class BondValuationPropertyTests
             rates.Add(rate);
             if (p.Index < period.Index)
             {
-                var gross = BondInterestMath.Settle(type, rates, p.Start, p.End, bondCount, bond.TaxExempt).Gross;
+                var gross = BondInterestMath.Settle(type, rates, p.Start, p.End, bondCount, taxExempt).Gross;
                 settlements.Add(BondValuationTests.NewSettlement(bond, p.Index, rate, gross));
             }
             else
@@ -59,7 +59,7 @@ public sealed class BondValuationPropertyTests
             }
         }
 
-        var outcome = BondValuation.Today(bond, settlements, catalog, today);
+        var outcome = BondValuation.Today(bond, taxExempt, settlements, catalog, today);
 
         var estimate = Assert.IsType<BondEstimateResponse>(outcome.Estimate);
         if (!BondSchedule.IsCoupon(type))

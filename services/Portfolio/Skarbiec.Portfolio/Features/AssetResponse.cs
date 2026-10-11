@@ -8,7 +8,7 @@ namespace Skarbiec.Portfolio.Features;
 public sealed record AssetResponse
 {
     public required Guid Id { get; init; }
-    public required Guid PortfolioId { get; init; }
+    public Guid? AccountId { get; init; }
     public required AssetClass AssetClass { get; init; }
     public required AssetValuationMode ValuationMode { get; init; }
     public required string Name { get; init; }
@@ -41,7 +41,7 @@ public static class AssetMappingExtensions
         decimal? fineWeightGramsPerPiece = null) => new()
         {
             Id = asset.Id,
-            PortfolioId = asset.PortfolioId,
+            AccountId = asset.AccountId,
             AssetClass = asset.AssetClass,
             ValuationMode = asset.ValuationMode,
             Name = asset.Name,

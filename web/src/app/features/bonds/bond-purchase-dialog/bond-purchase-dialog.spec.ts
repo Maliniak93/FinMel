@@ -19,16 +19,33 @@ import {
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
 import {
-  archivedPortfolio,
   plnCashCandidate,
-  reservePortfolio,
-  reservePortfolioId,
-  savingsPortfolio,
-  savingsPortfolioId,
   selectOptionLabels,
   pickSelectOption,
 } from '../../deposits/testing/deposit-fixtures';
 import { BondPurchaseDialog, type BondPurchaseDialogData } from './bond-purchase-dialog';
+
+const bondsAccountId = 'b1111111-1111-1111-1111-111111111111';
+const reserveBondsAccountId = 'b2222222-2222-2222-2222-222222222222';
+
+const accountList = [
+  { id: bondsAccountId, name: 'Obligacje IKE', type: 1, wrapper: 1, isArchived: false },
+  { id: reserveBondsAccountId, name: 'Obligacje zwykle', type: 1, wrapper: 0, isArchived: false },
+  {
+    id: 'b3333333-3333-3333-3333-333333333333',
+    name: 'Old bonds',
+    type: 1,
+    wrapper: 0,
+    isArchived: true,
+  },
+  {
+    id: 'b4444444-4444-4444-4444-444444444444',
+    name: 'XTB IKE',
+    type: 0,
+    wrapper: 1,
+    isArchived: false,
+  },
+];
 
 describe('BondPurchaseDialog', () => {
   let fixture: ComponentFixture<BondPurchaseDialog>;
@@ -67,8 +84,8 @@ describe('BondPurchaseDialog', () => {
               : [],
         );
       }
-      if (method(input) === 'GET' && /\/api\/portfolio\/portfolios(\?|$)/.test(url)) {
-        return jsonResponse([savingsPortfolio, archivedPortfolio, reservePortfolio]);
+      if (method(input) === 'GET' && /\/api\/portfolio\/accounts(\?|$)/.test(url)) {
+        return jsonResponse(accountList);
       }
       if (method(input) === 'GET' && url.includes('/api/portfolio/transfer-candidates')) {
         const currency = new URL(url).searchParams.get('currency') ?? '';
@@ -141,11 +158,10 @@ describe('BondPurchaseDialog', () => {
     firstPeriodRatePercent: 5.35,
     marginPercent: 2,
     earlyRedemptionFeePerBond: 3,
-    taxExempt: false,
   };
 
   it('lists the offer for the purchase date and reloads it when the date changes', async () => {
-    await setup({ portfolioId: savingsPortfolioId });
+    await setup({ accountId: bondsAccountId });
 
     await fill({ purchaseDate: new Date(2026, 9, 1) });
     expect(offerRequests().at(-1)!.searchParams.get('onSaleOn')).toBe('2026-10-01');
@@ -161,7 +177,7 @@ describe('BondPurchaseDialog', () => {
   });
 
   it('picking a series prefills code, type, price, rate, margin and the default fee', async () => {
-    await setup({ portfolioId: savingsPortfolioId });
+    await setup({ accountId: bondsAccountId });
     await fill({ purchaseDate: new Date(2026, 9, 1) });
 
     await pickSelectOption(fixture, 'series', 'EDO1036');
@@ -183,7 +199,7 @@ describe('BondPurchaseDialog', () => {
   });
 
   it('opened with a series prefills that series', async () => {
-    await setup({ portfolioId: savingsPortfolioId, seriesCode: 'EDO1036' });
+    await setup({ accountId: bondsAccountId, seriesCode: 'EDO1036' });
     await fill({ purchaseDate: new Date(2026, 9, 1) });
 
     await vi.waitFor(() => expect(valueOf('seriesCode')).toBe('EDO1036'));
@@ -192,7 +208,7 @@ describe('BondPurchaseDialog', () => {
   });
 
   it('"Wprowadź ręcznie" leaves every series field empty and editable', async () => {
-    await setup({ portfolioId: savingsPortfolioId });
+    await setup({ accountId: bondsAccountId });
     await switchLanguage(fixture, 'pl');
     await fill({ purchaseDate: new Date(2026, 9, 1) });
     await pickSelectOption(fixture, 'series', 'EDO1036');
@@ -212,19 +228,20 @@ describe('BondPurchaseDialog', () => {
     }
   });
 
-  it('offers only the non-archived portfolios when opened without one', async () => {
+  it('offers only the unarchived Bonds accounts when opened without one', async () => {
     await setup({});
 
-    const labels = await selectOptionLabels(fixture, 'portfolioId');
+    const labels = await selectOptionLabels(fixture, 'accountId');
 
-    expect(labels).toContain('Savings');
-    expect(labels).toContain('Reserve');
-    expect(labels).not.toContain('Old savings');
+    expect(labels).toContain('Obligacje IKE');
+    expect(labels).toContain('Obligacje zwykle');
+    expect(labels).not.toContain('Old bonds');
+    expect(labels).not.toContain('XTB IKE');
   });
 
-  it('create POSTs the purchase to the chosen portfolio and closes with true', async () => {
+  it('create POSTs the purchase to the chosen account and closes with true', async () => {
     await setup({});
-    await fill({ ...manualPurchase, portfolioId: reservePortfolioId });
+    await fill({ ...manualPurchase, accountId: reserveBondsAccountId });
 
     await component['onSubmit']();
 
@@ -233,7 +250,7 @@ describe('BondPurchaseDialog', () => {
     expect(request.url).toContain(`/api/portfolio/bonds`);
     const body = await request.json();
     expect(body).toMatchObject({
-      portfolioId: reservePortfolioId,
+      accountId: reserveBondsAccountId,
       name: 'My bond',
       seriesCode: 'EDO1036',
       type: 5,
@@ -243,26 +260,26 @@ describe('BondPurchaseDialog', () => {
       firstPeriodRatePercent: 5.35,
       marginPercent: 2,
       earlyRedemptionFeePerBond: 3,
-      taxExempt: false,
     });
+    expect(body).not.toHaveProperty('taxExempt');
     expect(body.fundingAssetId ?? null).toBeNull();
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
-  it('create preset to a portfolio POSTs to that portfolio', async () => {
-    await setup({ portfolioId: savingsPortfolioId });
+  it('create preset to an account POSTs to that account', async () => {
+    await setup({ accountId: bondsAccountId });
     await fill(manualPurchase);
 
     await component['onSubmit']();
 
     const [request] = writeRequests();
     expect(request.url).toContain(`/api/portfolio/bonds`);
-    expect((await request.json()).portfolioId).toBe(savingsPortfolioId);
+    expect((await request.json()).accountId).toBe(bondsAccountId);
   });
 
   describe('funding', () => {
     it('lists the PLN Cash candidates, defaulting to new money', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({ accountId: bondsAccountId });
 
       expect(valueOf('fundingAssetId') ?? null).toBeNull();
       const candidateRequest = fetchSpy.mock.calls
@@ -280,7 +297,7 @@ describe('BondPurchaseDialog', () => {
     });
 
     it('an amount above the selected Cash balance blocks submit', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({ accountId: bondsAccountId });
       await fill({
         ...manualPurchase,
         bondCount: 51,
@@ -299,7 +316,7 @@ describe('BondPurchaseDialog', () => {
     });
 
     it('create POSTs the chosen Cash as fundingAssetId', async () => {
-      await setup({ portfolioId: savingsPortfolioId });
+      await setup({ accountId: bondsAccountId });
       await fill({ ...manualPurchase, fundingAssetId: plnCashCandidate.assetId });
 
       await component['onSubmit']();

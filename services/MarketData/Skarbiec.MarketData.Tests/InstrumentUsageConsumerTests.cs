@@ -89,10 +89,9 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             await bus.Publish(new AssetRemoved
             {
                 AssetId = firstAssetId,
-                PortfolioId = Guid.NewGuid(),
+                AccountId = Guid.NewGuid(),
                 UserId = Guid.NewGuid(),
                 OccurredAtUtc = DateTimeOffset.UtcNow,
-                CascadedFromPortfolio = false,
             }, cancellationToken);
 
             var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
@@ -303,7 +302,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         Guid assetId, Guid instrumentId, long version, DateOnly? firstTransactionDate = null) => new()
         {
             AssetId = assetId,
-            PortfolioId = Guid.NewGuid(),
+            AccountId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             AssetClass = AssetClass.Stock,
             ValuationMode = AssetValuationMode.Market,
@@ -312,7 +311,6 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             Quantity = 1m,
             QuoteUnitsPerQuantity = 1m,
             QuantityHistory = [],
-            PortfolioIsArchived = false,
             IsArchived = false,
             Version = version,
             FirstTransactionDate = firstTransactionDate,

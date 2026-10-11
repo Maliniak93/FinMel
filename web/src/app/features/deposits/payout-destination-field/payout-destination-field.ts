@@ -42,7 +42,6 @@ function isSavingsAccount(result: unknown): result is SavingsAccountResponse {
 })
 export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
   readonly currency = input.required<string>();
-  readonly portfolioId = input.required<string>();
   readonly offerKeep = input(false);
   readonly hint = input<string | null>(null);
 
@@ -117,7 +116,7 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
   }
 
   protected optionLabel(candidate: TransferCandidateResponse): string {
-    return `${candidate.name} — ${candidate.portfolioName} (${formatMoney(candidate.balance, this.currency())})`;
+    return `${candidate.name} (${formatMoney(candidate.balance, this.currency())})`;
   }
 
   protected hasError(errorCode: string): boolean {
@@ -146,7 +145,6 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
     const previous = this.value();
     const data: SavingsAccountFormDialogData = {
       currency: this.currency(),
-      portfolioId: this.portfolioId(),
     };
     this.dialog
       .open(SavingsAccountFormDialog, { width: '560px', data })

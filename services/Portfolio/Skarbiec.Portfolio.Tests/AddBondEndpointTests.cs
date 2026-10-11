@@ -7,6 +7,7 @@ using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -20,16 +21,17 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
+        var accountId = await client.CreateAccountAsync(cancellationToken, "Bonds", AccountType.Bonds);
 
-        var response = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { AccountId = accountId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal(BondUri(body.AssetId), response.Headers.Location?.OriginalString);
-        Assert.Equal(portfolioId, body.PortfolioId);
-        Assert.Equal("Bonds", body.PortfolioName);
+        Assert.Equal(accountId, body.AccountId);
+        Assert.Equal("Bonds", body.AccountName);
+        Assert.Equal(TaxWrapper.Regular, body.TaxWrapper);
         Assert.Equal("EDO1036", body.SeriesCode);
         Assert.Equal(TreasuryBondType.Edo, body.Type);
         Assert.Equal(new DateOnly(2026, 10, 1), body.PurchaseDate);
@@ -38,7 +40,6 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(5.35m, body.FirstPeriodRatePercent);
         Assert.Equal(2.00m, body.MarginPercent);
         Assert.Equal(3.00m, body.EarlyRedemptionFeePerBond);
-        Assert.False(body.TaxExempt);
         Assert.Equal(new DateOnly(2036, 10, 1), body.MaturityDate);
         Assert.Equal(5_000m, body.NominalValue);
         Assert.Equal(5_000.00m, body.BookValue);
@@ -73,18 +74,41 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
     }
 
     [Fact]
+    public async Task RequiresBondsAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var brokerageId = await client.CreateAccountAsync(cancellationToken, "XTB", AccountType.Brokerage);
+        var bondsId = await client.CreateAccountAsync(cancellationToken, "Obligacje", AccountType.Bonds);
+        await client.ArchiveAccountAsync(bondsId, cancellationToken);
+
+        var withoutAccount = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest(), cancellationToken);
+        var intoBrokerage = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { AccountId = brokerageId }, cancellationToken);
+        var intoArchived = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { AccountId = bondsId }, cancellationToken);
+        var intoUnknown = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { AccountId = Guid.NewGuid() }, cancellationToken);
+
+        await withoutAccount.AssertProblemAsync(HttpStatusCode.BadRequest, PortfolioAssertions.AccountRequiredErrorCode, cancellationToken);
+        await intoBrokerage.AssertProblemAsync(HttpStatusCode.BadRequest, PortfolioAssertions.AccountTypeMismatchErrorCode, cancellationToken);
+        await intoArchived.AssertAccountArchivedConflictAsync(cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, intoUnknown.StatusCode);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+    }
+
+    [Fact]
     public async Task Add_FundedFromCash_WritesTransfer()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 6_000m);
-        var bondsId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 6_000m);
+        var bondsId = await client.CreateAccountAsync(cancellationToken, name: "Bonds", type: AccountType.Bonds);
 
         var response = await client.PostAsJsonAsync(
-            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { PortfolioId = bondsId }, cancellationToken);
+            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { AccountId = bondsId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);
@@ -121,18 +145,17 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, balance: 4_000m);
-        var bondsId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 4_000m);
+        var bondsId = await client.CreateAccountAsync(cancellationToken, name: "Bonds", type: AccountType.Bonds);
 
         var response = await client.PostAsJsonAsync(
-            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { PortfolioId = bondsId }, cancellationToken);
+            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { AccountId = bondsId }, cancellationToken);
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
         await client.AssertCashUntouchedAsync(cashId, cancellationToken, balance: 4_000m);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == bondsId, cancellationToken));
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.AccountId == bondsId, cancellationToken));
     }
 
     [Fact]
@@ -142,17 +165,17 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
+        var walletId = await client.CreateAccountAsync(cancellationToken, name: "Wallet");
         var stockId = await client.AddAssetAsync(walletId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock);
-        var bondsId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
+        var bondsId = await client.CreateAccountAsync(cancellationToken, name: "Bonds", type: AccountType.Bonds);
 
         var response = await client.PostAsJsonAsync(
-            AllBondsUri, NewBondRequest(fundingAssetId: stockId) with { PortfolioId = bondsId }, cancellationToken);
+            AllBondsUri, NewBondRequest(fundingAssetId: stockId) with { AccountId = bondsId }, cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == bondsId, cancellationToken));
+        Assert.False(await dbContext.Assets.AnyAsync(a => a.AccountId == bondsId, cancellationToken));
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 }

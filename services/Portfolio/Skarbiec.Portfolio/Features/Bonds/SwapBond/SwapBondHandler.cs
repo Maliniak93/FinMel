@@ -56,12 +56,11 @@ public sealed class SwapBondHandler(
             cash = destination.Value;
         }
 
-        // The swap stays in the old bond's portfolio, so an IKE lot stays in IKE with its tax exemption.
-        var portfolio = await dbContext.Portfolios.FirstAsync(p => p.Id == bond.PortfolioId, cancellationToken);
+        // The swap stays in the old bond's account, so an IKE lot stays in IKE with its tax exemption.
         var swapped = new Asset
         {
             Id = Guid.NewGuid(),
-            PortfolioId = bond.PortfolioId,
+            AccountId = bond.AccountId,
             AssetClass = AssetClass.Bond,
             Name = newBond.Name,
             Currency = Currency,
@@ -123,7 +122,6 @@ public sealed class SwapBondHandler(
             FirstPeriodRatePercent = newBond.FirstPeriodRatePercent,
             MarginPercent = newBond.MarginPercent,
             EarlyRedemptionFeePerBond = newBond.EarlyRedemptionFeePerBond,
-            TaxExempt = terms.TaxExempt,
             MaturityDate = BondSchedule.MaturityDate(newBond.Type, plan.Date),
             SwappedFromAssetId = bond.Id
         });
@@ -151,7 +149,7 @@ public sealed class SwapBondHandler(
 
         // All three assets publish in the same save as every leg and the redemption.
         await positionEventPublisher.PublishChangedAsync(bond, cancellationToken);
-        await positionEventPublisher.PublishCreatedAsync(swapped, portfolio, cancellationToken);
+        await positionEventPublisher.PublishCreatedAsync(swapped, cancellationToken);
 
         if (cash is not null && cashQuantity is { } quantity)
         {

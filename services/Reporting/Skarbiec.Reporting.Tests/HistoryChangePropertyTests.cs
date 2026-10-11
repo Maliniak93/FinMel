@@ -11,7 +11,7 @@ public sealed class HistoryChangePropertyTests
 
     private static readonly DateOnly Origin = new(2026, 3, 1);
     private static readonly Guid AssetId = Guid.NewGuid();
-    private static readonly Guid PortfolioId = Guid.NewGuid();
+    private static readonly Guid AccountId = Guid.NewGuid();
 
     public static TheoryData<int> Seeds()
     {
@@ -105,23 +105,6 @@ public sealed class HistoryChangePropertyTests
     }
 
     [Fact]
-    public void EarliestAffectedDate_PortfolioArchivedAndRestored_IsTheSetAndClearedDate()
-    {
-        var history = new[] { (Origin, 10m) };
-        var occurredAt = new DateTimeOffset(2026, 4, 20, 8, 0, 0, TimeSpan.Zero);
-
-        var archiving = HistoryChange.EarliestAffectedDate(
-            Stored(history: history),
-            Incoming(history: history, portfolioIsArchived: true, occurredAt: occurredAt));
-        var restoring = HistoryChange.EarliestAffectedDate(
-            Stored(history: history, portfolioIsArchived: true, portfolioArchivedOn: new DateOnly(2026, 4, 12)),
-            Incoming(history: history, portfolioIsArchived: false));
-
-        Assert.Equal(new DateOnly(2026, 4, 20), archiving);
-        Assert.Equal(new DateOnly(2026, 4, 12), restoring);
-    }
-
-    [Fact]
     public void EarliestAffectedDate_NothingChanged_IsNull()
     {
         var history = new[] { (Origin, 10m), (Origin.AddDays(5), 12m) };
@@ -171,25 +154,21 @@ public sealed class HistoryChangePropertyTests
         Guid? instrumentId = null,
         string currency = "PLN",
         bool isArchived = false,
-        bool portfolioIsArchived = false,
-        DateOnly? archivedOn = null,
-        DateOnly? portfolioArchivedOn = null) => new()
+        DateOnly? archivedOn = null) => new()
         {
             AssetId = AssetId,
             UserId = Guid.NewGuid(),
-            PortfolioId = PortfolioId,
+            AccountId = AccountId,
             AssetClass = assetClass,
             ValuationMode = valuationMode,
             InstrumentId = instrumentId,
             Currency = currency,
             Quantity = history.Count > 0 ? history[^1].Quantity : 0m,
-            PortfolioIsArchived = portfolioIsArchived,
             IsArchived = isArchived,
             Version = 0,
             UpdatedAt = DateTimeOffset.UtcNow,
             QuantityHistory = [.. history.Select(p => new PositionQuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             ArchivedOn = archivedOn,
-            PortfolioArchivedOn = portfolioArchivedOn,
         };
 
     private static AssetPositionChanged Incoming(
@@ -199,11 +178,10 @@ public sealed class HistoryChangePropertyTests
         Guid? instrumentId = null,
         string currency = "PLN",
         bool isArchived = false,
-        bool portfolioIsArchived = false,
         DateTimeOffset? occurredAt = null) => new()
         {
             AssetId = AssetId,
-            PortfolioId = PortfolioId,
+            AccountId = AccountId,
             UserId = Guid.NewGuid(),
             AssetClass = assetClass,
             ValuationMode = valuationMode,
@@ -212,7 +190,6 @@ public sealed class HistoryChangePropertyTests
             Quantity = history.Count > 0 ? history[^1].Quantity : 0m,
             QuoteUnitsPerQuantity = 1m,
             QuantityHistory = [.. history.Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
-            PortfolioIsArchived = portfolioIsArchived,
             IsArchived = isArchived,
             Version = 1,
             OccurredAtUtc = occurredAt ?? DateTimeOffset.UtcNow,

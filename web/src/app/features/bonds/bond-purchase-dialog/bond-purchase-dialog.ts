@@ -14,13 +14,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import { getApiMarketdataBondSeries, type BondSeriesListItem } from '../../../api/marketdata';
 import {
-  getApiPortfolioPortfolios,
+  getApiPortfolioAccounts,
   getApiPortfolioTransferCandidates,
   postApiPortfolioBonds,
   putApiPortfolioBondsByAssetId,
@@ -36,11 +35,12 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
+import { ACCOUNT_TYPE } from '../../accounts/account-type';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { BOND_TYPES, bondTypeInfo } from '../bond-types';
 
 export interface BondPurchaseDialogData {
-  portfolioId?: string;
+  accountId?: string;
   bond?: BondResponse;
   seriesCode?: string;
 }
@@ -65,7 +65,6 @@ function emptyToNull(value: unknown): number | null {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
-    MatSlideToggleModule,
     TranslocoPipe,
   ],
   templateUrl: './bond-purchase-dialog.html',
@@ -78,7 +77,7 @@ export class BondPurchaseDialog {
 
   private readonly bond = this.data.bond;
   protected readonly isEdit = !!this.bond;
-  protected readonly choosesPortfolio = !this.bond && !this.data.portfolioId;
+  protected readonly choosesAccount = !this.bond && !this.data.accountId;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
@@ -108,8 +107,8 @@ export class BondPurchaseDialog {
 
   protected readonly form = this.formBuilder.group({
     series: [null as string | null],
-    portfolioId: this.formBuilder.nonNullable.control(
-      { value: this.data.portfolioId ?? '', disabled: this.isEdit },
+    accountId: this.formBuilder.nonNullable.control(
+      { value: this.data.accountId ?? '', disabled: this.isEdit },
       [Validators.required],
     ),
     name: this.formBuilder.nonNullable.control(this.bond?.name ?? '', [
@@ -148,7 +147,6 @@ export class BondPurchaseDialog {
       (this.bond ? Number(this.bond.earlyRedemptionFeePerBond) : null) as number | null,
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
-    taxExempt: this.formBuilder.nonNullable.control(this.bond?.taxExempt ?? false),
     fundingAssetId: [
       { value: null as string | null, disabled: this.isEdit },
       [this.costWithinBalance],
@@ -189,17 +187,18 @@ export class BondPurchaseDialog {
     },
   });
 
-  protected readonly portfoliosResource = resource({
-    params: () => (this.choosesPortfolio ? {} : undefined),
+  protected readonly accountsResource = resource({
+    params: () => (this.choosesAccount ? {} : undefined),
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfolios({ signal: abortSignal });
+      const result = await getApiPortfolioAccounts({ signal: abortSignal });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ??
-            translate('bonds.purchase.portfoliosLoadFailed'),
+          readProblemDetails(result.error).detail ?? translate('bonds.purchase.accountsLoadFailed'),
         );
       }
-      return (result.data ?? []).filter((portfolio) => !portfolio.isArchived);
+      return (result.data ?? []).filter(
+        (account) => !account.isArchived && Number(account.type) === ACCOUNT_TYPE.Bonds,
+      );
     },
   });
 
@@ -343,7 +342,6 @@ export class BondPurchaseDialog {
       firstPeriodRatePercent: Number(values.firstPeriodRatePercent),
       marginPercent: emptyToNull(values.marginPercent),
       earlyRedemptionFeePerBond: Number(values.earlyRedemptionFeePerBond),
-      taxExempt: values.taxExempt,
     };
 
     const result = this.bond
@@ -354,7 +352,7 @@ export class BondPurchaseDialog {
       : await postApiPortfolioBonds({
           body: {
             ...terms,
-            portfolioId: values.portfolioId,
+            accountId: values.accountId,
             fundingAssetId: values.fundingAssetId ?? undefined,
           },
         });

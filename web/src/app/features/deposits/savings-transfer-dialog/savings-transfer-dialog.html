@@ -26,9 +26,7 @@
           @if (candidatesResource.hasValue()) {
             @for (candidate of candidatesResource.value(); track candidate.assetId) {
               <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
-                  formatMoney(candidate.balance, anchor.currency)
-                }})
+                {{ candidate.name }} ({{ formatMoney(candidate.balance, anchor.currency) }})
               </mat-option>
             }
           }
@@ -53,9 +51,7 @@
           @if (candidatesResource.hasValue()) {
             @for (candidate of candidatesResource.value(); track candidate.assetId) {
               <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} — {{ candidate.portfolioName }} ({{
-                  formatMoney(candidate.balance, anchor.currency)
-                }})
+                {{ candidate.name }} ({{ formatMoney(candidate.balance, anchor.currency) }})
               </mat-option>
             }
           }

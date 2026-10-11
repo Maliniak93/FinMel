@@ -1,14 +1,10 @@
 import type { SavingsAccountResponse } from '../../../api/portfolio';
-import { archivedPortfolioId, reservePortfolioId, savingsPortfolioId } from './deposit-fixtures';
 
 export function savingsAccountResponse(
   overrides: Partial<SavingsAccountResponse> = {},
 ): SavingsAccountResponse {
   return {
     assetId: '11111111-aaaa-1111-aaaa-111111111111',
-    portfolioId: savingsPortfolioId,
-    portfolioName: 'Savings',
-    portfolioIsArchived: false,
     isArchived: false,
     name: 'Savings account',
     bankName: 'Test bank',
@@ -25,8 +21,6 @@ export function savingsAccountResponse(
 
 export const activeSavingsAccount: SavingsAccountResponse = savingsAccountResponse({
   assetId: '22222222-aaaa-2222-aaaa-222222222222',
-  portfolioId: reservePortfolioId,
-  portfolioName: 'Reserve',
   name: 'Emergency fund',
   bankName: 'Bank A',
   balance: 25000,
@@ -41,15 +35,6 @@ export const taxFreeEurSavingsAccount: SavingsAccountResponse = savingsAccountRe
   balance: 1234.5,
   annualInterestRatePercent: 3,
   taxExempt: true,
-});
-
-export const archivedPortfolioSavingsAccount: SavingsAccountResponse = savingsAccountResponse({
-  assetId: '44444444-aaaa-4444-aaaa-444444444444',
-  portfolioId: archivedPortfolioId,
-  portfolioName: 'Old savings',
-  portfolioIsArchived: true,
-  name: 'Frozen account',
-  bankName: 'Bank C',
 });
 
 export const archivedSavingsAccount: SavingsAccountResponse = savingsAccountResponse({
@@ -91,25 +76,6 @@ export const settledSavingsAccount: SavingsAccountResponse = savingsAccountRespo
     grossInterest: 41.1,
     tax: 7.81,
     netInterest: 33.29,
-  },
-});
-
-export const archivedPortfolioDueSavingsAccount: SavingsAccountResponse = savingsAccountResponse({
-  assetId: '99999999-aaaa-9999-aaaa-999999999999',
-  portfolioId: archivedPortfolioId,
-  portfolioName: 'Old savings',
-  portfolioIsArchived: true,
-  name: 'Frozen due account',
-  bankName: 'Bank H',
-  interestDue: true,
-  duePeriodCount: 1,
-  lastSettlement: {
-    settlementId: 'abcdabcd-5555-6666-7777-888888888888',
-    periodStart: '2026-08-01',
-    periodEnd: '2026-08-31',
-    grossInterest: 42.47,
-    tax: 8.07,
-    netInterest: 34.4,
   },
 });
 

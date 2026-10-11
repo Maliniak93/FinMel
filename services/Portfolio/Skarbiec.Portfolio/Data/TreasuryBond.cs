@@ -15,7 +15,6 @@ public sealed class TreasuryBond : IUserOwned
     public required decimal FirstPeriodRatePercent { get; set; }
     public decimal? MarginPercent { get; set; }
     public required decimal EarlyRedemptionFeePerBond { get; set; }
-    public bool TaxExempt { get; set; }
 
     public required DateOnly MaturityDate { get; set; }
 

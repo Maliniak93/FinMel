@@ -10,11 +10,23 @@ namespace Skarbiec.Portfolio.Tests.Fixtures;
 
 internal static class PortfolioAssertions
 {
-    public const string PortfolioArchivedErrorCode = "Conflict.PortfolioArchived";
+    public const string AccountArchivedErrorCode = "Conflict.AccountArchived";
 
-    public static async Task AssertPortfolioArchivedConflictAsync(
+    public const string AccountNotEmptyErrorCode = "Conflict.AccountNotEmpty";
+
+    public const string AccountHasHistoryErrorCode = "Conflict.AccountHasHistory";
+
+    public const string DuplicateNameErrorCode = "Conflict.DuplicateName";
+
+    public const string AccountRequiredErrorCode = "Validation.AccountRequired";
+
+    public const string AccountTypeMismatchErrorCode = "Validation.AccountTypeMismatch";
+
+    public const string AccountNotAllowedErrorCode = "Validation.AccountNotAllowed";
+
+    public static async Task AssertAccountArchivedConflictAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
-        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioArchivedErrorCode, cancellationToken);
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, AccountArchivedErrorCode, cancellationToken);
 
     public const string AssetArchivedErrorCode = "Conflict.AssetArchived";
 

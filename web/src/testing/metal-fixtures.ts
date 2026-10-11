@@ -8,9 +8,6 @@ export const OUNCE_IN_GRAMS = 31.1034768;
 export function metalResponse(overrides: Partial<MetalResponse> = {}): MetalResponse {
   return {
     assetId: '11111111-eeee-1111-eeee-111111111111',
-    portfolioId: '22222222-2222-2222-2222-222222222222',
-    portfolioName: 'Vault',
-    portfolioIsArchived: false,
     isArchived: false,
     name: 'Krugerrand',
     metal: METAL.Gold,
@@ -25,8 +22,6 @@ export const goldKrugerrand: MetalResponse = metalResponse();
 
 export const silverBar: MetalResponse = metalResponse({
   assetId: '33333333-eeee-3333-eeee-333333333333',
-  portfolioId: '44444444-4444-4444-4444-444444444444',
-  portfolioName: 'Home',
   name: 'Silver bar',
   metal: METAL.Silver,
   fineWeightGramsPerPiece: 100,

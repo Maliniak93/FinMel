@@ -14,7 +14,7 @@ public sealed class SettleDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         Guid assetId, SettleDepositRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset both end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Deposit, cancellationToken);
         var terms = asset is null
@@ -26,13 +26,7 @@ public sealed class SettleDepositHandler(
             return DepositErrors.NotFound(assetId);
         }
 
-        var portfolio = await dbContext.Portfolios
-            .AsNoTracking()
-            .Where(p => p.Id == asset.PortfolioId)
-            .Select(p => new { p.Name, p.IsArchived })
-            .FirstAsync(cancellationToken);
-
-        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
             return readOnly;
         }
@@ -146,6 +140,6 @@ public sealed class SettleDepositHandler(
 
         var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, today, funding, payout?.ToInfo());
+        return terms.ToResponse(asset, today, funding, payout?.ToInfo());
     }
 }

@@ -13,15 +13,15 @@ public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var ownerId = Guid.NewGuid();
-        var (portfolioId, assetId) = (Guid.NewGuid(), Guid.NewGuid());
+        var (accountId, assetId) = (Guid.NewGuid(), Guid.NewGuid());
 
         await using (var seedContext = CreateDbContext(ownerId))
         {
-            seedContext.Portfolios.Add(new PortfolioEntity { Id = portfolioId, Name = "Retirement", Currency = "PLN" });
+            seedContext.Accounts.Add(new Account { Id = accountId, Name = "Retirement", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Regular });
             seedContext.Assets.Add(new Asset
             {
                 Id = assetId,
-                PortfolioId = portfolioId,
+                AccountId = accountId,
                 AssetClass = AssetClass.Stock,
                 ValuationMode = AssetValuationMode.Market,
                 Name = "Test stock",

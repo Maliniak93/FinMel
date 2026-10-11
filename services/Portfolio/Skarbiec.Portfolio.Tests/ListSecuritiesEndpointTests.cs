@@ -5,6 +5,7 @@ using Skarbiec.Portfolio.Features.Securities;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -22,14 +23,14 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
             .WithRate("EUR", new DateOnly(2026, 1, 20), 4.20m);
         Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Main");
+        var accountId = await client.CreateAccountAsync(cancellationToken, name: "Main");
         var euroEtf = await AddQuotedHoldingAsync(
-            client, portfolioId, cancellationToken, AssetClass.Etf, "EUR", "A ETF", "VWCE", 120m, "XETRA", new DateOnly(2026, 1, 30));
+            client, accountId, cancellationToken, AssetClass.Etf, "EUR", "A ETF", "VWCE", 120m, "XETRA", new DateOnly(2026, 1, 30));
         await client.RecordTransactionAsync(euroEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 10), cancellationToken, unitPrice: 100m);
         await client.RecordTransactionAsync(euroEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 20), cancellationToken, unitPrice: 120m);
         await client.RecordTransactionAsync(euroEtf, TransactionType.Sell, 5m, new DateOnly(2026, 1, 25), cancellationToken, unitPrice: 125m);
         var zlotyEtf = await AddQuotedHoldingAsync(
-            client, portfolioId, cancellationToken, AssetClass.Etf, "PLN", "B ETF", "ETFBW", 60m, "GPW", new DateOnly(2026, 1, 30));
+            client, accountId, cancellationToken, AssetClass.Etf, "PLN", "B ETF", "ETFBW", 60m, "GPW", new DateOnly(2026, 1, 30));
         await client.RecordTransactionAsync(zlotyEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 50m);
 
         var etfs = await client.GetAsync(AllSecuritiesUri(AssetClass.Etf), cancellationToken);
@@ -40,8 +41,8 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal([euroEtf, zlotyEtf], body.Holdings.Select(h => h.AssetId).ToArray());
         var euro = body.Holdings[0];
         Assert.Multiple(
-            () => Assert.Equal(portfolioId, euro.PortfolioId),
-            () => Assert.Equal("Main", euro.PortfolioName),
+            () => Assert.Equal(accountId, euro.AccountId),
+            () => Assert.Equal("Main", euro.AccountName),
             () => Assert.Equal("A ETF", euro.Name),
             () => Assert.Equal("VWCE", euro.Ticker),
             () => Assert.Equal("XETRA", euro.Exchange),
@@ -77,12 +78,12 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m).WithRate("USD", 3.90m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var firstPortfolio = await client.CreatePortfolioAsync(cancellationToken, name: "First");
-        var secondPortfolio = await client.CreatePortfolioAsync(cancellationToken, name: "Second");
-        var euro = await AddQuotedHoldingAsync(client, firstPortfolio, cancellationToken, currency: "EUR", name: "Euro stock", ticker: "SAP");
-        var dollar = await AddQuotedHoldingAsync(client, firstPortfolio, cancellationToken, currency: "USD", name: "Dollar stock", ticker: "AAPL");
-        var zloty = await AddQuotedHoldingAsync(client, secondPortfolio, cancellationToken, currency: "PLN", name: "Zloty stock", ticker: "CDR");
-        foreach (var (portfolio, asset) in new[] { (firstPortfolio, euro), (firstPortfolio, dollar), (secondPortfolio, zloty) })
+        var firstAccount = await client.CreateAccountAsync(cancellationToken, name: "First");
+        var secondAccount = await client.CreateAccountAsync(cancellationToken, name: "Second");
+        var euro = await AddQuotedHoldingAsync(client, firstAccount, cancellationToken, currency: "EUR", name: "Euro stock", ticker: "SAP");
+        var dollar = await AddQuotedHoldingAsync(client, firstAccount, cancellationToken, currency: "USD", name: "Dollar stock", ticker: "AAPL");
+        var zloty = await AddQuotedHoldingAsync(client, secondAccount, cancellationToken, currency: "PLN", name: "Zloty stock", ticker: "CDR");
+        foreach (var asset in new[] { euro, dollar, zloty })
         {
             await client.RecordTransactionAsync(asset, TransactionType.Buy, 1m, new DateOnly(2026, 1, 5), cancellationToken);
         }
@@ -103,13 +104,13 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithRate("USD", 4.00m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
+        var accountId = await client.CreateAccountAsync(cancellationToken);
         var noQuote = await AddQuotedHoldingAsync(
-            client, portfolioId, cancellationToken, currency: "USD", name: "A no quote", ticker: "NOQ", lastPrice: null);
+            client, accountId, cancellationToken, currency: "USD", name: "A no quote", ticker: "NOQ", lastPrice: null);
         var noRate = await AddQuotedHoldingAsync(
-            client, portfolioId, cancellationToken, currency: "EUR", name: "B no rate", ticker: "NOR", lastPrice: 50m);
+            client, accountId, cancellationToken, currency: "EUR", name: "B no rate", ticker: "NOR", lastPrice: 50m);
         var healthy = await AddQuotedHoldingAsync(
-            client, portfolioId, cancellationToken, currency: "USD", name: "C healthy", ticker: "OK", lastPrice: 20m);
+            client, accountId, cancellationToken, currency: "USD", name: "C healthy", ticker: "OK", lastPrice: 20m);
         foreach (var asset in new[] { noQuote, noRate, healthy })
         {
             await client.RecordTransactionAsync(asset, TransactionType.Buy, 10m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 10m);
@@ -149,9 +150,9 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithUnavailable();
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var first = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "First", ticker: "ONE");
-        var second = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Second", ticker: "TWO");
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var first = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "First", ticker: "ONE");
+        var second = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "Second", ticker: "TWO");
         await client.RecordTransactionAsync(first, TransactionType.Buy, 4m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 25m);
         await client.RecordTransactionAsync(second, TransactionType.Buy, 2m, new DateOnly(2026, 1, 6), cancellationToken, unitPrice: 30m);
 
@@ -178,19 +179,42 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task ReturnsAccount_SkipsArchivedAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var secondId = await client.CreateAccountAsync(cancellationToken, "B account");
+        var firstId = await client.CreateAccountAsync(cancellationToken, "A account");
+        var closedId = await client.CreateAccountAsync(cancellationToken, "Closed");
+        var inSecond = await AddQuotedHoldingAsync(client, secondId, cancellationToken, name: "Alpha", ticker: "ALP");
+        var inFirst = await AddQuotedHoldingAsync(client, firstId, cancellationToken, name: "Zeta", ticker: "ZET");
+        await AddQuotedHoldingAsync(client, closedId, cancellationToken, name: "In closed account", ticker: "CLS");
+        await client.ArchiveAccountAsync(closedId, cancellationToken);
+
+        var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+        Assert.Equal([inFirst, inSecond], body.Holdings.Select(h => h.AssetId).ToArray());
+        Assert.Equal([firstId, secondId], body.Holdings.Select(h => h.AccountId).ToArray());
+        Assert.Equal(["A account", "B account"], body.Holdings.Select(h => h.AccountName).ToArray());
+    }
+
+    [Fact]
     public async Task Excludes_ArchivedAndUnsupportedClasses()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Live");
-        var live = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Live stock", ticker: "LIVE");
-        var archived = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Archived stock", ticker: "OLD");
+        var accountId = await client.CreateAccountAsync(cancellationToken, name: "Live");
+        var live = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "Live stock", ticker: "LIVE");
+        var archived = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "Archived stock", ticker: "OLD");
         await client.ArchiveAssetAsync(archived, cancellationToken);
-        await client.AddCashAssetAsync(portfolioId, cancellationToken);
-        var archivedPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Closed");
-        await AddQuotedHoldingAsync(client, archivedPortfolioId, cancellationToken, name: "Stock in closed portfolio", ticker: "CLS");
-        await client.ArchivePortfolioAsync(archivedPortfolioId, cancellationToken);
+        await client.AddCashAssetAsync(cancellationToken);
+        var archivedAccountId = await client.CreateAccountAsync(cancellationToken, name: "Closed");
+        await AddQuotedHoldingAsync(client, archivedAccountId, cancellationToken, name: "Stock in closed account", ticker: "CLS");
+        await client.ArchiveAccountAsync(archivedAccountId, cancellationToken);
 
         var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
         var unsupported = await client.GetAsync(AllSecuritiesUri(AssetClass.Cash), cancellationToken);

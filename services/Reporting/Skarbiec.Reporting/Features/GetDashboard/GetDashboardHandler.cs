@@ -21,7 +21,7 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
                 AsOf = null,
                 IsStale = false,
                 ByAssetClass = [],
-                ByPortfolio = [],
+                ByAccount = [],
             };
         }
 
@@ -30,24 +30,24 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
         var lines = await db.AssetValuations
             .AsNoTracking()
             .Where(l => l.Date == snapshot.Date)
-            .Select(l => new { l.PortfolioId, l.AssetClass, l.ValuePln, l.IsStale })
+            .Select(l => new { l.AccountId, l.AssetClass, l.ValuePln, l.IsStale })
             .ToListAsync(cancellationToken);
 
-        var byPortfolio = lines
-            .GroupBy(l => l.PortfolioId)
+        var byAccount = lines
+            .GroupBy(l => l.AccountId)
             .Select(g =>
             {
                 var valuePln = g.Sum(l => l.ValuePln);
-                return new DashboardPortfolioValue
+                return new DashboardAccountValue
                 {
-                    PortfolioId = g.Key,
+                    AccountId = g.Key,
                     ValuePln = valuePln,
                     Percentage = netWorthPln == 0m ? 0m : Math.Round(valuePln / netWorthPln * 100m, 2),
                     SnapshotDate = snapshot.Date,
                     IsStale = g.Any(l => l.IsStale),
                 };
             })
-            .OrderByDescending(p => p.ValuePln)
+            .OrderByDescending(a => a.ValuePln)
             .ToList();
 
         var byAssetClass = lines
@@ -71,7 +71,7 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
             AsOf = snapshot.Date,
             IsStale = snapshot.IsStale,
             ByAssetClass = byAssetClass,
-            ByPortfolio = byPortfolio,
+            ByAccount = byAccount,
         };
     }
 }

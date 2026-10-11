@@ -15,7 +15,7 @@ public sealed class SettleSavingsInterestHandler(
     public async Task<Result<SavingsInterestSettlementResponse>> HandleAsync(
         Guid assetId, SettleSavingsInterestRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's account, a non-Savings asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's account, a non-Savings asset both end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Savings, cancellationToken);
         var terms = asset is null

@@ -4,7 +4,7 @@ namespace Skarbiec.Contracts.Events;
 public sealed record AssetPositionChanged
 {
     public required Guid AssetId { get; init; }
-    public required Guid PortfolioId { get; init; }
+    public Guid? AccountId { get; init; }
     public required Guid UserId { get; init; }
     public required AssetClass AssetClass { get; init; }
     public required AssetValuationMode ValuationMode { get; init; }
@@ -24,10 +24,7 @@ public sealed record AssetPositionChanged
     /// <summary>End-of-day quantity on each distinct transaction date, ascending; empty when there are no transactions. The last point equals Quantity.</summary>
     public required IReadOnlyList<QuantityPoint> QuantityHistory { get; init; }
 
-    /// <summary>The owning portfolio's archived flag at publish time.</summary>
-    public required bool PortfolioIsArchived { get; init; }
-
-    /// <summary>The asset's own archived flag, independent of PortfolioIsArchived.</summary>
+    /// <summary>The asset's own archived flag.</summary>
     public required bool IsArchived { get; init; }
 
     /// <summary>Strictly increasing per AssetId from 0; xmin would not move when only the archive flag changes.</summary>

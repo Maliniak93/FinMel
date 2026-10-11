@@ -20,7 +20,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "EUR");
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "EUR");
         var request = new RecordTransactionRequest
         {
             Type = TransactionType.Buy,
@@ -52,7 +52,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "PLN");
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "PLN");
         var request = new RecordTransactionRequest
         {
             Type = TransactionType.Deposit,
@@ -77,7 +77,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithNotFound("EUR");
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "EUR");
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "EUR");
         var request = new RecordTransactionRequest
         {
             Type = TransactionType.Buy,
@@ -106,7 +106,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithUnavailable("EUR");
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "EUR");
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "EUR");
         var request = new RecordTransactionRequest
         {
             Type = TransactionType.Buy,
@@ -131,7 +131,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "EUR");
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "EUR");
         var request = new RecordTransactionRequest
         {
             Type = TransactionType.Buy,
@@ -148,13 +148,13 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Record_OnArchivedPortfolio_ReturnsConflictWithoutFxLookup()
+    public async Task Record_OnArchivedAccount_ReturnsConflictWithoutFxLookup()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "EUR");
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "EUR");
+        await client.ArchiveAccountAsync(accountId, cancellationToken);
         var request = new RecordTransactionRequest
         {
             Type = TransactionType.Buy,
@@ -165,7 +165,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
 
         var response = await client.PostAsJsonAsync(TransactionsUri(assetId), request, cancellationToken);
 
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
+        await response.AssertAccountArchivedConflictAsync(cancellationToken);
         Assert.Empty(Factory.FxRateLookupClient.Calls);
         Assert.Equal(0, (await client.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
     }
@@ -175,7 +175,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 5m, new DateOnly(2026, 1, 1), cancellationToken);
         var oversell = new RecordTransactionRequest
         {
@@ -197,7 +197,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
         var request = new RecordTransactionRequest
         {
             Type = TransactionType.Buy,
@@ -219,7 +219,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var request = new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 1) };
 
         var response = await client.PostAsJsonAsync(TransactionsUri(Guid.NewGuid()), request, cancellationToken);
@@ -243,7 +242,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
 
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
         await client.RecordTransactionAsync(assetId, TransactionType.Sell, 4m, new DateOnly(2026, 1, 5), cancellationToken);
@@ -264,8 +263,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken, currency: "EUR");
+        var assetId = await client.AddCashAssetAsync(cancellationToken, currency: "EUR");
         await client.RecordTransactionAsync(
             assetId, TransactionType.Deposit, 1_000m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
         var fxCallsBefore = Factory.FxRateLookupClient.Calls.Count;
@@ -293,8 +291,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var assetId = await client.AddCashAssetAsync(cancellationToken);
         var deposit = new RecordTransactionRequest
         {
             Type = TransactionType.Deposit,
@@ -323,8 +320,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m);
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 100m);
         await client.ArchiveAssetAsync(cashId, cancellationToken);
         var request = new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = 50m, UnitPrice = 1m, Date = new DateOnly(2026, 2, 1) };
 
@@ -336,20 +332,21 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Record_InArchivedPortfolio_Returns409()
+    public async Task Record_InArchivedAccount_Returns409()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
+        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 5m, new DateOnly(2026, 1, 1), cancellationToken);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
-        var request = new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 3m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) };
+        await client.RecordTransactionAsync(assetId, TransactionType.Sell, 5m, new DateOnly(2026, 1, 2), cancellationToken);
+        await client.ArchiveAccountAsync(accountId, cancellationToken);
+        var request = new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 3m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 3) };
 
         var response = await client.PostAsJsonAsync(TransactionsUri(assetId), request, cancellationToken);
 
-        await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        Assert.Equal(5m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
-        Assert.Equal(1, (await client.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
+        await response.AssertAccountArchivedConflictAsync(cancellationToken);
+        Assert.Equal(0m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
+        Assert.Equal(2, (await client.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
     }
 
     [Theory]
@@ -359,7 +356,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
         var request = new RecordTransactionRequest { Type = type, Quantity = 500m, UnitPrice = 1m, Date = new DateOnly(2026, 2, 1) };
 
         var response = await client.PostAsJsonAsync(TransactionsUri(deposit.AssetId), request, cancellationToken);
@@ -381,7 +378,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await client.AddSavingsAccountAsync(cancellationToken);
         var request = new RecordTransactionRequest { Type = type, Quantity = 100m, UnitPrice = 1m, Date = SavingsToday };
 
         var response = await client.PostAsJsonAsync(TransactionsUri(account.AssetId), request, cancellationToken);
@@ -408,7 +405,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
+        var account = await client.AddSavingsAccountAsync(cancellationToken);
         var request = new RecordTransactionRequest { Type = TransactionType.Withdraw, Quantity = 10_000.01m, UnitPrice = 1m, Date = SavingsToday };
 
         var response = await client.PostAsJsonAsync(TransactionsUri(account.AssetId), request, cancellationToken);

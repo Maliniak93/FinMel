@@ -32,20 +32,18 @@ public sealed class AssetPositionChangedConsumer(
             {
                 AssetId = message.AssetId,
                 UserId = message.UserId,
-                PortfolioId = message.PortfolioId,
+                AccountId = message.AccountId,
                 AssetClass = message.AssetClass,
                 ValuationMode = message.ValuationMode,
                 InstrumentId = message.InstrumentId,
                 Currency = message.Currency,
                 Quantity = message.Quantity,
                 QuoteUnitsPerQuantity = message.QuoteUnitsPerQuantity,
-                PortfolioIsArchived = message.PortfolioIsArchived,
                 IsArchived = message.IsArchived,
                 Version = message.Version,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 QuantityHistory = ToHistory(message),
                 ArchivedOn = message.IsArchived ? occurredOn : null,
-                PortfolioArchivedOn = message.PortfolioIsArchived ? occurredOn : null,
             });
         }
         else if (message.Version < position.Version)
@@ -59,22 +57,19 @@ public sealed class AssetPositionChangedConsumer(
         {
             earliestAffected = HistoryChange.EarliestAffectedDate(position, message);
             position.UserId = message.UserId;
-            position.PortfolioId = message.PortfolioId;
+            position.AccountId = message.AccountId;
             position.AssetClass = message.AssetClass;
             position.ValuationMode = message.ValuationMode;
             position.InstrumentId = message.InstrumentId;
             position.Currency = message.Currency;
             position.Quantity = message.Quantity;
             position.QuoteUnitsPerQuantity = message.QuoteUnitsPerQuantity;
-            position.PortfolioIsArchived = message.PortfolioIsArchived;
             position.IsArchived = message.IsArchived;
             position.Version = message.Version;
             position.UpdatedAt = DateTimeOffset.UtcNow;
             position.QuantityHistory = ToHistory(message);
 
-            // Whichever of this event and the portfolio's own event lands first stamps the portfolio date; the other leaves it.
             position.ArchivedOn = message.IsArchived ? position.ArchivedOn ?? occurredOn : null;
-            position.PortfolioArchivedOn = message.PortfolioIsArchived ? position.PortfolioArchivedOn ?? occurredOn : null;
         }
 
         if (earliestAffected is { } from && from < snapshotWriter.Today)
@@ -84,12 +79,6 @@ public sealed class AssetPositionChangedConsumer(
 
         // Saved first so the revaluation reads this position, inside the same inbox transaction.
         await db.SaveChangesAsync(cancellationToken);
-
-        // Only an archived portfolio skips revaluation; an asset archive or restore revalues today.
-        if (message.PortfolioIsArchived)
-        {
-            return;
-        }
 
         await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
     }

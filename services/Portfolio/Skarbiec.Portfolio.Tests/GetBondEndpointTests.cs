@@ -23,7 +23,7 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
             type: TreasuryBondType.Ror,
             purchaseDate: new DateOnly(2026, 6, 10),
             marginPercent: null);
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken, request);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken, request);
 
         var response = await client.GetAsync(BondUri(bond.AssetId), cancellationToken);
 
@@ -50,7 +50,7 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
             type: TreasuryBondType.Ots,
             purchaseDate: new DateOnly(2026, 6, 10),
             marginPercent: null);
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken, request);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken, request);
 
         var body = await client.GetBondAsync(bond.AssetId, cancellationToken);
 
@@ -63,8 +63,8 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
 
         var response = await client.GetAsync(BondUri(cashId), cancellationToken);
 
@@ -161,7 +161,7 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
         Factory.BondRateLookupClient.WithUnavailable();
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken, NewEdoEarlyBondRequest());
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken, NewEdoEarlyBondRequest());
 
         var response = await client.GetAsync(BondUri(bond.AssetId), cancellationToken);
 

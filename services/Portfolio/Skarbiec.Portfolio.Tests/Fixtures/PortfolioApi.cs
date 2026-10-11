@@ -6,7 +6,6 @@ using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Bonds.AddBond;
 using Skarbiec.Portfolio.Features.Bonds.UpdateBond;
-using Skarbiec.Portfolio.Features.CreatePortfolio;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
 using Skarbiec.Portfolio.Features.Deposits.GetSettlementPreview;
@@ -28,15 +27,10 @@ namespace Skarbiec.Portfolio.Tests.Fixtures;
 // Arrange only: helpers EnsureSuccessStatusCode, so a test of endpoint X calls X directly and asserts on the raw response.
 internal static class PortfolioApi
 {
-    public const string PortfoliosUri = "/api/portfolio/portfolios";
-
-    public static string PortfolioUri(Guid portfolioId) =>
-        $"{PortfoliosUri}/{portfolioId}";
-
     public const string AllAssetsUri = "/api/portfolio/assets";
 
-    public static string AssetsUri(Guid portfolioId) =>
-        $"{AllAssetsUri}?portfolioId={portfolioId}";
+    public static string AssetsUri(Guid accountId) =>
+        $"{AllAssetsUri}?accountId={accountId}";
 
     public static string AssetUri(Guid assetId) =>
         $"/api/portfolio/assets/{assetId}";
@@ -59,21 +53,6 @@ internal static class PortfolioApi
     {
         var response = await client.PostAsync(RestoreAssetUri(assetId), content: null, cancellationToken);
         response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task<(Guid PortfolioId, Guid CashId)> AddArchivedCashAssetInLivePortfolioAsync(
-        this HttpClient client,
-        CancellationToken cancellationToken,
-        decimal balance = 5_000m,
-        string portfolioName = "Wallet",
-        string name = "Archived cash",
-        string currency = "PLN")
-    {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
-        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name, currency: currency);
-        await client.ArchiveAssetAsync(cashId, cancellationToken);
-
-        return (portfolioId, cashId);
     }
 
     public static string TransactionsUri(Guid assetId) =>
@@ -158,42 +137,40 @@ internal static class PortfolioApi
         return await client.GetDepositAsync(assetId, cancellationToken);
     }
 
-    public sealed record PaidOutDeposit(Guid DepositPortfolioId, DepositResponse Deposit, Guid CashPortfolioId, Guid CashAssetId);
+    public sealed record PaidOutDeposit(DepositResponse Deposit, Guid CashAssetId);
 
     public static async Task<PaidOutDeposit> CreatePaidOutDepositAsync(this HttpClient client, CancellationToken cancellationToken)
     {
-        var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetAsync(cashPortfolioId, cancellationToken);
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var cashId = await client.AddCashAssetAsync(cancellationToken);
         await client.SettleDepositAsync(
             deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: cashId));
 
-        return new PaidOutDeposit(depositPortfolioId, deposit, cashPortfolioId, cashId);
+        return new PaidOutDeposit(deposit, cashId);
     }
 
-    public sealed record DepositPaidIntoSavings(
-        Guid DepositPortfolioId, DepositResponse Deposit, Guid SavingsPortfolioId, SavingsAccountResponse Account);
+    public sealed record DepositPaidIntoSavings(DepositResponse Deposit, SavingsAccountResponse Account);
 
     public static async Task<DepositPaidIntoSavings> CreateDepositPaidIntoSavingsAsync(
         this HttpClient client, CancellationToken cancellationToken)
     {
-        var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName: "Wallet");
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var account = await client.AddSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false));
         await client.SettleDepositAsync(
             deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: account.AssetId));
 
-        return new DepositPaidIntoSavings(depositPortfolioId, deposit, savingsPortfolioId, account);
+        return new DepositPaidIntoSavings(deposit, account);
     }
 
-    public static async Task<(Guid PortfolioId, Guid SavingsId)> AddArchivedSavingsAccountAsync(
-        this HttpClient client, CancellationToken cancellationToken, string portfolioName = "Old savings")
+    public static async Task<Guid> AddArchivedSavingsAccountAsync(
+        this HttpClient client, CancellationToken cancellationToken)
     {
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var account = await client.AddSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false, name: "Old savings"));
+        await client.ArchiveAssetAsync(account.AssetId, cancellationToken);
 
-        return (portfolioId, account.AssetId);
+        return account.AssetId;
     }
 
     public static async Task SettleDepositAsync(
@@ -224,9 +201,8 @@ internal static class PortfolioApi
         DepositCapitalization capitalization = DepositCapitalization.AtMaturity,
         bool taxExempt = false,
         decimal earlyBreakInterestLossPercent = 100m,
-        Guid? fundingAssetId = null, Guid portfolioId = default) => new()
+        Guid? fundingAssetId = null) => new()
         {
-            PortfolioId = portfolioId,
             Name = name,
             BankName = bankName,
             Currency = currency,
@@ -256,22 +232,12 @@ internal static class PortfolioApi
     };
 
     public static async Task<DepositResponse> AddDepositAsync(
-        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddDepositRequest? request = null)
+        this HttpClient client, CancellationToken cancellationToken, AddDepositRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(
-            AllDepositsUri, (request ?? NewDepositRequest()) with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllDepositsUri, request ?? NewDepositRequest(), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
-    }
-
-    public static async Task<(Guid PortfolioId, DepositResponse Deposit)> CreatePortfolioWithDepositAsync(
-        this HttpClient client, CancellationToken cancellationToken, AddDepositRequest? request = null, string portfolioName = "Savings")
-    {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
-        var deposit = await client.AddDepositAsync(portfolioId, cancellationToken, request);
-
-        return (portfolioId, deposit);
     }
 
     public const string AllBondsUri = "/api/portfolio/bonds";
@@ -293,10 +259,8 @@ internal static class PortfolioApi
         decimal firstPeriodRatePercent = 5.35m,
         decimal? marginPercent = 2.00m,
         decimal earlyRedemptionFeePerBond = 3.00m,
-        bool taxExempt = false,
-        Guid? fundingAssetId = null, Guid portfolioId = default) => new()
+        Guid? fundingAssetId = null) => new()
         {
-            PortfolioId = portfolioId,
             Name = name,
             SeriesCode = seriesCode,
             Type = type,
@@ -306,7 +270,6 @@ internal static class PortfolioApi
             FirstPeriodRatePercent = firstPeriodRatePercent,
             MarginPercent = marginPercent,
             EarlyRedemptionFeePerBond = earlyRedemptionFeePerBond,
-            TaxExempt = taxExempt,
             FundingAssetId = fundingAssetId
         };
 
@@ -320,27 +283,30 @@ internal static class PortfolioApi
         PurchasePricePerBond = request.PurchasePricePerBond,
         FirstPeriodRatePercent = request.FirstPeriodRatePercent,
         MarginPercent = request.MarginPercent,
-        EarlyRedemptionFeePerBond = request.EarlyRedemptionFeePerBond,
-        TaxExempt = request.TaxExempt
+        EarlyRedemptionFeePerBond = request.EarlyRedemptionFeePerBond
     };
 
     public static async Task<BondResponse> AddBondAsync(
-        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddBondRequest? request = null)
+        this HttpClient client, Guid accountId, CancellationToken cancellationToken, AddBondRequest? request = null)
     {
         var response = await client.PostAsJsonAsync(
-            AllBondsUri, (request ?? NewBondRequest()) with { PortfolioId = portfolioId }, cancellationToken);
+            AllBondsUri, (request ?? NewBondRequest()) with { AccountId = accountId }, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken))!;
     }
 
-    public static async Task<(Guid PortfolioId, BondResponse Bond)> CreatePortfolioWithBondAsync(
-        this HttpClient client, CancellationToken cancellationToken, AddBondRequest? request = null, string portfolioName = "Bonds")
+    public static async Task<(Guid AccountId, BondResponse Bond)> CreateAccountWithBondAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        AddBondRequest? request = null,
+        TaxWrapper wrapper = TaxWrapper.Regular,
+        string accountName = "Bonds")
     {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
-        var bond = await client.AddBondAsync(portfolioId, cancellationToken, request);
+        var accountId = await client.CreateAccountAsync(cancellationToken, accountName, AccountType.Bonds, wrapper);
+        var bond = await client.AddBondAsync(accountId, cancellationToken, request);
 
-        return (portfolioId, bond);
+        return (accountId, bond);
     }
 
     public static async Task<BondResponse> GetBondAsync(
@@ -352,23 +318,24 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken))!;
     }
 
-    public sealed record FundedBond(Guid CashPortfolioId, Guid CashAssetId, Guid BondPortfolioId, BondResponse Bond);
+    public sealed record FundedBond(Guid CashAssetId, Guid BondAccountId, BondResponse Bond);
 
     public static async Task<FundedBond> CreateFundedBondAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
         decimal cashBalance = 6_000m,
         AddBondRequest? request = null,
-        DateOnly? cashToppedUpOn = null)
+        DateOnly? cashToppedUpOn = null,
+        TaxWrapper wrapper = TaxWrapper.Regular,
+        string accountName = "Bonds")
     {
-        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
         var cashId = await client.AddCashAssetWithBalanceAsync(
-            cashPortfolioId, cancellationToken, balance: cashBalance, toppedUpOn: cashToppedUpOn);
-        var bondPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
+            cancellationToken, balance: cashBalance, toppedUpOn: cashToppedUpOn);
+        var bondAccountId = await client.CreateAccountAsync(cancellationToken, accountName, AccountType.Bonds, wrapper);
         var bond = await client.AddBondAsync(
-            bondPortfolioId, cancellationToken, (request ?? NewBondRequest()) with { FundingAssetId = cashId });
+            bondAccountId, cancellationToken, (request ?? NewBondRequest()) with { FundingAssetId = cashId });
 
-        return new FundedBond(cashPortfolioId, cashId, bondPortfolioId, bond);
+        return new FundedBond(cashId, bondAccountId, bond);
     }
 
     public static string BondInterestSettlementsUri(Guid assetId) =>
@@ -383,7 +350,7 @@ internal static class PortfolioApi
     public static readonly DateOnly RorPurchaseDate = new(2026, 6, 10);
 
     public static AddBondRequest NewRorBondRequest(
-        DateOnly? purchaseDate = null, int bondCount = 50, decimal firstPeriodRatePercent = 4.00m, bool taxExempt = false) =>
+        DateOnly? purchaseDate = null, int bondCount = 50, decimal firstPeriodRatePercent = 4.00m) =>
         NewBondRequest(
             name: "ROR0627",
             seriesCode: "ROR0627",
@@ -391,8 +358,7 @@ internal static class PortfolioApi
             purchaseDate: purchaseDate ?? RorPurchaseDate,
             bondCount: bondCount,
             firstPeriodRatePercent: firstPeriodRatePercent,
-            marginPercent: null,
-            taxExempt: taxExempt);
+            marginPercent: null);
 
     public static object NewSettleBondBody(
         IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods, Guid? destinationAssetId = null) => new
@@ -446,7 +412,7 @@ internal static class PortfolioApi
 
     public static readonly DateTimeOffset AfterRorMaturityUtc = new(2027, 6, 11, 10, 0, 0, TimeSpan.Zero);
 
-    public static AddBondRequest NewTosBondRequest(int bondCount = 10, decimal purchasePricePerBond = 100m, bool taxExempt = false) =>
+    public static AddBondRequest NewTosBondRequest(int bondCount = 10, decimal purchasePricePerBond = 100m) =>
         NewBondRequest(
             name: "TOS1029",
             seriesCode: "TOS1029",
@@ -454,13 +420,12 @@ internal static class PortfolioApi
             bondCount: bondCount,
             purchasePricePerBond: purchasePricePerBond,
             firstPeriodRatePercent: 4.40m,
-            marginPercent: null,
-            taxExempt: taxExempt);
+            marginPercent: null);
 
     public static async Task<FundedBond> CreateSettledTosAsync(
-        this HttpClient client, CancellationToken cancellationToken, bool taxExempt = false)
+        this HttpClient client, CancellationToken cancellationToken, TaxWrapper wrapper = TaxWrapper.Regular)
     {
-        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest(taxExempt: taxExempt));
+        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest(), wrapper: wrapper);
         await client.SettleBondInterestAsync(
             funded.Bond.AssetId, [(1, null), (2, null), (3, null)], null, cancellationToken);
 
@@ -468,11 +433,12 @@ internal static class PortfolioApi
     }
 
     public static async Task<FundedBond> CreateSettledRorAsync(
-        this HttpClient client, CancellationToken cancellationToken, decimal purchasePricePerBond = 99.90m, bool taxExempt = false)
+        this HttpClient client, CancellationToken cancellationToken, decimal purchasePricePerBond = 99.90m, TaxWrapper wrapper = TaxWrapper.Regular)
     {
         var funded = await client.CreateFundedBondAsync(
             cancellationToken,
-            request: NewRorBondRequest(bondCount: 10, taxExempt: taxExempt) with { PurchasePricePerBond = purchasePricePerBond });
+            request: NewRorBondRequest(bondCount: 10) with { PurchasePricePerBond = purchasePricePerBond },
+            wrapper: wrapper);
         var periods = Enumerable.Range(1, 12).Select(index => (index, index == 1 ? (decimal?)null : 3.75m)).ToList();
         await client.SettleBondInterestAsync(funded.Bond.AssetId, periods, funded.CashAssetId, cancellationToken);
 
@@ -631,8 +597,7 @@ internal static class PortfolioApi
         PurchasePricePerBond = bond.PurchasePricePerBond,
         FirstPeriodRatePercent = bond.FirstPeriodRatePercent,
         MarginPercent = bond.MarginPercent,
-        EarlyRedemptionFeePerBond = bond.EarlyRedemptionFeePerBond,
-        TaxExempt = bond.TaxExempt
+        EarlyRedemptionFeePerBond = bond.EarlyRedemptionFeePerBond
     };
 
     public const string AllCashAccountsUri = "/api/portfolio/cash-accounts";
@@ -654,9 +619,8 @@ internal static class PortfolioApi
         bool taxExempt = false,
         bool withOpeningDeposit = true,
         decimal openingAmount = 10_000m,
-        DateOnly? openingDate = null, Guid portfolioId = default) => new()
+        DateOnly? openingDate = null) => new()
         {
-            PortfolioId = portfolioId,
             Name = name,
             BankName = bankName,
             Currency = currency,
@@ -680,22 +644,13 @@ internal static class PortfolioApi
         };
 
     public static async Task<SavingsAccountResponse> AddSavingsAccountAsync(
-        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null)
+        this HttpClient client, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null)
     {
         var response = await client.PostAsJsonAsync(
-            AllSavingsAccountsUri, (request ?? NewSavingsAccountRequest()) with { PortfolioId = portfolioId }, cancellationToken);
+            AllSavingsAccountsUri, request ?? NewSavingsAccountRequest(), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
-    }
-
-    public static async Task<(Guid PortfolioId, SavingsAccountResponse Account)> CreatePortfolioWithSavingsAccountAsync(
-        this HttpClient client, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null, string portfolioName = "Savings")
-    {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
-        var account = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, request);
-
-        return (portfolioId, account);
     }
 
     public static async Task<SavingsAccountResponse> GetSavingsAccountAsync(
@@ -724,9 +679,8 @@ internal static class PortfolioApi
         bool withFirstPurchase = true,
         decimal pieces = 10m,
         decimal pricePerPiece = 260.00m,
-        DateOnly? purchaseDate = null, Guid portfolioId = default) => new()
+        DateOnly? purchaseDate = null) => new()
         {
-            PortfolioId = portfolioId,
             Name = name,
             Metal = metal,
             FineWeight = fineWeight,
@@ -749,22 +703,12 @@ internal static class PortfolioApi
         };
 
     public static async Task<MetalResponse> AddMetalAsync(
-        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddMetalRequest? request = null)
+        this HttpClient client, CancellationToken cancellationToken, AddMetalRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(
-            AllMetalsUri, (request ?? NewMetalRequest()) with { PortfolioId = portfolioId }, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllMetalsUri, request ?? NewMetalRequest(), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken))!;
-    }
-
-    public static async Task<(Guid PortfolioId, MetalResponse Metal)> CreatePortfolioWithMetalAsync(
-        this HttpClient client, CancellationToken cancellationToken, AddMetalRequest? request = null, string portfolioName = "Metals")
-    {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
-        var metal = await client.AddMetalAsync(portfolioId, cancellationToken, request);
-
-        return (portfolioId, metal);
     }
 
     public static async Task<MetalResponse> GetMetalAsync(
@@ -797,35 +741,33 @@ internal static class PortfolioApi
 
     public static async Task<Guid> AddCashAssetWithBalanceAsync(
         this HttpClient client,
-        Guid portfolioId,
         CancellationToken cancellationToken,
         decimal balance = 5_000m,
         DateOnly? toppedUpOn = null,
         string currency = "PLN",
         string name = "Cash account")
     {
-        var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken, currency: currency, name: name);
+        var cashId = await client.AddCashAssetAsync(cancellationToken, currency: currency, name: name);
         await client.RecordTransactionAsync(
             cashId, TransactionType.Deposit, balance, toppedUpOn ?? DefaultTopUpDate, cancellationToken, unitPrice: 1m);
 
         return cashId;
     }
 
-    public static async Task<(Guid PortfolioId, Guid CashId)> AddArchivedCashAssetAsync(
+    public static async Task<Guid> AddArchivedCashAssetAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
         decimal balance = 5_000m,
-        string portfolioName = "Old wallet",
-        string name = "Archived cash")
+        string name = "Archived cash",
+        string currency = "PLN")
     {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
-        var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name);
-        await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: balance, name: name, currency: currency);
+        await client.ArchiveAssetAsync(cashId, cancellationToken);
 
-        return (portfolioId, cashId);
+        return cashId;
     }
 
-    public sealed record FundedDeposit(Guid CashPortfolioId, Guid CashAssetId, Guid DepositPortfolioId, DepositResponse Deposit);
+    public sealed record FundedDeposit(Guid CashAssetId, DepositResponse Deposit);
 
     public static async Task<FundedDeposit> CreateFundedDepositAsync(
         this HttpClient client,
@@ -833,13 +775,11 @@ internal static class PortfolioApi
         decimal cashBalance = 5_000m,
         decimal principal = 1_000m)
     {
-        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance);
-        var depositPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Savings");
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: cashBalance);
         var deposit = await client.AddDepositAsync(
-            depositPortfolioId, cancellationToken, NewDepositRequest(principal: principal, fundingAssetId: cashId));
+            cancellationToken, NewDepositRequest(principal: principal, fundingAssetId: cashId));
 
-        return new FundedDeposit(cashPortfolioId, cashId, depositPortfolioId, deposit);
+        return new FundedDeposit(cashId, deposit);
     }
 
     public static async Task<TransactionResponse> GetCashWithdrawAsync(
@@ -848,26 +788,9 @@ internal static class PortfolioApi
             (await client.ListTransactionsAsync(cashId, cancellationToken)).Items,
             t => t.Type == TransactionType.Withdraw);
 
-    public static async Task<Guid> CreatePortfolioAsync(
-        this HttpClient client, CancellationToken cancellationToken, string name = "Retirement")
-    {
-        var response = await client.PostAsJsonAsync(
-            PortfoliosUri, new CreatePortfolioRequest { Name = name, Currency = "PLN" }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content.ReadFromJsonAsync<PortfolioResponse>(cancellationToken))!.Id;
-    }
-
-    public static async Task ArchivePortfolioAsync(
-        this HttpClient client, Guid portfolioId, CancellationToken cancellationToken)
-    {
-        var response = await client.PostAsync($"{PortfolioUri(portfolioId)}/archive", content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
     public static async Task<Guid> AddAssetAsync(
         this HttpClient client,
-        Guid portfolioId,
+        Guid accountId,
         CancellationToken cancellationToken,
         string name = "Test asset",
         AssetClass assetClass = AssetClass.Stock,
@@ -875,7 +798,7 @@ internal static class PortfolioApi
     {
         var request = new AddAssetRequest
         {
-            PortfolioId = portfolioId,
+            AccountId = accountId,
             AssetClass = assetClass,
             Name = name,
             Currency = currency,
@@ -890,13 +813,12 @@ internal static class PortfolioApi
 
     public static async Task<Guid> AddCashAssetAsync(
         this HttpClient client,
-        Guid portfolioId,
         CancellationToken cancellationToken,
         AssetClass assetClass = AssetClass.Cash,
         string currency = "PLN",
         string name = "Cash account")
     {
-        var request = new AddAssetRequest { PortfolioId = portfolioId, AssetClass = assetClass, Name = name, Currency = currency };
+        var request = new AddAssetRequest { AssetClass = assetClass, Name = name, Currency = currency };
 
         var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -911,7 +833,7 @@ internal static class PortfolioApi
     // The instrument must already be scripted in FakeInstrumentLookupClient with the same class and currency.
     public static async Task<Guid> AddMarketAssetAsync(
         this HttpClient client,
-        Guid portfolioId,
+        Guid accountId,
         CancellationToken cancellationToken,
         AssetClass assetClass = AssetClass.Stock,
         string currency = "PLN",
@@ -920,7 +842,7 @@ internal static class PortfolioApi
     {
         var request = new AddAssetRequest
         {
-            PortfolioId = portfolioId,
+            AccountId = accountId,
             AssetClass = assetClass,
             Name = name,
             Currency = currency,
@@ -933,28 +855,28 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
     }
 
-    public static async Task<(Guid PortfolioId, Guid AssetId)> CreatePortfolioWithAssetAsync(
+    public static async Task<(Guid AccountId, Guid AssetId)> CreateAccountWithAssetAsync(
         this HttpClient client, CancellationToken cancellationToken, string currency = "PLN")
     {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, currency: currency);
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var assetId = await client.AddAssetAsync(accountId, cancellationToken, currency: currency);
 
-        return (portfolioId, assetId);
+        return (accountId, assetId);
     }
 
-    public static async Task<(Guid PortfolioId, IReadOnlyList<Guid> AssetIds)> CreatePortfolioWithAssetsAndTransactionsAsync(
+    public static async Task<(Guid AccountId, IReadOnlyList<Guid> AssetIds)> CreateAccountWithAssetsAndTransactionsAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
         int assetCount = 2,
         int transactionsPerAsset = 2,
-        string portfolioName = "Retirement")
+        string accountName = "Retirement")
     {
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
+        var accountId = await client.CreateAccountAsync(cancellationToken, accountName);
         var assetIds = new List<Guid>();
 
         for (var i = 0; i < assetCount; i++)
         {
-            var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: $"Asset {i + 1}");
+            var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: $"Asset {i + 1}");
             for (var t = 0; t < transactionsPerAsset; t++)
             {
                 await client.RecordTransactionAsync(
@@ -964,7 +886,7 @@ internal static class PortfolioApi
             assetIds.Add(assetId);
         }
 
-        return (portfolioId, assetIds);
+        return (accountId, assetIds);
     }
 
     public static async Task<Guid> RecordTransactionAsync(
@@ -1097,7 +1019,7 @@ internal static class PortfolioApi
             Date = date ?? DefaultTransferDate
         };
 
-    public sealed record CashAndSavings(Guid CashPortfolioId, Guid CashAssetId, Guid SavingsPortfolioId, Guid SavingsAssetId);
+    public sealed record CashAndSavings(Guid CashAssetId, Guid SavingsAssetId);
 
     public static async Task<CashAndSavings> CreateCashAndSavingsAsync(
         this HttpClient client,
@@ -1106,17 +1028,16 @@ internal static class PortfolioApi
         DateOnly? toppedUpOn = null,
         AddSavingsAccountRequest? savingsRequest = null)
     {
-        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance, toppedUpOn: toppedUpOn);
-        var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: cashBalance, toppedUpOn: toppedUpOn);
+        var account = await client.AddSavingsAccountAsync(
             cancellationToken, savingsRequest ?? NewSavingsAccountRequest(withOpeningDeposit: false));
 
-        return new CashAndSavings(cashPortfolioId, cashId, savingsPortfolioId, account.AssetId);
+        return new CashAndSavings(cashId, account.AssetId);
     }
 
     public static readonly DateOnly MetalCashDate = MetalPurchaseDate.AddDays(1);
 
-    public sealed record CashAndMetal(Guid CashPortfolioId, Guid CashAssetId, Guid MetalPortfolioId, Guid MetalAssetId);
+    public sealed record CashAndMetal(Guid CashAssetId, Guid MetalAssetId);
 
     public static async Task<CashAndMetal> CreateCashAndMetalAsync(
         this HttpClient client,
@@ -1124,14 +1045,12 @@ internal static class PortfolioApi
         decimal cashBalance = 5_000m,
         decimal pieces = 0m)
     {
-        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var cashId = await client.AddCashAssetWithBalanceAsync(cashPortfolioId, cancellationToken, balance: cashBalance);
-        var (metalPortfolioId, metal) = await client.CreatePortfolioWithMetalAsync(
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: cashBalance);
+        var metal = await client.AddMetalAsync(
             cancellationToken,
-            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, withFirstPurchase: pieces > 0m, pieces: pieces),
-            portfolioName: "Metals");
+            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, withFirstPurchase: pieces > 0m, pieces: pieces));
 
-        return new CashAndMetal(cashPortfolioId, cashId, metalPortfolioId, metal.AssetId);
+        return new CashAndMetal(cashId, metal.AssetId);
     }
 
     public static RecordTransactionRequest NewMetalCashRequest(
@@ -1169,7 +1088,7 @@ internal static class PortfolioApi
 
     public static readonly DateOnly TradeDate = new(2026, 2, 10);
 
-    public sealed record CashAndEtf(Guid CashPortfolioId, Guid CashAssetId, Guid EtfPortfolioId, Guid EtfAssetId);
+    public sealed record CashAndEtf(Guid CashAssetId, Guid EtfAccountId, Guid EtfAssetId);
 
     public static RecordTransactionRequest NewTradeRequest(
         Guid? cashAssetId,

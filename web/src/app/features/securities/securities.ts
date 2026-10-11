@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -12,6 +12,8 @@ import { SecuritiesTable } from './securities-table/securities-table';
   styleUrl: './securities.scss',
 })
 export class Securities {
+  readonly account = input<string>();
+
   protected readonly stockClass = ASSET_CLASS.Stock;
   protected readonly etfClass = ASSET_CLASS.Etf;
 }

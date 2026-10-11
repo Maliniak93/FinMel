@@ -18,10 +18,10 @@ public sealed class RestoreAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        // Two independent flags: an asset in an archived portfolio stays archived until the portfolio is restored.
-        if (await dbContext.IsPortfolioArchivedAsync(asset.PortfolioId, cancellationToken))
+        // An asset in an archived account stays archived until the account is restored.
+        if (await dbContext.AccountArchivedErrorAsync(asset, cancellationToken) is { } accountArchived)
         {
-            return PortfolioErrors.Archived(asset.PortfolioId);
+            return accountArchived;
         }
 
         // Not archived: 200 with the unchanged body and no event.

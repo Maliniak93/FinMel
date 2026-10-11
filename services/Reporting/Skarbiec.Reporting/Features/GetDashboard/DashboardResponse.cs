@@ -13,7 +13,7 @@ public sealed record DashboardResponse
     public required bool IsStale { get; init; }
 
     public required IReadOnlyList<DashboardAssetClassValue> ByAssetClass { get; init; }
-    public required IReadOnlyList<DashboardPortfolioValue> ByPortfolio { get; init; }
+    public required IReadOnlyList<DashboardAccountValue> ByAccount { get; init; }
 }
 
 public sealed record DashboardAssetClassValue
@@ -23,9 +23,10 @@ public sealed record DashboardAssetClassValue
     public required decimal Percentage { get; init; }
 }
 
-public sealed record DashboardPortfolioValue
+public sealed record DashboardAccountValue
 {
-    public required Guid PortfolioId { get; init; }
+    /// <summary>Null groups the lines of assets that sit in no account.</summary>
+    public Guid? AccountId { get; init; }
     public required decimal ValuePln { get; init; }
     public required decimal Percentage { get; init; }
     public required DateOnly SnapshotDate { get; init; }

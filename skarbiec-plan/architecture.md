@@ -8,9 +8,9 @@ Target state (the approved redesign, Część II). Four services + gateway — S
 |---|---|---|---|---|
 | **Gateway** (YARP) | routing `/api/<service>/*`, JWT validation, rate limiting, CORS | — | — | — |
 | **Identity** | registration, login, refresh/logout | `identity_db` | `UserRegistered` | — |
-| **Portfolio** | portfolios, assets (3 valuation modes), transactions = source of truth for quantity | `portfolio_db` | `AssetPositionChanged`, `AssetRemoved`, `PortfolioArchived`, `PortfolioRestored`, `PortfolioDeleted` | — |
+| **Portfolio** | accounts (Brokerage / Bonds, with a tax wrapper), assets (3 valuation modes), transactions = source of truth for quantity | `portfolio_db` | `AssetPositionChanged`, `AssetRemoved` | — |
 | **MarketData** | currency catalog, instruments, FX rates, quotes, sync jobs, ticker verification (ADR-018) | `marketdata_db` | `DailyPricesSynced` | `AssetPositionChanged`, `AssetRemoved` (→ `InstrumentUsage`) |
-| **Reporting** | positions read model with a quantity timeline, valuations (snapshots + per-asset lines) incl. the past-day history rebuild (ADR-032), dashboard, history, insights (allocation, rebalancing, emergency fund, goals) | `reporting_db` | later: `AllocationDriftDetected`, `EmergencyFundBelowThreshold` | `AssetPositionChanged`, `AssetRemoved`, `Portfolio*`, `DailyPricesSynced`, `InstrumentHistoryBackfilled` |
+| **Reporting** | positions read model with a quantity timeline, valuations (snapshots + per-asset lines) incl. the past-day history rebuild (ADR-032), dashboard, history, insights (allocation, rebalancing, emergency fund, goals) | `reporting_db` | later: `AllocationDriftDetected`, `EmergencyFundBelowThreshold` | `AssetPositionChanged`, `AssetRemoved`, `DailyPricesSynced`, `InstrumentHistoryBackfilled` |
 
 Angular talks only to the Gateway (ADR-013).
 
@@ -25,9 +25,8 @@ Angular talks only to the Gateway (ADR-013).
 
 | Event | Payload | Published when |
 |---|---|---|
-| `AssetPositionChanged` | `AssetId, PortfolioId, UserId, AssetClass, ValuationMode, InstrumentId?, Currency, Quantity, FirstTransactionDate?, QuantityHistory (end-of-day `(Date, Quantity)` per transaction date), PortfolioIsArchived, IsArchived, Version` | after **every** position mutation: add/update asset, record/update/delete transaction, archive/restore the asset (`IsArchived`, asset-archive) or its portfolio (fan-out) |
-| `AssetRemoved` | `AssetId, PortfolioId, UserId, CascadedFromPortfolio` | remove asset (its transactions go with it); also one per asset on portfolio delete, flagged `CascadedFromPortfolio` so Reporting skips the revaluation (spec-08) |
-| `PortfolioArchived` / `PortfolioRestored` / `PortfolioDeleted` | `PortfolioId, UserId` | the matching slice (`Restore` is a new slice — no "unarchive" exists today); `PortfolioDeleted` cascades to the assets and their transactions and is accompanied by one `AssetRemoved` per asset (spec-08) |
+| `AssetPositionChanged` | `AssetId, AccountId?, UserId, AssetClass, ValuationMode, InstrumentId?, Currency, Quantity, FirstTransactionDate?, QuantityHistory (end-of-day `(Date, Quantity)` per transaction date), IsArchived, Version` | after **every** position mutation: add/update asset, record/update/delete transaction, archive/restore the asset (`IsArchived`, asset-archive); `AccountId` is null for assets that sit in no account |
+| `AssetRemoved` | `AssetId, AccountId?, UserId` | remove asset (its transactions go with it) |
 | `DailyPricesSynced` | as today, plus `Kind: Prices \| Fx` | end of a sync job |
 | `InstrumentHistoryBackfilled` | `InstrumentId, From, To, OccurredAtUtc` (the clamped window the backfill fetched) | `HistoryBackfillJob` finishes with quotes stored (not on NoData or Error) |
 | `UserRegistered` | as today | no consumer yet (Notifications is an idea, not built) |
@@ -88,7 +87,7 @@ flowchart TB
     RP -->|"REST: prices/fx batch, daily"| MD
 
     ID -->|"event: UserRegistered"| MQ["RabbitMQ"]
-    PF -->|"events: AssetPositionChanged,<br/>AssetRemoved, Portfolio*"| MQ
+    PF -->|"events: AssetPositionChanged,<br/>AssetRemoved"| MQ
     MD -->|"event: DailyPricesSynced"| MQ
     MQ -->|consumes| MD
     MQ -->|consumes| RP
@@ -122,7 +121,7 @@ sequenceDiagram
     PF->>MQ: publish (from outbox, after commit)
     MQ->>RP: deliver AssetPositionChanged
     RP->>RP: inbox check, upsert Position
-    RP->>RP: revalue today's snapshot + lines of that portfolio<br/>from local LatestInstrumentPrice / LatestFxRate (ADR-025)
+    RP->>RP: revalue today's snapshot + lines of that user<br/>from local LatestInstrumentPrice / LatestFxRate (ADR-025)
     MQ->>MD: deliver AssetPositionChanged
     MD->>MD: inbox check, upsert AssetInstrumentLink + InstrumentUsage
     alt earliest FirstTransactionDate of live holdings < Instrument.HistoryCoveredFrom (or none covered)
@@ -151,7 +150,7 @@ sequenceDiagram
     MD-->>RP: batch prices/rates
     RP->>RP: keep them in LatestInstrumentPrice / LatestFxRate
     RP->>RP: value local Positions → AssetValuation lines +<br/>ValuationSnapshot (last-known price, stale > 7 days)
-    RP->>RP: request a rebuild for each portfolio whose last snapshot is older than yesterday +<br/>re-publish every pending rebuild request
+    RP->>RP: request a rebuild for each user whose last snapshot is older than yesterday +<br/>re-publish every pending rebuild request
 ```
 
 ### Sequence: position change → history rebuild

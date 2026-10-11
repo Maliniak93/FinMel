@@ -122,6 +122,47 @@ describe('Bonds page, my bonds tab', () => {
     ).length;
   }
 
+  const inIke = {
+    ...activeBond,
+    name: 'Edo in IKE',
+    accountId: 'c1111111-1111-1111-1111-111111111111',
+    accountName: 'Obligacje IKE',
+    taxWrapper: 1,
+  } as BondFixture;
+  const inRegular = {
+    ...interestDueBond,
+    name: 'Coi in regular',
+    accountId: 'c2222222-2222-2222-2222-222222222222',
+    accountName: 'Obligacje zwykle',
+    taxWrapper: 0,
+  } as BondFixture;
+
+  it('shows a Rachunek column with the account name and the tax wrapper of each bond', async () => {
+    await setup([inIke, inRegular]);
+    await switchLanguage(fixture, 'pl');
+
+    const headers = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('th'),
+      (th) => textOf(th),
+    );
+    expect(headers).toContain('Rachunek');
+    expect(textOf(rowFor('Edo in IKE'))).toContain('Obligacje IKE');
+    expect(textOf(rowFor('Edo in IKE'))).toContain('IKE');
+    expect(textOf(rowFor('Coi in regular'))).toContain('Obligacje zwykle');
+  });
+
+  it('filters the bonds by the account query parameter', async () => {
+    await setup([inIke, inRegular]);
+    await switchLanguage(fixture, 'pl');
+
+    fixture.componentRef.setInput('account', inRegular.accountId);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(rows()).toHaveLength(1);
+    expect(textOf(rowFor('Coi in regular'))).toContain('Obligacje zwykle');
+  });
+
   it('opens on "Moje obligacje", placed before "Aktualna oferta"', async () => {
     await setup();
     await switchLanguage(fixture, 'pl');

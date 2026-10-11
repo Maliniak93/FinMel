@@ -60,7 +60,6 @@ export class SavingsAccounts {
   protected readonly displayedColumns = [
     'name',
     'bankName',
-    'portfolio',
     'balance',
     'rate',
     'lastInterest',
@@ -93,7 +92,7 @@ export class SavingsAccounts {
   protected readonly formatMonth = formatMonth;
 
   protected isWritable(account: SavingsAccountResponse): boolean {
-    return !account.portfolioIsArchived && !account.isArchived;
+    return !account.isArchived;
   }
 
   // The generated client types the server's int as `number | string`.
@@ -166,7 +165,7 @@ export class SavingsAccounts {
   }
 
   protected transactionsLink(account: SavingsAccountResponse): string[] {
-    return ['/portfolios', account.portfolioId, 'assets', account.assetId, 'transactions'];
+    return ['/assets', account.assetId, 'transactions'];
   }
 
   protected openCreateDialog(): void {
@@ -213,7 +212,7 @@ export class SavingsAccounts {
     const done = await confirmSetAssetArchived(
       this.dialog,
       this.snackBar,
-      { portfolioId: account.portfolioId, assetId: account.assetId, name: account.name },
+      { assetId: account.assetId, name: account.name },
       archive,
     );
     if (done) {

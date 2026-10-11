@@ -18,9 +18,9 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await owner.CreatePortfolioWithMetalAsync(cancellationToken);
+        await owner.AddMetalAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await stranger.CreatePortfolioWithMetalAsync(cancellationToken, NewMetalRequest(name: "Stranger's own"));
+        await stranger.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Stranger's own"));
 
         var response = await stranger.GetAsync(AllMetalsUri, cancellationToken);
 
@@ -35,15 +35,11 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (ownerPortfolioId, metal) = await owner.CreatePortfolioWithMetalAsync(cancellationToken);
+        var metal = await owner.AddMetalAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.GetAsync(MetalUri(metal.AssetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.GetAsync(MetalUri(metal.AssetId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        var response = await stranger.GetAsync(MetalUri(metal.AssetId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -52,38 +48,15 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (ownerPortfolioId, metal) = await owner.CreatePortfolioWithMetalAsync(cancellationToken);
+        var metal = await owner.AddMetalAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var payload = NewUpdateMetalRequest(name: "Stranger's edit");
 
-        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(MetalUri(metal.AssetId), payload, cancellationToken);
-        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(MetalUri(metal.AssetId), payload, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        var response = await stranger.PutAsJsonAsync(MetalUri(metal.AssetId), payload, cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var unchanged = await owner.GetMetalAsync(metal.AssetId, cancellationToken);
         Assert.Equal("Maple Leaf 1 oz", unchanged.Name);
         Assert.Equal(31.10347680m, unchanged.FineWeightGramsPerPiece);
-    }
-
-    [Fact]
-    public async Task Add_IntoStrangersPortfolio_ReturnsNotFoundAndWritesNothing()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(MetalTodayUtc);
-        var ownerId = Guid.NewGuid();
-        using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var ownerPortfolioId = await owner.CreatePortfolioAsync(cancellationToken);
-        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-
-        var response = await stranger.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { PortfolioId = ownerPortfolioId }, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        await using var dbContext = CreateDbContext(ownerId);
-        Assert.Equal(0, await dbContext.Set<MetalHolding>().IgnoreQueryFilters().CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Transactions.IgnoreQueryFilters().CountAsync(cancellationToken));
     }
 
     [Fact]
@@ -93,7 +66,7 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var (_, metal) = await owner.CreatePortfolioWithMetalAsync(cancellationToken);
+        var metal = await owner.AddMetalAsync(cancellationToken);
 
         await using var strangerDb = CreateDbContext(Guid.NewGuid());
         Assert.False(await strangerDb.Set<MetalHolding>().AnyAsync(h => h.AssetId == metal.AssetId, cancellationToken));

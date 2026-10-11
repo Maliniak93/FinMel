@@ -15,7 +15,7 @@ public sealed class UpdateDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         Guid assetId, UpdateDepositRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset both end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Deposit, cancellationToken);
         var terms = asset is null
@@ -27,13 +27,7 @@ public sealed class UpdateDepositHandler(
             return DepositErrors.NotFound(assetId);
         }
 
-        var portfolio = await dbContext.Portfolios
-            .AsNoTracking()
-            .Where(p => p.Id == asset.PortfolioId)
-            .Select(p => new { p.Name, p.IsArchived })
-            .FirstAsync(cancellationToken);
-
-        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
             return readOnly;
         }
@@ -68,7 +62,7 @@ public sealed class UpdateDepositHandler(
         {
             fundingAsset = await dbContext.Assets.FirstAsync(a => a.Id == fundingLeg.AssetId, cancellationToken);
 
-            // The Cash side is read-only while it or its portfolio is archived, so its leg cannot be rewritten.
+            // The Cash side is read-only while it is archived, so its leg cannot be rewritten.
             if (await dbContext.ReadOnlyErrorAsync(fundingAsset, cancellationToken) is { } fundingReadOnly)
             {
                 return fundingReadOnly;
@@ -173,6 +167,6 @@ public sealed class UpdateDepositHandler(
         var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
 
         // Never paid out: only a settled deposit can be, and its terms are immutable.
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), funding, payout: null);
+        return terms.ToResponse(asset, WarsawCalendar.Today(timeProvider), funding, payout: null);
     }
 }

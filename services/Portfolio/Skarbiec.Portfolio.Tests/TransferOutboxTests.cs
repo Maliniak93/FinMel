@@ -22,7 +22,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var (walletId, cashId, savingsId, savingsAssetId) = await ArrangeCashAndSavingsAsync(cancellationToken);
+        var (cashId, savingsAssetId) = await ArrangeCashAndSavingsAsync(cancellationToken);
         var positionEventsBefore = await CountPositionEventsAsync(cancellationToken);
         SaveChanges.Reset();
 
@@ -41,11 +41,11 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         Assert.Equal(2, events.Count);
         var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
         Assert.Equal(3_000m, cashEvent.Quantity);
-        Assert.Equal(walletId, cashEvent.PortfolioId);
+        Assert.Null(cashEvent.AccountId);
         Assert.Equal(UserId, cashEvent.UserId);
         var savingsEvent = Assert.Single(events, e => e.AssetId == savingsAssetId);
         Assert.Equal(2_000m, savingsEvent.Quantity);
-        Assert.Equal(savingsId, savingsEvent.PortfolioId);
+        Assert.Null(savingsEvent.AccountId);
         Assert.Equal(AssetClass.Savings, savingsEvent.AssetClass);
 
         var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
@@ -58,7 +58,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var (_, cashId, _, savingsAssetId) = await ArrangeCashAndSavingsAsync(cancellationToken);
+        var (cashId, savingsAssetId) = await ArrangeCashAndSavingsAsync(cancellationToken);
         Guid transferId;
         await using (var create = Provider.CreateAsyncScope())
         {
@@ -93,7 +93,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     public async Task MetalBuyWithCash_PublishesBoth()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (_, cashId, metalPortfolioId, metalAssetId) = await ArrangeCashAndMetalAsync(cancellationToken);
+        var (cashId, metalAssetId) = await ArrangeCashAndMetalAsync(cancellationToken);
         var positionEventsBefore = await CountPositionEventsAsync(cancellationToken);
         SaveChanges.Reset();
 
@@ -121,12 +121,11 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     public async Task SecurityTrade_PublishesBothAssets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Guid walletId, cashId, brokerageId, stockId;
+        Guid cashId, brokerageId, stockId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-            brokerageId = await CreatePortfolioAsync(arrange.ServiceProvider, "Brokerage", cancellationToken);
+            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
+            brokerageId = await CreateAccountAsync(arrange.ServiceProvider, "Brokerage", cancellationToken);
             stockId = await AddStockAsync(arrange.ServiceProvider, brokerageId, "Shares", cancellationToken);
         }
 
@@ -148,10 +147,10 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         Assert.Equal(2, events.Count);
         var stockEvent = Assert.Single(events, e => e.AssetId == stockId);
         Assert.Equal(15m, stockEvent.Quantity);
-        Assert.Equal(brokerageId, stockEvent.PortfolioId);
+        Assert.Equal(brokerageId, stockEvent.AccountId);
         var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
         Assert.Equal(3_350m, cashEvent.Quantity);
-        Assert.Equal(walletId, cashEvent.PortfolioId);
+        Assert.Null(cashEvent.AccountId);
         var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
         Assert.Single(legs.Select(t => t.TransferId).Distinct());
@@ -162,7 +161,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     public async Task DeleteMetalTransfer_PublishesBoth()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (_, cashId, metalPortfolioId, metalAssetId) = await ArrangeCashAndMetalAsync(cancellationToken);
+        var (cashId, metalAssetId) = await ArrangeCashAndMetalAsync(cancellationToken);
         await using (var record = Provider.CreateAsyncScope())
         {
             var recorded = await record.ServiceProvider.GetRequiredService<RecordTransactionHandler>()
@@ -198,31 +197,27 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         Assert.False(await verifyDb.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
-    private async Task<(Guid WalletId, Guid CashId, Guid MetalPortfolioId, Guid MetalAssetId)> ArrangeCashAndMetalAsync(
+    private async Task<(Guid CashId, Guid MetalAssetId)> ArrangeCashAndMetalAsync(
         CancellationToken cancellationToken)
     {
         await using var arrange = Provider.CreateAsyncScope();
-        var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-        var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-        var metalPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Metals", cancellationToken);
+        var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
         var metal = await arrange.ServiceProvider.GetRequiredService<AddMetalHandler>()
-            .HandleAsync(PortfolioApi.NewMetalRequest(portfolioId: metalPortfolioId, metal: Metal.Gold, withFirstPurchase: false), cancellationToken);
+            .HandleAsync(PortfolioApi.NewMetalRequest(metal: Metal.Gold, withFirstPurchase: false), cancellationToken);
         Assert.True(metal.IsSuccess, metal.IsFailure ? metal.Error.Code : null);
 
-        return (walletId, cashId, metalPortfolioId, metal.Value.AssetId);
+        return (cashId, metal.Value.AssetId);
     }
 
-    private async Task<(Guid WalletId, Guid CashId, Guid SavingsPortfolioId, Guid SavingsAssetId)> ArrangeCashAndSavingsAsync(
+    private async Task<(Guid CashId, Guid SavingsAssetId)> ArrangeCashAndSavingsAsync(
         CancellationToken cancellationToken)
     {
         await using var arrange = Provider.CreateAsyncScope();
-        var walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
-        var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
-        var savingsPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
+        var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
         var account = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: savingsPortfolioId, withOpeningDeposit: false), cancellationToken);
+            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
         Assert.True(account.IsSuccess, account.IsFailure ? account.Error.Code : null);
 
-        return (walletId, cashId, savingsPortfolioId, account.Value.AssetId);
+        return (cashId, account.Value.AssetId);
     }
 }

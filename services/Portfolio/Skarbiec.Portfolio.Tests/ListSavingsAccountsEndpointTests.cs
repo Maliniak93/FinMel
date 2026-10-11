@@ -12,40 +12,33 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task List_ReturnsAccountsAcrossPortfoliosWithBalance()
+    public async Task List_ReturnsAccountsByNameWithBalance()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        // Portfolios sort by name (Old, archived, before Zeta); within a portfolio, accounts sort by name.
-        var (zetaId, zetaB) = await client.CreatePortfolioWithSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(name: "B account"), portfolioName: "Zeta");
-        var zetaA = await client.AddSavingsAccountAsync(zetaId, cancellationToken, NewSavingsAccountRequest(name: "A account"));
-        await client.AddCashAssetAsync(zetaId, cancellationToken);
-        var (oldId, oldAccount) = await client.CreatePortfolioWithSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(name: "Old account", taxExempt: true), portfolioName: "Old");
+        var accountB = await client.AddSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(name: "B account"));
+        var accountA = await client.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(name: "A account"));
+        await client.AddCashAssetAsync(cancellationToken);
+        var oldAccount = await client.AddSavingsAccountAsync(
+            cancellationToken, NewSavingsAccountRequest(name: "Old account", taxExempt: true));
         await client.RecordTransactionAsync(oldAccount.AssetId, TransactionType.Deposit, 500m, SavingsToday, cancellationToken, unitPrice: 1m);
         await client.RecordTransactionAsync(oldAccount.AssetId, TransactionType.Withdraw, 200m, SavingsToday, cancellationToken, unitPrice: 1m);
-        await client.ArchivePortfolioAsync(oldId, cancellationToken);
 
         var response = await client.GetAsync(AllSavingsAccountsUri, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var listed = (await response.Content.ReadFromJsonAsync<List<SavingsAccountResponse>>(cancellationToken))!;
         Assert.Equal(
-            [oldAccount.AssetId, zetaA.AssetId, zetaB.AssetId],
+            [accountA.AssetId, accountB.AssetId, oldAccount.AssetId],
             listed.Select(a => a.AssetId).ToArray());
-        var old = listed[0];
-        Assert.Equal(oldId, old.PortfolioId);
-        Assert.Equal("Old", old.PortfolioName);
-        Assert.True(old.PortfolioIsArchived);
+        var old = listed[2];
         Assert.Equal("Old account", old.Name);
         Assert.Equal(10_300m, old.Balance);
         Assert.True(old.TaxExempt);
         Assert.Equal(5.25m, old.AnnualInterestRatePercent);
-        Assert.Equal("Zeta", listed[1].PortfolioName);
-        Assert.False(listed[1].PortfolioIsArchived);
-        Assert.Equal(10_000m, listed[1].Balance);
+        Assert.Equal(10_000m, listed[0].Balance);
     }
 
     [Fact]
@@ -54,9 +47,8 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var live = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewSavingsAccountRequest(name: "Live account"));
-        var archived = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewSavingsAccountRequest(name: "Archived account"));
+        var live = await client.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(name: "Live account"));
+        var archived = await client.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(name: "Archived account"));
         await client.ArchiveAssetAsync(archived.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AllSavingsAccountsUri, cancellationToken);
@@ -66,7 +58,6 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
         Assert.Equal(2, listed.Count);
         Assert.False(listed.Single(a => a.AssetId == live.AssetId).IsArchived);
         Assert.True(listed.Single(a => a.AssetId == archived.AssetId).IsArchived);
-        Assert.False(listed.Single(a => a.AssetId == archived.AssetId).PortfolioIsArchived);
     }
 
     [Fact]
@@ -74,9 +65,8 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        await client.AddCashAssetAsync(portfolioId, cancellationToken);
-        await client.AddDepositAsync(portfolioId, cancellationToken);
+        await client.AddCashAssetAsync(cancellationToken);
+        await client.AddDepositAsync(cancellationToken);
 
         var response = await client.GetAsync(AllSavingsAccountsUri, cancellationToken);
 
@@ -100,11 +90,10 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(OctoberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, settledOnce) = await client.CreatePortfolioWithSavingsAccountAsync(
+        var settledOnce = await client.AddSavingsAccountAsync(
             cancellationToken, NewInterestAccountRequest(name: "Settled once"));
-        var untouched = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewInterestAccountRequest(name: "Untouched"));
-        var fresh = await client.AddSavingsAccountAsync(
-            portfolioId, cancellationToken, NewInterestAccountRequest(name: "Fresh", openingDate: new DateOnly(2026, 11, 1)));
+        var untouched = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest(name: "Untouched"));
+        var fresh = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest(name: "Fresh", openingDate: new DateOnly(2026, 11, 1)));
         await client.SettlePreviewedSavingsInterestAsync(settledOnce.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AllSavingsAccountsUri, cancellationToken);
@@ -140,7 +129,7 @@ public sealed class ListSavingsAccountsEndpointTests(SkarbiecContainersFixture c
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
+        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
         var due = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
         Assert.True(due.InterestDue);

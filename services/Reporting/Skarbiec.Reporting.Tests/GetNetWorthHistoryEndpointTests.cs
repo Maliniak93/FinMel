@@ -274,7 +274,7 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
         var jan = new DateOnly(Today.Year - 1, Today.Month, 1).AddDays(1);
         var mid = Today.AddMonths(-6);
         var last = Today;
@@ -284,10 +284,10 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
             await db.SeedSnapshotAsync(userId, jan, 1000m, cancellationToken);
             await db.SeedSnapshotAsync(userId, mid, 1000m, cancellationToken);
             await db.SeedSnapshotAsync(userId, last, 1700m, cancellationToken);
-            await db.SeedValuationLineAsync(userId, portfolioId, Guid.NewGuid(), jan, 1000m, cancellationToken, AssetClass.Cash);
-            await db.SeedValuationLineAsync(userId, portfolioId, Guid.NewGuid(), mid, 1000m, cancellationToken, AssetClass.Cash);
-            await db.SeedValuationLineAsync(userId, portfolioId, Guid.NewGuid(), last, 1000m, cancellationToken, AssetClass.Cash);
-            await db.SeedValuationLineAsync(userId, portfolioId, Guid.NewGuid(), last, 700m, cancellationToken, AssetClass.Etf);
+            await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), jan, 1000m, cancellationToken, AssetClass.Cash);
+            await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), mid, 1000m, cancellationToken, AssetClass.Cash);
+            await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), last, 1000m, cancellationToken, AssetClass.Cash);
+            await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), last, 700m, cancellationToken, AssetClass.Etf);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);

@@ -20,9 +20,9 @@ public sealed class RemoveAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
-        if (await dbContext.IsPortfolioArchivedAsync(asset.PortfolioId, cancellationToken))
+        if (await dbContext.AccountArchivedErrorAsync(asset, cancellationToken) is { } accountArchived)
         {
-            return PortfolioErrors.Archived(asset.PortfolioId);
+            return accountArchived;
         }
 
         // portfolio_db has no FKs, so the delete cascades to the asset's transactions explicitly.
@@ -62,10 +62,9 @@ public sealed class RemoveAssetHandler(
         await publishEndpoint.Publish(new AssetRemoved
         {
             AssetId = asset.Id,
-            PortfolioId = asset.PortfolioId,
+            AccountId = asset.AccountId,
             UserId = dbContext.CurrentUserId,
-            OccurredAtUtc = timeProvider.GetUtcNow(),
-            CascadedFromPortfolio = false
+            OccurredAtUtc = timeProvider.GetUtcNow()
         }, cancellationToken);
 
         try

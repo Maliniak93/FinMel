@@ -18,16 +18,14 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         var cancellationToken = TestContext.Current.CancellationToken;
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var ownerWalletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(ownerWalletId, cancellationToken, balance: 5_000m);
+        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
         var strangerId = Guid.NewGuid();
         using var stranger = Factory.CreateAuthenticatedClient(strangerId);
-        var strangerSavingsId = await stranger.CreatePortfolioAsync(cancellationToken, name: "Savings");
         var ownerBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
         var strangerBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
 
         var response = await stranger.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: ownerCashId) with { PortfolioId = strangerSavingsId }, cancellationToken);
+            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: ownerCashId), cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         Assert.Equal(ownerBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
@@ -112,11 +110,9 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var ownerWalletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(ownerWalletId, cancellationToken, name: "Owner's cash");
+        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(cancellationToken, name: "Owner's cash");
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerWalletId = await stranger.CreatePortfolioAsync(cancellationToken, name: "Wallet");
-        var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(strangerWalletId, cancellationToken, name: "Stranger's cash");
+        var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(cancellationToken, name: "Stranger's cash");
 
         var response = await stranger.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
 
@@ -137,7 +133,6 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         var cashLeg = await owner.GetCashWithdrawAsync(funded.CashAssetId, cancellationToken);
         var depositLeg = Assert.Single((await owner.ListTransactionsAsync(funded.Deposit.AssetId, cancellationToken)).Items);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken, name: "Stranger's");
         var update = new UpdateTransactionRequest { Type = TransactionType.Withdraw, Quantity = 1m, UnitPrice = 1m, Date = cashLeg.Date };
 
         HttpResponseMessage[] responses =
@@ -162,7 +157,6 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         var cashLeg = await owner.GetCashWithdrawAsync(funded.CashAssetId, cancellationToken);
         var depositLeg = Assert.Single((await owner.ListTransactionsAsync(funded.Deposit.AssetId, cancellationToken)).Items);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken, name: "Stranger's");
 
         HttpResponseMessage[] responses =
         [
@@ -183,13 +177,9 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await owner.CreateFundedDepositAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken, name: "Stranger's");
 
-        var viaOwnersPortfolio = await stranger.GetAsync(TransactionsUri(funded.CashAssetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.GetAsync(TransactionsUri(funded.CashAssetId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
+        var response = await stranger.GetAsync(TransactionsUri(funded.CashAssetId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

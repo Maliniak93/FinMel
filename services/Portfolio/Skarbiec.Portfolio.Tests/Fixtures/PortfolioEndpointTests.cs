@@ -21,7 +21,7 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
 
     protected async Task<Guid> AddQuotedHoldingAsync(
         HttpClient client,
-        Guid portfolioId,
+        Guid accountId,
         CancellationToken cancellationToken,
         AssetClass assetClass = AssetClass.Stock,
         string currency = "PLN",
@@ -35,7 +35,7 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         Factory.InstrumentLookupClient.WithInstrument(instrumentId, assetClass, currency);
         Factory.InstrumentQuoteLookupClient.WithInstrument(instrumentId, ticker, currency, lastPrice, lastPriceDate, exchange, name);
 
-        return await client.AddMarketAssetAsync(portfolioId, cancellationToken, assetClass, currency, instrumentId, name);
+        return await client.AddMarketAssetAsync(accountId, cancellationToken, assetClass, currency, instrumentId, name);
     }
 
     private protected async Task<PortfolioApi.CashAndEtf> CreateCashAndEtfAsync(
@@ -45,19 +45,18 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         decimal etfQuantity = 0m,
         string currency = "EUR")
     {
-        var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
         var cashId = await client.AddCashAssetWithBalanceAsync(
-            cashPortfolioId, cancellationToken, balance: cashBalance, currency: currency, name: "Broker cash");
-        var etfPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Brokerage");
+            cancellationToken, balance: cashBalance, currency: currency, name: "Broker cash");
+        var etfAccountId = await client.CreateAccountAsync(cancellationToken, "Brokerage");
         var etfId = await AddQuotedHoldingAsync(
-            client, etfPortfolioId, cancellationToken, AssetClass.Etf, currency, name: "World ETF", ticker: "VWCE.DE");
+            client, etfAccountId, cancellationToken, AssetClass.Etf, currency, name: "World ETF", ticker: "VWCE.DE");
         if (etfQuantity > 0m)
         {
             await client.RecordTransactionAsync(
                 etfId, TransactionType.Buy, etfQuantity, PortfolioApi.DefaultTopUpDate.AddDays(1), cancellationToken, unitPrice: 100m);
         }
 
-        return new PortfolioApi.CashAndEtf(cashPortfolioId, cashId, etfPortfolioId, etfId);
+        return new PortfolioApi.CashAndEtf(cashId, etfAccountId, etfId);
     }
 
     private protected async Task AssertFundedDepositUnchangedAsync(

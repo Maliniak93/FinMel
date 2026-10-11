@@ -10,7 +10,7 @@ public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, Ti
     public async Task<Result<SavingsAccountResponse>> HandleAsync(
         Guid assetId, UpdateSavingsAccountRequest request, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's account, a non-Savings asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's account, a non-Savings asset both end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Savings, cancellationToken);
         var terms = asset is null
@@ -22,13 +22,7 @@ public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, Ti
             return SavingsAccountErrors.NotFound(assetId);
         }
 
-        var portfolio = await dbContext.Portfolios
-            .AsNoTracking()
-            .Where(p => p.Id == asset.PortfolioId)
-            .Select(p => new { p.Name, p.IsArchived })
-            .FirstAsync(cancellationToken);
-
-        if (asset.ReadOnlyError(portfolio.IsArchived) is { } readOnly)
+        if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
             return readOnly;
         }
@@ -44,6 +38,6 @@ public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, Ti
         // The new rate and tax status re-project the unsettled months at once.
         var interest = await dbContext.LoadSavingsInterestStatusAsync(assetId, WarsawCalendar.Today(timeProvider), cancellationToken);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, interest);
+        return terms.ToResponse(asset, interest);
     }
 }

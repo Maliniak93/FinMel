@@ -35,7 +35,7 @@ internal static class BondRedemptionPlanning
         bool forWrite,
         CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookup first: another user's bond, a non-bond asset and a wrong portfolio all end in 404.
+        // Tenancy-scoped lookup first: another user's bond, a non-bond asset all end in 404.
         var bond = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
         var terms = bond is null
@@ -86,7 +86,7 @@ internal static class BondRedemptionPlanning
             : settlements.Sum(s => s.GrossInterest / s.BondCount);
 
         var amounts = BondRedemptionMath.AtMaturity(
-            capitalisedPerBond, terms.PurchasePricePerBond, terms.BondCount, terms.TaxExempt);
+            capitalisedPerBond, terms.PurchasePricePerBond, terms.BondCount, await dbContext.IsTaxExemptAsync(bond, cancellationToken));
 
         return new BondRedemptionPlan(bond, terms, amounts);
     }
@@ -100,8 +100,7 @@ internal static class BondRedemptionPlanning
             || destination.AssetClass != AssetClass.Cash
             || !TransferRoutes.IsAllowed(bond.AssetClass, destination.AssetClass)
             || destination.Currency != bond.Currency
-            || destination.IsArchived
-            || await dbContext.IsPortfolioArchivedAsync(destination.PortfolioId, cancellationToken))
+            || destination.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
         }

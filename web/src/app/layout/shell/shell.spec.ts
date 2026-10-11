@@ -111,6 +111,21 @@ describe('Shell', () => {
     );
   });
 
+  it('offers a "Rachunki" nav item linking to /accounts in place of "Portfele"', async () => {
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
+    );
+    const accounts = links.find((a) => (a.textContent ?? '').includes('Rachunki'));
+
+    expect(accounts).toBeDefined();
+    expect(accounts!.getAttribute('href')).toBe('/accounts');
+    expect(links.some((a) => (a.textContent ?? '').includes('Portfele'))).toBe(false);
+    expect(links.some((a) => a.getAttribute('href') === '/portfolios')).toBe(false);
+  });
+
   it('offers an "Obligacje" nav item linking to /bonds', async () => {
     await TestBed.inject(LanguageService).setLanguage('pl');
     await fixture.whenStable();
@@ -150,7 +165,7 @@ describe('Shell', () => {
     const englishLabels = navLabels();
     expect(englishLabels).toEqual([
       'Dashboard',
-      'Portfolios',
+      'Accounts',
       'Cash',
       'Stocks & ETFs',
       'Deposits & savings',

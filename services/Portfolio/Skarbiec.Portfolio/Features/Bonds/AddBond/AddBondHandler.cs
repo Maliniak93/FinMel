@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
 
@@ -16,22 +17,18 @@ public sealed class AddBondHandler(
     public async Task<Result<BondResponse>> HandleAsync(
         AddBondRequest request, CancellationToken cancellationToken)
     {
-        var portfolioId = request.PortfolioId;
-        var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
-        if (portfolio is null)
+        var resolved = await dbContext.ResolveAsync(AssetClass.Bond, request.AccountId, cancellationToken);
+        if (resolved.IsFailure)
         {
-            return PortfolioErrors.NotFound(portfolioId);
+            return resolved.Error;
         }
 
-        if (portfolio.IsArchived)
-        {
-            return PortfolioErrors.Archived(portfolioId);
-        }
+        var account = resolved.Value!;
 
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
-            PortfolioId = portfolioId,
+            AccountId = account.Id,
             AssetClass = AssetClass.Bond,
             Name = request.Name,
             Currency = Currency,
@@ -89,7 +86,6 @@ public sealed class AddBondHandler(
             FirstPeriodRatePercent = request.FirstPeriodRatePercent,
             MarginPercent = request.MarginPercent,
             EarlyRedemptionFeePerBond = request.EarlyRedemptionFeePerBond,
-            TaxExempt = request.TaxExempt,
             MaturityDate = BondSchedule.MaturityDate(request.Type, request.PurchaseDate)
         };
 
@@ -97,7 +93,7 @@ public sealed class AddBondHandler(
         dbContext.Transactions.Add(opening);
         dbContext.TreasuryBonds.Add(terms);
 
-        await positionEventPublisher.PublishCreatedAsync(asset, portfolio, cancellationToken);
+        await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
 
         if (funding is not null)
         {
@@ -121,7 +117,7 @@ public sealed class AddBondHandler(
 
         var fundingSource = funding is null ? null : new DepositFundingSource(funding.Source.Id, funding.Source.Name);
 
-        return terms.ToResponse(asset, portfolio.Name, portfolio.IsArchived, WarsawCalendar.Today(timeProvider), fundingSource, [], [], null);
+        return terms.ToResponse(asset, account, WarsawCalendar.Today(timeProvider), fundingSource, [], [], null);
     }
 
     private async Task<Result<FundingTransfer>> PlanFundingAsync(
@@ -134,8 +130,7 @@ public sealed class AddBondHandler(
             || source.AssetClass != AssetClass.Cash
             || !TransferRoutes.IsAllowed(source.AssetClass, bond.AssetClass)
             || source.Currency != bond.Currency
-            || source.IsArchived
-            || await dbContext.IsPortfolioArchivedAsync(source.PortfolioId, cancellationToken))
+            || source.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
         }

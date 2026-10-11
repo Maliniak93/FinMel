@@ -4,25 +4,6 @@
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
-    @if (choosesPortfolio) {
-      <mat-form-field appearance="outline" class="metal-form-dialog__field">
-        <mat-label>{{ 'metals.portfolio' | transloco }}</mat-label>
-        <mat-select formControlName="portfolioId">
-          @if (portfoliosResource.hasValue()) {
-            @for (portfolio of portfoliosResource.value(); track portfolio.id) {
-              <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
-            }
-          }
-        </mat-select>
-        @if (portfoliosResource.error(); as loadError) {
-          <mat-hint>{{ loadError.message }}</mat-hint>
-        }
-        @if (hasError('portfolioId', 'required')) {
-          <mat-error>{{ 'deposits.form.portfolioRequired' | transloco }}</mat-error>
-        }
-      </mat-form-field>
-    }
-
     <mat-form-field appearance="outline" class="metal-form-dialog__field">
       <mat-label>{{ 'metals.metal.column' | transloco }}</mat-label>
       <mat-select formControlName="metal">

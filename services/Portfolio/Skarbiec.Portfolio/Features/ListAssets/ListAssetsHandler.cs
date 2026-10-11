@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
 
@@ -8,21 +9,17 @@ namespace Skarbiec.Portfolio.Features.ListAssets;
 
 public sealed class ListAssetsHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
-    public async Task<Result<IReadOnlyList<AssetResponse>>> HandleAsync(Guid portfolioId, CancellationToken cancellationToken)
+    public async Task<Result<IReadOnlyList<AssetResponse>>> HandleAsync(Guid? accountId, CancellationToken cancellationToken)
     {
-        var portfolioExists = await dbContext.Portfolios
-            .AsNoTracking()
-            .AnyAsync(p => p.Id == portfolioId, cancellationToken);
-
-        if (!portfolioExists)
+        if (accountId is { } id && !await dbContext.Accounts.AsNoTracking().AnyAsync(a => a.Id == id, cancellationToken))
         {
-            return PortfolioErrors.NotFound(portfolioId);
+            return AccountErrors.NotFound(id);
         }
 
         // transactionCount as a correlated subquery: no N+1 and no counter column to drift.
         var rows = await dbContext.Assets
             .AsNoTracking()
-            .Where(a => a.PortfolioId == portfolioId)
+            .Where(a => accountId == null || a.AccountId == accountId)
             .OrderBy(a => a.Name)
             .Select(a => new
             {

@@ -1,51 +1,39 @@
-<h2 mat-dialog-title class="asset-form-dialog__title">
-  @if (!isEdit && !presetClass && selection()) {
-    <button
-      mat-icon-button
-      type="button"
-      [attr.aria-label]="'assets.form.backToTypes' | transloco"
-      (click)="back()"
-    >
-      <mat-icon>arrow_back</mat-icon>
-    </button>
-  }
+<h2 mat-dialog-title>
   {{ (isEdit ? 'assets.form.editTitle' : 'assets.newAsset') | transloco }}
 </h2>
 
 <form (submit)="submit($event)" novalidate>
   <mat-dialog-content>
-    @if (choosesPortfolio) {
-      <div [formGroup]="portfolioForm">
-        <mat-form-field appearance="outline" class="asset-form-dialog__portfolio">
-          <mat-label>{{ 'assets.form.portfolio' | transloco }}</mat-label>
-          <mat-select formControlName="portfolioId">
-            @if (portfoliosResource.hasValue()) {
-              @for (portfolio of portfoliosResource.value(); track portfolio.id) {
-                <mat-option [value]="portfolio.id">{{ portfolio.name }}</mat-option>
+    @if (choosesAccount) {
+      <div [formGroup]="accountForm">
+        <mat-form-field appearance="outline" class="asset-form-dialog__account">
+          <mat-label>{{ 'assets.form.account' | transloco }}</mat-label>
+          <mat-select formControlName="accountId">
+            @if (accountsResource.hasValue()) {
+              @for (account of accountsResource.value(); track account.id) {
+                <mat-option [value]="account.id">{{ account.name }}</mat-option>
               }
             }
           </mat-select>
-          @if (portfoliosResource.error(); as loadError) {
+          @if (accountsResource.error(); as loadError) {
             <mat-hint>{{ loadError.message }}</mat-hint>
+          } @else if (noAccounts()) {
+            <mat-hint>{{ 'assets.form.noBrokerageAccount' | transloco }}</mat-hint>
           }
-          @if (portfolioForm.controls.portfolioId.hasError('required')) {
-            <mat-error>{{ 'assets.form.portfolioRequired' | transloco }}</mat-error>
+          @if (accountForm.controls.accountId.hasError('required')) {
+            <mat-error>{{ 'assets.form.accountRequired' | transloco }}</mat-error>
           }
         </mat-form-field>
       </div>
     }
 
-    @if (selection(); as selected) {
-      @switch (selected.kind) {
-        @case ('cash') {
-          <app-cash-asset-form [assetClass]="selected.assetClass" [asset]="data.asset" />
-        }
-        @case ('security') {
-          <app-security-asset-form [assetClass]="selected.assetClass" [asset]="data.asset" />
-        }
+    @switch (kind) {
+      @case ('cash') {
+        <app-cash-asset-form [assetClass]="data.assetClass" [asset]="data.asset" />
       }
-    } @else {
-      <app-asset-type-picker (picked)="pick($event)" />
+      @case ('security') {
+        <app-security-asset-form [assetClass]="data.assetClass" [asset]="data.asset" />
+      }
     }
 
     @if (formError()) {
@@ -57,14 +45,12 @@
     <button mat-button type="button" (click)="cancel()">
       {{ 'common.cancel' | transloco }}
     </button>
-    @if (selection()) {
-      <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
-        @if (submitting()) {
-          <mat-spinner diameter="20" />
-        } @else {
-          {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
-        }
-      </button>
-    }
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ (isEdit ? 'common.save' : 'common.create') | transloco }}
+      }
+    </button>
   </mat-dialog-actions>
 </form>

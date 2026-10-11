@@ -33,11 +33,6 @@ public static class HistoryChange
             candidates.Add(incoming.IsArchived ? UtcDate(incoming.OccurredAtUtc) : stored.ArchivedOn);
         }
 
-        if (stored.PortfolioIsArchived != incoming.PortfolioIsArchived)
-        {
-            candidates.Add(incoming.PortfolioIsArchived ? UtcDate(incoming.OccurredAtUtc) : stored.PortfolioArchivedOn);
-        }
-
         return candidates.Aggregate((DateOnly?)null, Earlier);
     }
 

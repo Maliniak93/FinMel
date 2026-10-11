@@ -1,4 +1,4 @@
-import { Component, computed, inject, resource, signal } from '@angular/core';
+import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
@@ -9,6 +9,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
@@ -23,6 +24,7 @@ import {
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { formatDate, formatMoney, formatPercent } from '../../../shared/format';
+import { taxWrapperLabel } from '../../accounts/account-type';
 import {
   BondPurchaseDialog,
   type BondPurchaseDialogData,
@@ -94,6 +96,7 @@ function sumInGrosze(amounts: readonly (number | string)[]): number {
     MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
+    RouterLink,
     TranslocoPipe,
   ],
   templateUrl: './my-bonds.html',
@@ -108,7 +111,7 @@ export class MyBonds {
     'name',
     'seriesCode',
     'type',
-    'portfolio',
+    'account',
     'purchaseDate',
     'bondCount',
     'bookValue',
@@ -128,6 +131,8 @@ export class MyBonds {
   protected readonly totalLabelSpan = this.displayedColumns.indexOf('grossToday');
   protected readonly totalRestSpan =
     this.displayedColumns.length - this.displayedColumns.indexOf('netToday') - 1;
+
+  readonly account = input<string>();
 
   protected readonly bondsResource = resource({
     loader: async ({ abortSignal }) => {
@@ -154,6 +159,7 @@ export class MyBonds {
           .value()
           .filter(
             (bond) =>
+              (!this.account() || bond.accountId === this.account()) &&
               (this.showArchived() || !bond.isArchived) &&
               (this.showRedeemed() || !isRedeemed(bond)),
           )
@@ -188,6 +194,7 @@ export class MyBonds {
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
   protected readonly formatPercent = formatPercent;
+  protected readonly taxWrapperLabel = taxWrapperLabel;
   protected readonly canSettle = canSettle;
   protected readonly canEarlyRedeem = canEarlyRedeem;
   protected readonly canRedeem = canRedeem;
@@ -229,8 +236,7 @@ export class MyBonds {
     return (
       !!period.settlement &&
       period.settlement.settlementId === bond.lastSettlement?.settlementId &&
-      !bond.isArchived &&
-      !bond.portfolioIsArchived
+      !bond.isArchived
     );
   }
 
@@ -334,7 +340,7 @@ export class MyBonds {
   }
 
   protected openCreateDialog(): void {
-    this.openDialog({});
+    this.openDialog({ accountId: this.account() });
   }
 
   protected openEditDialog(bond: BondResponse): void {

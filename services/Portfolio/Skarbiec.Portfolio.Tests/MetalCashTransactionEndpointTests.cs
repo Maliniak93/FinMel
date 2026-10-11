@@ -90,14 +90,14 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         switch (scenario)
         {
             case "savings":
-                cashAssetId = (await client.CreatePortfolioWithSavingsAccountAsync(
-                    cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).Account.AssetId;
+                cashAssetId = (await client.AddSavingsAccountAsync(
+                    cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).AssetId;
                 break;
             case "eur-cash":
-                cashAssetId = await client.AddCashAssetWithBalanceAsync(setup.CashPortfolioId, cancellationToken, currency: "EUR", name: "Euro cash");
+                cashAssetId = await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "Euro cash");
                 break;
             case "archived-cash":
-                cashAssetId = (await client.AddArchivedCashAssetInLivePortfolioAsync(cancellationToken, portfolioName: "Old wallet")).CashId;
+                cashAssetId = await client.AddArchivedCashAssetAsync(cancellationToken);
                 break;
             default:
                 cashAssetId = setup.MetalAssetId;

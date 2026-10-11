@@ -8,7 +8,7 @@ public sealed class UndoBondInterestSettlementHandler(PortfolioDbContext dbConte
 {
     public async Task<Result> HandleAsync(Guid assetId, Guid settlementId, CancellationToken cancellationToken)
     {
-        // Tenancy-scoped lookups first, so a stranger never learns the portfolio's archived state.
+        // Tenancy-scoped lookups first, so a stranger never learns an account's archived state.
         var bond = await dbContext.Assets.FirstOrDefaultAsync(
             a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
 
