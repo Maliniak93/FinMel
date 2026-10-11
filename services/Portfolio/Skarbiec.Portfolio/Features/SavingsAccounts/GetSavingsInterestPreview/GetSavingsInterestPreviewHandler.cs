@@ -8,13 +8,13 @@ namespace Skarbiec.Portfolio.Features.SavingsAccounts.GetSavingsInterestPreview;
 public sealed class GetSavingsInterestPreviewHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<SavingsInterestPreviewResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        Guid assetId, CancellationToken cancellationToken)
     {
         // A SavingsAccount row exists only for a Savings-class asset, so any other asset id misses here.
         var terms = await (
                 from t in dbContext.SavingsAccounts.AsNoTracking()
                 join asset in dbContext.Assets on t.AssetId equals asset.Id
-                where asset.Id == assetId && asset.PortfolioId == portfolioId
+                where asset.Id == assetId
                 select t)
             .FirstOrDefaultAsync(cancellationToken);
 

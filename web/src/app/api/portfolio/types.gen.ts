@@ -5,6 +5,7 @@ export type ClientOptions = {
 };
 
 export type AddAssetRequest = {
+    portfolioId: string;
     assetClass: AssetClass;
     name: string;
     currency?: string;
@@ -13,6 +14,7 @@ export type AddAssetRequest = {
 };
 
 export type AddBondRequest = {
+    portfolioId: string;
     name: string;
     seriesCode: string;
     type: TreasuryBondType;
@@ -27,6 +29,7 @@ export type AddBondRequest = {
 };
 
 export type AddDepositRequest = {
+    portfolioId: string;
     name: string;
     bankName?: null | string;
     currency: string;
@@ -42,6 +45,7 @@ export type AddDepositRequest = {
 };
 
 export type AddMetalRequest = {
+    portfolioId: string;
     name: string;
     metal: Metal;
     fineWeight: number | string;
@@ -50,6 +54,7 @@ export type AddMetalRequest = {
 };
 
 export type AddSavingsAccountRequest = {
+    portfolioId: string;
     name: string;
     bankName?: null | string;
     currency: string;
@@ -710,273 +715,206 @@ export type PostApiPortfolioPortfoliosByIdRestoreResponses = {
 
 export type PostApiPortfolioPortfoliosByIdRestoreResponse = PostApiPortfolioPortfoliosByIdRestoreResponses[keyof PostApiPortfolioPortfoliosByIdRestoreResponses];
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsData = {
+export type GetApiPortfolioAssetsData = {
     body?: never;
-    path: {
+    path?: never;
+    query: {
         portfolioId: string;
     };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets';
+    url: '/api/portfolio/assets';
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses = {
+export type GetApiPortfolioAssetsResponses = {
     /**
      * OK
      */
     200: Array<AssetResponse>;
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsResponse = GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses];
+export type GetApiPortfolioAssetsResponse = GetApiPortfolioAssetsResponses[keyof GetApiPortfolioAssetsResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsData = {
+export type PostApiPortfolioAssetsData = {
     body: AddAssetRequest;
-    path: {
-        portfolioId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets';
+    url: '/api/portfolio/assets';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses = {
+export type PostApiPortfolioAssetsResponses = {
     /**
      * Created
      */
     201: AssetResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses];
+export type PostApiPortfolioAssetsResponse = PostApiPortfolioAssetsResponses[keyof PostApiPortfolioAssetsResponses];
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdData = {
+export type DeleteApiPortfolioAssetsByIdData = {
     body?: never;
     path: {
-        portfolioId: string;
         id: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}';
+    url: '/api/portfolio/assets/{id}';
 };
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses = {
+export type DeleteApiPortfolioAssetsByIdResponses = {
     /**
      * No Content
      */
     204: void;
 };
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponse = DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses[keyof DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses];
+export type DeleteApiPortfolioAssetsByIdResponse = DeleteApiPortfolioAssetsByIdResponses[keyof DeleteApiPortfolioAssetsByIdResponses];
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdData = {
+export type GetApiPortfolioAssetsByIdData = {
     body?: never;
     path: {
-        portfolioId: string;
         id: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}';
+    url: '/api/portfolio/assets/{id}';
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses = {
+export type GetApiPortfolioAssetsByIdResponses = {
     /**
      * OK
      */
     200: AssetResponse;
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponse = GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses];
+export type GetApiPortfolioAssetsByIdResponse = GetApiPortfolioAssetsByIdResponses[keyof GetApiPortfolioAssetsByIdResponses];
 
-export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdData = {
+export type PutApiPortfolioAssetsByIdData = {
     body: UpdateAssetRequest;
     path: {
-        portfolioId: string;
         id: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}';
+    url: '/api/portfolio/assets/{id}';
 };
 
-export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses = {
+export type PutApiPortfolioAssetsByIdResponses = {
     /**
      * OK
      */
     200: AssetResponse;
 };
 
-export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses];
+export type PutApiPortfolioAssetsByIdResponse = PutApiPortfolioAssetsByIdResponses[keyof PutApiPortfolioAssetsByIdResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveData = {
+export type PostApiPortfolioAssetsByIdArchiveData = {
     body?: never;
     path: {
-        portfolioId: string;
         id: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/archive';
+    url: '/api/portfolio/assets/{id}/archive';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses = {
+export type PostApiPortfolioAssetsByIdArchiveResponses = {
     /**
      * OK
      */
     200: AssetResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses];
+export type PostApiPortfolioAssetsByIdArchiveResponse = PostApiPortfolioAssetsByIdArchiveResponses[keyof PostApiPortfolioAssetsByIdArchiveResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreData = {
+export type PostApiPortfolioAssetsByIdRestoreData = {
     body?: never;
     path: {
-        portfolioId: string;
         id: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/restore';
+    url: '/api/portfolio/assets/{id}/restore';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses = {
+export type PostApiPortfolioAssetsByIdRestoreResponses = {
     /**
      * OK
      */
     200: AssetResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses];
+export type PostApiPortfolioAssetsByIdRestoreResponse = PostApiPortfolioAssetsByIdRestoreResponses[keyof PostApiPortfolioAssetsByIdRestoreResponses];
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData = {
+export type GetApiPortfolioAssetsByAssetIdTransactionsData = {
     body?: never;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: {
         page?: number | string;
         pageSize?: number | string;
     };
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions';
+    url: '/api/portfolio/assets/{assetId}/transactions';
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses = {
+export type GetApiPortfolioAssetsByAssetIdTransactionsResponses = {
     /**
      * OK
      */
     200: PagedResponseOfTransactionResponse;
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponse = GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses];
+export type GetApiPortfolioAssetsByAssetIdTransactionsResponse = GetApiPortfolioAssetsByAssetIdTransactionsResponses[keyof GetApiPortfolioAssetsByAssetIdTransactionsResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData = {
+export type PostApiPortfolioAssetsByAssetIdTransactionsData = {
     body: RecordTransactionRequest;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions';
+    url: '/api/portfolio/assets/{assetId}/transactions';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses = {
+export type PostApiPortfolioAssetsByAssetIdTransactionsResponses = {
     /**
      * Created
      */
     201: TransactionResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponse = PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses];
+export type PostApiPortfolioAssetsByAssetIdTransactionsResponse = PostApiPortfolioAssetsByAssetIdTransactionsResponses[keyof PostApiPortfolioAssetsByAssetIdTransactionsResponses];
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData = {
+export type DeleteApiPortfolioAssetsByAssetIdTransactionsByIdData = {
     body?: never;
     path: {
-        portfolioId: string;
         assetId: string;
         id: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions/{id}';
+    url: '/api/portfolio/assets/{assetId}/transactions/{id}';
 };
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses = {
+export type DeleteApiPortfolioAssetsByAssetIdTransactionsByIdResponses = {
     /**
      * No Content
      */
     204: void;
 };
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponse = DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses[keyof DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses];
+export type DeleteApiPortfolioAssetsByAssetIdTransactionsByIdResponse = DeleteApiPortfolioAssetsByAssetIdTransactionsByIdResponses[keyof DeleteApiPortfolioAssetsByAssetIdTransactionsByIdResponses];
 
-export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData = {
+export type PutApiPortfolioAssetsByAssetIdTransactionsByIdData = {
     body: UpdateTransactionRequest;
     path: {
-        portfolioId: string;
         assetId: string;
         id: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions/{id}';
+    url: '/api/portfolio/assets/{assetId}/transactions/{id}';
 };
 
-export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses = {
+export type PutApiPortfolioAssetsByAssetIdTransactionsByIdResponses = {
     /**
      * OK
      */
     200: TransactionResponse;
 };
 
-export type PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponse = PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses];
-
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsData = {
-    body: AddDepositRequest;
-    path: {
-        portfolioId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits';
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses = {
-    /**
-     * Created
-     */
-    201: DepositResponse;
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses];
-
-export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData = {
-    body?: never;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}';
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: DepositResponse;
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses];
-
-export type PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData = {
-    body: UpdateDepositRequest;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}';
-};
-
-export type PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: DepositResponse;
-};
-
-export type PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses];
+export type PutApiPortfolioAssetsByAssetIdTransactionsByIdResponse = PutApiPortfolioAssetsByAssetIdTransactionsByIdResponses[keyof PutApiPortfolioAssetsByAssetIdTransactionsByIdResponses];
 
 export type GetApiPortfolioDepositsData = {
     body?: never;
@@ -994,137 +932,129 @@ export type GetApiPortfolioDepositsResponses = {
 
 export type GetApiPortfolioDepositsResponse = GetApiPortfolioDepositsResponses[keyof GetApiPortfolioDepositsResponses];
 
-export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewData = {
+export type PostApiPortfolioDepositsData = {
+    body: AddDepositRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/deposits';
+};
+
+export type PostApiPortfolioDepositsResponses = {
+    /**
+     * Created
+     */
+    201: DepositResponse;
+};
+
+export type PostApiPortfolioDepositsResponse = PostApiPortfolioDepositsResponses[keyof PostApiPortfolioDepositsResponses];
+
+export type GetApiPortfolioDepositsByAssetIdData = {
     body?: never;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settlement-preview';
+    url: '/api/portfolio/deposits/{assetId}';
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses = {
+export type GetApiPortfolioDepositsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: DepositResponse;
+};
+
+export type GetApiPortfolioDepositsByAssetIdResponse = GetApiPortfolioDepositsByAssetIdResponses[keyof GetApiPortfolioDepositsByAssetIdResponses];
+
+export type PutApiPortfolioDepositsByAssetIdData = {
+    body: UpdateDepositRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/deposits/{assetId}';
+};
+
+export type PutApiPortfolioDepositsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: DepositResponse;
+};
+
+export type PutApiPortfolioDepositsByAssetIdResponse = PutApiPortfolioDepositsByAssetIdResponses[keyof PutApiPortfolioDepositsByAssetIdResponses];
+
+export type GetApiPortfolioDepositsByAssetIdSettlementPreviewData = {
+    body?: never;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/deposits/{assetId}/settlement-preview';
+};
+
+export type GetApiPortfolioDepositsByAssetIdSettlementPreviewResponses = {
     /**
      * OK
      */
     200: DepositSettlementPreviewResponse;
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses];
+export type GetApiPortfolioDepositsByAssetIdSettlementPreviewResponse = GetApiPortfolioDepositsByAssetIdSettlementPreviewResponses[keyof GetApiPortfolioDepositsByAssetIdSettlementPreviewResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleData = {
+export type PostApiPortfolioDepositsByAssetIdSettleData = {
     body: SettleDepositRequest;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settle';
+    url: '/api/portfolio/deposits/{assetId}/settle';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses = {
+export type PostApiPortfolioDepositsByAssetIdSettleResponses = {
     /**
      * OK
      */
     200: DepositResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses];
+export type PostApiPortfolioDepositsByAssetIdSettleResponse = PostApiPortfolioDepositsByAssetIdSettleResponses[keyof PostApiPortfolioDepositsByAssetIdSettleResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutData = {
+export type PostApiPortfolioDepositsByAssetIdPayoutData = {
     body: PayOutDepositRequest;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/payout';
+    url: '/api/portfolio/deposits/{assetId}/payout';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses = {
+export type PostApiPortfolioDepositsByAssetIdPayoutResponses = {
     /**
      * OK
      */
     200: DepositResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses];
+export type PostApiPortfolioDepositsByAssetIdPayoutResponse = PostApiPortfolioDepositsByAssetIdPayoutResponses[keyof PostApiPortfolioDepositsByAssetIdPayoutResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverData = {
+export type PostApiPortfolioDepositsByAssetIdRolloverData = {
     body: RollOverDepositRequest;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/rollover';
+    url: '/api/portfolio/deposits/{assetId}/rollover';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses = {
+export type PostApiPortfolioDepositsByAssetIdRolloverResponses = {
     /**
      * OK
      */
     200: DepositResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponse = PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses];
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsData = {
-    body: AddBondRequest;
-    path: {
-        portfolioId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds';
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsResponses = {
-    /**
-     * Created
-     */
-    201: BondResponse;
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsResponses];
-
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData = {
-    body?: never;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}';
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: BondResponse;
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses];
-
-export type PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData = {
-    body: UpdateBondRequest;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}';
-};
-
-export type PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: BondResponse;
-};
-
-export type PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses];
+export type PostApiPortfolioDepositsByAssetIdRolloverResponse = PostApiPortfolioDepositsByAssetIdRolloverResponses[keyof PostApiPortfolioDepositsByAssetIdRolloverResponses];
 
 export type GetApiPortfolioBondsData = {
     body?: never;
@@ -1142,144 +1072,188 @@ export type GetApiPortfolioBondsResponses = {
 
 export type GetApiPortfolioBondsResponse = GetApiPortfolioBondsResponses[keyof GetApiPortfolioBondsResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsData = {
-    body: SettleBondInterestRequest;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
+export type PostApiPortfolioBondsData = {
+    body: AddBondRequest;
+    path?: never;
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements';
+    url: '/api/portfolio/bonds';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses = {
-    /**
-     * Created
-     */
-    201: Array<BondSettlementResponse>;
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses];
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewData = {
-    body: SettleBondInterestRequest;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/preview';
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses = {
-    /**
-     * OK
-     */
-    200: BondInterestPreviewResponse;
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses];
-
-export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdData = {
-    body?: never;
-    path: {
-        portfolioId: string;
-        assetId: string;
-        settlementId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/{settlementId}';
-};
-
-export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses];
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionData = {
-    body: RedeemBondRequest;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption';
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses = {
-    /**
-     * OK
-     */
-    200: BondResponse;
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses];
-
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewData = {
-    body?: never;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption-preview';
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses = {
-    /**
-     * OK
-     */
-    200: BondRedemptionPreviewResponse;
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses];
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapData = {
-    body: SwapBondRequest;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/swap';
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses = {
+export type PostApiPortfolioBondsResponses = {
     /**
      * Created
      */
     201: BondResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses];
+export type PostApiPortfolioBondsResponse = PostApiPortfolioBondsResponses[keyof PostApiPortfolioBondsResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionData = {
-    body: RedeemBondEarlyRequest;
+export type GetApiPortfolioBondsByAssetIdData = {
+    body?: never;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption';
+    url: '/api/portfolio/bonds/{assetId}';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses = {
+export type GetApiPortfolioBondsByAssetIdResponses = {
     /**
      * OK
      */
     200: BondResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponse = PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses];
+export type GetApiPortfolioBondsByAssetIdResponse = GetApiPortfolioBondsByAssetIdResponses[keyof GetApiPortfolioBondsByAssetIdResponses];
 
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewData = {
+export type PutApiPortfolioBondsByAssetIdData = {
+    body: UpdateBondRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}';
+};
+
+export type PutApiPortfolioBondsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: BondResponse;
+};
+
+export type PutApiPortfolioBondsByAssetIdResponse = PutApiPortfolioBondsByAssetIdResponses[keyof PutApiPortfolioBondsByAssetIdResponses];
+
+export type PostApiPortfolioBondsByAssetIdInterestSettlementsData = {
+    body: SettleBondInterestRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}/interest-settlements';
+};
+
+export type PostApiPortfolioBondsByAssetIdInterestSettlementsResponses = {
+    /**
+     * Created
+     */
+    201: Array<BondSettlementResponse>;
+};
+
+export type PostApiPortfolioBondsByAssetIdInterestSettlementsResponse = PostApiPortfolioBondsByAssetIdInterestSettlementsResponses[keyof PostApiPortfolioBondsByAssetIdInterestSettlementsResponses];
+
+export type PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewData = {
+    body: SettleBondInterestRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}/interest-settlements/preview';
+};
+
+export type PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewResponses = {
+    /**
+     * OK
+     */
+    200: BondInterestPreviewResponse;
+};
+
+export type PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewResponse = PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewResponses[keyof PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewResponses];
+
+export type DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdData = {
     body?: never;
     path: {
-        portfolioId: string;
+        assetId: string;
+        settlementId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}/interest-settlements/{settlementId}';
+};
+
+export type DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdResponses];
+
+export type PostApiPortfolioBondsByAssetIdRedemptionData = {
+    body: RedeemBondRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}/redemption';
+};
+
+export type PostApiPortfolioBondsByAssetIdRedemptionResponses = {
+    /**
+     * OK
+     */
+    200: BondResponse;
+};
+
+export type PostApiPortfolioBondsByAssetIdRedemptionResponse = PostApiPortfolioBondsByAssetIdRedemptionResponses[keyof PostApiPortfolioBondsByAssetIdRedemptionResponses];
+
+export type GetApiPortfolioBondsByAssetIdRedemptionPreviewData = {
+    body?: never;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}/redemption-preview';
+};
+
+export type GetApiPortfolioBondsByAssetIdRedemptionPreviewResponses = {
+    /**
+     * OK
+     */
+    200: BondRedemptionPreviewResponse;
+};
+
+export type GetApiPortfolioBondsByAssetIdRedemptionPreviewResponse = GetApiPortfolioBondsByAssetIdRedemptionPreviewResponses[keyof GetApiPortfolioBondsByAssetIdRedemptionPreviewResponses];
+
+export type PostApiPortfolioBondsByAssetIdSwapData = {
+    body: SwapBondRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}/swap';
+};
+
+export type PostApiPortfolioBondsByAssetIdSwapResponses = {
+    /**
+     * Created
+     */
+    201: BondResponse;
+};
+
+export type PostApiPortfolioBondsByAssetIdSwapResponse = PostApiPortfolioBondsByAssetIdSwapResponses[keyof PostApiPortfolioBondsByAssetIdSwapResponses];
+
+export type PostApiPortfolioBondsByAssetIdEarlyRedemptionData = {
+    body: RedeemBondEarlyRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/bonds/{assetId}/early-redemption';
+};
+
+export type PostApiPortfolioBondsByAssetIdEarlyRedemptionResponses = {
+    /**
+     * OK
+     */
+    200: BondResponse;
+};
+
+export type PostApiPortfolioBondsByAssetIdEarlyRedemptionResponse = PostApiPortfolioBondsByAssetIdEarlyRedemptionResponses[keyof PostApiPortfolioBondsByAssetIdEarlyRedemptionResponses];
+
+export type GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewData = {
+    body?: never;
+    path: {
         assetId: string;
     };
     query: {
@@ -1287,73 +1261,17 @@ export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionP
         bondCount: number | string;
         runningPeriodRatePercent?: number | string;
     };
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption-preview';
+    url: '/api/portfolio/bonds/{assetId}/early-redemption-preview';
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses = {
+export type GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewResponses = {
     /**
      * OK
      */
     200: BondEarlyRedemptionPreviewResponse;
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses];
-
-export type PostApiPortfolioPortfoliosByPortfolioIdMetalsData = {
-    body: AddMetalRequest;
-    path: {
-        portfolioId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/metals';
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses = {
-    /**
-     * Created
-     */
-    201: MetalResponse;
-};
-
-export type PostApiPortfolioPortfoliosByPortfolioIdMetalsResponse = PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses];
-
-export type GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData = {
-    body?: never;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/metals/{assetId}';
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: MetalResponse;
-};
-
-export type GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses];
-
-export type PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData = {
-    body: UpdateMetalRequest;
-    path: {
-        portfolioId: string;
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/metals/{assetId}';
-};
-
-export type PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: MetalResponse;
-};
-
-export type PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses];
+export type GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewResponse = GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewResponses[keyof GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewResponses];
 
 export type GetApiPortfolioMetalsData = {
     body?: never;
@@ -1371,61 +1289,57 @@ export type GetApiPortfolioMetalsResponses = {
 
 export type GetApiPortfolioMetalsResponse = GetApiPortfolioMetalsResponses[keyof GetApiPortfolioMetalsResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData = {
-    body: AddSavingsAccountRequest;
-    path: {
-        portfolioId: string;
-    };
+export type PostApiPortfolioMetalsData = {
+    body: AddMetalRequest;
+    path?: never;
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts';
+    url: '/api/portfolio/metals';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses = {
+export type PostApiPortfolioMetalsResponses = {
     /**
      * Created
      */
-    201: SavingsAccountResponse;
+    201: MetalResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponse = PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses];
+export type PostApiPortfolioMetalsResponse = PostApiPortfolioMetalsResponses[keyof PostApiPortfolioMetalsResponses];
 
-export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData = {
+export type GetApiPortfolioMetalsByAssetIdData = {
     body?: never;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}';
+    url: '/api/portfolio/metals/{assetId}';
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses = {
+export type GetApiPortfolioMetalsByAssetIdResponses = {
     /**
      * OK
      */
-    200: SavingsAccountResponse;
+    200: MetalResponse;
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponse = GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses];
+export type GetApiPortfolioMetalsByAssetIdResponse = GetApiPortfolioMetalsByAssetIdResponses[keyof GetApiPortfolioMetalsByAssetIdResponses];
 
-export type PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData = {
-    body: UpdateSavingsAccountRequest;
+export type PutApiPortfolioMetalsByAssetIdData = {
+    body: UpdateMetalRequest;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}';
+    url: '/api/portfolio/metals/{assetId}';
 };
 
-export type PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses = {
+export type PutApiPortfolioMetalsByAssetIdResponses = {
     /**
      * OK
      */
-    200: SavingsAccountResponse;
+    200: MetalResponse;
 };
 
-export type PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponse = PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses[keyof PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses];
+export type PutApiPortfolioMetalsByAssetIdResponse = PutApiPortfolioMetalsByAssetIdResponses[keyof PutApiPortfolioMetalsByAssetIdResponses];
 
 export type GetApiPortfolioSavingsAccountsData = {
     body?: never;
@@ -1442,6 +1356,58 @@ export type GetApiPortfolioSavingsAccountsResponses = {
 };
 
 export type GetApiPortfolioSavingsAccountsResponse = GetApiPortfolioSavingsAccountsResponses[keyof GetApiPortfolioSavingsAccountsResponses];
+
+export type PostApiPortfolioSavingsAccountsData = {
+    body: AddSavingsAccountRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/savings-accounts';
+};
+
+export type PostApiPortfolioSavingsAccountsResponses = {
+    /**
+     * Created
+     */
+    201: SavingsAccountResponse;
+};
+
+export type PostApiPortfolioSavingsAccountsResponse = PostApiPortfolioSavingsAccountsResponses[keyof PostApiPortfolioSavingsAccountsResponses];
+
+export type GetApiPortfolioSavingsAccountsByAssetIdData = {
+    body?: never;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/savings-accounts/{assetId}';
+};
+
+export type GetApiPortfolioSavingsAccountsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: SavingsAccountResponse;
+};
+
+export type GetApiPortfolioSavingsAccountsByAssetIdResponse = GetApiPortfolioSavingsAccountsByAssetIdResponses[keyof GetApiPortfolioSavingsAccountsByAssetIdResponses];
+
+export type PutApiPortfolioSavingsAccountsByAssetIdData = {
+    body: UpdateSavingsAccountRequest;
+    path: {
+        assetId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/savings-accounts/{assetId}';
+};
+
+export type PutApiPortfolioSavingsAccountsByAssetIdResponses = {
+    /**
+     * OK
+     */
+    200: SavingsAccountResponse;
+};
+
+export type PutApiPortfolioSavingsAccountsByAssetIdResponse = PutApiPortfolioSavingsAccountsByAssetIdResponses[keyof PutApiPortfolioSavingsAccountsByAssetIdResponses];
 
 export type GetApiPortfolioCashAccountsData = {
     body?: never;
@@ -1477,63 +1443,60 @@ export type GetApiPortfolioSecuritiesResponses = {
 
 export type GetApiPortfolioSecuritiesResponse = GetApiPortfolioSecuritiesResponses[keyof GetApiPortfolioSecuritiesResponses];
 
-export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewData = {
+export type GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewData = {
     body?: never;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-preview';
+    url: '/api/portfolio/savings-accounts/{assetId}/interest-preview';
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses = {
+export type GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses = {
     /**
      * OK
      */
     200: SavingsInterestPreviewResponse;
 };
 
-export type GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponse = GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses[keyof GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses];
+export type GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponse = GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses[keyof GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses];
 
-export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsData = {
+export type PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsData = {
     body: SettleSavingsInterestRequest;
     path: {
-        portfolioId: string;
         assetId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements';
+    url: '/api/portfolio/savings-accounts/{assetId}/interest-settlements';
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses = {
+export type PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses = {
     /**
      * Created
      */
     201: SavingsInterestSettlementResponse;
 };
 
-export type PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponse = PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses[keyof PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses];
+export type PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponse = PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses[keyof PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses];
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData = {
+export type DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData = {
     body?: never;
     path: {
-        portfolioId: string;
         assetId: string;
         settlementId: string;
     };
     query?: never;
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements/{settlementId}';
+    url: '/api/portfolio/savings-accounts/{assetId}/interest-settlements/{settlementId}';
 };
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses = {
+export type DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses = {
     /**
      * No Content
      */
     204: void;
 };
 
-export type DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses];
+export type DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses];
 
 export type GetApiPortfolioTransferCandidatesData = {
     body?: never;

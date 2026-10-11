@@ -183,7 +183,10 @@ describe('AssetFormDialog', () => {
         .map((call: unknown[]) => call[0] as Request)
         .filter((request: Request) => typeof request !== 'string' && request.method === 'POST');
       expect(posts).toHaveLength(1);
-      expect(posts[0].url).toContain(`/portfolios/${reservePortfolioId}/assets`);
+      expect(posts[0].url).toContain(`/api/portfolio/assets`);
+      expect(await posts[0].json()).toEqual(
+        expect.objectContaining({ portfolioId: reservePortfolioId }),
+      );
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
@@ -301,8 +304,9 @@ describe('AssetFormDialog', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const request = fetchSpy.mock.calls[0][0] as Request;
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(`/portfolios/${portfolioId}/assets`);
+      expect(request.url).toContain(`/api/portfolio/assets`);
       expect(await request.json()).toEqual({
+        portfolioId,
         assetClass: 0,
         name: 'Checking account',
         currency: 'PLN',
@@ -363,7 +367,7 @@ describe('AssetFormDialog', () => {
 
       const request = fetchSpy.mock.calls[callsBefore][0] as Request;
       expect(request.method).toBe('PUT');
-      expect(request.url).toContain(`/portfolios/${portfolioId}/assets/${stockAsset.id}`);
+      expect(request.url).toContain(`/api/portfolio/assets/${stockAsset.id}`);
       const body = await request.json();
       expect(body).not.toHaveProperty('initialTransaction');
       expect(body).toEqual({

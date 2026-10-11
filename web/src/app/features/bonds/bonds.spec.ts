@@ -195,9 +195,7 @@ describe('Bonds page, my bonds tab', () => {
       const deleteCall = fetchSpy.mock.calls
         .map((call: unknown[]) => call[0] as Request)
         .find((request: Request) => request.method === 'DELETE');
-      expect(deleteCall?.url).toContain(
-        `/api/portfolio/portfolios/${activeBond.portfolioId}/assets/${activeBond.assetId}`,
-      );
+      expect(deleteCall?.url).toContain(`/api/portfolio/assets/${activeBond.assetId}`);
     });
     await vi.waitFor(() => expect(bondListCalls()).toBeGreaterThan(callsBefore));
   });
@@ -654,7 +652,7 @@ describe('Bonds page, interest settlement', () => {
         .map((call: unknown[]) => call[0] as Request)
         .find((request: Request) => request.method === 'DELETE');
       expect(deleteCall?.url).toContain(
-        `/api/portfolio/portfolios/${settledRorBond.portfolioId}/bonds/${settledRorBond.assetId}/interest-settlements/${settledRorBond.lastSettlement!.settlementId}`,
+        `/api/portfolio/bonds/${settledRorBond.assetId}/interest-settlements/${settledRorBond.lastSettlement!.settlementId}`,
       );
     });
     await vi.waitFor(() => expect(bondListCalls()).toBeGreaterThan(callsBefore));

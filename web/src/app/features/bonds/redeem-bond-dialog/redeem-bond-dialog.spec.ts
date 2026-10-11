@@ -96,9 +96,7 @@ describe('RedeemBondDialog', () => {
     await component['onSubmit']();
 
     const [request] = writeRequests(fetchSpy);
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${settledTosBond.portfolioId}/bonds/${settledTosBond.assetId}/redemption`,
-    );
+    expect(request.url).toContain(`/api/portfolio/bonds/${settledTosBond.assetId}/redemption`);
     expect(await request.json()).toEqual({ destinationAssetId: otherCashId });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });

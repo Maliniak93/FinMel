@@ -136,7 +136,6 @@ export class SecuritiesTable {
 
   protected openTransactionDialog(holding: SecurityHoldingResponse, type: TransactionType): void {
     const data: TransactionFormDialogData = {
-      portfolioId: holding.portfolioId,
       assetId: holding.assetId,
       assetClass: this.assetClass(),
       currency: holding.currency,

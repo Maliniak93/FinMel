@@ -18,9 +18,9 @@ public sealed class GetSavingsAccountEndpointTests(SkarbiecContainersFixture con
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
             cancellationToken, NewSavingsAccountRequest(taxExempt: true), portfolioName: "Retirement");
         await client.RecordTransactionAsync(
-            portfolioId, account.AssetId, TransactionType.Withdraw, 2_500m, SavingsToday, cancellationToken, unitPrice: 1m);
+            account.AssetId, TransactionType.Withdraw, 2_500m, SavingsToday, cancellationToken, unitPrice: 1m);
 
-        var fetched = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        var fetched = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
 
         Assert.Equal(account.AssetId, fetched.AssetId);
         Assert.Equal(portfolioId, fetched.PortfolioId);
@@ -42,9 +42,9 @@ public sealed class GetSavingsAccountEndpointTests(SkarbiecContainersFixture con
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
-        await client.ArchiveAssetAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.ArchiveAssetAsync(account.AssetId, cancellationToken);
 
-        var fetched = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        var fetched = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
 
         Assert.True(fetched.IsArchived);
         Assert.False(fetched.PortfolioIsArchived);
@@ -58,9 +58,9 @@ public sealed class GetSavingsAccountEndpointTests(SkarbiecContainersFixture con
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
 
-        var forDeposit = await client.GetAsync(SavingsAccountUri(portfolioId, deposit.AssetId), cancellationToken);
-        var forCash = await client.GetAsync(SavingsAccountUri(portfolioId, cashId), cancellationToken);
-        var forUnknown = await client.GetAsync(SavingsAccountUri(portfolioId, Guid.NewGuid()), cancellationToken);
+        var forDeposit = await client.GetAsync(SavingsAccountUri(deposit.AssetId), cancellationToken);
+        var forCash = await client.GetAsync(SavingsAccountUri(cashId), cancellationToken);
+        var forUnknown = await client.GetAsync(SavingsAccountUri(Guid.NewGuid()), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, forDeposit.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, forCash.StatusCode);
@@ -72,7 +72,7 @@ public sealed class GetSavingsAccountEndpointTests(SkarbiecContainersFixture con
     {
         using var client = Factory.CreateClient();
 
-        var response = await client.GetAsync(SavingsAccountUri(Guid.NewGuid(), Guid.NewGuid()), TestContext.Current.CancellationToken);
+        var response = await client.GetAsync(SavingsAccountUri(Guid.NewGuid()), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

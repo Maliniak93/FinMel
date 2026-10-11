@@ -115,7 +115,7 @@ describe('RollOverDepositDialog', () => {
   }
 
   const rolloverUrl = (deposit: DepositResponse) =>
-    `/api/portfolio/portfolios/${deposit.portfolioId}/deposits/${deposit.assetId}/rollover`;
+    `/api/portfolio/deposits/${deposit.assetId}/rollover`;
 
   describe('Due mode', () => {
     it('pre-fills gross and tax from the preview and the rate from the deposit', async () => {
@@ -125,7 +125,7 @@ describe('RollOverDepositDialog', () => {
         .map((call: unknown[]) => requestUrl(call[0]))
         .find((url: string) => url.includes('/settlement-preview'));
       expect(previewCall).toContain(
-        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/deposits/${dueDeposit.assetId}/settlement-preview`,
+        `/api/portfolio/deposits/${dueDeposit.assetId}/settlement-preview`,
       );
       expect(Number(findControl(form(), 'grossInterest').value)).toBe(147.95);
       expect(Number(findControl(form(), 'tax').value)).toBe(28.12);

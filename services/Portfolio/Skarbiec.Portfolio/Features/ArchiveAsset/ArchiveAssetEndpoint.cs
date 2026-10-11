@@ -7,7 +7,7 @@ public static class ArchiveAssetEndpoint
 {
     public static IEndpointRouteBuilder MapArchiveAssetEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets");
+        var group = app.MapGroup("/api/portfolio/assets");
 
         group.MapPost("{id:guid}/archive", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class ArchiveAssetEndpoint
     }
 
     private static async Task<Results<Ok<AssetResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid id, ArchiveAssetHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, id, cancellationToken)).ToHttpResult();
+        Guid id, ArchiveAssetHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(id, cancellationToken)).ToHttpResult();
 }

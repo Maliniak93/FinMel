@@ -199,9 +199,7 @@ describe('PayOutDepositDialog', () => {
 
     const [request] = writeRequests(fetchSpy);
     expect(request.method).toBe('POST');
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${settledDeposit.portfolioId}/deposits/${settledDeposit.assetId}/payout`,
-    );
+    expect(request.url).toContain(`/api/portfolio/deposits/${settledDeposit.assetId}/payout`);
     expect(await request.json()).toEqual({
       destinationAssetId: plnCashCandidate.assetId,
       date: '2026-04-18',
@@ -218,9 +216,7 @@ describe('PayOutDepositDialog', () => {
 
     const [request] = writeRequests(fetchSpy);
     expect(request.method).toBe('POST');
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${settledDeposit.portfolioId}/deposits/${settledDeposit.assetId}/payout`,
-    );
+    expect(request.url).toContain(`/api/portfolio/deposits/${settledDeposit.assetId}/payout`);
     expect(await request.json()).toEqual({
       destinationAssetId: plnSavingsCandidate.assetId,
       date: '2026-04-18',

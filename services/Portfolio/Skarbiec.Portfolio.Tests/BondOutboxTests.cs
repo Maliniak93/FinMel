@@ -28,7 +28,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddBondHandler>()
-            .HandleAsync(portfolioId, PortfolioApi.NewBondRequest(), cancellationToken);
+            .HandleAsync(PortfolioApi.NewBondRequest(portfolioId: portfolioId), cancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, SaveChanges.Count);
@@ -68,7 +68,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddBondHandler>()
-            .HandleAsync(bondsId, PortfolioApi.NewBondRequest(fundingAssetId: cashId), cancellationToken);
+            .HandleAsync(PortfolioApi.NewBondRequest(portfolioId: bondsId, fundingAssetId: cashId), cancellationToken);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Equal(1, SaveChanges.Count);
@@ -95,7 +95,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
             cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 6_000m, cancellationToken);
             bondsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Bonds", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddBondHandler>()
-                .HandleAsync(bondsId, PortfolioApi.NewBondRequest(fundingAssetId: cashId), cancellationToken);
+                .HandleAsync(PortfolioApi.NewBondRequest(portfolioId: bondsId, fundingAssetId: cashId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             assetId = added.Value.AssetId;
         }
@@ -107,7 +107,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         {
             var request = PortfolioApi.NewBondRequest(bondCount: 40).ToUpdateRequest();
             var result = await act.ServiceProvider.GetRequiredService<UpdateBondHandler>()
-                .HandleAsync(bondsId, assetId, request, cancellationToken);
+                .HandleAsync(assetId, request, cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -133,7 +133,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         {
             await Assert.ThrowsAnyAsync<InvalidOperationException>(() => failing.ServiceProvider
                 .GetRequiredService<SettleBondInterestHandler>()
-                .HandleAsync(bondsId, assetId, NewCouponSettlement(cashId), cancellationToken));
+                .HandleAsync(assetId, NewCouponSettlement(cashId), cancellationToken));
         }
 
         Assert.Equal(eventsBefore, await CountPositionEventsAsync(cancellationToken));
@@ -148,7 +148,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using (var retry = Provider.CreateAsyncScope())
         {
             var result = await retry.ServiceProvider.GetRequiredService<SettleBondInterestHandler>()
-                .HandleAsync(bondsId, assetId, NewCouponSettlement(cashId), cancellationToken);
+                .HandleAsync(assetId, NewCouponSettlement(cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -172,7 +172,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using var scope = Provider.CreateAsyncScope();
         var portfolioId = await CreatePortfolioAsync(scope.ServiceProvider, "Bonds", cancellationToken);
         var added = await scope.ServiceProvider.GetRequiredService<AddBondHandler>()
-            .HandleAsync(portfolioId, PortfolioApi.NewBondRequest(purchaseDate: new DateOnly(2025, 1, 10)), cancellationToken);
+            .HandleAsync(PortfolioApi.NewBondRequest(portfolioId: portfolioId, purchaseDate: new DateOnly(2025, 1, 10)), cancellationToken);
         Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
         var assetId = added.Value.AssetId;
         var eventsBefore = await CountPositionEventsAsync(cancellationToken);
@@ -181,7 +181,6 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<SettleBondInterestHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 new SettleBondInterestRequest { Periods = [new SettleBondPeriodRequest { PeriodIndex = 1 }] },
                 cancellationToken);
@@ -208,7 +207,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using (var settle = Provider.CreateAsyncScope())
         {
             var settled = await settle.ServiceProvider.GetRequiredService<SettleBondInterestHandler>()
-                .HandleAsync(bondsId, assetId, NewCouponSettlement(cashId), cancellationToken);
+                .HandleAsync(assetId, NewCouponSettlement(cashId), cancellationToken);
             Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
         }
 
@@ -225,7 +224,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<UndoBondInterestSettlementHandler>()
-                .HandleAsync(bondsId, assetId, settlementId, cancellationToken);
+                .HandleAsync(assetId, settlementId, cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -250,7 +249,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RedeemBondHandler>()
-                .HandleAsync(bondsId, assetId, new RedeemBondRequest { DestinationAssetId = cashId }, cancellationToken);
+                .HandleAsync(assetId, new RedeemBondRequest { DestinationAssetId = cashId }, cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -278,8 +277,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
             cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 6_000m, cancellationToken);
             bondsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Bonds", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddBondHandler>().HandleAsync(
-                bondsId,
-                PortfolioApi.NewBondRequest(purchaseDate: new DateOnly(2026, 2, 1), bondCount: 10, fundingAssetId: cashId),
+                PortfolioApi.NewBondRequest(portfolioId: bondsId, purchaseDate: new DateOnly(2026, 2, 1), bondCount: 10, fundingAssetId: cashId),
                 cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             assetId = added.Value.AssetId;
@@ -298,7 +296,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         {
             await Assert.ThrowsAnyAsync<InvalidOperationException>(() => failing.ServiceProvider
                 .GetRequiredService<RedeemBondEarlyHandler>()
-                .HandleAsync(bondsId, assetId, request, cancellationToken));
+                .HandleAsync(assetId, request, cancellationToken));
         }
 
         Assert.Equal(eventsBefore, await CountPositionEventsAsync(cancellationToken));
@@ -313,7 +311,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using (var retry = Provider.CreateAsyncScope())
         {
             var result = await retry.ServiceProvider.GetRequiredService<RedeemBondEarlyHandler>()
-                .HandleAsync(bondsId, assetId, request, cancellationToken);
+                .HandleAsync(assetId, request, cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -341,7 +339,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         {
             await Assert.ThrowsAnyAsync<InvalidOperationException>(() => failing.ServiceProvider
                 .GetRequiredService<SwapBondHandler>()
-                .HandleAsync(bondsId, assetId, NewSwap(cashId), cancellationToken));
+                .HandleAsync(assetId, NewSwap(cashId), cancellationToken));
         }
 
         Assert.Equal(eventsBefore, await CountPositionEventsAsync(cancellationToken));
@@ -357,7 +355,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         await using (var retry = Provider.CreateAsyncScope())
         {
             var result = await retry.ServiceProvider.GetRequiredService<SwapBondHandler>()
-                .HandleAsync(bondsId, assetId, NewSwap(cashId), cancellationToken);
+                .HandleAsync(assetId, NewSwap(cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -396,8 +394,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 6_000m, cancellationToken);
         var bondsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Bonds", cancellationToken);
         var added = await arrange.ServiceProvider.GetRequiredService<AddBondHandler>().HandleAsync(
-            bondsId,
-            PortfolioApi.NewBondRequest(
+            PortfolioApi.NewBondRequest(portfolioId: bondsId,
                 name: "OTS0426",
                 seriesCode: "OTS0426",
                 type: TreasuryBondType.Ots,
@@ -408,7 +405,6 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
             cancellationToken);
         Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
         var settled = await arrange.ServiceProvider.GetRequiredService<SettleBondInterestHandler>().HandleAsync(
-            bondsId,
             added.Value.AssetId,
             new SettleBondInterestRequest { Periods = [new SettleBondPeriodRequest { PeriodIndex = 1 }] },
             cancellationToken);
@@ -430,8 +426,7 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 6_000m, cancellationToken);
         var bondsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Bonds", cancellationToken);
         var added = await arrange.ServiceProvider.GetRequiredService<AddBondHandler>().HandleAsync(
-            bondsId,
-            PortfolioApi.NewRorBondRequest(purchaseDate: new DateOnly(2026, 1, 10)) with { FundingAssetId = cashId },
+            PortfolioApi.NewRorBondRequest(purchaseDate: new DateOnly(2026, 1, 10)) with { FundingAssetId = cashId, PortfolioId = bondsId },
             cancellationToken);
         Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
 

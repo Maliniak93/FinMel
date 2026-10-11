@@ -20,7 +20,7 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         var (ownerPortfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var response = await stranger.GetAsync(AssetUri(ownerPortfolioId, assetId), cancellationToken);
+        var response = await stranger.GetAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -33,7 +33,7 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         var (ownerPortfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var response = await stranger.PutAsJsonAsync(AssetUri(ownerPortfolioId, assetId), UpdatePayload(), cancellationToken);
+        var response = await stranger.PutAsJsonAsync(AssetUri(assetId), UpdatePayload(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -46,7 +46,7 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         var (ownerPortfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var response = await stranger.DeleteAsync(AssetUri(ownerPortfolioId, assetId), cancellationToken);
+        var response = await stranger.DeleteAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -78,7 +78,7 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var response = await stranger.GetAsync(AssetUri(strangerPortfolioId, assetId), cancellationToken);
+        var response = await stranger.GetAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -93,7 +93,7 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var response = await stranger.PutAsJsonAsync(AssetUri(strangerPortfolioId, assetId), UpdatePayload(), cancellationToken);
+        var response = await stranger.PutAsJsonAsync(AssetUri(assetId), UpdatePayload(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -108,7 +108,7 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var response = await stranger.DeleteAsync(AssetUri(strangerPortfolioId, assetId), cancellationToken);
+        var response = await stranger.DeleteAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -125,15 +125,15 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.DeleteAsync(AssetUri(ownerPortfolioId, assetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.DeleteAsync(AssetUri(strangerPortfolioId, assetId), cancellationToken);
+        var viaOwnersPortfolio = await stranger.DeleteAsync(AssetUri(assetId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.DeleteAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
 
-        var getAsset = await owner.GetAsync(AssetUri(ownerPortfolioId, assetId), cancellationToken);
+        var getAsset = await owner.GetAsync(AssetUri(assetId), cancellationToken);
         Assert.Equal(HttpStatusCode.OK, getAsset.StatusCode);
-        Assert.Equal(2, (await owner.ListTransactionsAsync(ownerPortfolioId, assetId, cancellationToken)).TotalCount);
+        Assert.Equal(2, (await owner.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
     }
 
     private static UpdateAssetRequest UpdatePayload() => new()

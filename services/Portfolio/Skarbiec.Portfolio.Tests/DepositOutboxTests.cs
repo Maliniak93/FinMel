@@ -35,7 +35,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddDepositHandler>()
-            .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+            .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId), cancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, SaveChanges.Count);
@@ -73,7 +73,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
             portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
                 .HandleAsync(new CreatePortfolioRequest { Name = "Deposit outbox portfolio" }, cancellationToken)).Value.Id;
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId), cancellationToken);
             Assert.True(added.IsSuccess);
             assetId = added.Value.AssetId;
         }
@@ -85,7 +85,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
             var request = PortfolioApi.NewDepositRequest(principal: 15_000m, startDate: new DateOnly(2026, 2, 1), termLength: 6)
                 .ToUpdateRequest();
             var result = await act.ServiceProvider.GetRequiredService<UpdateDepositHandler>()
-                .HandleAsync(portfolioId, assetId, request, cancellationToken);
+                .HandleAsync(assetId, request, cancellationToken);
             Assert.True(result.IsSuccess);
         }
 
@@ -119,7 +119,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
             portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
                 .HandleAsync(new CreatePortfolioRequest { Name = "Settlement outbox portfolio" }, cancellationToken)).Value.Id;
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId), cancellationToken);
             Assert.True(added.IsSuccess);
             assetId = added.Value.AssetId;
         }
@@ -129,7 +129,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
-                .HandleAsync(portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -168,7 +168,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
             portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
                 .HandleAsync(new CreatePortfolioRequest { Name = "Deposit outbox portfolio" }, cancellationToken)).Value.Id;
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId), cancellationToken);
             Assert.True(added.IsSuccess);
             assetId = added.Value.AssetId;
         }
@@ -178,7 +178,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
-                .HandleAsync(portfolioId, assetId, cancellationToken);
+                .HandleAsync(assetId, cancellationToken);
             Assert.True(result.IsSuccess);
         }
 
@@ -209,7 +209,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
             portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
                 .HandleAsync(new CreatePortfolioRequest { Name = "Archived deposit portfolio" }, cancellationToken)).Value.Id;
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId), cancellationToken);
             Assert.True(added.IsSuccess);
             assetId = added.Value.AssetId;
             Assert.True((await arrange.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
@@ -226,14 +226,13 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         var writes = new (string Name, Func<IServiceProvider, Task<Error>> Write)[]
         {
             ("AddDeposit", async s => (await s.GetRequiredService<AddDepositHandler>().HandleAsync(
-                portfolioId, PortfolioApi.NewDepositRequest(name: "Another"), cancellationToken)).Error),
+                PortfolioApi.NewDepositRequest(portfolioId: portfolioId, name: "Another"), cancellationToken)).Error),
             ("UpdateDeposit", async s => (await s.GetRequiredService<UpdateDepositHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 PortfolioApi.NewDepositRequest(principal: 99_999m).ToUpdateRequest(),
                 cancellationToken)).Error),
             ("SettleDeposit", async s => (await s.GetRequiredService<SettleDepositHandler>().HandleAsync(
-                portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken)).Error),
+                assetId, PortfolioApi.NewSettleRequest(), cancellationToken)).Error),
         };
 
         foreach (var (name, write) in writes)
@@ -263,7 +262,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         {
             portfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Rollover outbox portfolio", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             assetId = added.Value.AssetId;
         }
@@ -280,7 +279,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RollOverDepositHandler>()
-                .HandleAsync(portfolioId, assetId, PortfolioApi.NewRollOverRequest(), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewRollOverRequest(), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -322,11 +321,11 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         {
             portfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Rollover outbox portfolio", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             assetId = added.Value.AssetId;
             var settled = await arrange.ServiceProvider.GetRequiredService<SettleDepositHandler>()
-                .HandleAsync(portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
             Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
         }
 
@@ -344,7 +343,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RollOverDepositHandler>()
-                .HandleAsync(portfolioId, assetId, PortfolioApi.NewRollOverRequest(grossInterest: null, tax: null), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewRollOverRequest(grossInterest: null, tax: null), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -375,13 +374,12 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
             portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
                 .HandleAsync(new CreatePortfolioRequest { Name = "Deposit outbox portfolio" }, cancellationToken)).Value.Id;
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewDepositRequest(startDate: new DateOnly(2026, 1, 1)), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: portfolioId, startDate: new DateOnly(2026, 1, 1)), cancellationToken);
             Assert.True(added.IsSuccess);
             assetId = added.Value.AssetId;
 
             var cash = await arrange.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-                portfolioId,
-                new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
+                new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
                 cancellationToken);
             Assert.True(cash.IsSuccess);
             cashId = cash.Value.Id;
@@ -390,14 +388,14 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var settle = Provider.CreateAsyncScope())
         {
             var settled = await settle.ServiceProvider.GetRequiredService<SettleDepositHandler>()
-                .HandleAsync(portfolioId, assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
             Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
         }
 
         await using (var payOut = Provider.CreateAsyncScope())
         {
             var paidOut = await payOut.ServiceProvider.GetRequiredService<PayOutDepositHandler>()
-                .HandleAsync(portfolioId, assetId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
             Assert.True(paidOut.IsSuccess, paidOut.IsFailure ? paidOut.Error.Code : null);
         }
 

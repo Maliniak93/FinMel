@@ -18,13 +18,13 @@ import {
   type InstrumentDetailsResponse,
 } from '../../api/marketdata';
 import {
-  deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
+  deleteApiPortfolioAssetsById,
   getApiPortfolioPortfoliosById,
-  getApiPortfolioPortfoliosByPortfolioIdAssets,
-  getApiPortfolioPortfoliosByPortfolioIdBondsByAssetId,
-  getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId,
-  getApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId,
-  getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId,
+  getApiPortfolioAssets,
+  getApiPortfolioBondsByAssetId,
+  getApiPortfolioDepositsByAssetId,
+  getApiPortfolioMetalsByAssetId,
+  getApiPortfolioSavingsAccountsByAssetId,
   type AssetResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
@@ -108,8 +108,8 @@ export class Assets {
   protected readonly assetsResource = resource({
     params: () => ({ portfolioId: this.portfolioId() }),
     loader: async ({ params, abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosByPortfolioIdAssets({
-        path: { portfolioId: params.portfolioId },
+      const result = await getApiPortfolioAssets({
+        query: { portfolioId: params.portfolioId },
         signal: abortSignal,
       });
       if (result.error) {
@@ -233,8 +233,8 @@ export class Assets {
   }
 
   private async openDepositEditDialog(asset: AssetResponse): Promise<void> {
-    const result = await getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId({
-      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    const result = await getApiPortfolioDepositsByAssetId({
+      path: { assetId: asset.id },
     });
     if (result.error || !result.data) {
       this.snackBar.open(
@@ -256,8 +256,8 @@ export class Assets {
   }
 
   private async openBondEditDialog(asset: AssetResponse): Promise<void> {
-    const result = await getApiPortfolioPortfoliosByPortfolioIdBondsByAssetId({
-      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    const result = await getApiPortfolioBondsByAssetId({
+      path: { assetId: asset.id },
     });
     if (result.error || !result.data) {
       this.snackBar.open(
@@ -279,8 +279,8 @@ export class Assets {
   }
 
   private async openMetalEditDialog(asset: AssetResponse): Promise<void> {
-    const result = await getApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId({
-      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    const result = await getApiPortfolioMetalsByAssetId({
+      path: { assetId: asset.id },
     });
     if (result.error || !result.data) {
       this.snackBar.open(
@@ -302,8 +302,8 @@ export class Assets {
   }
 
   private async openSavingsAccountEditDialog(asset: AssetResponse): Promise<void> {
-    const result = await getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId({
-      path: { portfolioId: this.portfolioId(), assetId: asset.id },
+    const result = await getApiPortfolioSavingsAccountsByAssetId({
+      path: { assetId: asset.id },
     });
     if (result.error || !result.data) {
       this.snackBar.open(
@@ -362,8 +362,8 @@ export class Assets {
       return;
     }
 
-    const result = await deleteApiPortfolioPortfoliosByPortfolioIdAssetsById({
-      path: { portfolioId: this.portfolioId(), id: asset.id },
+    const result = await deleteApiPortfolioAssetsById({
+      path: { id: asset.id },
     });
     if (result.error) {
       this.snackBar.open(

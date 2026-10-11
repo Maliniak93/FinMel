@@ -8,8 +8,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreview,
-  postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemption,
+  getApiPortfolioBondsByAssetIdRedemptionPreview,
+  postApiPortfolioBondsByAssetIdRedemption,
   type BondResponse,
 } from '../../../api/portfolio';
 import {
@@ -64,8 +64,8 @@ export class RedeemBondDialog {
   protected readonly previewResource = resource({
     params: () => (this.unsettled ? undefined : {}),
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreview({
-        path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
+      const result = await getApiPortfolioBondsByAssetIdRedemptionPreview({
+        path: { assetId: this.bond.assetId },
         signal: abortSignal,
       });
       if (result.error || !result.data) {
@@ -118,8 +118,8 @@ export class RedeemBondDialog {
     this.submitting.set(true);
     this.formError.set(null);
 
-    const result = await postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemption({
-      path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
+    const result = await postApiPortfolioBondsByAssetIdRedemption({
+      path: { assetId: this.bond.assetId },
       body: { destinationAssetId: this.form.getRawValue().destinationAssetId! },
     });
 

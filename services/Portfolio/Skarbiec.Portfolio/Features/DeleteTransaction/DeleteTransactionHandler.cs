@@ -10,10 +10,10 @@ namespace Skarbiec.Portfolio.Features.DeleteTransaction;
 
 public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
-    public async Task<Result> HandleAsync(Guid portfolioId, Guid assetId, Guid id, CancellationToken cancellationToken)
+    public async Task<Result> HandleAsync(Guid assetId, Guid id, CancellationToken cancellationToken)
     {
         var asset = await dbContext.Assets
-            .FirstOrDefaultAsync(a => a.Id == assetId && a.PortfolioId == portfolioId, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == assetId, cancellationToken);
 
         if (asset is null)
         {

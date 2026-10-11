@@ -16,8 +16,8 @@ import { map } from 'rxjs';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreview,
-  postApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlements,
+  getApiPortfolioSavingsAccountsByAssetIdInterestPreview,
+  postApiPortfolioSavingsAccountsByAssetIdInterestSettlements,
   type SavingsAccountResponse,
 } from '../../../api/portfolio';
 import {
@@ -89,11 +89,10 @@ export class SettleSavingsInterestDialog {
 
   protected readonly previewResource = resource({
     loader: async ({ abortSignal }) => {
-      const result =
-        await getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreview({
-          path: { portfolioId: this.account.portfolioId, assetId: this.account.assetId },
-          signal: abortSignal,
-        });
+      const result = await getApiPortfolioSavingsAccountsByAssetIdInterestPreview({
+        path: { assetId: this.account.assetId },
+        signal: abortSignal,
+      });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ??
@@ -141,15 +140,14 @@ export class SettleSavingsInterestDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const result =
-      await postApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlements({
-        path: { portfolioId: this.account.portfolioId, assetId: this.account.assetId },
-        body: {
-          periodEnd: preview.periodEnd,
-          grossInterest: Number(values.grossInterest),
-          tax: Number(values.tax),
-        },
-      });
+    const result = await postApiPortfolioSavingsAccountsByAssetIdInterestSettlements({
+      path: { assetId: this.account.assetId },
+      body: {
+        periodEnd: preview.periodEnd,
+        grossInterest: Number(values.grossInterest),
+        tax: Number(values.tax),
+      },
+    });
 
     this.submitting.set(false);
 

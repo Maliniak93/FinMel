@@ -8,10 +8,10 @@ namespace Skarbiec.Portfolio.Features.Bonds.PreviewBondInterest;
 public sealed class PreviewBondInterestHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<BondInterestPreviewResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, SettleBondInterestRequest request, CancellationToken cancellationToken)
+        Guid assetId, SettleBondInterestRequest request, CancellationToken cancellationToken)
     {
         var plan = await dbContext.PlanBondInterestAsync(
-            portfolioId, assetId, request, WarsawCalendar.Today(timeProvider), cancellationToken);
+            assetId, request, WarsawCalendar.Today(timeProvider), cancellationToken);
         if (plan.IsFailure)
         {
             return plan.Error;

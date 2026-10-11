@@ -33,7 +33,6 @@ internal static class BondEarlyRedemptionPlanning
 {
     public static async Task<Result<BondEarlyRedemptionPlan>> PlanEarlyRedemptionAsync(
         this PortfolioDbContext dbContext,
-        Guid portfolioId,
         Guid assetId,
         DateOnly date,
         int bondCount,
@@ -44,7 +43,7 @@ internal static class BondEarlyRedemptionPlanning
     {
         // Tenancy-scoped lookup first: another user's bond, a non-bond asset and a wrong portfolio all end in 404.
         var bond = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Bond, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
         var terms = bond is null
             ? null
             : await dbContext.TreasuryBonds.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);

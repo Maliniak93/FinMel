@@ -54,7 +54,7 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         if (etfQuantity > 0m)
         {
             await client.RecordTransactionAsync(
-                etfPortfolioId, etfId, TransactionType.Buy, etfQuantity, PortfolioApi.DefaultTopUpDate.AddDays(1), cancellationToken, unitPrice: 100m);
+                etfId, TransactionType.Buy, etfQuantity, PortfolioApi.DefaultTopUpDate.AddDays(1), cancellationToken, unitPrice: 100m);
         }
 
         return new PortfolioApi.CashAndEtf(cashPortfolioId, cashId, etfPortfolioId, etfId);
@@ -63,11 +63,11 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
     private protected async Task AssertFundedDepositUnchangedAsync(
         HttpClient client, Guid userId, PortfolioApi.FundedDeposit funded, CancellationToken cancellationToken)
     {
-        var deposit = await client.GetDepositAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken);
+        var deposit = await client.GetDepositAsync(funded.Deposit.AssetId, cancellationToken);
         Assert.Equal(1_000m, deposit.Principal);
         Assert.Equal(new DateOnly(2026, 1, 15), deposit.StartDate);
-        Assert.Equal(4_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
-        Assert.Equal(1_000m, (await client.GetAssetAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(4_000m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(funded.Deposit.AssetId, cancellationToken)).Quantity);
 
         await using var dbContext = CreateDbContext(userId);
         var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
@@ -81,9 +81,9 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
     }
 
     private protected async Task<DepositSnapshot> SnapshotDepositAsync(
-        HttpClient client, Guid userId, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        HttpClient client, Guid userId, Guid assetId, CancellationToken cancellationToken)
     {
-        var deposit = await client.GetDepositAsync(portfolioId, assetId, cancellationToken);
+        var deposit = await client.GetDepositAsync(assetId, cancellationToken);
         var rows = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         await using var dbContext = CreateDbContext(userId);
@@ -101,9 +101,9 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
     }
 
     private protected async Task AssertDepositUnchangedAsync(
-        HttpClient client, Guid userId, Guid portfolioId, Guid assetId, DepositSnapshot before, CancellationToken cancellationToken)
+        HttpClient client, Guid userId, Guid assetId, DepositSnapshot before, CancellationToken cancellationToken)
     {
-        var after = await SnapshotDepositAsync(client, userId, portfolioId, assetId, cancellationToken);
+        var after = await SnapshotDepositAsync(client, userId, assetId, cancellationToken);
         Assert.Equal(before.Deposit, after.Deposit);
         Assert.Equal(before.Rows, after.Rows);
         Assert.Equal(before.Transactions, after.Transactions);

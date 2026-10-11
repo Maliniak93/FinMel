@@ -14,7 +14,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
-  deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
+  deleteApiPortfolioAssetsById,
   getApiPortfolioDeposits,
   type DepositResponse,
 } from '../../api/portfolio';
@@ -166,8 +166,8 @@ export class Deposits {
       return;
     }
 
-    const result = await deleteApiPortfolioPortfoliosByPortfolioIdAssetsById({
-      path: { portfolioId: deposit.portfolioId, id: deposit.assetId },
+    const result = await deleteApiPortfolioAssetsById({
+      path: { id: deposit.assetId },
     });
     if (result.error) {
       this.snackBar.open(

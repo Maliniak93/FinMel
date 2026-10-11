@@ -23,18 +23,18 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(
             cancellationToken, NewDepositRequest(earlyBreakInterestLossPercent: 50m));
-        var openingId = Assert.Single((await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items).Id;
-        var preview = await client.GetSettlementPreviewAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var openingId = Assert.Single((await client.ListTransactionsAsync(deposit.AssetId, cancellationToken)).Items).Id;
+        var preview = await client.GetSettlementPreviewAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(119.83m, preview.NetInterest);
 
         var response = await client.PostAsJsonAsync(
-            RollOverDepositUri(portfolioId, deposit.AssetId),
+            RollOverDepositUri(deposit.AssetId),
             NewRollOverRequest(annualInterestRatePercent: 5.5m, grossInterest: preview.GrossInterest, tax: preview.Tax),
             cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Roll over answered {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(cancellationToken)}");
 
-        var transactions = (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items;
+        var transactions = (await client.ListTransactionsAsync(deposit.AssetId, cancellationToken)).Items;
         Assert.Equal(2, transactions.Count);
         var credit = Assert.Single(transactions, t => t.Id != openingId);
         Assert.Equal(TransactionType.Deposit, credit.Type);
@@ -43,11 +43,11 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(new DateOnly(2026, 4, 15), credit.Date);
         Assert.Null(credit.Transfer);
 
-        var asset = await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var asset = await client.GetAssetAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(10_119.83m, asset.Quantity);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, deposit.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(deposit.AssetId, cancellationToken);
 
-        var rolled = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var rolled = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(10_119.83m, rolled.Principal);
         Assert.Equal(new DateOnly(2026, 4, 15), rolled.StartDate);
         Assert.Equal(new DateOnly(2026, 7, 15), rolled.MaturityDate);
@@ -81,7 +81,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken, NewDepositRequest(currency: "EUR"));
 
         var response = await client.PostAsJsonAsync(
-            RollOverDepositUri(portfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+            RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Roll over answered {(int)response.StatusCode}.");
         await using var dbContext = CreateDbContext(userId);
@@ -105,26 +105,25 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         using var client = Factory.CreateAuthenticatedClient(userId);
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
         await client.SettleDepositAsync(
-            portfolioId,
             deposit.AssetId,
             cancellationToken,
             NewSettleRequest(settledOn: new DateOnly(2026, 4, 17), grossInterest: 150.00m, tax: 28.50m));
         var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
-        var transactionsBefore = (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items;
+        var transactionsBefore = (await client.ListTransactionsAsync(deposit.AssetId, cancellationToken)).Items;
 
         var response = await client.PostAsJsonAsync(
-            RollOverDepositUri(portfolioId, deposit.AssetId), SettledRollOverBody(annualInterestRatePercent: 5.5m), cancellationToken);
+            RollOverDepositUri(deposit.AssetId), SettledRollOverBody(annualInterestRatePercent: 5.5m), cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Roll over answered {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(cancellationToken)}");
 
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));
-        var transactionsAfter = (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items;
+        var transactionsAfter = (await client.ListTransactionsAsync(deposit.AssetId, cancellationToken)).Items;
         Assert.Equal(
             transactionsBefore.Select(t => (t.Id, t.Type, t.Quantity, t.Date)).OrderBy(t => t.Id),
             transactionsAfter.Select(t => (t.Id, t.Type, t.Quantity, t.Date)).OrderBy(t => t.Id));
-        Assert.Equal(10_121.50m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(10_121.50m, (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
 
-        var rolled = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var rolled = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(10_121.50m, rolled.Principal);
         Assert.Equal(new DateOnly(2026, 4, 15), rolled.StartDate);
         Assert.Equal(new DateOnly(2026, 7, 15), rolled.MaturityDate);
@@ -149,10 +148,10 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken, NewDepositRequest(termLength: 1));
         Assert.Equal(new DateOnly(2026, 2, 15), deposit.MaturityDate);
-        var preview = await client.GetSettlementPreviewAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var preview = await client.GetSettlementPreviewAsync(deposit.AssetId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            RollOverDepositUri(portfolioId, deposit.AssetId),
+            RollOverDepositUri(deposit.AssetId),
             NewRollOverRequest(grossInterest: preview.GrossInterest, tax: preview.Tax),
             cancellationToken);
 
@@ -209,7 +208,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             case "archived-asset":
                 (portfolioId, var shelved) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
                 assetId = shelved.AssetId;
-                await client.ArchiveAssetAsync(portfolioId, assetId, cancellationToken);
+                await client.ArchiveAssetAsync(assetId, cancellationToken);
                 body = NewRollOverRequest();
                 break;
             case "settled-with-amounts":
@@ -217,7 +216,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             case "settled-with-tax-only":
                 (portfolioId, var settled) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
                 assetId = settled.AssetId;
-                await client.SettleDepositAsync(portfolioId, assetId, cancellationToken);
+                await client.SettleDepositAsync(assetId, cancellationToken);
                 body = invalidCase switch
                 {
                     "settled-with-amounts" => NewRollOverRequest(),
@@ -229,12 +228,12 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
                 throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null);
         }
 
-        var before = await SnapshotDepositAsync(client, userId, portfolioId, assetId, cancellationToken);
+        var before = await SnapshotDepositAsync(client, userId, assetId, cancellationToken);
 
-        var response = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, assetId), body, cancellationToken);
+        var response = await client.PostAsJsonAsync(RollOverDepositUri(assetId), body, cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, errorCode, cancellationToken);
-        await AssertDepositUnchangedAsync(client, userId, portfolioId, assetId, before, cancellationToken);
+        await AssertDepositUnchangedAsync(client, userId, assetId, before, cancellationToken);
         Assert.Equal(0, before.Deposit.RolloverCount);
     }
 
@@ -272,9 +271,9 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             "rate-5dp" => NewRollOverRequest(annualInterestRatePercent: 5.12345m),
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
-        var before = await SnapshotDepositAsync(client, userId, portfolioId, deposit.AssetId, cancellationToken);
+        var before = await SnapshotDepositAsync(client, userId, deposit.AssetId, cancellationToken);
 
-        var response = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, deposit.AssetId), body, cancellationToken);
+        var response = await client.PostAsJsonAsync(RollOverDepositUri(deposit.AssetId), body, cancellationToken);
 
         if (invalidCase.EndsWith("-missing", StringComparison.Ordinal))
         {
@@ -286,7 +285,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
 
-        await AssertDepositUnchangedAsync(client, userId, portfolioId, deposit.AssetId, before, cancellationToken);
+        await AssertDepositUnchangedAsync(client, userId, deposit.AssetId, before, cancellationToken);
         Assert.Equal(DepositStatus.Due, before.Deposit.Status);
     }
 
@@ -299,17 +298,17 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
 
-        var unknown = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, Guid.NewGuid()), NewRollOverRequest(), cancellationToken);
-        var cash = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, cashId), NewRollOverRequest(), cancellationToken);
+        var unknown = await client.PostAsJsonAsync(RollOverDepositUri(Guid.NewGuid()), NewRollOverRequest(), cancellationToken);
+        var cash = await client.PostAsJsonAsync(RollOverDepositUri(cashId), NewRollOverRequest(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, cash.StatusCode);
-        var cashAsset = await client.GetAssetAsync(portfolioId, cashId, cancellationToken);
+        var cashAsset = await client.GetAssetAsync(cashId, cancellationToken);
         Assert.Equal(0m, cashAsset.Quantity);
         Assert.Equal(0, cashAsset.TransactionCount);
 
         // Control: the route answers for a real deposit — the 404s were about the asset, not a missing route.
-        var real = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+        var real = await client.PostAsJsonAsync(RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
         Assert.True(real.IsSuccessStatusCode, $"Rolling over the real deposit answered {(int)real.StatusCode}.");
     }
 
@@ -324,16 +323,16 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         var cashId = await client.AddCashAssetAsync(walletId, cancellationToken);
 
         // Period 1 → 2: 10 119.83 from 2026-04-15 to 2026-07-15 at 5.5 %.
-        var first = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+        var first = await client.PostAsJsonAsync(RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
         Assert.True(first.IsSuccessStatusCode, $"The first roll over answered {(int)first.StatusCode}.");
-        Assert.Equal(DepositStatus.Active, (await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken)).Status);
+        Assert.Equal(DepositStatus.Active, (await client.GetDepositAsync(deposit.AssetId, cancellationToken)).Status);
 
         // Warsaw 2026-07-20 12:00 — past the new maturity.
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 7, 20, 10, 0, 0, TimeSpan.Zero));
-        var due = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var due = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.Due, due.Status);
 
-        var preview = await client.GetSettlementPreviewAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var preview = await client.GetSettlementPreviewAsync(deposit.AssetId, cancellationToken);
         var expected = DepositInterestMath.Project(new DepositTerms
         {
             Principal = 10_119.83m,
@@ -353,25 +352,25 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
 
         // Before the new start date is refused; on/after it is accepted.
         var beforeNewStart = await client.PostAsJsonAsync(
-            SettleDepositUri(portfolioId, deposit.AssetId),
+            SettleDepositUri(deposit.AssetId),
             NewSettleRequest(settledOn: new DateOnly(2026, 4, 14), grossInterest: preview.GrossInterest, tax: preview.Tax),
             cancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, beforeNewStart.StatusCode);
 
         var settle = await client.PostAsJsonAsync(
-            SettleDepositUri(portfolioId, deposit.AssetId),
+            SettleDepositUri(deposit.AssetId),
             NewSettleRequest(settledOn: new DateOnly(2026, 7, 16), grossInterest: preview.GrossInterest, tax: preview.Tax),
             cancellationToken);
         Assert.True(settle.IsSuccessStatusCode, $"Settling the rolled-over term answered {(int)settle.StatusCode}.");
         var balanceAfterSecondTerm = 10_119.83m + preview.NetInterest;
-        Assert.Equal(balanceAfterSecondTerm, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
-        Assert.Equal(DepositStatus.Settled, (await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken)).Status);
+        Assert.Equal(balanceAfterSecondTerm, (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(DepositStatus.Settled, (await client.GetDepositAsync(deposit.AssetId, cancellationToken)).Status);
 
         // Period 2 → 3, from Settled: count 2, the whole balance, starting on the 2026-07-15 maturity.
         var second = await client.PostAsJsonAsync(
-            RollOverDepositUri(portfolioId, deposit.AssetId), SettledRollOverBody(annualInterestRatePercent: 5m), cancellationToken);
+            RollOverDepositUri(deposit.AssetId), SettledRollOverBody(annualInterestRatePercent: 5m), cancellationToken);
         Assert.True(second.IsSuccessStatusCode, $"The second roll over answered {(int)second.StatusCode}.");
-        var third = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var third = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(2, third.RolloverCount);
         Assert.Equal(balanceAfterSecondTerm, third.Principal);
         Assert.Equal(new DateOnly(2026, 7, 15), third.StartDate);
@@ -380,29 +379,28 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
 
         // Warsaw 2026-10-20: settle the third term and pay the whole balance out.
         Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 10, 20, 10, 0, 0, TimeSpan.Zero));
-        var thirdPreview = await client.GetSettlementPreviewAsync(portfolioId, deposit.AssetId, cancellationToken);
+        var thirdPreview = await client.GetSettlementPreviewAsync(deposit.AssetId, cancellationToken);
         await client.SettleDepositAsync(
-            portfolioId,
             deposit.AssetId,
             cancellationToken,
             NewSettleRequest(settledOn: new DateOnly(2026, 10, 15), grossInterest: thirdPreview.GrossInterest, tax: thirdPreview.Tax));
-        var wholeBalance = (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity;
+        var wholeBalance = (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity;
         Assert.Equal(balanceAfterSecondTerm + thirdPreview.NetInterest, wholeBalance);
 
         var payOut = await client.PostAsJsonAsync(
-            PayOutDepositUri(portfolioId, deposit.AssetId), NewPayOutRequest(cashId, new DateOnly(2026, 10, 16)), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(cashId, new DateOnly(2026, 10, 16)), cancellationToken);
 
         Assert.True(payOut.IsSuccessStatusCode, $"The payout answered {(int)payOut.StatusCode}.");
-        Assert.Equal(0m, (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Quantity);
-        Assert.Equal(wholeBalance, (await client.GetAssetAsync(walletId, cashId, cancellationToken)).Quantity);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, deposit.AssetId, cancellationToken);
-        var paidOut = await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.Equal(0m, (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(wholeBalance, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(deposit.AssetId, cancellationToken);
+        var paidOut = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.PaidOut, paidOut.Status);
         Assert.Equal(2, paidOut.RolloverCount);
         Assert.Equal(new DateOnly(2026, 10, 16), paidOut.PaidOutOn);
 
         // Opening + three net-interest credits + the payout's Withdraw.
-        var transactions = (await client.ListTransactionsAsync(portfolioId, deposit.AssetId, cancellationToken)).Items;
+        var transactions = (await client.ListTransactionsAsync(deposit.AssetId, cancellationToken)).Items;
         Assert.Equal(5, transactions.Count);
         Assert.Equal(4, transactions.Count(t => t.Type == TransactionType.Deposit));
         Assert.Equal(wholeBalance, Assert.Single(transactions, t => t.Type == TransactionType.Withdraw).Quantity);

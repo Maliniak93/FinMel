@@ -131,13 +131,11 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         IServiceProvider services, Guid portfolioId, decimal balance, CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioId,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 
         var topUp = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-            portfolioId,
             assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = balance, UnitPrice = 1m, Date = PortfolioApi.DefaultTopUpDate },
             cancellationToken);
@@ -150,8 +148,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioId,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 
@@ -162,13 +159,11 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         IServiceProvider services, Guid portfolioId, string name, CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioId,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess);
 
         var buyResult = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-            portfolioId,
             assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 5m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) },
             cancellationToken);
@@ -185,8 +180,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         CancellationToken cancellationToken)
     {
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioId,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
 
@@ -195,7 +189,6 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         foreach (var (type, quantity, date) in transactions)
         {
             var recorded = await recordHandler.HandleAsync(
-                portfolioId,
                 assetResult.Value.Id,
                 new RecordTransactionRequest { Type = type, Quantity = quantity, UnitPrice = 10m, Date = date },
                 cancellationToken);

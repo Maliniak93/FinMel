@@ -7,7 +7,7 @@ public static class RedeemBondEndpoint
 {
     public static IEndpointRouteBuilder MapRedeemBondEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/bonds");
+        var group = app.MapGroup("/api/portfolio/bonds");
 
         group.MapPost("{assetId:guid}/redemption", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class RedeemBondEndpoint
     }
 
     private static async Task<Results<Ok<BondResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, RedeemBondRequest request, RedeemBondHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, request, cancellationToken)).ToHttpResult();
+        Guid assetId, RedeemBondRequest request, RedeemBondHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, request, cancellationToken)).ToHttpResult();
 }

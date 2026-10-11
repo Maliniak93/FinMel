@@ -11,31 +11,30 @@ internal sealed record BondLinks(
 internal static class BondReadModel
 {
     public static async Task<BondResponse?> LoadBondAsync(
-        this PortfolioDbContext dbContext, Guid portfolioId, Guid assetId, DateOnly today, CancellationToken cancellationToken) =>
-        (await dbContext.LoadBondInputAsync(portfolioId, assetId, today, cancellationToken))?.Response;
+        this PortfolioDbContext dbContext, Guid assetId, DateOnly today, CancellationToken cancellationToken) =>
+        (await dbContext.LoadBondInputAsync(assetId, today, cancellationToken))?.Response;
 
     public static async Task<BondResponse?> LoadBondWithEstimateAsync(
         this PortfolioDbContext dbContext,
-        Guid portfolioId,
         Guid assetId,
         DateOnly today,
         IBondRateLookupClient rateLookup,
         CancellationToken cancellationToken)
     {
-        var input = await dbContext.LoadBondInputAsync(portfolioId, assetId, today, cancellationToken);
+        var input = await dbContext.LoadBondInputAsync(assetId, today, cancellationToken);
 
         return input is null ? null : (await rateLookup.WithEstimatesAsync([input], today, cancellationToken))[0];
     }
 
     private static async Task<BondEstimateInput?> LoadBondInputAsync(
-        this PortfolioDbContext dbContext, Guid portfolioId, Guid assetId, DateOnly today, CancellationToken cancellationToken)
+        this PortfolioDbContext dbContext, Guid assetId, DateOnly today, CancellationToken cancellationToken)
     {
         // A TreasuryBond row exists only for a Bond-class asset, so any other asset id misses here.
         var row = await (
                 from terms in dbContext.TreasuryBonds.AsNoTracking()
                 join asset in dbContext.Assets.AsNoTracking() on terms.AssetId equals asset.Id
                 join portfolio in dbContext.Portfolios on asset.PortfolioId equals portfolio.Id
-                where asset.Id == assetId && asset.PortfolioId == portfolioId
+                where asset.Id == assetId
                 select new { Terms = terms, Asset = asset, PortfolioName = portfolio.Name, PortfolioIsArchived = portfolio.IsArchived })
             .FirstOrDefaultAsync(cancellationToken);
 

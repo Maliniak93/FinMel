@@ -7,7 +7,6 @@ namespace Skarbiec.Portfolio.Features.Bonds.GetBondEarlyRedemptionPreview;
 public sealed class GetBondEarlyRedemptionPreviewHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<BondEarlyRedemptionPreviewResponse>> HandleAsync(
-        Guid portfolioId,
         Guid assetId,
         DateOnly date,
         int bondCount,
@@ -15,7 +14,6 @@ public sealed class GetBondEarlyRedemptionPreviewHandler(PortfolioDbContext dbCo
         CancellationToken cancellationToken)
     {
         var planned = await dbContext.PlanEarlyRedemptionAsync(
-            portfolioId,
             assetId,
             date,
             bondCount,

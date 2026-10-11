@@ -56,8 +56,8 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.GetAsync(BondUri(ownerPortfolioId, bond.AssetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.GetAsync(BondUri(strangerPortfolioId, bond.AssetId), cancellationToken);
+        var viaOwnersPortfolio = await stranger.GetAsync(BondUri(bond.AssetId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.GetAsync(BondUri(bond.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
@@ -74,12 +74,12 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var payload = NewBondRequest(name: "Stranger's edit", bondCount: 1).ToUpdateRequest();
 
-        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(BondUri(ownerPortfolioId, bond.AssetId), payload, cancellationToken);
-        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(BondUri(strangerPortfolioId, bond.AssetId), payload, cancellationToken);
+        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(BondUri(bond.AssetId), payload, cancellationToken);
+        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(BondUri(bond.AssetId), payload, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
-        var asset = await owner.GetAssetAsync(ownerPortfolioId, bond.AssetId, cancellationToken);
+        var asset = await owner.GetAssetAsync(bond.AssetId, cancellationToken);
         Assert.Equal("EDO1036", asset.Name);
         Assert.Equal(5_000m, asset.Quantity);
         await using var dbContext = CreateDbContext(ownerId);
@@ -98,10 +98,10 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
         var response = await stranger.PostAsJsonAsync(
-            BondsUri(strangerPortfolioId), NewBondRequest(fundingAssetId: ownerCashId), cancellationToken);
+            AllBondsUri, NewBondRequest(fundingAssetId: ownerCashId) with { PortfolioId = strangerPortfolioId }, cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        await owner.AssertCashUntouchedAsync(ownerWalletId, ownerCashId, cancellationToken, balance: 6_000m);
+        await owner.AssertCashUntouchedAsync(ownerCashId, cancellationToken, balance: 6_000m);
         await using var dbContext = CreateDbContext(strangerId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
@@ -119,13 +119,13 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(strangerPortfolioId, cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.SettleBondInterestRawAsync(ownerPortfolioId, bond.AssetId, [(1, null)], strangerCashId, cancellationToken);
-        var viaStrangersPortfolio = await stranger.SettleBondInterestRawAsync(strangerPortfolioId, bond.AssetId, [(1, null)], strangerCashId, cancellationToken);
+        var viaOwnersPortfolio = await stranger.SettleBondInterestRawAsync(bond.AssetId, [(1, null)], strangerCashId, cancellationToken);
+        var viaStrangersPortfolio = await stranger.SettleBondInterestRawAsync(bond.AssetId, [(1, null)], strangerCashId, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
         Assert.Equal(0, await CountBondSettlementsAsync(ownerId, cancellationToken, bond.AssetId));
-        Assert.Equal(1, (await owner.ListTransactionsAsync(ownerPortfolioId, bond.AssetId, cancellationToken)).TotalCount);
+        Assert.Equal(1, (await owner.ListTransactionsAsync(bond.AssetId, cancellationToken)).TotalCount);
     }
 
     [Fact]
@@ -140,8 +140,8 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(strangerPortfolioId, cancellationToken);
         var body = NewSettleBondBody([(1, null)], strangerCashId);
 
-        var viaOwnersPortfolio = await stranger.PostAsJsonAsync(BondInterestPreviewUri(ownerPortfolioId, bond.AssetId), body, cancellationToken);
-        var viaStrangersPortfolio = await stranger.PostAsJsonAsync(BondInterestPreviewUri(strangerPortfolioId, bond.AssetId), body, cancellationToken);
+        var viaOwnersPortfolio = await stranger.PostAsJsonAsync(BondInterestPreviewUri(bond.AssetId), body, cancellationToken);
+        var viaStrangersPortfolio = await stranger.PostAsJsonAsync(BondInterestPreviewUri(bond.AssetId), body, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
@@ -155,20 +155,20 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
         var funded = await owner.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
-        await owner.SettleBondInterestAsync(funded.BondPortfolioId, funded.Bond.AssetId, [(1, null)], funded.CashAssetId, cancellationToken);
-        var settlementId = await owner.GetLastBondSettlementIdAsync(funded.BondPortfolioId, funded.Bond.AssetId, cancellationToken);
+        await owner.SettleBondInterestAsync(funded.Bond.AssetId, [(1, null)], funded.CashAssetId, cancellationToken);
+        var settlementId = await owner.GetLastBondSettlementIdAsync(funded.Bond.AssetId, cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
         var viaOwnersPortfolio = await stranger.DeleteAsync(
-            BondInterestSettlementUri(funded.BondPortfolioId, funded.Bond.AssetId, settlementId), cancellationToken);
+            BondInterestSettlementUri(funded.Bond.AssetId, settlementId), cancellationToken);
         var viaStrangersPortfolio = await stranger.DeleteAsync(
-            BondInterestSettlementUri(strangerPortfolioId, funded.Bond.AssetId, settlementId), cancellationToken);
+            BondInterestSettlementUri(funded.Bond.AssetId, settlementId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
         Assert.Equal(1, await CountBondSettlementsAsync(ownerId, cancellationToken, funded.Bond.AssetId));
-        Assert.Equal(1_013.36m, (await owner.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(1_013.36m, (await owner.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]
@@ -187,9 +187,9 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
 
         foreach (var portfolioId in new[] { funded.BondPortfolioId, strangerPortfolioId })
         {
-            var redeem = await stranger.RedeemBondRawAsync(portfolioId, assetId, strangerCashId, cancellationToken);
-            var preview = await stranger.GetAsync(BondRedemptionPreviewUri(portfolioId, assetId), cancellationToken);
-            var swap = await stranger.SwapBondRawAsync(portfolioId, assetId, NewSwapBody(10, strangerCashId), cancellationToken);
+            var redeem = await stranger.RedeemBondRawAsync(assetId, strangerCashId, cancellationToken);
+            var preview = await stranger.GetAsync(BondRedemptionPreviewUri(assetId), cancellationToken);
+            var swap = await stranger.SwapBondRawAsync(assetId, NewSwapBody(10, strangerCashId), cancellationToken);
 
             Assert.Equal(HttpStatusCode.NotFound, redeem.StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
@@ -198,7 +198,7 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
 
         Assert.Empty(await ReadBondRedemptionsAsync(ownerId, cancellationToken));
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
-        await stranger.AssertCashUntouchedAsync(strangerPortfolioId, strangerCashId, cancellationToken);
+        await stranger.AssertCashUntouchedAsync(strangerCashId, cancellationToken);
     }
 
     [Fact]
@@ -214,13 +214,13 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         var funded = await stranger.CreateSettledTosAsync(cancellationToken);
         var rowsBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
 
-        var redeem = await stranger.RedeemBondRawAsync(funded.BondPortfolioId, funded.Bond.AssetId, ownerCashId, cancellationToken);
+        var redeem = await stranger.RedeemBondRawAsync(funded.Bond.AssetId, ownerCashId, cancellationToken);
         var swap = await stranger.SwapBondRawAsync(
-            funded.BondPortfolioId, funded.Bond.AssetId, NewSwapBody(10, ownerCashId), cancellationToken);
+            funded.Bond.AssetId, NewSwapBody(10, ownerCashId), cancellationToken);
 
         await redeem.AssertInvalidTransferCounterpartAsync(cancellationToken);
         await swap.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        await owner.AssertCashUntouchedAsync(ownerWalletId, ownerCashId, cancellationToken, balance: 6_000m);
+        await owner.AssertCashUntouchedAsync(ownerCashId, cancellationToken, balance: 6_000m);
         Assert.Empty(await ReadBondRedemptionsAsync(strangerId, cancellationToken));
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
     }
@@ -242,9 +242,9 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         foreach (var portfolioId in new[] { funded.BondPortfolioId, strangerPortfolioId })
         {
             var redeem = await stranger.RedeemBondEarlyRawAsync(
-                portfolioId, assetId, EdoEarlyRedemptionDate, 4, strangerCashId, cancellationToken, runningPeriodRatePercent: 4.00m);
+                assetId, EdoEarlyRedemptionDate, 4, strangerCashId, cancellationToken, runningPeriodRatePercent: 4.00m);
             var preview = await stranger.GetAsync(
-                BondEarlyRedemptionPreviewUri(portfolioId, assetId, EdoEarlyRedemptionDate, 4, 4.00m), cancellationToken);
+                BondEarlyRedemptionPreviewUri(assetId, EdoEarlyRedemptionDate, 4, 4.00m), cancellationToken);
 
             Assert.Equal(HttpStatusCode.NotFound, redeem.StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
@@ -252,7 +252,7 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
 
         Assert.Empty(await ReadBondRedemptionsAsync(ownerId, cancellationToken));
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
-        await stranger.AssertCashUntouchedAsync(strangerPortfolioId, strangerCashId, cancellationToken);
+        await stranger.AssertCashUntouchedAsync(strangerCashId, cancellationToken);
     }
 
     [Fact]
@@ -269,10 +269,10 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         var rowsBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
 
         var response = await stranger.RedeemBondEarlyRawAsync(
-            funded.BondPortfolioId, funded.Bond.AssetId, EdoEarlyRedemptionDate, 4, ownerCashId, cancellationToken, runningPeriodRatePercent: 4.00m);
+            funded.Bond.AssetId, EdoEarlyRedemptionDate, 4, ownerCashId, cancellationToken, runningPeriodRatePercent: 4.00m);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        await owner.AssertCashUntouchedAsync(ownerWalletId, ownerCashId, cancellationToken, balance: 6_000m);
+        await owner.AssertCashUntouchedAsync(ownerCashId, cancellationToken, balance: 6_000m);
         Assert.Empty(await ReadBondRedemptionsAsync(strangerId, cancellationToken));
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
     }
@@ -289,10 +289,10 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         using var stranger = Factory.CreateAuthenticatedClient(strangerId);
         var (strangerPortfolioId, bond) = await stranger.CreatePortfolioWithBondAsync(cancellationToken, NewRorBondRequest());
 
-        var response = await stranger.SettleBondInterestRawAsync(strangerPortfolioId, bond.AssetId, [(1, null)], ownerCashId, cancellationToken);
+        var response = await stranger.SettleBondInterestRawAsync(bond.AssetId, [(1, null)], ownerCashId, cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        await owner.AssertCashUntouchedAsync(ownerWalletId, ownerCashId, cancellationToken, balance: 6_000m);
+        await owner.AssertCashUntouchedAsync(ownerCashId, cancellationToken, balance: 6_000m);
         Assert.Equal(0, await CountBondSettlementsAsync(strangerId, cancellationToken, bond.AssetId));
     }
 }

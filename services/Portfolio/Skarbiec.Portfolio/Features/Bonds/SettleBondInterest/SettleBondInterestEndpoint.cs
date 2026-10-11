@@ -7,7 +7,7 @@ public static class SettleBondInterestEndpoint
 {
     public static IEndpointRouteBuilder MapSettleBondInterestEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/bonds");
+        var group = app.MapGroup("/api/portfolio/bonds");
 
         group.MapPost("{assetId:guid}/interest-settlements", HandleAsync).RequireAuthorization();
 
@@ -15,16 +15,15 @@ public static class SettleBondInterestEndpoint
     }
 
     private static async Task<Results<Created<IReadOnlyList<BondSettlementResponse>>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId,
         Guid assetId,
         SettleBondInterestRequest request,
         SettleBondInterestHandler handler,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(portfolioId, assetId, request, cancellationToken);
+        var result = await handler.HandleAsync(assetId, request, cancellationToken);
 
         return result.IsSuccess
-            ? TypedResults.Created($"/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}", result.Value)
+            ? TypedResults.Created($"/api/portfolio/bonds/{assetId}", result.Value)
             : result.Error.ToProblem();
     }
 }

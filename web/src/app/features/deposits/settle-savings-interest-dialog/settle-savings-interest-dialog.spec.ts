@@ -96,7 +96,7 @@ describe('SettleSavingsInterestDialog', () => {
       .map((call: unknown[]) => requestUrl(call[0]))
       .find((url: string) => url.includes('/interest-preview'));
     expect(previewCall).toContain(
-      `/api/portfolio/portfolios/${dueSavingsAccount.portfolioId}/savings-accounts/${dueSavingsAccount.assetId}/interest-preview`,
+      `/api/portfolio/savings-accounts/${dueSavingsAccount.assetId}/interest-preview`,
     );
 
     expect(Number(findControl(form(), 'grossInterest').value)).toBe(41.1);
@@ -151,7 +151,7 @@ describe('SettleSavingsInterestDialog', () => {
     const [request] = writeRequests();
     expect(request.method).toBe('POST');
     expect(request.url).toContain(
-      `/api/portfolio/portfolios/${dueSavingsAccount.portfolioId}/savings-accounts/${dueSavingsAccount.assetId}/interest-settlements`,
+      `/api/portfolio/savings-accounts/${dueSavingsAccount.assetId}/interest-settlements`,
     );
     expect(await request.json()).toEqual({
       periodEnd: '2026-09-30',

@@ -49,9 +49,9 @@ public sealed class PortfolioTenancyIsolationTests(SkarbiecContainersFixture con
         Assert.Equal(HttpStatusCode.OK, getPortfolio.StatusCode);
         foreach (var assetId in assetIds)
         {
-            var getAsset = await owner.GetAsync(AssetUri(portfolioId, assetId), cancellationToken);
+            var getAsset = await owner.GetAsync(AssetUri(assetId), cancellationToken);
             Assert.Equal(HttpStatusCode.OK, getAsset.StatusCode);
-            Assert.Equal(2, (await owner.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).TotalCount);
+            Assert.Equal(2, (await owner.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
         }
     }
 }

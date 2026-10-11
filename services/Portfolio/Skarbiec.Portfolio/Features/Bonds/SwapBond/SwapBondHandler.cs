@@ -14,10 +14,10 @@ public sealed class SwapBondHandler(
     private const string Currency = "PLN";
 
     public async Task<Result<BondResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, SwapBondRequest request, CancellationToken cancellationToken)
+        Guid assetId, SwapBondRequest request, CancellationToken cancellationToken)
     {
         var today = WarsawCalendar.Today(timeProvider);
-        var planned = await dbContext.PlanRedemptionAsync(portfolioId, assetId, today, forWrite: true, cancellationToken);
+        var planned = await dbContext.PlanRedemptionAsync(assetId, today, forWrite: true, cancellationToken);
         if (planned.IsFailure)
         {
             return planned.Error;
@@ -57,11 +57,11 @@ public sealed class SwapBondHandler(
         }
 
         // The swap stays in the old bond's portfolio, so an IKE lot stays in IKE with its tax exemption.
-        var portfolio = await dbContext.Portfolios.FirstAsync(p => p.Id == portfolioId, cancellationToken);
+        var portfolio = await dbContext.Portfolios.FirstAsync(p => p.Id == bond.PortfolioId, cancellationToken);
         var swapped = new Asset
         {
             Id = Guid.NewGuid(),
-            PortfolioId = portfolioId,
+            PortfolioId = bond.PortfolioId,
             AssetClass = AssetClass.Bond,
             Name = newBond.Name,
             Currency = Currency,
@@ -168,6 +168,6 @@ public sealed class SwapBondHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        return (await dbContext.LoadBondAsync(portfolioId, swapped.Id, today, cancellationToken))!;
+        return (await dbContext.LoadBondAsync(swapped.Id, today, cancellationToken))!;
     }
 }

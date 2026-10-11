@@ -253,7 +253,7 @@ describe('EarlyRedeemBondDialog', () => {
 
     const [request] = writeRequests(fetchSpy);
     expect(request.url).toContain(
-      `/api/portfolio/portfolios/${edoYearOneSettledBond.portfolioId}/bonds/${edoYearOneSettledBond.assetId}/early-redemption`,
+      `/api/portfolio/bonds/${edoYearOneSettledBond.assetId}/early-redemption`,
     );
     expect(await request.json()).toEqual({
       date: '2026-05-13',

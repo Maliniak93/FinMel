@@ -18,8 +18,8 @@ import { map } from 'rxjs';
 
 import { getApiMarketdataBondSeries, type BondSeriesListItem } from '../../../api/marketdata';
 import {
-  getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreview,
-  postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwap,
+  getApiPortfolioBondsByAssetIdRedemptionPreview,
+  postApiPortfolioBondsByAssetIdSwap,
   type BondResponse,
   type TreasuryBondType,
 } from '../../../api/portfolio';
@@ -108,8 +108,8 @@ export class SwapBondDialog {
 
   protected readonly previewResource = resource({
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreview({
-        path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
+      const result = await getApiPortfolioBondsByAssetIdRedemptionPreview({
+        path: { assetId: this.bond.assetId },
         signal: abortSignal,
       });
       if (result.error || !result.data) {
@@ -244,8 +244,8 @@ export class SwapBondDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const result = await postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwap({
-      path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
+    const result = await postApiPortfolioBondsByAssetIdSwap({
+      path: { assetId: this.bond.assetId },
       body: {
         bondCount: Number(values.bondCount),
         newBond: {

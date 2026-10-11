@@ -7,11 +7,11 @@ namespace Skarbiec.Portfolio.Features.GetAsset;
 
 public sealed class GetAssetHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
-    public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    public async Task<Result<AssetResponse>> HandleAsync(Guid assetId, CancellationToken cancellationToken)
     {
         var row = await dbContext.Assets
             .AsNoTracking()
-            .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
+            .Where(a => a.Id == assetId)
             .Select(a => new
             {
                 Asset = a,

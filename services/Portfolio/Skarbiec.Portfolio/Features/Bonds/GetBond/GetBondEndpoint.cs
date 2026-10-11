@@ -7,7 +7,7 @@ public static class GetBondEndpoint
 {
     public static IEndpointRouteBuilder MapGetBondEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/bonds");
+        var group = app.MapGroup("/api/portfolio/bonds");
 
         group.MapGet("{assetId:guid}", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class GetBondEndpoint
     }
 
     private static async Task<Results<Ok<BondResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, GetBondHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, cancellationToken)).ToHttpResult();
+        Guid assetId, GetBondHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, cancellationToken)).ToHttpResult();
 }

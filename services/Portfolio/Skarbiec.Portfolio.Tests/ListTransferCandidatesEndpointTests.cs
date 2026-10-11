@@ -41,7 +41,7 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         var walletId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
         var liveId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Live cash");
         var archivedId = await client.AddCashAssetWithBalanceAsync(walletId, cancellationToken, name: "Archived cash");
-        await client.ArchiveAssetAsync(walletId, archivedId, cancellationToken);
+        await client.ArchiveAssetAsync(archivedId, cancellationToken);
 
         var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
 

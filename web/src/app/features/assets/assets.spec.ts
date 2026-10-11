@@ -602,7 +602,7 @@ describe('Assets', () => {
       await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
       const archiveCall = fetchSpy.mock.calls[callsBefore][0] as Request;
       expect(archiveCall.method).toBe('POST');
-      expect(archiveCall.url).toContain(`/portfolios/${portfolioId}/assets/${asset.id}/archive`);
+      expect(archiveCall.url).toContain(`/api/portfolio/assets/${asset.id}/archive`);
       expect((fetchSpy.mock.calls[callsBefore + 1][0] as Request).method).toBe('GET');
 
       callsBefore = fetchSpy.mock.calls.length;
@@ -615,9 +615,7 @@ describe('Assets', () => {
       await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore + 1));
       const restoreCall = fetchSpy.mock.calls[callsBefore][0] as Request;
       expect(restoreCall.method).toBe('POST');
-      expect(restoreCall.url).toContain(
-        `/portfolios/${portfolioId}/assets/${archivedCash.id}/restore`,
-      );
+      expect(restoreCall.url).toContain(`/api/portfolio/assets/${archivedCash.id}/restore`);
       expect((fetchSpy.mock.calls[callsBefore + 1][0] as Request).method).toBe('GET');
     });
 
@@ -662,7 +660,7 @@ describe('Assets', () => {
         fetchSpy.mock.calls
           .slice(callsBefore)
           .some((call: unknown[]) =>
-            requestUrl(call[0]).endsWith(`/portfolios/${portfolioId}/assets`),
+            requestUrl(call[0]).endsWith(`/api/portfolio/assets?portfolioId=${portfolioId}`),
           ),
       ).toBe(true),
     );
@@ -693,7 +691,7 @@ describe('Assets', () => {
         fetchSpy.mock.calls
           .slice(callsBefore)
           .some((call: unknown[]) =>
-            requestUrl(call[0]).endsWith(`/portfolios/${portfolioId}/assets`),
+            requestUrl(call[0]).endsWith(`/api/portfolio/assets?portfolioId=${portfolioId}`),
           ),
       ).toBe(true),
     );
@@ -781,7 +779,7 @@ describe('Assets', () => {
         fetchSpy.mock.calls
           .slice(callsBefore)
           .some((call: unknown[]) =>
-            requestUrl(call[0]).endsWith(`/portfolios/${portfolioId}/assets`),
+            requestUrl(call[0]).endsWith(`/api/portfolio/assets?portfolioId=${portfolioId}`),
           ),
       ).toBe(true),
     );

@@ -17,7 +17,7 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         // 10 000.00 at 6 % from 2026-01-15 for 3 months → matures 2026-04-15: gross 147.95, tax 28.12, net 119.83.
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
 
-        var response = await client.GetAsync(DepositSettlementPreviewUri(portfolioId, deposit.AssetId), cancellationToken);
+        var response = await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var preview = await response.ReadJsonAsync(cancellationToken);
@@ -37,7 +37,7 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
 
-        var response = await client.GetAsync(DepositSettlementPreviewUri(portfolioId, deposit.AssetId), cancellationToken);
+        var response = await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositNotDueErrorCode, cancellationToken);
     }
@@ -49,9 +49,9 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        await client.SettleDepositAsync(portfolioId, deposit.AssetId, cancellationToken);
+        await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
 
-        var response = await client.GetAsync(DepositSettlementPreviewUri(portfolioId, deposit.AssetId), cancellationToken);
+        var response = await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositAlreadySettledErrorCode, cancellationToken);
     }
@@ -65,12 +65,12 @@ public sealed class SettlementPreviewEndpointTests(SkarbiecContainersFixture con
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
 
-        var response = await client.GetAsync(DepositSettlementPreviewUri(portfolioId, cashId), cancellationToken);
+        var response = await client.GetAsync(DepositSettlementPreviewUri(cashId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         // Control: the Due deposit beside it is served by the same route.
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.GetAsync(DepositSettlementPreviewUri(portfolioId, deposit.AssetId), cancellationToken)).StatusCode);
+            (await client.GetAsync(DepositSettlementPreviewUri(deposit.AssetId), cancellationToken)).StatusCode);
     }
 }

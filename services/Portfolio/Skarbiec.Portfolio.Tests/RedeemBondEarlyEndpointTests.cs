@@ -24,7 +24,7 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         var assetId = funded.Bond.AssetId;
 
         var response = await client.RedeemBondEarlyRawAsync(
-            portfolioId, assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+            assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
 
         Assert.True(response.IsSuccessStatusCode, $"Early redemption answered {(int)response.StatusCode}.");
 
@@ -41,7 +41,7 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         Assert.NotNull(row.ChargeTransactionId);
         Assert.NotNull(row.CashTransferId);
 
-        var bondTransactions = (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items;
+        var bondTransactions = (await client.ListTransactionsAsync(assetId, cancellationToken)).Items;
         var credit = Assert.Single(
             bondTransactions,
             t => t is { Type: TransactionType.Deposit, Transfer: null, BondInterestPeriodIndex: null } && t.Date == EdoEarlyRedemptionDate);
@@ -54,12 +54,12 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(EdoEarlyRedemptionDate, payout.Date);
         Assert.Equal(funded.CashAssetId, payout.Transfer!.CounterpartAssetId);
 
-        Assert.Equal(632.10m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
-        Assert.Equal(5_410.33m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, assetId, cancellationToken);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        Assert.Equal(632.10m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
+        Assert.Equal(5_410.33m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(assetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(funded.CashAssetId, cancellationToken);
 
-        var bond = await client.GetBondAsync(portfolioId, assetId, cancellationToken);
+        var bond = await client.GetBondAsync(assetId, cancellationToken);
         Assert.Equal(6, bond.BondCount);
         Assert.Equal(632.10m, bond.BookValue);
         Assert.Equal(BondStatus.Active, bond.Status);
@@ -75,10 +75,10 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         var funded = await client.CreateRorWithThreeMonthsSettledAsync(cancellationToken);
         var portfolioId = funded.BondPortfolioId;
         var assetId = funded.Bond.AssetId;
-        var cashBefore = (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity;
+        var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
 
         var response = await client.RedeemBondEarlyRawAsync(
-            portfolioId, assetId, RorEarlyRedemptionDate, 20, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 3.75m);
+            assetId, RorEarlyRedemptionDate, 20, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 3.75m);
 
         Assert.True(response.IsSuccessStatusCode, $"Early redemption answered {(int)response.StatusCode}.");
 
@@ -92,7 +92,7 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         Assert.NotNull(row.CreditTransactionId);
         Assert.NotNull(row.ChargeTransactionId);
 
-        var bondTransactions = (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items;
+        var bondTransactions = (await client.ListTransactionsAsync(assetId, cancellationToken)).Items;
         var credit = Assert.Single(
             bondTransactions,
             t => t is { Type: TransactionType.Deposit, Transfer: null, BondInterestPeriodIndex: null } && t.Date == RorEarlyRedemptionDate);
@@ -101,13 +101,13 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
             bondTransactions, t => t is { Type: TransactionType.Withdraw, Transfer: null } && t.Date == RorEarlyRedemptionDate);
         Assert.Equal(10.00m, charge.Quantity);
 
-        Assert.Equal(0m, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+        Assert.Equal(0m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
         Assert.Equal(
             cashBefore + 1_993.20m,
-            (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, assetId, cancellationToken);
+            (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(assetId, cancellationToken);
 
-        var bond = await client.GetBondAsync(portfolioId, assetId, cancellationToken);
+        var bond = await client.GetBondAsync(assetId, cancellationToken);
         Assert.Equal(BondStatus.Redeemed, bond.Status);
         Assert.Equal(0m, bond.BookValue);
     }
@@ -168,7 +168,7 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         }
 
         var response = await client.RedeemBondEarlyRawAsync(
-            portfolioId, assetId, date, count, funded.CashAssetId, cancellationToken, rate);
+            assetId, date, count, funded.CashAssetId, cancellationToken, rate);
 
         await response.AssertProblemAsync(status, errorCode, cancellationToken);
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));

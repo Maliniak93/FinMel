@@ -230,9 +230,10 @@ describe('BondPurchaseDialog', () => {
 
     const [request] = writeRequests();
     expect(request.method).toBe('POST');
-    expect(request.url).toContain(`/api/portfolio/portfolios/${reservePortfolioId}/bonds`);
+    expect(request.url).toContain(`/api/portfolio/bonds`);
     const body = await request.json();
     expect(body).toMatchObject({
+      portfolioId: reservePortfolioId,
       name: 'My bond',
       seriesCode: 'EDO1036',
       type: 5,
@@ -255,7 +256,8 @@ describe('BondPurchaseDialog', () => {
     await component['onSubmit']();
 
     const [request] = writeRequests();
-    expect(request.url).toContain(`/api/portfolio/portfolios/${savingsPortfolioId}/bonds`);
+    expect(request.url).toContain(`/api/portfolio/bonds`);
+    expect((await request.json()).portfolioId).toBe(savingsPortfolioId);
   });
 
   describe('funding', () => {
@@ -329,9 +331,7 @@ describe('BondPurchaseDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('PUT');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${bond.portfolioId}/bonds/${bond.assetId}`,
-      );
+      expect(request.url).toContain(`/api/portfolio/bonds/${bond.assetId}`);
       const body = await request.json();
       expect(body.bondCount).toBe(60);
       expect(body).not.toHaveProperty('fundingAssetId');

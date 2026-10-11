@@ -37,12 +37,13 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var handler = scope.ServiceProvider.GetRequiredService<AddAssetHandler>();
         var request = new AddAssetRequest
         {
+            PortfolioId = portfolioResult.Value.Id,
             AssetClass = AssetClass.Cash,
             Name = "Outbox test asset",
             Currency = "PLN",
         };
 
-        var result = await handler.HandleAsync(portfolioResult.Value.Id, request, cancellationToken);
+        var result = await handler.HandleAsync(request, cancellationToken);
         Assert.True(result.IsSuccess);
 
         var asset = await dbContext.Assets.SingleOrDefaultAsync(a => a.Id == result.Value.Id, cancellationToken);
@@ -70,14 +71,12 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
         Assert.True(assetResult.IsSuccess);
 
         var instrumentId = Guid.NewGuid();
         var updateResult = await scope.ServiceProvider.GetRequiredService<UpdateAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
             assetResult.Value.Id,
             new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Now market", Currency = "USD", InstrumentId = instrumentId },
             cancellationToken);
@@ -101,12 +100,11 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
 
         var removeResult = await scope.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
-            .HandleAsync(portfolioResult.Value.Id, assetResult.Value.Id, cancellationToken);
+            .HandleAsync(assetResult.Value.Id, cancellationToken);
         Assert.True(removeResult.IsSuccess);
 
         var remainingAsset = await dbContext.Assets.SingleOrDefaultAsync(a => a.Id == assetResult.Value.Id, cancellationToken);
@@ -130,12 +128,10 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
 
         await scope.ServiceProvider.GetRequiredService<UpdateAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
             assetResult.Value.Id,
             new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash renamed", Currency = "PLN" },
             cancellationToken);
@@ -160,7 +156,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         SaveChanges.Reset();
 
         var removeResult = await scope.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
-            .HandleAsync(portfolioId, assetId, cancellationToken);
+            .HandleAsync(assetId, cancellationToken);
 
         Assert.True(removeResult.IsSuccess);
         Assert.Equal(1, SaveChanges.Count);
@@ -193,9 +189,9 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
                 .HandleAsync(new CreatePortfolioRequest { Name = "Cash rule outbox portfolio" }, cancellationToken)).Value.Id;
             var cashResult = await arrange.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-                portfolioId,
                 new AddAssetRequest
                 {
+                    PortfolioId = portfolioId,
                     AssetClass = AssetClass.Cash,
                     Name = "Wallet",
                     Currency = "PLN",
@@ -224,14 +220,13 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var writes = new (string Name, Func<IServiceProvider, Task<Error>> Write)[]
         {
             ("RecordTransaction", async s => (await s.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-                portfolioId,
                 cashAssetId,
                 new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 3) },
                 cancellationToken)).Error),
             ("AddAsset", async s => (await s.GetRequiredService<AddAssetHandler>().HandleAsync(
-                portfolioId,
                 new AddAssetRequest
                 {
+                    PortfolioId = portfolioId,
                     AssetClass = AssetClass.Cash,
                     Name = "Second wallet",
                     Currency = "PLN",
@@ -242,13 +237,11 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
                 },
                 cancellationToken)).Error),
             ("UpdateTransaction", async s => (await s.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
-                portfolioId,
                 cashAssetId,
                 depositId,
                 new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 100m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 1) },
                 cancellationToken)).Error),
             ("UpdateAsset", async s => (await s.GetRequiredService<UpdateAssetHandler>().HandleAsync(
-                portfolioId,
                 stockAssetId,
                 new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Now cash", Currency = "PLN" },
                 cancellationToken)).Error),
@@ -290,7 +283,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<ArchiveAssetHandler>()
-            .HandleAsync(portfolioId, assetId, cancellationToken);
+            .HandleAsync(assetId, cancellationToken);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Equal(1, SaveChanges.Count);
@@ -316,10 +309,10 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var portfolioId = await CreatePortfolioAsync(scope.ServiceProvider, "Outbox test portfolio", cancellationToken);
         var assetId = await AddCashWithBalanceAsync(scope.ServiceProvider, portfolioId, 100m, cancellationToken);
         var handler = scope.ServiceProvider.GetRequiredService<ArchiveAssetHandler>();
-        Assert.True((await handler.HandleAsync(portfolioId, assetId, cancellationToken)).IsSuccess);
+        Assert.True((await handler.HandleAsync(assetId, cancellationToken)).IsSuccess);
         var outboxRowsBefore = await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken);
 
-        var second = await handler.HandleAsync(portfolioId, assetId, cancellationToken);
+        var second = await handler.HandleAsync(assetId, cancellationToken);
 
         Assert.True(second.IsSuccess);
         Assert.True(second.Value.IsArchived);
@@ -336,13 +329,13 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var portfolioId = await CreatePortfolioAsync(scope.ServiceProvider, "Outbox test portfolio", cancellationToken);
         var assetId = await AddCashWithBalanceAsync(scope.ServiceProvider, portfolioId, 100m, cancellationToken);
         Assert.True((await scope.ServiceProvider.GetRequiredService<ArchiveAssetHandler>()
-            .HandleAsync(portfolioId, assetId, cancellationToken)).IsSuccess);
+            .HandleAsync(assetId, cancellationToken)).IsSuccess);
         var before = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
         var versionBefore = before.Where(e => e.AssetId == assetId).Max(e => e.Version);
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<RestoreAssetHandler>()
-            .HandleAsync(portfolioId, assetId, cancellationToken);
+            .HandleAsync(assetId, cancellationToken);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Equal(1, SaveChanges.Count);
@@ -367,7 +360,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var outboxRowsBefore = await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken);
 
         var result = await scope.ServiceProvider.GetRequiredService<RestoreAssetHandler>()
-            .HandleAsync(portfolioId, assetId, cancellationToken);
+            .HandleAsync(assetId, cancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.False(result.Value.IsArchived);
@@ -398,9 +391,9 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
 
         var calls = new (string Name, Func<IServiceProvider, Task<Error>> Call, string ExpectedCode)[]
         {
-            ("Archive", async s => (await s.GetRequiredService<ArchiveAssetHandler>().HandleAsync(portfolioId, assetId, cancellationToken)).Error, PortfolioAssertions.PortfolioArchivedErrorCode),
-            ("Restore", async s => (await s.GetRequiredService<RestoreAssetHandler>().HandleAsync(portfolioId, assetId, cancellationToken)).Error, PortfolioAssertions.PortfolioArchivedErrorCode),
-            ("Archive unknown", async s => (await s.GetRequiredService<ArchiveAssetHandler>().HandleAsync(portfolioId, Guid.NewGuid(), cancellationToken)).Error, "NotFound"),
+            ("Archive", async s => (await s.GetRequiredService<ArchiveAssetHandler>().HandleAsync(assetId, cancellationToken)).Error, PortfolioAssertions.PortfolioArchivedErrorCode),
+            ("Restore", async s => (await s.GetRequiredService<RestoreAssetHandler>().HandleAsync(assetId, cancellationToken)).Error, PortfolioAssertions.PortfolioArchivedErrorCode),
+            ("Archive unknown", async s => (await s.GetRequiredService<ArchiveAssetHandler>().HandleAsync(Guid.NewGuid(), cancellationToken)).Error, "NotFound"),
         };
 
         foreach (var (name, call, expectedCode) in calls)
@@ -430,7 +423,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             portfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Archived asset portfolio", cancellationToken);
             assetId = await AddCashWithBalanceAsync(arrange.ServiceProvider, portfolioId, 100m, cancellationToken);
             Assert.True((await arrange.ServiceProvider.GetRequiredService<ArchiveAssetHandler>()
-                .HandleAsync(portfolioId, assetId, cancellationToken)).IsSuccess);
+                .HandleAsync(assetId, cancellationToken)).IsSuccess);
         }
 
         Guid transactionId;
@@ -445,23 +438,20 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var writes = new (string Name, Func<IServiceProvider, Task<Error>> Write)[]
         {
             ("UpdateAsset", async s => (await s.GetRequiredService<UpdateAssetHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Renamed", Currency = "PLN" },
                 cancellationToken)).Error),
             ("RecordTransaction", async s => (await s.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = 1m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 3) },
                 cancellationToken)).Error),
             ("UpdateTransaction", async s => (await s.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 transactionId,
                 new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 50m, UnitPrice = 1m, Date = new DateOnly(2026, 1, 2) },
                 cancellationToken)).Error),
             ("DeleteTransaction", async s => (await s.GetRequiredService<DeleteTransactionHandler>()
-                .HandleAsync(portfolioId, assetId, transactionId, cancellationToken)).Error),
+                .HandleAsync(assetId, transactionId, cancellationToken)).Error),
         };
 
         foreach (var (name, write) in writes)
@@ -485,7 +475,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
 
         await using var remove = Provider.CreateAsyncScope();
         var removeResult = await remove.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
-            .HandleAsync(portfolioId, assetId, cancellationToken);
+            .HandleAsync(assetId, cancellationToken);
 
         Assert.True(removeResult.IsSuccess, removeResult.IsFailure ? removeResult.Error.Code : null);
         var removeDb = remove.ServiceProvider.GetRequiredService<PortfolioDbContext>();
@@ -504,8 +494,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var result = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(result.IsSuccess);
 

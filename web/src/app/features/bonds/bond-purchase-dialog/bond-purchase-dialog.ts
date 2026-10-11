@@ -22,8 +22,8 @@ import { getApiMarketdataBondSeries, type BondSeriesListItem } from '../../../ap
 import {
   getApiPortfolioPortfolios,
   getApiPortfolioTransferCandidates,
-  postApiPortfolioPortfoliosByPortfolioIdBonds,
-  putApiPortfolioPortfoliosByPortfolioIdBondsByAssetId,
+  postApiPortfolioBonds,
+  putApiPortfolioBondsByAssetId,
   type BondResponse,
   type TransferCandidateResponse,
   type TreasuryBondType,
@@ -347,13 +347,16 @@ export class BondPurchaseDialog {
     };
 
     const result = this.bond
-      ? await putApiPortfolioPortfoliosByPortfolioIdBondsByAssetId({
-          path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
+      ? await putApiPortfolioBondsByAssetId({
+          path: { assetId: this.bond.assetId },
           body: terms,
         })
-      : await postApiPortfolioPortfoliosByPortfolioIdBonds({
-          path: { portfolioId: values.portfolioId },
-          body: { ...terms, fundingAssetId: values.fundingAssetId ?? undefined },
+      : await postApiPortfolioBonds({
+          body: {
+            ...terms,
+            portfolioId: values.portfolioId,
+            fundingAssetId: values.fundingAssetId ?? undefined,
+          },
         });
 
     this.submitting.set(false);

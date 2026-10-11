@@ -14,8 +14,8 @@ import { map } from 'rxjs';
 import {
   getApiPortfolioCashAccounts,
   getApiPortfolioTransferCandidates,
-  postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
-  putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
+  postApiPortfolioAssetsByAssetIdTransactions,
+  putApiPortfolioAssetsByAssetIdTransactionsById,
   type AssetClass,
   type TransactionResponse,
   type TransactionType,
@@ -54,7 +54,6 @@ interface CashOption {
 }
 
 export interface TransactionFormDialogData {
-  portfolioId: string;
   assetId: string;
   assetClass: AssetClass;
   currency?: string;
@@ -225,16 +224,15 @@ export class TransactionFormDialog {
     const cashAssetId = this.showsCash() ? values.cashAssetId : null;
 
     const result = this.data.transaction
-      ? await putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById({
+      ? await putApiPortfolioAssetsByAssetIdTransactionsById({
           path: {
-            portfolioId: this.data.portfolioId,
             assetId: this.data.assetId,
             id: this.data.transaction.id,
           },
           body,
         })
-      : await postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions({
-          path: { portfolioId: this.data.portfolioId, assetId: this.data.assetId },
+      : await postApiPortfolioAssetsByAssetIdTransactions({
+          path: { assetId: this.data.assetId },
           body: cashAssetId ? { ...body, cashAssetId } : body,
         });
 

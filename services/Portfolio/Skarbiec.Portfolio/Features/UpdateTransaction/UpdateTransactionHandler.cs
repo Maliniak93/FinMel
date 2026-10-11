@@ -13,10 +13,10 @@ public sealed class UpdateTransactionHandler(
     PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, IFxRateLookupClient fxRateLookupClient)
 {
     public async Task<Result<TransactionResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, Guid id, UpdateTransactionRequest request, CancellationToken cancellationToken)
+        Guid assetId, Guid id, UpdateTransactionRequest request, CancellationToken cancellationToken)
     {
         var asset = await dbContext.Assets
-            .FirstOrDefaultAsync(a => a.Id == assetId && a.PortfolioId == portfolioId, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == assetId, cancellationToken);
 
         if (asset is null)
         {

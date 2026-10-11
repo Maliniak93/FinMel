@@ -38,7 +38,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var liveId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Live");
         var archivedId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Archived");
-        await client.ArchiveAssetAsync(portfolioId, archivedId, cancellationToken);
+        await client.ArchiveAssetAsync(archivedId, cancellationToken);
 
         var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
 
@@ -130,7 +130,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         var (portfolioId, settled) = await client.CreatePortfolioWithDepositAsync(cancellationToken, NewDepositRequest(name: "Settled"));
         var due = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Due"));
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
-        await client.SettleDepositAsync(portfolioId, settled.AssetId, cancellationToken);
+        await client.SettleDepositAsync(settled.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
 
@@ -152,7 +152,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
             cancellationToken, NewInterestAccountRequest(name: "Settled up"));
         var due = await client.AddSavingsAccountAsync(portfolioId, cancellationToken, NewInterestAccountRequest(name: "Due"));
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, settledUp.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(settledUp.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AssetsUri(portfolioId), cancellationToken);
 

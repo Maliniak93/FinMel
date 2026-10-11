@@ -7,7 +7,7 @@ public static class ListTransactionsEndpoint
 {
     public static IEndpointRouteBuilder MapListTransactionsEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets/{assetId:guid}/transactions");
+        var group = app.MapGroup("/api/portfolio/assets/{assetId:guid}/transactions");
 
         group.MapGet("", HandleAsync).RequireAuthorization();
 
@@ -16,6 +16,6 @@ public static class ListTransactionsEndpoint
 
     // Defaulted params, so omitted query parameters bind instead of 400ing as missing.
     private static async Task<Results<Ok<PagedResponse<TransactionResponse>>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, ListTransactionsHandler handler, CancellationToken cancellationToken, int page = 1, int pageSize = 20)
-        => (await handler.HandleAsync(portfolioId, assetId, page, pageSize, cancellationToken)).ToHttpResult();
+        Guid assetId, ListTransactionsHandler handler, CancellationToken cancellationToken, int page = 1, int pageSize = 20)
+        => (await handler.HandleAsync(assetId, page, pageSize, cancellationToken)).ToHttpResult();
 }

@@ -7,7 +7,7 @@ public static class UndoSavingsInterestSettlementEndpoint
 {
     public static IEndpointRouteBuilder MapUndoSavingsInterestSettlementEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/savings-accounts");
+        var group = app.MapGroup("/api/portfolio/savings-accounts");
 
         group.MapDelete("{assetId:guid}/interest-settlements/{settlementId:guid}", HandleAsync).RequireAuthorization();
 
@@ -15,10 +15,9 @@ public static class UndoSavingsInterestSettlementEndpoint
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId,
         Guid assetId,
         Guid settlementId,
         UndoSavingsInterestSettlementHandler handler,
         CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, settlementId, cancellationToken)).ToHttpResult();
+        => (await handler.HandleAsync(assetId, settlementId, cancellationToken)).ToHttpResult();
 }

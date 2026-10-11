@@ -67,7 +67,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
             cancellationToken, NewDepositRequest(name: "Settled deposit"));
         var dueDeposit = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Due deposit"));
         await client.SettleDepositAsync(
-            portfolioId,
             settledDeposit.AssetId,
             cancellationToken,
             NewSettleRequest(settledOn: new DateOnly(2026, 4, 16), grossInterest: 150.00m, tax: 28.50m));
@@ -152,7 +151,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var live = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Live deposit"));
         var archived = await client.AddDepositAsync(portfolioId, cancellationToken, NewDepositRequest(name: "Archived deposit"));
-        await client.ArchiveAssetAsync(portfolioId, archived.AssetId, cancellationToken);
+        await client.ArchiveAssetAsync(archived.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
@@ -211,7 +210,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Null(unfundedListed.FundingAssetName);
 
         // GetDeposit carries the same pair.
-        var single = await client.GetDepositAsync(funded.DepositPortfolioId, funded.Deposit.AssetId, cancellationToken);
+        var single = await client.GetDepositAsync(funded.Deposit.AssetId, cancellationToken);
         Assert.Equal(funded.CashAssetId, single.FundingAssetId);
         Assert.Equal("Cash account", single.FundingAssetName);
     }
@@ -225,7 +224,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
         var settledOnly = await client.AddDepositAsync(
             paidOut.DepositPortfolioId, cancellationToken, NewDepositRequest(name: "Settled deposit"));
-        await client.SettleDepositAsync(paidOut.DepositPortfolioId, settledOnly.AssetId, cancellationToken);
+        await client.SettleDepositAsync(settledOnly.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
@@ -243,12 +242,12 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Null(settled.PaidOutToAssetName);
 
         // GetDeposit carries the same payout.
-        var single = await client.GetDepositAsync(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId, cancellationToken);
+        var single = await client.GetDepositAsync(paidOut.Deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.PaidOut, single.Status);
         Assert.Equal(new DateOnly(2026, 4, 15), single.PaidOutOn);
         Assert.Equal("Cash account", single.PaidOutToAssetName);
 
-        var removeCash = await client.DeleteAsync(AssetUri(paidOut.CashPortfolioId, paidOut.CashAssetId), cancellationToken);
+        var removeCash = await client.DeleteAsync(AssetUri(paidOut.CashAssetId), cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, removeCash.StatusCode);
 
         var afterRemoval = await client.GetAsync(AllDepositsUri, cancellationToken);
@@ -260,9 +259,9 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(DepositStatus.PaidOut, relisted.Status);
         Assert.Equal(new DateOnly(2026, 4, 15), relisted.PaidOutOn);
         Assert.Null(relisted.PaidOutToAssetName);
-        var dangling = await client.GetDepositAsync(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId, cancellationToken);
+        var dangling = await client.GetDepositAsync(paidOut.Deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.PaidOut, dangling.Status);
         Assert.Null(dangling.PaidOutToAssetName);
-        Assert.Equal(0m, (await client.GetAssetAsync(paidOut.DepositPortfolioId, paidOut.Deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(0m, (await client.GetAssetAsync(paidOut.Deposit.AssetId, cancellationToken)).Quantity);
     }
 }

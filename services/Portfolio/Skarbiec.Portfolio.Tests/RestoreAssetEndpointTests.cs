@@ -17,14 +17,14 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-        await client.ArchiveAssetAsync(portfolioId, assetId, cancellationToken);
+        await client.ArchiveAssetAsync(assetId, cancellationToken);
 
-        var response = await client.PostAsync(RestoreAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        var response = await client.PostAsync(RestoreAssetUri(assetId), content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.False(body!.IsArchived);
-        Assert.False((await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).IsArchived);
+        Assert.False((await client.GetAssetAsync(assetId, cancellationToken)).IsArchived);
     }
 
     [Fact]
@@ -33,9 +33,9 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-        var before = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        var before = await client.GetAssetAsync(assetId, cancellationToken);
 
-        var response = await client.PostAsync(RestoreAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        var response = await client.PostAsync(RestoreAssetUri(assetId), content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(before, await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken));
@@ -48,13 +48,13 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m);
-        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
-        await client.RestoreAssetAsync(portfolioId, cashId, cancellationToken);
+        await client.ArchiveAssetAsync(cashId, cancellationToken);
+        await client.RestoreAssetAsync(cashId, cancellationToken);
 
         await client.RecordTransactionAsync(
-            portfolioId, cashId, TransactionType.Deposit, 50m, new DateOnly(2026, 2, 1), cancellationToken, unitPrice: 1m);
+            cashId, TransactionType.Deposit, 50m, new DateOnly(2026, 2, 1), cancellationToken, unitPrice: 1m);
 
-        Assert.Equal(150m, (await client.GetAssetAsync(portfolioId, cashId, cancellationToken)).Quantity);
+        Assert.Equal(150m, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
-        var response = await client.PostAsync(RestoreAssetUri(portfolioId, Guid.NewGuid()), content: null, cancellationToken);
+        var response = await client.PostAsync(RestoreAssetUri(Guid.NewGuid()), content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -75,12 +75,12 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-        await client.ArchiveAssetAsync(portfolioId, assetId, cancellationToken);
+        await client.ArchiveAssetAsync(assetId, cancellationToken);
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
 
-        var response = await client.PostAsync(RestoreAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        var response = await client.PostAsync(RestoreAssetUri(assetId), content: null, cancellationToken);
 
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        Assert.True((await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).IsArchived);
+        Assert.True((await client.GetAssetAsync(assetId, cancellationToken)).IsArchived);
     }
 }

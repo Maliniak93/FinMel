@@ -22,7 +22,7 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
 
         var response = await client.PutAsJsonAsync(
-            SavingsAccountUri(portfolioId, account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
+            SavingsAccountUri(account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken);
@@ -35,9 +35,9 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         Assert.True(body.TaxExempt);
         Assert.Equal(10_000m, body.Balance);
 
-        var fetched = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        var fetched = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
         Assert.Equal(body, fetched);
-        var asset = await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken);
+        var asset = await client.GetAssetAsync(account.AssetId, cancellationToken);
         Assert.Equal("Renamed savings", asset.Name);
         Assert.Equal(10_000m, asset.Quantity);
         Assert.Equal(1, asset.TransactionCount);
@@ -58,14 +58,14 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
         var payload = NewUpdateSavingsAccountRequest();
 
-        var forDeposit = await client.PutAsJsonAsync(SavingsAccountUri(portfolioId, deposit.AssetId), payload, cancellationToken);
-        var forCash = await client.PutAsJsonAsync(SavingsAccountUri(portfolioId, cashId), payload, cancellationToken);
-        var forUnknown = await client.PutAsJsonAsync(SavingsAccountUri(portfolioId, Guid.NewGuid()), payload, cancellationToken);
+        var forDeposit = await client.PutAsJsonAsync(SavingsAccountUri(deposit.AssetId), payload, cancellationToken);
+        var forCash = await client.PutAsJsonAsync(SavingsAccountUri(cashId), payload, cancellationToken);
+        var forUnknown = await client.PutAsJsonAsync(SavingsAccountUri(Guid.NewGuid()), payload, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, forDeposit.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, forCash.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, forUnknown.StatusCode);
-        Assert.Equal("Term deposit", (await client.GetAssetAsync(portfolioId, deposit.AssetId, cancellationToken)).Name);
+        Assert.Equal("Term deposit", (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Name);
     }
 
     [Fact]
@@ -78,10 +78,10 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
 
         var response = await client.PutAsJsonAsync(
-            SavingsAccountUri(portfolioId, account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
+            SavingsAccountUri(account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
 
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        var unchanged = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
         Assert.Equal("Savings account", unchanged.Name);
         Assert.Equal(5.25m, unchanged.AnnualInterestRatePercent);
     }
@@ -93,13 +93,13 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken);
-        await client.ArchiveAssetAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.ArchiveAssetAsync(account.AssetId, cancellationToken);
 
         var response = await client.PutAsJsonAsync(
-            SavingsAccountUri(portfolioId, account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
+            SavingsAccountUri(account.AssetId), NewUpdateSavingsAccountRequest(), cancellationToken);
 
         await response.AssertAssetArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        var unchanged = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
         Assert.Equal("Savings account", unchanged.Name);
         Assert.Equal(5.25m, unchanged.AnnualInterestRatePercent);
         Assert.False(unchanged.TaxExempt);
@@ -123,10 +123,10 @@ public sealed class UpdateSavingsAccountEndpointTests(SkarbiecContainersFixture 
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
-        var response = await client.PutAsJsonAsync(SavingsAccountUri(portfolioId, account.AssetId), payload, cancellationToken);
+        var response = await client.PutAsJsonAsync(SavingsAccountUri(account.AssetId), payload, cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var unchanged = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        var unchanged = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
         Assert.Equal("Savings account", unchanged.Name);
         Assert.Equal(5.25m, unchanged.AnnualInterestRatePercent);
     }

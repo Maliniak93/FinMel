@@ -7,7 +7,7 @@ public static class RestoreAssetEndpoint
 {
     public static IEndpointRouteBuilder MapRestoreAssetEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets");
+        var group = app.MapGroup("/api/portfolio/assets");
 
         group.MapPost("{id:guid}/restore", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class RestoreAssetEndpoint
     }
 
     private static async Task<Results<Ok<AssetResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid id, RestoreAssetHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, id, cancellationToken)).ToHttpResult();
+        Guid id, RestoreAssetHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(id, cancellationToken)).ToHttpResult();
 }

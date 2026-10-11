@@ -14,8 +14,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
-  deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
-  deleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementId,
+  deleteApiPortfolioAssetsById,
+  deleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementId,
   getApiPortfolioSavingsAccounts,
   type SavingsAccountResponse,
 } from '../../../api/portfolio';
@@ -148,15 +148,12 @@ export class SavingsAccounts {
     }
 
     const result =
-      await deleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementId(
-        {
-          path: {
-            portfolioId: account.portfolioId,
-            assetId: account.assetId,
-            settlementId: settlement.settlementId,
-          },
+      await deleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementId({
+        path: {
+          assetId: account.assetId,
+          settlementId: settlement.settlementId,
         },
-      );
+      });
     if (result.error) {
       this.snackBar.open(
         readProblemDetails(result.error).detail ?? translate('savings.interest.undoFailed'),
@@ -198,8 +195,8 @@ export class SavingsAccounts {
       return;
     }
 
-    const result = await deleteApiPortfolioPortfoliosByPortfolioIdAssetsById({
-      path: { portfolioId: account.portfolioId, id: account.assetId },
+    const result = await deleteApiPortfolioAssetsById({
+      path: { id: account.assetId },
     });
     if (result.error) {
       this.snackBar.open(

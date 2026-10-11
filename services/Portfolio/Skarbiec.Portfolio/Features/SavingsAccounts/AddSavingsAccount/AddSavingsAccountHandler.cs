@@ -13,8 +13,9 @@ public sealed class AddSavingsAccountHandler(
     TimeProvider timeProvider)
 {
     public async Task<Result<SavingsAccountResponse>> HandleAsync(
-        Guid portfolioId, AddSavingsAccountRequest request, CancellationToken cancellationToken)
+        AddSavingsAccountRequest request, CancellationToken cancellationToken)
     {
+        var portfolioId = request.PortfolioId;
         var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
         if (portfolio is null)
         {

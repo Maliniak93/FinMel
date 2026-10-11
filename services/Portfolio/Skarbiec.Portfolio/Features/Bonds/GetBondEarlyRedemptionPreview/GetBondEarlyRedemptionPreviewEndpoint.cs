@@ -7,7 +7,7 @@ public static class GetBondEarlyRedemptionPreviewEndpoint
 {
     public static IEndpointRouteBuilder MapGetBondEarlyRedemptionPreviewEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/bonds");
+        var group = app.MapGroup("/api/portfolio/bonds");
 
         group.MapGet("{assetId:guid}/early-redemption-preview", HandleAsync).RequireAuthorization();
 
@@ -15,13 +15,12 @@ public static class GetBondEarlyRedemptionPreviewEndpoint
     }
 
     private static async Task<Results<Ok<BondEarlyRedemptionPreviewResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId,
         Guid assetId,
         DateOnly date,
         int bondCount,
         decimal? runningPeriodRatePercent,
         GetBondEarlyRedemptionPreviewHandler handler,
         CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, date, bondCount, runningPeriodRatePercent, cancellationToken))
+        => (await handler.HandleAsync(assetId, date, bondCount, runningPeriodRatePercent, cancellationToken))
             .ToHttpResult();
 }

@@ -39,8 +39,8 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.GetAsync(MetalUri(ownerPortfolioId, metal.AssetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.GetAsync(MetalUri(strangerPortfolioId, metal.AssetId), cancellationToken);
+        var viaOwnersPortfolio = await stranger.GetAsync(MetalUri(metal.AssetId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.GetAsync(MetalUri(metal.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
@@ -57,12 +57,12 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var payload = NewUpdateMetalRequest(name: "Stranger's edit");
 
-        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(MetalUri(ownerPortfolioId, metal.AssetId), payload, cancellationToken);
-        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(MetalUri(strangerPortfolioId, metal.AssetId), payload, cancellationToken);
+        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(MetalUri(metal.AssetId), payload, cancellationToken);
+        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(MetalUri(metal.AssetId), payload, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
-        var unchanged = await owner.GetMetalAsync(ownerPortfolioId, metal.AssetId, cancellationToken);
+        var unchanged = await owner.GetMetalAsync(metal.AssetId, cancellationToken);
         Assert.Equal("Maple Leaf 1 oz", unchanged.Name);
         Assert.Equal(31.10347680m, unchanged.FineWeightGramsPerPiece);
     }
@@ -77,7 +77,7 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
         var ownerPortfolioId = await owner.CreatePortfolioAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var response = await stranger.PostAsJsonAsync(MetalsUri(ownerPortfolioId), NewMetalRequest(), cancellationToken);
+        var response = await stranger.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { PortfolioId = ownerPortfolioId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         await using var dbContext = CreateDbContext(ownerId);

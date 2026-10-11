@@ -16,7 +16,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
-        var response = await client.GetAsync(SavingsInterestPreviewUri(portfolioId, account.AssetId), cancellationToken);
+        var response = await client.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var preview = await response.ReadJsonAsync(cancellationToken);
@@ -38,7 +38,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
-        var response = await client.GetAsync(SavingsInterestPreviewUri(portfolioId, account.AssetId), cancellationToken);
+        var response = await client.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsInterestNotDueErrorCode, cancellationToken);
     }
@@ -51,7 +51,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
-        var preview = await client.GetSavingsInterestPreviewAsync(portfolioId, account.AssetId, cancellationToken);
+        var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
 
         Assert.Equal("2026-09-30", preview.GetProperty("periodEnd").GetString());
         Assert.Equal(3, preview.GetProperty("duePeriodCount").GetInt32());
@@ -65,7 +65,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest(taxExempt: true));
 
-        var preview = await client.GetSavingsInterestPreviewAsync(portfolioId, account.AssetId, cancellationToken);
+        var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
 
         Assert.Equal(41.10m, preview.GetProperty("grossInterest").GetDecimal());
         Assert.Equal(0m, preview.GetProperty("tax").GetDecimal());
@@ -81,7 +81,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
             cancellationToken, NewInterestAccountRequest(annualInterestRatePercent: 0m));
 
-        var response = await client.GetAsync(SavingsInterestPreviewUri(portfolioId, account.AssetId), cancellationToken);
+        var response = await client.GetAsync(SavingsInterestPreviewUri(account.AssetId), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsInterestNotDueErrorCode, cancellationToken);
     }
@@ -94,7 +94,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
 
-        var response = await client.GetAsync(SavingsInterestPreviewUri(portfolioId, cashId), cancellationToken);
+        var response = await client.GetAsync(SavingsInterestPreviewUri(cashId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -113,7 +113,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         await client.CreateTransferAsync(
             cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 5_000m, new DateOnly(2026, 9, 16)));
 
-        var preview = await client.GetSavingsInterestPreviewAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken);
+        var preview = await client.GetSavingsInterestPreviewAsync(setup.SavingsAssetId, cancellationToken);
 
         Assert.Equal(7_500.00m, preview.GetProperty("averageDailyBalance").GetDecimal());
         Assert.Equal(30.82m, preview.GetProperty("grossInterest").GetDecimal());
@@ -124,7 +124,7 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
     {
         using var client = Factory.CreateClient();
 
-        var response = await client.GetAsync(SavingsInterestPreviewUri(Guid.NewGuid(), Guid.NewGuid()), TestContext.Current.CancellationToken);
+        var response = await client.GetAsync(SavingsInterestPreviewUri(Guid.NewGuid()), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -137,13 +137,13 @@ public sealed class SavingsInterestPreviewEndpointTests(SkarbiecContainersFixtur
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (depositPortfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
         await client.SettleDepositAsync(
-            depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(grossInterest: 0m, tax: 0m));
+            deposit.AssetId, cancellationToken, NewSettleRequest(grossInterest: 0m, tax: 0m));
         var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
             cancellationToken, NewSavingsAccountRequest(annualInterestRatePercent: 5m, withOpeningDeposit: false), portfolioName: "Wallet");
         await client.PayOutDepositAsync(
-            depositPortfolioId, deposit.AssetId, account.AssetId, cancellationToken, new DateOnly(2026, 9, 16));
+            deposit.AssetId, account.AssetId, cancellationToken, new DateOnly(2026, 9, 16));
 
-        var preview = await client.GetSavingsInterestPreviewAsync(savingsPortfolioId, account.AssetId, cancellationToken);
+        var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
 
         Assert.Equal("2026-09-16", preview.GetProperty("periodStart").GetString());
         Assert.Equal("2026-09-30", preview.GetProperty("periodEnd").GetString());

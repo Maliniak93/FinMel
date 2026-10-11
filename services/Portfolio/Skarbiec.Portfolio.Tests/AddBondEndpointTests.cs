@@ -22,12 +22,12 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         using var client = Factory.CreateAuthenticatedClient(userId);
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
 
-        var response = await client.PostAsJsonAsync(BondsUri(portfolioId), NewBondRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { PortfolioId = portfolioId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);
         Assert.NotNull(body);
-        Assert.Equal(BondUri(portfolioId, body.AssetId), response.Headers.Location?.OriginalString);
+        Assert.Equal(BondUri(body.AssetId), response.Headers.Location?.OriginalString);
         Assert.Equal(portfolioId, body.PortfolioId);
         Assert.Equal("Bonds", body.PortfolioName);
         Assert.Equal("EDO1036", body.SeriesCode);
@@ -47,21 +47,21 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(BondStatus.Active, body.Status);
         Assert.Equal(10, body.Periods.Count);
 
-        var asset = await client.GetAssetAsync(portfolioId, body.AssetId, cancellationToken);
+        var asset = await client.GetAssetAsync(body.AssetId, cancellationToken);
         Assert.Equal(AssetClass.Bond, asset.AssetClass);
         Assert.Equal(AssetValuationMode.CurrencyValued, asset.ValuationMode);
         Assert.Equal("PLN", asset.Currency);
         Assert.Equal(5_000.00m, asset.Quantity);
         Assert.Equal(1, asset.TransactionCount);
 
-        var opening = Assert.Single((await client.ListTransactionsAsync(portfolioId, body.AssetId, cancellationToken)).Items);
+        var opening = Assert.Single((await client.ListTransactionsAsync(body.AssetId, cancellationToken)).Items);
         Assert.Equal(TransactionType.Deposit, opening.Type);
         Assert.Equal(5_000.00m, opening.Quantity);
         Assert.Equal(1m, opening.UnitPrice);
         Assert.Equal(new DateOnly(2026, 10, 1), opening.Date);
         Assert.Equal(5_000.00m, opening.ValuePln);
         Assert.Null(opening.Transfer);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, body.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(body.AssetId, cancellationToken);
 
         await using var dbContext = CreateDbContext(userId);
         var terms = await dbContext.Set<TreasuryBond>().SingleAsync(t => t.AssetId == body.AssetId, cancellationToken);
@@ -84,7 +84,7 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         var bondsId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
 
         var response = await client.PostAsJsonAsync(
-            BondsUri(bondsId), NewBondRequest(fundingAssetId: cashId), cancellationToken);
+            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { PortfolioId = bondsId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);
@@ -92,15 +92,15 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(cashId, body.FundingAssetId);
         Assert.Equal("Cash account", body.FundingAssetName);
 
-        Assert.Equal(1_000m, (await client.GetAssetAsync(walletId, cashId, cancellationToken)).Quantity);
-        Assert.Equal(5_000m, (await client.GetAssetAsync(bondsId, body.AssetId, cancellationToken)).Quantity);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(walletId, cashId, cancellationToken);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(bondsId, body.AssetId, cancellationToken);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
+        Assert.Equal(5_000m, (await client.GetAssetAsync(body.AssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(cashId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(body.AssetId, cancellationToken);
 
-        var withdraw = await client.GetCashWithdrawAsync(walletId, cashId, cancellationToken);
+        var withdraw = await client.GetCashWithdrawAsync(cashId, cancellationToken);
         Assert.Equal(5_000m, withdraw.Quantity);
         Assert.Equal(new DateOnly(2026, 10, 1), withdraw.Date);
-        var opening = Assert.Single((await client.ListTransactionsAsync(bondsId, body.AssetId, cancellationToken)).Items);
+        var opening = Assert.Single((await client.ListTransactionsAsync(body.AssetId, cancellationToken)).Items);
         Assert.Equal(TransactionType.Deposit, opening.Type);
         Assert.Equal(5_000m, opening.Quantity);
         Assert.Equal(new DateOnly(2026, 10, 1), opening.Date);
@@ -126,10 +126,10 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         var bondsId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
 
         var response = await client.PostAsJsonAsync(
-            BondsUri(bondsId), NewBondRequest(fundingAssetId: cashId), cancellationToken);
+            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { PortfolioId = bondsId }, cancellationToken);
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
-        await client.AssertCashUntouchedAsync(walletId, cashId, cancellationToken, balance: 4_000m);
+        await client.AssertCashUntouchedAsync(cashId, cancellationToken, balance: 4_000m);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
         Assert.False(await dbContext.Assets.AnyAsync(a => a.PortfolioId == bondsId, cancellationToken));
@@ -147,7 +147,7 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         var bondsId = await client.CreatePortfolioAsync(cancellationToken, name: "Bonds");
 
         var response = await client.PostAsJsonAsync(
-            BondsUri(bondsId), NewBondRequest(fundingAssetId: stockId), cancellationToken);
+            AllBondsUri, NewBondRequest(fundingAssetId: stockId) with { PortfolioId = bondsId }, cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         await using var dbContext = CreateDbContext(userId);

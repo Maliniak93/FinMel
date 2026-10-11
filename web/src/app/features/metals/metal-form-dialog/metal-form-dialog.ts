@@ -19,8 +19,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioPortfolios,
-  postApiPortfolioPortfoliosByPortfolioIdMetals,
-  putApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId,
+  postApiPortfolioMetals,
+  putApiPortfolioMetalsByAssetId,
   type Metal,
   type MetalResponse,
   type UpdateMetalRequest,
@@ -197,14 +197,14 @@ export class MetalFormDialog {
     };
 
     const result = this.holding
-      ? await putApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId({
-          path: { portfolioId: this.holding.portfolioId, assetId: this.holding.assetId },
+      ? await putApiPortfolioMetalsByAssetId({
+          path: { assetId: this.holding.assetId },
           body: product,
         })
-      : await postApiPortfolioPortfoliosByPortfolioIdMetals({
-          path: { portfolioId: this.data.portfolioId ?? values.portfolioId! },
+      : await postApiPortfolioMetals({
           body: {
             ...product,
+            portfolioId: this.data.portfolioId ?? values.portfolioId!,
             ...(isBlank(values.pieces)
               ? {}
               : {

@@ -13,8 +13,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
-  deleteApiPortfolioPortfoliosByPortfolioIdAssetsById,
-  deleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementId,
+  deleteApiPortfolioAssetsById,
+  deleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementId,
   getApiPortfolioBonds,
   type BondEstimateUnavailableReason,
   type BondPeriodResponse,
@@ -316,16 +316,12 @@ export class MyBonds {
       return;
     }
 
-    const result =
-      await deleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementId(
-        {
-          path: {
-            portfolioId: bond.portfolioId,
-            assetId: bond.assetId,
-            settlementId: settlement.settlementId,
-          },
-        },
-      );
+    const result = await deleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementId({
+      path: {
+        assetId: bond.assetId,
+        settlementId: settlement.settlementId,
+      },
+    });
     if (result.error) {
       this.snackBar.open(
         readProblemDetails(result.error).detail ?? translate('bonds.settle.undoFailed'),
@@ -363,8 +359,8 @@ export class MyBonds {
       return;
     }
 
-    const result = await deleteApiPortfolioPortfoliosByPortfolioIdAssetsById({
-      path: { portfolioId: bond.portfolioId, id: bond.assetId },
+    const result = await deleteApiPortfolioAssetsById({
+      path: { id: bond.assetId },
     });
     if (result.error) {
       this.snackBar.open(

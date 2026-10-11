@@ -12,11 +12,11 @@ public sealed class UpdateBondHandler(
     TimeProvider timeProvider)
 {
     public async Task<Result<BondResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, UpdateBondRequest request, CancellationToken cancellationToken)
+        Guid assetId, UpdateBondRequest request, CancellationToken cancellationToken)
     {
         // Tenancy-scoped lookup first: another user's bond, a non-bond asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Bond, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
         var terms = asset is null
             ? null
             : await dbContext.TreasuryBonds.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);
@@ -28,7 +28,7 @@ public sealed class UpdateBondHandler(
 
         var portfolio = await dbContext.Portfolios
             .AsNoTracking()
-            .Where(p => p.Id == portfolioId)
+            .Where(p => p.Id == asset.PortfolioId)
             .Select(p => new { p.Name, p.IsArchived })
             .FirstAsync(cancellationToken);
 
@@ -170,6 +170,6 @@ public sealed class UpdateBondHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        return (await dbContext.LoadBondAsync(portfolioId, assetId, WarsawCalendar.Today(timeProvider), cancellationToken))!;
+        return (await dbContext.LoadBondAsync(assetId, WarsawCalendar.Today(timeProvider), cancellationToken))!;
     }
 }

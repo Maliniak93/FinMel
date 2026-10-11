@@ -7,7 +7,7 @@ public static class AddMetalEndpoint
 {
     public static IEndpointRouteBuilder MapAddMetalEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/metals");
+        var group = app.MapGroup("/api/portfolio/metals");
 
         group.MapPost("", HandleAsync).RequireAuthorization();
 
@@ -15,12 +15,12 @@ public static class AddMetalEndpoint
     }
 
     private static async Task<Results<Created<MetalResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, AddMetalRequest request, AddMetalHandler handler, CancellationToken cancellationToken)
+        AddMetalRequest request, AddMetalHandler handler, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(portfolioId, request, cancellationToken);
+        var result = await handler.HandleAsync(request, cancellationToken);
 
         return result.IsSuccess
-            ? TypedResults.Created($"/api/portfolio/portfolios/{portfolioId}/metals/{result.Value.AssetId}", result.Value)
+            ? TypedResults.Created($"/api/portfolio/metals/{result.Value.AssetId}", result.Value)
             : result.Error.ToProblem();
     }
 }

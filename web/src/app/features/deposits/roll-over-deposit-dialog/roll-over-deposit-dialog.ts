@@ -16,8 +16,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
-  getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview,
-  postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRollover,
+  getApiPortfolioDepositsByAssetIdSettlementPreview,
+  postApiPortfolioDepositsByAssetIdRollover,
   type DepositResponse,
   type RollOverDepositRequest,
 } from '../../../api/portfolio';
@@ -135,12 +135,10 @@ export class RollOverDepositDialog {
   protected readonly previewResource = resource({
     params: () => (this.isDue ? {} : undefined),
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview(
-        {
-          path: { portfolioId: this.deposit.portfolioId, assetId: this.deposit.assetId },
-          signal: abortSignal,
-        },
-      );
+      const result = await getApiPortfolioDepositsByAssetIdSettlementPreview({
+        path: { assetId: this.deposit.assetId },
+        signal: abortSignal,
+      });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ?? translate('deposits.errors.previewLoadFailed'),
@@ -194,8 +192,8 @@ export class RollOverDepositDialog {
         }
       : { annualInterestRatePercent: Number(values.annualInterestRatePercent) };
 
-    const result = await postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRollover({
-      path: { portfolioId: this.deposit.portfolioId, assetId: this.deposit.assetId },
+    const result = await postApiPortfolioDepositsByAssetIdRollover({
+      path: { assetId: this.deposit.assetId },
       body,
     });
 

@@ -8,7 +8,7 @@ public static class UpdateAssetEndpoint
 {
     public static IEndpointRouteBuilder MapUpdateAssetEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets");
+        var group = app.MapGroup("/api/portfolio/assets");
 
         group.MapPut("{id:guid}", HandleAsync).RequireAuthorization();
 
@@ -16,9 +16,9 @@ public static class UpdateAssetEndpoint
     }
 
     private static async Task<Results<Ok<AssetResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid id, UpdateAssetRequest request, UpdateAssetHandler handler, CancellationToken cancellationToken)
+        Guid id, UpdateAssetRequest request, UpdateAssetHandler handler, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(portfolioId, id, request, cancellationToken);
+        var result = await handler.HandleAsync(id, request, cancellationToken);
 
         if (result.IsSuccess)
         {

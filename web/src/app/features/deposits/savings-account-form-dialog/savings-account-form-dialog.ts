@@ -20,8 +20,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioPortfolios,
-  postApiPortfolioPortfoliosByPortfolioIdSavingsAccounts,
-  putApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId,
+  postApiPortfolioSavingsAccounts,
+  putApiPortfolioSavingsAccountsByAssetId,
   type SavingsAccountResponse,
   type UpdateSavingsAccountRequest,
 } from '../../../api/portfolio';
@@ -181,14 +181,14 @@ export class SavingsAccountFormDialog {
     };
 
     const result = this.account
-      ? await putApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId({
-          path: { portfolioId: this.account.portfolioId, assetId: this.account.assetId },
+      ? await putApiPortfolioSavingsAccountsByAssetId({
+          path: { assetId: this.account.assetId },
           body: terms,
         })
-      : await postApiPortfolioPortfoliosByPortfolioIdSavingsAccounts({
-          path: { portfolioId: values.portfolioId! },
+      : await postApiPortfolioSavingsAccounts({
           body: {
             ...terms,
+            portfolioId: values.portfolioId!,
             currency: values.currency!,
             ...(isBlank(values.openingAmount)
               ? {}

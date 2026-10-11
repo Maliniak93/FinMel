@@ -14,8 +14,9 @@ public sealed class AddBondHandler(
     private const string Currency = "PLN";
 
     public async Task<Result<BondResponse>> HandleAsync(
-        Guid portfolioId, AddBondRequest request, CancellationToken cancellationToken)
+        AddBondRequest request, CancellationToken cancellationToken)
     {
+        var portfolioId = request.PortfolioId;
         var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
         if (portfolio is null)
         {

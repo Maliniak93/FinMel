@@ -100,7 +100,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RecordTransactionHandler>()
-                .HandleAsync(metalPortfolioId, metalAssetId, PortfolioApi.NewMetalCashRequest(cashId), cancellationToken);
+                .HandleAsync(metalAssetId, PortfolioApi.NewMetalCashRequest(cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -136,7 +136,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RecordTransactionHandler>()
-                .HandleAsync(brokerageId, stockId, PortfolioApi.NewTradeRequest(cashId), cancellationToken);
+                .HandleAsync(stockId, PortfolioApi.NewTradeRequest(cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -166,7 +166,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         await using (var record = Provider.CreateAsyncScope())
         {
             var recorded = await record.ServiceProvider.GetRequiredService<RecordTransactionHandler>()
-                .HandleAsync(metalPortfolioId, metalAssetId, PortfolioApi.NewMetalCashRequest(cashId), cancellationToken);
+                .HandleAsync(metalAssetId, PortfolioApi.NewMetalCashRequest(cashId), cancellationToken);
             Assert.True(recorded.IsSuccess, recorded.IsFailure ? recorded.Error.Code : null);
         }
 
@@ -206,7 +206,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
         var metalPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Metals", cancellationToken);
         var metal = await arrange.ServiceProvider.GetRequiredService<AddMetalHandler>()
-            .HandleAsync(metalPortfolioId, PortfolioApi.NewMetalRequest(metal: Metal.Gold, withFirstPurchase: false), cancellationToken);
+            .HandleAsync(PortfolioApi.NewMetalRequest(portfolioId: metalPortfolioId, metal: Metal.Gold, withFirstPurchase: false), cancellationToken);
         Assert.True(metal.IsSuccess, metal.IsFailure ? metal.Error.Code : null);
 
         return (walletId, cashId, metalPortfolioId, metal.Value.AssetId);
@@ -220,7 +220,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
         var savingsPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
         var account = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-            .HandleAsync(savingsPortfolioId, PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
+            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: savingsPortfolioId, withOpeningDeposit: false), cancellationToken);
         Assert.True(account.IsSuccess, account.IsFailure ? account.Error.Code : null);
 
         return (walletId, cashId, savingsPortfolioId, account.Value.AssetId);

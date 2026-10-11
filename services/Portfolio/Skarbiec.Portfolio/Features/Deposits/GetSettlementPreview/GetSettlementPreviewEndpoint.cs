@@ -7,7 +7,7 @@ public static class GetSettlementPreviewEndpoint
 {
     public static IEndpointRouteBuilder MapGetSettlementPreviewEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/deposits");
+        var group = app.MapGroup("/api/portfolio/deposits");
 
         group.MapGet("{assetId:guid}/settlement-preview", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class GetSettlementPreviewEndpoint
     }
 
     private static async Task<Results<Ok<DepositSettlementPreviewResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, GetSettlementPreviewHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, cancellationToken)).ToHttpResult();
+        Guid assetId, GetSettlementPreviewHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, cancellationToken)).ToHttpResult();
 }

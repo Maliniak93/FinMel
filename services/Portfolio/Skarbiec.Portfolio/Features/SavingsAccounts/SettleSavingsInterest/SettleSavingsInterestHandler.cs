@@ -13,11 +13,11 @@ public sealed class SettleSavingsInterestHandler(
     TimeProvider timeProvider)
 {
     public async Task<Result<SavingsInterestSettlementResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, SettleSavingsInterestRequest request, CancellationToken cancellationToken)
+        Guid assetId, SettleSavingsInterestRequest request, CancellationToken cancellationToken)
     {
         // Tenancy-scoped lookup first: another user's account, a non-Savings asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Savings, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Savings, cancellationToken);
         var terms = asset is null
             ? null
             : await dbContext.SavingsAccounts.AsNoTracking().FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);

@@ -10,8 +10,9 @@ public sealed class AddMetalHandler(
     PositionEventPublisher positionEventPublisher,
     TimeProvider timeProvider)
 {
-    public async Task<Result<MetalResponse>> HandleAsync(Guid portfolioId, AddMetalRequest request, CancellationToken cancellationToken)
+    public async Task<Result<MetalResponse>> HandleAsync(AddMetalRequest request, CancellationToken cancellationToken)
     {
+        var portfolioId = request.PortfolioId;
         var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
         if (portfolio is null)
         {

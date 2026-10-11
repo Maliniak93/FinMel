@@ -21,7 +21,7 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddMetalHandler>()
-            .HandleAsync(portfolioId, PortfolioApi.NewMetalRequest(), cancellationToken);
+            .HandleAsync(PortfolioApi.NewMetalRequest(portfolioId: portfolioId), cancellationToken);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Equal(1, SaveChanges.Count);
@@ -57,7 +57,7 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
         {
             portfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Metal update portfolio", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddMetalHandler>().HandleAsync(
-                portfolioId, PortfolioApi.NewMetalRequest(metal: Metal.Gold), cancellationToken);
+                PortfolioApi.NewMetalRequest(portfolioId: portfolioId, metal: Metal.Gold), cancellationToken);
             assetId = added.Value.AssetId;
         }
 
@@ -65,7 +65,7 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<UpdateMetalHandler>().HandleAsync(
-                portfolioId, assetId, PortfolioApi.NewUpdateMetalRequest(), cancellationToken);
+                assetId, PortfolioApi.NewUpdateMetalRequest(), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 

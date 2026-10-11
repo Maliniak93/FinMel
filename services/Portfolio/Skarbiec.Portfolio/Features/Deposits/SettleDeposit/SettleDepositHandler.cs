@@ -12,11 +12,11 @@ public sealed class SettleDepositHandler(
     TimeProvider timeProvider)
 {
     public async Task<Result<DepositResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, SettleDepositRequest request, CancellationToken cancellationToken)
+        Guid assetId, SettleDepositRequest request, CancellationToken cancellationToken)
     {
         // Tenancy-scoped lookup first: another user's deposit, a non-deposit asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Deposit, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Deposit, cancellationToken);
         var terms = asset is null
             ? null
             : await dbContext.TermDeposits.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);
@@ -28,7 +28,7 @@ public sealed class SettleDepositHandler(
 
         var portfolio = await dbContext.Portfolios
             .AsNoTracking()
-            .Where(p => p.Id == portfolioId)
+            .Where(p => p.Id == asset.PortfolioId)
             .Select(p => new { p.Name, p.IsArchived })
             .FirstAsync(cancellationToken);
 

@@ -25,12 +25,10 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
 
         var transactionResult = await scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-            portfolioResult.Value.Id,
             assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 5m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) },
             cancellationToken);
@@ -52,17 +50,14 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var buyResult = await scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-            portfolioResult.Value.Id,
             assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 10m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 1) },
             cancellationToken);
 
         var updateResult = await scope.ServiceProvider.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
-            portfolioResult.Value.Id,
             assetResult.Value.Id,
             buyResult.Value.Id,
             new UpdateTransactionRequest { Type = TransactionType.Buy, Quantity = 15m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 1) },
@@ -85,21 +80,20 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
         await recordHandler.HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 10m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 1) },
             cancellationToken);
         var sellResult = await recordHandler.HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Sell, Quantity = 3m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) },
             cancellationToken);
 
         var deleteResult = await scope.ServiceProvider.GetRequiredService<DeleteTransactionHandler>()
-            .HandleAsync(portfolioResult.Value.Id, assetResult.Value.Id, sellResult.Value.Id, cancellationToken);
+            .HandleAsync(assetResult.Value.Id, sellResult.Value.Id, cancellationToken);
         Assert.True(deleteResult.IsSuccess);
 
         // The last event in write order is the delete's; the quantity alone is ambiguous, as the earlier Buy also left 10.
@@ -120,13 +114,12 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
 
         var later = await recordHandler.HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2025, 1, 10) },
             cancellationToken);
         Assert.True(later.IsSuccess);
@@ -134,7 +127,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.Equal(new DateOnly(2025, 1, 10), afterFirst[^1].FirstTransactionDate);
 
         var earlier = await recordHandler.HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2024, 3, 4) },
             cancellationToken);
         Assert.True(earlier.IsSuccess);
@@ -142,7 +135,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         // A fresh scope, as in a real request: the earlier rows come from the stored-transaction query, not the change tracker.
         await using var requestScope = Provider.CreateAsyncScope();
         var extra = await requestScope.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2025, 2, 1) },
             cancellationToken);
         Assert.True(extra.IsSuccess);
@@ -162,27 +155,26 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
         var earliest = await recordHandler.HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2024, 3, 4) },
             cancellationToken);
         await recordHandler.HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2025, 1, 10) },
             cancellationToken);
         var extra = await recordHandler.HandleAsync(
-            portfolioResult.Value.Id, assetResult.Value.Id,
+            assetResult.Value.Id,
             new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2025, 2, 1) },
             cancellationToken);
 
         // Fresh scopes, as in real requests: the remaining rows come from the stored-transaction query, not the change tracker.
         await using var deleteScope = Provider.CreateAsyncScope();
         var deleteResult = await deleteScope.ServiceProvider.GetRequiredService<DeleteTransactionHandler>()
-            .HandleAsync(portfolioResult.Value.Id, assetResult.Value.Id, extra.Value.Id, cancellationToken);
+            .HandleAsync(assetResult.Value.Id, extra.Value.Id, cancellationToken);
         Assert.True(deleteResult.IsSuccess);
 
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
@@ -190,7 +182,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
 
         await using var deleteEarliestScope = Provider.CreateAsyncScope();
         var deleteEarliest = await deleteEarliestScope.ServiceProvider.GetRequiredService<DeleteTransactionHandler>()
-            .HandleAsync(portfolioResult.Value.Id, assetResult.Value.Id, earliest.Value.Id, cancellationToken);
+            .HandleAsync(assetResult.Value.Id, earliest.Value.Id, cancellationToken);
         Assert.True(deleteEarliest.IsSuccess);
 
         var afterEarliest = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
@@ -219,7 +211,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using (var record = Provider.CreateAsyncScope())
         {
             var sell = await record.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-                portfolioId, assetId,
+                assetId,
                 new RecordTransactionRequest { Type = TransactionType.Sell, Quantity = 2m, UnitPrice = 10m, Date = new DateOnly(2024, 6, 1) },
                 cancellationToken);
             Assert.True(sell.IsSuccess, sell.IsFailure ? sell.Error.Code : null);
@@ -260,7 +252,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using (var move = Provider.CreateAsyncScope())
         {
             var updateResult = await move.ServiceProvider.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
-                portfolioId, assetId, transactionIds[3],
+                assetId, transactionIds[3],
                 new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 2m, UnitPrice = 10m, Date = new DateOnly(2025, 2, 1) },
                 cancellationToken);
             Assert.True(updateResult.IsSuccess, updateResult.IsFailure ? updateResult.Error.Code : null);
@@ -300,7 +292,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using (var move = Provider.CreateAsyncScope())
         {
             var updateResult = await move.ServiceProvider.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
-                portfolioId, assetId, transactionIds[3],
+                assetId, transactionIds[3],
                 new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 2m, UnitPrice = 10m, Date = new DateOnly(2025, 2, 1) },
                 cancellationToken);
             Assert.True(updateResult.IsSuccess, updateResult.IsFailure ? updateResult.Error.Code : null);
@@ -309,7 +301,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using (var delete = Provider.CreateAsyncScope())
         {
             var deleteResult = await delete.ServiceProvider.GetRequiredService<DeleteTransactionHandler>()
-                .HandleAsync(portfolioId, assetId, transactionIds[3], cancellationToken);
+                .HandleAsync(assetId, transactionIds[3], cancellationToken);
             Assert.True(deleteResult.IsSuccess, deleteResult.IsFailure ? deleteResult.Error.Code : null);
         }
 

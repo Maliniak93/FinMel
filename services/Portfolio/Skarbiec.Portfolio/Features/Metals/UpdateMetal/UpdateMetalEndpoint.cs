@@ -7,7 +7,7 @@ public static class UpdateMetalEndpoint
 {
     public static IEndpointRouteBuilder MapUpdateMetalEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/metals");
+        var group = app.MapGroup("/api/portfolio/metals");
 
         group.MapPut("{assetId:guid}", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class UpdateMetalEndpoint
     }
 
     private static async Task<Results<Ok<MetalResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, UpdateMetalRequest request, UpdateMetalHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, request, cancellationToken)).ToHttpResult();
+        Guid assetId, UpdateMetalRequest request, UpdateMetalHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, request, cancellationToken)).ToHttpResult();
 }

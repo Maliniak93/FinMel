@@ -41,15 +41,15 @@ internal static class PortfolioAssertions
     public const string SettlementAmountsRequiredErrorCode = "Validation.SettlementAmountsRequired";
 
     public static async Task AssertDepositUnsettledAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, decimal principal = 10_000m)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken, decimal principal = 10_000m)
     {
-        var deposit = await client.GetDepositAsync(portfolioId, assetId, cancellationToken);
+        var deposit = await client.GetDepositAsync(assetId, cancellationToken);
         Assert.NotEqual(DepositStatus.Settled, deposit.Status);
         Assert.Null(deposit.SettledOn);
         Assert.Null(deposit.SettledGrossInterest);
         Assert.Null(deposit.SettledTax);
 
-        var asset = await client.GetAssetAsync(portfolioId, assetId, cancellationToken);
+        var asset = await client.GetAssetAsync(assetId, cancellationToken);
         Assert.Equal(principal, asset.Quantity);
         Assert.Equal(1, asset.TransactionCount);
         Assert.False(asset.DepositSettled);
@@ -168,11 +168,11 @@ internal static class PortfolioAssertions
         await response.AssertProblemAsync(HttpStatusCode.Conflict, TransferLegManagedErrorCode, cancellationToken);
 
     public static async Task AssertCashUntouchedAsync(
-        this HttpClient client, Guid portfolioId, Guid cashId, CancellationToken cancellationToken, decimal balance = 5_000m)
+        this HttpClient client, Guid cashId, CancellationToken cancellationToken, decimal balance = 5_000m)
     {
-        var cash = await client.GetAssetAsync(portfolioId, cashId, cancellationToken);
+        var cash = await client.GetAssetAsync(cashId, cancellationToken);
         Assert.Equal(balance, cash.Quantity);
-        var topUp = Assert.Single((await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items);
+        var topUp = Assert.Single((await client.ListTransactionsAsync(cashId, cancellationToken)).Items);
         Assert.Equal(Skarbiec.Contracts.TransactionType.Deposit, topUp.Type);
         Assert.Equal(balance, topUp.Quantity);
         Assert.Null(topUp.Transfer);
@@ -220,9 +220,9 @@ internal static class PortfolioAssertions
     }
 
     public static async Task AssertQuantityMatchesRecomputeFromScratchAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var page = await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken);
+        var page = await client.ListTransactionsAsync(assetId, cancellationToken);
         var transactions = page.Items.Select(t => new Transaction
         {
             Id = t.Id,
@@ -235,6 +235,6 @@ internal static class PortfolioAssertions
         var recomputed = TransactionQuantityCalculator.Recompute(transactions);
 
         Assert.True(recomputed.IsSuccess);
-        Assert.Equal(recomputed.Value, (await client.GetAssetAsync(portfolioId, assetId, cancellationToken)).Quantity);
+        Assert.Equal(recomputed.Value, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
     }
 }

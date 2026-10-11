@@ -77,7 +77,6 @@ export class Cash {
 
   protected openTransactionDialog(account: CashAccountResponse, type: TransactionType): void {
     const data: TransactionFormDialogData = {
-      portfolioId: account.portfolioId,
       assetId: account.assetId,
       assetClass: ASSET_CLASS.Cash,
       type,

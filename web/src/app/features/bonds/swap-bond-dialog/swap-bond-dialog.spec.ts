@@ -183,9 +183,7 @@ describe('SwapBondDialog', () => {
     await component['onSubmit']();
 
     const [request] = writeRequests(fetchSpy);
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${settledTosBond.portfolioId}/bonds/${settledTosBond.assetId}/swap`,
-    );
+    expect(request.url).toContain(`/api/portfolio/bonds/${settledTosBond.assetId}/swap`);
     expect(await request.json()).toEqual({
       bondCount: 6,
       newBond: {
