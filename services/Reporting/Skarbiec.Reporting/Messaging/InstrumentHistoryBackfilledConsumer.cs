@@ -6,7 +6,7 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-public sealed class InstrumentHistoryBackfilledConsumer(ReportingDbContext db, PortfolioSnapshotWriter snapshotWriter)
+public sealed class InstrumentHistoryBackfilledConsumer(ReportingDbContext db, SnapshotWriter snapshotWriter)
     : IConsumer<InstrumentHistoryBackfilled>
 {
     public async Task Consume(ConsumeContext<InstrumentHistoryBackfilled> context)
@@ -21,7 +21,7 @@ public sealed class InstrumentHistoryBackfilledConsumer(ReportingDbContext db, P
             .Where(p => p.InstrumentId == message.InstrumentId)
             .ToListAsync(cancellationToken);
 
-        foreach (var group in positions.GroupBy(p => p.PortfolioId))
+        foreach (var group in positions.GroupBy(p => p.UserId))
         {
             var firstDates = group
                 .Where(p => p.QuantityHistory.Count > 0)
@@ -43,7 +43,7 @@ public sealed class InstrumentHistoryBackfilledConsumer(ReportingDbContext db, P
                 continue;
             }
 
-            await HistoryRebuildRequests.RequestAsync(db, context, group.Key, group.First().UserId, from, cancellationToken);
+            await HistoryRebuildRequests.RequestAsync(db, context, group.Key, from, cancellationToken);
         }
     }
 }

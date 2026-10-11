@@ -43,9 +43,7 @@ export type NetWorthHistoryResponse = {
 export type GetApiReportingDashboardData = {
     body?: never;
     path?: never;
-    query?: {
-        portfolioId?: string;
-    };
+    query?: never;
     url: '/api/reporting/dashboard';
 };
 
@@ -63,7 +61,6 @@ export type GetApiReportingNetWorthHistoryData = {
     path?: never;
     query?: {
         range?: string;
-        portfolioId?: string;
         assetClass?: AssetClass;
     };
     url: '/api/reporting/net-worth-history';

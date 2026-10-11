@@ -2,6 +2,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
@@ -14,9 +15,9 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 namespace Skarbiec.Reporting.Tests;
 
 // Builds its own provider, with no HTTP host, on a queue unique to this class.
-public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
+public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
-    private const string QueueName = "portfolio-history-rebuild-consumer-test";
+    private const string QueueName = "history-rebuild-consumer-test";
 
     public async ValueTask InitializeAsync() => await MigrateAndResetAsync(containers);
 
@@ -36,17 +37,17 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-5), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-5), cancellationToken);
             await db.SeedValuationLineAsync(userId, portfolioId, assetId, today, 999m, cancellationToken, quantity: 1_000m);
-            await db.SeedSnapshotAsync(userId, portfolioId, today, 999m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, today, 999m, cancellationToken);
         }
 
         var client = new FakePriceQuoteClient().WithFxHistory("USDPLN", (today.AddDays(-6), 4.0m), (today.AddDays(-3), 4.5m));
 
         await RunConsumerAsync(client, async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
 
             for (var offset = 5; offset >= 1; offset--)
             {
@@ -58,15 +59,15 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                 Assert.Equal(expectedRate, line.FxRateUsed);
                 Assert.False(line.IsStale);
 
-                var snapshot = await GetSnapshotAsync(containers, portfolioId, date, cancellationToken);
+                var snapshot = await GetSnapshotAsync(containers, userId, date, cancellationToken);
                 Assert.NotNull(snapshot);
                 Assert.Equal(1_000m * expectedRate, snapshot.TotalPln);
                 Assert.Equal(userId, snapshot.UserId);
             }
 
-            Assert.Null(await GetSnapshotAsync(containers, portfolioId, today.AddDays(-6), cancellationToken));
+            Assert.Null(await GetSnapshotAsync(containers, userId, today.AddDays(-6), cancellationToken));
             Assert.Equal(999m, Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken)).ValuePln);
-            Assert.Equal(999m, (await GetSnapshotAsync(containers, portfolioId, today, cancellationToken))!.TotalPln);
+            Assert.Equal(999m, (await GetSnapshotAsync(containers, userId, today, cancellationToken))!.TotalPln);
         }, cancellationToken);
     }
 
@@ -87,19 +88,19 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             for (var offset = 20; offset >= 9; offset--)
             {
                 await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-offset), 100m, cancellationToken, quantity: 100m);
-                await db.SeedSnapshotAsync(userId, portfolioId, today.AddDays(-offset), 100m, cancellationToken);
+                await db.SeedSnapshotAsync(userId, today.AddDays(-offset), 100m, cancellationToken);
             }
 
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-20), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-20), cancellationToken);
         }
 
         await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
 
             var lines = await GetAllLinesAsync(containers, portfolioId, cancellationToken);
-            var snapshots = await GetAllSnapshotsAsync(containers, portfolioId, cancellationToken);
+            var snapshots = await GetAllSnapshotsAsync(containers, userId, cancellationToken);
 
             var expectedDates = Enumerable.Range(1, 8).Select(offset => today.AddDays(-offset)).Order().ToList();
             Assert.Equal(expectedDates, lines.Select(l => l.Date).Order());
@@ -122,19 +123,19 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
                 portfolioIsArchived: true, portfolioArchivedOn: today.AddDays(-5), quantityHistory: [(today.AddDays(-20), 100m)]);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-10), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-10), cancellationToken);
         }
 
         await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
 
             for (var offset = 10; offset >= 6; offset--)
             {
                 var date = today.AddDays(-offset);
                 Assert.Equal(100m, Assert.Single(await GetLinesAsync(containers, portfolioId, date, cancellationToken)).ValuePln);
-                Assert.Equal(100m, (await GetSnapshotAsync(containers, portfolioId, date, cancellationToken))!.TotalPln);
+                Assert.Equal(100m, (await GetSnapshotAsync(containers, userId, date, cancellationToken))!.TotalPln);
             }
 
             for (var offset = 5; offset >= 1; offset--)
@@ -142,7 +143,7 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                 var date = today.AddDays(-offset);
                 Assert.Empty(await GetLinesAsync(containers, portfolioId, date, cancellationToken));
 
-                var snapshot = await GetSnapshotAsync(containers, portfolioId, date, cancellationToken);
+                var snapshot = await GetSnapshotAsync(containers, userId, date, cancellationToken);
                 Assert.NotNull(snapshot);
                 Assert.Equal(0m, snapshot.TotalPln);
                 Assert.False(snapshot.IsStale);
@@ -168,19 +169,19 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             await db.SeedPositionAsync(keptAssetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
                 quantityHistory: [(today.AddDays(-20), 200m)]);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-8), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-8), cancellationToken);
         }
 
         await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
 
             for (var offset = 8; offset >= 6; offset--)
             {
                 var date = today.AddDays(-offset);
                 Assert.Equal(2, (await GetLinesAsync(containers, portfolioId, date, cancellationToken)).Count);
-                Assert.Equal(300m, (await GetSnapshotAsync(containers, portfolioId, date, cancellationToken))!.TotalPln);
+                Assert.Equal(300m, (await GetSnapshotAsync(containers, userId, date, cancellationToken))!.TotalPln);
             }
 
             for (var offset = 5; offset >= 1; offset--)
@@ -188,9 +189,90 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                 var date = today.AddDays(-offset);
                 var line = Assert.Single(await GetLinesAsync(containers, portfolioId, date, cancellationToken));
                 Assert.Equal(keptAssetId, line.AssetId);
-                Assert.Equal(200m, (await GetSnapshotAsync(containers, portfolioId, date, cancellationToken))!.TotalPln);
+                Assert.Equal(200m, (await GetSnapshotAsync(containers, userId, date, cancellationToken))!.TotalPln);
             }
         }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task RebuildsEveryPositionOfTheUser()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var portfolioAId = Guid.NewGuid();
+        var portfolioBId = Guid.NewGuid();
+        var assetAId = Guid.NewGuid();
+        var assetBId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetAId, userId, portfolioAId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
+                quantityHistory: [(today.AddDays(-20), 100m)]);
+            await db.SeedPositionAsync(assetBId, userId, portfolioBId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
+                quantityHistory: [(today.AddDays(-20), 200m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-10), cancellationToken, revision: 1);
+        }
+
+        await RunAsync(
+            containers,
+            x =>
+            {
+                x.AddConsumer<AssetPositionChangedConsumer>(typeof(PositionChangedTestDefinition));
+                x.AddConsumer<HistoryRebuildConsumer>(typeof(TestConsumerDefinition));
+            },
+            async provider =>
+            {
+                await provider.GetRequiredService<IBus>().Publish(
+                    new AssetPositionChanged
+                    {
+                        AssetId = assetAId,
+                        PortfolioId = portfolioAId,
+                        UserId = userId,
+                        AssetClass = AssetClass.Cash,
+                        ValuationMode = AssetValuationMode.CurrencyValued,
+                        Currency = "PLN",
+                        Quantity = 150m,
+                        QuoteUnitsPerQuantity = 1m,
+                        QuantityHistory =
+                        [
+                            new QuantityPoint { Date = today.AddDays(-20), Quantity = 100m },
+                            new QuantityPoint { Date = today.AddDays(-5), Quantity = 150m },
+                        ],
+                        PortfolioIsArchived = false,
+                        IsArchived = false,
+                        Version = 1,
+                        OccurredAtUtc = DateTimeOffset.UtcNow,
+                    },
+                    cancellationToken);
+
+                await WaitForPositionAsync(provider, assetAId, cancellationToken, p => p.Version == 1);
+                await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+                Assert.Empty(await GetUserLinesAsync(containers, userId, today.AddDays(-11), cancellationToken));
+
+                for (var offset = 10; offset >= 1; offset--)
+                {
+                    var date = today.AddDays(-offset);
+                    var expectedA = offset > 5 ? 100m : 150m;
+
+                    var lines = await GetUserLinesAsync(containers, userId, date, cancellationToken);
+                    Assert.Equal(2, lines.Count);
+                    Assert.Equal(portfolioAId, lines.Single(l => l.AssetId == assetAId).PortfolioId);
+                    Assert.Equal(portfolioBId, lines.Single(l => l.AssetId == assetBId).PortfolioId);
+                    Assert.Equal(expectedA, lines.Single(l => l.AssetId == assetAId).ValuePln);
+                    Assert.Equal(200m, lines.Single(l => l.AssetId == assetBId).ValuePln);
+
+                    var snapshot = await GetSnapshotAsync(containers, userId, date, cancellationToken);
+                    Assert.NotNull(snapshot);
+                    Assert.Equal(expectedA + 200m, snapshot.TotalPln);
+                }
+
+                Assert.Equal(10, (await GetAllSnapshotsAsync(containers, userId, cancellationToken)).Count(s => s.Date < today));
+            },
+            cancellationToken);
     }
 
     [Fact]
@@ -208,21 +290,21 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
             await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-3), 999m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, today.AddDays(-3), 999m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, today.AddDays(-3), 999m, cancellationToken);
         }
 
         var client = new FakePriceQuoteClient().WithFxHistory("USDPLN", (today.AddDays(-10), 4.0m));
 
         await RunConsumerAsync(client, async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
 
             // Nothing signals a no-op, so give the consumer time to run before asserting it wrote nothing.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             Assert.Equal(0, client.HistoryCalls);
             Assert.Equal(999m, Assert.Single(await GetAllLinesAsync(containers, portfolioId, cancellationToken)).ValuePln);
-            Assert.Equal(999m, Assert.Single(await GetAllSnapshotsAsync(containers, portfolioId, cancellationToken)).TotalPln);
+            Assert.Equal(999m, Assert.Single(await GetAllSnapshotsAsync(containers, userId, cancellationToken)).TotalPln);
         }, cancellationToken);
     }
 
@@ -240,7 +322,7 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-3), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-3), cancellationToken);
         }
 
         var client = new FakePriceQuoteClient().WithFxHistory("USDPLN", (today.AddDays(-10), 4.0m));
@@ -250,25 +332,25 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             var bus = provider.GetRequiredService<IBus>();
             var messageId = Guid.NewGuid();
 
-            await bus.PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken, messageId);
-            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            await bus.PublishRebuildRequestedAsync(userId, cancellationToken, messageId);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
             var callsAfterFirstRun = client.HistoryCalls;
             Assert.True(callsAfterFirstRun > 0);
 
             await using (var db = OpenDbContext(containers))
             {
-                await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-3), cancellationToken);
+                await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-3), cancellationToken);
             }
 
             // Same MessageId: the inbox must skip the consumer body, so the fresh request stays pending.
-            await bus.PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken, messageId);
+            await bus.PublishRebuildRequestedAsync(userId, cancellationToken, messageId);
 
             // Nothing signals a skip, so give a redelivery time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
-            Assert.NotNull(await GetRebuildRequestAsync(containers, portfolioId, cancellationToken));
+            Assert.NotNull(await GetRebuildRequestAsync(containers, userId, cancellationToken));
             Assert.Equal(callsAfterFirstRun, client.HistoryCalls);
-            Assert.Equal(3, (await GetAllSnapshotsAsync(containers, portfolioId, cancellationToken)).Count);
+            Assert.Equal(3, (await GetAllSnapshotsAsync(containers, userId, cancellationToken)).Count);
         }, cancellationToken);
     }
 
@@ -286,7 +368,7 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-3), cancellationToken, revision: 1);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-3), cancellationToken, revision: 1);
         }
 
         var bumped = 0;
@@ -301,16 +383,16 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
 
                 await using var db = OpenDbContext(containers);
                 await db.HistoryRebuildRequests.IgnoreQueryFilters()
-                    .Where(r => r.PortfolioId == portfolioId)
+                    .Where(r => r.UserId == userId)
                     .ExecuteUpdateAsync(s => s.SetProperty(r => r.Revision, r => r.Revision + 1), cancellationToken);
             });
 
         await RunConsumerAsync(client, async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-            await WaitForSnapshotAsync(provider, portfolioId, today.AddDays(-1), cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForSnapshotAsync(provider, userId, today.AddDays(-1), cancellationToken);
 
-            var request = await GetRebuildRequestAsync(containers, portfolioId, cancellationToken);
+            var request = await GetRebuildRequestAsync(containers, userId, cancellationToken);
             Assert.NotNull(request);
             Assert.Equal(2, request.Revision);
             Assert.Equal(today.AddDays(-3), request.FromDate);
@@ -332,15 +414,15 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
                 quantityHistory: [(today.AddDays(-20), 1_000m)]);
             await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-3), 999m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, today.AddDays(-3), 999m, cancellationToken);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-5), cancellationToken);
+            await db.SeedSnapshotAsync(userId, today.AddDays(-3), 999m, cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-5), cancellationToken);
         }
 
         var client = new FakePriceQuoteClient().Unavailable();
 
         await RunConsumerAsync(client, async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
 
             await WaitForAsync(
                 provider,
@@ -352,16 +434,16 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             // The failure is retried and then parked; give it time to write anything it wrongly would.
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
 
-            var request = await GetRebuildRequestAsync(containers, portfolioId, cancellationToken);
+            var request = await GetRebuildRequestAsync(containers, userId, cancellationToken);
             Assert.NotNull(request);
             Assert.Equal(today.AddDays(-5), request.FromDate);
             Assert.Equal(999m, Assert.Single(await GetAllLinesAsync(containers, portfolioId, cancellationToken)).ValuePln);
-            Assert.Equal(999m, Assert.Single(await GetAllSnapshotsAsync(containers, portfolioId, cancellationToken)).TotalPln);
+            Assert.Equal(999m, Assert.Single(await GetAllSnapshotsAsync(containers, userId, cancellationToken)).TotalPln);
         }, cancellationToken);
     }
 
     [Fact]
-    public async Task Rebuild_NeverTouchesAnotherUsersRows()
+    public async Task OtherUserUntouched()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
@@ -377,32 +459,32 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             await db.SeedPositionAsync(assetAId, userAId, portfolioAId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
                 quantityHistory: [(today.AddDays(-20), 100m)]);
-            await db.SeedHistoryRebuildRequestAsync(userAId, portfolioAId, today.AddDays(-5), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userAId, today.AddDays(-5), cancellationToken);
 
             await db.SeedPositionAsync(assetBId, userBId, portfolioBId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 200m,
                 quantityHistory: [(today.AddDays(-20), 200m)]);
             await db.SeedValuationLineAsync(userBId, portfolioBId, assetBId, today.AddDays(-3), 777m, cancellationToken);
-            await db.SeedSnapshotAsync(userBId, portfolioBId, today.AddDays(-3), 777m, cancellationToken);
-            await db.SeedHistoryRebuildRequestAsync(userBId, portfolioBId, today.AddDays(-5), cancellationToken, revision: 2);
+            await db.SeedSnapshotAsync(userBId, today.AddDays(-3), 777m, cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userBId, today.AddDays(-5), cancellationToken, revision: 2);
         }
 
         await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioAId, userAId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, portfolioAId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userAId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userAId, cancellationToken);
 
-            var snapshotsA = await GetAllSnapshotsAsync(containers, portfolioAId, cancellationToken);
+            var snapshotsA = await GetAllSnapshotsAsync(containers, userAId, cancellationToken);
             Assert.Equal(5, snapshotsA.Count);
             Assert.All(snapshotsA, s => Assert.Equal(100m, s.TotalPln));
             Assert.All(snapshotsA, s => Assert.Equal(userAId, s.UserId));
 
             var lineB = Assert.Single(await GetAllLinesAsync(containers, portfolioBId, cancellationToken));
             Assert.Equal(777m, lineB.ValuePln);
-            var snapshotB = Assert.Single(await GetAllSnapshotsAsync(containers, portfolioBId, cancellationToken));
+            var snapshotB = Assert.Single(await GetAllSnapshotsAsync(containers, userBId, cancellationToken));
             Assert.Equal(777m, snapshotB.TotalPln);
 
-            var requestB = await GetRebuildRequestAsync(containers, portfolioBId, cancellationToken);
+            var requestB = await GetRebuildRequestAsync(containers, userBId, cancellationToken);
             Assert.NotNull(requestB);
             Assert.Equal(2, requestB.Revision);
             Assert.Equal(today.AddDays(-5), requestB.FromDate);
@@ -433,7 +515,7 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                 var date = today.AddDays(-offset);
                 await db.SeedValuationLineAsync(userId, portfolioId, removedAssetId, date, 100m, cancellationToken, quantity: 100m);
                 await db.SeedValuationLineAsync(userId, portfolioId, keptAssetId, date, 200m, cancellationToken, quantity: 200m);
-                await db.SeedSnapshotAsync(userId, portfolioId, date, 300m, cancellationToken);
+                await db.SeedSnapshotAsync(userId, date, 300m, cancellationToken);
             }
         }
 
@@ -442,7 +524,7 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
             x =>
             {
                 x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedTestDefinition));
-                x.AddConsumer<PortfolioHistoryRebuildConsumer>(typeof(TestConsumerDefinition));
+                x.AddConsumer<HistoryRebuildConsumer>(typeof(TestConsumerDefinition));
             },
             async provider =>
             {
@@ -460,7 +542,7 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                 Assert.DoesNotContain(lines, l => l.AssetId == removedAssetId);
                 Assert.Equal(30, lines.Count(l => l.Date < today));
 
-                var snapshots = (await GetAllSnapshotsAsync(containers, portfolioId, cancellationToken))
+                var snapshots = (await GetAllSnapshotsAsync(containers, userId, cancellationToken))
                     .Where(s => s.Date < today)
                     .ToList();
                 Assert.Equal(30, snapshots.Count);
@@ -487,21 +569,21 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
                     quantityHistory: [(today.AddDays(-20), 33.3333m)]);
             }
 
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-3), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-3), cancellationToken);
         }
 
         var client = new FakePriceQuoteClient().WithFxHistory("USDPLN", (today.AddDays(-6), 4.0123m));
 
         await RunConsumerAsync(client, async provider =>
         {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
 
             for (var offset = 3; offset >= 1; offset--)
             {
                 var date = today.AddDays(-offset);
                 var lines = await GetLinesAsync(containers, portfolioId, date, cancellationToken);
-                var snapshot = await GetSnapshotAsync(containers, portfolioId, date, cancellationToken);
+                var snapshot = await GetSnapshotAsync(containers, userId, date, cancellationToken);
 
                 Assert.Equal(3, lines.Count);
                 Assert.NotNull(snapshot);
@@ -514,18 +596,23 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
         IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
             containers,
-            x => x.AddConsumer<PortfolioHistoryRebuildConsumer>(typeof(TestConsumerDefinition)),
+            x => x.AddConsumer<HistoryRebuildConsumer>(typeof(TestConsumerDefinition)),
             action,
             cancellationToken,
             priceQuoteClient);
 
-    private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<PortfolioHistoryRebuildConsumer, ReportingDbContext>
+    private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<HistoryRebuildConsumer, ReportingDbContext>
     {
         public TestConsumerDefinition() => Endpoint(e => e.Name = QueueName);
     }
 
+    private sealed class PositionChangedTestDefinition : IdempotentConsumerDefinition<AssetPositionChangedConsumer, ReportingDbContext>
+    {
+        public PositionChangedTestDefinition() => Endpoint(e => e.Name = "history-rebuild-position-changed-test");
+    }
+
     private sealed class AssetRemovedTestDefinition : IdempotentConsumerDefinition<AssetRemovedConsumer, ReportingDbContext>
     {
-        public AssetRemovedTestDefinition() => Endpoint(e => e.Name = "portfolio-history-rebuild-asset-removed-test");
+        public AssetRemovedTestDefinition() => Endpoint(e => e.Name = "history-rebuild-asset-removed-test");
     }
 }

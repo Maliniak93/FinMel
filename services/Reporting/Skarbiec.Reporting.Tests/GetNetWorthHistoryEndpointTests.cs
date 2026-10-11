@@ -19,15 +19,14 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
         var tooOld = Today.AddMonths(-2);
         var withinRange = Today.AddDays(-5);
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, portfolioId, tooOld, 100m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, withinRange, 200m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, Today, 300m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, tooOld, 100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, withinRange, 200m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 300m, cancellationToken);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -46,14 +45,13 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
         var lastYearEnd = new DateOnly(Today.Year - 1, 12, 31);
         var yearStart = new DateOnly(Today.Year, 1, 1);
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, portfolioId, lastYearEnd, 100m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, yearStart, 200m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, lastYearEnd, 100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, yearStart, 200m, cancellationToken);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -69,13 +67,12 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
         var earliest = Today.AddYears(-5);
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, portfolioId, earliest, 50m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, Today, 300m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, earliest, 50m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 300m, cancellationToken);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -87,24 +84,28 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     }
 
     [Fact]
-    public async Task Get_SumsAcrossPortfolios_PerDate()
+    public async Task Get_ThreeSnapshotDates_OnePointPerDateWithSnapshotTotal()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
+        var days = new[] { Today.AddDays(-20), Today.AddDays(-10), Today };
+        var totals = new[] { 1000m, 1500m, 1250m };
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, Guid.NewGuid(), Today, 1000m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, Guid.NewGuid(), Today, 500m, cancellationToken);
+            for (var i = 0; i < days.Length; i++)
+            {
+                await db.SeedSnapshotAsync(userId, days[i], totals[i], cancellationToken);
+            }
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
         var response = await client.GetAsync(NetWorthHistoryUri("MAX"), cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
 
-        var point = Assert.Single(body!.Points);
-        Assert.Equal(Today, point.Date);
-        Assert.Equal(1500m, point.NetWorthPln);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(days, body!.Points.Select(p => p.Date).ToArray());
+        Assert.Equal(totals, body.Points.Select(p => p.NetWorthPln).ToArray());
     }
 
     [Fact]
@@ -112,14 +113,13 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
         var day1 = Today.AddDays(-2);
         var day3 = Today;
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, portfolioId, day1, 100m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, day3, 110m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, day1, 100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, day3, 110m, cancellationToken);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -128,28 +128,6 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
 
         Assert.Equal(2, body!.Points.Count);
         Assert.DoesNotContain(body.Points, p => p.Date == Today.AddDays(-1));
-    }
-
-    [Fact]
-    public async Task Get_WithPortfolioIdFilter_ReturnsOnlyThatPortfoliosSeries()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var userId = Guid.NewGuid();
-        var retirementId = Guid.NewGuid();
-        var savingsId = Guid.NewGuid();
-
-        await using (var db = CreateDbContext(userId))
-        {
-            await db.SeedSnapshotAsync(userId, retirementId, Today, 1000m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, savingsId, Today, 500m, cancellationToken);
-        }
-
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var response = await client.GetAsync(NetWorthHistoryUri("MAX", retirementId), cancellationToken);
-        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
-
-        var point = Assert.Single(body!.Points);
-        Assert.Equal(1000m, point.NetWorthPln);
     }
 
     [Fact]
@@ -181,15 +159,12 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var firstPortfolioId = Guid.NewGuid();
-        var secondPortfolioId = Guid.NewGuid();
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, firstPortfolioId, Today.AddDays(-30), 600m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, secondPortfolioId, Today.AddDays(-30), 400m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, firstPortfolioId, Today.AddDays(-10), 5000m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, firstPortfolioId, Today, 1250m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-30), 1000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-10), 5000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 1250m, cancellationToken);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -209,7 +184,7 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, Guid.NewGuid(), Today, 1000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 1000m, cancellationToken);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -226,12 +201,11 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, portfolioId, Today.AddDays(-5), 0m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, Today, 500m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-5), 0m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 500m, cancellationToken);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
@@ -251,7 +225,7 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
 
         await using (var db = CreateDbContext(userAId))
         {
-            await db.SeedSnapshotAsync(userAId, Guid.NewGuid(), Today, 5000m, cancellationToken);
+            await db.SeedSnapshotAsync(userAId, Today, 5000m, cancellationToken);
         }
 
         using var userBClient = Factory.CreateAuthenticatedClient(userBId);
@@ -276,8 +250,7 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
         {
             for (var i = 0; i < days.Length; i++)
             {
-                await db.SeedSnapshotAsync(userId, portfolioA, days[i], etfA[i] + 1000m, cancellationToken);
-                await db.SeedSnapshotAsync(userId, portfolioB, days[i], etfB[i] + 500m, cancellationToken);
+                await db.SeedSnapshotAsync(userId, days[i], etfA[i] + etfB[i] + 1500m, cancellationToken);
                 await db.SeedValuationLineAsync(userId, portfolioA, Guid.NewGuid(), days[i], etfA[i], cancellationToken, AssetClass.Etf);
                 await db.SeedValuationLineAsync(userId, portfolioA, Guid.NewGuid(), days[i], 1000m, cancellationToken, AssetClass.Cash);
                 await db.SeedValuationLineAsync(userId, portfolioB, Guid.NewGuid(), days[i], etfB[i], cancellationToken, AssetClass.Etf);
@@ -308,9 +281,9 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, portfolioId, jan, 1000m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, mid, 1000m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioId, last, 1700m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, jan, 1000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, mid, 1000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, last, 1700m, cancellationToken);
             await db.SeedValuationLineAsync(userId, portfolioId, Guid.NewGuid(), jan, 1000m, cancellationToken, AssetClass.Cash);
             await db.SeedValuationLineAsync(userId, portfolioId, Guid.NewGuid(), mid, 1000m, cancellationToken, AssetClass.Cash);
             await db.SeedValuationLineAsync(userId, portfolioId, Guid.NewGuid(), last, 1000m, cancellationToken, AssetClass.Cash);
@@ -354,8 +327,7 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
                     await db.SeedValuationLineAsync(userId, portfolioB, Guid.NewGuid(), days[d], b, cancellationToken, classes[c]);
                 }
 
-                await db.SeedSnapshotAsync(userId, portfolioA, days[d], totalA, cancellationToken);
-                await db.SeedSnapshotAsync(userId, portfolioB, days[d], totalB, cancellationToken);
+                await db.SeedSnapshotAsync(userId, days[d], totalA + totalB, cancellationToken);
             }
         }
 
@@ -377,31 +349,6 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     }
 
     [Fact]
-    public async Task Get_WithAssetClassAndPortfolioId_ReturnsOnlyThatPortfoliosClass()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var userId = Guid.NewGuid();
-        var portfolioA = Guid.NewGuid();
-        var portfolioB = Guid.NewGuid();
-
-        await using (var db = CreateDbContext(userId))
-        {
-            await db.SeedSnapshotAsync(userId, portfolioA, Today, 300m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, portfolioB, Today, 900m, cancellationToken);
-            await db.SeedValuationLineAsync(userId, portfolioA, Guid.NewGuid(), Today, 300m, cancellationToken, AssetClass.Etf);
-            await db.SeedValuationLineAsync(userId, portfolioB, Guid.NewGuid(), Today, 900m, cancellationToken, AssetClass.Etf);
-        }
-
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var response = await client.GetAsync(NetWorthHistoryUri("MAX", portfolioA, AssetClass.Etf), cancellationToken);
-        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var point = Assert.Single(body!.Points);
-        Assert.Equal(300m, point.NetWorthPln);
-    }
-
-    [Fact]
     public async Task Get_WithAssetClass_NeverIncludesAnotherUsersValuations()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -412,13 +359,13 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
 
         await using (var dbA = CreateDbContext(userAId))
         {
-            await dbA.SeedSnapshotAsync(userAId, portfolioA, Today, 5000m, cancellationToken);
+            await dbA.SeedSnapshotAsync(userAId, Today, 5000m, cancellationToken);
             await dbA.SeedValuationLineAsync(userAId, portfolioA, Guid.NewGuid(), Today, 5000m, cancellationToken, AssetClass.Etf);
         }
 
         await using (var dbB = CreateDbContext(userBId))
         {
-            await dbB.SeedSnapshotAsync(userBId, portfolioB, Today, 120m, cancellationToken);
+            await dbB.SeedSnapshotAsync(userBId, Today, 120m, cancellationToken);
             await dbB.SeedValuationLineAsync(userBId, portfolioB, Guid.NewGuid(), Today, 120m, cancellationToken, AssetClass.Etf);
         }
 

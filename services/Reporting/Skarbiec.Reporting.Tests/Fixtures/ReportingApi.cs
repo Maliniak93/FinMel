@@ -11,10 +11,7 @@ internal static class ReportingApi
     public const string DashboardUri = "/api/reporting/dashboard";
     public const string NetWorthHistoryBaseUri = "/api/reporting/net-worth-history";
 
-    public static string DashboardUri_ForPortfolio(Guid portfolioId) =>
-        $"{DashboardUri}?portfolioId={portfolioId}";
-
-    public static string NetWorthHistoryUri(string? range = null, Guid? portfolioId = null, AssetClass? assetClass = null)
+    public static string NetWorthHistoryUri(string? range = null, AssetClass? assetClass = null)
     {
         var parameters = new List<string>();
         if (assetClass is not null)
@@ -27,18 +24,12 @@ internal static class ReportingApi
             parameters.Add($"range={Uri.EscapeDataString(range)}");
         }
 
-        if (portfolioId is not null)
-        {
-            parameters.Add($"portfolioId={portfolioId}");
-        }
-
         return parameters.Count > 0 ? $"{NetWorthHistoryBaseUri}?{string.Join('&', parameters)}" : NetWorthHistoryBaseUri;
     }
 
     public static async Task SeedSnapshotAsync(
         this ReportingDbContext db,
         Guid userId,
-        Guid portfolioId,
         DateOnly date,
         decimal totalPln,
         CancellationToken cancellationToken,
@@ -48,7 +39,6 @@ internal static class ReportingApi
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            PortfolioId = portfolioId,
             Date = date,
             TotalPln = totalPln,
             IsStale = isStale,
@@ -100,14 +90,12 @@ internal static class ReportingApi
     public static async Task SeedHistoryRebuildRequestAsync(
         this ReportingDbContext db,
         Guid userId,
-        Guid portfolioId,
         DateOnly fromDate,
         CancellationToken cancellationToken,
         long revision = 1)
     {
         db.HistoryRebuildRequests.Add(new HistoryRebuildRequest
         {
-            PortfolioId = portfolioId,
             UserId = userId,
             FromDate = fromDate,
             Revision = revision,

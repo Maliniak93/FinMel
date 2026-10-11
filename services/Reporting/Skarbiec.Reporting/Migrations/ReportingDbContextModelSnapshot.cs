@@ -246,7 +246,7 @@ namespace Skarbiec.Reporting.Migrations
 
             modelBuilder.Entity("Skarbiec.Reporting.Data.HistoryRebuildRequest", b =>
                 {
-                    b.Property<Guid>("PortfolioId")
+                    b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateOnly>("FromDate")
@@ -255,10 +255,7 @@ namespace Skarbiec.Reporting.Migrations
                     b.Property<long>("Revision")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("PortfolioId");
+                    b.HasKey("UserId");
 
                     b.ToTable("HistoryRebuildRequests");
                 });
@@ -386,9 +383,6 @@ namespace Skarbiec.Reporting.Migrations
                     b.Property<bool>("IsStale")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid>("PortfolioId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("TotalPln")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -398,10 +392,8 @@ namespace Skarbiec.Reporting.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PortfolioId", "Date")
+                    b.HasIndex("UserId", "Date")
                         .IsUnique();
-
-                    b.HasIndex("UserId", "Date");
 
                     b.ToTable("ValuationSnapshots");
                 });

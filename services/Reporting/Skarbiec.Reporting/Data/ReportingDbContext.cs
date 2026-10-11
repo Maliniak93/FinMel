@@ -42,8 +42,8 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
 
         modelBuilder.Entity<HistoryRebuildRequest>(request =>
         {
-            request.HasKey(r => r.PortfolioId);
-            request.Property(r => r.PortfolioId).ValueGeneratedNever();
+            request.HasKey(r => r.UserId);
+            request.Property(r => r.UserId).ValueGeneratedNever();
         });
 
         modelBuilder.Entity<AssetValuation>(line =>
@@ -64,11 +64,8 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
         {
             snapshot.Property(s => s.TotalPln).HasPrecision(18, 2);
 
-            // One row per portfolio per day, so a redelivered event overwrites it.
-            snapshot.HasIndex(s => new { s.PortfolioId, s.Date }).IsUnique();
-
-            // GetDashboard and GetNetWorthHistory filter and order on this pair.
-            snapshot.HasIndex(s => new { s.UserId, s.Date });
+            // One row per user per day, so a redelivered event overwrites it; GetDashboard and GetNetWorthHistory read on it too.
+            snapshot.HasIndex(s => new { s.UserId, s.Date }).IsUnique();
         });
 
         // Global reference data, not IUserOwned, so the query filter below skips it.

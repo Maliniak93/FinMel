@@ -3,7 +3,7 @@ using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Valuation;
 
-// Pure, with no DB or HTTP access: values one portfolio for every day of a range through ValuationAlgorithm, from quantity history and price/FX series.
+// Pure, with no DB or HTTP access: values one user's positions for every day of a range through ValuationAlgorithm, from quantity history and price/FX series.
 public static class HistoryRebuild
 {
     // Series are ascending by date, so one forward-only cursor per series finds "latest on or before" without searching.
@@ -14,7 +14,6 @@ public static class HistoryRebuild
         DateOnly from,
         DateOnly to)
     {
-        var portfolioArchivedOn = positions.Min(p => p.PortfolioArchivedOn);
         var states = positions.Select(p => new PositionState(p)).ToList();
         var priceCursors = priceSeries.ToDictionary(s => s.Key, s => new Cursor<InstrumentPriceLookup>(s.Value, p => p.Date));
         var fxCursors = fxSeries.ToDictionary(s => s.Key, s => new Cursor<FxRateLookup>(s.Value, r => r.Date), StringComparer.OrdinalIgnoreCase);
@@ -40,12 +39,12 @@ public static class HistoryRebuild
                 }
             }
 
-            var archivedPortfolio = portfolioArchivedOn is { } archivedOn && day >= archivedOn;
+            var archivedPortfolio = states.Any(s => s.IsPortfolioArchivedOn(day));
             var valued = new List<ValuationPosition>();
             foreach (var state in states)
             {
                 var quantity = state.QuantityOn(day);
-                if (archivedPortfolio || state.IsArchivedOn(day))
+                if (state.IsPortfolioArchivedOn(day) || state.IsArchivedOn(day))
                 {
                     continue;
                 }
@@ -78,6 +77,8 @@ public static class HistoryRebuild
     private sealed class PositionState(Position position)
     {
         private int _next;
+
+        public bool IsPortfolioArchivedOn(DateOnly day) => position.PortfolioArchivedOn is { } archivedOn && day >= archivedOn;
 
         public bool IsArchivedOn(DateOnly day) => position.ArchivedOn is { } archivedOn && day >= archivedOn;
 

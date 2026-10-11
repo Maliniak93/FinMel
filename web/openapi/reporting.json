@@ -10,16 +10,6 @@
         "tags": [
           "GetDashboardEndpoint"
         ],
-        "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -46,14 +36,6 @@
             "schema": {
               "type": "string",
               "default": "1Y"
-            }
-          },
-          {
-            "name": "portfolioId",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
             }
           },
           {

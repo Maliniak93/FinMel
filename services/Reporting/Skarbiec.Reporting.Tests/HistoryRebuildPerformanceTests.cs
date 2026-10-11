@@ -14,7 +14,7 @@ namespace Skarbiec.Reporting.Tests;
 
 // Timed from publishing the request to its deletion, which happens in the same save as the last rewritten row.
 [Collection(TestingDefaults.SerialCollectionName)]
-public sealed class PortfolioHistoryRebuildPerformanceTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
+public sealed class HistoryRebuildPerformanceTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
     private const string QueueName = "portfolio-history-rebuild-performance-test";
     private const int Days = 3 * 365;
@@ -53,7 +53,7 @@ public sealed class PortfolioHistoryRebuildPerformanceTests(SkarbiecContainersFi
                     quantityHistory: [(from.AddDays(i), 1_000m), (from.AddDays(500), 5_000m)]);
             }
 
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, from, cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, from, cancellationToken);
         }
 
         client.WithFxHistory("USDPLN", Series(from, today, i => 3.8m + i % 20 / 100m));
@@ -61,15 +61,15 @@ public sealed class PortfolioHistoryRebuildPerformanceTests(SkarbiecContainersFi
 
         await RunAsync(
             containers,
-            x => x.AddConsumer<PortfolioHistoryRebuildConsumer>(typeof(TestConsumerDefinition)),
+            x => x.AddConsumer<HistoryRebuildConsumer>(typeof(TestConsumerDefinition)),
             async provider =>
             {
                 var stopwatch = Stopwatch.StartNew();
-                await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-                await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
+                await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+                await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
                 stopwatch.Stop();
 
-                var snapshots = await GetAllSnapshotsAsync(containers, portfolioId, cancellationToken);
+                var snapshots = await GetAllSnapshotsAsync(containers, userId, cancellationToken);
                 Assert.Equal(Days, snapshots.Count);
                 Assert.True(
                     stopwatch.ElapsedMilliseconds < 10_000,
@@ -82,7 +82,7 @@ public sealed class PortfolioHistoryRebuildPerformanceTests(SkarbiecContainersFi
     private static (DateOnly Date, decimal Value)[] Series(DateOnly from, DateOnly to, Func<int, decimal> value) =>
         [.. Enumerable.Range(0, to.DayNumber - from.DayNumber + 1).Select(i => (from.AddDays(i), value(i)))];
 
-    private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<PortfolioHistoryRebuildConsumer, ReportingDbContext>
+    private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<HistoryRebuildConsumer, ReportingDbContext>
     {
         public TestConsumerDefinition() => Endpoint(e => e.Name = QueueName);
     }

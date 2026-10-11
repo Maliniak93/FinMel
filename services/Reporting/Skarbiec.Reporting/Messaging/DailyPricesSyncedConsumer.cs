@@ -7,11 +7,11 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-// A failed portfolio stays out of the database so it never poisons the outbox transaction; failing to reach MarketData propagates for the retry.
+// A failed user stays out of the database so it never poisons the outbox transaction; failing to reach MarketData propagates for the retry.
 public sealed class DailyPricesSyncedConsumer(
     ReportingDbContext db,
     IPriceQuoteClient priceQuoteClient,
-    PortfolioSnapshotWriter snapshotWriter,
+    SnapshotWriter snapshotWriter,
     ILogger<DailyPricesSyncedConsumer> logger) : IConsumer<DailyPricesSynced>
 {
     public async Task Consume(ConsumeContext<DailyPricesSynced> context)
@@ -25,9 +25,9 @@ public sealed class DailyPricesSyncedConsumer(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<List<(Guid PortfolioId, Guid UserId)>> ValueAsync(DateOnly snapshotDate, CancellationToken cancellationToken)
+    private async Task<List<Guid>> ValueAsync(DateOnly snapshotDate, CancellationToken cancellationToken)
     {
-        // IgnoreQueryFilters: this consumer values every user's portfolios in one pass; archived ones are excluded.
+        // IgnoreQueryFilters: this consumer values every user in one pass; archived positions are excluded.
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
@@ -50,7 +50,7 @@ public sealed class DailyPricesSyncedConsumer(
         var existingSnapshots = await db.ValuationSnapshots
             .IgnoreQueryFilters()
             .Where(s => s.Date == snapshotDate)
-            .ToDictionaryAsync(s => s.PortfolioId, cancellationToken);
+            .ToDictionaryAsync(s => s.UserId, cancellationToken);
 
         // IgnoreQueryFilters: the sync date's lines of every user are upserted in this one pass.
         var existingLines = await db.AssetValuations
@@ -60,28 +60,29 @@ public sealed class DailyPricesSyncedConsumer(
 
         var computed = 0;
         var failed = 0;
-        List<(Guid PortfolioId, Guid UserId)> valued = [];
+        List<Guid> valued = [];
 
-        foreach (var group in positions.GroupBy(p => p.PortfolioId))
+        foreach (var group in positions.GroupBy(p => p.UserId))
         {
             try
             {
-                List<Position> portfolioPositions = [.. group];
-                snapshotWriter.UpsertPortfolio(
+                await SnapshotWriter.LockUserAsync(db, group.Key, cancellationToken);
+
+                List<Position> userPositions = [.. group];
+                snapshotWriter.UpsertUser(
                     group.Key,
-                    portfolioPositions[0].UserId,
-                    portfolioPositions,
+                    userPositions,
                     pricesByInstrument,
                     fxRatesByPair,
                     snapshotDate,
                     existingSnapshots.GetValueOrDefault(group.Key),
                     existingLines);
                 computed++;
-                valued.Add((group.Key, portfolioPositions[0].UserId));
+                valued.Add(group.Key);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "DailyPricesSyncedConsumer: valuation failed for portfolio {PortfolioId}.", group.Key);
+                logger.LogWarning(ex, "DailyPricesSyncedConsumer: valuation failed for user {UserId}.", group.Key);
                 failed++;
             }
         }
@@ -89,7 +90,7 @@ public sealed class DailyPricesSyncedConsumer(
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "DailyPricesSyncedConsumer: snapshot run for {SnapshotDate} finished: {Computed} portfolio(s) computed, {Failed} failed.",
+            "DailyPricesSyncedConsumer: snapshot run for {SnapshotDate} finished: {Computed} user(s) computed, {Failed} failed.",
             snapshotDate, computed, failed);
 
         return valued;
@@ -97,7 +98,7 @@ public sealed class DailyPricesSyncedConsumer(
 
     private async Task<HashSet<Guid>> RequestGapsAsync(
         ConsumeContext context,
-        IReadOnlyList<(Guid PortfolioId, Guid UserId)> valued,
+        IReadOnlyList<Guid> valued,
         DateOnly snapshotDate,
         CancellationToken cancellationToken)
     {
@@ -107,22 +108,20 @@ public sealed class DailyPricesSyncedConsumer(
             return requested;
         }
 
-        var portfolioIds = valued.Select(v => v.PortfolioId).ToList();
-
-        // IgnoreQueryFilters: the previous snapshots of every user's portfolios are read in one pass.
+        // IgnoreQueryFilters: the previous snapshots of every user are read in one pass.
         var latestBefore = await db.ValuationSnapshots
             .IgnoreQueryFilters()
-            .Where(s => portfolioIds.Contains(s.PortfolioId) && s.Date < snapshotDate)
-            .GroupBy(s => s.PortfolioId)
-            .Select(g => new { PortfolioId = g.Key, Latest = g.Max(s => s.Date) })
-            .ToDictionaryAsync(x => x.PortfolioId, x => x.Latest, cancellationToken);
+            .Where(s => valued.Contains(s.UserId) && s.Date < snapshotDate)
+            .GroupBy(s => s.UserId)
+            .Select(g => new { UserId = g.Key, Latest = g.Max(s => s.Date) })
+            .ToDictionaryAsync(x => x.UserId, x => x.Latest, cancellationToken);
 
-        foreach (var (portfolioId, userId) in valued)
+        foreach (var userId in valued)
         {
-            if (latestBefore.TryGetValue(portfolioId, out var latest) && latest < snapshotDate.AddDays(-1))
+            if (latestBefore.TryGetValue(userId, out var latest) && latest < snapshotDate.AddDays(-1))
             {
-                await HistoryRebuildRequests.RequestAsync(db, context, portfolioId, userId, latest.AddDays(1), cancellationToken);
-                requested.Add(portfolioId);
+                await HistoryRebuildRequests.RequestAsync(db, context, userId, latest.AddDays(1), cancellationToken);
+                requested.Add(userId);
             }
         }
 
@@ -137,15 +136,13 @@ public sealed class DailyPricesSyncedConsumer(
         var pending = await db.HistoryRebuildRequests
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(r => !requested.Contains(r.PortfolioId))
-            .Select(r => new { r.PortfolioId, r.UserId })
+            .Where(r => !requested.Contains(r.UserId))
+            .Select(r => r.UserId)
             .ToListAsync(cancellationToken);
 
-        foreach (var request in pending)
+        foreach (var userId in pending)
         {
-            await context.Publish(
-                new PortfolioHistoryRebuildRequested { PortfolioId = request.PortfolioId, UserId = request.UserId },
-                cancellationToken);
+            await context.Publish(new HistoryRebuildRequested { UserId = userId }, cancellationToken);
         }
     }
 
@@ -169,7 +166,7 @@ public sealed class DailyPricesSyncedConsumer(
         DateOnly snapshotDate,
         CancellationToken cancellationToken)
     {
-        var pairs = PortfolioSnapshotWriter.RequiredFxPairs(positions, pricesByInstrument);
+        var pairs = SnapshotWriter.RequiredFxPairs(positions, pricesByInstrument);
 
         return pairs.Count == 0
             ? new Dictionary<string, FxRateLookup>()

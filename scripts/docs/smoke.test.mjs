@@ -50,7 +50,7 @@ test("facts on this repository lists the contract events, the internal message, 
         "UserRegistered",
       ],
     );
-    assert.equal(messages.find((m) => m.name === "PortfolioHistoryRebuildRequested")?.kind, "internal");
+    assert.equal(messages.find((m) => m.name === "HistoryRebuildRequested")?.kind, "internal");
     assert.equal(messages.flatMap((m) => m.consumers).length, 10);
 
     const services = pages["bazy-danych"].facts.services;

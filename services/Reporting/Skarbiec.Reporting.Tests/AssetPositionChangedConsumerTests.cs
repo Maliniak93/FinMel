@@ -19,7 +19,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
     private const string QueueName = "asset-position-changed-consumer-test";
     private const string ProbeQueueName = "asset-position-changed-rebuild-probe-test";
 
-    private static readonly ConcurrentBag<Guid> RequestedPortfolios = [];
+    private static readonly ConcurrentBag<Guid> RequestedUsers = [];
 
     public async ValueTask InitializeAsync() => await MigrateAndResetAsync(containers);
 
@@ -135,7 +135,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
 
             await bus.Publish(Event(assetId, portfolioId, userId, quantity: 100m, version: 5), cancellationToken);
             await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 5);
-            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 100m);
+            await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 100m);
 
             await bus.Publish(Event(assetId, portfolioId, userId, quantity: 1m, version: 4), cancellationToken);
 
@@ -149,7 +149,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             Assert.Equal(5, position.Version);
             Assert.Equal(100m, position.Quantity);
 
-            var snapshot = await GetSnapshotAsync(containers, portfolioId, today, cancellationToken);
+            var snapshot = await GetSnapshotAsync(containers, userId, today, cancellationToken);
             Assert.NotNull(snapshot);
             Assert.Equal(100m, snapshot.TotalPln);
 
@@ -176,7 +176,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
 
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
             await WaitForPositionAsync(provider, assetId, cancellationToken);
-            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken);
+            await WaitForSnapshotAsync(provider, userId, today, cancellationToken);
 
             // Same MessageId: the inbox must skip the consumer body.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
@@ -194,7 +194,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             Assert.Equal(42m, position.Quantity);
 
             var snapshots = await db.ValuationSnapshots.IgnoreQueryFilters()
-                .Where(s => s.PortfolioId == portfolioId && s.Date == today)
+                .Where(s => s.UserId == userId && s.Date == today)
                 .ToListAsync(cancellationToken);
             Assert.Equal(42m, Assert.Single(snapshots).TotalPln);
 
@@ -219,7 +219,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(Event(assetId, portfolioId, userId, quantity: 1_000m, version: 0), cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken);
 
             Assert.Equal(1_000m, snapshot.TotalPln);
             Assert.Equal(userId, snapshot.UserId);
@@ -253,7 +253,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(Event(assetId, portfolioId, userId, quantity: 100m, version: 0, currency: "USD"), cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken);
 
             var line = Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
             Assert.Equal(400m, line.ValuePln);
@@ -293,7 +293,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken);
 
             var line = Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
             Assert.Equal(assetId, line.AssetId);
@@ -306,7 +306,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
     }
 
     [Fact]
-    public async Task Consume_RevaluesOnlyTheEventsPortfolio()
+    public async Task TwoPortfolios_OneUserSnapshot()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = Today;
@@ -321,14 +321,8 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         {
             await db.SeedPositionAsync(assetAId, userId, portfolioAId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m);
-            await db.SeedValuationLineAsync(userId, portfolioAId, assetAId, today, 100m, cancellationToken, quantity: 100m);
-            await db.SeedSnapshotAsync(userId, portfolioAId, today, 100m, cancellationToken);
-
-            // B's position says 5 000 PLN but its rows for today say 777, so any revaluation of B would show as 5 000.
             await db.SeedPositionAsync(assetBId, userId, portfolioBId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 5_000m);
-            await db.SeedValuationLineAsync(userId, portfolioBId, assetBId, today, 777m, cancellationToken, quantity: 777m);
-            await db.SeedSnapshotAsync(userId, portfolioBId, today, 777m, cancellationToken);
         }
 
         await RunConsumerAsync(async provider =>
@@ -336,15 +330,19 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(Event(assetAId, portfolioAId, userId, quantity: 300m, version: 1), cancellationToken);
 
-            await WaitForSnapshotAsync(provider, portfolioAId, today, cancellationToken, s => s.TotalPln == 300m);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 5_300m);
+            Assert.Equal(userId, snapshot.UserId);
 
-            var snapshotB = await GetSnapshotAsync(containers, portfolioBId, today, cancellationToken);
-            Assert.NotNull(snapshotB);
-            Assert.Equal(777m, snapshotB.TotalPln);
+            await using var db = OpenDbContext(containers);
+            Assert.Equal(1, await db.ValuationSnapshots.IgnoreQueryFilters().CountAsync(s => s.UserId == userId && s.Date == today, cancellationToken));
 
-            var lineB = Assert.Single(await GetLinesAsync(containers, portfolioBId, today, cancellationToken));
-            Assert.Equal(777m, lineB.ValuePln);
-            Assert.Equal(777m, lineB.Quantity);
+            var lines = await GetUserLinesAsync(containers, userId, today, cancellationToken);
+            Assert.Equal(2, lines.Count);
+            Assert.Equal(5_300m, lines.Sum(l => l.ValuePln));
+            Assert.Equal(300m, lines.Single(l => l.AssetId == assetAId).ValuePln);
+            Assert.Equal(portfolioAId, lines.Single(l => l.AssetId == assetAId).PortfolioId);
+            Assert.Equal(5_000m, lines.Single(l => l.AssetId == assetBId).ValuePln);
+            Assert.Equal(portfolioBId, lines.Single(l => l.AssetId == assetBId).PortfolioId);
         }, cancellationToken);
     }
 
@@ -373,9 +371,9 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             await WaitForPositionAsync(provider, archivedAssetId, cancellationToken);
 
             await bus.Publish(Event(controlAssetId, controlPortfolioId, userId, quantity: 50m, version: 0), cancellationToken);
-            await WaitForSnapshotAsync(provider, controlPortfolioId, today, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken);
 
-            Assert.Null(await GetSnapshotAsync(containers, archivedPortfolioId, today, cancellationToken));
+            Assert.Equal(50m, snapshot.TotalPln);
             Assert.Empty(await GetLinesAsync(containers, archivedPortfolioId, today, cancellationToken));
         }, cancellationToken);
     }
@@ -395,7 +393,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         {
             await db.SeedValuationLineAsync(userId, portfolioId, assetAId, yesterday, 111m, cancellationToken, quantity: 111m);
             await db.SeedValuationLineAsync(userId, portfolioId, assetBId, yesterday, 222m, cancellationToken, quantity: 222m);
-            await db.SeedSnapshotAsync(userId, portfolioId, yesterday, 333m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, yesterday, 333m, cancellationToken);
         }
 
         await RunConsumerAsync(async provider =>
@@ -403,17 +401,17 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 0), cancellationToken);
             await bus.Publish(Event(assetBId, portfolioId, userId, quantity: 200m, version: 0), cancellationToken);
-            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 300m);
+            await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 300m);
 
             await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 1, isArchived: true), cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 200m);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 200m);
             Assert.Equal(200m, snapshot.TotalPln);
             var line = Assert.Single(await GetLinesAsync(containers, portfolioId, today, cancellationToken));
             Assert.Equal(assetBId, line.AssetId);
             Assert.True((await WaitForPositionAsync(provider, assetAId, cancellationToken)).IsArchived);
 
-            var yesterdaySnapshot = await GetSnapshotAsync(containers, portfolioId, yesterday, cancellationToken);
+            var yesterdaySnapshot = await GetSnapshotAsync(containers, userId, yesterday, cancellationToken);
             Assert.Equal(333m, yesterdaySnapshot!.TotalPln);
             Assert.Equal(2, (await GetLinesAsync(containers, portfolioId, yesterday, cancellationToken)).Count);
         }, cancellationToken);
@@ -435,11 +433,11 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 0), cancellationToken);
             await bus.Publish(Event(assetBId, portfolioId, userId, quantity: 200m, version: 0), cancellationToken);
             await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 1, isArchived: true), cancellationToken);
-            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 200m);
+            await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 200m);
 
             await bus.Publish(Event(assetAId, portfolioId, userId, quantity: 100m, version: 2, isArchived: false), cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 300m);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 300m);
             Assert.Equal(300m, snapshot.TotalPln);
             var lines = await GetLinesAsync(containers, portfolioId, today, cancellationToken);
             Assert.Equal(2, lines.Count);
@@ -472,20 +470,20 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                     history: [(today.AddDays(-30), 10m), (today.AddDays(-10), 15m)]),
                 cancellationToken);
 
-            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            var request = await WaitForRebuildRequestAsync(provider, userId, cancellationToken);
             Assert.Equal(today.AddDays(-10), request.FromDate);
             Assert.Equal(userId, request.UserId);
 
             await WaitForAsync(
                 provider,
-                (_, _) => Task.FromResult(RequestedPortfolios.Count(id => id == portfolioId)),
+                (_, _) => Task.FromResult(RequestedUsers.Count(id => id == userId)),
                 count => count >= 1,
-                "The PortfolioHistoryRebuildRequested message",
+                "The HistoryRebuildRequested message",
                 cancellationToken);
 
             // Nothing signals a duplicate publish, so give one time to land before asserting there is exactly one.
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-            Assert.Equal(1, RequestedPortfolios.Count(id => id == portfolioId));
+            Assert.Equal(1, RequestedUsers.Count(id => id == userId));
         }, cancellationToken);
     }
 
@@ -503,7 +501,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
                 quantityHistory: [(today.AddDays(-30), 10m)]);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-20), cancellationToken, revision: 3);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-20), cancellationToken, revision: 3);
         }
 
         await RunConsumerAsync(async provider =>
@@ -514,7 +512,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                     history: [(today.AddDays(-30), 10m), (today.AddDays(-5), 15m)]),
                 cancellationToken);
 
-            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken, r => r.Revision > 3);
+            var request = await WaitForRebuildRequestAsync(provider, userId, cancellationToken, r => r.Revision > 3);
 
             Assert.Equal(today.AddDays(-20), request.FromDate);
             Assert.Equal(4, request.Revision);
@@ -556,8 +554,8 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             // Nothing signals an absent request, so give a late outbox delivery time to land before asserting none.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
-            Assert.Null(await GetRebuildRequestAsync(containers, portfolioId, cancellationToken));
-            Assert.DoesNotContain(portfolioId, RequestedPortfolios);
+            Assert.Null(await GetRebuildRequestAsync(containers, userId, cancellationToken));
+            Assert.DoesNotContain(userId, RequestedUsers);
         }, cancellationToken);
     }
 
@@ -584,7 +582,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Event(assetId, portfolioId, userId, quantity: 10m, version: 1, isArchived: false, history: [(today.AddDays(-30), 10m)]),
                 cancellationToken);
 
-            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            var request = await WaitForRebuildRequestAsync(provider, userId, cancellationToken);
             var position = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
 
             Assert.Equal(today.AddDays(-5), request.FromDate);
@@ -619,7 +617,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
 
             Assert.Equal(today, position.ArchivedOn);
-            Assert.Null(await GetRebuildRequestAsync(containers, portfolioId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, userId, cancellationToken));
         }, cancellationToken);
     }
 
@@ -666,11 +664,11 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         public TestConsumerDefinition() => Endpoint(e => e.Name = QueueName);
     }
 
-    private sealed class RebuildProbeConsumer : IConsumer<PortfolioHistoryRebuildRequested>
+    private sealed class RebuildProbeConsumer : IConsumer<HistoryRebuildRequested>
     {
-        public Task Consume(ConsumeContext<PortfolioHistoryRebuildRequested> context)
+        public Task Consume(ConsumeContext<HistoryRebuildRequested> context)
         {
-            RequestedPortfolios.Add(context.Message.PortfolioId);
+            RequestedUsers.Add(context.Message.UserId);
             return Task.CompletedTask;
         }
     }
