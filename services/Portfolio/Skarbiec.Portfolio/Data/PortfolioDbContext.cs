@@ -43,7 +43,6 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             asset.Property(a => a.Name).HasMaxLength(200);
             asset.Property(a => a.Currency).HasMaxLength(3);
             asset.Property(a => a.Quantity).HasPrecision(18, 8);
-            asset.Property(a => a.ManualValueAmount).HasPrecision(18, 2);
 
             // No FK, but every asset query filters by PortfolioId.
             asset.HasIndex(a => a.PortfolioId);

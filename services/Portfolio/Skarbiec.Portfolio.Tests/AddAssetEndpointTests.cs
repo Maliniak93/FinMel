@@ -45,8 +45,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
             AssetClass = AssetClass.PreciousMetal,
             Name = "Gold coin",
             Currency = "PLN",
-            ManualValue = 1000m,
-            ManualValueDate = new DateOnly(2026, 7, 1)
+            InstrumentId = Guid.NewGuid()
         };
 
         var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
@@ -60,10 +59,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     [InlineData(AssetClass.Cash)]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
-    [InlineData(AssetClass.Crypto)]
-    [InlineData(AssetClass.RealEstate)]
-    [InlineData(AssetClass.Other)]
-    public async Task Add_EveryAssetClassWithManualValue_ReturnsCreated(AssetClass assetClass)
+    public async Task Add_EveryCreatableAssetClass_ReturnsCreated(AssetClass assetClass)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -73,8 +69,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
             AssetClass = assetClass,
             Name = "Test asset",
             Currency = "USD",
-            ManualValue = 1000.50m,
-            ManualValueDate = new DateOnly(2026, 7, 1)
+            InstrumentId = AssetValuationModes.SupportsCurrencyValued(assetClass) ? null : FakeInstrumentLookupClient.IdFor(assetClass, "USD")
         };
 
         var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
@@ -87,8 +82,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         // No InitialTransaction here, so the quantity stays 0.
         Assert.Equal(0m, body.Quantity);
         Assert.Equal(0, body.TransactionCount);
-        Assert.Equal(1000.50m, body.ManualValue);
-        Assert.Equal(new DateOnly(2026, 7, 1), body.ManualValueDate);
         Assert.Equal(AssetUri(portfolioId, body.Id), response.Headers.Location?.OriginalString);
     }
 
@@ -98,7 +91,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var request = new { AssetClass = AssetClass.RealEstate, Name = "Flat", ManualValue = 500000m, ManualValueDate = new DateOnly(2026, 1, 1) };
+        var request = new { AssetClass = AssetClass.Cash, Name = "Wallet" };
 
         var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
 
@@ -267,9 +260,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         {
             AssetClass = AssetClass.Cash,
             Name = $"Cash in {currency}",
-            Currency = currency,
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = currency
         };
 
         var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
@@ -289,9 +280,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         {
             AssetClass = AssetClass.Cash,
             Name = "Swiss cash",
-            Currency = "CHF",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = "CHF"
         };
 
         var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
@@ -306,26 +295,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
-    public async Task Add_WithNegativeManualValue_ReturnsBadRequest()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var request = new AddAssetRequest
-        {
-            AssetClass = AssetClass.Cash,
-            Name = "Negative value",
-            Currency = "PLN",
-            ManualValue = -1m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
-        };
-
-        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Add_WithNegativeInitialTransactionQuantity_ReturnsBadRequestWithFieldDetails()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -336,8 +305,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
             AssetClass = AssetClass.Stock,
             Name = "Negative quantity",
             Currency = "PLN",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1),
             InitialTransaction = new RecordTransactionRequest
             {
                 Type = TransactionType.Buy,
@@ -366,9 +333,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         {
             AssetClass = AssetClass.Cash,
             Name = "Orphan",
-            Currency = "PLN",
-            ManualValue = 1m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = "PLN"
         };
 
         var response = await client.PostAsJsonAsync(AssetsUri(Guid.NewGuid()), request, cancellationToken);
@@ -384,9 +349,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         {
             AssetClass = AssetClass.Cash,
             Name = "Unauthorized",
-            Currency = "PLN",
-            ManualValue = 1m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = "PLN"
         };
 
         var response = await client.PostAsJsonAsync(AssetsUri(Guid.NewGuid()), request, TestContext.Current.CancellationToken);
@@ -415,8 +378,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal(instrumentId, body.InstrumentId);
-        Assert.Null(body.ManualValue);
-        Assert.Null(body.ManualValueDate);
     }
 
     [Fact]
@@ -426,7 +387,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var instrumentId = Guid.NewGuid();
-        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Crypto, "PLN");
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Etf, "PLN");
         var request = new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Wrong class", Currency = "PLN", InstrumentId = instrumentId };
 
         var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
@@ -484,28 +445,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
-    public async Task Add_WithBothInstrumentIdAndManualValue_ReturnsBadRequest()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var request = new AddAssetRequest
-        {
-            AssetClass = AssetClass.Stock,
-            Name = "Ambiguous",
-            Currency = "USD",
-            InstrumentId = Guid.NewGuid(),
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
-        };
-
-        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Add_WithNeitherInstrumentIdNorManualValue_ReturnsBadRequest()
+    public async Task Add_MarketClassWithoutInstrumentId_ReturnsBadRequest()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -547,8 +487,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(1_000m, body.Quantity);
         Assert.Equal(1, body.TransactionCount);
         Assert.Null(body.InstrumentId);
-        Assert.Null(body.ManualValue);
-        Assert.Null(body.ManualValueDate);
     }
 
     [Theory]
@@ -609,27 +547,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
-    public async Task Add_EveryAssetClassWithManualValue_ReturnsManualValuationMode()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
-        var request = new AddAssetRequest
-        {
-            AssetClass = AssetClass.Cash,
-            Name = "Manual cash",
-            Currency = "PLN",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1),
-        };
-
-        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
-
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.Equal(AssetValuationMode.Manual, body!.ValuationMode);
-    }
-
-    [Fact]
     public async Task AddAsset_ToArchivedPortfolio_Returns409()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -673,9 +590,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         {
             AssetClass = AssetClass.Cash,
             Name = "Sneaky cash",
-            Currency = "PLN",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
+            Currency = "PLN"
         };
 
         var response = await stranger.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
@@ -688,7 +603,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     [Theory]
     [InlineData("currency-valued")]
     [InlineData("currency-valued-with-opening-deposit")]
-    [InlineData("manual")]
     public async Task Add_DepositClass_ReturnsBadRequest(string shape)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -709,7 +623,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
                     Date = new DateOnly(2026, 1, 1)
                 }
             },
-            "manual" => request with { ManualValue = 1_000m, ManualValueDate = new DateOnly(2026, 1, 1) },
             _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
         };
 
@@ -724,7 +637,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     [Theory]
     [InlineData("currency-valued")]
     [InlineData("currency-valued-with-opening-deposit")]
-    [InlineData("manual")]
     public async Task Add_SavingsClass_ReturnsUseSavingsAccountEndpoints(string shape)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -745,7 +657,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
                     Date = new DateOnly(2026, 1, 1)
                 }
             },
-            "manual" => request with { ManualValue = 1_000m, ManualValueDate = new DateOnly(2026, 1, 1) },
             _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
         };
 

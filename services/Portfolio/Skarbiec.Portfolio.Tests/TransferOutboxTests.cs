@@ -127,7 +127,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
             walletId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
             cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
             brokerageId = await CreatePortfolioAsync(arrange.ServiceProvider, "Brokerage", cancellationToken);
-            stockId = await AddManualStockAsync(arrange.ServiceProvider, brokerageId, "Shares", cancellationToken);
+            stockId = await AddStockAsync(arrange.ServiceProvider, brokerageId, "Shares", cancellationToken);
         }
 
         var positionEventsBefore = await CountPositionEventsAsync(cancellationToken);

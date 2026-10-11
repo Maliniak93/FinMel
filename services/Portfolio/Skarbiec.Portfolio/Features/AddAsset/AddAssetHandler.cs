@@ -96,18 +96,6 @@ public sealed class AddAssetHandler(
             asset.InstrumentId = instrumentId;
             asset.ValuationMode = AssetValuationMode.Market;
         }
-        else if (request.ManualValue is { } manualAmount)
-        {
-            var manualValue = Money.Create(manualAmount, request.Currency);
-            if (manualValue.IsFailure)
-            {
-                return manualValue.Error;
-            }
-
-            asset.ManualValueAmount = manualValue.Value.Amount;
-            asset.ManualValueDate = request.ManualValueDate;
-            asset.ValuationMode = AssetValuationMode.Manual;
-        }
 
         // Fully validated before anything is staged, so a failure leaves no half-created asset.
         Transaction? initialTransaction = null;

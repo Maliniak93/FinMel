@@ -66,12 +66,10 @@ const asset: AssetResponse = {
   id: '11111111-1111-1111-1111-111111111111',
   portfolioId,
   assetClass: 2,
-  valuationMode: 1,
+  valuationMode: 0,
   name: 'Apple',
   currency: 'USD',
   quantity: 10,
-  manualValue: 1000,
-  manualValueDate: '2020-01-01',
   transactionCount: 0,
   isArchived: false,
 };
@@ -97,8 +95,6 @@ const currencyValuedAsset: AssetResponse = {
   name: 'Cash',
   currency: 'PLN',
   quantity: 1000,
-  manualValue: null,
-  manualValueDate: null,
   transactionCount: 1,
   isArchived: false,
 };
@@ -365,7 +361,7 @@ describe('Assets', () => {
       assetClass: 2,
       quoteCurrency: 'USD',
       exchange: null,
-      source: 1,
+      source: 0,
       verificationStatus: 0,
       lastPrice: 212,
       lastPriceDate: new Date().toISOString().slice(0, 10),
@@ -390,7 +386,7 @@ describe('Assets', () => {
       assetClass: 2,
       quoteCurrency: 'USD',
       exchange: null,
-      source: 1,
+      source: 0,
       verificationStatus: 0,
       lastPrice: 212,
       lastPriceDate: staleDate.toISOString().slice(0, 10),
@@ -410,7 +406,7 @@ describe('Assets', () => {
       assetClass: 2,
       quoteCurrency: 'USD',
       exchange: null,
-      source: 1,
+      source: 0,
       verificationStatus: 1,
       lastPrice: null,
       lastPriceDate: null,
@@ -435,9 +431,7 @@ describe('Assets', () => {
   it('does not flag a currency-valued asset as stale', async () => {
     await setup(jsonResponse([currencyValuedAsset]));
 
-    const cell = (fixture.nativeElement as HTMLElement).querySelector(
-      'td.mat-column-manualValueDate',
-    );
+    const cell = (fixture.nativeElement as HTMLElement).querySelector('td.mat-column-valuedOn');
     expect(cell?.textContent).toContain('—');
     expect(cell?.textContent).not.toContain('Stale');
   });
@@ -447,32 +441,6 @@ describe('Assets', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain(formatMoney(250, 'EUR'));
-  });
-
-  it('flags only a manual asset with an old valuation date as stale', async () => {
-    const staleDate = new Date();
-    staleDate.setMonth(staleDate.getMonth() - 7);
-    const freshDate = new Date();
-    freshDate.setDate(freshDate.getDate() - 7);
-
-    const staleManualAsset: AssetResponse = {
-      ...asset,
-      id: '77777777-7777-7777-7777-777777777777',
-      manualValueDate: staleDate.toISOString().slice(0, 10),
-    };
-    const freshManualAsset: AssetResponse = {
-      ...asset,
-      id: '88888888-8888-8888-8888-888888888888',
-      name: 'Fresh',
-      manualValueDate: freshDate.toISOString().slice(0, 10),
-    };
-
-    await setup(jsonResponse([staleManualAsset, freshManualAsset]));
-
-    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr.mat-mdc-row');
-    expect(rows.length).toBe(2);
-    expect(rows[0].textContent).toContain('Stale — refresh me');
-    expect(rows[1].textContent).not.toContain('Stale');
   });
 
   describe('archived portfolio is read-only', () => {
@@ -769,7 +737,7 @@ describe('Assets', () => {
       assetClass: 6,
       quoteCurrency: 'PLN',
       exchange: null,
-      source: 1,
+      source: 0,
       verificationStatus: 0,
       lastPrice: 500,
       lastPriceDate: new Date().toISOString().slice(0, 10),
@@ -905,18 +873,26 @@ describe('Assets', () => {
   });
 
   it('reformats values when the language changes', async () => {
-    const valuedAsset: AssetResponse = {
-      ...asset,
-      quantity: 12345.5,
-      manualValue: 1234.56,
-      manualValueDate: '2026-09-27',
+    const valuedAsset: AssetResponse = { ...marketAsset, quantity: 12345.5 };
+    const instrument: InstrumentDetailsResponse = {
+      id: instrumentId,
+      ticker: 'AAPL.US',
+      name: 'Apple Inc.',
+      assetClass: 2,
+      quoteCurrency: 'USD',
+      exchange: null,
+      source: 0,
+      verificationStatus: 0,
+      lastPrice: 0.1,
+      lastPriceDate: '2026-09-27',
     };
-    await setup(jsonResponse([valuedAsset]));
+    await setup(jsonResponse([valuedAsset]), undefined, jsonResponse(instrument));
+    await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     const cell = (column: string) => textOf(element.querySelector(`td.mat-column-${column}`));
     const money = (locale: string) =>
       new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' })
-        .format(1234.56)
+        .format(1234.55)
         .replace(/\s+/g, ' ');
     const quantity = (locale: string) =>
       new Intl.NumberFormat(locale, { maximumFractionDigits: 8 })
@@ -925,7 +901,7 @@ describe('Assets', () => {
 
     expect(cell('value')).toContain(money('en-US'));
     expect(cell('quantity')).toContain(quantity('en-US'));
-    expect(cell('manualValueDate')).toContain('Sep 27, 2026');
+    expect(cell('valuedOn')).toContain('Sep 27, 2026');
     const fetchesBefore = fetchSpy.mock.calls.length;
 
     await TestBed.inject(LanguageService).setLanguage('pl');
@@ -933,8 +909,8 @@ describe('Assets', () => {
 
     expect(cell('value')).toContain(money('pl-PL'));
     expect(cell('quantity')).toContain(quantity('pl-PL'));
-    expect(cell('manualValueDate')).toContain('27 wrz 2026');
-    expect(cell('manualValueDate')).not.toContain('Sep 27, 2026');
+    expect(cell('valuedOn')).toContain('27 wrz 2026');
+    expect(cell('valuedOn')).not.toContain('Sep 27, 2026');
     expect(fetchSpy.mock.calls.length).toBe(fetchesBefore);
   });
 
@@ -964,14 +940,29 @@ describe('Assets', () => {
 
     it('renders in Polish', async () => {
       const deposit = { ...depositAsset(maturity), name: 'Matured deposit' };
-      await setup(jsonResponse([asset, deposit]));
+      const staleDate = new Date();
+      staleDate.setDate(staleDate.getDate() - 10);
+      const staleInstrument: InstrumentDetailsResponse = {
+        id: instrumentId,
+        ticker: 'AAPL.US',
+        name: 'Apple Inc.',
+        assetClass: 2,
+        quoteCurrency: 'USD',
+        exchange: null,
+        source: 0,
+        verificationStatus: 0,
+        lastPrice: 212,
+        lastPriceDate: staleDate.toISOString().slice(0, 10),
+      };
+      await setup(jsonResponse([marketAsset, deposit]), undefined, jsonResponse(staleInstrument));
+      await fixture.whenStable();
       const element = fixture.nativeElement as HTMLElement;
       const texts = async () => [
         ...labelsOf(element, 'a.assets-page__back'),
         ...labelsOf(element, '.assets-page__header > button'),
         ...labelsOf(element, 'th:not(:empty)'),
         ...labelsOf(element, 'mat-chip'),
-        tooltipOf('.mat-column-manualValueDate mat-chip'),
+        tooltipOf('.mat-column-valuedOn mat-chip'),
         ...(await menuItems()),
       ];
       const heading = () => textOf(element.querySelector('h1'));
@@ -987,9 +978,9 @@ describe('Assets', () => {
         'Currency',
         'Value',
         'Valued on',
-        'Stale — refresh me',
+        'Stale',
         'Due',
-        'This valuation is more than 6 months old — consider refreshing it.',
+        "This instrument's price is more than 7 days old.",
         'Edit',
         'Archive',
         'Delete',
@@ -1034,7 +1025,7 @@ describe('Assets', () => {
         assetClass: 2,
         quoteCurrency: 'USD',
         exchange: null,
-        source: 1,
+        source: 0,
         verificationStatus: 0,
         lastPrice: 212,
         lastPriceDate: staleDate.toISOString().slice(0, 10),
@@ -1044,7 +1035,7 @@ describe('Assets', () => {
       const element = fixture.nativeElement as HTMLElement;
       const texts = () => [
         ...labelsOf(element, 'mat-chip'),
-        tooltipOf('.mat-column-manualValueDate mat-chip'),
+        tooltipOf('.mat-column-valuedOn mat-chip'),
       ];
 
       const english = texts();
@@ -1063,7 +1054,7 @@ describe('Assets', () => {
         assetClass: 2,
         quoteCurrency: 'USD',
         exchange: null,
-        source: 1,
+        source: 0,
         verificationStatus: 1,
         lastPrice: null,
         lastPriceDate: null,

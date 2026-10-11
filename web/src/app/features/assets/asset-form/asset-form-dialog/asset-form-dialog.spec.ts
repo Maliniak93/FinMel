@@ -21,12 +21,9 @@ import { SavingsAccountFormDialog } from '../../../deposits/savings-account-form
 import { ASSET_CLASS, ASSET_CLASSES } from '../../asset-class';
 import { AssetTypePicker } from '../asset-type-picker/asset-type-picker';
 import { CashAssetForm } from '../forms/cash-asset-form/cash-asset-form';
-import { ManualAssetForm } from '../forms/manual-asset-form/manual-asset-form';
 import { SecurityAssetForm } from '../forms/security-asset-form/security-asset-form';
 import {
   cashAsset,
-  cryptoAsset,
-  cryptoInstrumentDetails,
   findControl,
   hasControl,
   instrumentId,
@@ -35,6 +32,8 @@ import {
   renderedText,
   requestUrl,
   showValidationErrors,
+  stockAsset,
+  stockInstrumentDetails,
   toggleFirstTransaction,
 } from '../testing/asset-form-fixtures';
 import {
@@ -49,21 +48,14 @@ import { INSTRUMENT_REQUIRED_MESSAGE } from '../blocks/instrument-picker/instrum
 import { AssetFormDialog, type AssetFormDialogData } from './asset-form-dialog';
 import { provideI18nTesting } from '../../../../core/i18n/testing';
 
-type AssetFormComponent = CashAssetForm | SecurityAssetForm | ManualAssetForm;
+type AssetFormComponent = CashAssetForm | SecurityAssetForm;
 
-const FORM_COMPONENTS: readonly Type<AssetFormComponent>[] = [
-  CashAssetForm,
-  SecurityAssetForm,
-  ManualAssetForm,
-];
+const FORM_COMPONENTS: readonly Type<AssetFormComponent>[] = [CashAssetForm, SecurityAssetForm];
 
 const EXPECTED_FORM: Record<number, Type<AssetFormComponent>> = {
   [ASSET_CLASS.Cash]: CashAssetForm,
   [ASSET_CLASS.Stock]: SecurityAssetForm,
   [ASSET_CLASS.Etf]: SecurityAssetForm,
-  [ASSET_CLASS.Crypto]: SecurityAssetForm,
-  [ASSET_CLASS.RealEstate]: ManualAssetForm,
-  [ASSET_CLASS.Other]: ManualAssetForm,
 };
 
 describe('AssetFormDialog', () => {
@@ -147,7 +139,7 @@ describe('AssetFormDialog', () => {
       await setup({ portfolioId });
 
       expect(picker()).not.toBeNull();
-      expect(picker()!.querySelectorAll('button')).toHaveLength(10);
+      expect(picker()!.querySelectorAll('button')).toHaveLength(7);
       expect(renderedForms()).toEqual([]);
 
       for (const { value } of ASSET_CLASSES.filter(
@@ -347,36 +339,36 @@ describe('AssetFormDialog', () => {
 
   describe('edit', () => {
     it('edit opens the form of the stored class', async () => {
-      await setup({ portfolioId, asset: cryptoAsset }, async (input) =>
+      await setup({ portfolioId, asset: stockAsset }, async (input) =>
         requestUrl(input).includes('/instruments/')
-          ? jsonResponse(cryptoInstrumentDetails)
-          : jsonResponse(cryptoAsset),
+          ? jsonResponse(stockInstrumentDetails)
+          : jsonResponse(stockAsset),
       );
 
       expect(picker()).toBeNull();
       expect(renderedForms()).toEqual([SecurityAssetForm]);
-      expect(activeForm().assetClass()).toBe(ASSET_CLASS.Crypto);
+      expect(activeForm().assetClass()).toBe(ASSET_CLASS.Stock);
       expect(hasControl(activeForm().form, 'assetClass')).toBe(false);
       expect(renderedText(fixture)).not.toContain('Asset class');
-      expect(findControl(activeForm().form, 'name').value).toBe('Bitcoin');
+      expect(findControl(activeForm().form, 'name').value).toBe('Apple');
       expect(
         fetchSpy.mock.calls.some((call: unknown[]) =>
           requestUrl(call[0]).includes(`/instruments/${instrumentId}`),
         ),
       ).toBe(true);
-      expect(renderedText(fixture)).toContain('bitcoin');
+      expect(renderedText(fixture)).toContain('AAPL');
 
       const callsBefore = fetchSpy.mock.calls.length;
       await component['onSubmit']();
 
       const request = fetchSpy.mock.calls[callsBefore][0] as Request;
       expect(request.method).toBe('PUT');
-      expect(request.url).toContain(`/portfolios/${portfolioId}/assets/${cryptoAsset.id}`);
+      expect(request.url).toContain(`/portfolios/${portfolioId}/assets/${stockAsset.id}`);
       const body = await request.json();
       expect(body).not.toHaveProperty('initialTransaction');
       expect(body).toEqual({
-        assetClass: 5,
-        name: 'Bitcoin',
+        assetClass: 2,
+        name: 'Apple',
         currency: 'USD',
         instrumentId,
       });
@@ -468,9 +460,8 @@ describe('AssetFormDialog', () => {
         jsonResponse({ detail: 'Something odd happened.', errorCode: 'Unexpected.Whatever' }, 400),
       );
 
-      await pickTile(ASSET_CLASS.RealEstate);
-      findControl(activeForm().form, 'name').setValue('Apartment');
-      findControl(activeForm().form, 'manualValue').setValue(650000);
+      await pickTile(ASSET_CLASS.Cash);
+      findControl(activeForm().form, 'name').setValue('Checking account');
 
       await component['onSubmit']();
       fixture.detectChanges();
@@ -559,7 +550,7 @@ describe('AssetFormDialog', () => {
 
     it('shows a client-side validation message from a form step in Polish', async () => {
       await setup({ portfolioId });
-      await pickTile(ASSET_CLASS.Other);
+      await pickTile(ASSET_CLASS.Cash);
       await showValidationErrors(fixture, activeForm().form);
       const errors = () => labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
 

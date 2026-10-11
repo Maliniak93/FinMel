@@ -12,8 +12,6 @@
     { "date": "2024-03-04", "quantity": 15 },
     { "date": "2025-01-10", "quantity": 12.5 }
   ],
-  "manualValueAmount": null,
-  "manualValueDate": null,
   "portfolioIsArchived": false,
   "isArchived": true,
   "version": 3,

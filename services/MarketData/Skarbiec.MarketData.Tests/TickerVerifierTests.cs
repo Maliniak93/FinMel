@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
-using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.Yahoo;
 using Skarbiec.MarketData.Sources.Verification;
 using Skarbiec.MarketData.Tests.Fixtures;
@@ -119,34 +118,6 @@ public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : 
         var outcome = await verifier.VerifyAsync(PriceSource.Yahoo, "DOWN.US", cancellationToken);
 
         Assert.Equal(TickerVerificationOutcome.Unreachable, outcome);
-    }
-
-    [Fact]
-    public async Task VerifyAsync_CoinGeckoKnownId_ReturnsExists()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
-        var apiClient = new FakeCoinGeckoApiClient().WithLatestResponse(RecordedResponse.Read("coingecko-latest-happy-path.json"));
-        var source = new CoinGeckoPriceSource(apiClient, NullLogger<CoinGeckoPriceSource>.Instance);
-        var verifier = new TickerVerifier(db, [source], NullLogger<TickerVerifier>.Instance);
-
-        var outcome = await verifier.VerifyAsync(PriceSource.CoinGecko, "bitcoin", cancellationToken);
-
-        Assert.Equal(TickerVerificationOutcome.Exists, outcome);
-    }
-
-    [Fact]
-    public async Task VerifyAsync_CoinGeckoUnknownId_ReturnsDoesNotExist()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
-        var apiClient = new FakeCoinGeckoApiClient().WithLatestResponse(RecordedResponse.Read("coingecko-latest-no-data.json"));
-        var source = new CoinGeckoPriceSource(apiClient, NullLogger<CoinGeckoPriceSource>.Instance);
-        var verifier = new TickerVerifier(db, [source], NullLogger<TickerVerifier>.Instance);
-
-        var outcome = await verifier.VerifyAsync(PriceSource.CoinGecko, "not-a-real-coin-id-xyz", cancellationToken);
-
-        Assert.Equal(TickerVerificationOutcome.DoesNotExist, outcome);
     }
 
     [Fact]

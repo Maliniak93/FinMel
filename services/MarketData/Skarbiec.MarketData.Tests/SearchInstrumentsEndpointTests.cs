@@ -81,10 +81,10 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var crypto = await client.GetAsync(SearchInstrumentsUri("bitcoin", assetClass: AssetClass.Crypto), cancellationToken);
+        var nonSecurity = await client.GetAsync(SearchInstrumentsUri("deposit", assetClass: AssetClass.Cash), cancellationToken);
         var shortQuery = await client.GetAsync(SearchInstrumentsUri("c", assetClass: AssetClass.Stock), cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, crypto.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, nonSecurity.StatusCode);
         Assert.Equal(HttpStatusCode.OK, shortQuery.StatusCode);
         Assert.Empty(Factory.InstrumentSearch.Calls);
     }

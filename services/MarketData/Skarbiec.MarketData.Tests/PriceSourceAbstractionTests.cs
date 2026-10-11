@@ -78,7 +78,7 @@ public sealed class PriceSourceAbstractionTests
 
     private sealed class AlwaysNoDataPriceSource : IPriceSource
     {
-        public PriceSource Source => PriceSource.CoinGecko;
+        public PriceSource Source => PriceSource.GoldApi;
 
         public TimeSpan RequestDelay => TimeSpan.FromSeconds(2);
 

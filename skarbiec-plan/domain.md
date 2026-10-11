@@ -4,17 +4,16 @@ Target state (Część II.3). Items that don't exist on `master` yet are marked 
 
 ## Asset classes and valuation modes
 
-`AssetClass`: `Cash`, `Deposit`, `Stock`, `Etf`, `Bond`, `Crypto`, `PreciousMetal`, `RealEstate`, `Other`, `Savings` (appended, so the stored ints stay stable).
+`AssetClass`: `Cash = 0`, `Deposit = 1`, `Stock = 2`, `Etf = 3`, `Bond = 4`, `PreciousMetal = 6`, `Savings = 9` — explicit values, so the stored ints stay stable and removed members leave gaps.
 
-`AssetValuationMode` — three modes, explicit on `Asset.ValuationMode` (M1.4; before that, market-vs-manual was inferred from `InstrumentId is not null`, which had no way to express the third mode):
+`AssetValuationMode` — two modes, explicit on `Asset.ValuationMode` (`Market = 0`, `CurrencyValued = 2`):
 
 | Mode | Shape | Default classes |
 |---|---|---|
-| **Market** | points at an `Instrument` (ticker + source); value = quantity × last price × FX rate | Stock, Etf, Crypto, PreciousMetal |
-| **Manual** | `ManualValueAmount` + `ManualValueDate`, refreshed by hand | RealEstate, Other |
-| **Currency-valued** | no instrument, no manual value; value = quantity × FX rate for the asset's own currency (rate = 1 for PLN, so no lookup at all) | Cash, Deposit, Savings, Bond |
+| **Market** | points at an `Instrument` (ticker + source); value = quantity × last price × FX rate | Stock, Etf, PreciousMetal |
+| **Currency-valued** | no instrument; value = quantity × FX rate for the asset's own currency (rate = 1 for PLN, so no lookup at all) | Cash, Deposit, Savings, Bond |
 
-The class → default-mode mapping is a default, not a hard constraint — Market and Manual stay available to every class; only "neither instrument nor manual value" is gated by class, since that combination was always a validation error before Currency-valued existed.
+The class → default-mode mapping is a default, not a hard constraint — Market stays available to every class; only "no instrument" is gated by class: a Market class needs an instrument, and a Currency-valued class takes none.
 
 ## Identity (`identity_db`)
 
@@ -28,7 +27,7 @@ The class → default-mode mapping is a default, not a hard constraint — Marke
 | Entity | Fields | Changes vs today |
 |---|---|---|
 | `Portfolio` | `Id, UserId, Name, Description?, Currency, IsArchived` | `AssetCount` removed (spec-02); delete cascades to its assets and their transactions in the handler (spec-08) |
-| `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, ManualValueAmount?, ManualValueDate?, InstrumentId?, Version, IsArchived, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out); `IsArchived` is the asset's own archive flag, independent of its portfolio's (asset-archive) |
+| `Asset` | `Id, UserId, PortfolioId, AssetClass, ValuationMode, Name, Currency, Quantity, InstrumentId?, Version, IsArchived, xmin` | `ValuationMode` already explicit (M1.4); `TransactionCount` removed (spec-02); delete cascades to its transactions in the handler (spec-08); `Version` is the per-asset event-ordering counter `PositionEventPublisher` bumps (not `xmin`, which doesn't move on the archive/restore fan-out); `IsArchived` is the asset's own archive flag, independent of its portfolio's (asset-archive) |
 | `Transaction` | `Id, UserId, AssetId, Type, Quantity, UnitPriceAmount, FxRateToPln?, Date, TransferId?, xmin` | `FeeAmount` removed; `FxRateToPln` is the `{Asset.Currency}PLN` rate frozen at write time — the latest MarketData rate on or before `Date`, `1` for PLN, `null` when MarketData has none that early (ADR-026); `TransferId` (indexed, asset-transfers-deposit-funding) links the two legs of a transfer, `null` on an ordinary or detached transaction |
 | `TermDeposit` | `AssetId (PK, FK → Asset), UserId, BankName?, Principal, StartDate, TermLength, TermUnit (Days \| Months), MaturityDate, AnnualInterestRatePercent, Capitalization (AtMaturity \| Monthly \| Quarterly \| Yearly), TaxExempt, EarlyBreakInterestLossPercent, SettledOn?, SettledGrossInterest?, SettledTax?, RolloverCount` | new (term-deposits): the terms of a Deposit-class asset, 1:1 with it and the one real FK in `portfolio_db` (cascade delete); `MaturityDate` is derived on every write; the projection (`DepositInterestMath`: actual/365, gross per capitalisation period rounded half-away-from-zero to grosze, 19 % Belka tax per period rounded up, net compounded) and the `Active \| Due \| Settled \| PaidOut` status (Europe/Warsaw date; Settled wins over Due, PaidOut over Settled — a settled deposit with a `Withdraw` is paid out, deposit-payout-to-cash) are computed at read time, never stored; the three `Settled*` fields (term-deposits-settlement) record what the bank actually paid, set together by `SettleDeposit` and null until then; `RolloverCount` (deposit-rollover, default 0) counts the terms `RollOverDeposit` started, stored rather than derived from the transactions |
 | `SavingsAccount` | `AssetId (PK, FK → Asset), UserId, BankName?, AnnualInterestRatePercent, TaxExempt` | new (savings-accounts): the terms of a Savings-class asset, 1:1 with it and FK-cascaded like `TermDeposit`; `AnnualInterestRatePercent` is the current rate (no history); the balance is `Asset.Quantity`, moved only by the asset's ordinary transactions |
@@ -84,11 +83,9 @@ erDiagram
         uuid user_id
         uuid portfolio_id FK
         string asset_class
-        string valuation_mode "Market Manual CurrencyValued"
+        string valuation_mode "Market CurrencyValued"
         string currency
         numeric quantity
-        numeric manual_value_amount "Manual only"
-        date manual_value_date "Manual only"
         uuid instrument_id "Market only"
         bigint version "AssetPositionChanged ordering"
         bool is_archived "asset's own flag"
@@ -135,7 +132,7 @@ erDiagram
 | Entity | Fields | Role |
 |---|---|---|
 | `Currency` | `Code (PK), Name, Symbol, DecimalPlaces, DisplayOrder` | no `FallbackRateToPln`, no `IsPivot` (PLN is the fixed base). Seed: PLN, EUR, USD, GBP, CHF |
-| `Instrument` | `Id, Ticker, Name, Source, QuoteCurrency, AssetClass, Exchange?, VerificationStatus, HistoryCoveredFrom?` | `HistoryCoveredFrom` is the earliest date `HistoryBackfillJob` has covered (the requested date, even when the source clamped it), null until the first backfill. `QuoteCurrency` is unconstrained (whatever the provider quotes), except a Stock/Etf takes it and `Exchange` (the configured name, e.g. GPW, Xetra; null for Crypto/gold) from the `InstrumentSearch:Exchanges` entry matching its ticker suffix (ADR-030). Portfolio rejects a market asset whose class or currency differs from its instrument's |
+| `Instrument` | `Id, Ticker, Name, Source, QuoteCurrency, AssetClass, Exchange?, VerificationStatus, HistoryCoveredFrom?` | `HistoryCoveredFrom` is the earliest date `HistoryBackfillJob` has covered (the requested date, even when the source clamped it), null until the first backfill. `QuoteCurrency` is unconstrained (whatever the provider quotes), except a Stock/Etf takes it and `Exchange` (the configured name, e.g. GPW, Xetra; null for gold) from the `InstrumentSearch:Exchanges` entry matching its ticker suffix (ADR-030). Portfolio rejects a market asset whose class or currency differs from its instrument's |
 | `PriceQuote` | `InstrumentId, Date, ClosePrice` — unique (instrument, date) | unchanged |
 | `FxRate` | `Pair (e.g. USDPLN), Date, Rate` — unique (pair, date) | unchanged |
 | `SyncRun` | + `Kind: Prices \| Fx \| Backfill \| BondCatalog` | one log shape for all four jobs |
@@ -144,7 +141,7 @@ erDiagram
 | `BondSeries` | `Code (PK, e.g. EDO1036), Type (TreasuryBondType), Isin, SaleStart, SaleEnd, IssuePrice, SwapPrice?, MarginPercent?, UpdatedAtUtc` | global catalog of retail treasury bond series from MF's `Dane_dotyczace_obligacji_detalicznych.xls`; never deleted when a series drops out of the file |
 | `BondSeriesPeriodRate` | `(SeriesCode, PeriodIndex) PK, RatePercent` — FK cascade to `BondSeries` | every period rate MF has published, in percent; `PeriodIndex` 0 is the first period; replaced by the file's on every sync |
 
-Jobs: `FxSyncJob` daily over every catalog currency, 12-month backfill on a currency's first run; `PriceSyncJob` syncs only instruments in use; `HistoryBackfillJob` fires from the `AssetPositionChanged` consumer when the earliest `FirstTransactionDate` of an instrument's live holdings predates its `HistoryCoveredFrom` (or nothing is covered yet) — never at instrument creation — and fetches only `[from, HistoryCoveredFrom − 1 day]` (or up to today), clamped to the source's `MaxHistoryDays` (CoinGecko 365), so the history only grows backwards from the first purchase, and on success publishes `InstrumentHistoryBackfilled` with the fetched window through the outbox; `BondCatalogSyncJob` daily (`BondCatalogSync:Cron`, 07:00) scrapes the MF page for the file link, parses the file and upserts the bond catalog by code in one transaction — a failure leaves the catalog unchanged — and runs once at startup when the catalog is empty. All four write a `SyncRun` and respect `Testing:DisableBackgroundJobs`.
+Jobs: `FxSyncJob` daily over every catalog currency, 12-month backfill on a currency's first run; `PriceSyncJob` syncs only instruments in use; `HistoryBackfillJob` fires from the `AssetPositionChanged` consumer when the earliest `FirstTransactionDate` of an instrument's live holdings predates its `HistoryCoveredFrom` (or nothing is covered yet) — never at instrument creation — and fetches only `[from, HistoryCoveredFrom − 1 day]` (or up to today), clamped to the source's `MaxHistoryDays` (unset for Yahoo and GoldApi), so the history only grows backwards from the first purchase, and on success publishes `InstrumentHistoryBackfilled` with the fetched window through the outbox; `BondCatalogSyncJob` daily (`BondCatalogSync:Cron`, 07:00) scrapes the MF page for the file link, parses the file and upserts the bond catalog by code in one transaction — a failure leaves the catalog unchanged — and runs once at startup when the catalog is empty. All four write a `SyncRun` and respect `Testing:DisableBackgroundJobs`.
 
 ```mermaid
 erDiagram
@@ -160,7 +157,7 @@ erDiagram
     INSTRUMENT {
         uuid id PK
         string ticker
-        string source "Yahoo CoinGecko GoldApi"
+        string source "Yahoo GoldApi"
         string quote_currency
         string asset_class
         string verification_status "Verified Unverified Failed"
@@ -282,7 +279,6 @@ erDiagram
 ```
 asset value (PLN) =
   if Market:            Quantity × last PriceQuote × FxRate(quote currency → PLN, same date)
-  if Manual:             ManualValueAmount × FxRate(currency → PLN, snapshot date)
   if Currency-valued:   Quantity × FxRate(currency → PLN, snapshot date)
 
 portfolio value = Σ assets ; net worth = Σ portfolios
@@ -290,7 +286,7 @@ portfolio value = Σ assets ; net worth = Σ portfolios
 
 No price for a given day → use the last known one (weekends, holidays); mark `IsStale` when the price or rate used is more than 7 days old. Unchanged by the redesign — only *where* it runs moves, from Reporting querying Portfolio/MarketData live to Reporting valuing its own `Position` rows against a daily price/FX batch.
 
-**History (ADR-032).** A change to the past (a backdated, edited or deleted transaction, a Manual value change, an archive or restore) makes Reporting rewrite every day from the earliest affected date to yesterday for that portfolio. Per day `d`: the quantity is the last `QuantityHistory` point on or before `d`, the price and rate are the last series element on or before `d` (from MarketData's history batches), and the day goes through the same `ValuationAlgorithm`. A Market or Currency-valued position has a line from its first history date, a Manual one from `ManualValueDate` (its stored lines before that date are kept), and none from the day it or its portfolio is archived; a day with no line gets no snapshot, except an archived portfolio's days, which get a zero snapshot. Today is not rebuilt — it stays with the ADR-025 path.
+**History (ADR-032).** A change to the past (a backdated, edited or deleted transaction, an archive or restore) makes Reporting rewrite every day from the earliest affected date to yesterday for that portfolio. Per day `d`: the quantity is the last `QuantityHistory` point on or before `d`, the price and rate are the last series element on or before `d` (from MarketData's history batches), and the day goes through the same `ValuationAlgorithm`. A position has a line from its first history date, and none from the day it or its portfolio is archived; a day with no line gets no snapshot, except an archived portfolio's days, which get a zero snapshot. Today is not rebuilt — it stays with the ADR-025 path.
 
 ## Invariants
 
@@ -317,7 +313,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 - One `PriceQuote` per (instrument, date); one `FxRate` per (pair, date) — unique indexes.
 - Every user-owned entity carries `UserId` from the JWT — enforced by an architecture test, never trusted from the request body (ADR-006).
 - A user-chosen currency (`Portfolio.Currency`, `Asset.Currency`) is one of `SupportedCurrencies` (PLN/EUR/USD, default PLN, canonical uppercase) — validated on write only; this does not constrain `Instrument.QuoteCurrency` or `FxRate.Pair`.
-- `Asset.ValuationMode` is exactly one of Market / Manual / Currency-valued, enforced by request validation, not a DB constraint.
+- `Asset.ValuationMode` is exactly one of Market / Currency-valued, enforced by request validation, not a DB constraint.
 
 ## Conscious simplifications
 

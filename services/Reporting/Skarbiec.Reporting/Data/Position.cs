@@ -24,11 +24,6 @@ public sealed class Position : IUserOwned
     // Market mode multiplier: the price is per quote unit (a gram of metal), the quantity in pieces.
     public decimal QuoteUnitsPerQuantity { get; set; } = 1m;
 
-    // Manual mode only, set together with ManualValueDate.
-    public decimal? ManualValueAmount { get; set; }
-
-    public DateOnly? ManualValueDate { get; set; }
-
     // Kept current by both the per-asset fan-out and the archive and restore consumers.
     public required bool PortfolioIsArchived { get; set; }
 

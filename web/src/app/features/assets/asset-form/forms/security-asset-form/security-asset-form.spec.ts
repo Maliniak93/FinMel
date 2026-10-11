@@ -75,15 +75,15 @@ describe('SecurityAssetForm', () => {
     expect(component.toBody()).toMatchObject({ name: 'My world ETF', instrumentId });
   });
 
-  it('offers the custom-ticker link only for Crypto, not for Stock or Etf', async () => {
+  it('offers no custom-ticker link for Stock or Etf', async () => {
     await setup(2);
     expect(renderedText(fixture)).not.toContain('Verify a new ticker');
 
     TestBed.resetTestingModule();
     fetchSpy.mockRestore();
 
-    await setup(5);
-    expect(renderedText(fixture)).toContain('Verify a new ticker');
+    await setup(3);
+    expect(renderedText(fixture)).not.toContain('Verify a new ticker');
   });
 
   it('checked first transaction → defaults to Buy with unit price 0', async () => {
@@ -97,7 +97,7 @@ describe('SecurityAssetForm', () => {
   });
   describe('in Polish', () => {
     it('renders in Polish', async () => {
-      await setup(5);
+      await setup(2);
       const element = fixture.nativeElement as HTMLElement;
       const texts = () => [
         ...labelsOf(element, 'mat-label'),
@@ -114,7 +114,6 @@ describe('SecurityAssetForm', () => {
         'Instrument',
         'Search by ticker or name',
         'Pick an existing instrument above, or verify a new ticker below — creation is blocked until one is selected.',
-        "Can't find it? Verify a new ticker",
         'Add first transaction',
       ]);
 

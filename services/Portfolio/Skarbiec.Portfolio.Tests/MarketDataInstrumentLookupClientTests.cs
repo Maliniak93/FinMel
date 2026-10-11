@@ -80,14 +80,14 @@ public sealed class MarketDataInstrumentLookupClientTests(SkarbiecContainersFixt
         var found = await CheckWithResponseAsync(
             () => new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = JsonContent.Create(new { assetClass = AssetClass.Crypto, quoteCurrency = "USD" }),
+                Content = JsonContent.Create(new { assetClass = AssetClass.Etf, quoteCurrency = "USD" }),
             },
             cancellationToken);
         var notFound = await CheckWithResponseAsync(() => new HttpResponseMessage(HttpStatusCode.NotFound), cancellationToken);
         var serverError = await CheckWithResponseAsync(() => new HttpResponseMessage(HttpStatusCode.InternalServerError), cancellationToken);
 
         Assert.Equal(InstrumentLookupStatus.Found, found.Status);
-        Assert.Equal(AssetClass.Crypto, found.AssetClass);
+        Assert.Equal(AssetClass.Etf, found.AssetClass);
         Assert.Equal("USD", found.QuoteCurrency);
         Assert.Equal(InstrumentLookupStatus.NotFound, notFound.Status);
         Assert.Equal(InstrumentLookupStatus.Unavailable, serverError.Status);

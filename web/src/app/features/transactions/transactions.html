@@ -11,9 +11,6 @@
         <p class="transactions-page__summary">
           {{ assetClassLabel(asset.assetClass) | transloco }} · {{ 'assets.quantity' | transloco }}
           {{ formatQuantity(asset.quantity) }}
-          @if (asset.manualValue !== null && asset.manualValue !== undefined) {
-            · {{ formatMoney(asset.manualValue, asset.currency) }}
-          }
         </p>
       } @else {
         <h1>{{ 'transactions.title' | transloco }}</h1>

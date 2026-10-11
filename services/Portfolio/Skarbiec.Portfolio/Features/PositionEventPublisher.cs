@@ -92,8 +92,6 @@ public sealed class PositionEventPublisher(
             Currency = asset.Currency,
             Quantity = asset.Quantity,
             QuoteUnitsPerQuantity = await QuoteUnitsPerQuantityAsync(asset, cancellationToken),
-            ManualValueAmount = asset.ManualValueAmount,
-            ManualValueDate = asset.ManualValueDate,
             FirstTransactionDate = quantityHistory.Count == 0 ? null : quantityHistory[0].Date,
             QuantityHistory = quantityHistory,
             PortfolioIsArchived = portfolioIsArchived,

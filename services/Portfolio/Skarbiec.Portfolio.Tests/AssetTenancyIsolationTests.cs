@@ -140,8 +140,6 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
     {
         AssetClass = AssetClass.Cash,
         Name = "Stranger's edit",
-        Currency = "PLN",
-        ManualValue = 1m,
-        ManualValueDate = new DateOnly(2026, 1, 1)
+        Currency = "PLN"
     };
 }

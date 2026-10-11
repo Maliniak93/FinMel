@@ -40,8 +40,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             AssetClass = AssetClass.Cash,
             Name = "Outbox test asset",
             Currency = "PLN",
-            ManualValue = 100m,
-            ManualValueDate = new DateOnly(2026, 1, 1)
         };
 
         var result = await handler.HandleAsync(portfolioResult.Value.Id, request, cancellationToken);
@@ -57,7 +55,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Equal(UserId, evt.UserId);
         Assert.Equal(AssetClass.Cash, evt.AssetClass);
         Assert.Equal("PLN", evt.Currency);
-        Assert.Equal(100m, evt.ManualValueAmount);
+        Assert.Equal(AssetValuationMode.CurrencyValued, evt.ValuationMode);
         Assert.False(evt.PortfolioIsArchived);
     }
 
@@ -73,7 +71,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
         Assert.True(assetResult.IsSuccess);
 
@@ -90,8 +88,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Equal(AssetValuationMode.Market, updateEvent.ValuationMode);
         Assert.Equal(instrumentId, updateEvent.InstrumentId);
         Assert.Equal("USD", updateEvent.Currency);
-        Assert.Null(updateEvent.ManualValueAmount);
-        Assert.Null(updateEvent.ManualValueDate);
     }
 
     [Fact]
@@ -106,7 +102,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
 
         var removeResult = await scope.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
@@ -135,13 +131,13 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
 
         await scope.ServiceProvider.GetRequiredService<UpdateAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
             assetResult.Value.Id,
-            new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash renamed", Currency = "PLN", ManualValue = 50m, ManualValueDate = new DateOnly(2026, 1, 2) },
+            new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash renamed", Currency = "PLN" },
             cancellationToken);
 
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
@@ -509,7 +505,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var result = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         Assert.True(result.IsSuccess);
 
@@ -525,7 +521,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         await using var scope = Provider.CreateAsyncScope();
         var portfolioId = (await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken)).Value.Id;
-        await AddManualStockAsync(scope.ServiceProvider, portfolioId, "Shares", cancellationToken);
+        await AddStockAsync(scope.ServiceProvider, portfolioId, "Shares", cancellationToken);
 
         var evt = Assert.Single(await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()
             .ReadPublishedAsync<AssetPositionChanged>(cancellationToken));

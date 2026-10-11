@@ -26,7 +26,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
 
         var transactionResult = await scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
@@ -53,7 +53,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var buyResult = await scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>().HandleAsync(
             portfolioResult.Value.Id,
@@ -86,7 +86,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2026, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
         await recordHandler.HandleAsync(
@@ -121,7 +121,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
 
@@ -163,7 +163,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", ManualValue = 0m, ManualValueDate = new DateOnly(2024, 1, 1) },
+            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
         var earliest = await recordHandler.HandleAsync(

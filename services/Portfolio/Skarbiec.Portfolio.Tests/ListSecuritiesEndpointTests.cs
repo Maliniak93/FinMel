@@ -178,7 +178,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
-    public async Task Excludes_ArchivedManualAndOtherClasses()
+    public async Task Excludes_ArchivedAndUnsupportedClasses()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SavingsTodayUtc);
@@ -187,14 +187,13 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         var live = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Live stock", ticker: "LIVE");
         var archived = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Archived stock", ticker: "OLD");
         await client.ArchiveAssetAsync(portfolioId, archived, cancellationToken);
-        await client.AddAssetAsync(portfolioId, cancellationToken, name: "Manual stock", assetClass: AssetClass.Stock, manualValue: 500m);
-        await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, AssetClass.Crypto, name: "Bitcoin", ticker: "BTC");
+        await client.AddCashAssetAsync(portfolioId, cancellationToken);
         var archivedPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Closed");
         await AddQuotedHoldingAsync(client, archivedPortfolioId, cancellationToken, name: "Stock in closed portfolio", ticker: "CLS");
         await client.ArchivePortfolioAsync(archivedPortfolioId, cancellationToken);
 
         var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
-        var unsupported = await client.GetAsync(AllSecuritiesUri(AssetClass.Crypto), cancellationToken);
+        var unsupported = await client.GetAsync(AllSecuritiesUri(AssetClass.Cash), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;

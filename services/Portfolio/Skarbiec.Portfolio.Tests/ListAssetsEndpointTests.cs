@@ -88,11 +88,9 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
                 Id = assetId,
                 PortfolioId = portfolioId,
                 AssetClass = AssetClass.Cash,
-                ValuationMode = AssetValuationMode.Manual,
+                ValuationMode = AssetValuationMode.CurrencyValued,
                 Name = "Legacy GBP cash",
-                Currency = "GBP",
-                ManualValueAmount = 100m,
-                ManualValueDate = new DateOnly(2026, 1, 1)
+                Currency = "GBP"
             });
             await seedContext.SaveChangesAsync(cancellationToken);
         }

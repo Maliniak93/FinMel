@@ -11,7 +11,7 @@ public sealed class Instrument
     public required string QuoteCurrency { get; set; }
     public required AssetClass AssetClass { get; set; }
 
-    // The configured exchange name (GPW, Xetra) of a Stock/Etf listing; null for crypto and metals.
+    // The configured exchange name (GPW, Xetra) of a Stock/Etf listing; null for metals.
     public string? Exchange { get; set; }
 
     // Verified by default: only AddCustomInstrument starts an instrument Unverified.

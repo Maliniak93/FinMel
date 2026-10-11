@@ -132,7 +132,7 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken, portfolioName: "Old savings");
         await client.AddCashAssetAsync(portfolioId, cancellationToken);
-        await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock, manualValue: 100m);
+        await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock);
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);

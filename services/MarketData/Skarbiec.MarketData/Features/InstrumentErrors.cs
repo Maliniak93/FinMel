@@ -8,12 +8,12 @@ internal static class InstrumentErrors
     public static Error UnsupportedCustomSource(PriceSource source) =>
         new(
             "Validation.UnsupportedInstrumentSource",
-            $"Custom instruments can't use source '{source}' — it serves only the built-in gold and silver instruments. Use Yahoo or CoinGecko.");
+            $"Custom instruments can't use source '{source}' — it serves only the built-in gold and silver instruments.");
 
     public static Error UnsupportedAssetClass(AssetClass assetClass) =>
         new(
             "Validation.UnsupportedInstrumentAssetClass",
-            $"Asset class '{assetClass}' has no market data provider — custom instruments are only for Stock, Etf or Crypto.");
+            $"Asset class '{assetClass}' has no market data provider — custom instruments are only for Stock or Etf.");
 
     public static Error TickerNotFound(PriceSource source, string ticker) =>
         new(

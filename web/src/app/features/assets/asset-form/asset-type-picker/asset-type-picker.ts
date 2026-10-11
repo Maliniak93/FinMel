@@ -11,10 +11,7 @@ const ASSET_CLASS_ICONS: Record<AssetClass, string> = {
   [ASSET_CLASS.Stock]: 'show_chart',
   [ASSET_CLASS.Etf]: 'stacked_line_chart',
   [ASSET_CLASS.Bond]: 'receipt_long',
-  [ASSET_CLASS.Crypto]: 'currency_bitcoin',
   [ASSET_CLASS.PreciousMetal]: 'diamond',
-  [ASSET_CLASS.RealEstate]: 'home',
-  [ASSET_CLASS.Other]: 'category',
   [ASSET_CLASS.Savings]: 'account_balance',
 };
 

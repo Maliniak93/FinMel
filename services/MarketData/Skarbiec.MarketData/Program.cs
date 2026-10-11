@@ -20,7 +20,6 @@ using Skarbiec.MarketData.Features.SearchInstruments;
 using Skarbiec.MarketData.Features.TriggerSync;
 using Skarbiec.MarketData.Messaging;
 using Skarbiec.MarketData.Sources;
-using Skarbiec.MarketData.Sources.CoinGecko;
 using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Sources.MfBonds;
 using Skarbiec.MarketData.Sources.Nbp;
@@ -50,7 +49,6 @@ if (!OpenApiBuildTime.IsActive)
 
     builder.AddNbpSources();
     builder.AddYahooSource();
-    builder.AddCoinGeckoSource();
     builder.AddGoldApiSource();
     builder.AddMfBondSource();
     builder.AddPriceSyncJob();

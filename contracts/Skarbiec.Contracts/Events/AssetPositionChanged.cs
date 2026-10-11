@@ -18,11 +18,6 @@ public sealed record AssetPositionChanged
     /// <summary>Quote units per unit of Quantity: grams of fine metal per piece for PreciousMetal, 1 for every other class.</summary>
     public required decimal QuoteUnitsPerQuantity { get; init; }
 
-    /// <summary>Manual mode only, set together with ManualValueDate.</summary>
-    public decimal? ManualValueAmount { get; init; }
-
-    public DateOnly? ManualValueDate { get; init; }
-
     /// <summary>Date of the asset's earliest transaction; null when it has none.</summary>
     public DateOnly? FirstTransactionDate { get; init; }
 

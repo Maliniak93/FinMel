@@ -109,52 +109,6 @@ public sealed class PortfolioHistoryRebuildConsumerTests(SkarbiecContainersFixtu
     }
 
     [Fact]
-    public async Task Rebuild_Manual_ValuesFromManualValueDateAndKeepsEarlierLines()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var today = Today;
-        var userId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
-        var assetId = Guid.NewGuid();
-
-        await using (var db = OpenDbContext(containers))
-        {
-            await db.SeedPositionAsync(assetId, userId, portfolioId, cancellationToken,
-                assetClass: AssetClass.RealEstate, valuationMode: AssetValuationMode.Manual, currency: "EUR", quantity: 1m,
-                manualValueAmount: 500_000m, manualValueDate: today.AddDays(-10));
-            await db.SeedValuationLineAsync(userId, portfolioId, assetId, today.AddDays(-15), 450_000m, cancellationToken,
-                assetClass: AssetClass.RealEstate, fxRateUsed: 4.0m);
-            await db.SeedHistoryRebuildRequestAsync(userId, portfolioId, today.AddDays(-20), cancellationToken);
-        }
-
-        var client = new FakePriceQuoteClient().WithFxHistory("EURPLN", (today.AddDays(-12), 4.2m));
-
-        await RunConsumerAsync(client, async provider =>
-        {
-            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(portfolioId, userId, cancellationToken);
-            await WaitForNoRebuildRequestAsync(provider, portfolioId, cancellationToken);
-
-            var kept = Assert.Single(await GetLinesAsync(containers, portfolioId, today.AddDays(-15), cancellationToken));
-            Assert.Equal(450_000m, kept.ValuePln);
-            Assert.Equal(4.0m, kept.FxRateUsed);
-
-            for (var offset = 14; offset >= 11; offset--)
-            {
-                Assert.Empty(await GetLinesAsync(containers, portfolioId, today.AddDays(-offset), cancellationToken));
-            }
-
-            for (var offset = 10; offset >= 1; offset--)
-            {
-                var line = Assert.Single(await GetLinesAsync(containers, portfolioId, today.AddDays(-offset), cancellationToken));
-                Assert.Equal(500_000m * 4.2m, line.ValuePln);
-
-                var snapshot = await GetSnapshotAsync(containers, portfolioId, today.AddDays(-offset), cancellationToken);
-                Assert.Equal(500_000m * 4.2m, snapshot!.TotalPln);
-            }
-        }, cancellationToken);
-    }
-
-    [Fact]
     public async Task Rebuild_ArchivedPortfolio_ZeroFromArchiveDate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

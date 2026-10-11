@@ -58,9 +58,6 @@ public sealed class AssetTransactionTypesTests
     [Theory]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
-    [InlineData(AssetClass.Crypto)]
-    [InlineData(AssetClass.RealEstate)]
-    [InlineData(AssetClass.Other)]
     public void Allowed_NonCashLikeClass_ReturnsEveryType(AssetClass assetClass)
     {
         Assert.Equal(Enum.GetValues<TransactionType>().Order(), AssetTransactionTypes.Allowed(assetClass).Order());

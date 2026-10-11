@@ -2182,22 +2182,6 @@
             ],
             "format": "uuid"
           },
-          "manualValue": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "manualValueDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
           "initialTransaction": {
             "oneOf": [
               {
@@ -2522,22 +2506,6 @@
               "string"
             ],
             "format": "double"
-          },
-          "manualValue": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "manualValueDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
           },
           "instrumentId": {
             "type": [
@@ -4859,22 +4827,6 @@
               "string"
             ],
             "format": "uuid"
-          },
-          "manualValue": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "manualValueDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
           }
         }
       },

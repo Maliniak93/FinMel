@@ -457,11 +457,8 @@ describe('TransactionFormDialog', () => {
       expect(body.cashAssetId ?? null).toBeNull();
     });
 
-    it('has no Cash select for a Crypto Buy', async () => {
-      await setup(
-        { portfolioId, assetId, assetClass: ASSET_CLASS.Crypto, currency: 'EUR' },
-        respond,
-      );
+    it('has no Cash select for a Cash asset', async () => {
+      await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash, currency: 'EUR' }, respond);
       fixture.detectChanges();
       await fixture.whenStable();
       expect(cashSelect()).toBeNull();

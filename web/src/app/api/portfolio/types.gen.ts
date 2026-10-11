@@ -9,8 +9,6 @@ export type AddAssetRequest = {
     name: string;
     currency?: string;
     instrumentId?: null | string;
-    manualValue?: null | number | string;
-    manualValueDate?: null | string;
     initialTransaction?: null | RecordTransactionRequest;
 };
 
@@ -70,8 +68,6 @@ export type AssetResponse = {
     name: string;
     currency: string;
     quantity: number | string;
-    manualValue?: null | number | string;
-    manualValueDate?: null | string;
     instrumentId?: null | string;
     transactionCount: number | string;
     depositMaturityDate?: null | string;
@@ -517,8 +513,6 @@ export type UpdateAssetRequest = {
     name: string;
     currency: string;
     instrumentId?: null | string;
-    manualValue?: null | number | string;
-    manualValueDate?: null | string;
 };
 
 export type UpdateBondRequest = {

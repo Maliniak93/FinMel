@@ -98,21 +98,7 @@ public sealed class PortfolioHistoryRebuildConsumer(
             ? new Dictionary<string, IReadOnlyList<FxRateLookup>>()
             : await priceQuoteClient.GetFxHistoryAsync(pairs, from, to, cancellationToken);
 
-        var manualAssetIds = positions
-            .Where(p => p.ValuationMode == AssetValuationMode.Manual)
-            .Select(p => p.AssetId)
-            .ToList();
-
-        // IgnoreQueryFilters: the stored Manual lines belong to the request's user, not to a request user.
-        var storedManualLines = manualAssetIds.Count == 0
-            ? []
-            : await db.AssetValuations
-                .AsNoTracking()
-                .IgnoreQueryFilters()
-                .Where(l => l.PortfolioId == portfolioId && manualAssetIds.Contains(l.AssetId) && l.Date >= from && l.Date <= to)
-                .ToListAsync(cancellationToken);
-
-        var days = HistoryRebuild.Compute(positions, priceSeries, fxSeries, from, to, storedManualLines);
+        var days = HistoryRebuild.Compute(positions, priceSeries, fxSeries, from, to);
 
         // IgnoreQueryFilters: the rows being replaced belong to the request's user, not to a request user.
         await db.AssetValuations

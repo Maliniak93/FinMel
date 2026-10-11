@@ -1,25 +1,22 @@
 namespace Skarbiec.Contracts;
 
+// The ints are stored: keep them pinned.
 public enum AssetValuationMode
 {
     // Quantity × last quote × FxRate(quote currency→PLN).
-    Market,
-
-    // ManualValueAmount × FxRate(Currency→PLN) at the snapshot date.
-    Manual,
+    Market = 0,
 
     // Quantity × FxRate(Currency→PLN), e.g. plain cash, a term deposit or a treasury bond.
-    CurrencyValued,
+    CurrencyValued = 2,
 }
 
-// A default, not a constraint: Market and Manual stay open to every class; only "neither field set" is gated by it.
+// A default, not a constraint: Market stays open to every class; only "no instrument" is gated by it.
 public static class AssetValuationModes
 {
     public static AssetValuationMode Default(AssetClass assetClass) => assetClass switch
     {
         AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.Bond => AssetValuationMode.CurrencyValued,
-        AssetClass.Stock or AssetClass.Etf or AssetClass.Crypto or AssetClass.PreciousMetal => AssetValuationMode.Market,
-        AssetClass.RealEstate or AssetClass.Other => AssetValuationMode.Manual,
+        AssetClass.Stock or AssetClass.Etf or AssetClass.PreciousMetal => AssetValuationMode.Market,
         _ => throw new ArgumentOutOfRangeException(nameof(assetClass), assetClass, "Unmapped AssetClass — add it to AssetValuationModes.Default."),
     };
 

@@ -4,11 +4,11 @@
 
 ## Vision
 
-A multi-user web application for managing personal wealth. The user enters assets and transactions manually; the system automatically fetches currency rates and price quotes (stocks, ETFs, precious metals, crypto), values the portfolio, tracks net-worth history, and supports decision-making: target allocation, rebalancing, emergency fund, savings goals.
+A multi-user web application for managing personal wealth. The user enters assets and transactions manually; the system automatically fetches currency rates and price quotes (stocks, ETFs, precious metals), values the portfolio, tracks net-worth history, and supports decision-making: target allocation, rebalancing, emergency fund, savings goals.
 
 ## The problem we solve
 
-- Wealth scattered across many places (bank accounts, IKE/IKZE, broker, crypto, real estate, cash) — no single net-worth view.
+- Wealth scattered across many places (bank accounts, IKE/IKZE, broker, cash) — no single net-worth view.
 - Manual spreadsheets don't update prices and don't compute rebalancing.
 - No systematic tracking of strategy execution (allocation drift, emergency-fund status, goal progress).
 
@@ -26,9 +26,9 @@ A multi-user web application for managing personal wealth. The user enters asset
 
 - Registration / login; 15-minute JWT + rotated httpOnly refresh cookie; per-user data isolation.
 - Portfolios: create, edit, archive.
-- Assets in three valuation modes: market (ticker-priced), manual, currency-valued.
+- Assets in two valuation modes: market (ticker-priced) and currency-valued.
 - Transactions: buy, sell, deposit, withdrawal, dividend, interest — asset quantity derived from transaction history.
-- Automatic FX rates (NBP) and quotes (Stooq, CoinGecko) — daily job.
+- Automatic FX rates (NBP) and quotes (Yahoo, gold-api.com) — daily job.
 - Ticker verification before a market asset is created, so a typo doesn't silently create a dead instrument (ADR-018).
 - Portfolio valuation in PLN, net-worth dashboard, value history.
 - Dark theme.
