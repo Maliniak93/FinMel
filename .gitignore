@@ -41,3 +41,5 @@ skarbiec-plan/issues/
 skarbiec-plan/prompts/
 # Generated local code guide (scripts/docs.mjs, /docs)
 skarbiec-plan/przewodnik/
+# Logs of unattended epic runs (scripts/epic.mjs)
+skarbiec-plan/epic-runs/
