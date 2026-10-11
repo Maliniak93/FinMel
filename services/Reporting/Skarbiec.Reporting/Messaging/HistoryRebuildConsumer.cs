@@ -8,31 +8,31 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-// Holds the portfolio's advisory lock across the MarketData calls; a failure there propagates and rolls everything back, request included.
-public sealed class PortfolioHistoryRebuildConsumer(
+// Holds the user's advisory lock across the MarketData calls; a failure there propagates and rolls everything back, request included.
+public sealed class HistoryRebuildConsumer(
     ReportingDbContext db,
     IPriceQuoteClient priceQuoteClient,
     TimeProvider timeProvider,
-    ILogger<PortfolioHistoryRebuildConsumer> logger) : IConsumer<PortfolioHistoryRebuildRequested>
+    ILogger<HistoryRebuildConsumer> logger) : IConsumer<HistoryRebuildRequested>
 {
     private const string RevisionGuardSavepoint = "revision_guard";
 
-    public async Task Consume(ConsumeContext<PortfolioHistoryRebuildRequested> context)
+    public async Task Consume(ConsumeContext<HistoryRebuildRequested> context)
     {
-        var portfolioId = context.Message.PortfolioId;
+        var userId = context.Message.UserId;
         var cancellationToken = context.CancellationToken;
 
-        await PortfolioSnapshotWriter.LockPortfolioAsync(db, portfolioId, cancellationToken);
+        await SnapshotWriter.LockUserAsync(db, userId, cancellationToken);
 
-        // IgnoreQueryFilters: a consumer has no request user and rewrites the portfolio of the user the request names.
+        // IgnoreQueryFilters: a consumer has no request user and rewrites the user the request names.
         var request = await db.HistoryRebuildRequests
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(r => r.PortfolioId == portfolioId, cancellationToken);
+            .SingleOrDefaultAsync(r => r.UserId == userId, cancellationToken);
 
         if (request is null)
         {
-            logger.LogInformation("PortfolioHistoryRebuildConsumer: no pending rebuild for portfolio {PortfolioId}.", portfolioId);
+            logger.LogInformation("HistoryRebuildConsumer: no pending rebuild for user {UserId}.", userId);
             return;
         }
 
@@ -60,7 +60,7 @@ public sealed class PortfolioHistoryRebuildConsumer(
         {
             await db.HistoryRebuildRequests
                 .IgnoreQueryFilters()
-                .Where(r => r.PortfolioId == request.PortfolioId && r.Revision == request.Revision)
+                .Where(r => r.UserId == request.UserId && r.Revision == request.Revision)
                 .ExecuteDeleteAsync(cancellationToken);
         }
         catch (Exception exception) when (transaction is not null && IsSerializationFailure(exception))
@@ -72,13 +72,13 @@ public sealed class PortfolioHistoryRebuildConsumer(
 
     private async Task RewriteAsync(HistoryRebuildRequest request, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
-        var portfolioId = request.PortfolioId;
+        var userId = request.UserId;
 
         // IgnoreQueryFilters: the positions belong to the request's user, not to a request user.
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => p.PortfolioId == portfolioId)
+            .Where(p => p.UserId == userId)
             .ToListAsync(cancellationToken);
 
         var instrumentIds = positions
@@ -93,28 +93,29 @@ public sealed class PortfolioHistoryRebuildConsumer(
         var quoteCurrencies = priceSeries
             .Where(s => s.Value.Count > 0)
             .ToDictionary(s => s.Key, s => s.Value[0]);
-        var pairs = PortfolioSnapshotWriter.RequiredFxPairs(positions, quoteCurrencies);
+        var pairs = SnapshotWriter.RequiredFxPairs(positions, quoteCurrencies);
         var fxSeries = pairs.Count == 0
             ? new Dictionary<string, IReadOnlyList<FxRateLookup>>()
             : await priceQuoteClient.GetFxHistoryAsync(pairs, from, to, cancellationToken);
 
         var days = HistoryRebuild.Compute(positions, priceSeries, fxSeries, from, to);
+        var portfolioByAsset = positions.ToDictionary(p => p.AssetId, p => p.PortfolioId);
 
         // IgnoreQueryFilters: the rows being replaced belong to the request's user, not to a request user.
         await db.AssetValuations
             .IgnoreQueryFilters()
-            .Where(l => l.PortfolioId == portfolioId && l.Date >= from && l.Date <= to)
+            .Where(l => l.UserId == userId && l.Date >= from && l.Date <= to)
             .ExecuteDeleteAsync(cancellationToken);
         await db.ValuationSnapshots
             .IgnoreQueryFilters()
-            .Where(s => s.PortfolioId == portfolioId && s.Date >= from && s.Date <= to)
+            .Where(s => s.UserId == userId && s.Date >= from && s.Date <= to)
             .ExecuteDeleteAsync(cancellationToken);
 
         db.AssetValuations.AddRange(days.SelectMany(day => day.Lines.Select(line => new AssetValuation
         {
             Id = Guid.NewGuid(),
-            UserId = request.UserId,
-            PortfolioId = portfolioId,
+            UserId = userId,
+            PortfolioId = portfolioByAsset[line.AssetId],
             AssetId = line.AssetId,
             Date = day.Date,
             AssetClass = line.AssetClass,
@@ -129,8 +130,7 @@ public sealed class PortfolioHistoryRebuildConsumer(
         db.ValuationSnapshots.AddRange(days.Select(day => new ValuationSnapshot
         {
             Id = Guid.NewGuid(),
-            UserId = request.UserId,
-            PortfolioId = portfolioId,
+            UserId = userId,
             Date = day.Date,
             TotalPln = day.TotalPln,
             IsStale = day.IsStale,
@@ -139,8 +139,8 @@ public sealed class PortfolioHistoryRebuildConsumer(
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "PortfolioHistoryRebuildConsumer: rebuilt {Days} day(s) of portfolio {PortfolioId} from {From} to {To}.",
-            days.Count, portfolioId, from, to);
+            "HistoryRebuildConsumer: rebuilt {Days} day(s) of user {UserId} from {From} to {To}.",
+            days.Count, userId, from, to);
     }
 
     // The Npgsql execution strategy wraps the transient PostgresException in an InvalidOperationException.

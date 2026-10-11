@@ -4,7 +4,7 @@ using Skarbiec.Reporting.Data;
 namespace Skarbiec.Reporting.Valuation;
 
 // Not a service layer: a stateless helper so the upsert logic exists once, writing through the caller's DbContext.
-public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider timeProvider)
+public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvider)
 {
     private const string BaseCurrency = "PLN";
 
@@ -22,17 +22,17 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
             .ToList();
 
     // Values from the stored last prices and rates only, and drops today's lines of assets that are gone.
-    public async Task RevalueTodayAsync(Guid portfolioId, Guid userId, CancellationToken cancellationToken)
+    public async Task RevalueTodayAsync(Guid userId, CancellationToken cancellationToken)
     {
         var today = Today;
 
-        await LockPortfolioAsync(db, portfolioId, cancellationToken);
+        await LockUserAsync(db, userId, cancellationToken);
 
         // IgnoreQueryFilters: a consumer has no request user and writes for the user the event names.
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => p.PortfolioId == portfolioId && !p.PortfolioIsArchived && !p.IsArchived)
+            .Where(p => p.UserId == userId && !p.PortfolioIsArchived && !p.IsArchived)
             .ToListAsync(cancellationToken);
 
         var pricesByInstrument = await LoadLatestPricesAsync(positions, cancellationToken);
@@ -41,15 +41,15 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
         // IgnoreQueryFilters: the snapshot belongs to the event's user, not to a request user.
         var existingSnapshot = await db.ValuationSnapshots
             .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(s => s.PortfolioId == portfolioId && s.Date == today, cancellationToken);
+            .SingleOrDefaultAsync(s => s.UserId == userId && s.Date == today, cancellationToken);
 
         // IgnoreQueryFilters: the lines belong to the event's user, not to a request user.
         var existingLines = await db.AssetValuations
             .IgnoreQueryFilters()
-            .Where(l => l.PortfolioId == portfolioId && l.Date == today)
+            .Where(l => l.UserId == userId && l.Date == today)
             .ToDictionaryAsync(l => l.AssetId, cancellationToken);
 
-        UpsertPortfolio(portfolioId, userId, positions, pricesByInstrument, fxRatesByPair, today, existingSnapshot, existingLines);
+        UpsertUser(userId, positions, pricesByInstrument, fxRatesByPair, today, existingSnapshot, existingLines);
 
         var heldAssetIds = positions.Select(p => p.AssetId).ToHashSet();
         db.AssetValuations.RemoveRange(existingLines.Values.Where(l => !heldAssetIds.Contains(l.AssetId)));
@@ -57,13 +57,12 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    // Serializes writers of one portfolio across queues; released when the inbox transaction ends.
-    public static Task LockPortfolioAsync(ReportingDbContext db, Guid portfolioId, CancellationToken cancellationToken) =>
-        db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({AdvisoryLockKey(portfolioId)})", cancellationToken);
+    // Serializes writers of one user across queues; released when the inbox transaction ends.
+    public static Task LockUserAsync(ReportingDbContext db, Guid userId, CancellationToken cancellationToken) =>
+        db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({AdvisoryLockKey(userId)})", cancellationToken);
 
-    // Stages only, with no I/O, so nothing reaches Postgres for a portfolio until the caller saves.
-    public void UpsertPortfolio(
-        Guid portfolioId,
+    // Stages only, with no I/O, so nothing reaches Postgres for a user until the caller saves.
+    public void UpsertUser(
         Guid userId,
         IReadOnlyList<Position> positions,
         IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument,
@@ -87,9 +86,11 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
 
         var result = ValuationAlgorithm.Calculate(valuationPositions, pricesByInstrument, fxRatesByPair, snapshotDate);
 
+        var portfolioByAsset = positions.ToDictionary(p => p.AssetId, p => p.PortfolioId);
+
         foreach (var valued in result.Lines)
         {
-            UpsertLine(portfolioId, userId, valued, snapshotDate, existingLines);
+            UpsertLine(portfolioByAsset[valued.AssetId], userId, valued, snapshotDate, existingLines);
         }
 
         if (existingSnapshot is not null)
@@ -104,7 +105,6 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            PortfolioId = portfolioId,
             Date = snapshotDate,
             TotalPln = result.TotalPln,
             IsStale = result.IsStale,
@@ -189,6 +189,6 @@ public sealed class PortfolioSnapshotWriter(ReportingDbContext db, TimeProvider 
                 cancellationToken);
     }
 
-    // A collision only over-serializes two portfolios; it never under-serializes one.
-    private static long AdvisoryLockKey(Guid portfolioId) => BitConverter.ToInt64(portfolioId.ToByteArray(), 0);
+    // A collision only over-serializes two users; it never under-serializes one.
+    private static long AdvisoryLockKey(Guid userId) => BitConverter.ToInt64(userId.ToByteArray(), 0);
 }

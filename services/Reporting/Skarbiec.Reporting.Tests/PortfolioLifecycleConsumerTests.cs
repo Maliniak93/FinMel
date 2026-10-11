@@ -66,25 +66,30 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
     }
 
     [Fact]
-    public async Task Consume_PortfolioDeleted_RemovesPositionsAndValuationHistory()
+    public async Task Delete_RequestsUserRebuild()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var earliestLine = today.AddDays(-10);
         var deletedPortfolioId = Guid.NewGuid();
         var otherPortfolioId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var deletedAssetId = Guid.NewGuid();
         var otherAssetId = Guid.NewGuid();
-        var valuationDate = new DateOnly(2026, 8, 1);
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(deletedAssetId, userId, deletedPortfolioId, cancellationToken);
-            await db.SeedValuationLineAsync(userId, deletedPortfolioId, deletedAssetId, valuationDate, 1_000m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, deletedPortfolioId, valuationDate, 1_000m, cancellationToken);
+            await db.SeedPositionAsync(deletedAssetId, userId, deletedPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedPositionAsync(otherAssetId, userId, otherPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 2_000m);
 
-            await db.SeedPositionAsync(otherAssetId, userId, otherPortfolioId, cancellationToken);
-            await db.SeedValuationLineAsync(userId, otherPortfolioId, otherAssetId, valuationDate, 2_000m, cancellationToken);
-            await db.SeedSnapshotAsync(userId, otherPortfolioId, valuationDate, 2_000m, cancellationToken);
+            foreach (var date in new[] { earliestLine, today.AddDays(-3), today })
+            {
+                await db.SeedValuationLineAsync(userId, deletedPortfolioId, deletedAssetId, date, 1_000m, cancellationToken, quantity: 1_000m);
+                await db.SeedValuationLineAsync(userId, otherPortfolioId, otherAssetId, date, 2_000m, cancellationToken, quantity: 2_000m);
+                await db.SeedSnapshotAsync(userId, date, 3_000m, cancellationToken);
+            }
         }
 
         await RunConsumerAsync(async provider =>
@@ -98,17 +103,73 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
             }, cancellationToken);
 
             await WaitForNoPositionsAsync(provider, deletedPortfolioId, cancellationToken);
+            var request = await WaitForRebuildRequestAsync(provider, userId, cancellationToken);
+
+            Assert.Equal(earliestLine, request.FromDate);
+            Assert.Equal(userId, request.UserId);
 
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
 
             Assert.Empty(await db.Positions.IgnoreQueryFilters().Where(p => p.PortfolioId == deletedPortfolioId).ToListAsync(cancellationToken));
             Assert.Empty(await db.AssetValuations.IgnoreQueryFilters().Where(l => l.PortfolioId == deletedPortfolioId).ToListAsync(cancellationToken));
-            Assert.Empty(await db.ValuationSnapshots.IgnoreQueryFilters().Where(s => s.PortfolioId == deletedPortfolioId).ToListAsync(cancellationToken));
 
             Assert.Single(await db.Positions.IgnoreQueryFilters().Where(p => p.PortfolioId == otherPortfolioId).ToListAsync(cancellationToken));
-            Assert.Single(await db.AssetValuations.IgnoreQueryFilters().Where(l => l.PortfolioId == otherPortfolioId).ToListAsync(cancellationToken));
-            Assert.Single(await db.ValuationSnapshots.IgnoreQueryFilters().Where(s => s.PortfolioId == otherPortfolioId).ToListAsync(cancellationToken));
+            Assert.Equal(3, await db.AssetValuations.IgnoreQueryFilters().CountAsync(l => l.PortfolioId == otherPortfolioId, cancellationToken));
+
+            var todaySnapshot = await GetSnapshotAsync(containers, userId, today, cancellationToken);
+            Assert.NotNull(todaySnapshot);
+            Assert.Equal(2_000m, todaySnapshot.TotalPln);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Archive_DropsFromUserSnapshot()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var yesterday = today.AddDays(-1);
+        var archivedPortfolioId = Guid.NewGuid();
+        var keptPortfolioId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var archivedAssetId = Guid.NewGuid();
+        var keptAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(archivedAssetId, userId, archivedPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedPositionAsync(keptAssetId, userId, keptPortfolioId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 500m);
+
+            foreach (var date in new[] { yesterday, today })
+            {
+                await db.SeedValuationLineAsync(userId, archivedPortfolioId, archivedAssetId, date, 1_000m, cancellationToken, quantity: 1_000m);
+                await db.SeedValuationLineAsync(userId, keptPortfolioId, keptAssetId, date, 500m, cancellationToken, quantity: 500m);
+                await db.SeedSnapshotAsync(userId, date, 1_500m, cancellationToken);
+            }
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(new PortfolioArchived
+            {
+                PortfolioId = archivedPortfolioId,
+                UserId = userId,
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 500m);
+            Assert.Equal(userId, snapshot.UserId);
+
+            var todaysLine = Assert.Single(await GetUserLinesAsync(containers, userId, today, cancellationToken));
+            Assert.Equal(keptAssetId, todaysLine.AssetId);
+
+            var earlier = await GetSnapshotAsync(containers, userId, yesterday, cancellationToken);
+            Assert.NotNull(earlier);
+            Assert.Equal(1_500m, earlier.TotalPln);
+            Assert.Equal(2, (await GetUserLinesAsync(containers, userId, yesterday, cancellationToken)).Count);
         }, cancellationToken);
     }
 
@@ -142,7 +203,7 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken);
 
             Assert.Equal(1_500m, snapshot.TotalPln);
             Assert.Equal(userId, snapshot.UserId);
@@ -182,7 +243,7 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
 
-            var request = await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            var request = await WaitForRebuildRequestAsync(provider, userId, cancellationToken);
             var positions = await WaitForPositionsAsync(provider, portfolioId, cancellationToken, ps => ps.All(p => !p.PortfolioIsArchived));
 
             Assert.Equal(today.AddDays(-5), request.FromDate);
@@ -238,7 +299,7 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "PLN", quantity: 1_000m, portfolioIsArchived: false);
             await db.SeedValuationLineAsync(userId, portfolioId, cashAssetId, today, 1_000m, cancellationToken, quantity: 1_000m);
-            await db.SeedSnapshotAsync(userId, portfolioId, today, 1_000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, today, 1_000m, cancellationToken);
         }
 
         await RunConsumerAsync(async provider =>
@@ -251,7 +312,7 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 0m);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 0m);
 
             Assert.Equal(0m, snapshot.TotalPln);
             Assert.Equal(userId, snapshot.UserId);
@@ -276,7 +337,7 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
                 currency: "PLN", quantity: 1_000m, portfolioIsArchived: false);
             await db.SeedValuationLineAsync(userId, portfolioId, cashAssetId, yesterday, 1_000m, cancellationToken, quantity: 1_000m);
-            await db.SeedSnapshotAsync(userId, portfolioId, yesterday, 1_000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, yesterday, 1_000m, cancellationToken);
         }
 
         await RunConsumerAsync(async provider =>
@@ -289,9 +350,9 @@ public sealed class PortfolioLifecycleConsumerTests(SkarbiecContainersFixture co
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
 
-            await WaitForSnapshotAsync(provider, portfolioId, today, cancellationToken, s => s.TotalPln == 0m);
+            await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 0m);
 
-            var earlier = await GetSnapshotAsync(containers, portfolioId, yesterday, cancellationToken);
+            var earlier = await GetSnapshotAsync(containers, userId, yesterday, cancellationToken);
             Assert.NotNull(earlier);
             Assert.Equal(1_000m, earlier.TotalPln);
 

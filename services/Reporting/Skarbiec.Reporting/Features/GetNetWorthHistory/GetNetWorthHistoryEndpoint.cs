@@ -20,7 +20,6 @@ public static class GetNetWorthHistoryEndpoint
         GetNetWorthHistoryHandler handler,
         CancellationToken cancellationToken,
         string range = "1Y",
-        Guid? portfolioId = null,
         AssetClass? assetClass = null)
-        => (await handler.HandleAsync(range, portfolioId, assetClass, cancellationToken)).ToHttpResult();
+        => (await handler.HandleAsync(range, assetClass, cancellationToken)).ToHttpResult();
 }

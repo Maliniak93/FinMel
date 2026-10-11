@@ -5,8 +5,8 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-// The per-asset fan-out carries the same flag; whichever lands first, the zero snapshot is written once.
-public sealed class PortfolioArchivedConsumer(ReportingDbContext db, PortfolioSnapshotWriter snapshotWriter)
+// The per-asset fan-out carries the same flag; whichever lands first, today's snapshot is revalued the same way.
+public sealed class PortfolioArchivedConsumer(ReportingDbContext db, SnapshotWriter snapshotWriter)
     : IConsumer<PortfolioArchived>
 {
     public async Task Consume(ConsumeContext<PortfolioArchived> context)
@@ -24,10 +24,10 @@ public sealed class PortfolioArchivedConsumer(ReportingDbContext db, PortfolioSn
 
         if (affectedFrom is { } from && from < snapshotWriter.Today)
         {
-            await HistoryRebuildRequests.RequestAsync(db, context, message.PortfolioId, message.UserId, from, cancellationToken);
+            await HistoryRebuildRequests.RequestAsync(db, context, message.UserId, from, cancellationToken);
         }
 
-        // RevalueTodayAsync reads only non-archived positions, so this writes a zero snapshot for today.
-        await snapshotWriter.RevalueTodayAsync(message.PortfolioId, message.UserId, cancellationToken);
+        // RevalueTodayAsync reads only non-archived positions, so today's snapshot drops this portfolio's lines.
+        await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
     }
 }

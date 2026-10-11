@@ -52,15 +52,15 @@ public sealed class InstrumentHistoryBackfilledConsumerTests(SkarbiecContainersF
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(BackfilledEvent(instrumentXId, today), cancellationToken);
 
-            var requestA = await WaitForRebuildRequestAsync(provider, portfolioAId, cancellationToken);
+            var requestA = await WaitForRebuildRequestAsync(provider, userAId, cancellationToken);
             Assert.Equal(today.AddDays(-100), requestA.FromDate);
             Assert.Equal(userAId, requestA.UserId);
 
-            var requestB = await WaitForRebuildRequestAsync(provider, portfolioBId, cancellationToken);
+            var requestB = await WaitForRebuildRequestAsync(provider, userBId, cancellationToken);
             Assert.Equal(today.AddDays(-60), requestB.FromDate);
             Assert.Equal(userBId, requestB.UserId);
 
-            Assert.Null(await GetRebuildRequestAsync(containers, portfolioCId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, userCId, cancellationToken));
         }, cancellationToken);
     }
 
@@ -91,9 +91,9 @@ public sealed class InstrumentHistoryBackfilledConsumerTests(SkarbiecContainersF
             await bus.Publish(BackfilledEvent(instrumentId, today), cancellationToken);
 
             // The earlier holding is the witness that the consumer has run; the later one must not be requested in the same pass.
-            await WaitForRebuildRequestAsync(provider, earlyPortfolioId, cancellationToken);
+            await WaitForRebuildRequestAsync(provider, earlyUserId, cancellationToken);
 
-            Assert.Null(await GetRebuildRequestAsync(containers, latePortfolioId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, lateUserId, cancellationToken));
         }, cancellationToken);
     }
 
@@ -120,7 +120,7 @@ public sealed class InstrumentHistoryBackfilledConsumerTests(SkarbiecContainersF
             var @event = BackfilledEvent(instrumentId, today);
 
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
-            await WaitForRebuildRequestAsync(provider, portfolioId, cancellationToken);
+            await WaitForRebuildRequestAsync(provider, userId, cancellationToken);
 
             // Same MessageId: the inbox must skip the consumer body, so the revision is not bumped again.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
@@ -128,7 +128,7 @@ public sealed class InstrumentHistoryBackfilledConsumerTests(SkarbiecContainersF
             // Nothing signals a skip, so give a redelivery time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
-            var request = await GetRebuildRequestAsync(containers, portfolioId, cancellationToken);
+            var request = await GetRebuildRequestAsync(containers, userId, cancellationToken);
             Assert.NotNull(request);
             Assert.Equal(1L, request.Revision);
         }, cancellationToken);

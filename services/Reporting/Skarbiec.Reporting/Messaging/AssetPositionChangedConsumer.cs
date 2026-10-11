@@ -9,7 +9,7 @@ namespace Skarbiec.Reporting.Messaging;
 // Ordered by the per-asset Version, not a timestamp: an older event is dropped, an equal one is the same state.
 public sealed class AssetPositionChangedConsumer(
     ReportingDbContext db,
-    PortfolioSnapshotWriter snapshotWriter,
+    SnapshotWriter snapshotWriter,
     ILogger<AssetPositionChangedConsumer> logger) : IConsumer<AssetPositionChanged>
 {
     public async Task Consume(ConsumeContext<AssetPositionChanged> context)
@@ -79,7 +79,7 @@ public sealed class AssetPositionChangedConsumer(
 
         if (earliestAffected is { } from && from < snapshotWriter.Today)
         {
-            await HistoryRebuildRequests.RequestAsync(db, context, message.PortfolioId, message.UserId, from, cancellationToken);
+            await HistoryRebuildRequests.RequestAsync(db, context, message.UserId, from, cancellationToken);
         }
 
         // Saved first so the revaluation reads this position, inside the same inbox transaction.
@@ -91,7 +91,7 @@ public sealed class AssetPositionChangedConsumer(
             return;
         }
 
-        await snapshotWriter.RevalueTodayAsync(message.PortfolioId, message.UserId, cancellationToken);
+        await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
     }
 
     private static List<PositionQuantityPoint> ToHistory(AssetPositionChanged message) =>

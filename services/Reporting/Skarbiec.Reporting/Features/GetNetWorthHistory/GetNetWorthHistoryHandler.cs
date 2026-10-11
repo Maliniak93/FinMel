@@ -7,7 +7,7 @@ namespace Skarbiec.Reporting.Features.GetNetWorthHistory;
 public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvider timeProvider)
 {
     public async Task<Result<NetWorthHistoryResponse>> HandleAsync(
-        string range, Guid? portfolioId, AssetClass? assetClass, CancellationToken cancellationToken)
+        string range, AssetClass? assetClass, CancellationToken cancellationToken)
     {
         if (assetClass is { } requestedClass && !Enum.IsDefined(requestedClass))
         {
@@ -24,11 +24,9 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
 
         var points = await db.ValuationSnapshots
             .AsNoTracking()
-            .Where(s => portfolioId == null || s.PortfolioId == portfolioId)
             .Where(s => start == null || s.Date >= start)
-            .GroupBy(s => s.Date)
-            .Select(g => new { Date = g.Key, NetWorthPln = g.Sum(s => s.TotalPln) })
-            .OrderBy(p => p.Date)
+            .OrderBy(s => s.Date)
+            .Select(s => new { s.Date, NetWorthPln = s.TotalPln })
             .ToListAsync(cancellationToken);
 
         if (assetClass is { } filterClass)
@@ -36,7 +34,6 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             var classTotals = await db.AssetValuations
                 .AsNoTracking()
                 .Where(v => v.AssetClass == filterClass)
-                .Where(v => portfolioId == null || v.PortfolioId == portfolioId)
                 .Where(v => start == null || v.Date >= start)
                 .GroupBy(v => v.Date)
                 .Select(g => new { Date = g.Key, ValuePln = g.Sum(v => v.ValuePln) })

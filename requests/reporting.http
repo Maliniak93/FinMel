@@ -10,20 +10,12 @@ Content-Type: application/json
   "password": "P@ssw0rd!123"
 }
 
-### Dashboard — all portfolios (byPortfolio rows carry percentage of net worth)
+### Dashboard — the user's latest snapshot (byPortfolio rows carry percentage of net worth)
 GET {{baseUrl}}/api/reporting/dashboard
 Authorization: Bearer {{authToken}}
 
-### Dashboard — one portfolio
-GET {{baseUrl}}/api/reporting/dashboard?portfolioId={{createPortfolio.response.body.id}}
-Authorization: Bearer {{authToken}}
-
-### Net worth history — range: 1M | 1Y | YTD | MAX (default 1Y), all portfolios; response carries points plus changePln / changePercent (null without two points)
+### Net worth history — range: 1M | 1Y | YTD | MAX (default 1Y), one point per snapshot date; response carries points plus changePln / changePercent (null without two points)
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y
-Authorization: Bearer {{authToken}}
-
-### Net worth history — one portfolio
-GET {{baseUrl}}/api/reporting/net-worth-history?range=1M&portfolioId={{createPortfolio.response.body.id}}
 Authorization: Bearer {{authToken}}
 
 ### Net worth history — one asset class (AssetClass int: 3 = Etf), 0 on days the class was not held

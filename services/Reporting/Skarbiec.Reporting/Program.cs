@@ -28,7 +28,7 @@ if (!OpenApiBuildTime.IsActive)
     builder.Services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(reportingConnectionString));
 
     // Scoped, so it gets the consume scope's DbContext.
-    builder.Services.AddScoped<PortfolioSnapshotWriter>();
+    builder.Services.AddScoped<SnapshotWriter>();
 
     // Arity-1 AddConsumer<T> with the definition as a Type: the two-generic form does not compile.
     builder.AddRabbitMqMessaging<WebApplicationBuilder, ReportingDbContext>(
@@ -40,7 +40,7 @@ if (!OpenApiBuildTime.IsActive)
             x.AddConsumer<PortfolioArchivedConsumer>(typeof(PortfolioArchivedConsumerDefinition));
             x.AddConsumer<PortfolioRestoredConsumer>(typeof(PortfolioRestoredConsumerDefinition));
             x.AddConsumer<PortfolioDeletedConsumer>(typeof(PortfolioDeletedConsumerDefinition));
-            x.AddConsumer<PortfolioHistoryRebuildConsumer>(typeof(PortfolioHistoryRebuildConsumerDefinition));
+            x.AddConsumer<HistoryRebuildConsumer>(typeof(HistoryRebuildConsumerDefinition));
             x.AddConsumer<InstrumentHistoryBackfilledConsumer>(typeof(InstrumentHistoryBackfilledConsumerDefinition));
         });
 

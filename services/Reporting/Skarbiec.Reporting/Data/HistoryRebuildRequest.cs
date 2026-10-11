@@ -2,13 +2,11 @@ using Skarbiec.ServiceDefaults.Tenancy;
 
 namespace Skarbiec.Reporting.Data;
 
-// One pending rebuild per portfolio; the consumer deletes it only if Revision is still the one it read.
+// One pending rebuild per user; the consumer deletes it only if Revision is still the one it read.
 public sealed class HistoryRebuildRequest : IUserOwned
 {
-    public required Guid PortfolioId { get; init; }
-
     // Set by the requesting consumer from the event, not stamped by UserOwnedSaveInterceptor.
-    public Guid UserId { get; set; }
+    public required Guid UserId { get; set; }
 
     // The earliest date still to be rewritten.
     public required DateOnly FromDate { get; set; }

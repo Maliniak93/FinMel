@@ -24,7 +24,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
-    public async Task Consume_DailyPricesSynced_ValuesEveryPortfolioFromLocalPositions()
+    public async Task OneSnapshotPerUser()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
@@ -55,8 +55,8 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
-            var snapshotA = await WaitForSnapshotAsync(provider, portfolioAId, snapshotDate, cancellationToken);
-            var snapshotB = await WaitForSnapshotAsync(provider, portfolioBId, snapshotDate, cancellationToken);
+            var snapshotA = await WaitForSnapshotAsync(provider, userAId, snapshotDate, cancellationToken);
+            var snapshotB = await WaitForSnapshotAsync(provider, userBId, snapshotDate, cancellationToken);
 
             Assert.Equal(userAId, snapshotA.UserId);
             Assert.Equal(1_500m, snapshotA.TotalPln);
@@ -93,7 +93,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
 
             Assert.False(await db.ValuationSnapshots.IgnoreQueryFilters()
-                .AnyAsync(s => s.PortfolioId == archivedPortfolioId, cancellationToken));
+                .AnyAsync(s => s.UserId == userId, cancellationToken));
             Assert.False(await db.AssetValuations.IgnoreQueryFilters()
                 .AnyAsync(l => l.AssetId == archivedAssetId, cancellationToken));
         }, cancellationToken);
@@ -123,7 +123,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
 
             Assert.Equal(50m, snapshot.TotalPln);
             var line = Assert.Single(await GetLinesAsync(containers, portfolioId, snapshotDate, cancellationToken));
@@ -167,7 +167,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
 
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
@@ -227,7 +227,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
             Assert.True(snapshot.IsStale);
 
             await using var scope = provider.CreateAsyncScope();
@@ -271,7 +271,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             };
 
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
-            await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
 
             // Same MessageId: the inbox must skip the consumer body.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
@@ -283,7 +283,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
 
             var snapshots = await db.ValuationSnapshots.IgnoreQueryFilters()
-                .Where(s => s.PortfolioId == portfolioId && s.Date == snapshotDate)
+                .Where(s => s.UserId == userId && s.Date == snapshotDate)
                 .ToListAsync(cancellationToken);
             Assert.Single(snapshots);
 
@@ -294,7 +294,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
-    // Both kinds recompute, and the (PortfolioId, Date) upsert keeps a same-day pair idempotent.
+    // Both kinds recompute, and the (UserId, Date) upsert keeps a same-day pair idempotent.
     [Fact]
     public async Task Consume_FxKind_RecomputesSnapshots()
     {
@@ -327,7 +327,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
                 Kind = PriceSyncKind.Fx,
             }, cancellationToken);
 
-            var snapshot = await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            var snapshot = await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
 
             Assert.Equal(430m, snapshot.TotalPln);
         }, cancellationToken);
@@ -360,7 +360,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         await RunConsumerAsync(priceQuoteClient, async provider =>
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
-            await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
 
             await using var db = OpenDbContext(containers);
 
@@ -406,7 +406,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         await RunConsumerAsync(priceQuoteClient, async provider =>
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
-            await WaitForSnapshotAsync(provider, portfolioId, snapshotDate, cancellationToken);
+            await WaitForSnapshotAsync(provider, userId, snapshotDate, cancellationToken);
 
             await using var db = OpenDbContext(containers);
 
@@ -421,52 +421,53 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Consume_GapSinceLastSnapshot_RequestsRebuildFromDayAfter()
+    public async Task GapRequestedPerUser()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
         var gapUserId = Guid.NewGuid();
-        var gapPortfolioId = Guid.NewGuid();
-        var freshPortfolioId = Guid.NewGuid();
-        var newPortfolioId = Guid.NewGuid();
-        var archivedPortfolioId = Guid.NewGuid();
+        var freshUserId = Guid.NewGuid();
+        var newUserId = Guid.NewGuid();
+        var archivedUserId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedPositionAsync(Guid.NewGuid(), gapUserId, gapPortfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), gapUserId, Guid.NewGuid(), cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
-            await db.SeedSnapshotAsync(gapUserId, gapPortfolioId, snapshotDate.AddDays(-6), 1_000m, cancellationToken);
+            await db.SeedPositionAsync(Guid.NewGuid(), gapUserId, Guid.NewGuid(), cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 500m);
+            await db.SeedSnapshotAsync(gapUserId, snapshotDate.AddDays(-6), 1_500m, cancellationToken);
 
-            await db.SeedPositionAsync(Guid.NewGuid(), Guid.NewGuid(), freshPortfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), freshUserId, Guid.NewGuid(), cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
-            await db.SeedSnapshotAsync(Guid.NewGuid(), freshPortfolioId, snapshotDate.AddDays(-1), 1_000m, cancellationToken);
+            await db.SeedSnapshotAsync(freshUserId, snapshotDate.AddDays(-1), 1_000m, cancellationToken);
 
-            await db.SeedPositionAsync(Guid.NewGuid(), Guid.NewGuid(), newPortfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), newUserId, Guid.NewGuid(), cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
 
-            await db.SeedPositionAsync(Guid.NewGuid(), Guid.NewGuid(), archivedPortfolioId, cancellationToken,
+            await db.SeedPositionAsync(Guid.NewGuid(), archivedUserId, Guid.NewGuid(), cancellationToken,
                 assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m,
                 portfolioIsArchived: true);
-            await db.SeedSnapshotAsync(Guid.NewGuid(), archivedPortfolioId, snapshotDate.AddDays(-6), 1_000m, cancellationToken);
+            await db.SeedSnapshotAsync(archivedUserId, snapshotDate.AddDays(-6), 1_000m, cancellationToken);
         }
 
         await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
         {
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
-            var request = await WaitForRebuildRequestAsync(provider, gapPortfolioId, cancellationToken);
+            var request = await WaitForRebuildRequestAsync(provider, gapUserId, cancellationToken);
             Assert.Equal(snapshotDate.AddDays(-5), request.FromDate);
             Assert.Equal(gapUserId, request.UserId);
 
-            Assert.Null(await GetRebuildRequestAsync(containers, freshPortfolioId, cancellationToken));
-            Assert.Null(await GetRebuildRequestAsync(containers, newPortfolioId, cancellationToken));
-            Assert.Null(await GetRebuildRequestAsync(containers, archivedPortfolioId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, freshUserId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, newUserId, cancellationToken));
+            Assert.Null(await GetRebuildRequestAsync(containers, archivedUserId, cancellationToken));
 
             // The gap request is published by the request itself; the re-publish step must not publish it a second time.
             var recorder = provider.GetRequiredService<RebuildRequestRecorder>();
-            await recorder.WaitForDeliveryAsync(gapPortfolioId, cancellationToken);
+            await recorder.WaitForDeliveryAsync(gapUserId, cancellationToken);
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
-            Assert.Single(recorder.DeliveredFor(gapPortfolioId));
+            Assert.Single(recorder.DeliveredFor(gapUserId));
         }, cancellationToken);
     }
 
@@ -476,11 +477,10 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshotDate = new DateOnly(2026, 8, 10);
         var userId = Guid.NewGuid();
-        var pendingPortfolioId = Guid.NewGuid();
 
         await using (var db = OpenDbContext(containers))
         {
-            await db.SeedHistoryRebuildRequestAsync(userId, pendingPortfolioId, snapshotDate.AddDays(-10), cancellationToken);
+            await db.SeedHistoryRebuildRequestAsync(userId, snapshotDate.AddDays(-10), cancellationToken);
         }
 
         // No positions at all: the re-publish must not depend on the sync having valued anything.
@@ -489,10 +489,10 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             await PublishSyncAsync(provider, snapshotDate, cancellationToken);
 
             var recorder = provider.GetRequiredService<RebuildRequestRecorder>();
-            await recorder.WaitForDeliveryAsync(pendingPortfolioId, cancellationToken);
+            await recorder.WaitForDeliveryAsync(userId, cancellationToken);
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
-            var republished = Assert.Single(recorder.DeliveredFor(pendingPortfolioId));
+            var republished = Assert.Single(recorder.DeliveredFor(userId));
             Assert.Equal(userId, republished.UserId);
         }, cancellationToken);
     }

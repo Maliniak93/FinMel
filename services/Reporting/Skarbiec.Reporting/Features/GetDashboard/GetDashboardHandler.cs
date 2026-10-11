@@ -5,57 +5,62 @@ namespace Skarbiec.Reporting.Features.GetDashboard;
 
 public sealed class GetDashboardHandler(ReportingDbContext db)
 {
-    public async Task<DashboardResponse> HandleAsync(Guid? portfolioId, CancellationToken cancellationToken)
+    public async Task<DashboardResponse> HandleAsync(CancellationToken cancellationToken)
     {
-        // A per-portfolio compute failure leaves that portfolio at its last good date, so "latest" is a per-row max.
-        var latestDatePerPortfolio = db.ValuationSnapshots
-            .Where(s => portfolioId == null || s.PortfolioId == portfolioId)
-            .GroupBy(s => s.PortfolioId)
-            .Select(g => new { PortfolioId = g.Key, Date = g.Max(s => s.Date) });
-
-        var snapshots = await db.ValuationSnapshots
+        // Snapshots and lines are tenancy-filtered in their own right, so this never reaches another user's rows.
+        var snapshot = await db.ValuationSnapshots
             .AsNoTracking()
-            .Where(s => portfolioId == null || s.PortfolioId == portfolioId)
-            .Join(
-                latestDatePerPortfolio,
-                s => new { s.PortfolioId, s.Date },
-                l => new { l.PortfolioId, l.Date },
-                (s, _) => s)
+            .OrderByDescending(s => s.Date)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (snapshot is null)
+        {
+            return new DashboardResponse
+            {
+                NetWorthPln = 0m,
+                AsOf = null,
+                IsStale = false,
+                ByAssetClass = [],
+                ByPortfolio = [],
+            };
+        }
+
+        var netWorthPln = snapshot.TotalPln;
+
+        var lines = await db.AssetValuations
+            .AsNoTracking()
+            .Where(l => l.Date == snapshot.Date)
+            .Select(l => new { l.PortfolioId, l.AssetClass, l.ValuePln, l.IsStale })
             .ToListAsync(cancellationToken);
 
-        var netWorthPln = snapshots.Sum(s => s.TotalPln);
-
-        var byPortfolio = snapshots
-            .Select(s => new DashboardPortfolioValue
+        var byPortfolio = lines
+            .GroupBy(l => l.PortfolioId)
+            .Select(g =>
             {
-                PortfolioId = s.PortfolioId,
-                ValuePln = s.TotalPln,
-                Percentage = netWorthPln == 0m ? 0m : Math.Round(s.TotalPln / netWorthPln * 100m, 2),
-                SnapshotDate = s.Date,
-                IsStale = s.IsStale,
+                var valuePln = g.Sum(l => l.ValuePln);
+                return new DashboardPortfolioValue
+                {
+                    PortfolioId = g.Key,
+                    ValuePln = valuePln,
+                    Percentage = netWorthPln == 0m ? 0m : Math.Round(valuePln / netWorthPln * 100m, 2),
+                    SnapshotDate = snapshot.Date,
+                    IsStale = g.Any(l => l.IsStale),
+                };
             })
             .OrderByDescending(p => p.ValuePln)
             .ToList();
 
-        // Lines are tenancy-filtered in their own right, so this never reaches another user's assets.
-        var assetClassTotals = await db.AssetValuations
-            .AsNoTracking()
-            .Where(l => portfolioId == null || l.PortfolioId == portfolioId)
-            .Join(
-                latestDatePerPortfolio,
-                l => new { l.PortfolioId, l.Date },
-                p => new { p.PortfolioId, p.Date },
-                (l, _) => l)
+        var byAssetClass = lines
             .GroupBy(l => l.AssetClass)
-            .Select(g => new { AssetClass = g.Key, ValuePln = g.Sum(l => l.ValuePln) })
-            .ToListAsync(cancellationToken);
-
-        var byAssetClass = assetClassTotals
-            .Select(t => new DashboardAssetClassValue
+            .Select(g =>
             {
-                AssetClass = t.AssetClass,
-                ValuePln = t.ValuePln,
-                Percentage = netWorthPln == 0m ? 0m : Math.Round(t.ValuePln / netWorthPln * 100m, 2),
+                var valuePln = g.Sum(l => l.ValuePln);
+                return new DashboardAssetClassValue
+                {
+                    AssetClass = g.Key,
+                    ValuePln = valuePln,
+                    Percentage = netWorthPln == 0m ? 0m : Math.Round(valuePln / netWorthPln * 100m, 2),
+                };
             })
             .OrderByDescending(b => b.ValuePln)
             .ToList();
@@ -63,8 +68,8 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
         return new DashboardResponse
         {
             NetWorthPln = netWorthPln,
-            AsOf = snapshots.Count == 0 ? null : snapshots.Max(s => s.Date),
-            IsStale = snapshots.Any(s => s.IsStale),
+            AsOf = snapshot.Date,
+            IsStale = snapshot.IsStale,
             ByAssetClass = byAssetClass,
             ByPortfolio = byPortfolio,
         };

@@ -26,7 +26,7 @@ internal static class ReportingConsumers
         services.AddLogging();
         services.AddSingleton(priceQuoteClient ?? new FakePriceQuoteClient());
         services.AddSingleton(TimeProvider.System);
-        services.AddScoped<PortfolioSnapshotWriter>();
+        services.AddScoped<SnapshotWriter>();
         services.AddSingleton<RebuildRequestRecorder>();
 
         // Consumers never read ICurrentUser.UserId, but ReportingDbContext's constructor needs an implementation.
@@ -170,7 +170,7 @@ internal static class ReportingConsumers
 
     public static async Task<ValuationSnapshot> WaitForSnapshotAsync(
         IServiceProvider provider,
-        Guid portfolioId,
+        Guid userId,
         DateOnly date,
         CancellationToken cancellationToken,
         Func<ValuationSnapshot, bool>? predicate = null)
@@ -179,9 +179,9 @@ internal static class ReportingConsumers
         var snapshot = await WaitForAsync(
             provider,
             (db, ct) => db.ValuationSnapshots.IgnoreQueryFilters()
-                .SingleOrDefaultAsync(s => s.PortfolioId == portfolioId && s.Date == date, ct),
+                .SingleOrDefaultAsync(s => s.UserId == userId && s.Date == date, ct),
             s => s is not null && predicate(s),
-            $"A matching ValuationSnapshot for portfolio {portfolioId} on {date}",
+            $"A matching ValuationSnapshot for user {userId} on {date}",
             cancellationToken);
 
         return snapshot!;
@@ -197,41 +197,41 @@ internal static class ReportingConsumers
     }
 
     public static async Task<ValuationSnapshot?> GetSnapshotAsync(
-        SkarbiecContainersFixture containers, Guid portfolioId, DateOnly date, CancellationToken cancellationToken)
+        SkarbiecContainersFixture containers, Guid userId, DateOnly date, CancellationToken cancellationToken)
     {
         await using var db = OpenDbContext(containers);
         return await db.ValuationSnapshots.IgnoreQueryFilters()
-            .SingleOrDefaultAsync(s => s.PortfolioId == portfolioId && s.Date == date, cancellationToken);
+            .SingleOrDefaultAsync(s => s.UserId == userId && s.Date == date, cancellationToken);
     }
 
     public static async Task<HistoryRebuildRequest?> GetRebuildRequestAsync(
-        SkarbiecContainersFixture containers, Guid portfolioId, CancellationToken cancellationToken)
+        SkarbiecContainersFixture containers, Guid userId, CancellationToken cancellationToken)
     {
         await using var db = OpenDbContext(containers);
         return await db.HistoryRebuildRequests.IgnoreQueryFilters()
-            .SingleOrDefaultAsync(r => r.PortfolioId == portfolioId, cancellationToken);
+            .SingleOrDefaultAsync(r => r.UserId == userId, cancellationToken);
     }
 
     public static async Task<HistoryRebuildRequest> WaitForRebuildRequestAsync(
-        IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken, Func<HistoryRebuildRequest, bool>? predicate = null)
+        IServiceProvider provider, Guid userId, CancellationToken cancellationToken, Func<HistoryRebuildRequest, bool>? predicate = null)
     {
         predicate ??= _ => true;
         var request = await WaitForAsync(
             provider,
-            (db, ct) => db.HistoryRebuildRequests.IgnoreQueryFilters().SingleOrDefaultAsync(r => r.PortfolioId == portfolioId, ct),
+            (db, ct) => db.HistoryRebuildRequests.IgnoreQueryFilters().SingleOrDefaultAsync(r => r.UserId == userId, ct),
             r => r is not null && predicate(r),
-            $"A matching HistoryRebuildRequest for portfolio {portfolioId}",
+            $"A matching HistoryRebuildRequest for user {userId}",
             cancellationToken);
 
         return request!;
     }
 
-    public static Task WaitForNoRebuildRequestAsync(IServiceProvider provider, Guid portfolioId, CancellationToken cancellationToken) =>
+    public static Task WaitForNoRebuildRequestAsync(IServiceProvider provider, Guid userId, CancellationToken cancellationToken) =>
         WaitForAsync(
             provider,
-            (db, ct) => db.HistoryRebuildRequests.IgnoreQueryFilters().AnyAsync(r => r.PortfolioId == portfolioId, ct),
+            (db, ct) => db.HistoryRebuildRequests.IgnoreQueryFilters().AnyAsync(r => r.UserId == userId, ct),
             stillExists => !stillExists,
-            $"Deleting the HistoryRebuildRequest for portfolio {portfolioId}",
+            $"Deleting the HistoryRebuildRequest for user {userId}",
             cancellationToken);
 
     public static async Task<List<AssetValuation>> GetAllLinesAsync(
@@ -244,18 +244,18 @@ internal static class ReportingConsumers
     }
 
     public static async Task<List<ValuationSnapshot>> GetAllSnapshotsAsync(
-        SkarbiecContainersFixture containers, Guid portfolioId, CancellationToken cancellationToken)
+        SkarbiecContainersFixture containers, Guid userId, CancellationToken cancellationToken)
     {
         await using var db = OpenDbContext(containers);
         return await db.ValuationSnapshots.IgnoreQueryFilters()
-            .Where(s => s.PortfolioId == portfolioId)
+            .Where(s => s.UserId == userId)
             .ToListAsync(cancellationToken);
     }
 
     public static Task PublishRebuildRequestedAsync(
-        this IBus bus, Guid portfolioId, Guid userId, CancellationToken cancellationToken, Guid? messageId = null) =>
+        this IBus bus, Guid userId, CancellationToken cancellationToken, Guid? messageId = null) =>
         bus.Publish(
-            new PortfolioHistoryRebuildRequested { PortfolioId = portfolioId, UserId = userId },
+            new HistoryRebuildRequested { UserId = userId },
             context =>
             {
                 if (messageId is { } id)
@@ -264,4 +264,22 @@ internal static class ReportingConsumers
                 }
             },
             cancellationToken);
+
+    public static async Task<List<AssetValuation>> GetUserLinesAsync(
+        SkarbiecContainersFixture containers, Guid userId, DateOnly date, CancellationToken cancellationToken)
+    {
+        await using var db = OpenDbContext(containers);
+        return await db.AssetValuations.IgnoreQueryFilters()
+            .Where(l => l.UserId == userId && l.Date == date)
+            .ToListAsync(cancellationToken);
+    }
+
+    public static async Task<List<AssetValuation>> GetAllUserLinesAsync(
+        SkarbiecContainersFixture containers, Guid userId, CancellationToken cancellationToken)
+    {
+        await using var db = OpenDbContext(containers);
+        return await db.AssetValuations.IgnoreQueryFilters()
+            .Where(l => l.UserId == userId)
+            .ToListAsync(cancellationToken);
+    }
 }

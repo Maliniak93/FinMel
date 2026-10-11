@@ -4,22 +4,22 @@ using Skarbiec.Reporting.Messaging;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
-// Counts PortfolioHistoryRebuildRequested deliveries without running the rebuild, so a fact can assert on the publish alone.
+// Counts HistoryRebuildRequested deliveries without running the rebuild, so a fact can assert on the publish alone.
 public sealed class RebuildRequestRecorder
 {
-    private readonly ConcurrentQueue<PortfolioHistoryRebuildRequested> _delivered = new();
+    private readonly ConcurrentQueue<HistoryRebuildRequested> _delivered = new();
 
-    public void Record(PortfolioHistoryRebuildRequested message) => _delivered.Enqueue(message);
+    public void Record(HistoryRebuildRequested message) => _delivered.Enqueue(message);
 
-    public List<PortfolioHistoryRebuildRequested> DeliveredFor(Guid portfolioId) =>
-        [.. _delivered.Where(message => message.PortfolioId == portfolioId)];
+    public List<HistoryRebuildRequested> DeliveredFor(Guid userId) =>
+        [.. _delivered.Where(message => message.UserId == userId)];
 
-    public async Task WaitForDeliveryAsync(Guid portfolioId, CancellationToken cancellationToken)
+    public async Task WaitForDeliveryAsync(Guid userId, CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
         while (DateTimeOffset.UtcNow < deadline)
         {
-            if (_delivered.Any(message => message.PortfolioId == portfolioId))
+            if (_delivered.Any(message => message.UserId == userId))
             {
                 return;
             }
@@ -27,13 +27,13 @@ public sealed class RebuildRequestRecorder
             await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
         }
 
-        throw new TimeoutException($"A PortfolioHistoryRebuildRequested for portfolio {portfolioId} was never delivered.");
+        throw new TimeoutException($"A HistoryRebuildRequested for user {userId} was never delivered.");
     }
 }
 
-public sealed class RebuildRequestRecorderConsumer(RebuildRequestRecorder recorder) : IConsumer<PortfolioHistoryRebuildRequested>
+public sealed class RebuildRequestRecorderConsumer(RebuildRequestRecorder recorder) : IConsumer<HistoryRebuildRequested>
 {
-    public Task Consume(ConsumeContext<PortfolioHistoryRebuildRequested> context)
+    public Task Consume(ConsumeContext<HistoryRebuildRequested> context)
     {
         recorder.Record(context.Message);
         return Task.CompletedTask;

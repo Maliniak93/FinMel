@@ -165,10 +165,10 @@ sequenceDiagram
 
     MQ->>RP: deliver AssetPositionChanged (QuantityHistory)
     RP->>RP: inbox check, store Position + archive dates
-    RP->>RP: earliest affected date < today?<br/>upsert HistoryRebuildRequest (LEAST from, Revision + 1)<br/>+ outbox PortfolioHistoryRebuildRequested
+    RP->>RP: earliest affected date < today?<br/>upsert HistoryRebuildRequest (LEAST from, Revision + 1)<br/>+ outbox HistoryRebuildRequested
     RP->>RP: revalue today (ADR-025)
-    MQ->>RP: deliver PortfolioHistoryRebuildRequested
-    RP->>RP: inbox check, portfolio advisory lock, read request
+    MQ->>RP: deliver HistoryRebuildRequested
+    RP->>RP: inbox check, user advisory lock, read request
     RP->>MD: REST prices/history-batch + fx/history-batch for [from, yesterday]
     MD-->>RP: series (last quote before from + every quote in range)
     RP->>RP: replace lines + snapshots for [from, yesterday]

@@ -5,7 +5,7 @@ using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Messaging;
 
-public sealed class PortfolioRestoredConsumer(ReportingDbContext db, PortfolioSnapshotWriter snapshotWriter)
+public sealed class PortfolioRestoredConsumer(ReportingDbContext db, SnapshotWriter snapshotWriter)
     : IConsumer<PortfolioRestored>
 {
     public async Task Consume(ConsumeContext<PortfolioRestored> context)
@@ -23,9 +23,9 @@ public sealed class PortfolioRestoredConsumer(ReportingDbContext db, PortfolioSn
 
         if (affectedFrom is { } from && from < snapshotWriter.Today)
         {
-            await HistoryRebuildRequests.RequestAsync(db, context, message.PortfolioId, message.UserId, from, cancellationToken);
+            await HistoryRebuildRequests.RequestAsync(db, context, message.UserId, from, cancellationToken);
         }
 
-        await snapshotWriter.RevalueTodayAsync(message.PortfolioId, message.UserId, cancellationToken);
+        await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
     }
 }

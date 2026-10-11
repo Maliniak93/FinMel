@@ -2,7 +2,7 @@ using Skarbiec.ServiceDefaults.Tenancy;
 
 namespace Skarbiec.Reporting.Data;
 
-// Unique on (PortfolioId, Date), so a redelivery or rerun overwrites; the per-asset detail lives in the AssetValuation lines.
+// Unique on (UserId, Date), so a redelivery or rerun overwrites; the per-asset detail lives in the AssetValuation lines.
 public sealed class ValuationSnapshot : IUserOwned
 {
     public required Guid Id { get; init; }
@@ -10,7 +10,6 @@ public sealed class ValuationSnapshot : IUserOwned
     // Set by the consumer from the Position row, not stamped by UserOwnedSaveInterceptor.
     public Guid UserId { get; set; }
 
-    public required Guid PortfolioId { get; init; }
     public required DateOnly Date { get; set; }
     public decimal TotalPln { get; set; }
 

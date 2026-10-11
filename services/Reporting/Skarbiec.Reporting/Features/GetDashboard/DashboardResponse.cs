@@ -6,10 +6,10 @@ public sealed record DashboardResponse
 {
     public required decimal NetWorthPln { get; init; }
 
-    /// <summary>Latest snapshot date across the included portfolios; null before any snapshot exists.</summary>
+    /// <summary>Date of the user's latest snapshot; null before any snapshot exists.</summary>
     public required DateOnly? AsOf { get; init; }
 
-    /// <summary>Any included portfolio's latest snapshot is stale; portfolios can lag independently.</summary>
+    /// <summary>The latest snapshot used a stale price or rate.</summary>
     public required bool IsStale { get; init; }
 
     public required IReadOnlyList<DashboardAssetClassValue> ByAssetClass { get; init; }

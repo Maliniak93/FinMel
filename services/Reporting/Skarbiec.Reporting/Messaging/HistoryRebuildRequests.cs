@@ -10,23 +10,20 @@ internal static class HistoryRebuildRequests
     public static async Task RequestAsync(
         ReportingDbContext db,
         IPublishEndpoint publishEndpoint,
-        Guid portfolioId,
         Guid userId,
         DateOnly from,
         CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlAsync(
             $"""
-            INSERT INTO "HistoryRebuildRequests" ("PortfolioId", "UserId", "FromDate", "Revision")
-            VALUES ({portfolioId}, {userId}, {from}, 1)
-            ON CONFLICT ("PortfolioId") DO UPDATE
+            INSERT INTO "HistoryRebuildRequests" ("UserId", "FromDate", "Revision")
+            VALUES ({userId}, {from}, 1)
+            ON CONFLICT ("UserId") DO UPDATE
             SET "FromDate" = LEAST("HistoryRebuildRequests"."FromDate", EXCLUDED."FromDate"),
                 "Revision" = "HistoryRebuildRequests"."Revision" + 1
             """,
             cancellationToken);
 
-        await publishEndpoint.Publish(
-            new PortfolioHistoryRebuildRequested { PortfolioId = portfolioId, UserId = userId },
-            cancellationToken);
+        await publishEndpoint.Publish(new HistoryRebuildRequested { UserId = userId }, cancellationToken);
     }
 }

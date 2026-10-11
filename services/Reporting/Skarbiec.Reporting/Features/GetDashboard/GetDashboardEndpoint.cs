@@ -13,7 +13,6 @@ public static class GetDashboardEndpoint
         return app;
     }
 
-    private static async Task<Ok<DashboardResponse>> HandleAsync(
-        GetDashboardHandler handler, CancellationToken cancellationToken, Guid? portfolioId = null)
-        => TypedResults.Ok(await handler.HandleAsync(portfolioId, cancellationToken));
+    private static async Task<Ok<DashboardResponse>> HandleAsync(GetDashboardHandler handler, CancellationToken cancellationToken)
+        => TypedResults.Ok(await handler.HandleAsync(cancellationToken));
 }

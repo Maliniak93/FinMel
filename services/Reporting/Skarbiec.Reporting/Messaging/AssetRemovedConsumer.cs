@@ -7,7 +7,7 @@ using Skarbiec.Reporting.Valuation;
 namespace Skarbiec.Reporting.Messaging;
 
 // A cascaded removal leaves history to PortfolioDeleted's sweep and skips revaluation so it never races it.
-public sealed class AssetRemovedConsumer(ReportingDbContext db, PortfolioSnapshotWriter snapshotWriter) : IConsumer<AssetRemoved>
+public sealed class AssetRemovedConsumer(ReportingDbContext db, SnapshotWriter snapshotWriter) : IConsumer<AssetRemoved>
 {
     public async Task Consume(ConsumeContext<AssetRemoved> context)
     {
@@ -34,7 +34,7 @@ public sealed class AssetRemovedConsumer(ReportingDbContext db, PortfolioSnapsho
 
             if (earliestLine is { } from && from < snapshotWriter.Today)
             {
-                await HistoryRebuildRequests.RequestAsync(db, context, position.PortfolioId, message.UserId, from, cancellationToken);
+                await HistoryRebuildRequests.RequestAsync(db, context, message.UserId, from, cancellationToken);
             }
         }
 
@@ -48,6 +48,6 @@ public sealed class AssetRemovedConsumer(ReportingDbContext db, PortfolioSnapsho
             return;
         }
 
-        await snapshotWriter.RevalueTodayAsync(position.PortfolioId, message.UserId, cancellationToken);
+        await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
     }
 }
