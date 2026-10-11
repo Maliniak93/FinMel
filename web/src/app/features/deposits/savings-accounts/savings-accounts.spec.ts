@@ -232,9 +232,7 @@ describe('SavingsAccounts', () => {
     await vi.waitFor(() => expect(writes()).toHaveLength(1));
     const [request] = writes();
     expect(request.method).toBe('DELETE');
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${activeSavingsAccount.portfolioId}/assets/${activeSavingsAccount.assetId}`,
-    );
+    expect(request.url).toContain(`/api/portfolio/assets/${activeSavingsAccount.assetId}`);
     await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listCallsBefore));
   });
 
@@ -289,7 +287,7 @@ describe('SavingsAccounts', () => {
       const [request] = writes();
       expect(request.method).toBe('POST');
       expect(request.url).toContain(
-        `/api/portfolio/portfolios/${activeSavingsAccount.portfolioId}/assets/${activeSavingsAccount.assetId}/archive`,
+        `/api/portfolio/assets/${activeSavingsAccount.assetId}/archive`,
       );
       await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listCallsBefore));
     });
@@ -317,7 +315,7 @@ describe('SavingsAccounts', () => {
       const [request] = writes();
       expect(request.method).toBe('POST');
       expect(request.url).toContain(
-        `/api/portfolio/portfolios/${archivedSavingsAccount.portfolioId}/assets/${archivedSavingsAccount.assetId}/restore`,
+        `/api/portfolio/assets/${archivedSavingsAccount.assetId}/restore`,
       );
       await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listCallsBefore));
     });
@@ -458,7 +456,7 @@ describe('SavingsAccounts', () => {
       const [request] = writes();
       expect(request.method).toBe('DELETE');
       expect(request.url).toContain(
-        `/api/portfolio/portfolios/${settledSavingsAccount.portfolioId}/savings-accounts/${settledSavingsAccount.assetId}/interest-settlements/${settledSavingsAccount.lastSettlement!.settlementId}`,
+        `/api/portfolio/savings-accounts/${settledSavingsAccount.assetId}/interest-settlements/${settledSavingsAccount.lastSettlement!.settlementId}`,
       );
       await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listCallsBefore));
     });

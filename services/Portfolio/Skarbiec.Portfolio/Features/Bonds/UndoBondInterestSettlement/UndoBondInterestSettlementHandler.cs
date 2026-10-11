@@ -6,11 +6,11 @@ namespace Skarbiec.Portfolio.Features.Bonds.UndoBondInterestSettlement;
 
 public sealed class UndoBondInterestSettlementHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
-    public async Task<Result> HandleAsync(Guid portfolioId, Guid assetId, Guid settlementId, CancellationToken cancellationToken)
+    public async Task<Result> HandleAsync(Guid assetId, Guid settlementId, CancellationToken cancellationToken)
     {
         // Tenancy-scoped lookups first, so a stranger never learns the portfolio's archived state.
         var bond = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Bond, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
 
         if (bond is null)
         {

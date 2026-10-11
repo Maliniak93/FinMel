@@ -12,10 +12,10 @@ public sealed class RedeemBondHandler(
     TimeProvider timeProvider)
 {
     public async Task<Result<BondResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, RedeemBondRequest request, CancellationToken cancellationToken)
+        Guid assetId, RedeemBondRequest request, CancellationToken cancellationToken)
     {
         var today = WarsawCalendar.Today(timeProvider);
-        var planned = await dbContext.PlanRedemptionAsync(portfolioId, assetId, today, forWrite: true, cancellationToken);
+        var planned = await dbContext.PlanRedemptionAsync(assetId, today, forWrite: true, cancellationToken);
         if (planned.IsFailure)
         {
             return planned.Error;
@@ -86,6 +86,6 @@ public sealed class RedeemBondHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        return (await dbContext.LoadBondAsync(portfolioId, assetId, today, cancellationToken))!;
+        return (await dbContext.LoadBondAsync(assetId, today, cancellationToken))!;
     }
 }

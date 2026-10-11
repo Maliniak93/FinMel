@@ -10,7 +10,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
     private const int MaxPageSize = 100;
 
     public async Task<Result<PagedResponse<TransactionResponse>>> HandleAsync(
-        Guid portfolioId, Guid assetId, int page, int pageSize, CancellationToken cancellationToken)
+        Guid assetId, int page, int pageSize, CancellationToken cancellationToken)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
@@ -18,7 +18,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
         // The asset lookup doubles as the existence check, and its class tells whether a transfer leg is on a manual route.
         var asset = await dbContext.Assets
             .AsNoTracking()
-            .Where(a => a.Id == assetId && a.PortfolioId == portfolioId)
+            .Where(a => a.Id == assetId)
             .Select(a => new { a.Currency, a.AssetClass })
             .FirstOrDefaultAsync(cancellationToken);
 

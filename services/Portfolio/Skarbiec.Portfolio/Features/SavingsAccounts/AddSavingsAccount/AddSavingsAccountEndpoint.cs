@@ -7,7 +7,7 @@ public static class AddSavingsAccountEndpoint
 {
     public static IEndpointRouteBuilder MapAddSavingsAccountEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/savings-accounts");
+        var group = app.MapGroup("/api/portfolio/savings-accounts");
 
         group.MapPost("", HandleAsync).RequireAuthorization();
 
@@ -15,12 +15,12 @@ public static class AddSavingsAccountEndpoint
     }
 
     private static async Task<Results<Created<SavingsAccountResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, AddSavingsAccountRequest request, AddSavingsAccountHandler handler, CancellationToken cancellationToken)
+        AddSavingsAccountRequest request, AddSavingsAccountHandler handler, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(portfolioId, request, cancellationToken);
+        var result = await handler.HandleAsync(request, cancellationToken);
 
         return result.IsSuccess
-            ? TypedResults.Created($"/api/portfolio/portfolios/{portfolioId}/savings-accounts/{result.Value.AssetId}", result.Value)
+            ? TypedResults.Created($"/api/portfolio/savings-accounts/{result.Value.AssetId}", result.Value)
             : result.Error.ToProblem();
     }
 }

@@ -33,29 +33,31 @@ internal static class PortfolioApi
     public static string PortfolioUri(Guid portfolioId) =>
         $"{PortfoliosUri}/{portfolioId}";
 
+    public const string AllAssetsUri = "/api/portfolio/assets";
+
     public static string AssetsUri(Guid portfolioId) =>
-        $"{PortfoliosUri}/{portfolioId}/assets";
+        $"{AllAssetsUri}?portfolioId={portfolioId}";
 
-    public static string AssetUri(Guid portfolioId, Guid assetId) =>
-        $"{PortfoliosUri}/{portfolioId}/assets/{assetId}";
+    public static string AssetUri(Guid assetId) =>
+        $"/api/portfolio/assets/{assetId}";
 
-    public static string ArchiveAssetUri(Guid portfolioId, Guid assetId) =>
-        $"{AssetUri(portfolioId, assetId)}/archive";
+    public static string ArchiveAssetUri(Guid assetId) =>
+        $"{AssetUri(assetId)}/archive";
 
-    public static string RestoreAssetUri(Guid portfolioId, Guid assetId) =>
-        $"{AssetUri(portfolioId, assetId)}/restore";
+    public static string RestoreAssetUri(Guid assetId) =>
+        $"{AssetUri(assetId)}/restore";
 
     public static async Task ArchiveAssetAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.PostAsync(ArchiveAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        var response = await client.PostAsync(ArchiveAssetUri(assetId), content: null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public static async Task RestoreAssetAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.PostAsync(RestoreAssetUri(portfolioId, assetId), content: null, cancellationToken);
+        var response = await client.PostAsync(RestoreAssetUri(assetId), content: null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -69,30 +71,27 @@ internal static class PortfolioApi
     {
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: portfolioName);
         var cashId = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: balance, name: name, currency: currency);
-        await client.ArchiveAssetAsync(portfolioId, cashId, cancellationToken);
+        await client.ArchiveAssetAsync(cashId, cancellationToken);
 
         return (portfolioId, cashId);
     }
 
-    public static string TransactionsUri(Guid portfolioId, Guid assetId) =>
-        $"{PortfoliosUri}/{portfolioId}/assets/{assetId}/transactions";
+    public static string TransactionsUri(Guid assetId) =>
+        $"/api/portfolio/assets/{assetId}/transactions";
 
-    public static string TransactionUri(Guid portfolioId, Guid assetId, Guid transactionId) =>
-        $"{PortfoliosUri}/{portfolioId}/assets/{assetId}/transactions/{transactionId}";
+    public static string TransactionUri(Guid assetId, Guid transactionId) =>
+        $"/api/portfolio/assets/{assetId}/transactions/{transactionId}";
 
     public const string AllDepositsUri = "/api/portfolio/deposits";
 
-    public static string DepositsUri(Guid portfolioId) =>
-        $"{PortfoliosUri}/{portfolioId}/deposits";
+    public static string DepositUri(Guid assetId) =>
+        $"/api/portfolio/deposits/{assetId}";
 
-    public static string DepositUri(Guid portfolioId, Guid assetId) =>
-        $"{PortfoliosUri}/{portfolioId}/deposits/{assetId}";
+    public static string DepositSettlementPreviewUri(Guid assetId) =>
+        $"{DepositUri(assetId)}/settlement-preview";
 
-    public static string DepositSettlementPreviewUri(Guid portfolioId, Guid assetId) =>
-        $"{DepositUri(portfolioId, assetId)}/settlement-preview";
-
-    public static string SettleDepositUri(Guid portfolioId, Guid assetId) =>
-        $"{DepositUri(portfolioId, assetId)}/settle";
+    public static string SettleDepositUri(Guid assetId) =>
+        $"{DepositUri(assetId)}/settle";
 
     public static readonly DateTimeOffset AfterDefaultMaturityUtc = new(2026, 4, 20, 10, 0, 0, TimeSpan.Zero);
 
@@ -108,8 +107,8 @@ internal static class PortfolioApi
             DestinationAssetId = destinationAssetId
         };
 
-    public static string PayOutDepositUri(Guid portfolioId, Guid assetId) =>
-        $"{DepositUri(portfolioId, assetId)}/payout";
+    public static string PayOutDepositUri(Guid assetId) =>
+        $"{DepositUri(assetId)}/payout";
 
     public static PayOutDepositRequest NewPayOutRequest(Guid destinationAssetId, DateOnly? date = null) => new()
     {
@@ -118,24 +117,24 @@ internal static class PortfolioApi
     };
 
     public static async Task PayOutDepositAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken, DateOnly? date = null)
+        this HttpClient client, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken, DateOnly? date = null)
     {
         var response = await client.PostAsJsonAsync(
-            PayOutDepositUri(portfolioId, assetId), NewPayOutRequest(destinationAssetId, date), cancellationToken);
+            PayOutDepositUri(assetId), NewPayOutRequest(destinationAssetId, date), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public static async Task<DepositSettlementPreviewResponse> GetSettlementPreviewAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.GetAsync(DepositSettlementPreviewUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(DepositSettlementPreviewUri(assetId), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<DepositSettlementPreviewResponse>(cancellationToken))!;
     }
 
-    public static string RollOverDepositUri(Guid portfolioId, Guid assetId) =>
-        $"{DepositUri(portfolioId, assetId)}/rollover";
+    public static string RollOverDepositUri(Guid assetId) =>
+        $"{DepositUri(assetId)}/rollover";
 
     public static RollOverDepositRequest NewRollOverRequest(
         decimal annualInterestRatePercent = 5.5m,
@@ -151,12 +150,12 @@ internal static class PortfolioApi
         new { annualInterestRatePercent };
 
     public static async Task<DepositResponse> RollOverDepositAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, object? body = null)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken, object? body = null)
     {
-        var response = await client.PostAsJsonAsync(RollOverDepositUri(portfolioId, assetId), body ?? NewRollOverRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(RollOverDepositUri(assetId), body ?? NewRollOverRequest(), cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        return await client.GetDepositAsync(portfolioId, assetId, cancellationToken);
+        return await client.GetDepositAsync(assetId, cancellationToken);
     }
 
     public sealed record PaidOutDeposit(Guid DepositPortfolioId, DepositResponse Deposit, Guid CashPortfolioId, Guid CashAssetId);
@@ -167,7 +166,7 @@ internal static class PortfolioApi
         var cashPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Wallet");
         var cashId = await client.AddCashAssetAsync(cashPortfolioId, cancellationToken);
         await client.SettleDepositAsync(
-            depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: cashId));
+            deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: cashId));
 
         return new PaidOutDeposit(depositPortfolioId, deposit, cashPortfolioId, cashId);
     }
@@ -182,7 +181,7 @@ internal static class PortfolioApi
         var (savingsPortfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(
             cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false), portfolioName: "Wallet");
         await client.SettleDepositAsync(
-            depositPortfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: account.AssetId));
+            deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: account.AssetId));
 
         return new DepositPaidIntoSavings(depositPortfolioId, deposit, savingsPortfolioId, account);
     }
@@ -198,16 +197,16 @@ internal static class PortfolioApi
     }
 
     public static async Task SettleDepositAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken, SettleDepositRequest? request = null)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken, SettleDepositRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(SettleDepositUri(portfolioId, assetId), request ?? NewSettleRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(SettleDepositUri(assetId), request ?? NewSettleRequest(), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public static async Task<DepositResponse> GetDepositAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.GetAsync(DepositUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(DepositUri(assetId), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
@@ -225,8 +224,9 @@ internal static class PortfolioApi
         DepositCapitalization capitalization = DepositCapitalization.AtMaturity,
         bool taxExempt = false,
         decimal earlyBreakInterestLossPercent = 100m,
-        Guid? fundingAssetId = null) => new()
+        Guid? fundingAssetId = null, Guid portfolioId = default) => new()
         {
+            PortfolioId = portfolioId,
             Name = name,
             BankName = bankName,
             Currency = currency,
@@ -258,7 +258,8 @@ internal static class PortfolioApi
     public static async Task<DepositResponse> AddDepositAsync(
         this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddDepositRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(DepositsUri(portfolioId), request ?? NewDepositRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(
+            AllDepositsUri, (request ?? NewDepositRequest()) with { PortfolioId = portfolioId }, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
@@ -275,11 +276,8 @@ internal static class PortfolioApi
 
     public const string AllBondsUri = "/api/portfolio/bonds";
 
-    public static string BondsUri(Guid portfolioId) =>
-        $"{PortfoliosUri}/{portfolioId}/bonds";
-
-    public static string BondUri(Guid portfolioId, Guid assetId) =>
-        $"{PortfoliosUri}/{portfolioId}/bonds/{assetId}";
+    public static string BondUri(Guid assetId) =>
+        $"/api/portfolio/bonds/{assetId}";
 
     public static readonly DateOnly DefaultBondPurchaseDate = new(2026, 10, 1);
 
@@ -296,8 +294,9 @@ internal static class PortfolioApi
         decimal? marginPercent = 2.00m,
         decimal earlyRedemptionFeePerBond = 3.00m,
         bool taxExempt = false,
-        Guid? fundingAssetId = null) => new()
+        Guid? fundingAssetId = null, Guid portfolioId = default) => new()
         {
+            PortfolioId = portfolioId,
             Name = name,
             SeriesCode = seriesCode,
             Type = type,
@@ -328,7 +327,8 @@ internal static class PortfolioApi
     public static async Task<BondResponse> AddBondAsync(
         this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddBondRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(BondsUri(portfolioId), request ?? NewBondRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(
+            AllBondsUri, (request ?? NewBondRequest()) with { PortfolioId = portfolioId }, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken))!;
@@ -344,9 +344,9 @@ internal static class PortfolioApi
     }
 
     public static async Task<BondResponse> GetBondAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.GetAsync(BondUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(BondUri(assetId), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken))!;
@@ -371,14 +371,14 @@ internal static class PortfolioApi
         return new FundedBond(cashPortfolioId, cashId, bondPortfolioId, bond);
     }
 
-    public static string BondInterestSettlementsUri(Guid portfolioId, Guid assetId) =>
-        $"{BondUri(portfolioId, assetId)}/interest-settlements";
+    public static string BondInterestSettlementsUri(Guid assetId) =>
+        $"{BondUri(assetId)}/interest-settlements";
 
-    public static string BondInterestPreviewUri(Guid portfolioId, Guid assetId) =>
-        $"{BondInterestSettlementsUri(portfolioId, assetId)}/preview";
+    public static string BondInterestPreviewUri(Guid assetId) =>
+        $"{BondInterestSettlementsUri(assetId)}/preview";
 
-    public static string BondInterestSettlementUri(Guid portfolioId, Guid assetId, Guid settlementId) =>
-        $"{BondInterestSettlementsUri(portfolioId, assetId)}/{settlementId}";
+    public static string BondInterestSettlementUri(Guid assetId, Guid settlementId) =>
+        $"{BondInterestSettlementsUri(assetId)}/{settlementId}";
 
     public static readonly DateOnly RorPurchaseDate = new(2026, 6, 10);
 
@@ -403,42 +403,40 @@ internal static class PortfolioApi
 
     public static async Task<HttpResponseMessage> SettleBondInterestRawAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods,
         Guid? destinationAssetId,
         CancellationToken cancellationToken) =>
         await client.PostAsJsonAsync(
-            BondInterestSettlementsUri(portfolioId, assetId), NewSettleBondBody(periods, destinationAssetId), cancellationToken);
+            BondInterestSettlementsUri(assetId), NewSettleBondBody(periods, destinationAssetId), cancellationToken);
 
     public static async Task SettleBondInterestAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods,
         Guid? destinationAssetId,
         CancellationToken cancellationToken)
     {
-        var response = await client.SettleBondInterestRawAsync(portfolioId, assetId, periods, destinationAssetId, cancellationToken);
+        var response = await client.SettleBondInterestRawAsync(assetId, periods, destinationAssetId, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public static async Task<Guid> GetLastBondSettlementIdAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var bond = await client.GetBondAsync(portfolioId, assetId, cancellationToken);
+        var bond = await client.GetBondAsync(assetId, cancellationToken);
 
         return bond.LastSettlement!.SettlementId;
     }
 
-    public static string BondRedemptionUri(Guid portfolioId, Guid assetId) =>
-        $"{BondUri(portfolioId, assetId)}/redemption";
+    public static string BondRedemptionUri(Guid assetId) =>
+        $"{BondUri(assetId)}/redemption";
 
-    public static string BondRedemptionPreviewUri(Guid portfolioId, Guid assetId) =>
-        $"{BondUri(portfolioId, assetId)}/redemption-preview";
+    public static string BondRedemptionPreviewUri(Guid assetId) =>
+        $"{BondUri(assetId)}/redemption-preview";
 
-    public static string BondSwapUri(Guid portfolioId, Guid assetId) =>
-        $"{BondUri(portfolioId, assetId)}/swap";
+    public static string BondSwapUri(Guid assetId) =>
+        $"{BondUri(assetId)}/swap";
 
     public static readonly DateOnly TosMaturityDate = new(2029, 10, 1);
 
@@ -464,7 +462,7 @@ internal static class PortfolioApi
     {
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest(taxExempt: taxExempt));
         await client.SettleBondInterestAsync(
-            funded.BondPortfolioId, funded.Bond.AssetId, [(1, null), (2, null), (3, null)], null, cancellationToken);
+            funded.Bond.AssetId, [(1, null), (2, null), (3, null)], null, cancellationToken);
 
         return funded;
     }
@@ -476,19 +474,19 @@ internal static class PortfolioApi
             cancellationToken,
             request: NewRorBondRequest(bondCount: 10, taxExempt: taxExempt) with { PurchasePricePerBond = purchasePricePerBond });
         var periods = Enumerable.Range(1, 12).Select(index => (index, index == 1 ? (decimal?)null : 3.75m)).ToList();
-        await client.SettleBondInterestAsync(funded.BondPortfolioId, funded.Bond.AssetId, periods, funded.CashAssetId, cancellationToken);
+        await client.SettleBondInterestAsync(funded.Bond.AssetId, periods, funded.CashAssetId, cancellationToken);
 
         return funded;
     }
 
     public static async Task<HttpResponseMessage> RedeemBondRawAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken) =>
-        await client.PostAsJsonAsync(BondRedemptionUri(portfolioId, assetId), new { destinationAssetId }, cancellationToken);
+        this HttpClient client, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken) =>
+        await client.PostAsJsonAsync(BondRedemptionUri(assetId), new { destinationAssetId }, cancellationToken);
 
     public static async Task RedeemBondAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken)
     {
-        var response = await client.RedeemBondRawAsync(portfolioId, assetId, destinationAssetId, cancellationToken);
+        var response = await client.RedeemBondRawAsync(assetId, destinationAssetId, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -502,12 +500,12 @@ internal static class PortfolioApi
 
     public static readonly DateTimeOffset RorEarlyRedemptionDayUtc = new(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
 
-    public static string BondEarlyRedemptionUri(Guid portfolioId, Guid assetId) =>
-        $"{BondUri(portfolioId, assetId)}/early-redemption";
+    public static string BondEarlyRedemptionUri(Guid assetId) =>
+        $"{BondUri(assetId)}/early-redemption";
 
     public static string BondEarlyRedemptionPreviewUri(
-        Guid portfolioId, Guid assetId, DateOnly date, int bondCount, decimal? runningPeriodRatePercent = null) =>
-        $"{BondUri(portfolioId, assetId)}/early-redemption-preview?date={date:yyyy-MM-dd}&bondCount={bondCount}"
+        Guid assetId, DateOnly date, int bondCount, decimal? runningPeriodRatePercent = null) =>
+        $"{BondUri(assetId)}/early-redemption-preview?date={date:yyyy-MM-dd}&bondCount={bondCount}"
         + (runningPeriodRatePercent is { } rate ? $"&runningPeriodRatePercent={rate.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : string.Empty);
 
     public static AddBondRequest NewEdoEarlyBondRequest(int bondCount = 10) =>
@@ -524,7 +522,6 @@ internal static class PortfolioApi
 
     public static async Task<HttpResponseMessage> RedeemBondEarlyRawAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         DateOnly date,
         int bondCount,
@@ -532,13 +529,12 @@ internal static class PortfolioApi
         CancellationToken cancellationToken,
         decimal? runningPeriodRatePercent = null) =>
         await client.PostAsJsonAsync(
-            BondEarlyRedemptionUri(portfolioId, assetId),
+            BondEarlyRedemptionUri(assetId),
             NewEarlyRedeemBody(date, bondCount, destinationAssetId, runningPeriodRatePercent),
             cancellationToken);
 
     public static async Task RedeemBondEarlyAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         DateOnly date,
         int bondCount,
@@ -547,7 +543,7 @@ internal static class PortfolioApi
         decimal? runningPeriodRatePercent = null)
     {
         var response = await client.RedeemBondEarlyRawAsync(
-            portfolioId, assetId, date, bondCount, destinationAssetId, cancellationToken, runningPeriodRatePercent);
+            assetId, date, bondCount, destinationAssetId, cancellationToken, runningPeriodRatePercent);
         response.EnsureSuccessStatusCode();
     }
 
@@ -558,7 +554,7 @@ internal static class PortfolioApi
             cancellationToken, request: NewEdoEarlyBondRequest(), cashToppedUpOn: new DateOnly(2025, 1, 1));
         if (settleYearOne)
         {
-            await client.SettleBondInterestAsync(funded.BondPortfolioId, funded.Bond.AssetId, [(1, null)], null, cancellationToken);
+            await client.SettleBondInterestAsync(funded.Bond.AssetId, [(1, null)], null, cancellationToken);
         }
 
         return funded;
@@ -570,7 +566,7 @@ internal static class PortfolioApi
         var funded = await client.CreateFundedBondAsync(
             cancellationToken, request: NewRorBondRequest(bondCount: bondCount) with { EarlyRedemptionFeePerBond = 0.50m });
         await client.SettleBondInterestAsync(
-            funded.BondPortfolioId, funded.Bond.AssetId, [(1, null), (2, 3.75m), (3, 3.75m)], funded.CashAssetId, cancellationToken);
+            funded.Bond.AssetId, [(1, null), (2, 3.75m), (3, 3.75m)], funded.CashAssetId, cancellationToken);
 
         return funded;
     }
@@ -599,21 +595,19 @@ internal static class PortfolioApi
 
     public static async Task<HttpResponseMessage> SwapBondRawAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         object body,
         CancellationToken cancellationToken) =>
-        await client.PostAsJsonAsync(BondSwapUri(portfolioId, assetId), body, cancellationToken);
+        await client.PostAsJsonAsync(BondSwapUri(assetId), body, cancellationToken);
 
     public static async Task SwapBondAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         int bondCount,
         Guid? destinationAssetId,
         CancellationToken cancellationToken)
     {
-        var response = await client.SwapBondRawAsync(portfolioId, assetId, NewSwapBody(bondCount, destinationAssetId), cancellationToken);
+        var response = await client.SwapBondRawAsync(assetId, NewSwapBody(bondCount, destinationAssetId), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -645,11 +639,8 @@ internal static class PortfolioApi
 
     public const string AllSavingsAccountsUri = "/api/portfolio/savings-accounts";
 
-    public static string SavingsAccountsUri(Guid portfolioId) =>
-        $"{PortfoliosUri}/{portfolioId}/savings-accounts";
-
-    public static string SavingsAccountUri(Guid portfolioId, Guid assetId) =>
-        $"{PortfoliosUri}/{portfolioId}/savings-accounts/{assetId}";
+    public static string SavingsAccountUri(Guid assetId) =>
+        $"/api/portfolio/savings-accounts/{assetId}";
 
     public static readonly DateTimeOffset SavingsTodayUtc = new(2026, 2, 1, 10, 0, 0, TimeSpan.Zero);
 
@@ -663,8 +654,9 @@ internal static class PortfolioApi
         bool taxExempt = false,
         bool withOpeningDeposit = true,
         decimal openingAmount = 10_000m,
-        DateOnly? openingDate = null) => new()
+        DateOnly? openingDate = null, Guid portfolioId = default) => new()
         {
+            PortfolioId = portfolioId,
             Name = name,
             BankName = bankName,
             Currency = currency,
@@ -690,7 +682,8 @@ internal static class PortfolioApi
     public static async Task<SavingsAccountResponse> AddSavingsAccountAsync(
         this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(SavingsAccountsUri(portfolioId), request ?? NewSavingsAccountRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(
+            AllSavingsAccountsUri, (request ?? NewSavingsAccountRequest()) with { PortfolioId = portfolioId }, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
@@ -706,9 +699,9 @@ internal static class PortfolioApi
     }
 
     public static async Task<SavingsAccountResponse> GetSavingsAccountAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.GetAsync(SavingsAccountUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(SavingsAccountUri(assetId), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
@@ -716,11 +709,8 @@ internal static class PortfolioApi
 
     public const string AllMetalsUri = "/api/portfolio/metals";
 
-    public static string MetalsUri(Guid portfolioId) =>
-        $"{PortfoliosUri}/{portfolioId}/metals";
-
-    public static string MetalUri(Guid portfolioId, Guid assetId) =>
-        $"{PortfoliosUri}/{portfolioId}/metals/{assetId}";
+    public static string MetalUri(Guid assetId) =>
+        $"/api/portfolio/metals/{assetId}";
 
     public static readonly DateTimeOffset MetalTodayUtc = new(2026, 10, 5, 10, 0, 0, TimeSpan.Zero);
 
@@ -734,8 +724,9 @@ internal static class PortfolioApi
         bool withFirstPurchase = true,
         decimal pieces = 10m,
         decimal pricePerPiece = 260.00m,
-        DateOnly? purchaseDate = null) => new()
+        DateOnly? purchaseDate = null, Guid portfolioId = default) => new()
         {
+            PortfolioId = portfolioId,
             Name = name,
             Metal = metal,
             FineWeight = fineWeight,
@@ -760,7 +751,8 @@ internal static class PortfolioApi
     public static async Task<MetalResponse> AddMetalAsync(
         this HttpClient client, Guid portfolioId, CancellationToken cancellationToken, AddMetalRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(MetalsUri(portfolioId), request ?? NewMetalRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(
+            AllMetalsUri, (request ?? NewMetalRequest()) with { PortfolioId = portfolioId }, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken))!;
@@ -776,9 +768,9 @@ internal static class PortfolioApi
     }
 
     public static async Task<MetalResponse> GetMetalAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.GetAsync(MetalUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(MetalUri(assetId), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken))!;
@@ -814,7 +806,7 @@ internal static class PortfolioApi
     {
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken, currency: currency, name: name);
         await client.RecordTransactionAsync(
-            portfolioId, cashId, TransactionType.Deposit, balance, toppedUpOn ?? DefaultTopUpDate, cancellationToken, unitPrice: 1m);
+            cashId, TransactionType.Deposit, balance, toppedUpOn ?? DefaultTopUpDate, cancellationToken, unitPrice: 1m);
 
         return cashId;
     }
@@ -851,9 +843,9 @@ internal static class PortfolioApi
     }
 
     public static async Task<TransactionResponse> GetCashWithdrawAsync(
-        this HttpClient client, Guid portfolioId, Guid cashId, CancellationToken cancellationToken) =>
+        this HttpClient client, Guid cashId, CancellationToken cancellationToken) =>
         Assert.Single(
-            (await client.ListTransactionsAsync(portfolioId, cashId, cancellationToken)).Items,
+            (await client.ListTransactionsAsync(cashId, cancellationToken)).Items,
             t => t.Type == TransactionType.Withdraw);
 
     public static async Task<Guid> CreatePortfolioAsync(
@@ -883,13 +875,14 @@ internal static class PortfolioApi
     {
         var request = new AddAssetRequest
         {
+            PortfolioId = portfolioId,
             AssetClass = assetClass,
             Name = name,
             Currency = currency,
             InstrumentId = AssetValuationModes.SupportsCurrencyValued(assetClass) ? null : FakeInstrumentLookupClient.IdFor(assetClass, currency)
         };
 
-        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
@@ -903,9 +896,9 @@ internal static class PortfolioApi
         string currency = "PLN",
         string name = "Cash account")
     {
-        var request = new AddAssetRequest { AssetClass = assetClass, Name = name, Currency = currency };
+        var request = new AddAssetRequest { PortfolioId = portfolioId, AssetClass = assetClass, Name = name, Currency = currency };
 
-        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
@@ -927,13 +920,14 @@ internal static class PortfolioApi
     {
         var request = new AddAssetRequest
         {
+            PortfolioId = portfolioId,
             AssetClass = assetClass,
             Name = name,
             Currency = currency,
             InstrumentId = instrumentId ?? Guid.NewGuid()
         };
 
-        var response = await client.PostAsJsonAsync(AssetsUri(portfolioId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
@@ -964,7 +958,7 @@ internal static class PortfolioApi
             for (var t = 0; t < transactionsPerAsset; t++)
             {
                 await client.RecordTransactionAsync(
-                    portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1).AddDays(t), cancellationToken);
+                    assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1).AddDays(t), cancellationToken);
             }
 
             assetIds.Add(assetId);
@@ -975,7 +969,6 @@ internal static class PortfolioApi
 
     public static async Task<Guid> RecordTransactionAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         TransactionType type,
         decimal quantity,
@@ -985,39 +978,39 @@ internal static class PortfolioApi
     {
         var request = new RecordTransactionRequest { Type = type, Quantity = quantity, UnitPrice = unitPrice, Date = date };
 
-        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, assetId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(TransactionsUri(assetId), request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!.Id;
     }
 
     public static async Task<AssetResponse> GetAssetAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.GetAsync(AssetUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(AssetUri(assetId), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!;
     }
 
     public static async Task<PagedResponse<TransactionResponse>> ListTransactionsAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
         // The largest page, so a settled-and-redeemed bond's whole history fits in one read.
-        var response = await client.GetAsync($"{TransactionsUri(portfolioId, assetId)}?pageSize=100", cancellationToken);
+        var response = await client.GetAsync($"{TransactionsUri(assetId)}?pageSize=100", cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken))!;
     }
 
-    public static string SavingsInterestPreviewUri(Guid portfolioId, Guid assetId) =>
-        $"{SavingsAccountUri(portfolioId, assetId)}/interest-preview";
+    public static string SavingsInterestPreviewUri(Guid assetId) =>
+        $"{SavingsAccountUri(assetId)}/interest-preview";
 
-    public static string SavingsInterestSettlementsUri(Guid portfolioId, Guid assetId) =>
-        $"{SavingsAccountUri(portfolioId, assetId)}/interest-settlements";
+    public static string SavingsInterestSettlementsUri(Guid assetId) =>
+        $"{SavingsAccountUri(assetId)}/interest-settlements";
 
-    public static string SavingsInterestSettlementUri(Guid portfolioId, Guid assetId, Guid settlementId) =>
-        $"{SavingsInterestSettlementsUri(portfolioId, assetId)}/{settlementId}";
+    public static string SavingsInterestSettlementUri(Guid assetId, Guid settlementId) =>
+        $"{SavingsInterestSettlementsUri(assetId)}/{settlementId}";
 
     public static readonly DateOnly InterestOpeningDate = new(2026, 9, 1);
 
@@ -1045,9 +1038,9 @@ internal static class PortfolioApi
         new { periodEnd, grossInterest, tax };
 
     public static async Task<System.Text.Json.JsonElement> GetSavingsInterestPreviewAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.GetAsync(SavingsInterestPreviewUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(SavingsInterestPreviewUri(assetId), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return await response.ReadJsonAsync(cancellationToken);
@@ -1055,7 +1048,6 @@ internal static class PortfolioApi
 
     public static async Task SettleSavingsInterestAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         DateOnly periodEnd,
         decimal grossInterest,
@@ -1063,17 +1055,16 @@ internal static class PortfolioApi
         CancellationToken cancellationToken)
     {
         var response = await client.PostAsJsonAsync(
-            SavingsInterestSettlementsUri(portfolioId, assetId), NewSettleInterestBody(periodEnd, grossInterest, tax), cancellationToken);
+            SavingsInterestSettlementsUri(assetId), NewSettleInterestBody(periodEnd, grossInterest, tax), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public static async Task<DateOnly> SettlePreviewedSavingsInterestAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var preview = await client.GetSavingsInterestPreviewAsync(portfolioId, assetId, cancellationToken);
+        var preview = await client.GetSavingsInterestPreviewAsync(assetId, cancellationToken);
         var periodEnd = DateOnly.Parse(preview.GetProperty("periodEnd").GetString()!, System.Globalization.CultureInfo.InvariantCulture);
         await client.SettleSavingsInterestAsync(
-            portfolioId,
             assetId,
             periodEnd,
             preview.GetProperty("grossInterest").GetDecimal(),
@@ -1084,9 +1075,9 @@ internal static class PortfolioApi
     }
 
     public static async Task<Guid> GetLastSettlementIdAsync(
-        this HttpClient client, Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var account = await client.GetSavingsAccountAsync(portfolioId, assetId, cancellationToken);
+        var account = await client.GetSavingsAccountAsync(assetId, cancellationToken);
 
         return account.LastSettlement!.SettlementId;
     }
@@ -1159,7 +1150,6 @@ internal static class PortfolioApi
 
     public static async Task<TransactionResponse> RecordMetalTransactionWithCashAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         Guid cashAssetId,
         CancellationToken cancellationToken,
@@ -1169,11 +1159,11 @@ internal static class PortfolioApi
         DateOnly? date = null)
     {
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(portfolioId, assetId), NewMetalCashRequest(cashAssetId, type, pieces, pricePerPiece, date), cancellationToken);
+            TransactionsUri(assetId), NewMetalCashRequest(cashAssetId, type, pieces, pricePerPiece, date), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return Assert.Single(
-            (await client.ListTransactionsAsync(portfolioId, assetId, cancellationToken)).Items,
+            (await client.ListTransactionsAsync(assetId, cancellationToken)).Items,
             t => t.Type == type && t.Transfer is not null);
     }
 
@@ -1197,7 +1187,6 @@ internal static class PortfolioApi
 
     public static async Task<TransactionResponse> RecordTradeWithCashAsync(
         this HttpClient client,
-        Guid portfolioId,
         Guid assetId,
         Guid cashAssetId,
         CancellationToken cancellationToken,
@@ -1207,7 +1196,7 @@ internal static class PortfolioApi
         DateOnly? date = null)
     {
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(portfolioId, assetId), NewTradeRequest(cashAssetId, type, quantity, unitPrice, date), cancellationToken);
+            TransactionsUri(assetId), NewTradeRequest(cashAssetId, type, quantity, unitPrice, date), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!;

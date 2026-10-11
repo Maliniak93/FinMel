@@ -10,7 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlements,
+  postApiPortfolioBondsByAssetIdInterestSettlements,
   type BondResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
@@ -114,12 +114,10 @@ export class SettleAllBondsDialog {
 
     for (const section of pending) {
       section.error.set(null);
-      const result = await postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlements(
-        {
-          path: { portfolioId: section.bond.portfolioId, assetId: section.bond.assetId },
-          body: settleRequest(section),
-        },
-      );
+      const result = await postApiPortfolioBondsByAssetIdInterestSettlements({
+        path: { assetId: section.bond.assetId },
+        body: settleRequest(section),
+      });
       if (result.error) {
         section.error.set(
           readProblemDetails(result.error).detail ?? translate('bonds.settle.failed'),

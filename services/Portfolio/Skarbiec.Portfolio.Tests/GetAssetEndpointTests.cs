@@ -20,7 +20,7 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Shares");
 
-        var response = await client.GetAsync(AssetUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
@@ -35,7 +35,7 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
-        var response = await client.GetAsync(AssetUri(portfolioId, Guid.NewGuid()), cancellationToken);
+        var response = await client.GetAsync(AssetUri(Guid.NewGuid()), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -46,10 +46,10 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken);
-        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1), cancellationToken);
-        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 2), cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 2), cancellationToken);
 
-        var response = await client.GetAsync(AssetUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
@@ -79,7 +79,7 @@ public sealed class GetAssetEndpointTests(SkarbiecContainersFixture containers) 
         }
 
         using var client = Factory.CreateAuthenticatedClient(ownerId);
-        var response = await client.GetAsync(AssetUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);

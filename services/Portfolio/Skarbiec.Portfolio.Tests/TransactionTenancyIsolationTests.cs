@@ -19,7 +19,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var response = await stranger.PutAsJsonAsync(
-            TransactionUri(ownerPortfolioId, ownerAssetId, transactionId), UpdatePayload(), cancellationToken);
+            TransactionUri(ownerAssetId, transactionId), UpdatePayload(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -31,7 +31,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
         var (ownerPortfolioId, ownerAssetId, transactionId) = await CreateOwnedTransactionAsync(cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var response = await stranger.DeleteAsync(TransactionUri(ownerPortfolioId, ownerAssetId, transactionId), cancellationToken);
+        var response = await stranger.DeleteAsync(TransactionUri(ownerAssetId, transactionId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -45,7 +45,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (strangerPortfolioId, strangerAssetId) = await stranger.CreatePortfolioWithAssetAsync(cancellationToken);
 
-        var page = await stranger.ListTransactionsAsync(strangerPortfolioId, strangerAssetId, cancellationToken);
+        var page = await stranger.ListTransactionsAsync(strangerAssetId, cancellationToken);
 
         Assert.Empty(page.Items);
     }
@@ -60,7 +60,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
         var (strangerPortfolioId, strangerAssetId) = await stranger.CreatePortfolioWithAssetAsync(cancellationToken);
 
         var response = await stranger.PutAsJsonAsync(
-            TransactionUri(strangerPortfolioId, strangerAssetId, transactionId), UpdatePayload(), cancellationToken);
+            TransactionUri(strangerAssetId, transactionId), UpdatePayload(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -74,7 +74,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (strangerPortfolioId, strangerAssetId) = await stranger.CreatePortfolioWithAssetAsync(cancellationToken);
 
-        var response = await stranger.DeleteAsync(TransactionUri(strangerPortfolioId, strangerAssetId, transactionId), cancellationToken);
+        var response = await stranger.DeleteAsync(TransactionUri(strangerAssetId, transactionId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -84,7 +84,7 @@ public sealed class TransactionTenancyIsolationTests(SkarbiecContainersFixture c
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await owner.CreatePortfolioWithAssetAsync(cancellationToken);
         var transactionId = await owner.RecordTransactionAsync(
-            portfolioId, assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
+            assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
 
         return (portfolioId, assetId, transactionId);
     }

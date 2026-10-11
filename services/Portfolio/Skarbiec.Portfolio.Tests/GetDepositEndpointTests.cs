@@ -17,10 +17,10 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        Assert.False((await client.GetDepositAsync(portfolioId, deposit.AssetId, cancellationToken)).IsArchived);
-        await client.ArchiveAssetAsync(portfolioId, deposit.AssetId, cancellationToken);
+        Assert.False((await client.GetDepositAsync(deposit.AssetId, cancellationToken)).IsArchived);
+        await client.ArchiveAssetAsync(deposit.AssetId, cancellationToken);
 
-        var response = await client.GetAsync(DepositUri(portfolioId, deposit.AssetId), cancellationToken);
+        var response = await client.GetAsync(DepositUri(deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
@@ -37,7 +37,7 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(
             cancellationToken, NewDepositRequest(capitalization: DepositCapitalization.Monthly, principal: 12_000m, startDate: new DateOnly(2026, 1, 1)));
 
-        var response = await client.GetAsync(DepositUri(portfolioId, deposit.AssetId), cancellationToken);
+        var response = await client.GetAsync(DepositUri(deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
@@ -63,9 +63,9 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
         await client.SettleDepositAsync(
-            portfolioId, deposit.AssetId, cancellationToken, NewSettleRequest(settledOn: new DateOnly(2026, 4, 17), grossInterest: 150.00m, tax: 28.50m));
+            deposit.AssetId, cancellationToken, NewSettleRequest(settledOn: new DateOnly(2026, 4, 17), grossInterest: 150.00m, tax: 28.50m));
 
-        var response = await client.GetAsync(DepositUri(portfolioId, deposit.AssetId), cancellationToken);
+        var response = await client.GetAsync(DepositUri(deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
@@ -85,23 +85,10 @@ public sealed class GetDepositEndpointTests(SkarbiecContainersFixture containers
         var (portfolioId, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
         var cashId = await client.AddCashAssetAsync(portfolioId, cancellationToken);
 
-        var response = await client.GetAsync(DepositUri(portfolioId, cashId), cancellationToken);
+        var response = await client.GetAsync(DepositUri(cashId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         // Control: the deposit beside it is served by the same route.
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(DepositUri(portfolioId, deposit.AssetId), cancellationToken)).StatusCode);
-    }
-
-    [Fact]
-    public async Task Get_DepositUnderWrongPortfolio_ReturnsNotFound()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (_, deposit) = await client.CreatePortfolioWithDepositAsync(cancellationToken);
-        var otherPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Other portfolio");
-
-        var response = await client.GetAsync(DepositUri(otherPortfolioId, deposit.AssetId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(DepositUri(deposit.AssetId), cancellationToken)).StatusCode);
     }
 }

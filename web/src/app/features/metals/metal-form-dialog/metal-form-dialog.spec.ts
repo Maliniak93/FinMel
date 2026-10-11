@@ -106,8 +106,9 @@ describe('MetalFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(`/api/portfolio/portfolios/${reservePortfolioId}/metals`);
+      expect(request.url).toContain(`/api/portfolio/metals`);
       expect(await request.json()).toEqual({
+        portfolioId: reservePortfolioId,
         name: 'Krugerrand',
         metal: METAL.Gold,
         fineWeight: 1,
@@ -124,9 +125,10 @@ describe('MetalFormDialog', () => {
       await component['onSubmit']();
 
       const [request] = writeRequests();
-      expect(request.url).toContain(`/api/portfolio/portfolios/${savingsPortfolioId}/metals`);
+      expect(request.url).toContain(`/api/portfolio/metals`);
       const body = await request.json();
       expect(body).not.toHaveProperty('firstPurchase');
+      expect(body.portfolioId).toBe(savingsPortfolioId);
       expect(body).toMatchObject({ metal: METAL.Silver, fineWeight: 100, weightUnit: 'Gram' });
     });
 
@@ -171,9 +173,7 @@ describe('MetalFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('PUT');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${holding.portfolioId}/metals/${holding.assetId}`,
-      );
+      expect(request.url).toContain(`/api/portfolio/metals/${holding.assetId}`);
       expect(await request.json()).toEqual({
         name: 'Silver bar',
         metal: METAL.Silver,

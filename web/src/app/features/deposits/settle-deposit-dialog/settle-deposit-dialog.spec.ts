@@ -128,7 +128,7 @@ describe('SettleDepositDialog', () => {
       .map((call: unknown[]) => requestUrl(call[0]))
       .find((url: string) => url.includes('/settlement-preview'));
     expect(previewCall).toContain(
-      `/api/portfolio/portfolios/${dueDeposit.portfolioId}/deposits/${dueDeposit.assetId}/settlement-preview`,
+      `/api/portfolio/deposits/${dueDeposit.assetId}/settlement-preview`,
     );
 
     const settledOn = findControl(form(), 'settledOn').value as Date;
@@ -185,9 +185,7 @@ describe('SettleDepositDialog', () => {
 
     const [request] = writeRequests();
     expect(request.method).toBe('POST');
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${dueDeposit.portfolioId}/deposits/${dueDeposit.assetId}/settle`,
-    );
+    expect(request.url).toContain(`/api/portfolio/deposits/${dueDeposit.assetId}/settle`);
     expect(await request.json()).toEqual({
       settledOn: '2026-04-17',
       grossInterest: 150,
@@ -293,9 +291,7 @@ describe('SettleDepositDialog', () => {
       await component['onSubmit']();
 
       const [request] = writeRequests();
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/deposits/${dueDeposit.assetId}/settle`,
-      );
+      expect(request.url).toContain(`/api/portfolio/deposits/${dueDeposit.assetId}/settle`);
       expect(await request.json()).toEqual({
         settledOn: '2026-04-15',
         grossInterest: 147.95,
@@ -312,9 +308,7 @@ describe('SettleDepositDialog', () => {
       await component['onSubmit']();
 
       const [request] = writeRequests();
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/deposits/${dueDeposit.assetId}/settle`,
-      );
+      expect(request.url).toContain(`/api/portfolio/deposits/${dueDeposit.assetId}/settle`);
       expect(await request.json()).toEqual({
         settledOn: '2026-04-15',
         grossInterest: 147.95,

@@ -146,7 +146,7 @@ describe('SettleBondInterestDialog', () => {
 
     const [request] = settleRequests();
     expect(request.url).toContain(
-      `/api/portfolio/portfolios/${dueRorBond.portfolioId}/bonds/${dueRorBond.assetId}/interest-settlements`,
+      `/api/portfolio/bonds/${dueRorBond.assetId}/interest-settlements`,
     );
     expect(await request.json()).toEqual({
       periods: [

@@ -96,7 +96,7 @@ describe('TransactionFormDialog', () => {
   }
 
   it('creates a Buy with the form values and closes with true on success', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction }, 201));
 
     component['form'].controls.quantity.setValue(10);
@@ -115,7 +115,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('pre-fills the form from an existing transaction and updates via PUT on success', async () => {
-    await setup({ portfolioId, assetId, assetClass, transaction: existingTransaction });
+    await setup({ assetId, assetClass, transaction: existingTransaction });
     fetchSpy.mockResolvedValue(jsonResponse(existingTransaction));
 
     expect(component['form'].controls.type.value).toBe(0);
@@ -136,7 +136,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('sends unit price 1 for a Deposit, where the unit-price field is hidden', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction, type: 2 }, 201));
 
     component['form'].controls.type.setValue(2);
@@ -154,7 +154,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('offers no Fee type', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
 
     expect(await typeOptionLabels()).toEqual([
       'Buy',
@@ -175,14 +175,14 @@ describe('TransactionFormDialog', () => {
   });
 
   it('offers only Deposit/Withdraw for a Cash asset', async () => {
-    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash });
+    await setup({ assetId, assetClass: ASSET_CLASS.Cash });
 
     expect(component['form'].controls.type.value).toBe(2);
     expect(await typeOptionLabels()).toEqual(['Deposit', 'Withdraw']);
   });
 
   it('offers only Buy/Sell for a precious metal and labels the quantity in pieces and the price per piece', async () => {
-    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.PreciousMetal, type: 0 });
+    await setup({ assetId, assetClass: ASSET_CLASS.PreciousMetal, type: 0 });
 
     const fieldLabels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('mat-label'),
@@ -195,13 +195,13 @@ describe('TransactionFormDialog', () => {
   });
 
   it('preselects the type from dialog data', async () => {
-    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash, type: 3 });
+    await setup({ assetId, assetClass: ASSET_CLASS.Cash, type: 3 });
 
     expect(component['form'].controls.type.value).toBe(3);
   });
 
   it('offers all six types and starts on Buy for a market asset (ETF)', async () => {
-    await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Etf });
+    await setup({ assetId, assetClass: ASSET_CLASS.Etf });
 
     expect(component['form'].controls.type.value).toBe(0);
     expect(await typeOptionLabels()).toEqual([
@@ -216,7 +216,6 @@ describe('TransactionFormDialog', () => {
 
   it('keeps the stored type when editing a Cash asset transaction', async () => {
     await setup({
-      portfolioId,
       assetId,
       assetClass: ASSET_CLASS.Cash,
       transaction: { ...existingTransaction, type: 3 },
@@ -226,7 +225,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('does not submit an invalid form', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
     fetchSpy.mockResolvedValue(jsonResponse(existingTransaction, 201));
 
     component['form'].controls.quantity.setValue(-1);
@@ -238,7 +237,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('surfaces a validation error on the matching field, without closing', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
     fetchSpy.mockResolvedValue(
       jsonResponse(
         {
@@ -258,7 +257,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('surfaces the 409 history-breaking-edit conflict as a human-readable form banner', async () => {
-    await setup({ portfolioId, assetId, assetClass, transaction: existingTransaction });
+    await setup({ assetId, assetClass, transaction: existingTransaction });
     fetchSpy.mockResolvedValue(
       jsonResponse(
         {
@@ -279,7 +278,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('surfaces the 400 oversell validation error as a human-readable form banner', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
     fetchSpy.mockResolvedValue(
       jsonResponse(
         {
@@ -303,7 +302,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('closes with false on cancel', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
 
     component['cancel']();
 
@@ -311,7 +310,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('shows labels and validation in Polish', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
     const element = fixture.nativeElement as HTMLElement;
     component['form'].controls.quantity.setValue(-1);
     component['form'].controls.unitPrice.setValue(-1);
@@ -346,7 +345,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('names the amount field in the Polish validation message of a non-priced type', async () => {
-    await setup({ portfolioId, assetId, assetClass });
+    await setup({ assetId, assetClass });
     const element = fixture.nativeElement as HTMLElement;
     component['form'].controls.type.setValue(2);
     component['form'].controls.quantity.setValue(-1);
@@ -364,7 +363,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('shows the edit title and save button in Polish', async () => {
-    await setup({ portfolioId, assetId, assetClass, transaction: existingTransaction });
+    await setup({ assetId, assetClass, transaction: existingTransaction });
     const element = fixture.nativeElement as HTMLElement;
     const texts = () => [
       ...labelsOf(element, 'h2'),
@@ -382,7 +381,6 @@ describe('TransactionFormDialog', () => {
     const metalAssetId = '44444444-4444-4444-4444-444444444444';
     const cashAssetId = '55555555-5555-5555-5555-555555555555';
     const metalData = {
-      portfolioId,
       assetId: metalAssetId,
       assetClass: ASSET_CLASS.PreciousMetal,
     };
@@ -458,7 +456,7 @@ describe('TransactionFormDialog', () => {
     });
 
     it('has no Cash select for a Cash asset', async () => {
-      await setup({ portfolioId, assetId, assetClass: ASSET_CLASS.Cash, currency: 'EUR' }, respond);
+      await setup({ assetId, assetClass: ASSET_CLASS.Cash, currency: 'EUR' }, respond);
       fixture.detectChanges();
       await fixture.whenStable();
       expect(cashSelect()).toBeNull();
@@ -470,7 +468,6 @@ describe('TransactionFormDialog', () => {
     const eurCashId = '77777777-7777-7777-7777-777777777777';
     const plnCashId = '88888888-8888-8888-8888-888888888888';
     const etfData: TransactionFormDialogData = {
-      portfolioId,
       assetId: etfAssetId,
       assetClass: ASSET_CLASS.Etf,
       currency: 'EUR',

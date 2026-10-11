@@ -36,12 +36,10 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var addAssetHandler = scope.ServiceProvider.GetRequiredService<AddAssetHandler>();
         await addAssetHandler.HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN" },
             cancellationToken);
         await addAssetHandler.HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN" },
             cancellationToken);
 
         var archiveResult = await scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
@@ -70,12 +68,10 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         var addAssetHandler = scope.ServiceProvider.GetRequiredService<AddAssetHandler>();
         await addAssetHandler.HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash 1", Currency = "PLN" },
             cancellationToken);
         await addAssetHandler.HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash 2", Currency = "PLN" },
             cancellationToken);
         await scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
             .HandleAsync(portfolioResult.Value.Id, cancellationToken);
@@ -105,8 +101,7 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
         var positionEventsBefore = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
         Assert.Single(positionEventsBefore);
@@ -132,8 +127,7 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var portfolioResult = await scope.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Outbox test portfolio" }, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Cash, Name = "Cash", Currency = "PLN" },
             cancellationToken);
 
         var archiveHandler = scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>();
@@ -250,29 +244,25 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var writes = new (string Name, Func<IServiceProvider, Task<Error>> Write)[]
         {
             ("AddAsset", async s => (await s.GetRequiredService<AddAssetHandler>().HandleAsync(
-                portfolioId,
-                new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "New cash", Currency = "PLN" },
+                new AddAssetRequest { PortfolioId = portfolioId, AssetClass = AssetClass.Cash, Name = "New cash", Currency = "PLN" },
                 cancellationToken)).Error),
             ("UpdateAsset", async s => (await s.GetRequiredService<UpdateAssetHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 new UpdateAssetRequest { AssetClass = AssetClass.Stock, Name = "Renamed", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
                 cancellationToken)).Error),
             ("RecordTransaction", async s => (await s.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 3) },
                 cancellationToken)).Error),
             ("UpdateTransaction", async s => (await s.GetRequiredService<UpdateTransactionHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 transactionId,
                 new UpdateTransactionRequest { Type = TransactionType.Buy, Quantity = 50m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 2) },
                 cancellationToken)).Error),
             ("DeleteTransaction", async s => (await s.GetRequiredService<DeleteTransactionHandler>()
-                .HandleAsync(portfolioId, assetId, transactionId, cancellationToken)).Error),
+                .HandleAsync(assetId, transactionId, cancellationToken)).Error),
             ("RemoveAsset", async s => (await s.GetRequiredService<RemoveAssetHandler>()
-                .HandleAsync(portfolioId, assetId, cancellationToken)).Error),
+                .HandleAsync(assetId, cancellationToken)).Error),
         };
 
         foreach (var (name, write) in writes)
@@ -307,7 +297,7 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var archivedAssetId = await AddCashWithBalanceAsync(scope.ServiceProvider, portfolioId, 100m, cancellationToken);
         var liveAssetId = await AddCashWithBalanceAsync(scope.ServiceProvider, portfolioId, 200m, cancellationToken);
         Assert.True((await scope.ServiceProvider.GetRequiredService<ArchiveAssetHandler>()
-            .HandleAsync(portfolioId, archivedAssetId, cancellationToken)).IsSuccess);
+            .HandleAsync(archivedAssetId, cancellationToken)).IsSuccess);
 
         var result = await scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
             .HandleAsync(portfolioId, cancellationToken);
@@ -332,7 +322,7 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var archivedAssetId = await AddCashWithBalanceAsync(scope.ServiceProvider, portfolioId, 100m, cancellationToken);
         var liveAssetId = await AddCashWithBalanceAsync(scope.ServiceProvider, portfolioId, 200m, cancellationToken);
         Assert.True((await scope.ServiceProvider.GetRequiredService<ArchiveAssetHandler>()
-            .HandleAsync(portfolioId, archivedAssetId, cancellationToken)).IsSuccess);
+            .HandleAsync(archivedAssetId, cancellationToken)).IsSuccess);
         Assert.True((await scope.ServiceProvider.GetRequiredService<ArchivePortfolioHandler>()
             .HandleAsync(portfolioId, cancellationToken)).IsSuccess);
         var eventsBefore = (await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Count;
@@ -363,22 +353,19 @@ public sealed class PortfolioLifecycleOutboxTests(SkarbiecContainersFixture cont
         var recordHandler = scope.ServiceProvider.GetRequiredService<RecordTransactionHandler>();
 
         var first = await addAssetHandler.HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 1", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Stock 1", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var second = await addAssetHandler.HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 2", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Stock 2", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
         var third = await addAssetHandler.HandleAsync(
-            portfolioResult.Value.Id,
-            new AddAssetRequest { AssetClass = AssetClass.Stock, Name = "Stock 3", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
+            new AddAssetRequest { PortfolioId = portfolioResult.Value.Id, AssetClass = AssetClass.Stock, Name = "Stock 3", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
 
         foreach (var (asset, date) in new[] { (first, new DateOnly(2024, 3, 4)), (first, new DateOnly(2025, 1, 10)), (second, new DateOnly(2023, 5, 2)) })
         {
             var recorded = await recordHandler.HandleAsync(
-                portfolioResult.Value.Id, asset.Value.Id,
+                asset.Value.Id,
                 new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 10m, Date = date },
                 cancellationToken);
             Assert.True(recorded.IsSuccess);

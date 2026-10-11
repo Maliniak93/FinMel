@@ -215,7 +215,6 @@ describe('Cash', () => {
         TransactionFormDialog,
         expect.objectContaining({
           data: expect.objectContaining({
-            portfolioId: eurWallet.portfolioId,
             assetId: eurWallet.assetId,
             assetClass: ASSET_CLASS.Cash,
             type,

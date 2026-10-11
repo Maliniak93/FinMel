@@ -200,9 +200,8 @@ describe('Transactions', () => {
 
     expect(dialog.open).toHaveBeenCalledTimes(2);
     const [createCall, editCall] = dialog.open.mock.calls;
-    expect(createCall[1].data).toEqual({ portfolioId, assetId, assetClass: 0, currency: 'PLN' });
+    expect(createCall[1].data).toEqual({ assetId, assetClass: 0, currency: 'PLN' });
     expect(editCall[1].data).toEqual({
-      portfolioId,
       assetId,
       assetClass: 0,
       currency: 'PLN',

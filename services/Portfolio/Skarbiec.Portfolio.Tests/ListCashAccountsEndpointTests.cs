@@ -49,7 +49,7 @@ public sealed class ListCashAccountsEndpointTests(SkarbiecContainersFixture cont
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Live");
         var live = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 100m, name: "Live cash");
         var archived = await client.AddCashAssetWithBalanceAsync(portfolioId, cancellationToken, balance: 200m, name: "Archived cash");
-        await client.ArchiveAssetAsync(portfolioId, archived, cancellationToken);
+        await client.ArchiveAssetAsync(archived, cancellationToken);
         await client.AddArchivedCashAssetAsync(cancellationToken, balance: 400m);
 
         var response = await client.GetAsync(AllCashAccountsUri, cancellationToken);

@@ -7,7 +7,7 @@ public static class GetMetalEndpoint
 {
     public static IEndpointRouteBuilder MapGetMetalEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/metals");
+        var group = app.MapGroup("/api/portfolio/metals");
 
         group.MapGet("{assetId:guid}", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class GetMetalEndpoint
     }
 
     private static async Task<Results<Ok<MetalResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, GetMetalHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, cancellationToken)).ToHttpResult();
+        Guid assetId, GetMetalHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, cancellationToken)).ToHttpResult();
 }

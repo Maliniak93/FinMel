@@ -7,7 +7,7 @@ public static class UpdateTransactionEndpoint
 {
     public static IEndpointRouteBuilder MapUpdateTransactionEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets/{assetId:guid}/transactions");
+        var group = app.MapGroup("/api/portfolio/assets/{assetId:guid}/transactions");
 
         group.MapPut("{id:guid}", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class UpdateTransactionEndpoint
     }
 
     private static async Task<Results<Ok<TransactionResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, Guid id, UpdateTransactionRequest request, UpdateTransactionHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, id, request, cancellationToken)).ToHttpResult();
+        Guid assetId, Guid id, UpdateTransactionRequest request, UpdateTransactionHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, id, request, cancellationToken)).ToHttpResult();
 }

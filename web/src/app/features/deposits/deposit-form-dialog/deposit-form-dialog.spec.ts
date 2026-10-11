@@ -208,8 +208,9 @@ describe('DepositFormDialog', () => {
 
     const [request] = writeRequests();
     expect(request.method).toBe('POST');
-    expect(request.url).toContain(`/api/portfolio/portfolios/${reservePortfolioId}/deposits`);
+    expect(request.url).toContain(`/api/portfolio/deposits`);
     expect(await request.json()).toEqual({
+      portfolioId: reservePortfolioId,
       name: 'Term deposit',
       bankName: 'Test bank',
       currency: 'EUR',
@@ -233,10 +234,10 @@ describe('DepositFormDialog', () => {
 
     const [request] = writeRequests();
     expect(request.method).toBe('POST');
-    expect(request.url).toContain(`/api/portfolio/portfolios/${savingsPortfolioId}/deposits`);
+    expect(request.url).toContain(`/api/portfolio/deposits`);
     const body = await request.json();
     expect(body.taxExempt).toBe(true);
-    expect(body).not.toHaveProperty('portfolioId');
+    expect(body.portfolioId).toBe(savingsPortfolioId);
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
@@ -265,9 +266,7 @@ describe('DepositFormDialog', () => {
 
     const [request] = writeRequests();
     expect(request.method).toBe('PUT');
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${deposit.portfolioId}/deposits/${deposit.assetId}`,
-    );
+    expect(request.url).toContain(`/api/portfolio/deposits/${deposit.assetId}`);
     const body = await request.json();
     expect(body).not.toHaveProperty('portfolioId');
     expect(body).not.toHaveProperty('currency');
@@ -314,9 +313,7 @@ describe('DepositFormDialog', () => {
 
     const [request] = writeRequests();
     expect(request.method).toBe('PUT');
-    expect(request.url).toContain(
-      `/api/portfolio/portfolios/${rolledOverDeposit.portfolioId}/deposits/${rolledOverDeposit.assetId}`,
-    );
+    expect(request.url).toContain(`/api/portfolio/deposits/${rolledOverDeposit.assetId}`);
     expect(await request.json()).toEqual({
       name: 'Renamed deposit',
       bankName: 'Bank G',
@@ -480,7 +477,7 @@ describe('DepositFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(`/api/portfolio/portfolios/${savingsPortfolioId}/deposits`);
+      expect(request.url).toContain(`/api/portfolio/deposits`);
       const body = await request.json();
       expect(body.fundingAssetId).toBe(plnCashCandidate.assetId);
       expect(body.principal).toBe(1000);

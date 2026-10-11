@@ -25,12 +25,12 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Main");
         var euroEtf = await AddQuotedHoldingAsync(
             client, portfolioId, cancellationToken, AssetClass.Etf, "EUR", "A ETF", "VWCE", 120m, "XETRA", new DateOnly(2026, 1, 30));
-        await client.RecordTransactionAsync(portfolioId, euroEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 10), cancellationToken, unitPrice: 100m);
-        await client.RecordTransactionAsync(portfolioId, euroEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 20), cancellationToken, unitPrice: 120m);
-        await client.RecordTransactionAsync(portfolioId, euroEtf, TransactionType.Sell, 5m, new DateOnly(2026, 1, 25), cancellationToken, unitPrice: 125m);
+        await client.RecordTransactionAsync(euroEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 10), cancellationToken, unitPrice: 100m);
+        await client.RecordTransactionAsync(euroEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 20), cancellationToken, unitPrice: 120m);
+        await client.RecordTransactionAsync(euroEtf, TransactionType.Sell, 5m, new DateOnly(2026, 1, 25), cancellationToken, unitPrice: 125m);
         var zlotyEtf = await AddQuotedHoldingAsync(
             client, portfolioId, cancellationToken, AssetClass.Etf, "PLN", "B ETF", "ETFBW", 60m, "GPW", new DateOnly(2026, 1, 30));
-        await client.RecordTransactionAsync(portfolioId, zlotyEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 50m);
+        await client.RecordTransactionAsync(zlotyEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 50m);
 
         var etfs = await client.GetAsync(AllSecuritiesUri(AssetClass.Etf), cancellationToken);
         var stocks = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
@@ -84,7 +84,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         var zloty = await AddQuotedHoldingAsync(client, secondPortfolio, cancellationToken, currency: "PLN", name: "Zloty stock", ticker: "CDR");
         foreach (var (portfolio, asset) in new[] { (firstPortfolio, euro), (firstPortfolio, dollar), (secondPortfolio, zloty) })
         {
-            await client.RecordTransactionAsync(portfolio, asset, TransactionType.Buy, 1m, new DateOnly(2026, 1, 5), cancellationToken);
+            await client.RecordTransactionAsync(asset, TransactionType.Buy, 1m, new DateOnly(2026, 1, 5), cancellationToken);
         }
 
         var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
@@ -112,7 +112,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
             client, portfolioId, cancellationToken, currency: "USD", name: "C healthy", ticker: "OK", lastPrice: 20m);
         foreach (var asset in new[] { noQuote, noRate, healthy })
         {
-            await client.RecordTransactionAsync(portfolioId, asset, TransactionType.Buy, 10m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 10m);
+            await client.RecordTransactionAsync(asset, TransactionType.Buy, 10m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 10m);
         }
 
         var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
@@ -152,8 +152,8 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         var first = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "First", ticker: "ONE");
         var second = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Second", ticker: "TWO");
-        await client.RecordTransactionAsync(portfolioId, first, TransactionType.Buy, 4m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 25m);
-        await client.RecordTransactionAsync(portfolioId, second, TransactionType.Buy, 2m, new DateOnly(2026, 1, 6), cancellationToken, unitPrice: 30m);
+        await client.RecordTransactionAsync(first, TransactionType.Buy, 4m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 25m);
+        await client.RecordTransactionAsync(second, TransactionType.Buy, 2m, new DateOnly(2026, 1, 6), cancellationToken, unitPrice: 30m);
 
         var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
 
@@ -186,7 +186,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Live");
         var live = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Live stock", ticker: "LIVE");
         var archived = await AddQuotedHoldingAsync(client, portfolioId, cancellationToken, name: "Archived stock", ticker: "OLD");
-        await client.ArchiveAssetAsync(portfolioId, archived, cancellationToken);
+        await client.ArchiveAssetAsync(archived, cancellationToken);
         await client.AddCashAssetAsync(portfolioId, cancellationToken);
         var archivedPortfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Closed");
         await AddQuotedHoldingAsync(client, archivedPortfolioId, cancellationToken, name: "Stock in closed portfolio", ticker: "CLS");

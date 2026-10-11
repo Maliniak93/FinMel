@@ -143,10 +143,9 @@ describe('SavingsAccountFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${reservePortfolioId}/savings-accounts`,
-      );
+      expect(request.url).toContain(`/api/portfolio/savings-accounts`);
       expect(await request.json()).toEqual({
+        portfolioId: reservePortfolioId,
         name: 'Savings account',
         bankName: 'Test bank',
         currency: 'EUR',
@@ -165,12 +164,10 @@ describe('SavingsAccountFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${savingsPortfolioId}/savings-accounts`,
-      );
+      expect(request.url).toContain(`/api/portfolio/savings-accounts`);
       const body = await request.json();
       expect(body).not.toHaveProperty('openingDeposit');
-      expect(body).not.toHaveProperty('portfolioId');
+      expect(body.portfolioId).toBe(savingsPortfolioId);
       expect(body).toMatchObject({ name: 'Savings account', currency: 'PLN', taxExempt: false });
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
@@ -183,10 +180,9 @@ describe('SavingsAccountFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${savingsPortfolioId}/savings-accounts`,
-      );
+      expect(request.url).toContain(`/api/portfolio/savings-accounts`);
       const body = await request.json();
+      expect(body.portfolioId).toBe(savingsPortfolioId);
       expect(body.openingDeposit.amount).toBe(500);
       expect(body.openingDeposit.date).toBe(toDateOnly(new Date()));
       expect(dialogRef.close).toHaveBeenCalledWith(true);
@@ -307,9 +303,7 @@ describe('SavingsAccountFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('PUT');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${account.portfolioId}/savings-accounts/${account.assetId}`,
-      );
+      expect(request.url).toContain(`/api/portfolio/savings-accounts/${account.assetId}`);
       expect(await request.json()).toEqual({
         name: 'Renamed account',
         bankName: 'Old bank',
@@ -396,12 +390,14 @@ describe('SavingsAccountFormDialog', () => {
 
       const [request] = writeRequests();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${savingsPortfolioId}/savings-accounts`,
-      );
+      expect(request.url).toContain(`/api/portfolio/savings-accounts`);
       const body = await request.json();
       expect(body).not.toHaveProperty('openingDeposit');
-      expect(body).toMatchObject({ name: 'Savings account', currency: 'PLN' });
+      expect(body).toMatchObject({
+        portfolioId: savingsPortfolioId,
+        name: 'Savings account',
+        currency: 'PLN',
+      });
       expect(dialogRef.close).toHaveBeenCalledTimes(1);
       expect(dialogRef.close).toHaveBeenCalledWith(created);
     });
@@ -418,10 +414,10 @@ describe('SavingsAccountFormDialog', () => {
       await component['onSubmit']();
 
       const [request] = writeRequests();
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${reservePortfolioId}/savings-accounts`,
-      );
-      expect((await request.json()).currency).toBe('PLN');
+      expect(request.url).toContain(`/api/portfolio/savings-accounts`);
+      const body = await request.json();
+      expect(body.portfolioId).toBe(reservePortfolioId);
+      expect(body.currency).toBe('PLN');
     });
 
     it('plain create mode still closes with true', async () => {

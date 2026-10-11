@@ -8,11 +8,11 @@ namespace Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<SavingsAccountResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, UpdateSavingsAccountRequest request, CancellationToken cancellationToken)
+        Guid assetId, UpdateSavingsAccountRequest request, CancellationToken cancellationToken)
     {
         // Tenancy-scoped lookup first: another user's account, a non-Savings asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Savings, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Savings, cancellationToken);
         var terms = asset is null
             ? null
             : await dbContext.SavingsAccounts.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);
@@ -24,7 +24,7 @@ public sealed class UpdateSavingsAccountHandler(PortfolioDbContext dbContext, Ti
 
         var portfolio = await dbContext.Portfolios
             .AsNoTracking()
-            .Where(p => p.Id == portfolioId)
+            .Where(p => p.Id == asset.PortfolioId)
             .Select(p => new { p.Name, p.IsArchived })
             .FirstAsync(cancellationToken);
 

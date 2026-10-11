@@ -40,7 +40,7 @@ public sealed class AddBondValidatorTests(SkarbiecContainersFixture containers) 
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
-        var response = await client.PostAsJsonAsync(BondsUri(portfolioId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllBondsUri, request with { PortfolioId = portfolioId }, cancellationToken);
 
         await response.AssertFieldValidationErrorAsync(field, cancellationToken);
         await using var dbContext = CreateDbContext(userId);

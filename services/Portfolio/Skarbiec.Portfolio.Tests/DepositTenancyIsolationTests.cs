@@ -37,8 +37,8 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.GetAsync(DepositUri(ownerPortfolioId, deposit.AssetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.GetAsync(DepositUri(strangerPortfolioId, deposit.AssetId), cancellationToken);
+        var viaOwnersPortfolio = await stranger.GetAsync(DepositUri(deposit.AssetId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.GetAsync(DepositUri(deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
@@ -55,12 +55,12 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
         var payload = NewDepositRequest(name: "Stranger's edit", principal: 1m).ToUpdateRequest();
 
-        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(DepositUri(ownerPortfolioId, deposit.AssetId), payload, cancellationToken);
-        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(DepositUri(strangerPortfolioId, deposit.AssetId), payload, cancellationToken);
+        var viaOwnersPortfolio = await stranger.PutAsJsonAsync(DepositUri(deposit.AssetId), payload, cancellationToken);
+        var viaStrangersPortfolio = await stranger.PutAsJsonAsync(DepositUri(deposit.AssetId), payload, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
-        var asset = await owner.GetAssetAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
+        var asset = await owner.GetAssetAsync(deposit.AssetId, cancellationToken);
         Assert.Equal("Term deposit", asset.Name);
         Assert.Equal(10_000m, asset.Quantity);
         await using var dbContext = CreateDbContext(ownerId);
@@ -77,12 +77,12 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
-        var viaOwnersPortfolio = await stranger.DeleteAsync(AssetUri(ownerPortfolioId, deposit.AssetId), cancellationToken);
-        var viaStrangersPortfolio = await stranger.DeleteAsync(AssetUri(strangerPortfolioId, deposit.AssetId), cancellationToken);
+        var viaOwnersPortfolio = await stranger.DeleteAsync(AssetUri(deposit.AssetId), cancellationToken);
+        var viaStrangersPortfolio = await stranger.DeleteAsync(AssetUri(deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
-        var stillThere = await owner.GetAsync(DepositUri(ownerPortfolioId, deposit.AssetId), cancellationToken);
+        var stillThere = await owner.GetAsync(DepositUri(deposit.AssetId), cancellationToken);
         Assert.Equal(HttpStatusCode.OK, stillThere.StatusCode);
         await using var dbContext = CreateDbContext(ownerId);
         Assert.True(await dbContext.Set<TermDeposit>().AnyAsync(t => t.AssetId == deposit.AssetId, cancellationToken));
@@ -101,26 +101,26 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
 
         var previewViaOwnersPortfolio = await stranger.GetAsync(
-            DepositSettlementPreviewUri(ownerPortfolioId, deposit.AssetId), cancellationToken);
+            DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
         var previewViaStrangersPortfolio = await stranger.GetAsync(
-            DepositSettlementPreviewUri(strangerPortfolioId, deposit.AssetId), cancellationToken);
+            DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
         var settleViaOwnersPortfolio = await stranger.PostAsJsonAsync(
-            SettleDepositUri(ownerPortfolioId, deposit.AssetId), NewSettleRequest(), cancellationToken);
+            SettleDepositUri(deposit.AssetId), NewSettleRequest(), cancellationToken);
         var settleViaStrangersPortfolio = await stranger.PostAsJsonAsync(
-            SettleDepositUri(strangerPortfolioId, deposit.AssetId), NewSettleRequest(), cancellationToken);
+            SettleDepositUri(deposit.AssetId), NewSettleRequest(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, previewViaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, previewViaStrangersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, settleViaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, settleViaStrangersPortfolio.StatusCode);
-        await owner.AssertDepositUnsettledAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
+        await owner.AssertDepositUnsettledAsync(deposit.AssetId, cancellationToken);
         await using var dbContext = CreateDbContext(ownerId);
         var terms = await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken);
         Assert.Null(terms.SettledOn);
         Assert.Null(terms.SettledGrossInterest);
         Assert.Null(terms.SettledTax);
         // Control: the owner can still settle it — the 404s were about the caller, not the deposit.
-        var ownSettle = await owner.PostAsJsonAsync(SettleDepositUri(ownerPortfolioId, deposit.AssetId), NewSettleRequest(), cancellationToken);
+        var ownSettle = await owner.PostAsJsonAsync(SettleDepositUri(deposit.AssetId), NewSettleRequest(), cancellationToken);
         Assert.True(ownSettle.IsSuccessStatusCode, $"The owner's settle answered {(int)ownSettle.StatusCode}.");
     }
 
@@ -134,16 +134,16 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var (ownerPortfolioId, deposit) = await owner.CreatePortfolioWithDepositAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerPortfolioId = await stranger.CreatePortfolioAsync(cancellationToken);
-        var before = await SnapshotDepositAsync(owner, ownerId, ownerPortfolioId, deposit.AssetId, cancellationToken);
+        var before = await SnapshotDepositAsync(owner, ownerId, deposit.AssetId, cancellationToken);
 
         var viaOwnersPortfolio = await stranger.PostAsJsonAsync(
-            RollOverDepositUri(ownerPortfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+            RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
         var viaStrangersPortfolio = await stranger.PostAsJsonAsync(
-            RollOverDepositUri(strangerPortfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+            RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
-        await AssertDepositUnchangedAsync(owner, ownerId, ownerPortfolioId, deposit.AssetId, before, cancellationToken);
+        await AssertDepositUnchangedAsync(owner, ownerId, deposit.AssetId, before, cancellationToken);
         await using (var dbContext = CreateDbContext(ownerId))
         {
             var terms = await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken);
@@ -153,7 +153,7 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
 
         // Control: the owner can still roll it over — the 404s were about the caller, not the deposit.
         var ownRollOver = await owner.PostAsJsonAsync(
-            RollOverDepositUri(ownerPortfolioId, deposit.AssetId), NewRollOverRequest(), cancellationToken);
+            RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
         Assert.True(ownRollOver.IsSuccessStatusCode, $"The owner's roll over answered {(int)ownRollOver.StatusCode}.");
     }
 
@@ -166,7 +166,7 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var ownerPortfolioId = await owner.CreatePortfolioAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var response = await stranger.PostAsJsonAsync(DepositsUri(ownerPortfolioId), NewDepositRequest(), cancellationToken);
+        var response = await stranger.PostAsJsonAsync(AllDepositsUri, NewDepositRequest() with { PortfolioId = ownerPortfolioId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         await using var dbContext = CreateDbContext(ownerId);
@@ -196,7 +196,7 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
         var (ownerPortfolioId, deposit) = await owner.CreatePortfolioWithDepositAsync(cancellationToken);
-        await owner.SettleDepositAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
+        await owner.SettleDepositAsync(deposit.AssetId, cancellationToken);
         var ownerWalletId = await owner.CreatePortfolioAsync(cancellationToken, name: "Wallet");
         var ownerCashId = await owner.AddCashAssetAsync(ownerWalletId, cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -206,28 +206,28 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
             strangerPortfolioId, cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false));
 
         var viaOwnersPortfolio = await stranger.PostAsJsonAsync(
-            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
         var viaStrangersPortfolio = await stranger.PostAsJsonAsync(
-            PayOutDepositUri(strangerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
         var intoStrangersCash = await owner.PostAsJsonAsync(
-            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
 
         var intoStrangersSavings = await owner.PostAsJsonAsync(
-            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(strangerSavings.AssetId), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerSavings.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, viaOwnersPortfolio.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaStrangersPortfolio.StatusCode);
         await intoStrangersCash.AssertInvalidTransferCounterpartAsync(cancellationToken);
         await intoStrangersSavings.AssertInvalidTransferCounterpartAsync(cancellationToken);
 
-        var unchanged = await owner.GetDepositAsync(ownerPortfolioId, deposit.AssetId, cancellationToken);
+        var unchanged = await owner.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.Settled, unchanged.Status);
         Assert.Null(unchanged.PaidOutOn);
-        Assert.Equal(10_119.83m, (await owner.GetAssetAsync(ownerPortfolioId, deposit.AssetId, cancellationToken)).Quantity);
-        var strangerCash = await stranger.GetAssetAsync(strangerPortfolioId, strangerCashId, cancellationToken);
+        Assert.Equal(10_119.83m, (await owner.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
+        var strangerCash = await stranger.GetAssetAsync(strangerCashId, cancellationToken);
         Assert.Equal(0m, strangerCash.Quantity);
         Assert.Equal(0, strangerCash.TransactionCount);
-        var strangerSavingsAfter = await stranger.GetAssetAsync(strangerPortfolioId, strangerSavings.AssetId, cancellationToken);
+        var strangerSavingsAfter = await stranger.GetAssetAsync(strangerSavings.AssetId, cancellationToken);
         Assert.Equal(0m, strangerSavingsAfter.Quantity);
         Assert.Equal(0, strangerSavingsAfter.TransactionCount);
         await using (var dbContext = CreateDbContext(ownerId))
@@ -237,7 +237,7 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
 
         // Control: the owner can still pay out into their own Cash — the rejections were about the caller and the destination.
         var ownPayOut = await owner.PostAsJsonAsync(
-            PayOutDepositUri(ownerPortfolioId, deposit.AssetId), NewPayOutRequest(ownerCashId), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(ownerCashId), cancellationToken);
         Assert.True(ownPayOut.IsSuccessStatusCode, $"The owner's payout answered {(int)ownPayOut.StatusCode}.");
     }
 }

@@ -4,8 +4,8 @@ import { translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
-  postApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchive,
-  postApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestore,
+  postApiPortfolioAssetsByIdArchive,
+  postApiPortfolioAssetsByIdRestore,
 } from '../api/portfolio';
 import { readProblemDetails } from '../core/auth/problem-details';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
@@ -38,10 +38,10 @@ export async function confirmSetAssetArchived(
     return false;
   }
 
-  const options = { path: { portfolioId: asset.portfolioId, id: asset.assetId } };
+  const options = { path: { id: asset.assetId } };
   const result = archive
-    ? await postApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchive(options)
-    : await postApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestore(options);
+    ? await postApiPortfolioAssetsByIdArchive(options)
+    : await postApiPortfolioAssetsByIdRestore(options);
   if (result.error) {
     snackBar.open(
       readProblemDetails(result.error).detail ??

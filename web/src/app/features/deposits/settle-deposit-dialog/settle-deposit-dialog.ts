@@ -17,8 +17,8 @@ import { map } from 'rxjs';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview,
-  postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettle,
+  getApiPortfolioDepositsByAssetIdSettlementPreview,
+  postApiPortfolioDepositsByAssetIdSettle,
   type DepositResponse,
 } from '../../../api/portfolio';
 import {
@@ -115,12 +115,10 @@ export class SettleDepositDialog {
 
   protected readonly previewResource = resource({
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview(
-        {
-          path: { portfolioId: this.deposit.portfolioId, assetId: this.deposit.assetId },
-          signal: abortSignal,
-        },
-      );
+      const result = await getApiPortfolioDepositsByAssetIdSettlementPreview({
+        path: { assetId: this.deposit.assetId },
+        signal: abortSignal,
+      });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ?? translate('deposits.errors.previewLoadFailed'),
@@ -167,8 +165,8 @@ export class SettleDepositDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const result = await postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettle({
-      path: { portfolioId: this.deposit.portfolioId, assetId: this.deposit.assetId },
+    const result = await postApiPortfolioDepositsByAssetIdSettle({
+      path: { assetId: this.deposit.assetId },
       body: {
         settledOn: toDateOnly(values.settledOn!),
         grossInterest: Number(values.grossInterest),

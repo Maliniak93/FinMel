@@ -22,11 +22,11 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var assetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Asset A");
         var otherAssetId = await client.AddAssetAsync(portfolioId, cancellationToken, name: "Asset B");
 
-        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1), cancellationToken);
-        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 10), cancellationToken);
-        await client.RecordTransactionAsync(portfolioId, otherAssetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 15), cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 10), cancellationToken);
+        await client.RecordTransactionAsync(otherAssetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, 15), cancellationToken);
 
-        var response = await client.GetAsync(TransactionsUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(TransactionsUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken);
@@ -47,10 +47,10 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
 
         for (var day = 1; day <= 5; day++)
         {
-            await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, day), cancellationToken);
+            await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, new DateOnly(2026, 1, day), cancellationToken);
         }
 
-        var response = await client.GetAsync($"{TransactionsUri(portfolioId, assetId)}?page=2&pageSize=2", cancellationToken);
+        var response = await client.GetAsync($"{TransactionsUri(assetId)}?page=2&pageSize=2", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken);
@@ -72,11 +72,11 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Factory.FxRateLookupClient.WithRate("EUR", pricedDate, 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, assetId) = await client.CreatePortfolioWithAssetAsync(cancellationToken, currency: "EUR");
-        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 2m, pricedDate, cancellationToken, unitPrice: 50m);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 2m, pricedDate, cancellationToken, unitPrice: 50m);
         Factory.FxRateLookupClient.WithNotFound("EUR");
-        await client.RecordTransactionAsync(portfolioId, assetId, TransactionType.Buy, 1m, unpricedDate, cancellationToken, unitPrice: 50m);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, unpricedDate, cancellationToken, unitPrice: 50m);
 
-        var response = await client.GetAsync(TransactionsUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(TransactionsUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
@@ -101,8 +101,8 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await client.CreateFundedDepositAsync(cancellationToken);
 
-        var cashResponse = await client.GetAsync(TransactionsUri(funded.CashPortfolioId, funded.CashAssetId), cancellationToken);
-        var depositResponse = await client.GetAsync(TransactionsUri(funded.DepositPortfolioId, funded.Deposit.AssetId), cancellationToken);
+        var cashResponse = await client.GetAsync(TransactionsUri(funded.CashAssetId), cancellationToken);
+        var depositResponse = await client.GetAsync(TransactionsUri(funded.Deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, cashResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, depositResponse.StatusCode);
@@ -136,7 +136,7 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
-        var response = await client.GetAsync(TransactionsUri(portfolioId, Guid.NewGuid()), cancellationToken);
+        var response = await client.GetAsync(TransactionsUri(Guid.NewGuid()), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -146,7 +146,7 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
     {
         using var client = Factory.CreateClient();
 
-        var response = await client.GetAsync(TransactionsUri(Guid.NewGuid(), Guid.NewGuid()), TestContext.Current.CancellationToken);
+        var response = await client.GetAsync(TransactionsUri(Guid.NewGuid()), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -158,9 +158,9 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
 
-        var response = await client.GetAsync(TransactionsUri(portfolioId, account.AssetId), cancellationToken);
+        var response = await client.GetAsync(TransactionsUri(account.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
@@ -180,8 +180,8 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
         var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
 
-        var cashLeg = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
-        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Items);
+        var cashLeg = await client.GetCashWithdrawAsync(setup.CashAssetId, cancellationToken);
+        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsAssetId, cancellationToken)).Items);
 
         Assert.NotNull(cashLeg.Transfer);
         Assert.Equal(transferId, cashLeg.Transfer.TransferId);
@@ -193,7 +193,7 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
 
         using var fundingClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await fundingClient.CreateFundedDepositAsync(cancellationToken);
-        var fundingLeg = await fundingClient.GetCashWithdrawAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken);
+        var fundingLeg = await fundingClient.GetCashWithdrawAsync(funded.CashAssetId, cancellationToken);
         Assert.NotNull(fundingLeg.Transfer);
         Assert.NotEqual(Guid.Empty, fundingLeg.Transfer.TransferId);
         Assert.False(fundingLeg.Transfer.Manual);
@@ -206,12 +206,12 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var setup = await client.CreateCashAndMetalAsync(cancellationToken);
-        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken);
+        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalAssetId, setup.CashAssetId, cancellationToken);
         var sell = await client.RecordMetalTransactionWithCashAsync(
-            setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken,
+            setup.MetalAssetId, setup.CashAssetId, cancellationToken,
             type: TransactionType.Sell, pieces: 1m, pricePerPiece: 1_300m, date: MetalCashDate.AddDays(1));
 
-        var cashLegs = (await client.ListTransactionsAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Items;
+        var cashLegs = (await client.ListTransactionsAsync(setup.CashAssetId, cancellationToken)).Items;
         var withdraw = Assert.Single(cashLegs, t => t.Type == TransactionType.Withdraw);
         var deposit = Assert.Single(cashLegs, t => t.Type == TransactionType.Deposit && t.Transfer is not null);
 
@@ -239,11 +239,11 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        await client.RecordTradeWithCashAsync(setup.EtfPortfolioId, setup.EtfAssetId, setup.CashAssetId, cancellationToken);
+        await client.RecordTradeWithCashAsync(setup.EtfAssetId, setup.CashAssetId, cancellationToken);
 
-        var buy = Assert.Single((await client.ListTransactionsAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken)).Items);
+        var buy = Assert.Single((await client.ListTransactionsAsync(setup.EtfAssetId, cancellationToken)).Items);
         var withdraw = Assert.Single(
-            (await client.ListTransactionsAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Items,
+            (await client.ListTransactionsAsync(setup.CashAssetId, cancellationToken)).Items,
             t => t.Type == TransactionType.Withdraw);
 
         Assert.NotNull(buy.Transfer);
@@ -267,9 +267,9 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
 
-        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsPortfolioId, setup.Account.AssetId, cancellationToken)).Items);
+        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.Account.AssetId, cancellationToken)).Items);
         var depositLeg = Assert.Single(
-            (await client.ListTransactionsAsync(setup.DepositPortfolioId, setup.Deposit.AssetId, cancellationToken)).Items,
+            (await client.ListTransactionsAsync(setup.Deposit.AssetId, cancellationToken)).Items,
             t => t.Type == TransactionType.Withdraw);
 
         Assert.NotNull(savingsLeg.Transfer);
@@ -287,9 +287,9 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 10, 2, 10, 0, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, bond) = await client.CreatePortfolioWithBondAsync(cancellationToken);
-        await client.SettleBondInterestAsync(portfolioId, bond.AssetId, [(1, null)], null, cancellationToken);
+        await client.SettleBondInterestAsync(bond.AssetId, [(1, null)], null, cancellationToken);
 
-        var response = await client.GetAsync(TransactionsUri(portfolioId, bond.AssetId), cancellationToken);
+        var response = await client.GetAsync(TransactionsUri(bond.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();

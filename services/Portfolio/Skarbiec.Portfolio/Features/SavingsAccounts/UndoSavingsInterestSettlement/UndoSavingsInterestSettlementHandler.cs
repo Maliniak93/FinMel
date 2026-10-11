@@ -6,11 +6,11 @@ namespace Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlem
 
 public sealed class UndoSavingsInterestSettlementHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
-    public async Task<Result> HandleAsync(Guid portfolioId, Guid assetId, Guid settlementId, CancellationToken cancellationToken)
+    public async Task<Result> HandleAsync(Guid assetId, Guid settlementId, CancellationToken cancellationToken)
     {
         // Tenancy-scoped lookups first, so a stranger never learns the portfolio's archived state.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Savings, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Savings, cancellationToken);
 
         if (asset is null)
         {

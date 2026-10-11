@@ -48,7 +48,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
-                savingsId, PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+                PortfolioApi.NewDepositRequest(portfolioId: savingsId, principal: 1_000m, fundingAssetId: cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
             depositId = result.Value.AssetId;
         }
@@ -90,7 +90,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
             cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
             savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
-                savingsId, PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+                PortfolioApi.NewDepositRequest(portfolioId: savingsId, principal: 1_000m, fundingAssetId: cashId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -108,7 +108,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         {
             var request = PortfolioApi.NewDepositRequest(principal: 1_500m, startDate: new DateOnly(2026, 2, 1)).ToUpdateRequest();
             var result = await act.ServiceProvider.GetRequiredService<UpdateDepositHandler>()
-                .HandleAsync(savingsId, depositId, request, cancellationToken);
+                .HandleAsync(depositId, request, cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -145,7 +145,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
             cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
             savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>().HandleAsync(
-                savingsId, PortfolioApi.NewDepositRequest(principal: 1_000m, fundingAssetId: cashId), cancellationToken);
+                PortfolioApi.NewDepositRequest(portfolioId: savingsId, principal: 1_000m, fundingAssetId: cashId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -162,7 +162,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RemoveAssetHandler>()
-                .HandleAsync(savingsId, depositId, cancellationToken);
+                .HandleAsync(depositId, cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -192,7 +192,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
             cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
             savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(savingsId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: savingsId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -209,7 +209,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
-                .HandleAsync(savingsId, depositId, PortfolioApi.NewSettleRequest(destinationAssetId: cashId), cancellationToken);
+                .HandleAsync(depositId, PortfolioApi.NewSettleRequest(destinationAssetId: cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -255,12 +255,12 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         {
             savingsPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Wallet", cancellationToken);
             var account = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-                .HandleAsync(savingsPortfolioId, PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
+                .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: savingsPortfolioId, withOpeningDeposit: false), cancellationToken);
             Assert.True(account.IsSuccess, account.IsFailure ? account.Error.Code : null);
             savingsId = account.Value.AssetId;
             depositPortfolioId = await CreatePortfolioAsync(arrange.ServiceProvider, "Deposits", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(depositPortfolioId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: depositPortfolioId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -271,7 +271,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
-                .HandleAsync(depositPortfolioId, depositId, PortfolioApi.NewSettleRequest(destinationAssetId: savingsId), cancellationToken);
+                .HandleAsync(depositId, PortfolioApi.NewSettleRequest(destinationAssetId: savingsId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -308,7 +308,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
             stockId = await AddAssetWithBuyAsync(arrange.ServiceProvider, brokerId, "Some stock", cancellationToken);
             savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(savingsId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: savingsId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
         }
@@ -325,7 +325,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<SettleDepositHandler>()
-                .HandleAsync(savingsId, depositId, PortfolioApi.NewSettleRequest(destinationAssetId: stockId), cancellationToken);
+                .HandleAsync(depositId, PortfolioApi.NewSettleRequest(destinationAssetId: stockId), cancellationToken);
             Assert.True(result.IsFailure);
             Assert.Equal(PortfolioAssertions.InvalidTransferCounterpartErrorCode, result.Error.Code);
         }
@@ -353,11 +353,11 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
             cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, walletId, 5_000m, cancellationToken);
             savingsId = await CreatePortfolioAsync(arrange.ServiceProvider, "Savings", cancellationToken);
             var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(savingsId, PortfolioApi.NewDepositRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewDepositRequest(portfolioId: savingsId), cancellationToken);
             Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
             depositId = added.Value.AssetId;
             var settled = await arrange.ServiceProvider.GetRequiredService<SettleDepositHandler>()
-                .HandleAsync(savingsId, depositId, PortfolioApi.NewSettleRequest(), cancellationToken);
+                .HandleAsync(depositId, PortfolioApi.NewSettleRequest(), cancellationToken);
             Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
         }
 
@@ -373,7 +373,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<PayOutDepositHandler>()
-                .HandleAsync(savingsId, depositId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
+                .HandleAsync(depositId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -404,7 +404,7 @@ public sealed class DepositTransferOutboxTests(SkarbiecContainersFixture contain
         await using (var again = Provider.CreateAsyncScope())
         {
             var second = await again.ServiceProvider.GetRequiredService<PayOutDepositHandler>()
-                .HandleAsync(savingsId, depositId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
+                .HandleAsync(depositId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
             Assert.True(second.IsFailure);
             Assert.Equal(PortfolioAssertions.DepositAlreadyPaidOutErrorCode, second.Error.Code);
         }

@@ -7,7 +7,7 @@ public static class DeleteTransactionEndpoint
 {
     public static IEndpointRouteBuilder MapDeleteTransactionEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets/{assetId:guid}/transactions");
+        var group = app.MapGroup("/api/portfolio/assets/{assetId:guid}/transactions");
 
         group.MapDelete("{id:guid}", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class DeleteTransactionEndpoint
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, Guid id, DeleteTransactionHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, id, cancellationToken)).ToHttpResult();
+        Guid assetId, Guid id, DeleteTransactionHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, id, cancellationToken)).ToHttpResult();
 }

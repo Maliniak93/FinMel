@@ -17,27 +17,27 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
-        var septemberSettlementId = await client.GetLastSettlementIdAsync(portfolioId, account.AssetId, cancellationToken);
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
-        var octoberSettlementId = await client.GetLastSettlementIdAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var septemberSettlementId = await client.GetLastSettlementIdAsync(account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var octoberSettlementId = await client.GetLastSettlementIdAsync(account.AssetId, cancellationToken);
         Assert.NotEqual(septemberSettlementId, octoberSettlementId);
-        Assert.Equal(10_067.80m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+        Assert.Equal(10_067.80m, (await client.GetSavingsAccountAsync(account.AssetId, cancellationToken)).Balance);
 
         var response = await client.DeleteAsync(
-            SavingsInterestSettlementUri(portfolioId, account.AssetId, octoberSettlementId), cancellationToken);
+            SavingsInterestSettlementUri(account.AssetId, octoberSettlementId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        var afterUndo = await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken);
+        var afterUndo = await client.GetSavingsAccountAsync(account.AssetId, cancellationToken);
         Assert.Equal(10_033.29m, afterUndo.Balance);
         Assert.Equal(septemberSettlementId, afterUndo.LastSettlement!.SettlementId);
-        var transactions = (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items;
+        var transactions = (await client.ListTransactionsAsync(account.AssetId, cancellationToken)).Items;
         Assert.Equal(2, transactions.Count);
         Assert.DoesNotContain(transactions, t => t.SavingsInterestPeriodEnd == OctoberEnd);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(account.AssetId, cancellationToken);
         Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
 
-        var preview = await client.GetSavingsInterestPreviewAsync(portfolioId, account.AssetId, cancellationToken);
+        var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
         Assert.Equal("2026-10-31", preview.GetProperty("periodEnd").GetString());
     }
 
@@ -49,17 +49,17 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
-        var septemberSettlementId = await client.GetLastSettlementIdAsync(portfolioId, account.AssetId, cancellationToken);
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var septemberSettlementId = await client.GetLastSettlementIdAsync(account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
 
         var response = await client.DeleteAsync(
-            SavingsInterestSettlementUri(portfolioId, account.AssetId, septemberSettlementId), cancellationToken);
+            SavingsInterestSettlementUri(account.AssetId, septemberSettlementId), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsSettlementNotLatestErrorCode, cancellationToken);
         Assert.Equal(2, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
-        Assert.Equal(10_067.80m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
-        Assert.Equal(3, (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).TotalCount);
+        Assert.Equal(10_067.80m, (await client.GetSavingsAccountAsync(account.AssetId, cancellationToken)).Balance);
+        Assert.Equal(3, (await client.ListTransactionsAsync(account.AssetId, cancellationToken)).TotalCount);
     }
 
     [Fact]
@@ -70,18 +70,18 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
-        var settlementId = await client.GetLastSettlementIdAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var settlementId = await client.GetLastSettlementIdAsync(account.AssetId, cancellationToken);
         await client.RecordTransactionAsync(
-            portfolioId, account.AssetId, TransactionType.Withdraw, 10_033.29m, new DateOnly(2026, 10, 1), cancellationToken, unitPrice: 1m);
+            account.AssetId, TransactionType.Withdraw, 10_033.29m, new DateOnly(2026, 10, 1), cancellationToken, unitPrice: 1m);
 
-        var response = await client.DeleteAsync(SavingsInterestSettlementUri(portfolioId, account.AssetId, settlementId), cancellationToken);
+        var response = await client.DeleteAsync(SavingsInterestSettlementUri(account.AssetId, settlementId), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.OversellsPositionErrorCode, cancellationToken);
         Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
-        Assert.Equal(0m, (await client.GetSavingsAccountAsync(portfolioId, account.AssetId, cancellationToken)).Balance);
+        Assert.Equal(0m, (await client.GetSavingsAccountAsync(account.AssetId, cancellationToken)).Balance);
         Assert.Contains(
-            (await client.ListTransactionsAsync(portfolioId, account.AssetId, cancellationToken)).Items,
+            (await client.ListTransactionsAsync(account.AssetId, cancellationToken)).Items,
             t => t.SavingsInterestPeriodEnd == SeptemberEnd);
     }
 
@@ -93,17 +93,17 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettleSavingsInterestAsync(portfolioId, account.AssetId, SeptemberEnd, 10.00m, 10.00m, cancellationToken);
-        var settlementId = await client.GetLastSettlementIdAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettleSavingsInterestAsync(account.AssetId, SeptemberEnd, 10.00m, 10.00m, cancellationToken);
+        var settlementId = await client.GetLastSettlementIdAsync(account.AssetId, cancellationToken);
 
-        var response = await client.DeleteAsync(SavingsInterestSettlementUri(portfolioId, account.AssetId, settlementId), cancellationToken);
+        var response = await client.DeleteAsync(SavingsInterestSettlementUri(account.AssetId, settlementId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal(0, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
-        var asset = await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken);
+        var asset = await client.GetAssetAsync(account.AssetId, cancellationToken);
         Assert.Equal(10_000m, asset.Quantity);
         Assert.Equal(1, asset.TransactionCount);
-        var preview = await client.GetSavingsInterestPreviewAsync(portfolioId, account.AssetId, cancellationToken);
+        var preview = await client.GetSavingsInterestPreviewAsync(account.AssetId, cancellationToken);
         Assert.Equal("2026-09-30", preview.GetProperty("periodEnd").GetString());
     }
 
@@ -115,7 +115,7 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
 
-        var response = await client.DeleteAsync(SavingsInterestSettlementUri(portfolioId, account.AssetId, Guid.NewGuid()), cancellationToken);
+        var response = await client.DeleteAsync(SavingsInterestSettlementUri(account.AssetId, Guid.NewGuid()), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -128,14 +128,14 @@ public sealed class UndoSavingsInterestSettlementEndpointTests(SkarbiecContainer
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var (portfolioId, account) = await client.CreatePortfolioWithSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(portfolioId, account.AssetId, cancellationToken);
-        var settlementId = await client.GetLastSettlementIdAsync(portfolioId, account.AssetId, cancellationToken);
+        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var settlementId = await client.GetLastSettlementIdAsync(account.AssetId, cancellationToken);
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
 
-        var response = await client.DeleteAsync(SavingsInterestSettlementUri(portfolioId, account.AssetId, settlementId), cancellationToken);
+        var response = await client.DeleteAsync(SavingsInterestSettlementUri(account.AssetId, settlementId), cancellationToken);
 
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
         Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
-        Assert.Equal(10_033.29m, (await client.GetAssetAsync(portfolioId, account.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(10_033.29m, (await client.GetAssetAsync(account.AssetId, cancellationToken)).Quantity);
     }
 }

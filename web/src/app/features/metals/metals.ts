@@ -138,7 +138,6 @@ export class Metals {
 
   protected openTransactionDialog(holding: MetalResponse, type: TransactionType): void {
     const data: TransactionFormDialogData = {
-      portfolioId: holding.portfolioId,
       assetId: holding.assetId,
       assetClass: ASSET_CLASS.PreciousMetal,
       type,

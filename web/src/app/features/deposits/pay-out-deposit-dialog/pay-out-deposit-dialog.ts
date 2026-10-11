@@ -15,7 +15,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
-  postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayout,
+  postApiPortfolioDepositsByAssetIdPayout,
   type DepositResponse,
 } from '../../../api/portfolio';
 import {
@@ -96,8 +96,8 @@ export class PayOutDepositDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const result = await postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayout({
-      path: { portfolioId: this.deposit.portfolioId, assetId: this.deposit.assetId },
+    const result = await postApiPortfolioDepositsByAssetIdPayout({
+      path: { assetId: this.deposit.assetId },
       body: {
         destinationAssetId: values.destinationAssetId!,
         date: toDateOnly(values.date!),

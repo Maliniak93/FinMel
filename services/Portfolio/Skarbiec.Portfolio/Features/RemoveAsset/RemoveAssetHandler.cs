@@ -10,19 +10,19 @@ namespace Skarbiec.Portfolio.Features.RemoveAsset;
 public sealed class RemoveAssetHandler(
     PortfolioDbContext dbContext, IPublishEndpoint publishEndpoint, TimeProvider timeProvider)
 {
-    public async Task<Result> HandleAsync(Guid portfolioId, Guid assetId, CancellationToken cancellationToken)
+    public async Task<Result> HandleAsync(Guid assetId, CancellationToken cancellationToken)
     {
         var asset = await dbContext.Assets
-            .FirstOrDefaultAsync(a => a.Id == assetId && a.PortfolioId == portfolioId, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == assetId, cancellationToken);
 
         if (asset is null)
         {
             return AssetErrors.NotFound(assetId);
         }
 
-        if (await dbContext.IsPortfolioArchivedAsync(portfolioId, cancellationToken))
+        if (await dbContext.IsPortfolioArchivedAsync(asset.PortfolioId, cancellationToken))
         {
-            return PortfolioErrors.Archived(portfolioId);
+            return PortfolioErrors.Archived(asset.PortfolioId);
         }
 
         // portfolio_db has no FKs, so the delete cascades to the asset's transactions explicitly.
@@ -62,7 +62,7 @@ public sealed class RemoveAssetHandler(
         await publishEndpoint.Publish(new AssetRemoved
         {
             AssetId = asset.Id,
-            PortfolioId = portfolioId,
+            PortfolioId = asset.PortfolioId,
             UserId = dbContext.CurrentUserId,
             OccurredAtUtc = timeProvider.GetUtcNow(),
             CascadedFromPortfolio = false

@@ -15,7 +15,6 @@ internal static class BondInterestPlanning
 {
     public static async Task<Result<BondInterestPlan>> PlanBondInterestAsync(
         this PortfolioDbContext dbContext,
-        Guid portfolioId,
         Guid assetId,
         SettleBondInterestRequest request,
         DateOnly today,
@@ -23,7 +22,7 @@ internal static class BondInterestPlanning
     {
         // Tenancy-scoped lookup first: another user's bond, a non-bond asset and a wrong portfolio all end in 404.
         var bond = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.Bond, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.Bond, cancellationToken);
         var terms = bond is null
             ? null
             : await dbContext.TreasuryBonds.AsNoTracking().FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);

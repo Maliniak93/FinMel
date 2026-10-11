@@ -22,12 +22,12 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         using var client = Factory.CreateAuthenticatedClient(userId);
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken, name: "Metals");
 
-        var response = await client.PostAsJsonAsync(MetalsUri(portfolioId), NewMetalRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { PortfolioId = portfolioId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken);
         Assert.NotNull(body);
-        Assert.Equal(MetalUri(portfolioId, body.AssetId), response.Headers.Location?.OriginalString);
+        Assert.Equal(MetalUri(body.AssetId), response.Headers.Location?.OriginalString);
         Assert.Equal(portfolioId, body.PortfolioId);
         Assert.Equal("Metals", body.PortfolioName);
         Assert.Equal("Maple Leaf 1 oz", body.Name);
@@ -37,7 +37,7 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(311.0347680m, body.TotalFineGrams);
         Assert.False(body.IsArchived);
 
-        var asset = await client.GetAssetAsync(portfolioId, body.AssetId, cancellationToken);
+        var asset = await client.GetAssetAsync(body.AssetId, cancellationToken);
         Assert.Equal(AssetClass.PreciousMetal, asset.AssetClass);
         Assert.Equal(AssetValuationMode.Market, asset.ValuationMode);
         Assert.Equal("PLN", asset.Currency);
@@ -45,13 +45,13 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(31.10347680m, asset.FineWeightGramsPerPiece);
         Assert.Equal(1, asset.TransactionCount);
 
-        var buy = Assert.Single((await client.ListTransactionsAsync(portfolioId, body.AssetId, cancellationToken)).Items);
+        var buy = Assert.Single((await client.ListTransactionsAsync(body.AssetId, cancellationToken)).Items);
         Assert.Equal(TransactionType.Buy, buy.Type);
         Assert.Equal(10m, buy.Quantity);
         Assert.Equal(260.00m, buy.UnitPrice);
         Assert.Equal(MetalPurchaseDate, buy.Date);
         Assert.Equal(2_600.00m, buy.ValuePln);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(portfolioId, body.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(body.AssetId, cancellationToken);
 
         await using var dbContext = CreateDbContext(userId);
         var storedAsset = await dbContext.Assets.SingleAsync(a => a.Id == body.AssetId, cancellationToken);
@@ -71,8 +71,8 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            MetalsUri(portfolioId),
-            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram, withFirstPurchase: false),
+            AllMetalsUri,
+            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram, withFirstPurchase: false) with { PortfolioId = portfolioId },
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -80,7 +80,7 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         Assert.NotNull(body);
         Assert.Equal(50m, body.FineWeightGramsPerPiece);
         Assert.Equal(0m, body.Pieces);
-        Assert.Empty((await client.ListTransactionsAsync(portfolioId, body.AssetId, cancellationToken)).Items);
+        Assert.Empty((await client.ListTransactionsAsync(body.AssetId, cancellationToken)).Items);
     }
 
     [Theory]
@@ -110,7 +110,7 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
-        var response = await client.PostAsJsonAsync(MetalsUri(portfolioId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(AllMetalsUri, request with { PortfolioId = portfolioId }, cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await using var dbContext = CreateDbContext(userId);
@@ -129,7 +129,7 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         var portfolioId = await client.CreatePortfolioAsync(cancellationToken);
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
 
-        var response = await client.PostAsJsonAsync(MetalsUri(portfolioId), NewMetalRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { PortfolioId = portfolioId }, cancellationToken);
 
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
         await using var dbContext = CreateDbContext(userId);
@@ -143,7 +143,7 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
         using var client = Factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            MetalsUri(Guid.NewGuid()), NewMetalRequest(), TestContext.Current.CancellationToken);
+            AllMetalsUri, NewMetalRequest() with { PortfolioId = Guid.NewGuid() }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

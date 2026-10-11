@@ -20,7 +20,7 @@ public sealed class PreviewBondInterestEndpointTests(SkarbiecContainersFixture c
         var assetId = funded.Bond.AssetId;
 
         var response = await client.PostAsJsonAsync(
-            BondInterestPreviewUri(funded.BondPortfolioId, assetId),
+            BondInterestPreviewUri(assetId),
             NewSettleBondBody([(1, null), (2, 3.75m), (3, 3.75m)], funded.CashAssetId),
             cancellationToken);
 
@@ -44,8 +44,8 @@ public sealed class PreviewBondInterestEndpointTests(SkarbiecContainersFixture c
         Assert.Equal(38.46m, totals.GetProperty("net").GetDecimal());
 
         Assert.Equal(0, await CountBondSettlementsAsync(userId, cancellationToken, assetId));
-        Assert.Equal(1, (await client.ListTransactionsAsync(funded.BondPortfolioId, assetId, cancellationToken)).TotalCount);
-        Assert.Equal(1_000m, (await client.GetAssetAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).Quantity);
-        Assert.Equal(2, (await client.ListTransactionsAsync(funded.CashPortfolioId, funded.CashAssetId, cancellationToken)).TotalCount);
+        Assert.Equal(1, (await client.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
+        Assert.Equal(1_000m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2, (await client.ListTransactionsAsync(funded.CashAssetId, cancellationToken)).TotalCount);
     }
 }

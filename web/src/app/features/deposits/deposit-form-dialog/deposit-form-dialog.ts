@@ -21,8 +21,8 @@ import { map } from 'rxjs';
 import {
   getApiPortfolioPortfolios,
   getApiPortfolioTransferCandidates,
-  postApiPortfolioPortfoliosByPortfolioIdDeposits,
-  putApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId,
+  postApiPortfolioDeposits,
+  putApiPortfolioDepositsByAssetId,
   type DepositCapitalization,
   type DepositResponse,
   type DepositTermUnit,
@@ -267,14 +267,14 @@ export class DepositFormDialog {
     };
 
     const result = this.deposit
-      ? await putApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId({
-          path: { portfolioId: this.deposit.portfolioId, assetId: this.deposit.assetId },
+      ? await putApiPortfolioDepositsByAssetId({
+          path: { assetId: this.deposit.assetId },
           body: terms,
         })
-      : await postApiPortfolioPortfoliosByPortfolioIdDeposits({
-          path: { portfolioId: values.portfolioId },
+      : await postApiPortfolioDeposits({
           body: {
             ...terms,
+            portfolioId: values.portfolioId,
             currency: values.currency,
             fundingAssetId: values.fundingAssetId ?? undefined,
           },

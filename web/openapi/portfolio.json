@@ -233,21 +233,10 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/assets": {
+    "/api/portfolio/assets": {
       "post": {
         "tags": [
           "AddAssetEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
         ],
         "requestBody": {
           "content": {
@@ -279,7 +268,7 @@
         "parameters": [
           {
             "name": "portfolioId",
-            "in": "path",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string",
@@ -304,21 +293,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/assets/{id}": {
+    "/api/portfolio/assets/{id}": {
       "put": {
         "tags": [
           "UpdateAssetEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "id",
             "in": "path",
@@ -358,15 +338,6 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "id",
             "in": "path",
             "required": true,
@@ -395,15 +366,6 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "id",
             "in": "path",
             "required": true,
@@ -420,22 +382,13 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/assets/{id}/archive": {
+    "/api/portfolio/assets/{id}/archive": {
       "post": {
         "tags": [
           "ArchiveAssetEndpoint"
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "id",
             "in": "path",
             "required": true,
@@ -459,22 +412,13 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/assets/{id}/restore": {
+    "/api/portfolio/assets/{id}/restore": {
       "post": {
         "tags": [
           "RestoreAssetEndpoint"
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "id",
             "in": "path",
             "required": true,
@@ -498,21 +442,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions": {
+    "/api/portfolio/assets/{assetId}/transactions": {
       "post": {
         "tags": [
           "RecordTransactionEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -551,15 +486,6 @@
           "ListTransactionsEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -610,21 +536,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions/{id}": {
+    "/api/portfolio/assets/{assetId}/transactions/{id}": {
       "put": {
         "tags": [
           "UpdateTransactionEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -673,15 +590,6 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "assetId",
             "in": "path",
             "required": true,
@@ -707,21 +615,10 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/deposits": {
+    "/api/portfolio/deposits": {
       "post": {
         "tags": [
           "AddDepositEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
         ],
         "requestBody": {
           "content": {
@@ -745,23 +642,34 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "ListDepositsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepositResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}": {
+    "/api/portfolio/deposits/{assetId}": {
       "put": {
         "tags": [
           "UpdateDepositEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -801,15 +709,6 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "assetId",
             "in": "path",
             "required": true,
@@ -833,43 +732,12 @@
         }
       }
     },
-    "/api/portfolio/deposits": {
-      "get": {
-        "tags": [
-          "ListDepositsEndpoint"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DepositResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settlement-preview": {
+    "/api/portfolio/deposits/{assetId}/settlement-preview": {
       "get": {
         "tags": [
           "GetSettlementPreviewEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -894,21 +762,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settle": {
+    "/api/portfolio/deposits/{assetId}/settle": {
       "post": {
         "tags": [
           "SettleDepositEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -943,21 +802,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/payout": {
+    "/api/portfolio/deposits/{assetId}/payout": {
       "post": {
         "tags": [
           "PayOutDepositEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -992,21 +842,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/rollover": {
+    "/api/portfolio/deposits/{assetId}/rollover": {
       "post": {
         "tags": [
           "RollOverDepositEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1041,21 +882,10 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds": {
+    "/api/portfolio/bonds": {
       "post": {
         "tags": [
           "AddBondEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
         ],
         "requestBody": {
           "content": {
@@ -1079,23 +909,34 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "ListBondsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BondResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}": {
+    "/api/portfolio/bonds/{assetId}": {
       "put": {
         "tags": [
           "UpdateBondEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1135,15 +976,6 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "assetId",
             "in": "path",
             "required": true,
@@ -1167,43 +999,12 @@
         }
       }
     },
-    "/api/portfolio/bonds": {
-      "get": {
-        "tags": [
-          "ListBondsEndpoint"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/BondResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements": {
+    "/api/portfolio/bonds/{assetId}/interest-settlements": {
       "post": {
         "tags": [
           "SettleBondInterestEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1241,21 +1042,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/preview": {
+    "/api/portfolio/bonds/{assetId}/interest-settlements/preview": {
       "post": {
         "tags": [
           "PreviewBondInterestEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1290,21 +1082,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/{settlementId}": {
+    "/api/portfolio/bonds/{assetId}/interest-settlements/{settlementId}": {
       "delete": {
         "tags": [
           "UndoBondInterestSettlementEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1331,21 +1114,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption": {
+    "/api/portfolio/bonds/{assetId}/redemption": {
       "post": {
         "tags": [
           "RedeemBondEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1380,21 +1154,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption-preview": {
+    "/api/portfolio/bonds/{assetId}/redemption-preview": {
       "get": {
         "tags": [
           "GetBondRedemptionPreviewEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1419,21 +1184,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/swap": {
+    "/api/portfolio/bonds/{assetId}/swap": {
       "post": {
         "tags": [
           "SwapBondEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1468,21 +1224,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption": {
+    "/api/portfolio/bonds/{assetId}/early-redemption": {
       "post": {
         "tags": [
           "RedeemBondEarlyEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1517,21 +1264,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption-preview": {
+    "/api/portfolio/bonds/{assetId}/early-redemption-preview": {
       "get": {
         "tags": [
           "GetBondEarlyRedemptionPreviewEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1590,21 +1328,10 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/metals": {
+    "/api/portfolio/metals": {
       "post": {
         "tags": [
           "AddMetalEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
         ],
         "requestBody": {
           "content": {
@@ -1628,23 +1355,34 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "ListMetalsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MetalResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/metals/{assetId}": {
+    "/api/portfolio/metals/{assetId}": {
       "put": {
         "tags": [
           "UpdateMetalEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1684,15 +1422,6 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "assetId",
             "in": "path",
             "required": true,
@@ -1716,43 +1445,10 @@
         }
       }
     },
-    "/api/portfolio/metals": {
-      "get": {
-        "tags": [
-          "ListMetalsEndpoint"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MetalResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/portfolio/portfolios/{portfolioId}/savings-accounts": {
+    "/api/portfolio/savings-accounts": {
       "post": {
         "tags": [
           "AddSavingsAccountEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
         ],
         "requestBody": {
           "content": {
@@ -1776,23 +1472,34 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "ListSavingsAccountsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavingsAccountResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}": {
+    "/api/portfolio/savings-accounts/{assetId}": {
       "put": {
         "tags": [
           "UpdateSavingsAccountEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1832,15 +1539,6 @@
         ],
         "parameters": [
           {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "assetId",
             "in": "path",
             "required": true,
@@ -1857,28 +1555,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SavingsAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/portfolio/savings-accounts": {
-      "get": {
-        "tags": [
-          "ListSavingsAccountsEndpoint"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SavingsAccountResponse"
-                  }
                 }
               }
             }
@@ -1934,21 +1610,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-preview": {
+    "/api/portfolio/savings-accounts/{assetId}/interest-preview": {
       "get": {
         "tags": [
           "GetSavingsInterestPreviewEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -1973,21 +1640,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements": {
+    "/api/portfolio/savings-accounts/{assetId}/interest-settlements": {
       "post": {
         "tags": [
           "SettleSavingsInterestEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -2022,21 +1680,12 @@
         }
       }
     },
-    "/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements/{settlementId}": {
+    "/api/portfolio/savings-accounts/{assetId}/interest-settlements/{settlementId}": {
       "delete": {
         "tags": [
           "UndoSavingsInterestSettlementEndpoint"
         ],
         "parameters": [
-          {
-            "name": "portfolioId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "assetId",
             "in": "path",
@@ -2160,11 +1809,16 @@
     "schemas": {
       "AddAssetRequest": {
         "required": [
+          "portfolioId",
           "assetClass",
           "name"
         ],
         "type": "object",
         "properties": {
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "assetClass": {
             "$ref": "#/components/schemas/AssetClass"
           },
@@ -2196,6 +1850,7 @@
       },
       "AddBondRequest": {
         "required": [
+          "portfolioId",
           "name",
           "seriesCode",
           "type",
@@ -2207,6 +1862,10 @@
         ],
         "type": "object",
         "properties": {
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "name": {
             "maxLength": 200,
             "type": "string"
@@ -2287,6 +1946,7 @@
       },
       "AddDepositRequest": {
         "required": [
+          "portfolioId",
           "name",
           "currency",
           "principal",
@@ -2298,6 +1958,10 @@
         ],
         "type": "object",
         "properties": {
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "name": {
             "maxLength": 200,
             "type": "string"
@@ -2376,6 +2040,7 @@
       },
       "AddMetalRequest": {
         "required": [
+          "portfolioId",
           "name",
           "metal",
           "fineWeight",
@@ -2383,6 +2048,10 @@
         ],
         "type": "object",
         "properties": {
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "name": {
             "maxLength": 200,
             "type": "string"
@@ -2417,12 +2086,17 @@
       },
       "AddSavingsAccountRequest": {
         "required": [
+          "portfolioId",
           "name",
           "currency",
           "annualInterestRatePercent"
         ],
         "type": "object",
         "properties": {
+          "portfolioId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "name": {
             "maxLength": 200,
             "type": "string"
@@ -5184,13 +4858,13 @@
       "name": "AddDepositEndpoint"
     },
     {
+      "name": "ListDepositsEndpoint"
+    },
+    {
       "name": "UpdateDepositEndpoint"
     },
     {
       "name": "GetDepositEndpoint"
-    },
-    {
-      "name": "ListDepositsEndpoint"
     },
     {
       "name": "GetSettlementPreviewEndpoint"
@@ -5208,13 +4882,13 @@
       "name": "AddBondEndpoint"
     },
     {
+      "name": "ListBondsEndpoint"
+    },
+    {
       "name": "UpdateBondEndpoint"
     },
     {
       "name": "GetBondEndpoint"
-    },
-    {
-      "name": "ListBondsEndpoint"
     },
     {
       "name": "SettleBondInterestEndpoint"
@@ -5244,25 +4918,25 @@
       "name": "AddMetalEndpoint"
     },
     {
+      "name": "ListMetalsEndpoint"
+    },
+    {
       "name": "UpdateMetalEndpoint"
     },
     {
       "name": "GetMetalEndpoint"
     },
     {
-      "name": "ListMetalsEndpoint"
+      "name": "AddSavingsAccountEndpoint"
     },
     {
-      "name": "AddSavingsAccountEndpoint"
+      "name": "ListSavingsAccountsEndpoint"
     },
     {
       "name": "UpdateSavingsAccountEndpoint"
     },
     {
       "name": "GetSavingsAccountEndpoint"
-    },
-    {
-      "name": "ListSavingsAccountsEndpoint"
     },
     {
       "name": "ListCashAccountsEndpoint"

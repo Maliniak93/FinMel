@@ -15,8 +15,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioPortfolios,
-  postApiPortfolioPortfoliosByPortfolioIdAssets,
-  putApiPortfolioPortfoliosByPortfolioIdAssetsById,
+  postApiPortfolioAssets,
+  putApiPortfolioAssetsById,
   type AssetClass,
   type AssetResponse,
 } from '../../../../api/portfolio';
@@ -188,13 +188,12 @@ export class AssetFormDialog {
 
     const body = active.toBody();
     const result = this.data.asset
-      ? await putApiPortfolioPortfoliosByPortfolioIdAssetsById({
-          path: { portfolioId, id: this.data.asset.id },
+      ? await putApiPortfolioAssetsById({
+          path: { id: this.data.asset.id },
           body,
         })
-      : await postApiPortfolioPortfoliosByPortfolioIdAssets({
-          path: { portfolioId },
-          body,
+      : await postApiPortfolioAssets({
+          body: { ...body, portfolioId },
         });
 
     this.submitting.set(false);

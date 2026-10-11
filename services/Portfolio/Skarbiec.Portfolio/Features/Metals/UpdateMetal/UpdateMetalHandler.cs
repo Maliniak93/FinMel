@@ -7,11 +7,11 @@ namespace Skarbiec.Portfolio.Features.Metals.UpdateMetal;
 public sealed class UpdateMetalHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
     public async Task<Result<MetalResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, UpdateMetalRequest request, CancellationToken cancellationToken)
+        Guid assetId, UpdateMetalRequest request, CancellationToken cancellationToken)
     {
         // Tenancy-scoped lookup first: another user's holding, a non-metal asset and a wrong portfolio all end in 404.
         var asset = await dbContext.Assets.FirstOrDefaultAsync(
-            a => a.Id == assetId && a.PortfolioId == portfolioId && a.AssetClass == AssetClass.PreciousMetal, cancellationToken);
+            a => a.Id == assetId && a.AssetClass == AssetClass.PreciousMetal, cancellationToken);
         var holding = asset is null
             ? null
             : await dbContext.MetalHoldings.FirstOrDefaultAsync(h => h.AssetId == assetId, cancellationToken);
@@ -23,7 +23,7 @@ public sealed class UpdateMetalHandler(PortfolioDbContext dbContext, PositionEve
 
         var portfolio = await dbContext.Portfolios
             .AsNoTracking()
-            .Where(p => p.Id == portfolioId)
+            .Where(p => p.Id == asset.PortfolioId)
             .Select(p => new { p.Name, p.IsArchived })
             .FirstAsync(cancellationToken);
 

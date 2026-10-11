@@ -318,7 +318,6 @@ describe('Securities page', () => {
         TransactionFormDialog,
         expect.objectContaining({
           data: expect.objectContaining({
-            portfolioId: vwce.portfolioId,
             assetId: vwce.assetId,
             assetClass: ASSET_CLASS.Stock,
             type,

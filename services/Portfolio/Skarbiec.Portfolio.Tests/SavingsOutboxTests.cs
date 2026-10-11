@@ -31,7 +31,7 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-            .HandleAsync(portfolioId, PortfolioApi.NewSavingsAccountRequest(), cancellationToken);
+            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId), cancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, SaveChanges.Count);
@@ -68,7 +68,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<SettleSavingsInterestHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 new SettleSavingsInterestRequest { PeriodEnd = new DateOnly(2026, 1, 31), GrossInterest = 50.00m, Tax = 9.50m },
                 cancellationToken);
@@ -108,7 +107,6 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var settle = Provider.CreateAsyncScope())
         {
             var settled = await settle.ServiceProvider.GetRequiredService<SettleSavingsInterestHandler>().HandleAsync(
-                portfolioId,
                 assetId,
                 new SettleSavingsInterestRequest { PeriodEnd = new DateOnly(2026, 1, 31), GrossInterest = 50.00m, Tax = 9.50m },
                 cancellationToken);
@@ -127,7 +125,7 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<UndoSavingsInterestSettlementHandler>()
-                .HandleAsync(portfolioId, assetId, settlementId, cancellationToken);
+                .HandleAsync(assetId, settlementId, cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -150,8 +148,7 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         var portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
             .HandleAsync(new CreatePortfolioRequest { Name = "Interest outbox portfolio" }, cancellationToken)).Value.Id;
         var added = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>().HandleAsync(
-            portfolioId,
-            PortfolioApi.NewSavingsAccountRequest(annualInterestRatePercent: 5m, openingDate: new DateOnly(2026, 1, 1)),
+            PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId, annualInterestRatePercent: 5m, openingDate: new DateOnly(2026, 1, 1)),
             cancellationToken);
         Assert.True(added.IsSuccess);
 
@@ -168,7 +165,7 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
             .HandleAsync(new CreatePortfolioRequest { Name = "Empty savings outbox portfolio" }, cancellationToken)).Value.Id;
 
         var result = await scope.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-            .HandleAsync(portfolioId, PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
+            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId, withOpeningDeposit: false), cancellationToken);
 
         Assert.True(result.IsSuccess);
         await using var verify = Provider.CreateAsyncScope();
@@ -191,7 +188,7 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
             portfolioId = (await arrange.ServiceProvider.GetRequiredService<CreatePortfolioHandler>()
                 .HandleAsync(new CreatePortfolioRequest { Name = "Update savings outbox portfolio" }, cancellationToken)).Value.Id;
             var added = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-                .HandleAsync(portfolioId, PortfolioApi.NewSavingsAccountRequest(), cancellationToken);
+                .HandleAsync(PortfolioApi.NewSavingsAccountRequest(portfolioId: portfolioId), cancellationToken);
             Assert.True(added.IsSuccess);
             assetId = added.Value.AssetId;
         }
@@ -206,7 +203,7 @@ public sealed class SavingsOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<UpdateSavingsAccountHandler>()
-                .HandleAsync(portfolioId, assetId, PortfolioApi.NewUpdateSavingsAccountRequest(), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewUpdateSavingsAccountRequest(), cancellationToken);
             Assert.True(result.IsSuccess);
         }
 

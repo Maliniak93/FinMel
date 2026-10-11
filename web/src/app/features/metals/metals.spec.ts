@@ -184,7 +184,6 @@ describe('Metals', () => {
         TransactionFormDialog,
         expect.objectContaining({
           data: expect.objectContaining({
-            portfolioId: silverBar.portfolioId,
             assetId: silverBar.assetId,
             assetClass: ASSET_CLASS.PreciousMetal,
             type,

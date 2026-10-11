@@ -7,7 +7,7 @@ public static class GetDepositEndpoint
 {
     public static IEndpointRouteBuilder MapGetDepositEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/deposits");
+        var group = app.MapGroup("/api/portfolio/deposits");
 
         group.MapGet("{assetId:guid}", HandleAsync).RequireAuthorization();
 
@@ -15,6 +15,6 @@ public static class GetDepositEndpoint
     }
 
     private static async Task<Results<Ok<DepositResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, Guid assetId, GetDepositHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(portfolioId, assetId, cancellationToken)).ToHttpResult();
+        Guid assetId, GetDepositHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(assetId, cancellationToken)).ToHttpResult();
 }

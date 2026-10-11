@@ -49,11 +49,12 @@ Authorization: Bearer {{authToken}}
 
 ### Add an asset to the archived portfolio (409)
 # Run right after the archive above.
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "assetClass": "Cash",
   "name": "Cash in an archived portfolio",
   "currency": "PLN"
@@ -72,11 +73,12 @@ Authorization: Bearer {{authToken}}
 
 ### Add a currency-valued asset
 # @name addAsset
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "assetClass": "Cash",
   "name": "Savings account",
   "currency": "PLN",
@@ -85,11 +87,12 @@ Content-Type: application/json
 
 ### Add a market-valuation asset
 # @name addMarketAsset
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "assetClass": "Stock",
   "name": "Example stock",
   "currency": "USD",
@@ -98,15 +101,15 @@ Content-Type: application/json
 }
 
 ### List assets
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+GET {{baseUrl}}/api/portfolio/assets?portfolioId={{createPortfolio.response.body.id}}
 Authorization: Bearer {{authToken}}
 
 ### Get an asset
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+GET {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 
 ### Update an asset
-PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+PUT {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -118,12 +121,12 @@ Content-Type: application/json
 }
 
 ### Archive an asset
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/archive
+POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/archive
 Authorization: Bearer {{authToken}}
 
 ### Update the archived asset (409)
 # Run right after the archive above.
-PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+PUT {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -134,11 +137,11 @@ Content-Type: application/json
 }
 
 ### Restore an archived asset
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/restore
+POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/restore
 Authorization: Bearer {{authToken}}
 
 ### Remove an asset
-DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}
+DELETE {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 
 
@@ -146,7 +149,7 @@ Authorization: Bearer {{authToken}}
 
 ### Record a transaction
 # @name recordTransaction
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -158,7 +161,7 @@ Content-Type: application/json
 }
 
 ### Record a Buy on the Cash asset (400)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -170,11 +173,11 @@ Content-Type: application/json
 }
 
 ### List transactions (paged)
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions?page=1&pageSize=20
+GET {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions?page=1&pageSize=20
 Authorization: Bearer {{authToken}}
 
 ### Update a transaction
-PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
+PUT {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -186,7 +189,7 @@ Content-Type: application/json
 }
 
 ### Delete a transaction
-DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
+DELETE {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions/{{recordTransaction.response.body.id}}
 Authorization: Bearer {{authToken}}
 
 
@@ -194,11 +197,12 @@ Authorization: Bearer {{authToken}}
 
 ### Add a term deposit
 # @name addDeposit
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "3-month deposit",
   "bankName": "Example bank",
   "currency": "PLN",
@@ -214,11 +218,12 @@ Content-Type: application/json
 
 ### Add a Cash account to fund a deposit from
 # @name addFundingCash
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "assetClass": "Cash",
   "name": "Current account",
   "currency": "PLN",
@@ -236,11 +241,12 @@ Authorization: Bearer {{authToken}}
 
 ### Add a term deposit funded from cash
 # @name addFundedDeposit
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "Funded deposit",
   "bankName": "Example bank",
   "currency": "PLN",
@@ -260,11 +266,11 @@ GET {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 
 ### Get a deposit
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}
+GET {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
 ### Update a deposit
-PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}
+PUT {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -282,7 +288,7 @@ Content-Type: application/json
 }
 
 ### Record a transaction on the deposit (409)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addDeposit.response.body.assetId}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addDeposit.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -295,11 +301,11 @@ Content-Type: application/json
 
 ### Preview the settlement of a Due deposit
 # @name settlementPreview
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/settlement-preview
+GET {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the deposit
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/settle
+POST {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -310,7 +316,7 @@ Content-Type: application/json
 }
 
 ### Pay the settled deposit out to cash
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addDeposit.response.body.assetId}}/payout
+POST {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}/payout
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -321,11 +327,11 @@ Content-Type: application/json
 
 ### Preview the settlement of the funded deposit
 # @name fundedSettlementPreview
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addFundedDeposit.response.body.assetId}}/settlement-preview
+GET {{baseUrl}}/api/portfolio/deposits/{{addFundedDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the funded deposit and pay it out at once
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addFundedDeposit.response.body.assetId}}/settle
+POST {{baseUrl}}/api/portfolio/deposits/{{addFundedDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -338,11 +344,12 @@ Content-Type: application/json
 
 ### Add a matured deposit to roll over
 # @name addRenewableDeposit
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "Renewable deposit",
   "bankName": "Example bank",
   "currency": "PLN",
@@ -358,11 +365,11 @@ Content-Type: application/json
 
 ### Preview the settlement of the renewable deposit
 # @name renewablePreview
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/settlement-preview
+GET {{baseUrl}}/api/portfolio/deposits/{{addRenewableDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
 ### Roll the Due deposit over
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
+POST {{baseUrl}}/api/portfolio/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -374,11 +381,11 @@ Content-Type: application/json
 
 ### Preview the settlement of the rolled-over term
 # @name renewedPreview
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/settlement-preview
+GET {{baseUrl}}/api/portfolio/deposits/{{addRenewableDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the rolled-over term, keeping the money in the deposit
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/settle
+POST {{baseUrl}}/api/portfolio/deposits/{{addRenewableDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -389,7 +396,7 @@ Content-Type: application/json
 }
 
 ### Roll the Settled deposit over
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
+POST {{baseUrl}}/api/portfolio/deposits/{{addRenewableDeposit.response.body.assetId}}/rollover
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -401,11 +408,12 @@ Content-Type: application/json
 
 ### Add a treasury bond bought with new money (type 5 = EDO)
 # @name addBond
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds
+POST {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "EDO1036",
   "seriesCode": "EDO1036",
   "type": 5,
@@ -420,11 +428,12 @@ Content-Type: application/json
 
 ### Add a treasury bond funded from cash (type 1 = ROR)
 # @name addFundedBond
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds
+POST {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "ROR0627",
   "seriesCode": "ROR0627",
   "type": 1,
@@ -442,11 +451,11 @@ GET {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
 
 ### Get a bond
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addBond.response.body.assetId}}
+GET {{baseUrl}}/api/portfolio/bonds/{{addBond.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
 ### Update a bond
-PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addBond.response.body.assetId}}
+PUT {{baseUrl}}/api/portfolio/bonds/{{addBond.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -464,7 +473,7 @@ Content-Type: application/json
 }
 
 ### Record a transaction on the bond (409)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addBond.response.body.assetId}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addBond.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -476,7 +485,7 @@ Content-Type: application/json
 }
 
 ### Preview the funded ROR's three due months (period 1 takes the rate from the terms)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/preview
+POST {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/preview
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -490,7 +499,7 @@ Content-Type: application/json
 }
 
 ### Settle them: each net coupon is credited and moved Bond → Cash on its period end
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements
+POST {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -505,19 +514,19 @@ Content-Type: application/json
 
 ### Get the funded ROR: settled periods, duePeriodCount and lastSettlement
 # @name getFundedBond
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}
+GET {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
 ### Undo the latest settlement (only the latest can be undone)
-DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/{{getFundedBond.response.body.lastSettlement.settlementId}}
+DELETE {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements/{{getFundedBond.response.body.lastSettlement.settlementId}}
 Authorization: Bearer {{authToken}}
 
 ### Preview redeeming 4 of the funded ROR's 10 early, inside month 3 (months 1–2 stay settled after the undo)
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/early-redemption-preview?date=2026-09-05&bondCount=4&runningPeriodRatePercent=3.75
+GET {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/early-redemption-preview?date=2026-09-05&bondCount=4&runningPeriodRatePercent=3.75
 Authorization: Bearer {{authToken}}
 
 ### Redeem them early: accrued interest credited, the full fee and Belka tax charged, the proceeds moved Bond → Cash; 6 bonds remain
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addFundedBond.response.body.assetId}}/early-redemption
+POST {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/early-redemption
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -530,11 +539,12 @@ Content-Type: application/json
 
 ### Add a matured 3-month bond funded from cash (type 0 = OTS)
 # @name addMaturedBond
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds
+POST {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "OTS0926",
   "seriesCode": "OTS0926",
   "type": 0,
@@ -548,7 +558,7 @@ Content-Type: application/json
 }
 
 ### Settle its only period: the interest is capitalised into the bond
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/interest-settlements
+POST {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}/interest-settlements
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -559,12 +569,12 @@ Content-Type: application/json
 }
 
 ### Preview its redemption: capitalised interest, discount, Belka tax and proceeds, all dated the maturity date
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/redemption-preview
+GET {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}/redemption-preview
 Authorization: Bearer {{authToken}}
 
 ### Swap 6 of the 10 into EDO1036 at the swap price; the rest of the proceeds goes to the cash (send the redemption below instead to pay everything out)
 # @name swapBond
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/swap
+POST {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}/swap
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -583,7 +593,7 @@ Content-Type: application/json
 }
 
 ### Redeem the whole holding to cash instead (409 once it was swapped)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}/redemption
+POST {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}/redemption
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -592,18 +602,19 @@ Content-Type: application/json
 }
 
 ### Get the redeemed bond: status Redeemed, its redemption and the swap target's name
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/bonds/{{addMaturedBond.response.body.assetId}}
+GET {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
 ### --- Savings accounts ---
 
 ### Add a savings account
 # @name addSavingsAccount
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts
+POST {{baseUrl}}/api/portfolio/savings-accounts
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "Savings account",
   "bankName": "Example bank",
   "currency": "PLN",
@@ -616,7 +627,7 @@ Content-Type: application/json
 }
 
 ### Pay into the savings account
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addSavingsAccount.response.body.assetId}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addSavingsAccount.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -644,11 +655,11 @@ GET {{baseUrl}}/api/portfolio/securities?assetClass=Etf
 Authorization: Bearer {{authToken}}
 
 ### Get a savings account
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
+GET {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
 ### Update a savings account
-PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}
+PUT {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -661,12 +672,12 @@ Content-Type: application/json
 
 ### Preview the savings account's next due interest month
 # @name savingsInterestPreview
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-preview
+GET {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the previewed interest month
 # @name settleSavingsInterest
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements
+POST {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -677,7 +688,7 @@ Content-Type: application/json
 }
 
 ### Undo the latest interest settlement
-DELETE {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements/{{settleSavingsInterest.response.body.settlementId}}
+DELETE {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements/{{settleSavingsInterest.response.body.settlementId}}
 Authorization: Bearer {{authToken}}
 
 ### --- Transfers between cash and savings ---
@@ -703,11 +714,12 @@ Authorization: Bearer {{authToken}}
 
 ### Add a matured deposit to pay out into savings
 # @name addSavingsBoundDeposit
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits
+POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "Deposit for savings",
   "bankName": "Example bank",
   "currency": "PLN",
@@ -723,11 +735,11 @@ Content-Type: application/json
 
 ### Preview the settlement of the deposit bound for savings
 # @name savingsBoundPreview
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settlement-preview
+GET {{baseUrl}}/api/portfolio/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
 ### Settle the deposit and pay it out into the savings account
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settle
+POST {{baseUrl}}/api/portfolio/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -742,11 +754,12 @@ Content-Type: application/json
 
 ### Add a silver coin with a first purchase (metal 1 = Silver; weightUnit Gram | TroyOunce)
 # @name addMetal
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals
+POST {{baseUrl}}/api/portfolio/metals
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "Maple Leaf 1 oz",
   "metal": 1,
   "fineWeight": 1,
@@ -759,11 +772,12 @@ Content-Type: application/json
 }
 
 ### Add a gold bar with no purchase yet (metal 0 = Gold)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals
+POST {{baseUrl}}/api/portfolio/metals
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "name": "Gold bar 50 g",
   "metal": 0,
   "fineWeight": 50,
@@ -775,11 +789,11 @@ GET {{baseUrl}}/api/portfolio/metals
 Authorization: Bearer {{authToken}}
 
 ### Get a precious metal holding
-GET {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals/{{addMetal.response.body.assetId}}
+GET {{baseUrl}}/api/portfolio/metals/{{addMetal.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
 ### Update it: metal, name and fine weight (moves the instrument with the metal)
-PUT {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/metals/{{addMetal.response.body.assetId}}
+PUT {{baseUrl}}/api/portfolio/metals/{{addMetal.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -791,7 +805,7 @@ Content-Type: application/json
 }
 
 ### Buy one more piece (a PreciousMetal asset takes Buy and Sell only)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addMetal.response.body.assetId}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -804,7 +818,7 @@ Content-Type: application/json
 
 ### Buy one piece paid from the Cash account: a linked Cash Withdraw of quantity × unitPrice
 # @name metalBuyWithCash
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addMetal.response.body.assetId}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -817,7 +831,7 @@ Content-Type: application/json
 }
 
 ### Sell one piece into the Cash account: a linked Cash Deposit of quantity × unitPrice
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addMetal.response.body.assetId}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -831,11 +845,12 @@ Content-Type: application/json
 
 ### Add a PLN stock to trade through the Cash account
 # @name addPlnStock
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "assetClass": "Stock",
   "name": "PLN stock",
   "currency": "PLN",
@@ -844,7 +859,7 @@ Content-Type: application/json
 
 ### Buy 15 shares paid from the Cash account: a linked Cash Withdraw of round(quantity x unitPrice, 2); a Sell or Dividend pays into it
 # @name stockBuyWithCash
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets/{{addPlnStock.response.body.id}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addPlnStock.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -861,11 +876,12 @@ DELETE {{baseUrl}}/api/portfolio/transfers/{{metalBuyWithCash.response.body.tran
 Authorization: Bearer {{authToken}}
 
 ### Add a precious metal through the generic assets endpoint (400 Validation.UseMetalEndpoints)
-POST {{baseUrl}}/api/portfolio/portfolios/{{createPortfolio.response.body.id}}/assets
+POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "portfolioId": "{{createPortfolio.response.body.id}}",
   "assetClass": 6,
   "name": "Gold coin",
   "currency": "PLN",

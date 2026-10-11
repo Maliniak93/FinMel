@@ -15,8 +15,9 @@ public sealed class AddAssetHandler(
     IInstrumentLookupClient instrumentLookupClient,
     IFxRateLookupClient fxRateLookupClient)
 {
-    public async Task<Result<AssetResponse>> HandleAsync(Guid portfolioId, AddAssetRequest request, CancellationToken cancellationToken)
+    public async Task<Result<AssetResponse>> HandleAsync(AddAssetRequest request, CancellationToken cancellationToken)
     {
+        var portfolioId = request.PortfolioId;
         var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
         if (portfolio is null)
         {

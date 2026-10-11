@@ -23,11 +23,11 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         var setup = await client.CreateCashAndMetalAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(setup.MetalPortfolioId, setup.MetalAssetId), NewMetalCashRequest(setup.CashAssetId), cancellationToken);
+            TransactionsUri(setup.MetalAssetId), NewMetalCashRequest(setup.CashAssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal(2m, (await client.GetAssetAsync(setup.MetalPortfolioId, setup.MetalAssetId, cancellationToken)).Quantity);
-        Assert.Equal(2_600m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2m, (await client.GetAssetAsync(setup.MetalAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2_600m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
         await using var dbContext = CreateDbContext(userId);
         var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
@@ -42,8 +42,8 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         Assert.Equal(1m, withdraw.UnitPriceAmount);
         Assert.Equal(MetalCashDate, withdraw.Date);
         Assert.Equal(1m, withdraw.FxRateToPln);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.MetalPortfolioId, setup.MetalAssetId, cancellationToken);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.MetalAssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.CashAssetId, cancellationToken);
     }
 
     [Fact]
@@ -56,13 +56,13 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         var setup = await client.CreateCashAndMetalAsync(cancellationToken, pieces: 3m);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(setup.MetalPortfolioId, setup.MetalAssetId),
+            TransactionsUri(setup.MetalAssetId),
             NewMetalCashRequest(setup.CashAssetId, TransactionType.Sell, pieces: 1m, pricePerPiece: 1_300.00m),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal(2m, (await client.GetAssetAsync(setup.MetalPortfolioId, setup.MetalAssetId, cancellationToken)).Quantity);
-        Assert.Equal(6_300m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2m, (await client.GetAssetAsync(setup.MetalAssetId, cancellationToken)).Quantity);
+        Assert.Equal(6_300m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
         await using var dbContext = CreateDbContext(userId);
         var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
@@ -107,7 +107,7 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(setup.MetalPortfolioId, setup.MetalAssetId), NewMetalCashRequest(cashAssetId, pieces: 1m, pricePerPiece: 100m), cancellationToken);
+            TransactionsUri(setup.MetalAssetId), NewMetalCashRequest(cashAssetId, pieces: 1m, pricePerPiece: 100m), cancellationToken);
 
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
@@ -126,11 +126,11 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(setup.MetalPortfolioId, setup.MetalAssetId), NewMetalCashRequest(setup.CashAssetId), cancellationToken);
+            TransactionsUri(setup.MetalAssetId), NewMetalCashRequest(setup.CashAssetId), cancellationToken);
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        await client.AssertCashUntouchedAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken, balance: 1_000m);
+        await client.AssertCashUntouchedAsync(setup.CashAssetId, cancellationToken, balance: 1_000m);
     }
 
     [Fact]
@@ -141,18 +141,18 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await client.CreateCashAndMetalAsync(cancellationToken);
-        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalPortfolioId, setup.MetalAssetId, setup.CashAssetId, cancellationToken);
-        var withdraw = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalAssetId, setup.CashAssetId, cancellationToken);
+        var withdraw = await client.GetCashWithdrawAsync(setup.CashAssetId, cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
         var updateBuy = new UpdateTransactionRequest { Type = TransactionType.Buy, Quantity = 1m, UnitPrice = 1_200m, Date = buy.Date };
         var updateWithdraw = new UpdateTransactionRequest { Type = TransactionType.Withdraw, Quantity = 1m, UnitPrice = 1m, Date = withdraw.Date };
 
         HttpResponseMessage[] responses =
         [
-            await client.PutAsJsonAsync(TransactionUri(setup.MetalPortfolioId, setup.MetalAssetId, buy.Id), updateBuy, cancellationToken),
-            await client.DeleteAsync(TransactionUri(setup.MetalPortfolioId, setup.MetalAssetId, buy.Id), cancellationToken),
-            await client.PutAsJsonAsync(TransactionUri(setup.CashPortfolioId, setup.CashAssetId, withdraw.Id), updateWithdraw, cancellationToken),
-            await client.DeleteAsync(TransactionUri(setup.CashPortfolioId, setup.CashAssetId, withdraw.Id), cancellationToken),
+            await client.PutAsJsonAsync(TransactionUri(setup.MetalAssetId, buy.Id), updateBuy, cancellationToken),
+            await client.DeleteAsync(TransactionUri(setup.MetalAssetId, buy.Id), cancellationToken),
+            await client.PutAsJsonAsync(TransactionUri(setup.CashAssetId, withdraw.Id), updateWithdraw, cancellationToken),
+            await client.DeleteAsync(TransactionUri(setup.CashAssetId, withdraw.Id), cancellationToken),
         ];
 
         foreach (var response in responses)

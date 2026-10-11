@@ -6,6 +6,8 @@ namespace Skarbiec.Portfolio.Features.Deposits.AddDeposit;
 
 public sealed record AddDepositRequest : IValidatableObject
 {
+    public required Guid PortfolioId { get; init; }
+
     [Required, MaxLength(200)]
     public required string Name { get; init; }
 

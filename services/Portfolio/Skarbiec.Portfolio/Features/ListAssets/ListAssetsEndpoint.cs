@@ -7,7 +7,7 @@ public static class ListAssetsEndpoint
 {
     public static IEndpointRouteBuilder MapListAssetsEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets");
+        var group = app.MapGroup("/api/portfolio/assets");
 
         group.MapGet("", HandleAsync).RequireAuthorization();
 

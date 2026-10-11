@@ -5,6 +5,8 @@ namespace Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 
 public sealed record AddSavingsAccountRequest
 {
+    public required Guid PortfolioId { get; init; }
+
     [Required, MaxLength(200)]
     public required string Name { get; init; }
 

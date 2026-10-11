@@ -30,8 +30,8 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.NotNull(body);
         Assert.NotEqual(Guid.Empty, body.TransferId);
 
-        Assert.Equal(3_000m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
-        Assert.Equal(2_000m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Quantity);
+        Assert.Equal(3_000m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2_000m, (await client.GetAssetAsync(setup.SavingsAssetId, cancellationToken)).Quantity);
 
         await using var dbContext = CreateDbContext(userId);
         var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
@@ -43,12 +43,12 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         Assert.Contains(legs, l => l.AssetId == setup.CashAssetId && l.Type == TransactionType.Withdraw);
         Assert.Contains(legs, l => l.AssetId == setup.SavingsAssetId && l.Type == TransactionType.Deposit);
 
-        var cashLeg = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        var cashLeg = await client.GetCashWithdrawAsync(setup.CashAssetId, cancellationToken);
         Assert.NotNull(cashLeg.Transfer);
         Assert.Equal(setup.SavingsAssetId, cashLeg.Transfer.CounterpartAssetId);
         Assert.Equal(TransferDirection.Out, cashLeg.Transfer.Direction);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.CashAssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.SavingsAssetId, cancellationToken);
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal(1_500m, (await client.GetAssetAsync(setup.SavingsPortfolioId, setup.SavingsAssetId, cancellationToken)).Quantity);
-        Assert.Equal(3_500m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(1_500m, (await client.GetAssetAsync(setup.SavingsAssetId, cancellationToken)).Quantity);
+        Assert.Equal(3_500m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
     }
 
     [Theory]
@@ -157,7 +157,7 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        await client.AssertCashUntouchedAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        await client.AssertCashUntouchedAsync(setup.CashAssetId, cancellationToken);
     }
 
     [Fact]

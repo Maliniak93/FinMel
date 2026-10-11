@@ -13,8 +13,9 @@ public sealed class AddDepositHandler(
     TimeProvider timeProvider)
 {
     public async Task<Result<DepositResponse>> HandleAsync(
-        Guid portfolioId, AddDepositRequest request, CancellationToken cancellationToken)
+        AddDepositRequest request, CancellationToken cancellationToken)
     {
+        var portfolioId = request.PortfolioId;
         var portfolio = await dbContext.Portfolios.FirstOrDefaultAsync(p => p.Id == portfolioId, cancellationToken);
         if (portfolio is null)
         {

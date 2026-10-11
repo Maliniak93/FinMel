@@ -18,8 +18,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
-  getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreview,
-  postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemption,
+  getApiPortfolioBondsByAssetIdEarlyRedemptionPreview,
+  postApiPortfolioBondsByAssetIdEarlyRedemption,
   type BondPeriodResponse,
   type BondResponse,
 } from '../../../api/portfolio';
@@ -203,12 +203,11 @@ export class EarlyRedeemBondDialog {
   protected readonly previewResource = resource({
     params: () => this.previewQuery(),
     loader: async ({ params, abortSignal }) => {
-      const result =
-        await getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreview({
-          path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
-          query: params,
-          signal: abortSignal,
-        });
+      const result = await getApiPortfolioBondsByAssetIdEarlyRedemptionPreview({
+        path: { assetId: this.bond.assetId },
+        query: params,
+        signal: abortSignal,
+      });
       if (result.error || !result.data) {
         throw new Error(
           readProblemDetails(result.error).detail ?? translate('bonds.earlyRedeem.previewFailed'),
@@ -272,8 +271,8 @@ export class EarlyRedeemBondDialog {
     this.submitting.set(true);
     this.formError.set(null);
 
-    const result = await postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemption({
-      path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
+    const result = await postApiPortfolioBondsByAssetIdEarlyRedemption({
+      path: { assetId: this.bond.assetId },
       body: { ...query, destinationAssetId: this.form.getRawValue().destinationAssetId! },
     });
 

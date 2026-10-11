@@ -12,11 +12,11 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
-  deleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById,
+  deleteApiPortfolioAssetsByAssetIdTransactionsById,
   deleteApiPortfolioTransfersByTransferId,
   getApiPortfolioPortfoliosById,
-  getApiPortfolioPortfoliosByPortfolioIdAssetsById,
-  getApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions,
+  getApiPortfolioAssetsById,
+  getApiPortfolioAssetsByAssetIdTransactions,
   type TransactionResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
@@ -61,8 +61,8 @@ export class Transactions {
   protected readonly assetResource = resource({
     params: () => ({ portfolioId: this.portfolioId(), assetId: this.assetId() }),
     loader: async ({ params, abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosByPortfolioIdAssetsById({
-        path: { portfolioId: params.portfolioId, id: params.assetId },
+      const result = await getApiPortfolioAssetsById({
+        path: { id: params.assetId },
         signal: abortSignal,
       });
       if (result.error) {
@@ -125,8 +125,8 @@ export class Transactions {
       pageSize: this.pageSize(),
     }),
     loader: async ({ params, abortSignal }) => {
-      const result = await getApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions({
-        path: { portfolioId: params.portfolioId, assetId: params.assetId },
+      const result = await getApiPortfolioAssetsByAssetIdTransactions({
+        path: { assetId: params.assetId },
         query: { page: params.page, pageSize: params.pageSize },
         signal: abortSignal,
       });
@@ -167,7 +167,6 @@ export class Transactions {
       return null;
     }
     return {
-      portfolioId: this.portfolioId(),
       assetId: this.assetId(),
       assetClass: this.assetResource.value().assetClass,
       currency: this.assetResource.value().currency,
@@ -224,8 +223,8 @@ export class Transactions {
       return;
     }
 
-    const result = await deleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById({
-      path: { portfolioId: this.portfolioId(), assetId: this.assetId(), id: transaction.id },
+    const result = await deleteApiPortfolioAssetsByAssetIdTransactionsById({
+      path: { assetId: this.assetId(), id: transaction.id },
     });
     if (result.error) {
       this.snackBar.open(

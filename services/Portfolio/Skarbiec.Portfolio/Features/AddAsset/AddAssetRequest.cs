@@ -6,6 +6,8 @@ namespace Skarbiec.Portfolio.Features.AddAsset;
 
 public sealed record AddAssetRequest : IValidatableObject
 {
+    public required Guid PortfolioId { get; init; }
+
     public required AssetClass AssetClass { get; init; }
 
     [Required, MaxLength(200)]

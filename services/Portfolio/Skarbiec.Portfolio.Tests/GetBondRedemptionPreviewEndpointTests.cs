@@ -20,7 +20,7 @@ public sealed class GetBondRedemptionPreviewEndpointTests(SkarbiecContainersFixt
         var assetId = funded.Bond.AssetId;
         var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
 
-        var response = await client.GetAsync(BondRedemptionPreviewUri(portfolioId, assetId), cancellationToken);
+        var response = await client.GetAsync(BondRedemptionPreviewUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var preview = await response.ReadJsonAsync(cancellationToken);
@@ -34,7 +34,7 @@ public sealed class GetBondRedemptionPreviewEndpointTests(SkarbiecContainersFixt
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));
         Assert.Empty(await ReadBondRedemptionsAsync(userId, cancellationToken));
 
-        await client.RedeemBondAsync(portfolioId, assetId, funded.CashAssetId, cancellationToken);
+        await client.RedeemBondAsync(assetId, funded.CashAssetId, cancellationToken);
 
         var row = Assert.Single(await ReadBondRedemptionsAsync(userId, cancellationToken, assetId));
         Assert.Equal(preview.GetProperty("bondCount").GetInt32(), row.BondCount);
@@ -53,7 +53,7 @@ public sealed class GetBondRedemptionPreviewEndpointTests(SkarbiecContainersFixt
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
 
-        var response = await client.GetAsync(BondRedemptionPreviewUri(funded.BondPortfolioId, funded.Bond.AssetId), cancellationToken);
+        var response = await client.GetAsync(BondRedemptionPreviewUri(funded.Bond.AssetId), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.BondNotMaturedErrorCode, cancellationToken);
     }

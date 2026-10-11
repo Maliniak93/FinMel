@@ -5,6 +5,8 @@ namespace Skarbiec.Portfolio.Features.Bonds.AddBond;
 
 public sealed record AddBondRequest : IValidatableObject
 {
+    public required Guid PortfolioId { get; init; }
+
     [Required, MaxLength(200)]
     public required string Name { get; init; }
 

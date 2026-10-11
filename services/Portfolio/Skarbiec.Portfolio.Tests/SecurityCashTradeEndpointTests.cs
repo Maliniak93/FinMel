@@ -23,11 +23,11 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(setup.EtfPortfolioId, setup.EtfAssetId), NewTradeRequest(setup.CashAssetId), cancellationToken);
+            TransactionsUri(setup.EtfAssetId), NewTradeRequest(setup.CashAssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal(15m, (await client.GetAssetAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken)).Quantity);
-        Assert.Equal(350m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(15m, (await client.GetAssetAsync(setup.EtfAssetId, cancellationToken)).Quantity);
+        Assert.Equal(350m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
         await using var dbContext = CreateDbContext(userId);
         var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
@@ -43,8 +43,8 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(TradeDate, withdraw.Date);
         Assert.Equal(4.30m, buy.FxRateToPln);
         Assert.Equal(buy.FxRateToPln, withdraw.FxRateToPln);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.EtfAssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(setup.CashAssetId, cancellationToken);
     }
 
     [Fact]
@@ -56,18 +56,18 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var setup = await CreateCashAndEtfAsync(client, cancellationToken, etfQuantity: 20m);
 
         var sell = await client.PostAsJsonAsync(
-            TransactionsUri(setup.EtfPortfolioId, setup.EtfAssetId),
+            TransactionsUri(setup.EtfAssetId),
             NewTradeRequest(setup.CashAssetId, TransactionType.Sell, quantity: 5m, unitPrice: 130m),
             cancellationToken);
         var dividend = await client.PostAsJsonAsync(
-            TransactionsUri(setup.EtfPortfolioId, setup.EtfAssetId),
+            TransactionsUri(setup.EtfAssetId),
             NewTradeRequest(setup.CashAssetId, TransactionType.Dividend, quantity: 12.40m, unitPrice: 1m, date: TradeDate.AddDays(1)),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, sell.StatusCode);
         Assert.Equal(HttpStatusCode.Created, dividend.StatusCode);
-        Assert.Equal(15m, (await client.GetAssetAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken)).Quantity);
-        Assert.Equal(2_662.40m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(15m, (await client.GetAssetAsync(setup.EtfAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2_662.40m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
         await using var dbContext = CreateDbContext(userId);
         var cashLegs = await dbContext.Transactions
             .Where(t => t.AssetId == setup.CashAssetId && t.TransferId != null)
@@ -93,11 +93,11 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(setup.EtfPortfolioId, setup.EtfAssetId), NewTradeRequest(setup.CashAssetId), cancellationToken);
+            TransactionsUri(setup.EtfAssetId), NewTradeRequest(setup.CashAssetId), cancellationToken);
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        await client.AssertCashUntouchedAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken, balance: 1_000m);
+        await client.AssertCashUntouchedAsync(setup.CashAssetId, cancellationToken, balance: 1_000m);
     }
 
     [Theory]
@@ -138,7 +138,7 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(setup.EtfPortfolioId, setup.EtfAssetId),
+            TransactionsUri(setup.EtfAssetId),
             NewTradeRequest(cashAssetId, quantity: 1m, unitPrice: 100m),
             cancellationToken);
 
@@ -160,11 +160,11 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
 
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
-        var response = await client.PostAsJsonAsync(TransactionsUri(portfolioId, assetId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(TransactionsUri(assetId), request, cancellationToken);
 
         await response.AssertCashLinkNotAllowedAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        await client.AssertCashUntouchedAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken, balance: 2_000m);
+        await client.AssertCashUntouchedAsync(setup.CashAssetId, cancellationToken, balance: 2_000m);
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        var buy = await client.RecordTradeWithCashAsync(setup.EtfPortfolioId, setup.EtfAssetId, setup.CashAssetId, cancellationToken);
+        var buy = await client.RecordTradeWithCashAsync(setup.EtfAssetId, setup.CashAssetId, cancellationToken);
         var update = new UpdateTransactionRequest
         {
             Type = TransactionType.Buy,
@@ -184,11 +184,11 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         };
 
         var response = await client.PutAsJsonAsync(
-            TransactionUri(setup.EtfPortfolioId, setup.EtfAssetId, buy.Id), update, cancellationToken);
+            TransactionUri(setup.EtfAssetId, buy.Id), update, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(10m, (await client.GetAssetAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken)).Quantity);
-        Assert.Equal(900m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(10m, (await client.GetAssetAsync(setup.EtfAssetId, cancellationToken)).Quantity);
+        Assert.Equal(900m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
         await using var dbContext = CreateDbContext(userId);
         var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
@@ -206,16 +206,16 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        var buy = await client.RecordTradeWithCashAsync(setup.EtfPortfolioId, setup.EtfAssetId, setup.CashAssetId, cancellationToken);
+        var buy = await client.RecordTradeWithCashAsync(setup.EtfAssetId, setup.CashAssetId, cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
         var update = new UpdateTransactionRequest { Type = TransactionType.Sell, Quantity = 15m, UnitPrice = 110m, Date = TradeDate };
 
         var response = await client.PutAsJsonAsync(
-            TransactionUri(setup.EtfPortfolioId, setup.EtfAssetId, buy.Id), update, cancellationToken);
+            TransactionUri(setup.EtfAssetId, buy.Id), update, cancellationToken);
 
         await response.AssertTransferLegManagedAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        Assert.Equal(350m, (await client.GetAssetAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(350m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]
@@ -225,13 +225,13 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        var buy = await client.RecordTradeWithCashAsync(setup.EtfPortfolioId, setup.EtfAssetId, setup.CashAssetId, cancellationToken);
+        var buy = await client.RecordTradeWithCashAsync(setup.EtfAssetId, setup.CashAssetId, cancellationToken);
 
-        var response = await client.DeleteAsync(TransactionUri(setup.EtfPortfolioId, setup.EtfAssetId, buy.Id), cancellationToken);
+        var response = await client.DeleteAsync(TransactionUri(setup.EtfAssetId, buy.Id), cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Delete answered {(int)response.StatusCode}.");
-        Assert.Equal(0m, (await client.GetAssetAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken)).Quantity);
-        await client.AssertCashUntouchedAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken, balance: 2_000m);
+        Assert.Equal(0m, (await client.GetAssetAsync(setup.EtfAssetId, cancellationToken)).Quantity);
+        await client.AssertCashUntouchedAsync(setup.CashAssetId, cancellationToken, balance: 2_000m);
         await using var dbContext = CreateDbContext(userId);
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
         Assert.Empty(await dbContext.Transactions.Where(t => t.AssetId == setup.EtfAssetId).ToListAsync(cancellationToken));
@@ -245,17 +245,17 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await CreateCashAndEtfAsync(client, cancellationToken, etfQuantity: 20m);
         var sell = await client.RecordTradeWithCashAsync(
-            setup.EtfPortfolioId, setup.EtfAssetId, setup.CashAssetId, cancellationToken,
+            setup.EtfAssetId, setup.CashAssetId, cancellationToken,
             type: TransactionType.Sell, quantity: 5m, unitPrice: 130m);
         await client.RecordTransactionAsync(
-            setup.CashPortfolioId, setup.CashAssetId, TransactionType.Withdraw, 2_650m, TradeDate.AddDays(2), cancellationToken, unitPrice: 1m);
+            setup.CashAssetId, TransactionType.Withdraw, 2_650m, TradeDate.AddDays(2), cancellationToken, unitPrice: 1m);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
-        var response = await client.DeleteAsync(TransactionUri(setup.EtfPortfolioId, setup.EtfAssetId, sell.Id), cancellationToken);
+        var response = await client.DeleteAsync(TransactionUri(setup.EtfAssetId, sell.Id), cancellationToken);
 
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.OversellsPositionErrorCode, cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        Assert.Equal(15m, (await client.GetAssetAsync(setup.EtfPortfolioId, setup.EtfAssetId, cancellationToken)).Quantity);
+        Assert.Equal(15m, (await client.GetAssetAsync(setup.EtfAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]
@@ -265,15 +265,15 @@ public sealed class SecurityCashTradeEndpointTests(SkarbiecContainersFixture con
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        await client.RecordTradeWithCashAsync(setup.EtfPortfolioId, setup.EtfAssetId, setup.CashAssetId, cancellationToken);
-        var withdraw = await client.GetCashWithdrawAsync(setup.CashPortfolioId, setup.CashAssetId, cancellationToken);
+        await client.RecordTradeWithCashAsync(setup.EtfAssetId, setup.CashAssetId, cancellationToken);
+        var withdraw = await client.GetCashWithdrawAsync(setup.CashAssetId, cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
         var update = new UpdateTransactionRequest { Type = TransactionType.Withdraw, Quantity = 1m, UnitPrice = 1m, Date = withdraw.Date };
 
         HttpResponseMessage[] responses =
         [
-            await client.PutAsJsonAsync(TransactionUri(setup.CashPortfolioId, setup.CashAssetId, withdraw.Id), update, cancellationToken),
-            await client.DeleteAsync(TransactionUri(setup.CashPortfolioId, setup.CashAssetId, withdraw.Id), cancellationToken),
+            await client.PutAsJsonAsync(TransactionUri(setup.CashAssetId, withdraw.Id), update, cancellationToken),
+            await client.DeleteAsync(TransactionUri(setup.CashAssetId, withdraw.Id), cancellationToken),
         ];
 
         foreach (var response in responses)

@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { DeleteApiPortfolioPortfoliosByIdData, DeleteApiPortfolioPortfoliosByIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdData, DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses, DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData, DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses, DeleteApiPortfolioTransfersByTransferIdData, DeleteApiPortfolioTransfersByTransferIdResponses, GetApiPortfolioBondsData, GetApiPortfolioBondsResponses, GetApiPortfolioCashAccountsData, GetApiPortfolioCashAccountsResponses, GetApiPortfolioDepositsData, GetApiPortfolioDepositsResponses, GetApiPortfolioMeData, GetApiPortfolioMeResponses, GetApiPortfolioMetalsData, GetApiPortfolioMetalsResponses, GetApiPortfolioPortfoliosByIdData, GetApiPortfolioPortfoliosByIdResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, GetApiPortfolioPortfoliosByPortfolioIdAssetsData, GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses, GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData, GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewData, GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses, GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewData, GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses, GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses, GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewData, GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses, GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData, GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses, GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData, GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewData, GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses, GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses, GetApiPortfolioPortfoliosData, GetApiPortfolioPortfoliosResponses, GetApiPortfolioSavingsAccountsData, GetApiPortfolioSavingsAccountsResponses, GetApiPortfolioSecuritiesData, GetApiPortfolioSecuritiesResponses, GetApiPortfolioTransferCandidatesData, GetApiPortfolioTransferCandidatesResponses, PostApiPortfolioPortfoliosByIdArchiveData, PostApiPortfolioPortfoliosByIdArchiveResponses, PostApiPortfolioPortfoliosByIdRestoreData, PostApiPortfolioPortfoliosByIdRestoreResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveData, PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreData, PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses, PostApiPortfolioPortfoliosByPortfolioIdAssetsData, PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionData, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsData, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewData, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionData, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapData, PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses, PostApiPortfolioPortfoliosByPortfolioIdBondsData, PostApiPortfolioPortfoliosByPortfolioIdBondsResponses, PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutData, PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses, PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverData, PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses, PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleData, PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses, PostApiPortfolioPortfoliosByPortfolioIdDepositsData, PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses, PostApiPortfolioPortfoliosByPortfolioIdMetalsData, PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses, PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsData, PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses, PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData, PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses, PostApiPortfolioPortfoliosData, PostApiPortfolioPortfoliosResponses, PostApiPortfolioTransfersData, PostApiPortfolioTransfersResponses, PutApiPortfolioPortfoliosByIdData, PutApiPortfolioPortfoliosByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData, PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses, PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData, PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses, PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData, PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses } from './types.gen.js';
+import type { DeleteApiPortfolioAssetsByAssetIdTransactionsByIdData, DeleteApiPortfolioAssetsByAssetIdTransactionsByIdResponses, DeleteApiPortfolioAssetsByIdData, DeleteApiPortfolioAssetsByIdResponses, DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdData, DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdResponses, DeleteApiPortfolioPortfoliosByIdData, DeleteApiPortfolioPortfoliosByIdResponses, DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData, DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses, DeleteApiPortfolioTransfersByTransferIdData, DeleteApiPortfolioTransfersByTransferIdResponses, GetApiPortfolioAssetsByAssetIdTransactionsData, GetApiPortfolioAssetsByAssetIdTransactionsResponses, GetApiPortfolioAssetsByIdData, GetApiPortfolioAssetsByIdResponses, GetApiPortfolioAssetsData, GetApiPortfolioAssetsResponses, GetApiPortfolioBondsByAssetIdData, GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewData, GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewResponses, GetApiPortfolioBondsByAssetIdRedemptionPreviewData, GetApiPortfolioBondsByAssetIdRedemptionPreviewResponses, GetApiPortfolioBondsByAssetIdResponses, GetApiPortfolioBondsData, GetApiPortfolioBondsResponses, GetApiPortfolioCashAccountsData, GetApiPortfolioCashAccountsResponses, GetApiPortfolioDepositsByAssetIdData, GetApiPortfolioDepositsByAssetIdResponses, GetApiPortfolioDepositsByAssetIdSettlementPreviewData, GetApiPortfolioDepositsByAssetIdSettlementPreviewResponses, GetApiPortfolioDepositsData, GetApiPortfolioDepositsResponses, GetApiPortfolioMeData, GetApiPortfolioMeResponses, GetApiPortfolioMetalsByAssetIdData, GetApiPortfolioMetalsByAssetIdResponses, GetApiPortfolioMetalsData, GetApiPortfolioMetalsResponses, GetApiPortfolioPortfoliosByIdData, GetApiPortfolioPortfoliosByIdResponses, GetApiPortfolioPortfoliosData, GetApiPortfolioPortfoliosResponses, GetApiPortfolioSavingsAccountsByAssetIdData, GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewData, GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses, GetApiPortfolioSavingsAccountsByAssetIdResponses, GetApiPortfolioSavingsAccountsData, GetApiPortfolioSavingsAccountsResponses, GetApiPortfolioSecuritiesData, GetApiPortfolioSecuritiesResponses, GetApiPortfolioTransferCandidatesData, GetApiPortfolioTransferCandidatesResponses, PostApiPortfolioAssetsByAssetIdTransactionsData, PostApiPortfolioAssetsByAssetIdTransactionsResponses, PostApiPortfolioAssetsByIdArchiveData, PostApiPortfolioAssetsByIdArchiveResponses, PostApiPortfolioAssetsByIdRestoreData, PostApiPortfolioAssetsByIdRestoreResponses, PostApiPortfolioAssetsData, PostApiPortfolioAssetsResponses, PostApiPortfolioBondsByAssetIdEarlyRedemptionData, PostApiPortfolioBondsByAssetIdEarlyRedemptionResponses, PostApiPortfolioBondsByAssetIdInterestSettlementsData, PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewData, PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewResponses, PostApiPortfolioBondsByAssetIdInterestSettlementsResponses, PostApiPortfolioBondsByAssetIdRedemptionData, PostApiPortfolioBondsByAssetIdRedemptionResponses, PostApiPortfolioBondsByAssetIdSwapData, PostApiPortfolioBondsByAssetIdSwapResponses, PostApiPortfolioBondsData, PostApiPortfolioBondsResponses, PostApiPortfolioDepositsByAssetIdPayoutData, PostApiPortfolioDepositsByAssetIdPayoutResponses, PostApiPortfolioDepositsByAssetIdRolloverData, PostApiPortfolioDepositsByAssetIdRolloverResponses, PostApiPortfolioDepositsByAssetIdSettleData, PostApiPortfolioDepositsByAssetIdSettleResponses, PostApiPortfolioDepositsData, PostApiPortfolioDepositsResponses, PostApiPortfolioMetalsData, PostApiPortfolioMetalsResponses, PostApiPortfolioPortfoliosByIdArchiveData, PostApiPortfolioPortfoliosByIdArchiveResponses, PostApiPortfolioPortfoliosByIdRestoreData, PostApiPortfolioPortfoliosByIdRestoreResponses, PostApiPortfolioPortfoliosData, PostApiPortfolioPortfoliosResponses, PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsData, PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses, PostApiPortfolioSavingsAccountsData, PostApiPortfolioSavingsAccountsResponses, PostApiPortfolioTransfersData, PostApiPortfolioTransfersResponses, PutApiPortfolioAssetsByAssetIdTransactionsByIdData, PutApiPortfolioAssetsByAssetIdTransactionsByIdResponses, PutApiPortfolioAssetsByIdData, PutApiPortfolioAssetsByIdResponses, PutApiPortfolioBondsByAssetIdData, PutApiPortfolioBondsByAssetIdResponses, PutApiPortfolioDepositsByAssetIdData, PutApiPortfolioDepositsByAssetIdResponses, PutApiPortfolioMetalsByAssetIdData, PutApiPortfolioMetalsByAssetIdResponses, PutApiPortfolioPortfoliosByIdData, PutApiPortfolioPortfoliosByIdResponses, PutApiPortfolioSavingsAccountsByAssetIdData, PutApiPortfolioSavingsAccountsByAssetIdResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -48,10 +48,10 @@ export const postApiPortfolioPortfoliosByIdArchive = <ThrowOnError extends boole
 
 export const postApiPortfolioPortfoliosByIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByIdRestoreData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByIdRestoreResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByIdRestoreResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{id}/restore', ...options });
 
-export const getApiPortfolioPortfoliosByPortfolioIdAssets = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdAssetsData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdAssetsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/assets', ...options });
+export const getApiPortfolioAssets = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioAssetsData, ThrowOnError>): RequestResult<GetApiPortfolioAssetsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioAssetsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/assets', ...options });
 
-export const postApiPortfolioPortfoliosByPortfolioIdAssets = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdAssetsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdAssetsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/assets',
+export const postApiPortfolioAssets = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioAssetsData, ThrowOnError>): RequestResult<PostApiPortfolioAssetsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioAssetsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/assets',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -59,12 +59,12 @@ export const postApiPortfolioPortfoliosByPortfolioIdAssets = <ThrowOnError exten
     }
 });
 
-export const deleteApiPortfolioPortfoliosByPortfolioIdAssetsById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}', ...options });
+export const deleteApiPortfolioAssetsById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioAssetsByIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioAssetsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioAssetsByIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/assets/{id}', ...options });
 
-export const getApiPortfolioPortfoliosByPortfolioIdAssetsById = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}', ...options });
+export const getApiPortfolioAssetsById = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioAssetsByIdData, ThrowOnError>): RequestResult<GetApiPortfolioAssetsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioAssetsByIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/assets/{id}', ...options });
 
-export const putApiPortfolioPortfoliosByPortfolioIdAssetsById = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdData, ThrowOnError>): RequestResult<PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioPortfoliosByPortfolioIdAssetsByIdResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}',
+export const putApiPortfolioAssetsById = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioAssetsByIdData, ThrowOnError>): RequestResult<PutApiPortfolioAssetsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioAssetsByIdResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/assets/{id}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -72,14 +72,14 @@ export const putApiPortfolioPortfoliosByPortfolioIdAssetsById = <ThrowOnError ex
     }
 });
 
-export const postApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchive = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdArchiveResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/archive', ...options });
+export const postApiPortfolioAssetsByIdArchive = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioAssetsByIdArchiveData, ThrowOnError>): RequestResult<PostApiPortfolioAssetsByIdArchiveResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioAssetsByIdArchiveResponses, unknown, ThrowOnError>({ url: '/api/portfolio/assets/{id}/archive', ...options });
 
-export const postApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdAssetsByIdRestoreResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/assets/{id}/restore', ...options });
+export const postApiPortfolioAssetsByIdRestore = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioAssetsByIdRestoreData, ThrowOnError>): RequestResult<PostApiPortfolioAssetsByIdRestoreResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioAssetsByIdRestoreResponses, unknown, ThrowOnError>({ url: '/api/portfolio/assets/{id}/restore', ...options });
 
-export const getApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions', ...options });
+export const getApiPortfolioAssetsByAssetIdTransactions = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioAssetsByAssetIdTransactionsData, ThrowOnError>): RequestResult<GetApiPortfolioAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/assets/{assetId}/transactions', ...options });
 
-export const postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions',
+export const postApiPortfolioAssetsByAssetIdTransactions = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioAssetsByAssetIdTransactionsData, ThrowOnError>): RequestResult<PostApiPortfolioAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioAssetsByAssetIdTransactionsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/assets/{assetId}/transactions',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -87,30 +87,10 @@ export const postApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactions 
     }
 });
 
-export const deleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions/{id}', ...options });
+export const deleteApiPortfolioAssetsByAssetIdTransactionsById = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioAssetsByAssetIdTransactionsByIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/assets/{assetId}/transactions/{id}', ...options });
 
-export const putApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsById = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdData, ThrowOnError>): RequestResult<PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioPortfoliosByPortfolioIdAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/assets/{assetId}/transactions/{id}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const postApiPortfolioPortfoliosByPortfolioIdDeposits = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdDepositsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdDepositsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}', ...options });
-
-export const putApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}',
+export const putApiPortfolioAssetsByAssetIdTransactionsById = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioAssetsByAssetIdTransactionsByIdData, ThrowOnError>): RequestResult<PutApiPortfolioAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioAssetsByAssetIdTransactionsByIdResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/assets/{assetId}/transactions/{id}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -120,10 +100,8 @@ export const putApiPortfolioPortfoliosByPortfolioIdDepositsByAssetId = <ThrowOnE
 
 export const getApiPortfolioDeposits = <ThrowOnError extends boolean = false>(options?: Options<GetApiPortfolioDepositsData, ThrowOnError>): RequestResult<GetApiPortfolioDepositsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiPortfolioDepositsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/deposits', ...options });
 
-export const getApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettlementPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settlement-preview', ...options });
-
-export const postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettle = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettleResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/settle',
+export const postApiPortfolioDeposits = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioDepositsData, ThrowOnError>): RequestResult<PostApiPortfolioDepositsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioDepositsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/deposits',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -131,8 +109,10 @@ export const postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdSettle = <T
     }
 });
 
-export const postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayout = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayoutResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/payout',
+export const getApiPortfolioDepositsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioDepositsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioDepositsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioDepositsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/deposits/{assetId}', ...options });
+
+export const putApiPortfolioDepositsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioDepositsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioDepositsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioDepositsByAssetIdResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/deposits/{assetId}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -140,8 +120,10 @@ export const postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdPayout = <T
     }
 });
 
-export const postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRollover = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRolloverResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/deposits/{assetId}/rollover',
+export const getApiPortfolioDepositsByAssetIdSettlementPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioDepositsByAssetIdSettlementPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioDepositsByAssetIdSettlementPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioDepositsByAssetIdSettlementPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/deposits/{assetId}/settlement-preview', ...options });
+
+export const postApiPortfolioDepositsByAssetIdSettle = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioDepositsByAssetIdSettleData, ThrowOnError>): RequestResult<PostApiPortfolioDepositsByAssetIdSettleResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioDepositsByAssetIdSettleResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/deposits/{assetId}/settle',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -149,8 +131,8 @@ export const postApiPortfolioPortfoliosByPortfolioIdDepositsByAssetIdRollover = 
     }
 });
 
-export const postApiPortfolioPortfoliosByPortfolioIdBonds = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdBondsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdBondsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdBondsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds',
+export const postApiPortfolioDepositsByAssetIdPayout = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioDepositsByAssetIdPayoutData, ThrowOnError>): RequestResult<PostApiPortfolioDepositsByAssetIdPayoutResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioDepositsByAssetIdPayoutResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/deposits/{assetId}/payout',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -158,10 +140,8 @@ export const postApiPortfolioPortfoliosByPortfolioIdBonds = <ThrowOnError extend
     }
 });
 
-export const getApiPortfolioPortfoliosByPortfolioIdBondsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}', ...options });
-
-export const putApiPortfolioPortfoliosByPortfolioIdBondsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}',
+export const postApiPortfolioDepositsByAssetIdRollover = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioDepositsByAssetIdRolloverData, ThrowOnError>): RequestResult<PostApiPortfolioDepositsByAssetIdRolloverResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioDepositsByAssetIdRolloverResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/deposits/{assetId}/rollover',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -171,8 +151,8 @@ export const putApiPortfolioPortfoliosByPortfolioIdBondsByAssetId = <ThrowOnErro
 
 export const getApiPortfolioBonds = <ThrowOnError extends boolean = false>(options?: Options<GetApiPortfolioBondsData, ThrowOnError>): RequestResult<GetApiPortfolioBondsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiPortfolioBondsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/bonds', ...options });
 
-export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlements = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements',
+export const postApiPortfolioBonds = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioBondsData, ThrowOnError>): RequestResult<PostApiPortfolioBondsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioBondsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/bonds',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -180,8 +160,10 @@ export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettle
     }
 });
 
-export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreview = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreviewResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/preview',
+export const getApiPortfolioBondsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioBondsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioBondsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioBondsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/bonds/{assetId}', ...options });
+
+export const putApiPortfolioBondsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioBondsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioBondsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioBondsByAssetIdResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/bonds/{assetId}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -189,10 +171,8 @@ export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettle
     }
 });
 
-export const deleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementId = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/interest-settlements/{settlementId}', ...options });
-
-export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemption = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption',
+export const postApiPortfolioBondsByAssetIdInterestSettlements = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioBondsByAssetIdInterestSettlementsData, ThrowOnError>): RequestResult<PostApiPortfolioBondsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioBondsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/bonds/{assetId}/interest-settlements',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -200,10 +180,8 @@ export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemption = <
     }
 });
 
-export const getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdRedemptionPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/redemption-preview', ...options });
-
-export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwap = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwapResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/swap',
+export const postApiPortfolioBondsByAssetIdInterestSettlementsPreview = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewData, ThrowOnError>): RequestResult<PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioBondsByAssetIdInterestSettlementsPreviewResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/bonds/{assetId}/interest-settlements/preview',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -211,8 +189,10 @@ export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdSwap = <ThrowO
     }
 });
 
-export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemption = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption',
+export const deleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementId = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioBondsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/bonds/{assetId}/interest-settlements/{settlementId}', ...options });
+
+export const postApiPortfolioBondsByAssetIdRedemption = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioBondsByAssetIdRedemptionData, ThrowOnError>): RequestResult<PostApiPortfolioBondsByAssetIdRedemptionResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioBondsByAssetIdRedemptionResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/bonds/{assetId}/redemption',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -220,10 +200,10 @@ export const postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptio
     }
 });
 
-export const getApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdEarlyRedemptionPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/bonds/{assetId}/early-redemption-preview', ...options });
+export const getApiPortfolioBondsByAssetIdRedemptionPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioBondsByAssetIdRedemptionPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioBondsByAssetIdRedemptionPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioBondsByAssetIdRedemptionPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/bonds/{assetId}/redemption-preview', ...options });
 
-export const postApiPortfolioPortfoliosByPortfolioIdMetals = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdMetalsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdMetalsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/metals',
+export const postApiPortfolioBondsByAssetIdSwap = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioBondsByAssetIdSwapData, ThrowOnError>): RequestResult<PostApiPortfolioBondsByAssetIdSwapResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioBondsByAssetIdSwapResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/bonds/{assetId}/swap',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -231,21 +211,21 @@ export const postApiPortfolioPortfoliosByPortfolioIdMetals = <ThrowOnError exten
     }
 });
 
-export const getApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/metals/{assetId}', ...options });
-
-export const putApiPortfolioPortfoliosByPortfolioIdMetalsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioPortfoliosByPortfolioIdMetalsByAssetIdResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/metals/{assetId}',
+export const postApiPortfolioBondsByAssetIdEarlyRedemption = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioBondsByAssetIdEarlyRedemptionData, ThrowOnError>): RequestResult<PostApiPortfolioBondsByAssetIdEarlyRedemptionResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioBondsByAssetIdEarlyRedemptionResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/bonds/{assetId}/early-redemption',
     ...options,
     headers: {
         'Content-Type': 'application/json',
         ...options.headers
     }
 });
+
+export const getApiPortfolioBondsByAssetIdEarlyRedemptionPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioBondsByAssetIdEarlyRedemptionPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/bonds/{assetId}/early-redemption-preview', ...options });
 
 export const getApiPortfolioMetals = <ThrowOnError extends boolean = false>(options?: Options<GetApiPortfolioMetalsData, ThrowOnError>): RequestResult<GetApiPortfolioMetalsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiPortfolioMetalsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/metals', ...options });
 
-export const postApiPortfolioPortfoliosByPortfolioIdSavingsAccounts = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts',
+export const postApiPortfolioMetals = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioMetalsData, ThrowOnError>): RequestResult<PostApiPortfolioMetalsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioMetalsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/metals',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -253,10 +233,10 @@ export const postApiPortfolioPortfoliosByPortfolioIdSavingsAccounts = <ThrowOnEr
     }
 });
 
-export const getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}', ...options });
+export const getApiPortfolioMetalsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioMetalsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioMetalsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioMetalsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/metals/{assetId}', ...options });
 
-export const putApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}',
+export const putApiPortfolioMetalsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioMetalsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioMetalsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioMetalsByAssetIdResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/metals/{assetId}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -266,14 +246,8 @@ export const putApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetId = <T
 
 export const getApiPortfolioSavingsAccounts = <ThrowOnError extends boolean = false>(options?: Options<GetApiPortfolioSavingsAccountsData, ThrowOnError>): RequestResult<GetApiPortfolioSavingsAccountsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiPortfolioSavingsAccountsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/savings-accounts', ...options });
 
-export const getApiPortfolioCashAccounts = <ThrowOnError extends boolean = false>(options?: Options<GetApiPortfolioCashAccountsData, ThrowOnError>): RequestResult<GetApiPortfolioCashAccountsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiPortfolioCashAccountsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/cash-accounts', ...options });
-
-export const getApiPortfolioSecurities = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioSecuritiesData, ThrowOnError>): RequestResult<GetApiPortfolioSecuritiesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioSecuritiesResponses, unknown, ThrowOnError>({ url: '/api/portfolio/securities', ...options });
-
-export const getApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-preview', ...options });
-
-export const postApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlements = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsData, ThrowOnError>): RequestResult<PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError>({
-    url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements',
+export const postApiPortfolioSavingsAccounts = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioSavingsAccountsData, ThrowOnError>): RequestResult<PostApiPortfolioSavingsAccountsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioSavingsAccountsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/savings-accounts',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -281,7 +255,33 @@ export const postApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInte
     }
 });
 
-export const deleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementId = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioPortfoliosByPortfolioIdSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/portfolios/{portfolioId}/savings-accounts/{assetId}/interest-settlements/{settlementId}', ...options });
+export const getApiPortfolioSavingsAccountsByAssetId = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioSavingsAccountsByAssetIdData, ThrowOnError>): RequestResult<GetApiPortfolioSavingsAccountsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioSavingsAccountsByAssetIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/savings-accounts/{assetId}', ...options });
+
+export const putApiPortfolioSavingsAccountsByAssetId = <ThrowOnError extends boolean = false>(options: Options<PutApiPortfolioSavingsAccountsByAssetIdData, ThrowOnError>): RequestResult<PutApiPortfolioSavingsAccountsByAssetIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiPortfolioSavingsAccountsByAssetIdResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/savings-accounts/{assetId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getApiPortfolioCashAccounts = <ThrowOnError extends boolean = false>(options?: Options<GetApiPortfolioCashAccountsData, ThrowOnError>): RequestResult<GetApiPortfolioCashAccountsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetApiPortfolioCashAccountsResponses, unknown, ThrowOnError>({ url: '/api/portfolio/cash-accounts', ...options });
+
+export const getApiPortfolioSecurities = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioSecuritiesData, ThrowOnError>): RequestResult<GetApiPortfolioSecuritiesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioSecuritiesResponses, unknown, ThrowOnError>({ url: '/api/portfolio/securities', ...options });
+
+export const getApiPortfolioSavingsAccountsByAssetIdInterestPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewData, ThrowOnError>): RequestResult<GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses, unknown, ThrowOnError>({ url: '/api/portfolio/savings-accounts/{assetId}/interest-preview', ...options });
+
+export const postApiPortfolioSavingsAccountsByAssetIdInterestSettlements = <ThrowOnError extends boolean = false>(options: Options<PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsData, ThrowOnError>): RequestResult<PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses, unknown, ThrowOnError>({
+    url: '/api/portfolio/savings-accounts/{assetId}/interest-settlements',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const deleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementId = <ThrowOnError extends boolean = false>(options: Options<DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData, ThrowOnError>): RequestResult<DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses, unknown, ThrowOnError>({ url: '/api/portfolio/savings-accounts/{assetId}/interest-settlements/{settlementId}', ...options });
 
 export const getApiPortfolioTransferCandidates = <ThrowOnError extends boolean = false>(options: Options<GetApiPortfolioTransferCandidatesData, ThrowOnError>): RequestResult<GetApiPortfolioTransferCandidatesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiPortfolioTransferCandidatesResponses, unknown, ThrowOnError>({ url: '/api/portfolio/transfer-candidates', ...options });
 

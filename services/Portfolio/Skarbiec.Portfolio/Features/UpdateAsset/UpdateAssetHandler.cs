@@ -13,10 +13,10 @@ public sealed class UpdateAssetHandler(
     PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, IInstrumentLookupClient instrumentLookupClient)
 {
     public async Task<Result<AssetResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, UpdateAssetRequest request, CancellationToken cancellationToken)
+        Guid assetId, UpdateAssetRequest request, CancellationToken cancellationToken)
     {
         var asset = await dbContext.Assets
-            .FirstOrDefaultAsync(a => a.Id == assetId && a.PortfolioId == portfolioId, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == assetId, cancellationToken);
 
         if (asset is null)
         {

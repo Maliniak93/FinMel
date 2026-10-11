@@ -22,10 +22,10 @@ public sealed class UpdateMetalEndpointTests(SkarbiecContainersFixture container
             cancellationToken, NewMetalRequest(name: "Krugerrand", metal: Metal.Gold, pieces: 2m));
 
         var response = await client.PutAsJsonAsync(
-            MetalUri(portfolioId, metal.AssetId), NewUpdateMetalRequest(name: "Silver bar"), cancellationToken);
+            MetalUri(metal.AssetId), NewUpdateMetalRequest(name: "Silver bar"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var updated = await client.GetMetalAsync(portfolioId, metal.AssetId, cancellationToken);
+        var updated = await client.GetMetalAsync(metal.AssetId, cancellationToken);
         Assert.Equal("Silver bar", updated.Name);
         Assert.Equal(Metal.Silver, updated.Metal);
         Assert.Equal(100m, updated.FineWeightGramsPerPiece);
@@ -46,10 +46,10 @@ public sealed class UpdateMetalEndpointTests(SkarbiecContainersFixture container
         await client.ArchivePortfolioAsync(portfolioId, cancellationToken);
 
         var response = await client.PutAsJsonAsync(
-            MetalUri(portfolioId, metal.AssetId), NewUpdateMetalRequest(), cancellationToken);
+            MetalUri(metal.AssetId), NewUpdateMetalRequest(), cancellationToken);
 
         await response.AssertPortfolioArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetMetalAsync(portfolioId, metal.AssetId, cancellationToken);
+        var unchanged = await client.GetMetalAsync(metal.AssetId, cancellationToken);
         Assert.Equal("Maple Leaf 1 oz", unchanged.Name);
         Assert.Equal(31.10347680m, unchanged.FineWeightGramsPerPiece);
     }
@@ -61,13 +61,13 @@ public sealed class UpdateMetalEndpointTests(SkarbiecContainersFixture container
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (portfolioId, metal) = await client.CreatePortfolioWithMetalAsync(cancellationToken);
-        await client.ArchiveAssetAsync(portfolioId, metal.AssetId, cancellationToken);
+        await client.ArchiveAssetAsync(metal.AssetId, cancellationToken);
 
         var response = await client.PutAsJsonAsync(
-            MetalUri(portfolioId, metal.AssetId), NewUpdateMetalRequest(), cancellationToken);
+            MetalUri(metal.AssetId), NewUpdateMetalRequest(), cancellationToken);
 
         await response.AssertAssetArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetMetalAsync(portfolioId, metal.AssetId, cancellationToken);
+        var unchanged = await client.GetMetalAsync(metal.AssetId, cancellationToken);
         Assert.Equal("Maple Leaf 1 oz", unchanged.Name);
         Assert.Equal(Metal.Silver, unchanged.Metal);
     }

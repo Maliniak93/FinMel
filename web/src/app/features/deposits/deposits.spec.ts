@@ -286,9 +286,7 @@ describe('Deposits', () => {
     const deleteCall = fetchSpy.mock.calls
       .map((call: unknown[]) => call[0] as Request)
       .find((request: Request) => request.method === 'DELETE');
-    expect(deleteCall?.url).toContain(
-      `/api/portfolio/portfolios/${dueDeposit.portfolioId}/assets/${dueDeposit.assetId}`,
-    );
+    expect(deleteCall?.url).toContain(`/api/portfolio/assets/${dueDeposit.assetId}`);
     await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
   });
 
@@ -595,9 +593,7 @@ describe('Deposits', () => {
       await vi.waitFor(() => expect(writes()).toHaveLength(1));
       const [request] = writes();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${dueDeposit.portfolioId}/assets/${dueDeposit.assetId}/archive`,
-      );
+      expect(request.url).toContain(`/api/portfolio/assets/${dueDeposit.assetId}/archive`);
       await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
     });
 
@@ -623,9 +619,7 @@ describe('Deposits', () => {
       await vi.waitFor(() => expect(writes()).toHaveLength(1));
       const [request] = writes();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(
-        `/api/portfolio/portfolios/${archivedDueDeposit.portfolioId}/assets/${archivedDueDeposit.assetId}/restore`,
-      );
+      expect(request.url).toContain(`/api/portfolio/assets/${archivedDueDeposit.assetId}/restore`);
       await vi.waitFor(() => expect(depositListCalls()).toBeGreaterThan(listCallsBefore));
     });
 

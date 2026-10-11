@@ -11,8 +11,8 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map, merge, of, startWith, switchMap } from 'rxjs';
 
 import {
-  postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlements,
-  postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreview,
+  postApiPortfolioBondsByAssetIdInterestSettlements,
+  postApiPortfolioBondsByAssetIdInterestSettlementsPreview,
   type BondResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
@@ -98,12 +98,11 @@ export class SettleBondInterestDialog {
   protected readonly previewResource = resource({
     params: () => this.previewRequest(),
     loader: async ({ params, abortSignal }) => {
-      const result =
-        await postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlementsPreview({
-          path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
-          body: params,
-          signal: abortSignal,
-        });
+      const result = await postApiPortfolioBondsByAssetIdInterestSettlementsPreview({
+        path: { assetId: this.bond.assetId },
+        body: params,
+        signal: abortSignal,
+      });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ?? translate('bonds.settle.previewFailed'),
@@ -128,8 +127,8 @@ export class SettleBondInterestDialog {
     this.submitting.set(true);
     this.formError.set(null);
 
-    const result = await postApiPortfolioPortfoliosByPortfolioIdBondsByAssetIdInterestSettlements({
-      path: { portfolioId: this.bond.portfolioId, assetId: this.bond.assetId },
+    const result = await postApiPortfolioBondsByAssetIdInterestSettlements({
+      path: { assetId: this.bond.assetId },
       body: settleRequest(section),
     });
 

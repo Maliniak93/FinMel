@@ -7,7 +7,7 @@ public static class AddAssetEndpoint
 {
     public static IEndpointRouteBuilder MapAddAssetEndpoint(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/portfolio/portfolios/{portfolioId:guid}/assets");
+        var group = app.MapGroup("/api/portfolio/assets");
 
         group.MapPost("", HandleAsync).RequireAuthorization();
 
@@ -15,12 +15,12 @@ public static class AddAssetEndpoint
     }
 
     private static async Task<Results<Created<AssetResponse>, ProblemHttpResult>> HandleAsync(
-        Guid portfolioId, AddAssetRequest request, AddAssetHandler handler, CancellationToken cancellationToken)
+        AddAssetRequest request, AddAssetHandler handler, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(portfolioId, request, cancellationToken);
+        var result = await handler.HandleAsync(request, cancellationToken);
 
         return result.IsSuccess
-            ? TypedResults.Created($"/api/portfolio/portfolios/{portfolioId}/assets/{result.Value.Id}", result.Value)
+            ? TypedResults.Created($"/api/portfolio/assets/{result.Value.Id}", result.Value)
             : result.Error.ToProblem();
     }
 }

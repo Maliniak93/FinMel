@@ -12,11 +12,10 @@ public sealed class RedeemBondEarlyHandler(
     TimeProvider timeProvider)
 {
     public async Task<Result<BondResponse>> HandleAsync(
-        Guid portfolioId, Guid assetId, RedeemBondEarlyRequest request, CancellationToken cancellationToken)
+        Guid assetId, RedeemBondEarlyRequest request, CancellationToken cancellationToken)
     {
         var today = WarsawCalendar.Today(timeProvider);
         var planned = await dbContext.PlanEarlyRedemptionAsync(
-            portfolioId,
             assetId,
             request.Date,
             request.BondCount,
@@ -97,6 +96,6 @@ public sealed class RedeemBondEarlyHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        return (await dbContext.LoadBondAsync(portfolioId, assetId, today, cancellationToken))!;
+        return (await dbContext.LoadBondAsync(assetId, today, cancellationToken))!;
     }
 }
