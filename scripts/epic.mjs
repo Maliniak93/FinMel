@@ -69,6 +69,25 @@ function openPr(branch) {
   return JSON.parse(res.out)[0] ?? null;
 }
 
+const currentBranch = () => git(["rev-parse", "--abbrev-ref", "HEAD"]).out;
+const dirtyFiles = () => git(["status", "--porcelain"]).out.split(/\r?\n/).filter(Boolean);
+
+function lastComment(number) {
+  const res = gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", '.comments[-1].body // ""']);
+  if (!res.ok) throw new Stop("github", `gh issue view ${number}: ${res.firstErr}`);
+  return res.out;
+}
+
+const SHIP_BLOCKED = "**Blocked** at `ship`";
+
+// "ship" retries a failed ship step, "resume" continues an interrupted build on the tree on disk, "build" starts fresh
+function partPlan(part, dirtyCount) {
+  const onBranch = currentBranch() === part.branch;
+  if (!onBranch && dirtyCount) return "build";
+  if (lastComment(part.number).startsWith(SHIP_BLOCKED)) return "ship";
+  return onBranch && dirtyCount ? "resume" : "build";
+}
+
 function resolveClaude() {
   if (!IS_WIN) return { cmd: "claude", shell: false };
   const found = run("where", ["claude"]).out.split(/\r?\n/).filter(Boolean);
@@ -81,6 +100,25 @@ function resolveClaude() {
 
 function claudeSpawn(claude, argv) {
   return { cmd: claude.cmd, argv: claude.shell ? argv.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : argv, shell: claude.shell };
+}
+
+function retryShip(part) {
+  console.log(`retrying the ship step of #${part.number} on ${part.branch}`);
+  if (currentBranch() !== part.branch) {
+    const switched = git(["switch", part.branch]);
+    if (!switched.ok) throw new Stop("ship-failed", `git switch ${part.branch}: ${switched.firstErr}`);
+  }
+  const json = JSON.stringify({ deviations: [], resumedShip: true });
+  const res = spawnSync(NODE, ["scripts/ship.mjs", String(part.number), "--branch", part.branch, "--title", part.title, "--json", json], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, timeout: 3600e3, maxBuffer: 64 * 1024 * 1024 });
+  const line = (res.stdout ?? "").split(/\r?\n/).reverse().find((l) => l.startsWith("SHIP_RESULT: "));
+  let parsed = null;
+  try {
+    parsed = JSON.parse(line.slice("SHIP_RESULT: ".length));
+  } catch {
+  }
+  if (parsed?.ok) return;
+  const cause = res.error?.message ?? (res.stderr ?? "").trim().split(/\r?\n/).find(Boolean) ?? "";
+  throw new Stop("ship-failed", parsed ? `${parsed.failedCommand ?? "ship.mjs"}: ${parsed.error ?? "failed"}` : `ship.mjs gave no result: ${cause}`);
 }
 
 function probeLimits(claude) {
@@ -293,13 +331,20 @@ async function handlePart(sub, ctx) {
   if (!pr) {
     if (existsSync(stopFile(ctx.epic))) throw new Stop("stopped", "stop file found");
     if (ctx.builds >= ctx.maxTasks) throw new Stop("max-tasks", `${ctx.maxTasks} build(s) done in this run`);
-    ctx.limits = checkLimits(ctx.claude, ctx.threshold);
-    ctx.builds++;
-    const built = await build(ctx.claude, ctx.epic, part.number);
-    entry.buildMin = minutes(built.ms);
-    if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
-    pr = openPr(part.branch);
-    if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
+    if (partPlan(part, dirtyFiles().length) === "ship") {
+      entry.shipOnly = true;
+      retryShip(part);
+      pr = openPr(part.branch);
+      if (!pr) throw new Stop("ship-failed", `#${part.number}: ship.mjs succeeded but no open PR exists for ${part.branch}`);
+    } else {
+      ctx.limits = checkLimits(ctx.claude, ctx.threshold);
+      ctx.builds++;
+      const built = await build(ctx.claude, ctx.epic, part.number);
+      entry.buildMin = minutes(built.ms);
+      if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
+      pr = openPr(part.branch);
+      if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
+    }
   }
 
   entry.prUrl = pr.url;
@@ -326,11 +371,18 @@ function preChecks(epic, flags) {
   }
   const issue = getIssue(epic);
   if (!issue.epic) throw new Stop("not-epic", `#${epic} is not an epic`);
-  const dirty = git(["status", "--porcelain"]).out.split(/\r?\n/).filter(Boolean);
+  const dirty = dirtyFiles();
   if (dirty.length) {
-    const listed = `the working tree is not clean:\n${dirty.slice(0, 10).join("\n")}${dirty.length > 10 ? `\n... ${dirty.length - 10} more` : ""}`;
-    if (!flags["dry-run"]) throw new Stop("dirty-tree", listed);
-    console.log(`warning: ${listed}`);
+    const next = issue.subIssues.find((s) => s.state !== "CLOSED");
+    const part = next ? getIssue(next.number) : null;
+    if (part?.branch && currentBranch() === part.branch && !openPr(part.branch)) {
+      const verb = partPlan(part, dirty.length) === "ship" ? "retrying the ship step of" : "resuming";
+      console.log(`${flags["dry-run"] ? "dry-run: would be resumed - " : ""}${verb} #${part.number} on ${part.branch} with ${dirty.length} uncommitted file(s)`);
+    } else {
+      const listed = `the working tree is not clean:\n${dirty.slice(0, 10).join("\n")}${dirty.length > 10 ? `\n... ${dirty.length - 10} more` : ""}`;
+      if (!flags["dry-run"]) throw new Stop("dirty-tree", listed);
+      console.log(`warning: ${listed}\n(a real run would stop: dirty-tree)`);
+    }
   }
   const runners = runnerOnline();
   if (!runners) throw new Stop("runner-offline", "no self-hosted runner is online - the WSL runner is down, see skarbiec-plan/runbooks/ci.md");
@@ -347,7 +399,13 @@ function dryRunTable(issue) {
         first = false;
         const branch = getIssue(sub.number).branch;
         const pr = branch ? openPr(branch) : null;
-        action = !branch ? "stop: no Branch field" : pr ? `CI → merge PR ${pr.url}` : "build";
+        const dirtyCount = dirtyFiles().length;
+        const plan = branch && !pr ? partPlan({ number: sub.number, branch }, dirtyCount) : "build";
+        if (!branch) action = "stop: no Branch field";
+        else if (pr) action = `CI → merge PR ${pr.url}`;
+        else if (plan === "ship") action = "retry ship (previous ship step failed)";
+        else if (plan === "resume") action = `resume build (${dirtyCount} uncommitted file(s) on ${branch})`;
+        else action = "build";
       }
     }
     console.log(`#${sub.number} ${sub.title} — ${sub.state} — ${action}`);
@@ -357,7 +415,7 @@ function dryRunTable(issue) {
 function summary(reason, detail, parts, epic, costLine) {
   const lines = [`## Epic run: ${reason}`, ""];
   lines.push(parts.length ? "Parts handled in this run:" : "No part was merged in this run.");
-  for (const p of parts) lines.push(`- #${p.number} ${p.title} - ${p.prUrl ?? "no PR"} (build ${p.buildMin ?? "-"} min, CI ${p.ciMin ?? "-"} min)`);
+  for (const p of parts) lines.push(`- #${p.number} ${p.title} - ${p.prUrl ?? "no PR"} (${p.shipOnly ? "ship retried" : `build ${p.buildMin ?? "-"} min`}, CI ${p.ciMin ?? "-"} min)`);
   if (detail) lines.push("", "Detail:", "", "```", detail, "```");
   if (costLine) lines.push("", costLine);
   lines.push("", `Resume with \`node scripts/epic.mjs ${epic}\`.`);

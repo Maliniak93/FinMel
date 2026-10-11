@@ -420,10 +420,14 @@ function report([number, ...rest]) {
   if (run.status === "shipped") {
     const [pr] = JSON.parse(gh(["pr", "list", "--repo", REPO, "--head", run.branch, "--state", "open", "--json", "url", "--limit", "1"]));
     lines.push(`**Built** on \`${run.branch}\` — ${pr ? `PR ${pr.url} is open, awaiting your merge.` : "pushed, but no open PR was found for it."}`, "");
-    lines.push(`- Tests: ${run.tests?.length ? run.tests.map((t) => `\`${t}\``).join(", ") : "none — skip-tests"}`);
-    lines.push(`- Fix rounds: ${run.rounds ?? 0}`);
-    lines.push(`- Review: ${run.reviewRan ? `clean, ${run.minor?.length ?? 0} minor finding(s)` : "skipped"}`);
-    for (const f of run.minor ?? []) lines.push(`  - \`${where(f)}\` — ${f.claim}`);
+    if (run.resumedShip) {
+      lines.push("- Shipped by `scripts/epic.mjs` after the earlier ship step failed — tests and review are in the blocked report above.");
+    } else {
+      lines.push(`- Tests: ${run.tests?.length ? run.tests.map((t) => `\`${t}\``).join(", ") : "none — skip-tests"}`);
+      lines.push(`- Fix rounds: ${run.rounds ?? 0}`);
+      lines.push(`- Review: ${run.reviewRan ? `clean, ${run.minor?.length ?? 0} minor finding(s)` : "skipped"}`);
+      for (const f of run.minor ?? []) lines.push(`  - \`${where(f)}\` — ${f.claim}`);
+    }
   } else {
     lines.push(`**Blocked** at \`${run.stage ?? "?"}\`${run.reason ? ` — ${run.reason}` : ""}`, "");
     for (const f of run.failures ?? []) lines.push(`- ${f.step}: ${f.summary}${f.file ? ` (\`${f.file}\`)` : ""}`);
@@ -443,7 +447,7 @@ function report([number, ...rest]) {
 
   gh(["issue", "comment", String(number), "--repo", REPO, "--body-file", "-"], lines.join("\n"));
   console.log(`#${number}: report posted`);
-  if (run.status === "shipped" && run.reviewRan) tick([number]);
+  if (run.status === "shipped" && (run.reviewRan || run.resumedShip)) tick([number]);
 }
 
 function list() {
