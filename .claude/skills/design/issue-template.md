@@ -51,6 +51,10 @@
 
 - [ ] **AC-1** Given ___, when ___, then ___. — proof: `<test name or command>`
 
+## Test manualny
+
+<!-- The steps a person runs by hand after the merge. Skip the section (delete it) when the change is not visible in the app: skip-tests, cleanup, workflow specs. About 5–15 steps. Describe behaviour, not exact labels, unless the label is a criterion. Standard preparation: skarbiec-plan/workflow.md → Manual test plan. Shape: a numbered **Przygotowanie** block (the standard preparation plus what this change adds), then numbered **Kroki** on concrete PLN amounts, dates, tickers and routes, each ending in `→ <expected result>`. Write the steps in Polish. -->
+
 ## Verification
 
-<!-- Commands to run, plus manual smoke steps in the browser if this touches the UI. With skip-tests: "No new tests: the gate is <commands> plus the existing suites". -->
+<!-- Commands to run and the proof each AC names. The manual steps for a person are in ## Test manualny above. With skip-tests: "No new tests: the gate is <commands> plus the existing suites". -->

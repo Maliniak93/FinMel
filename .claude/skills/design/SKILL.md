@@ -71,13 +71,21 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
    move). Then every AC's proof must be a command, a grep or an existing test class, and Verification
    says so in one line. Never reach for it to dodge writing a test for real behaviour — the workflow
    will ship that spec without a single new assertion.
-8. If the design changes a hard rule, append a draft ADR (status 🕐) to `skarbiec-plan/decisions.md`
+8. **Manual test plan.** Write `## Test manualny` (the shape is in `issue-template.md`) when the change is visible in
+   the app. Omit the section for a `skip-tests` spec, a cleanup or a workflow spec. For a part or a single spec, a
+   **part plan**: a numbered **Przygotowanie** block (the standard preparation in `skarbiec-plan/workflow.md` →
+   Manual test plan, plus what this change adds), then 5–15 numbered **Kroki** on concrete PLN amounts, dates,
+   tickers and routes, each ending in `→ <expected result>`. Describe behaviour, not exact labels, unless the label
+   is an AC. Write the steps in Polish. A part with no UI effect of its own gets only the line
+   `Weryfikacja w planie epica, krok <n>.`, where `<n>` is its step in the umbrella's plan. The approval summary
+   names the plan's step count (`Test manualny: 9 kroków`), or `brak planu` when the section is omitted.
+9. If the design changes a hard rule, append a draft ADR (status 🕐) to `skarbiec-plan/decisions.md`
    and reference it from Design decisions. Do not silently break an ADR. This is the only repo file
    `/design` may touch.
-9. Scope is a promise: everything the change does **not** include goes under Out of scope, especially
+10. Scope is a promise: everything the change does **not** include goes under Out of scope, especially
    the adjacent thing the user will assume is included. For a change spec, the adjacent thing is
    usually "and while we are in there, clean up X" — name it and exclude it.
-10. Watch for a split the whole time — see **Splitting into an epic** below.
+11. Watch for a split the whole time — see **Splitting into an epic** below.
 
 ## Splitting into an epic
 
@@ -111,8 +119,11 @@ A good cut:
 Drafting: the umbrella from `.claude/skills/design/epic-template.md` as `<slug>.md` (Goal, Why,
 Parts in build order, overall Out of scope, cross-part Design decisions — no AC), plus one full spec
 per part from `issue-template.md` as `<slug>-<n>-<part-slug>.md`, each with its own tier, kind and
-skip-tests. Check the umbrella with `check --epic` and every part with `check`. The approval summary
-lists the parts one line each (title, tier, kind, AC count).
+skip-tests. The umbrella gets the **whole-feature plan**: its `## Test manualny` is one continuous
+scenario of about 15–30 steps, from an empty account to the final state, assuming all parts merged;
+each part carries its own part plan or the `Weryfikacja w planie epica, krok <n>.` line (step 8).
+Check the umbrella with `check --epic` and every part with `check`. The approval summary
+lists the parts one line each (title, tier, kind, AC count, plan step count).
 
 Converting an already published spec (the user asks, or `/build` blocked on it): the existing issue
 stays a part — narrow its body to that part with `edit --body-file`, never delete and re-create it —
@@ -122,9 +133,10 @@ either `create --parent <epic>` (new part) or `edit <n> --parent <epic>` (the ex
 ## Finish
 
 Run `node scripts/gh-project.mjs check --body-file <scratchpad>/<slug>.md` (`--epic` for an
-umbrella) and fix what it lists — it checks Goal, Out of scope, and that every AC checkbox names a
-`proof:`. Then present a summary of at most 15 lines: goal (for a change: today → wanted), kind, tier, scope, the
-acceptance criteria as one line each, whether tests are skipped, the split (if any), and anything
+umbrella) and fix what it lists — it checks Goal, Out of scope, that every AC checkbox names a
+`proof:`, and the shape of `## Test manualny` (a warning when it is missing, an error when it has a `- [ ]`
+line or neither a numbered step nor the `Weryfikacja w planie epica` line). Then present a summary of at most 15 lines: goal (for a change: today → wanted), kind, tier, scope, the
+acceptance criteria as one line each, whether tests are skipped, the manual plan's step count (or `brak planu`), the split (if any), and anything
 still open. Then ask for approval. Iterate on the draft until the user says yes; nothing is published
 before that.
 

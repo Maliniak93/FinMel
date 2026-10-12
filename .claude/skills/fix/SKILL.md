@@ -62,6 +62,9 @@ In the session scratchpad as `fix-<slug>.md`, from `.claude/skills/design/issue-
   `Method_Scenario_Outcome` in the right test project (or `*.spec.ts` for Angular); **AC-2** = the touched
   projects stay green — proof `node scripts/verify.mjs --projects <A,B|web>`. Add more only for edge cases the
   root cause implies.
+- `## Test manualny` = the reproduction steps as a person runs them in the app, numbered, with the result
+  expected after the fix on each step's `→` line (a **Przygotowanie** block, then **Kroki**, in Polish, per
+  `issue-template.md`). Under the same skip rule as `/design` step 8: omit it when the bug is not visible in the app.
 - Leave empty sections and HTML comments alone — publishing strips them.
 
 ## 3a. Split, when one fix is not one PR
