@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
@@ -126,9 +128,10 @@ internal static class AccountsApi
         CancellationToken cancellationToken,
         decimal balance = 0m,
         string name = "XTB",
-        DateOnly? depositedOn = null)
+        DateOnly? depositedOn = null,
+        TaxWrapper wrapper = TaxWrapper.Regular)
     {
-        var accountId = await client.CreateAccountAsync(cancellationToken, name);
+        var accountId = await client.CreateAccountAsync(cancellationToken, name, wrapper: wrapper);
         var cashAssetId = await client.GetAccountCashAssetIdAsync(accountId, cancellationToken);
         if (balance > 0m)
         {
@@ -230,6 +233,38 @@ internal static class AccountsApi
 
         return (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
     }
+
+    public static string ContributionLimitUri(Guid accountId, int year) => $"{AccountUri(accountId)}/contribution-limits/{year}";
+
+    public static string AccountContributionUri(Guid accountId, int year) => $"{AccountUri(accountId)}?year={year}";
+
+    public sealed record ContributionView(int Year, decimal ContributedPln, decimal? LimitPln);
+
+    public static async Task SetContributionLimitAsync(
+        this HttpClient client, Guid accountId, int year, decimal amount, CancellationToken cancellationToken)
+    {
+        var response = await client.PutAsJsonAsync(ContributionLimitUri(accountId, year), new { amount }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<ContributionView?> GetContributionAsync(
+        this HttpClient client, Guid accountId, int year, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(AccountContributionUri(accountId, year), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await response.ReadContributionAsync(cancellationToken);
+    }
+
+    public static async Task<ContributionView?> ReadContributionAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var account = await response.Content.ReadFromJsonAsync<JsonNode>(cancellationToken);
+
+        return account!["contribution"]?.Deserialize<ContributionView>(WebJson);
+    }
+
+    private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
 
     public static AddAssetRequest NewAccountlessCashRequest(Guid? accountId = null) => new()
     {

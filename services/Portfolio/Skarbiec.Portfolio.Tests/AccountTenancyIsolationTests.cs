@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
@@ -135,5 +136,24 @@ public sealed class AccountTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var assets = await owner.GetFromJsonAsync<List<AssetResponse>>(PortfolioApi.AssetsUri(accountId), cancellationToken);
         Assert.Empty(assets!);
+    }
+
+    [Fact]
+    public async Task ContributionLimit()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await owner.CreateAccountAsync(cancellationToken, "XTB IKE", wrapper: TaxWrapper.Ike);
+        await owner.SetContributionLimitAsync(accountId, 2026, 26_000m, cancellationToken);
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var set = await stranger.PutAsJsonAsync(ContributionLimitUri(accountId, 2026), new { amount = 1m }, cancellationToken);
+        var delete = await stranger.DeleteAsync(ContributionLimitUri(accountId, 2026), cancellationToken);
+        var read = await stranger.GetAsync(AccountContributionUri(accountId, 2026), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, set.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Equal(26_000m, (await owner.GetContributionAsync(accountId, 2026, cancellationToken))!.LimitPln);
     }
 }

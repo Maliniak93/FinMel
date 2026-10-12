@@ -14,6 +14,6 @@ public static class ListAccountsEndpoint
     }
 
     private static async Task<Ok<IReadOnlyList<AccountResponse>>> HandleAsync(
-        ListAccountsHandler handler, CancellationToken cancellationToken)
-        => TypedResults.Ok(await handler.HandleAsync(cancellationToken));
+        int? year, ListAccountsHandler handler, CancellationToken cancellationToken)
+        => TypedResults.Ok(await handler.HandleAsync(year, cancellationToken));
 }

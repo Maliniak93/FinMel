@@ -4,7 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
-import { restoreEnglish } from '../../../../testing/i18n';
+import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -13,6 +13,7 @@ import { formatMoney } from '../../../shared/format';
 import { jsonResponse, requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
 import { AccountTransferDialog } from '../account-transfer-dialog/account-transfer-dialog';
 import { CashOperationDialog } from '../cash-operation-dialog/cash-operation-dialog';
+import { ContributionLimitDialog } from '../contribution-limit-dialog/contribution-limit-dialog';
 import { AccountDetail } from './account-detail';
 
 const accountId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -299,5 +300,43 @@ describe('AccountDetail', () => {
     expect(action(/^deposit$/i).disabled).toBe(true);
     expect(action(/^withdraw$/i).disabled).toBe(true);
     expect(action(/^transfer$/i).disabled).toBe(true);
+  });
+
+  it('an IKE account shows the contributions of the year against its limit in a bar', async () => {
+    await setup({
+      wrapper: 1,
+      contribution: { year: 2026, contributedPln: 12000, limitPln: 26000 },
+    });
+    await switchLanguage(fixture, 'pl');
+
+    expect(text()).toContain('Wpłacono 12 000,00 / 26 000,00 zł w 2026');
+    expect(root().querySelector('[role="progressbar"]')).not.toBeNull();
+  });
+
+  it('an IKE account without a limit shows only the sum of the year and no bar', async () => {
+    await setup({
+      wrapper: 1,
+      contribution: { year: 2026, contributedPln: 12000, limitPln: null },
+    });
+    await switchLanguage(fixture, 'pl');
+
+    expect(text()).toContain('Wpłacono 12 000,00 zł w 2026');
+    expect(root().querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it('Limit wpłat opens the contribution limit dialog for this account and year', async () => {
+    await setup({
+      wrapper: 1,
+      contribution: { year: 2026, contributedPln: 12000, limitPln: 26000 },
+    });
+    await switchLanguage(fixture, 'pl');
+    dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+
+    action(/limit wpłat/i).click();
+    await fixture.whenStable();
+
+    const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data: unknown }];
+    expect(dialogType).toBe(ContributionLimitDialog);
+    expect(config.data).toMatchObject({ accountId, year: 2026, limitPln: 26000 });
   });
 });

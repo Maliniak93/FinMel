@@ -11,6 +11,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public Guid CurrentUserId => currentUser.UserId;
 
     public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<AccountContributionLimit> AccountContributionLimits => Set<AccountContributionLimit>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
@@ -36,6 +37,12 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             // Case-sensitive exact match on Postgres's default collation; the client trims before submit.
             account.HasIndex(a => new { a.UserId, a.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<AccountContributionLimit>(limit =>
+        {
+            limit.HasIndex(l => new { l.AccountId, l.Year }).IsUnique();
+            limit.Property(l => l.Amount).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Asset>(asset =>

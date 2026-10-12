@@ -835,6 +835,16 @@
       "nameTooLong": "Name is too long.",
       "duplicateName": "An account with this name already exists.",
       "fixedHint": "The type and tax wrapper can't be changed after the account is created."
+    },
+    "contribution": {
+      "withLimit": "Contributed {{ contributed }} / {{ limit }} PLN in {{ year }}",
+      "noLimit": "Contributed {{ contributed }} PLN in {{ year }}",
+      "action": "Contribution limit",
+      "year": "Year",
+      "amount": "Limit (PLN)",
+      "dialogTitle": "Contribution limit",
+      "yearInvalid": "Enter a year from 2000 to 2100.",
+      "remove": "Remove limit"
     }
   }
 }

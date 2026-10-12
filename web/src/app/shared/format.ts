@@ -30,6 +30,13 @@ export function formatMoneyCompact(
   }
 }
 
+export function formatAmount(amount: number | string): string {
+  return new Intl.NumberFormat(activeLocale(), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(amount));
+}
+
 export function formatQuantity(quantity: number | string): string {
   return new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 8 }).format(
     Number(quantity),
