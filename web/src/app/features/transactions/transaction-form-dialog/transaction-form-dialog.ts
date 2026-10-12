@@ -12,7 +12,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
-  getApiPortfolioCashAccounts,
+  getApiPortfolioAccountsById,
   getApiPortfolioTransferCandidates,
   postApiPortfolioAssetsByAssetIdTransactions,
   putApiPortfolioAssetsByAssetIdTransactionsById,
@@ -31,17 +31,20 @@ import { ASSET_CLASS } from '../../assets/asset-class';
 import {
   allowedTransactionTypes,
   isPricedTransactionType,
+  isSecurityAssetClass,
   quantityFieldLabel,
   TRANSACTION_TYPE_BUY,
   TRANSACTION_TYPE_DIVIDEND,
+  TRANSACTION_TYPE_INTEREST,
   TRANSACTION_TYPE_SELL,
   unitPriceFieldLabel,
 } from '../transaction-type';
 
-const METAL_CASH_CURRENCY = 'PLN';
+const CASH_CURRENCY = 'PLN';
 
 const CASH_ERROR_KEYS: Record<string, string> = {
   'Validation.InsufficientFunds': 'transactions.form.insufficientFunds',
+  'Validation.FxRateMissing': 'transactions.form.fxRateMissing',
   'Validation.InvalidTransferCounterpart': 'transactions.form.invalidCashAccount',
   'Conflict.TransferLegManaged': 'transactions.form.legManaged',
 };
@@ -56,6 +59,7 @@ export interface TransactionFormDialogData {
   assetId: string;
   assetClass: AssetClass;
   currency?: string;
+  accountId?: string | null;
   transaction?: TransactionResponse;
   type?: TransactionType;
 }
@@ -100,7 +104,13 @@ export class TransactionFormDialog {
       this.data.transaction ? fromDateOnly(this.data.transaction.date) : new Date(),
       [Validators.required],
     ],
-    cashAssetId: [this.data.transaction?.transfer?.counterpartAssetId ?? (null as string | null)],
+    feeAmount: [
+      this.data.transaction?.feeAmount != null
+        ? Number(this.data.transaction.feeAmount)
+        : (null as number | null),
+      [Validators.min(0)],
+    ],
+    cashAssetId: [null as string | null],
   });
 
   private readonly selectedType = toSignal(this.form.controls.type.valueChanges, {
@@ -112,37 +122,16 @@ export class TransactionFormDialog {
   );
   protected readonly unitPriceLabel = unitPriceFieldLabel(this.data.assetClass);
 
-  private readonly isSecurity =
-    this.data.assetClass === ASSET_CLASS.Stock || this.data.assetClass === ASSET_CLASS.Etf;
-  private readonly linkedTransfer = this.data.transaction?.transfer;
+  private readonly isSecurity = isSecurityAssetClass(this.data.assetClass);
 
-  // A new precious-metal trade or stock or ETF trade can move money through a Cash account; an edit only shows the account it is linked to.
-  private readonly offersCash = this.isEdit
-    ? this.isSecurity && !!this.linkedTransfer
-    : (this.isSecurity && !!this.data.currency) ||
-      this.data.assetClass === ASSET_CLASS.PreciousMetal;
+  // A new precious-metal trade can move money through a free Cash account.
+  private readonly offersCash = !this.isEdit && this.data.assetClass === ASSET_CLASS.PreciousMetal;
   protected readonly showsCash = computed(() => {
-    if (!this.offersCash) {
-      return false;
-    }
     const type = this.selectedType();
-    return (
-      type === TRANSACTION_TYPE_BUY ||
-      type === TRANSACTION_TYPE_SELL ||
-      (this.isSecurity && type === TRANSACTION_TYPE_DIVIDEND)
-    );
+    return this.offersCash && (type === TRANSACTION_TYPE_BUY || type === TRANSACTION_TYPE_SELL);
   });
-  protected readonly cashCurrency = this.isSecurity
-    ? (this.data.currency ?? METAL_CASH_CURRENCY)
-    : METAL_CASH_CURRENCY;
-  protected readonly cashHintKey = computed(() => {
-    if (!this.isSecurity) {
-      return 'transactions.form.cashAmountHint';
-    }
-    return this.selectedType() === TRANSACTION_TYPE_BUY
-      ? 'transactions.form.cashAmountTaken'
-      : 'transactions.form.cashAmountReceived';
-  });
+  protected readonly showsFee = computed(() => this.isSecurity && this.isPriced());
+  protected readonly cashCurrency = CASH_CURRENCY;
   protected readonly formatMoney = formatMoney;
 
   private readonly formValue = toSignal(
@@ -158,44 +147,78 @@ export class TransactionFormDialog {
     if (!values.cashAssetId || !Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
       return null;
     }
-    if (values.type === TRANSACTION_TYPE_DIVIDEND) {
-      return Math.round(quantity * 100) / 100;
-    }
     return Math.round(quantity * Math.round(unitPrice * 100)) / 100;
   });
 
   protected readonly cashCandidatesResource = resource({
-    params: () => (this.offersCash && !this.isEdit ? { currency: this.cashCurrency } : undefined),
+    params: () => (this.offersCash ? { currency: this.cashCurrency } : undefined),
     loader: async ({ params, abortSignal }): Promise<CashOption[]> => {
-      const failure = (error: unknown): Error =>
-        new Error(
-          readProblemDetails(error).detail ?? translate('transactions.form.cashAccountsLoadFailed'),
-        );
-
-      if (this.isSecurity) {
-        const result = await getApiPortfolioCashAccounts({ signal: abortSignal });
-        if (result.error) {
-          throw failure(result.error);
-        }
-        return (result.data?.accounts ?? []).filter(
-          (account) => account.currency === params.currency,
-        );
-      }
-
       const result = await getApiPortfolioTransferCandidates({
         query: { currency: params.currency, assetClass: ASSET_CLASS.Cash },
         signal: abortSignal,
       });
       if (result.error) {
-        throw failure(result.error);
+        throw new Error(
+          readProblemDetails(result.error).detail ??
+            translate('transactions.form.cashAccountsLoadFailed'),
+        );
       }
       return result.data ?? [];
     },
   });
 
+  protected readonly accountResource = resource({
+    params: () =>
+      this.isSecurity && !this.isEdit && this.data.accountId
+        ? { accountId: this.data.accountId }
+        : undefined,
+    loader: async ({ params, abortSignal }) => {
+      const result = await getApiPortfolioAccountsById({
+        path: { id: params.accountId },
+        signal: abortSignal,
+      });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('transactions.accountLoadFailed'),
+        );
+      }
+      return result.data;
+    },
+  });
+
+  // Display only, in whole grosze; the amount is known client-side only for a PLN security.
+  protected readonly accountCash = computed(() => {
+    if (!this.accountResource.hasValue()) {
+      return null;
+    }
+    const account = this.accountResource.value();
+    const values = this.formValue();
+    const type = Number(values.type);
+    const quantity = Number(values.quantity);
+    const unitPrice = Number(values.unitPrice);
+    const fee = Number(values.feeAmount ?? 0);
+    let amount: number | null = null;
+    if (type === TRANSACTION_TYPE_DIVIDEND || type === TRANSACTION_TYPE_INTEREST) {
+      amount = Math.round(quantity * 100) / 100;
+    } else if (this.data.currency === CASH_CURRENCY) {
+      const gross = Math.round(quantity * Math.round(unitPrice * 100));
+      const feeGrosze = Math.round(fee * 100);
+      amount = (type === TRANSACTION_TYPE_BUY ? gross + feeGrosze : gross - feeGrosze) / 100;
+    }
+    if (amount !== null && !Number.isFinite(amount)) {
+      amount = null;
+    }
+    const key =
+      amount === null
+        ? 'transactions.form.accountCashBalance'
+        : type === TRANSACTION_TYPE_BUY
+          ? 'transactions.form.accountCashTaken'
+          : 'transactions.form.accountCashReceived';
+    return { key, name: account.name, balance: account.cashBalance, amount };
+  });
+
   constructor() {
-    if (this.isEdit && this.offersCash) {
-      this.form.controls.cashAssetId.disable();
+    if (this.isEdit && this.isSecurity) {
       this.form.controls.type.disable();
     }
   }
@@ -214,11 +237,13 @@ export class TransactionFormDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
+    const feeAmount = this.showsFee() ? values.feeAmount : null;
     const body = {
       type: values.type,
       quantity: values.quantity,
       unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
       date: toDateOnly(values.date),
+      ...(feeAmount !== null ? { feeAmount } : {}),
     };
     const cashAssetId = this.showsCash() ? values.cashAssetId : null;
 

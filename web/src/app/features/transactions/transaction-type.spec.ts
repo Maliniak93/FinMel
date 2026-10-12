@@ -2,7 +2,7 @@ import { ASSET_CLASS } from '../assets/asset-class';
 import { allowedTransactionTypes, TRANSACTION_TYPES } from './transaction-type';
 
 describe('transaction-type', () => {
-  it('allowedTransactionTypes limits Cash, Deposit, Savings and Bond to Deposit/Withdraw and a precious metal to Buy/Sell', () => {
+  it('allowedTransactionTypes limits Cash, Deposit, Savings and Bond to Deposit/Withdraw, a precious metal to Buy/Sell and a stock or ETF to Buy/Sell/Dividend/Interest', () => {
     const cashLike: number[] = [
       ASSET_CLASS.Cash,
       ASSET_CLASS.Deposit,
@@ -19,7 +19,7 @@ describe('transaction-type', () => {
         expect(allowed).toEqual([TRANSACTION_TYPES[2], TRANSACTION_TYPES[3]]);
         expect(allowed.map((t) => t.value)).toEqual([2, 3]);
       } else {
-        expect(allowed).toEqual(TRANSACTION_TYPES);
+        expect(allowed.map((t) => t.value)).toEqual([0, 1, 4, 5]);
       }
     }
   });

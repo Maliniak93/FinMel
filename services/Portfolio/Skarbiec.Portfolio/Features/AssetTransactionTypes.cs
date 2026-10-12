@@ -9,12 +9,13 @@ public static class AssetTransactionTypes
 
     private static readonly TransactionType[] MetalTypes = [TransactionType.Buy, TransactionType.Sell];
 
-    private static readonly TransactionType[] AllTypes = Enum.GetValues<TransactionType>();
+    private static readonly TransactionType[] SecurityTypes =
+        [TransactionType.Buy, TransactionType.Sell, TransactionType.Dividend, TransactionType.Interest];
 
     public static IReadOnlyList<TransactionType> Allowed(AssetClass assetClass) =>
         assetClass == AssetClass.PreciousMetal ? MetalTypes
             : AssetValuationModes.CurrencyValuedClasses.Contains(assetClass) ? CashLikeTypes
-            : AllTypes;
+            : SecurityTypes;
 
     public static bool IsAllowed(AssetClass assetClass, TransactionType type) => Allowed(assetClass).Contains(type);
 }

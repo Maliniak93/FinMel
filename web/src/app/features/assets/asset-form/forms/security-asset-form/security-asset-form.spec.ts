@@ -140,6 +140,7 @@ describe('SecurityAssetForm', () => {
         'Type',
         'Quantity',
         'Unit price',
+        'Fee (PLN)',
         'Date',
         'Name is required.',
         'Quantity must not be negative.',

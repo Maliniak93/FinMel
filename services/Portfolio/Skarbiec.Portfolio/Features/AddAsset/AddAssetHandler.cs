@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Metals;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
+using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.AddAsset;
@@ -46,6 +47,19 @@ public sealed class AddAssetHandler(
         if (request.InitialTransaction is { } initial && !AssetTransactionTypes.IsAllowed(request.AssetClass, initial.Type))
         {
             return TransactionErrors.TypeNotAllowedForClass(initial.Type, request.AssetClass);
+        }
+
+        if (request.InitialTransaction is { } opening)
+        {
+            if (opening.CashAssetId is not null && BrokerageTrade.Applies(request.AssetClass))
+            {
+                return TransferErrors.CashLinkNotAllowed;
+            }
+
+            if (BrokerageTrade.FeeError(request.AssetClass, opening.Type, opening.FeeAmount) is { } feeError)
+            {
+                return feeError;
+            }
         }
 
         var account = await dbContext.ResolveAsync(request.AssetClass, request.AccountId, cancellationToken);
@@ -95,6 +109,7 @@ public sealed class AddAssetHandler(
 
         // Fully validated before anything is staged, so a failure leaves no half-created asset.
         Transaction? initialTransaction = null;
+        BrokerageLegs? brokerage = null;
         if (request.InitialTransaction is { } transactionRequest)
         {
             var unitPrice = Money.Create(transactionRequest.UnitPrice, asset.Currency);
@@ -109,7 +124,10 @@ public sealed class AddAssetHandler(
                 AssetId = asset.Id,
                 Type = transactionRequest.Type,
                 Quantity = transactionRequest.Quantity,
-                UnitPriceAmount = unitPrice.Value.Amount,
+                UnitPriceAmount = BrokerageTrade.Applies(asset.AssetClass)
+                    ? BrokerageTrade.SecurityUnitPrice(transactionRequest.Type, unitPrice.Value.Amount)
+                    : unitPrice.Value.Amount,
+                FeeAmount = transactionRequest.FeeAmount,
                 Date = transactionRequest.Date
             };
 
@@ -121,14 +139,28 @@ public sealed class AddAssetHandler(
             }
 
             // Resolved after every other check and before staging, so MarketData being down leaves no half-created asset.
-            var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(
-                asset.Currency, transactionRequest.Date, cancellationToken);
-            if (fxRateToPln.IsFailure)
+            if (BrokerageTrade.Applies(asset.AssetClass))
             {
-                return fxRateToPln.Error;
+                var planned = await dbContext.PlanAsync(fxRateLookupClient, asset, initialTransaction, cancellationToken);
+                if (planned.IsFailure)
+                {
+                    return planned.Error;
+                }
+
+                brokerage = planned.Value;
+            }
+            else
+            {
+                var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(
+                    asset.Currency, transactionRequest.Date, cancellationToken);
+                if (fxRateToPln.IsFailure)
+                {
+                    return fxRateToPln.Error;
+                }
+
+                initialTransaction.FxRateToPln = fxRateToPln.Value;
             }
 
-            initialTransaction.FxRateToPln = fxRateToPln.Value;
             asset.Quantity = recomputed.Value;
         }
 
@@ -141,6 +173,13 @@ public sealed class AddAssetHandler(
 
         // The initial transaction is already folded into asset.Quantity, so a consumer sees the real opening state.
         await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
+
+        if (brokerage is not null)
+        {
+            brokerage.Cash.Quantity = brokerage.CashQuantity;
+            dbContext.Transactions.Add(brokerage.CashLeg);
+            await positionEventPublisher.PublishChangedAsync(brokerage.Cash, cancellationToken);
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

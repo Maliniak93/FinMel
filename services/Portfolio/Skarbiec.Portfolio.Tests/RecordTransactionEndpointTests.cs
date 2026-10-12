@@ -33,9 +33,9 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var json = await response.ReadJsonAsync(cancellationToken);
-        json.AssertCarriesNoFee();
         var body = json.Deserialize<TransactionResponse>(JsonSerializerOptions.Web);
         Assert.NotNull(body);
+        Assert.Null(body.FeeAmount);
         Assert.Equal(TransactionType.Buy, body.Type);
         Assert.Equal(10m, body.Quantity);
         Assert.Equal(100m, body.UnitPrice);
@@ -55,9 +55,9 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "PLN");
         var request = new RecordTransactionRequest
         {
-            Type = TransactionType.Deposit,
-            Quantity = 1000m,
-            UnitPrice = 1m,
+            Type = TransactionType.Buy,
+            Quantity = 10m,
+            UnitPrice = 100m,
             Date = new DateOnly(2026, 3, 4)
         };
 
@@ -77,12 +77,12 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient.WithNotFound("EUR");
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "EUR");
+        var assetId = await client.AddCashAssetAsync(cancellationToken, currency: "EUR");
         var request = new RecordTransactionRequest
         {
-            Type = TransactionType.Buy,
-            Quantity = 2m,
-            UnitPrice = 50m,
+            Type = TransactionType.Deposit,
+            Quantity = 100m,
+            UnitPrice = 1m,
             Date = new DateOnly(2020, 1, 2)
         };
 
@@ -97,7 +97,7 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
 
         var listed = Assert.Single((await client.ListTransactionsAsync(assetId, cancellationToken)).Items);
         Assert.Null(listed.ValuePln);
-        Assert.Equal(2m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
+        Assert.Equal(100m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
     }
 
     [Fact]

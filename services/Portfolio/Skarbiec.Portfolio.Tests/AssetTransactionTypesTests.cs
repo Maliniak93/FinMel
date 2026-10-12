@@ -9,13 +9,14 @@ public sealed class AssetTransactionTypesTests
 
     private static readonly TransactionType[] MetalTypes = [TransactionType.Buy, TransactionType.Sell];
 
-    private static bool IsCashLike(AssetClass assetClass) =>
-        assetClass is AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.Bond;
+    private static readonly TransactionType[] SecurityTypes =
+        [TransactionType.Buy, TransactionType.Sell, TransactionType.Dividend, TransactionType.Interest];
 
     private static bool Expected(AssetClass assetClass, TransactionType type) => assetClass switch
     {
         AssetClass.PreciousMetal => MetalTypes.Contains(type),
-        _ => !IsCashLike(assetClass) || CashLikeTypes.Contains(type)
+        AssetClass.Stock or AssetClass.Etf => SecurityTypes.Contains(type),
+        _ => CashLikeTypes.Contains(type)
     };
 
     public static TheoryData<AssetClass, TransactionType, bool> FullMatrix()
@@ -58,8 +59,8 @@ public sealed class AssetTransactionTypesTests
     [Theory]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
-    public void Allowed_NonCashLikeClass_ReturnsEveryType(AssetClass assetClass)
+    public void Allowed_Security_ReturnsBuySellDividendAndInterest(AssetClass assetClass)
     {
-        Assert.Equal(Enum.GetValues<TransactionType>().Order(), AssetTransactionTypes.Allowed(assetClass).Order());
+        Assert.Equal(SecurityTypes.Order(), AssetTransactionTypes.Allowed(assetClass).Order());
     }
 }

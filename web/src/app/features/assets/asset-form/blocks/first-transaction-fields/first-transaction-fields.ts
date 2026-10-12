@@ -10,18 +10,20 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import type { RecordTransactionRequest } from '../../../../../api/portfolio';
 import { toDateOnly } from '../../../../../shared/date-only';
 import {
+  allowedTransactionTypes,
   isPricedTransactionType,
   quantityFieldLabel,
   TRANSACTION_TYPE_BUY,
   TRANSACTION_TYPE_DEPOSIT,
-  TRANSACTION_TYPES,
 } from '../../../../transactions/transaction-type';
+import { ASSET_CLASS } from '../../../asset-class';
 
 export function createFirstTransactionGroup(fb: FormBuilder, currencyValued = false) {
   const group = fb.nonNullable.group({
     type: [currencyValued ? TRANSACTION_TYPE_DEPOSIT : TRANSACTION_TYPE_BUY, [Validators.required]],
     quantity: [0, [Validators.min(0)]],
     unitPrice: [currencyValued ? 1 : 0, [Validators.min(0)]],
+    feeAmount: [null as number | null, [Validators.min(0)]],
     date: [new Date(), [Validators.required]],
   });
   group.disable();
@@ -38,11 +40,13 @@ export function buildInitialTransaction(
   }
 
   const values = group.getRawValue();
+  const priced = isPricedTransactionType(values.type);
   return {
     type: values.type,
     quantity: values.quantity,
-    unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
+    unitPrice: priced ? values.unitPrice : 1,
     date: toDateOnly(values.date),
+    ...(priced && values.feeAmount !== null ? { feeAmount: values.feeAmount } : {}),
   };
 }
 
@@ -64,7 +68,7 @@ export class FirstTransactionFields {
   readonly group = input.required<FirstTransactionGroup>();
   readonly openingDeposit = input(false);
 
-  protected readonly transactionTypes = TRANSACTION_TYPES;
+  protected readonly transactionTypes = allowedTransactionTypes(ASSET_CLASS.Stock);
   protected readonly isPriced = isPricedTransactionType;
   protected readonly quantityLabel = quantityFieldLabel;
 

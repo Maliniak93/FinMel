@@ -15,12 +15,14 @@ const BUY = 0;
 const SELL = 1;
 const WITHDRAW = 3;
 const DIVIDEND = 4;
+const INTEREST = 5;
 
 export const TRANSACTION_TYPE_BUY: TransactionType = BUY;
 export const TRANSACTION_TYPE_SELL: TransactionType = SELL;
 export const TRANSACTION_TYPE_DEPOSIT: TransactionType = 2;
 export const TRANSACTION_TYPE_WITHDRAW: TransactionType = WITHDRAW;
 export const TRANSACTION_TYPE_DIVIDEND: TransactionType = DIVIDEND;
+export const TRANSACTION_TYPE_INTEREST: TransactionType = INTEREST;
 
 const CASH_LIKE_CLASSES: readonly number[] = [
   ASSET_CLASS.Cash,
@@ -30,9 +32,22 @@ const CASH_LIKE_CLASSES: readonly number[] = [
 ];
 const CASH_LIKE_TYPES: readonly number[] = [TRANSACTION_TYPE_DEPOSIT, WITHDRAW];
 const METAL_TYPES: readonly number[] = [BUY, SELL];
+const SECURITY_TYPES: readonly number[] = [BUY, SELL, DIVIDEND, INTEREST];
 
 function isPreciousMetal(assetClass: AssetClass | undefined): boolean {
   return assetClass !== undefined && Number(assetClass) === ASSET_CLASS.PreciousMetal;
+}
+
+export function isSecurityAssetClass(assetClass: AssetClass | undefined): boolean {
+  return (
+    assetClass !== undefined &&
+    (Number(assetClass) === ASSET_CLASS.Stock || Number(assetClass) === ASSET_CLASS.Etf)
+  );
+}
+
+function isSecurityIncome(value: TransactionType, assetClass: AssetClass | undefined): boolean {
+  const type = Number(value);
+  return isSecurityAssetClass(assetClass) && (type === DIVIDEND || type === INTEREST);
 }
 
 export function allowedTransactionTypes(
@@ -41,9 +56,10 @@ export function allowedTransactionTypes(
   if (isPreciousMetal(assetClass)) {
     return TRANSACTION_TYPES.filter((t) => METAL_TYPES.includes(t.value));
   }
-  return CASH_LIKE_CLASSES.includes(Number(assetClass))
-    ? TRANSACTION_TYPES.filter((t) => CASH_LIKE_TYPES.includes(t.value))
-    : TRANSACTION_TYPES;
+  if (CASH_LIKE_CLASSES.includes(Number(assetClass))) {
+    return TRANSACTION_TYPES.filter((t) => CASH_LIKE_TYPES.includes(t.value));
+  }
+  return TRANSACTION_TYPES.filter((t) => SECURITY_TYPES.includes(t.value));
 }
 
 export function transactionTypeLabel(value: TransactionType): string {
@@ -61,7 +77,9 @@ export function isPricedTransactionType(value: TransactionType): boolean {
 // A precious metal's quantity is in pieces, priced per piece.
 export function quantityFieldLabel(value: TransactionType, assetClass?: AssetClass): string {
   if (!isPricedTransactionType(value)) {
-    return 'enums.quantityField.amount';
+    return isSecurityIncome(value, assetClass)
+      ? 'enums.quantityField.netAmountPln'
+      : 'enums.quantityField.amount';
   }
   return isPreciousMetal(assetClass)
     ? 'enums.quantityField.pieces'

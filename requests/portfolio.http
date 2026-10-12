@@ -903,7 +903,7 @@ Content-Type: application/json
   "cashAssetId": "{{addFundingCash.response.body.id}}"
 }
 
-### Add a PLN stock to trade through the Cash account
+### Add a PLN stock to trade through its account's cash (deposit into the account first)
 # @name addPlnStock
 POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
@@ -917,18 +917,69 @@ Content-Type: application/json
   "instrumentId": "{{addCustomInstrument.response.body.id}}"
 }
 
-### Buy 15 shares paid from the Cash account: a linked Cash Withdraw of round(quantity x unitPrice, 2); a Sell or Dividend pays into it
-# @name stockBuyWithCash
+### Buy 10 shares with a 3 zł fee: a linked Withdraw from the account's cash of round(quantity x unitPrice x rate, 2) + fee (400 Validation.InsufficientFunds when the cash would go negative on any day, 400 Validation.CashLinkNotAllowed with a cashAssetId)
+# @name stockBuy
 POST {{baseUrl}}/api/portfolio/assets/{{addPlnStock.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "type": 0,
-  "quantity": 15,
+  "type": "Buy",
+  "quantity": 10,
+  "unitPrice": 120.00,
+  "date": "2026-10-05",
+  "feeAmount": 3.00
+}
+
+### Sell 4 shares: a linked Deposit into the account's cash of the gross less the fee (400 Validation.FeeExceedsProceeds when the fee is higher)
+POST {{baseUrl}}/api/portfolio/assets/{{addPlnStock.response.body.id}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Sell",
+  "quantity": 4,
+  "unitPrice": 130.00,
+  "date": "2026-10-06",
+  "feeAmount": 3.00
+}
+
+### Buy 2 shares of the USD stock: the cash leg is a PLN Withdraw at the USDPLN rate of the day (400 Validation.FxRateMissing when MarketData has none that early)
+POST {{baseUrl}}/api/portfolio/assets/{{addMarketAsset.response.body.id}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Buy",
+  "quantity": 2,
+  "unitPrice": 100.00,
+  "date": "2026-10-05",
+  "feeAmount": 5.00
+}
+
+### Record a dividend: the quantity is the net PLN amount (unit price 1, FX 1), paid into the account's cash at any position size
+POST {{baseUrl}}/api/portfolio/assets/{{addPlnStock.response.body.id}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Dividend",
+  "quantity": 37.40,
+  "unitPrice": 1,
+  "date": "2026-10-07"
+}
+
+### Update the buy: the cash leg is resized and the rate re-frozen for the new date
+PUT {{baseUrl}}/api/portfolio/assets/{{addPlnStock.response.body.id}}/transactions/{{stockBuy.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Buy",
+  "quantity": 10,
   "unitPrice": 110.00,
   "date": "2026-10-05",
-  "cashAssetId": "{{addFundingCash.response.body.id}}"
+  "feeAmount": 3.00
 }
 
 ### Delete the funded buy: both legs go (409 Conflict.OversellsPosition if a later Sell needs its pieces)

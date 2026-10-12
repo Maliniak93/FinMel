@@ -38,27 +38,6 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return await client.AddMarketAssetAsync(accountId, cancellationToken, assetClass, currency, instrumentId, name);
     }
 
-    private protected async Task<PortfolioApi.CashAndEtf> CreateCashAndEtfAsync(
-        HttpClient client,
-        CancellationToken cancellationToken,
-        decimal cashBalance = 2_000m,
-        decimal etfQuantity = 0m,
-        string currency = "EUR")
-    {
-        var cashId = await client.AddCashAssetWithBalanceAsync(
-            cancellationToken, balance: cashBalance, currency: currency, name: "Broker cash");
-        var etfAccountId = await client.CreateAccountAsync(cancellationToken, "Brokerage");
-        var etfId = await AddQuotedHoldingAsync(
-            client, etfAccountId, cancellationToken, AssetClass.Etf, currency, name: "World ETF", ticker: "VWCE.DE");
-        if (etfQuantity > 0m)
-        {
-            await client.RecordTransactionAsync(
-                etfId, TransactionType.Buy, etfQuantity, PortfolioApi.DefaultTopUpDate.AddDays(1), cancellationToken, unitPrice: 100m);
-        }
-
-        return new PortfolioApi.CashAndEtf(cashId, etfAccountId, etfId);
-    }
-
     private protected async Task AssertFundedDepositUnchangedAsync(
         HttpClient client, Guid userId, PortfolioApi.FundedDeposit funded, CancellationToken cancellationToken)
     {

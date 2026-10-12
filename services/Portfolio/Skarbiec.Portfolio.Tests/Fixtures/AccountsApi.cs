@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.RecordTransaction;
+using Skarbiec.Portfolio.Features.Securities;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
@@ -35,9 +36,30 @@ internal static class AccountsApi
         return (await response.Content.ReadFromJsonAsync<AccountResponse>(cancellationToken))!.Id;
     }
 
+    public static readonly DateOnly FundingDay = new(2000, 1, 1);
+
+    public static readonly DateOnly DrainDay = new(2099, 12, 31);
+
+    // Covers any trade a generic test records; dated before every date those tests use.
+    public static async Task FundAccountAsync(
+        this HttpClient client, Guid accountId, CancellationToken cancellationToken, decimal amount = 1_000_000m)
+    {
+        var cashAssetId = await client.GetAccountCashAssetIdAsync(accountId, cancellationToken);
+        await client.RecordTransactionAsync(
+            cashAssetId, TransactionType.Deposit, amount, FundingDay, cancellationToken, unitPrice: 1m);
+    }
+
+    // An account archives only with its cash at zero, so the balance a test left behind is withdrawn first.
     public static async Task ArchiveAccountAsync(
         this HttpClient client, Guid accountId, CancellationToken cancellationToken)
     {
+        var account = await client.GetAccountAsync(accountId, cancellationToken);
+        if (account.CashBalance > 0m)
+        {
+            await client.RecordTransactionAsync(
+                account.CashAssetId, TransactionType.Withdraw, account.CashBalance, DrainDay, cancellationToken, unitPrice: 1m);
+        }
+
         var response = await client.PostAsync(ArchiveAccountUri(accountId), content: null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
@@ -72,6 +94,7 @@ internal static class AccountsApi
 
         if (quantity > 0m)
         {
+            await client.FundAccountAsync(accountId, cancellationToken, amount: quantity * 10m);
             await client.RecordTransactionAsync(
                 assetId, TransactionType.Buy, quantity, PortfolioApi.DefaultTopUpDate, cancellationToken);
         }
@@ -144,6 +167,69 @@ internal static class AccountsApi
     public static async Task<decimal> GetCashBalanceAsync(
         this HttpClient client, Guid accountId, CancellationToken cancellationToken) =>
         (await client.GetAccountAsync(accountId, cancellationToken)).CashBalance;
+
+    public sealed record BrokerageHolding(Guid AccountId, Guid CashAssetId, Guid AssetId);
+
+    public static async Task<BrokerageHolding> CreateBrokerageHoldingAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal cashBalance = 5_000m,
+        AssetClass assetClass = AssetClass.Etf,
+        string currency = "PLN",
+        string accountName = "XTB IKE",
+        DateOnly? depositedOn = null)
+    {
+        var (accountId, cashAssetId) = await client.CreateAccountWithCashAsync(
+            cancellationToken, cashBalance, accountName, depositedOn);
+        var assetId = await client.AddMarketAssetAsync(
+            accountId, cancellationToken, assetClass, currency, FakeInstrumentLookupClient.IdFor(assetClass, currency), "Holding");
+
+        return new BrokerageHolding(accountId, cashAssetId, assetId);
+    }
+
+    public static RecordTransactionRequest NewBrokerageTradeRequest(
+        TransactionType type = TransactionType.Buy,
+        decimal quantity = 10m,
+        decimal unitPrice = 120m,
+        DateOnly? date = null,
+        decimal? feeAmount = null,
+        Guid? cashAssetId = null) => new()
+        {
+            Type = type,
+            Quantity = quantity,
+            UnitPrice = unitPrice,
+            Date = date ?? CashDay1,
+            FeeAmount = feeAmount,
+            CashAssetId = cashAssetId
+        };
+
+    public static async Task<TransactionResponse> RecordBrokerageTradeAsync(
+        this HttpClient client,
+        Guid assetId,
+        CancellationToken cancellationToken,
+        TransactionType type = TransactionType.Buy,
+        decimal quantity = 10m,
+        decimal unitPrice = 120m,
+        DateOnly? date = null,
+        decimal? feeAmount = null)
+    {
+        var response = await client.PostAsJsonAsync(
+            PortfolioApi.TransactionsUri(assetId),
+            NewBrokerageTradeRequest(type, quantity, unitPrice, date, feeAmount),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!;
+    }
+
+    public static async Task<SecuritiesResponse> GetSecuritiesAsync(
+        this HttpClient client, AssetClass assetClass, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(PortfolioApi.AllSecuritiesUri(assetClass), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+    }
 
     public static AddAssetRequest NewAccountlessCashRequest(Guid? accountId = null) => new()
     {

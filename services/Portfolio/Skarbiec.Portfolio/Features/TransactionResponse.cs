@@ -18,6 +18,9 @@ public sealed record TransactionResponse
     /// <summary>Quantity × UnitPrice in PLN at the rate frozen on the transaction's date, rounded to 2 places; null when no rate was known.</summary>
     public decimal? ValuePln { get; init; }
 
+    /// <summary>The broker's fee in PLN on a stock or ETF Buy or Sell; null otherwise.</summary>
+    public decimal? FeeAmount { get; init; }
+
     public required DateOnly Date { get; init; }
 
     /// <summary>The counterpart of a transfer leg; null on an ordinary transaction.</summary>
@@ -48,6 +51,7 @@ public static class TransactionMappingExtensions
             ValuePln = transaction.FxRateToPln is { } rate
             ? Math.Round(transaction.Quantity * transaction.UnitPriceAmount * rate, 2, MidpointRounding.AwayFromZero)
             : null,
+            FeeAmount = transaction.FeeAmount,
             Date = transaction.Date,
             Transfer = transfer,
             SavingsInterestPeriodEnd = savingsInterestPeriodEnd,

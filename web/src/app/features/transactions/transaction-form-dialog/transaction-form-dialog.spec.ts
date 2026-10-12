@@ -135,7 +135,7 @@ describe('TransactionFormDialog', () => {
   });
 
   it('sends unit price 1 for a Deposit, where the unit-price field is hidden', async () => {
-    await setup({ assetId, assetClass });
+    await setup({ assetId, assetClass: ASSET_CLASS.Cash });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction, type: 2 }, 201));
 
     component['form'].controls.type.setValue(2);
@@ -155,14 +155,7 @@ describe('TransactionFormDialog', () => {
   it('offers no Fee type', async () => {
     await setup({ assetId, assetClass });
 
-    expect(await typeOptionLabels()).toEqual([
-      'Buy',
-      'Sell',
-      'Deposit',
-      'Withdraw',
-      'Dividend',
-      'Interest',
-    ]);
+    expect(await typeOptionLabels()).toEqual(['Buy', 'Sell', 'Dividend', 'Interest']);
     expect(Object.keys(component['form'].controls)).not.toContain('fee');
 
     const element = fixture.nativeElement as HTMLElement;
@@ -199,18 +192,11 @@ describe('TransactionFormDialog', () => {
     expect(component['form'].controls.type.value).toBe(3);
   });
 
-  it('offers all six types and starts on Buy for a market asset (ETF)', async () => {
+  it('offers Buy, Sell, Dividend and Interest and starts on Buy for a market asset (ETF)', async () => {
     await setup({ assetId, assetClass: ASSET_CLASS.Etf });
 
     expect(component['form'].controls.type.value).toBe(0);
-    expect(await typeOptionLabels()).toEqual([
-      'Buy',
-      'Sell',
-      'Deposit',
-      'Withdraw',
-      'Dividend',
-      'Interest',
-    ]);
+    expect(await typeOptionLabels()).toEqual(['Buy', 'Sell', 'Dividend', 'Interest']);
   });
 
   it('keeps the stored type when editing a Cash asset transaction', async () => {
@@ -330,6 +316,7 @@ describe('TransactionFormDialog', () => {
       'Type',
       'Quantity',
       'Unit price',
+      'Fee (PLN)',
       'Date',
       'Quantity must not be negative.',
       'Unit price must not be negative.',
@@ -460,53 +447,39 @@ describe('TransactionFormDialog', () => {
     });
   });
 
-  describe('Cash account for a stock or ETF', () => {
+  describe('Brokerage trade for a stock or ETF', () => {
     const etfAssetId = '66666666-6666-6666-6666-666666666666';
-    const eurCashId = '77777777-7777-7777-7777-777777777777';
-    const plnCashId = '88888888-8888-8888-8888-888888888888';
+    const accountId = '77777777-7777-7777-7777-777777777777';
     const etfData: TransactionFormDialogData = {
       assetId: etfAssetId,
       assetClass: ASSET_CLASS.Etf,
-      currency: 'EUR',
+      currency: 'PLN',
+      accountId,
     };
 
     function respond(request: Request): Response {
-      if (request.url.includes('/cash-accounts')) {
+      if (request.url.includes(`/accounts/${accountId}`)) {
         return jsonResponse({
-          accounts: [
-            {
-              assetId: eurCashId,
-              name: 'Broker cash',
-              currency: 'EUR',
-              balance: 2000,
-            },
-            {
-              assetId: plnCashId,
-              name: 'Zloty cash',
-              currency: 'PLN',
-              balance: 9000,
-            },
-          ],
-          totals: [],
+          id: accountId,
+          name: 'XTB IKE',
+          type: 0,
+          wrapper: 1,
+          isArchived: false,
+          cashAssetId: '88888888-8888-8888-8888-888888888888',
+          cashBalance: 5000,
         });
       }
       return jsonResponse({ ...existingTransaction, assetId: etfAssetId }, 201);
     }
 
-    function cashSelect(): HTMLElement | null {
-      return (fixture.nativeElement as HTMLElement).querySelector(
-        'mat-select[formcontrolname="cashAssetId"]',
-      );
-    }
-
-    async function cashOptionLabels(): Promise<string[]> {
-      cashSelect()?.querySelector<HTMLElement>('.mat-mdc-select-trigger')?.click();
+    async function render(data: TransactionFormDialogData): Promise<void> {
+      await setup(data, respond);
       fixture.detectChanges();
       await fixture.whenStable();
-      return Array.from(
-        TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-option'),
-        (option) => (option.textContent ?? '').trim(),
-      );
+    }
+
+    function element(): HTMLElement {
+      return fixture.nativeElement as HTMLElement;
     }
 
     function postedTransaction(): Request | undefined {
@@ -517,102 +490,110 @@ describe('TransactionFormDialog', () => {
         );
     }
 
-    it('offers only Cash accounts in the asset currency, shows the amount to be taken and sends cashAssetId', async () => {
-      await setup(etfData, respond);
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(cashSelect()).not.toBeNull();
-      expect(
-        fetchSpy.mock.calls.some((call: unknown[]) =>
-          (call[0] as Request).url.includes('/cash-accounts'),
-        ),
-      ).toBe(true);
-      const labels = await cashOptionLabels();
-      expect(labels).toHaveLength(2);
-      expect(labels.some((label) => label.includes('Broker cash'))).toBe(true);
-      expect(labels.some((label) => label.includes('Zloty cash'))).toBe(false);
-
-      component['form'].controls.quantity.setValue(15);
-      component['form'].controls.unitPrice.setValue(110);
-      component['form'].controls.cashAssetId.setValue(eurCashId);
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-      expect(text).toContain('1,650.00');
-      expect(text).toContain('€');
-
+    async function submitRejected(errorCode: string): Promise<void> {
+      await render(etfData);
+      fetchSpy.mockResolvedValue(jsonResponse({ detail: 'Rejected.', errorCode }, 400));
+      component['form'].controls.quantity.setValue(10);
+      component['form'].controls.unitPrice.setValue(120);
+      await switchLanguage(fixture, 'pl');
       await component['onSubmit']();
+    }
 
-      const post = postedTransaction();
-      expect(post).toBeDefined();
-      const body = await post!.json();
-      expect(body.cashAssetId).toBe(eurCashId);
-      expect(dialogRef.close).toHaveBeenCalledWith(true);
-    });
+    it('Buy shows a fee field and the account-cash hint, has no cash select, and sends feeAmount', async () => {
+      await render(etfData);
 
-    it('offers the select for a Sell and a Dividend but not for a Deposit', async () => {
-      await setup({ ...etfData, type: 4 }, respond);
+      component['form'].controls.quantity.setValue(10);
+      component['form'].controls.unitPrice.setValue(120);
+      component['form'].controls.feeAmount.setValue(3);
       fixture.detectChanges();
       await fixture.whenStable();
-      expect(cashSelect()).not.toBeNull();
 
-      component['form'].controls.type.setValue(1);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      expect(cashSelect()).not.toBeNull();
-
-      component['form'].controls.type.setValue(2);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      expect(cashSelect()).toBeNull();
-    });
-
-    it('omits cashAssetId while no account is chosen', async () => {
-      await setup(etfData, respond);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      component['form'].controls.quantity.setValue(1);
-      component['form'].controls.unitPrice.setValue(100);
+      expect(element().querySelector('mat-select[formcontrolname="cashAssetId"]')).toBeNull();
+      expect(element().querySelector('[formcontrolname="feeAmount"]')).not.toBeNull();
+      const text = element().textContent ?? '';
+      expect(text).toContain('XTB IKE');
+      expect(text).toContain('1,203.00');
+      expect(text).toContain('5,000.00');
 
       await component['onSubmit']();
 
       const body = await postedTransaction()!.json();
+      expect(body.feeAmount).toBe(3);
       expect(body.cashAssetId ?? null).toBeNull();
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
-    it('shows the linked account read-only when editing a linked transaction', async () => {
-      const linked: TransactionResponse = {
+    it('does not request the free Cash accounts of a stock or ETF', async () => {
+      await render(etfData);
+
+      expect(
+        fetchSpy.mock.calls.some((call: unknown[]) =>
+          (call[0] as Request).url.includes('/cash-accounts'),
+        ),
+      ).toBe(false);
+    });
+
+    it('labels the fee field "Prowizja (PLN)" in Polish', async () => {
+      await render(etfData);
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(labelsOf(element(), 'mat-label')).toContain('Prowizja (PLN)');
+    });
+
+    it('Dividend shows one "Kwota netto (PLN)" field and no fee, price or cash select', async () => {
+      await render({ ...etfData, type: 4 });
+
+      await switchLanguage(fixture, 'pl');
+
+      expect(labelsOf(element(), 'mat-label')).toContain('Kwota netto (PLN)');
+      expect(element().querySelector('[formcontrolname="feeAmount"]')).toBeNull();
+      expect(element().querySelector('[formcontrolname="unitPrice"]')).toBeNull();
+      expect(element().querySelector('mat-select[formcontrolname="cashAssetId"]')).toBeNull();
+
+      component['form'].controls.quantity.setValue(37.4);
+      await component['onSubmit']();
+
+      const body = await postedTransaction()!.json();
+      expect(body.quantity).toBe(37.4);
+      expect(body.unitPrice).toBe(1);
+      expect(body.feeAmount ?? null).toBeNull();
+    });
+
+    it('shows "Brak środków na rachunku" for Validation.InsufficientFunds', async () => {
+      await submitRejected('Validation.InsufficientFunds');
+
+      expect(component['formError']()).toBe('Brak środków na rachunku');
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('shows "Brak kursu waluty z tego dnia" for Validation.FxRateMissing', async () => {
+      await submitRejected('Validation.FxRateMissing');
+
+      expect(component['formError']()).toBe('Brak kursu waluty z tego dnia');
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('pre-fills the fee when editing a Buy and sends it back', async () => {
+      const buy: TransactionResponse = {
         ...existingTransaction,
         assetId: etfAssetId,
-        transfer: {
-          transferId: '99999999-9999-9999-9999-999999999999',
-          manual: false,
-          counterpartAssetId: eurCashId,
-          counterpartAssetName: 'Broker cash',
-          counterpartAccountName: 'Main',
-          direction: 0,
-        },
+        currency: 'PLN',
+        feeAmount: 3,
       };
-      await setup({ ...etfData, transaction: linked }, respond);
-      fixture.detectChanges();
-      await fixture.whenStable();
+      await render({ ...etfData, transaction: buy });
+      fetchSpy.mockResolvedValue(jsonResponse(buy));
 
-      const select = cashSelect();
-      expect(select).not.toBeNull();
-      expect(component['form'].controls.cashAssetId.disabled).toBe(true);
-      expect(select?.textContent).toContain('Broker cash');
+      expect(component['form'].controls.feeAmount.value).toBe(3);
 
-      fetchSpy.mockResolvedValue(jsonResponse(linked));
+      component['form'].controls.feeAmount.setValue(4);
       await component['onSubmit']();
 
       const put = fetchSpy.mock.calls
         .map((call: unknown[]) => call[0] as Request)
         .find((request: Request) => request.method === 'PUT');
-      expect(put).toBeDefined();
       const body = await put!.json();
-      expect(body.cashAssetId ?? null).toBeNull();
+      expect(body.feeAmount).toBe(4);
     });
   });
 });

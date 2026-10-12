@@ -107,13 +107,13 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
             return cashReadOnly;
         }
 
-        var securityQuantity = await RecomputeWithoutAsync(transaction, cancellationToken);
+        var securityQuantity = await RecomputeWithoutAsync(transaction, TransactionErrors.MutationBreaksHistory, cancellationToken);
         if (securityQuantity.IsFailure)
         {
             return securityQuantity.Error;
         }
 
-        var cashQuantity = await RecomputeWithoutAsync(cashLeg, cancellationToken);
+        var cashQuantity = await RecomputeWithoutAsync(cashLeg, _ => TransferErrors.InsufficientFunds, cancellationToken);
         if (cashQuantity.IsFailure)
         {
             return cashQuantity.Error;
@@ -138,13 +138,14 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         return Result.Success();
     }
 
-    private async Task<Result<decimal>> RecomputeWithoutAsync(Transaction leg, CancellationToken cancellationToken)
+    private async Task<Result<decimal>> RecomputeWithoutAsync(
+        Transaction leg, Func<TransactionType, Error> oversellError, CancellationToken cancellationToken)
     {
         var remaining = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => t.AssetId == leg.AssetId && t.Id != leg.Id)
             .ToListAsync(cancellationToken);
 
-        return TransactionQuantityCalculator.Recompute(remaining, TransactionErrors.MutationBreaksHistory);
+        return TransactionQuantityCalculator.Recompute(remaining, oversellError);
     }
 }

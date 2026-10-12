@@ -24,6 +24,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken, name: "Main");
+        await client.FundAccountAsync(accountId, cancellationToken);
         var euroEtf = await AddQuotedHoldingAsync(
             client, accountId, cancellationToken, AssetClass.Etf, "EUR", "A ETF", "VWCE", 120m, "XETRA", new DateOnly(2026, 1, 30));
         await client.RecordTransactionAsync(euroEtf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 10), cancellationToken, unitPrice: 100m);
@@ -80,6 +81,8 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var firstAccount = await client.CreateAccountAsync(cancellationToken, name: "First");
         var secondAccount = await client.CreateAccountAsync(cancellationToken, name: "Second");
+        await client.FundAccountAsync(firstAccount, cancellationToken);
+        await client.FundAccountAsync(secondAccount, cancellationToken);
         var euro = await AddQuotedHoldingAsync(client, firstAccount, cancellationToken, currency: "EUR", name: "Euro stock", ticker: "SAP");
         var dollar = await AddQuotedHoldingAsync(client, firstAccount, cancellationToken, currency: "USD", name: "Dollar stock", ticker: "AAPL");
         var zloty = await AddQuotedHoldingAsync(client, secondAccount, cancellationToken, currency: "PLN", name: "Zloty stock", ticker: "CDR");
@@ -105,6 +108,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         Factory.InstrumentQuoteLookupClient.WithRate("USD", 4.00m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var noQuote = await AddQuotedHoldingAsync(
             client, accountId, cancellationToken, currency: "USD", name: "A no quote", ticker: "NOQ", lastPrice: null);
         var noRate = await AddQuotedHoldingAsync(
@@ -151,6 +155,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
         Factory.InstrumentQuoteLookupClient.WithUnavailable();
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var first = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "First", ticker: "ONE");
         var second = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "Second", ticker: "TWO");
         await client.RecordTransactionAsync(first, TransactionType.Buy, 4m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 25m);

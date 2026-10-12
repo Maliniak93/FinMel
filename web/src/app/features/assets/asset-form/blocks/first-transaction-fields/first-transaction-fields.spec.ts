@@ -11,7 +11,6 @@ import {
 } from '../../../../../../testing/i18n';
 import {
   findControl,
-  hasControl,
   showValidationErrors,
   toggleFirstTransaction,
 } from '../../testing/asset-form-fixtures';
@@ -137,16 +136,64 @@ describe('FirstTransactionFields', () => {
     });
   });
 
-  it('has no fee control', async () => {
+  it('Buy shows the optional fee field and builds feeAmount', async () => {
     await setup();
 
     await toggleFirstTransaction(fixture);
+    findControl(group, 'type').setValue(0);
+    findControl(group, 'quantity').setValue(10);
+    findControl(group, 'unitPrice').setValue(120);
+    findControl(group, 'date').setValue(new Date(2026, 9, 12));
+    findControl(group, 'feeAmount').setValue(3);
 
-    expect(hasControl(group, 'fee')).toBe(false);
     expect(
-      (fixture.nativeElement as HTMLElement).querySelector('[formcontrolname="fee"]'),
+      (fixture.nativeElement as HTMLElement).querySelector('[formcontrolname="feeAmount"]'),
+    ).not.toBeNull();
+    expect(buildInitialTransaction(group)).toEqual({
+      type: 0,
+      quantity: 10,
+      unitPrice: 120,
+      date: '2026-10-12',
+      feeAmount: 3,
+    });
+  });
+
+  it('an empty fee is not sent', async () => {
+    await setup();
+
+    await toggleFirstTransaction(fixture);
+    findControl(group, 'quantity').setValue(10);
+    findControl(group, 'unitPrice').setValue(120);
+
+    expect(buildInitialTransaction(group)?.feeAmount ?? null).toBeNull();
+  });
+
+  it('a Dividend hides the fee field and sends no fee', async () => {
+    await setup();
+
+    await toggleFirstTransaction(fixture);
+    findControl(group, 'type').setValue(4);
+    findControl(group, 'quantity').setValue(37.4);
+    findControl(group, 'feeAmount').setValue(3);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[formcontrolname="feeAmount"]'),
+    ).toBeNull();
+    expect(buildInitialTransaction(group)?.feeAmount ?? null).toBeNull();
+  });
+
+  it('openingDeposit has no fee field', async () => {
+    await setup({ openingDeposit: true });
+
+    await toggleFirstTransaction(fixture);
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[formcontrolname="feeAmount"]'),
     ).toBeNull();
   });
+
   describe('in Polish', () => {
     it('renders in Polish', async () => {
       await setup();
@@ -155,7 +202,10 @@ describe('FirstTransactionFields', () => {
       const texts = () => [...labelsOf(element, 'mat-checkbox'), ...labelsOf(element, 'mat-label')];
 
       const english = texts();
-      expect(english).toEqual(['Add first transaction', 'Type', 'Quantity', 'Unit price', 'Date']);
+      expect(english).toContain('Fee (PLN)');
+      expect(english).toEqual(
+        expect.arrayContaining(['Add first transaction', 'Type', 'Quantity', 'Unit price', 'Date']),
+      );
 
       await switchLanguage(fixture, 'pl');
 

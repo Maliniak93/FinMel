@@ -124,8 +124,9 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         Guid cashId, brokerageId, stockId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
             brokerageId = await CreateAccountAsync(arrange.ServiceProvider, "Brokerage", cancellationToken);
+            await FundAccountCashAsync(arrange.ServiceProvider, brokerageId, cancellationToken, amount: 5_000m);
+            cashId = (await LoadAccountCashAsync(arrange.ServiceProvider, brokerageId, cancellationToken)).Id;
             stockId = await AddStockAsync(arrange.ServiceProvider, brokerageId, "Shares", cancellationToken);
         }
 
@@ -135,7 +136,10 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<RecordTransactionHandler>()
-                .HandleAsync(stockId, PortfolioApi.NewTradeRequest(cashId), cancellationToken);
+                .HandleAsync(
+                    stockId,
+                    new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 15m, UnitPrice = 110m, Date = AccountsApi.CashDay1 },
+                    cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -150,7 +154,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         Assert.Equal(brokerageId, stockEvent.AccountId);
         var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
         Assert.Equal(3_350m, cashEvent.Quantity);
-        Assert.Null(cashEvent.AccountId);
+        Assert.Equal(brokerageId, cashEvent.AccountId);
         var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
         Assert.Single(legs.Select(t => t.TransferId).Distinct());

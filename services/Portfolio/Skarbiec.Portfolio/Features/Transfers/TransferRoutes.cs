@@ -42,7 +42,7 @@ public static class TransferRoutes
         [(AssetClass.Cash, AssetClass.PreciousMetal)] = Access.Delete,
         [(AssetClass.PreciousMetal, AssetClass.Cash)] = Access.Delete,
 
-        // A stock or ETF Buy paid from cash and a Sell or Dividend paid into it, through RecordTransaction's cashAssetId; changed through the stock's own transaction.
+        // A stock or ETF trade, dividend or interest settles only in its own account's cash, written by RecordTransaction and AddAsset; changed through the security's own transaction.
         [(AssetClass.Cash, AssetClass.Stock)] = Access.None,
         [(AssetClass.Cash, AssetClass.Etf)] = Access.None,
         [(AssetClass.Stock, AssetClass.Cash)] = Access.None,

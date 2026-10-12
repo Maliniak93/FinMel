@@ -336,6 +336,7 @@ export type RecordTransactionRequest = {
     unitPrice: number | string;
     date: string;
     cashAssetId?: null | string;
+    feeAmount?: null | number | string;
 };
 
 export type RedeemBondEarlyRequest = {
@@ -472,6 +473,7 @@ export type TransactionResponse = {
     unitPrice: number | string;
     currency: string;
     valuePln?: null | number | string;
+    feeAmount?: null | number | string;
     date: string;
     transfer?: null | TransactionTransferResponse;
     savingsInterestPeriodEnd?: null | string;
@@ -554,6 +556,7 @@ export type UpdateTransactionRequest = {
     quantity?: number | string;
     unitPrice: number | string;
     date: string;
+    feeAmount?: null | number | string;
 };
 
 export type WeightUnit = 'Gram' | 'TroyOunce';

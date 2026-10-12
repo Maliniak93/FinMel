@@ -49,6 +49,11 @@ public sealed class UpdateTransactionHandler(
             return TransactionErrors.NotFound(id);
         }
 
+        if (BrokerageTrade.FeeError(asset.AssetClass, request.Type, request.FeeAmount) is { } feeError)
+        {
+            return feeError;
+        }
+
         // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
@@ -154,25 +159,14 @@ public sealed class UpdateTransactionHandler(
             return unitPrice.Error;
         }
 
-        var securityUnitPrice = TransferLegs.SecurityUnitPrice(request.Type, unitPrice.Value.Amount);
         var candidate = new Transaction
         {
             Id = transaction.Id,
             AssetId = asset.Id,
             Type = request.Type,
             Quantity = request.Quantity,
-            UnitPriceAmount = securityUnitPrice,
-            Date = request.Date
-        };
-
-        var cashAmount = TransferLegs.TradeCashAmount(request.Type, request.Quantity, securityUnitPrice);
-        var cashCandidate = new Transaction
-        {
-            Id = cashLeg.Id,
-            AssetId = cash.Id,
-            Type = cashLeg.Type,
-            Quantity = cashAmount,
-            UnitPriceAmount = 1m,
+            UnitPriceAmount = BrokerageTrade.SecurityUnitPrice(request.Type, unitPrice.Value.Amount),
+            FeeAmount = request.FeeAmount,
             Date = request.Date
         };
 
@@ -182,24 +176,44 @@ public sealed class UpdateTransactionHandler(
             return securityQuantity.Error;
         }
 
-        var cashQuantity = await RecomputeWithAsync(cash.Id, cashCandidate, _ => TransferErrors.InsufficientFunds, cancellationToken);
-        if (cashQuantity.IsFailure)
-        {
-            return cashQuantity.Error;
-        }
-
-        var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
+        // Re-resolved on every update so the stored rate always matches the current date.
+        var fxRateToPln = await fxRateLookupClient.ResolveRateAsync(asset.Currency, request.Type, request.Date, cancellationToken);
         if (fxRateToPln.IsFailure)
         {
             return fxRateToPln.Error;
         }
 
+        candidate.FxRateToPln = fxRateToPln.Value;
+
+        var cashAmount = BrokerageTrade.CashAmount(candidate);
+        if (cashAmount.IsFailure)
+        {
+            return cashAmount.Error;
+        }
+
+        var cashCandidate = new Transaction
+        {
+            Id = cashLeg.Id,
+            AssetId = cash.Id,
+            Type = cashLeg.Type,
+            Quantity = cashAmount.Value,
+            UnitPriceAmount = 1m,
+            Date = request.Date
+        };
+
+        var cashQuantity = await dbContext.ReplayCashAsync(cash.Id, cashCandidate, cancellationToken);
+        if (cashQuantity.IsFailure)
+        {
+            return cashQuantity.Error;
+        }
+
         transaction.Quantity = candidate.Quantity;
         transaction.UnitPriceAmount = candidate.UnitPriceAmount;
-        transaction.FxRateToPln = fxRateToPln.Value;
+        transaction.FeeAmount = candidate.FeeAmount;
+        transaction.FxRateToPln = candidate.FxRateToPln;
         transaction.Date = candidate.Date;
-        cashLeg.Quantity = cashAmount;
-        cashLeg.FxRateToPln = fxRateToPln.Value;
+        cashLeg.Quantity = cashAmount.Value;
+        cashLeg.FxRateToPln = 1m;
         cashLeg.Date = request.Date;
         asset.Quantity = securityQuantity.Value;
         cash.Quantity = cashQuantity.Value;

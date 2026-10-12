@@ -14,6 +14,9 @@ public sealed record RecordTransactionRequest
 
     public required DateOnly Date { get; init; }
 
-    /// <summary>A Cash account in the asset's currency paying for a stock, ETF or precious-metal Buy, or receiving a Sell's proceeds or a stock or ETF Dividend.</summary>
+    /// <summary>A Cash account in the asset's currency paying for a precious-metal Buy or receiving its Sell's proceeds; a stock or ETF always settles in its account's cash.</summary>
     public Guid? CashAssetId { get; init; }
+
+    /// <summary>The broker's fee in PLN on a stock or ETF Buy or Sell; omitted when there is none.</summary>
+    public decimal? FeeAmount { get; init; }
 }

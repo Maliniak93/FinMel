@@ -27,7 +27,7 @@ import {
   TransactionFormDialog,
   type TransactionFormDialogData,
 } from './transaction-form-dialog/transaction-form-dialog';
-import { transactionTypeLabel } from './transaction-type';
+import { isSecurityAssetClass, transactionTypeLabel } from './transaction-type';
 import { transferLabel } from './transfer-direction';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -116,12 +116,18 @@ export class Transactions {
     () => this.isArchived() || this.isAssetArchived() || this.isTermDeposit(),
   );
 
+  protected readonly isSecurity = computed(
+    () =>
+      this.assetResource.hasValue() && isSecurityAssetClass(this.assetResource.value().assetClass),
+  );
+
   protected readonly displayedColumns = computed(() => [
     'date',
     'type',
     'quantity',
     'currency',
     'value',
+    ...(this.isSecurity() ? ['fee'] : []),
     ...(this.isReadOnly() ? [] : ['actions']),
   ]);
 
@@ -173,10 +179,12 @@ export class Transactions {
     if (!this.assetResource.hasValue()) {
       return null;
     }
+    const asset = this.assetResource.value();
     return {
       assetId: this.assetId(),
-      assetClass: this.assetResource.value().assetClass,
-      currency: this.assetResource.value().currency,
+      assetClass: asset.assetClass,
+      currency: asset.currency,
+      ...(this.isSecurity() ? { accountId: asset.accountId } : {}),
     };
   }
 
