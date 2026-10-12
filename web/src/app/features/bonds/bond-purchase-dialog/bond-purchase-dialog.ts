@@ -1,12 +1,6 @@
 import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-  type AbstractControl,
-  type ValidationErrors,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -20,11 +14,9 @@ import { map } from 'rxjs';
 import { getApiMarketdataBondSeries, type BondSeriesListItem } from '../../../api/marketdata';
 import {
   getApiPortfolioAccounts,
-  getApiPortfolioTransferCandidates,
   postApiPortfolioBonds,
   putApiPortfolioBondsByAssetId,
   type BondResponse,
-  type TransferCandidateResponse,
   type TreasuryBondType,
   type UpdateBondRequest,
 } from '../../../api/portfolio';
@@ -36,7 +28,6 @@ import {
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
 import { ACCOUNT_TYPE } from '../../accounts/account-type';
-import { ASSET_CLASS } from '../../assets/asset-class';
 import { BOND_TYPES, bondTypeInfo } from '../bond-types';
 
 export interface BondPurchaseDialogData {
@@ -90,25 +81,10 @@ export class BondPurchaseDialog {
   private pendingSeriesCode = this.data.seriesCode ?? null;
   private prefilledName: string | null = null;
 
-  private readonly costWithinBalance = (control: AbstractControl): ValidationErrors | null => {
-    const fundingAssetId = control.value as string | null;
-    if (!fundingAssetId) {
-      return null;
-    }
-    const source = this.fundingSource(fundingAssetId);
-    const costInGrosze = this.costInGrosze(control.parent?.getRawValue());
-    if (!source || costInGrosze === null) {
-      return null;
-    }
-    return costInGrosze > Math.round(Number(source.balance) * 100)
-      ? { exceedsBalance: { balance: source.balance } }
-      : null;
-  };
-
   protected readonly form = this.formBuilder.group({
     series: [null as string | null],
     accountId: this.formBuilder.nonNullable.control(
-      { value: this.data.accountId ?? '', disabled: this.isEdit },
+      { value: this.data.accountId ?? this.bond?.accountId ?? '', disabled: this.isEdit },
       [Validators.required],
     ),
     name: this.formBuilder.nonNullable.control(this.bond?.name ?? '', [
@@ -147,10 +123,6 @@ export class BondPurchaseDialog {
       (this.bond ? Number(this.bond.earlyRedemptionFeePerBond) : null) as number | null,
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
-    fundingAssetId: [
-      { value: null as string | null, disabled: this.isEdit },
-      [this.costWithinBalance],
-    ],
   });
 
   private readonly formValue = toSignal(
@@ -188,7 +160,7 @@ export class BondPurchaseDialog {
   });
 
   protected readonly accountsResource = resource({
-    params: () => (this.choosesAccount ? {} : undefined),
+    params: () => (this.isEdit ? undefined : {}),
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioAccounts({ signal: abortSignal });
       if (result.error) {
@@ -202,31 +174,19 @@ export class BondPurchaseDialog {
     },
   });
 
-  protected readonly fundingCandidatesResource = resource({
-    params: () => (this.isEdit ? undefined : { currency: BOND_CURRENCY }),
-    loader: async ({ params, abortSignal }) => {
-      const result = await getApiPortfolioTransferCandidates({
-        query: { currency: params.currency, assetClass: ASSET_CLASS.Cash },
-        signal: abortSignal,
-      });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ?? translate('bonds.purchase.fundingLoadFailed'),
-        );
-      }
-      return result.data ?? [];
-    },
+  protected readonly accountCash = computed(() => {
+    if (!this.accountsResource.hasValue()) {
+      return null;
+    }
+    const accountId = this.formValue().accountId;
+    const account = this.accountsResource.value().find((candidate) => candidate.id === accountId);
+    return account
+      ? { name: account.name, balance: account.cashBalance, amount: this.cost() }
+      : null;
   });
 
   constructor() {
     const controls = this.form.controls;
-    controls.fundingAssetId.updateValueAndValidity({ emitEvent: false });
-    controls.bondCount.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe(() => controls.fundingAssetId.updateValueAndValidity());
-    controls.purchasePricePerBond.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe(() => controls.fundingAssetId.updateValueAndValidity());
     controls.series.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe((series) => this.applySeries(series));
@@ -242,23 +202,6 @@ export class BondPurchaseDialog {
           this.pendingSeriesCode = null;
           controls.series.setValue(code);
         }
-      });
-    });
-
-    effect(() => {
-      if (!this.fundingCandidatesResource.hasValue()) {
-        return;
-      }
-      const candidates = this.fundingCandidatesResource.value();
-      untracked(() => {
-        const fundingAssetId = controls.fundingAssetId;
-        if (
-          fundingAssetId.value !== null &&
-          !candidates.some((candidate) => candidate.assetId === fundingAssetId.value)
-        ) {
-          fundingAssetId.setValue(null);
-        }
-        fundingAssetId.updateValueAndValidity();
       });
     });
   }
@@ -303,19 +246,13 @@ export class BondPurchaseDialog {
     }
   }
 
-  // Display and cap check only, in whole grosze; the server computes the stored amount.
+  // Display only, in whole grosze; the server computes the stored amount.
   private costInGrosze(
     values: { bondCount?: number | null; purchasePricePerBond?: number | null } | undefined,
   ): number | null {
     const count = emptyToNull(values?.bondCount);
     const price = emptyToNull(values?.purchasePricePerBond);
     return count === null || price === null ? null : count * Math.round(price * 100);
-  }
-
-  private fundingSource(assetId: string): TransferCandidateResponse | undefined {
-    return this.fundingCandidatesResource.hasValue()
-      ? this.fundingCandidatesResource.value().find((candidate) => candidate.assetId === assetId)
-      : undefined;
   }
 
   protected async onSubmit(): Promise<void> {
@@ -349,13 +286,7 @@ export class BondPurchaseDialog {
           path: { assetId: this.bond.assetId },
           body: terms,
         })
-      : await postApiPortfolioBonds({
-          body: {
-            ...terms,
-            accountId: values.accountId,
-            fundingAssetId: values.fundingAssetId ?? undefined,
-          },
-        });
+      : await postApiPortfolioBonds({ body: { ...terms, accountId: values.accountId } });
 
     this.submitting.set(false);
 
@@ -373,10 +304,7 @@ export class BondPurchaseDialog {
 
   private applyServerErrors(problem: ApiProblemDetails): void {
     if (problem.errorCode === 'Validation.InsufficientFunds') {
-      this.form.controls.fundingAssetId.setErrors({
-        server: problem.detail ?? translate('bonds.purchase.insufficientFunds'),
-      });
-      this.form.controls.fundingAssetId.markAsTouched();
+      this.formError.set(translate('bonds.insufficientFunds'));
       return;
     }
 

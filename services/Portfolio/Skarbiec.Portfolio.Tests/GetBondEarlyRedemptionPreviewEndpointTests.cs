@@ -36,7 +36,7 @@ public sealed class GetBondEarlyRedemptionPreviewEndpointTests(SkarbiecContainer
         Assert.Empty(await ReadBondRedemptionsAsync(userId, cancellationToken, assetId));
 
         await client.RedeemBondEarlyAsync(
-            assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+            assetId, EdoEarlyRedemptionDate, 4, cancellationToken, runningPeriodRatePercent: 4.00m);
 
         var row = Assert.Single(await ReadBondRedemptionsAsync(userId, cancellationToken, assetId));
         Assert.Equal(preview.GetProperty("bondCount").GetInt32(), row.BondCount);

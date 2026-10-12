@@ -19,7 +19,7 @@ public static class TransferRoutes
         // Funding a term deposit from cash — entered through AddDeposit's fundingAssetId.
         [(AssetClass.Cash, AssetClass.Deposit)] = Access.None,
 
-        // Buying a treasury bond with cash — entered through AddBond's fundingAssetId.
+        // A treasury bond's purchase and a swap's shortfall, paid from its own account's cash by AddBond, UpdateBond and SwapBond.
         [(AssetClass.Cash, AssetClass.Bond)] = Access.None,
 
         // Paying a settled deposit out to cash, through SettleDeposit's destinationAssetId and PayOutDeposit.
@@ -28,7 +28,7 @@ public static class TransferRoutes
         // Paying a settled deposit out into a savings account, through the same two payout slices.
         [(AssetClass.Deposit, AssetClass.Savings)] = Access.None,
 
-        // Paying a treasury bond's coupon out to cash, through SettleBondInterest's destinationAssetId.
+        // A treasury bond's coupon, redemption proceeds and swap leftover, paid to its own account's cash by SettleBondInterest, RedeemBond, RedeemBondEarly and SwapBond.
         [(AssetClass.Bond, AssetClass.Cash)] = Access.None,
 
         // Buying a new series with a matured bond's proceeds, through SwapBond.

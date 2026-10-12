@@ -14,7 +14,7 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task Redeem_Capitalising_TaxesInterestAtMaturity()
+    public async Task ProceedsToAccountCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
@@ -24,7 +24,7 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         var assetId = funded.Bond.AssetId;
         Assert.Equal(1_137.90m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
 
-        var response = await client.RedeemBondRawAsync(assetId, funded.CashAssetId, cancellationToken);
+        var response = await client.RedeemBondRawAsync(assetId, cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Redemption answered {(int)response.StatusCode}.");
 
@@ -85,7 +85,7 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         var assetId = funded.Bond.AssetId;
         var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
 
-        var response = await client.RedeemBondRawAsync(assetId, funded.CashAssetId, cancellationToken);
+        var response = await client.RedeemBondRawAsync(assetId, cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Redemption answered {(int)response.StatusCode}.");
 
@@ -129,12 +129,12 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
         var assetId = funded.Bond.AssetId;
-        await client.RedeemBondEarlyAsync(assetId, earlyDate, 4, funded.CashAssetId, cancellationToken);
+        await client.RedeemBondEarlyAsync(assetId, earlyDate, 4, cancellationToken);
         Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
-        await client.SettleBondInterestAsync(assetId, [(1, null), (2, null), (3, null)], null, cancellationToken);
+        await client.SettleBondInterestAsync(assetId, [(1, null), (2, null), (3, null)], cancellationToken);
         var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
 
-        var response = await client.RedeemBondRawAsync(assetId, funded.CashAssetId, cancellationToken);
+        var response = await client.RedeemBondRawAsync(assetId, cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Redemption answered {(int)response.StatusCode}.");
         var rows = await ReadBondRedemptionsAsync(userId, cancellationToken, assetId);
@@ -155,7 +155,6 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         { "before maturity", HttpStatusCode.Conflict, PortfolioAssertions.BondNotMaturedErrorCode },
         { "unsettled period", HttpStatusCode.Conflict, PortfolioAssertions.BondInterestUnsettledErrorCode },
         { "already redeemed", HttpStatusCode.Conflict, PortfolioAssertions.BondAlreadyRedeemedErrorCode },
-        { "stock as destination", HttpStatusCode.BadRequest, PortfolioAssertions.InvalidTransferCounterpartErrorCode },
         { "archived bond", HttpStatusCode.Conflict, PortfolioAssertions.AssetArchivedErrorCode },
     };
 
@@ -176,7 +175,7 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
             case "unsettled period":
                 funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
                 await client.SettleBondInterestAsync(
-                    funded.Bond.AssetId, [(1, null)], null, cancellationToken);
+                    funded.Bond.AssetId, [(1, null)], cancellationToken);
                 break;
             default:
                 funded = await client.CreateSettledTosAsync(cancellationToken);
@@ -184,14 +183,10 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         }
 
         var assetId = funded.Bond.AssetId;
-        var destination = funded.CashAssetId;
         switch (scenario)
         {
             case "already redeemed":
-                await client.RedeemBondAsync(assetId, destination, cancellationToken);
-                break;
-            case "stock as destination":
-                destination = await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken, name: "Stocks"), cancellationToken);
+                await client.RedeemBondAsync(assetId, cancellationToken);
                 break;
             case "archived bond":
                 await client.ArchiveAssetAsync(assetId, cancellationToken);
@@ -201,7 +196,7 @@ public sealed class RedeemBondEndpointTests(SkarbiecContainersFixture containers
         var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
         var redemptionsBefore = (await ReadBondRedemptionsAsync(userId, cancellationToken)).Count;
 
-        var response = await client.RedeemBondRawAsync(assetId, destination, cancellationToken);
+        var response = await client.RedeemBondRawAsync(assetId, cancellationToken);
 
         await response.AssertProblemAsync(status, errorCode, cancellationToken);
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));

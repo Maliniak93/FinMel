@@ -285,7 +285,7 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 10, 2, 10, 0, 0, TimeSpan.Zero));
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
-        await client.SettleBondInterestAsync(bond.AssetId, [(1, null)], null, cancellationToken);
+        await client.SettleBondInterestAsync(bond.AssetId, [(1, null)], cancellationToken);
 
         var response = await client.GetAsync(TransactionsUri(bond.AssetId), cancellationToken);
 

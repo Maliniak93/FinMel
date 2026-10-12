@@ -22,6 +22,7 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var accountId = await client.CreateAccountAsync(cancellationToken, "Bonds", AccountType.Bonds);
+        await client.FundAccountAsync(accountId, cancellationToken);
 
         var response = await client.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { AccountId = accountId }, cancellationToken);
 
@@ -43,7 +44,6 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(new DateOnly(2036, 10, 1), body.MaturityDate);
         Assert.Equal(5_000m, body.NominalValue);
         Assert.Equal(5_000.00m, body.BookValue);
-        Assert.Null(body.FundingAssetId);
         Assert.False(body.IsArchived);
         Assert.Equal(BondStatus.Active, body.Status);
         Assert.Equal(10, body.Periods.Count);
@@ -61,7 +61,7 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(1m, opening.UnitPrice);
         Assert.Equal(new DateOnly(2026, 10, 1), opening.Date);
         Assert.Equal(5_000.00m, opening.ValuePln);
-        Assert.Null(opening.Transfer);
+        Assert.NotNull(opening.Transfer);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(body.AssetId, cancellationToken);
 
         await using var dbContext = CreateDbContext(userId);
@@ -98,36 +98,39 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
     }
 
     [Fact]
-    public async Task Add_FundedFromCash_WritesTransfer()
+    public async Task FundsFromAccountCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 10, 12, 10, 0, 0, TimeSpan.Zero));
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 6_000m);
         var bondsId = await client.CreateAccountAsync(cancellationToken, name: "Bonds", type: AccountType.Bonds);
+        var cashId = await client.GetAccountCashAssetIdAsync(bondsId, cancellationToken);
+        await client.RecordTransactionAsync(
+            cashId, TransactionType.Deposit, 5_000m, DefaultTopUpDate, cancellationToken, unitPrice: 1m);
 
         var response = await client.PostAsJsonAsync(
-            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { AccountId = bondsId }, cancellationToken);
+            AllBondsUri,
+            NewBondRequest(bondCount: 10, purchaseDate: CashDay1) with { AccountId = bondsId },
+            cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);
         Assert.NotNull(body);
-        Assert.Equal(cashId, body.FundingAssetId);
-        Assert.Equal("Cash account", body.FundingAssetName);
-
-        Assert.Equal(1_000m, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
-        Assert.Equal(5_000m, (await client.GetAssetAsync(body.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(4_000m, await client.GetCashBalanceAsync(bondsId, cancellationToken));
+        Assert.Equal(1_000m, (await client.GetAssetAsync(body.AssetId, cancellationToken)).Quantity);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(cashId, cancellationToken);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(body.AssetId, cancellationToken);
 
         var withdraw = await client.GetCashWithdrawAsync(cashId, cancellationToken);
-        Assert.Equal(5_000m, withdraw.Quantity);
-        Assert.Equal(new DateOnly(2026, 10, 1), withdraw.Date);
+        Assert.Equal(1_000m, withdraw.Quantity);
+        Assert.Equal(CashDay1, withdraw.Date);
+        Assert.Equal(body.AssetId, withdraw.Transfer!.CounterpartAssetId);
         var opening = Assert.Single((await client.ListTransactionsAsync(body.AssetId, cancellationToken)).Items);
         Assert.Equal(TransactionType.Deposit, opening.Type);
-        Assert.Equal(5_000m, opening.Quantity);
-        Assert.Equal(new DateOnly(2026, 10, 1), opening.Date);
+        Assert.Equal(1_000m, opening.Quantity);
+        Assert.Equal(CashDay1, opening.Date);
+        Assert.Equal(cashId, opening.Transfer!.CounterpartAssetId);
 
         await using var dbContext = CreateDbContext(userId);
         var legs = await dbContext.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
@@ -135,44 +138,27 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Single(legs.Select(t => t.TransferId).Distinct());
         Assert.Equal(withdraw.Id, Assert.Single(legs, t => t.AssetId == cashId).Id);
         Assert.Equal(opening.Id, Assert.Single(legs, t => t.AssetId == body.AssetId).Id);
-        Assert.Equal(1, await dbContext.Transactions.CountAsync(t => t.AssetId == cashId && t.TransferId == null, cancellationToken));
     }
 
     [Fact]
-    public async Task Add_FundingExceedsBalance_ReturnsInsufficientFunds()
+    public async Task ExceedsAccountCash_Returns400()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 10, 12, 10, 0, 0, TimeSpan.Zero));
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 4_000m);
         var bondsId = await client.CreateAccountAsync(cancellationToken, name: "Bonds", type: AccountType.Bonds);
+        var cashId = await client.GetAccountCashAssetIdAsync(bondsId, cancellationToken);
+        await client.RecordTransactionAsync(
+            cashId, TransactionType.Deposit, 5_000m, DefaultTopUpDate, cancellationToken, unitPrice: 1m);
 
         var response = await client.PostAsJsonAsync(
-            AllBondsUri, NewBondRequest(fundingAssetId: cashId) with { AccountId = bondsId }, cancellationToken);
+            AllBondsUri,
+            NewBondRequest(bondCount: 60, purchaseDate: CashDay1) with { AccountId = bondsId },
+            cancellationToken);
 
         await response.AssertInsufficientFundsAsync(cancellationToken);
-        await client.AssertCashUntouchedAsync(cashId, cancellationToken, balance: 4_000m);
-        await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
-        Assert.False(await dbContext.Assets.ExcludingAccountCash().AnyAsync(a => a.AccountId == bondsId, cancellationToken));
-    }
-
-    [Fact]
-    public async Task Add_StockAsFundingSource_ReturnsInvalidTransferCounterpart()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var walletId = await client.CreateAccountAsync(cancellationToken, name: "Wallet");
-        var stockId = await client.AddAssetAsync(walletId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock);
-        var bondsId = await client.CreateAccountAsync(cancellationToken, name: "Bonds", type: AccountType.Bonds);
-
-        var response = await client.PostAsJsonAsync(
-            AllBondsUri, NewBondRequest(fundingAssetId: stockId) with { AccountId = bondsId }, cancellationToken);
-
-        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(5_000m, await client.GetCashBalanceAsync(bondsId, cancellationToken));
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
         Assert.False(await dbContext.Assets.ExcludingAccountCash().AnyAsync(a => a.AccountId == bondsId, cancellationToken));

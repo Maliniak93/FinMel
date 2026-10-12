@@ -1,13 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-import {
-  cashCandidates,
-  dueEdoBond,
-  dueRorBond,
-  edoSeries,
-  rorSeries,
-} from '../../../../testing/bond-fixtures';
+import { dueEdoBond, dueRorBond, edoSeries, rorSeries } from '../../../../testing/bond-fixtures';
 import { restoreEnglish } from '../../../../testing/i18n';
 import { client as marketDataClient } from '../../../api/marketdata/client.gen';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
@@ -46,9 +40,6 @@ describe('SettleAllBondsDialog', () => {
         }
         if (url.includes('/api/marketdata/bond-series/EDO1036')) {
           return jsonResponse(edoSeries);
-        }
-        if (url.includes('/api/portfolio/transfer-candidates')) {
-          return jsonResponse(cashCandidates);
         }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -113,6 +104,16 @@ describe('SettleAllBondsDialog', () => {
     expect(text).toContain(dueEdoBond.name);
     expect(Number(rateInput(dueRorBond.assetId, 2)!.value)).toBe(3.75);
     expect(rateInput(dueRorBond.assetId, 3)!.value).toBe('');
+  });
+
+  it('shows the account cash line for the coupon bond only, with no cash select', async () => {
+    await setup(() => jsonResponse({}, 201));
+
+    expect(renderedText(fixture)).toContain(`To the cash of ${dueRorBond.accountName}`);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('mat-select')).toHaveLength(0);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.settle-all-bonds-dialog__hint'),
+    ).toHaveLength(1);
   });
 
   it('blocks submit while a ticked bond is missing a rate, and skips it once unticked', async () => {

@@ -53,24 +53,9 @@
     </div>
 
     @if (current.coupon) {
-      <mat-form-field appearance="outline" class="settle-bond-interest-dialog__destination">
-        <mat-label>{{ 'bonds.settle.destination' | transloco }}</mat-label>
-        <mat-select [formControl]="current.destination">
-          @if (candidatesResource.hasValue()) {
-            @for (candidate of candidatesResource.value(); track candidate.assetId) {
-              <mat-option [value]="candidate.assetId">
-                {{ candidate.name }}
-              </mat-option>
-            }
-          }
-        </mat-select>
-        @if (candidatesResource.error(); as loadError) {
-          <mat-hint>{{ loadError.message }}</mat-hint>
-        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
-          <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
-        }
-        <mat-error>{{ 'bonds.settle.destinationRequired' | transloco }}</mat-error>
-      </mat-form-field>
+      <p class="settle-bond-interest-dialog__hint">
+        {{ 'bonds.toAccountCash' | transloco: { account: bond.accountName } }}
+      </p>
     } @else {
       <p class="settle-bond-interest-dialog__hint">{{ 'bonds.settle.capitalised' | transloco }}</p>
     }

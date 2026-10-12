@@ -274,7 +274,7 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateSettledTosAsync(cancellationToken);
-        await client.SwapBondAsync(funded.Bond.AssetId, 10, funded.CashAssetId, cancellationToken);
+        await client.SwapBondAsync(funded.Bond.AssetId, 10, cancellationToken);
         var edo = await client.FindSwappedBondAsync(funded.Bond.AssetId, cancellationToken);
 
         var response = await client.DeleteAsync(AssetUri(funded.Bond.AssetId), cancellationToken);
@@ -374,7 +374,7 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         using var client = Factory.CreateAuthenticatedClient(userId);
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
         await client.SettleBondInterestAsync(
-            funded.Bond.AssetId, [(1, null), (2, 3.75m)], funded.CashAssetId, cancellationToken);
+            funded.Bond.AssetId, [(1, null), (2, 3.75m)], cancellationToken);
 
         var response = await client.DeleteAsync(AssetUri(funded.Bond.AssetId), cancellationToken);
 

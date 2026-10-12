@@ -67,7 +67,7 @@ public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers)
         Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var closed = await client.CreateSettledTosAsync(cancellationToken);
-        await client.RedeemBondAsync(closed.Bond.AssetId, closed.CashAssetId, cancellationToken);
+        await client.RedeemBondAsync(closed.Bond.AssetId, cancellationToken);
         await client.ArchiveAccountAsync(closed.BondAccountId, cancellationToken);
         var liveAccountId = await client.CreateAccountAsync(cancellationToken, name: "Live", type: AccountType.Bonds);
         var live = await client.AddBondAsync(liveAccountId, cancellationToken, NewTosBondRequest() with { Name = "Tos live" });

@@ -25,12 +25,6 @@ internal static class BondErrors
     public static readonly Error PeriodRate =
         new("Validation.BondPeriodRate", "A fixed-rate or first period takes the rate from the bond's terms and must not send one; every other period needs a rate from 0 to 100 with at most 4 decimal places.");
 
-    public static readonly Error PayoutDestinationRequired =
-        new("Validation.BondPayoutDestinationRequired", "A coupon bond pays its interest out — pick the Cash asset that receives it.");
-
-    public static readonly Error PayoutDestinationNotAllowed =
-        new("Validation.BondPayoutDestinationNotAllowed", "A capitalising bond adds its interest to its own value — it takes no payout destination.");
-
     public static Error SettlementNotFound(Guid settlementId) =>
         new("NotFound.BondInterestSettlement", $"Interest settlement '{settlementId}' was not found.");
 
@@ -63,13 +57,4 @@ internal static class BondErrors
 
     public static readonly Error SwapCount =
         new("Validation.BondSwapCount", "The number of bonds to swap must be from 1 to the number of bonds held.");
-
-    public static readonly Error SwapExceedsProceeds =
-        new("Validation.BondSwapExceedsProceeds", "The swap costs more than the redemption pays out.");
-
-    public static readonly Error SwapLeftoverDestinationRequired =
-        new("Validation.BondPayoutDestinationRequired", "The swap leaves money over — pick the Cash asset that receives it.");
-
-    public static readonly Error SettlementTransferDetached =
-        new("Conflict.BondSettlementTransferDetached", "The Cash side of this coupon payout no longer exists, so the settlement can't be undone.");
 }

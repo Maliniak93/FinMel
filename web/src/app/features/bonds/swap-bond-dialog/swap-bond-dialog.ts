@@ -1,12 +1,6 @@
-import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-  type AbstractControl,
-  type ValidationErrors,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -29,7 +23,6 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { formatDate, formatMoney } from '../../../shared/format';
-import { loadCashCandidates } from '../bond-interest';
 import { BOND_TYPES, bondTypeInfo } from '../bond-types';
 
 export interface SwapBondDialogData {
@@ -54,6 +47,7 @@ interface SwapAmounts {
   readonly proceeds: number;
   readonly cost: number | null;
   readonly leftover: number | null;
+  readonly shortfall: number | null;
 }
 
 @Component({
@@ -121,20 +115,6 @@ export class SwapBondDialog {
     },
   });
 
-  protected readonly candidatesResource = resource({
-    loader: ({ abortSignal }) => loadCashCandidates(abortSignal),
-  });
-
-  private readonly costWithinProceeds = (control: AbstractControl): ValidationErrors | null => {
-    const leftover = this.amountsInGrosze(control.parent?.getRawValue())?.leftover ?? null;
-    return leftover !== null && leftover < 0 ? { exceedsProceeds: true } : null;
-  };
-
-  private readonly destinationForLeftover = (control: AbstractControl): ValidationErrors | null => {
-    const leftover = this.amountsInGrosze(control.parent?.getRawValue())?.leftover ?? null;
-    return leftover !== null && leftover > 0 && !control.value ? { required: true } : null;
-  };
-
   protected readonly form = this.formBuilder.group({
     series: [null as string | null],
     name: this.formBuilder.nonNullable.control('', [
@@ -161,14 +141,8 @@ export class SwapBondDialog {
     ],
     bondCount: [
       this.heldCount as number | null,
-      [
-        Validators.required,
-        Validators.min(1),
-        Validators.max(this.heldCount),
-        this.costWithinProceeds,
-      ],
+      [Validators.required, Validators.min(1), Validators.max(this.heldCount)],
     ],
-    destinationAssetId: [null as string | null, [this.destinationForLeftover]],
   });
 
   private readonly formValue = toSignal(
@@ -187,43 +161,15 @@ export class SwapBondDialog {
     return {
       proceeds: grosze.proceeds / 100,
       cost: grosze.cost === null ? null : grosze.cost / 100,
-      leftover: grosze.leftover === null ? null : grosze.leftover / 100,
+      leftover: grosze.leftover === null ? null : Math.max(grosze.leftover, 0) / 100,
+      shortfall: grosze.leftover === null ? null : Math.max(-grosze.leftover, 0) / 100,
     };
   });
 
-  protected readonly needsDestination = computed(() => (this.amounts()?.leftover ?? 0) > 0);
-
   constructor() {
-    const controls = this.form.controls;
-    controls.series.valueChanges
+    this.form.controls.series.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe((series) => this.applySeries(series));
-    for (const control of [controls.bondCount, controls.swapPricePerBond]) {
-      control.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.revalidateAmounts());
-    }
-
-    effect(() => {
-      if (this.previewResource.hasValue()) {
-        untracked(() => this.revalidateAmounts());
-      }
-    });
-
-    // The Cash the purchase was paid from is where the leftover most likely goes.
-    effect(() => {
-      if (!this.candidatesResource.hasValue()) {
-        return;
-      }
-      const candidates = this.candidatesResource.value();
-      untracked(() => {
-        const destination = controls.destinationAssetId;
-        if (
-          destination.value === null &&
-          candidates.some((candidate) => candidate.assetId === this.bond.fundingAssetId)
-        ) {
-          destination.setValue(this.bond.fundingAssetId ?? null);
-        }
-      });
-    });
   }
 
   protected typeLabel(series: BondSeriesListItem): string {
@@ -257,7 +203,6 @@ export class SwapBondDialog {
           marginPercent: emptyToNull(values.marginPercent),
           earlyRedemptionFeePerBond: Number(values.earlyRedemptionFeePerBond),
         },
-        destinationAssetId: this.needsDestination() ? values.destinationAssetId : null,
       },
     });
 
@@ -311,13 +256,7 @@ export class SwapBondDialog {
     }
   }
 
-  private revalidateAmounts(): void {
-    const controls = this.form.controls;
-    controls.bondCount.updateValueAndValidity({ emitEvent: false });
-    controls.destinationAssetId.updateValueAndValidity({ emitEvent: false });
-  }
-
-  // Display and checks only, in whole grosze; the server computes the stored amounts.
+  // Display only, in whole grosze; the server computes the stored amounts.
   private amountsInGrosze(
     values: { bondCount?: number | null; swapPricePerBond?: number | null } | undefined,
   ): { proceeds: number; cost: number | null; leftover: number | null } | null {
@@ -335,6 +274,11 @@ export class SwapBondDialog {
   }
 
   private applyServerErrors(problem: ApiProblemDetails): void {
+    if (problem.errorCode === 'Validation.InsufficientFunds') {
+      this.formError.set(translate('bonds.insufficientFunds'));
+      return;
+    }
+
     if (applyFieldErrors(this.form, problem)) {
       return;
     }

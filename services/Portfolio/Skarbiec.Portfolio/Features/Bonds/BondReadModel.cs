@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Bonds;
@@ -43,7 +42,6 @@ internal static class BondReadModel
             return null;
         }
 
-        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
         var settlements = await dbContext.BondInterestSettlements
             .AsNoTracking()
             .Where(s => s.AssetId == assetId)
@@ -54,7 +52,6 @@ internal static class BondReadModel
             row.Asset,
             row.Account,
             today,
-            funding,
             settlements,
             [.. links.Redemptions[assetId]],
             links.SwappedFrom.GetValueOrDefault(assetId));
@@ -67,7 +64,7 @@ internal static class BondReadModel
     {
         var ids = bonds.Select(b => b.AssetId).ToList();
 
-        // A counterpart's name is missing once it was removed: its leg is gone, or the asset itself is.
+        // The swap target's name is missing once that bond was removed.
         var redemptions = await (
                 from redemption in dbContext.BondRedemptions.AsNoTracking()
                 where ids.Contains(redemption.AssetId)
@@ -82,14 +79,6 @@ internal static class BondReadModel
                     redemption.Fee,
                     redemption.Tax,
                     redemption.Proceeds,
-                    DestinationAssetName = (
-                            from inLeg in dbContext.Transactions
-                            where redemption.CashTransferId != null
-                                && inLeg.TransferId == redemption.CashTransferId
-                                && inLeg.AssetId != redemption.AssetId
-                            join destination in dbContext.Assets on inLeg.AssetId equals destination.Id
-                            select destination.Name)
-                        .FirstOrDefault(),
                     SwapTargetAssetName = dbContext.Assets
                         .Where(a => a.Id == redemption.SwapTargetAssetId)
                         .Select(a => a.Name)
@@ -121,7 +110,6 @@ internal static class BondReadModel
                     Fee = r.Fee,
                     Tax = r.Tax,
                     Proceeds = r.Proceeds,
-                    DestinationAssetName = r.DestinationAssetName,
                     SwapTargetAssetName = r.SwapTargetAssetName
                 }),
             swappedFrom);

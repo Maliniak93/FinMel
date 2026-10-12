@@ -2,8 +2,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import {
-  cashCandidates,
-  fundingCashId,
   settledTosBond,
   swapOffer,
   tosRedemptionPreview,
@@ -41,6 +39,7 @@ describe('SwapBondDialog', () => {
   async function setup(
     bond: BondFixture = settledTosBond,
     preview: typeof tosRedemptionPreview = tosRedemptionPreview,
+    writeResponse: () => Response = () => jsonResponse(bond, 201),
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -52,12 +51,9 @@ describe('SwapBondDialog', () => {
         if (url.includes('/api/marketdata/bond-series')) {
           return jsonResponse(swapOffer);
         }
-        if (url.includes('/api/portfolio/transfer-candidates')) {
-          return jsonResponse(cashCandidates);
-        }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
-      return jsonResponse(bond, 201);
+      return writeResponse();
     });
 
     await TestBed.configureTestingModule({
@@ -75,7 +71,6 @@ describe('SwapBondDialog', () => {
     await vi.waitFor(() => {
       expect(component['offerResource'].hasValue()).toBe(true);
       expect(component['previewResource'].hasValue()).toBe(true);
-      expect(component['candidatesResource'].hasValue()).toBe(true);
     });
   }
 
@@ -149,33 +144,47 @@ describe('SwapBondDialog', () => {
     expect(textAt('swap-leftover')).toContain(money(512.29));
   });
 
-  it('requires a Cash account while the leftover is above 0', async () => {
-    await setup({ ...settledTosBond, fundingAssetId: null, fundingAssetName: null });
+  it('names the account cash as the leftover target and has no cash select', async () => {
+    await setup();
     await pickSeries('EDO0939');
 
-    await component['onSubmit']();
-    fixture.detectChanges();
-
-    expect(writeRequests(fetchSpy)).toEqual([]);
-    expect(renderedText(fixture)).toContain('Pick the cash account that receives the leftover.');
-    expect(dialogRef.close).not.toHaveBeenCalled();
+    expect(textAt('account-cash')).toContain(`To the cash of ${settledTosBond.accountName}`);
+    expect(textAt('swap-shortfall')).toBe('');
+    expect(Object.keys(component['form'].controls)).not.toContain('destinationAssetId');
   });
 
-  it('blocks a swap that costs more than the redemption pays out', async () => {
+  it('shows the shortfall paid from the account cash when the swap costs more than the redemption pays out', async () => {
     await setup(settledTosBond, { ...tosRedemptionPreview, proceeds: 999.81 });
     await pickSeries('EDO0939');
     component['form'].controls.swapPricePerBond.setValue(100);
     fixture.detectChanges();
     await fixture.whenStable();
 
+    expect(textAt('swap-shortfall')).toContain(`Top-up from the account cash: ${money(0.19)}`);
+    expect(textAt('account-cash')).toBe('');
+
+    await component['onSubmit']();
+
+    expect(writeRequests(fetchSpy)).toHaveLength(1);
+  });
+
+  it('answers an insufficient-funds rejection with the account message', async () => {
+    await setup(settledTosBond, tosRedemptionPreview, () =>
+      jsonResponse(
+        { detail: 'The cash cannot cover this.', errorCode: 'Validation.InsufficientFunds' },
+        400,
+      ),
+    );
+    await pickSeries('EDO0939');
+
     await component['onSubmit']();
     fixture.detectChanges();
 
-    expect(writeRequests(fetchSpy)).toEqual([]);
-    expect(renderedText(fixture)).toContain('The swap costs more than the redemption pays out.');
+    expect(renderedText(fixture)).toContain('Insufficient funds on the account');
+    expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
-  it('swaps the picked count into the new series with the leftover to the funding Cash, then closes with true', async () => {
+  it('swaps the picked count into the new series with no destination, then closes with true', async () => {
     await setup();
     await pickSeries('EDO0939');
     await setCount(6);
@@ -195,7 +204,6 @@ describe('SwapBondDialog', () => {
         marginPercent: 2,
         earlyRedemptionFeePerBond: 3,
       },
-      destinationAssetId: fundingCashId,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });

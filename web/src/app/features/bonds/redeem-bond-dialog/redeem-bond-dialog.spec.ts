@@ -2,9 +2,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import {
-  cashCandidates,
-  fundingCashId,
-  otherCashId,
   settledTosBond,
   tosRedemptionPreview,
   unsettledTosBond,
@@ -45,9 +42,6 @@ describe('RedeemBondDialog', () => {
         if (url.endsWith('/redemption-preview')) {
           return jsonResponse(tosRedemptionPreview);
         }
-        if (url.includes('/api/portfolio/transfer-candidates')) {
-          return jsonResponse(cashCandidates);
-        }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
       return jsonResponse(bond);
@@ -73,7 +67,7 @@ describe('RedeemBondDialog', () => {
       .filter((input: unknown) => requestUrl(input).endsWith('/redemption-preview'));
   }
 
-  it('shows the redemption preview and defaults the Cash picker to the funding account', async () => {
+  it('shows the redemption preview and the account cash line instead of a cash select', async () => {
     await setup();
 
     await vi.waitFor(() => {
@@ -83,34 +77,21 @@ describe('RedeemBondDialog', () => {
       expect(text).toContain(formatMoney(tosRedemptionPreview.capitalisedInterest, 'PLN'));
       expect(text).toContain(formatMoney(tosRedemptionPreview.tax, 'PLN'));
       expect(text).toContain(formatMoney(tosRedemptionPreview.proceeds, 'PLN'));
-      expect(text).toContain('Wallet cash');
+      expect(text).toContain(`To the cash of ${settledTosBond.accountName}`);
     });
-    expect(component['form'].controls.destinationAssetId.value).toBe(fundingCashId);
+    expect((fixture.nativeElement as HTMLElement).querySelector('mat-select')).toBeNull();
   });
 
-  it('redeems to the picked Cash and closes with true', async () => {
+  it('redeems with no destination and closes with true', async () => {
     await setup();
     await vi.waitFor(() => expect(component['previewResource'].hasValue()).toBe(true));
-    component['form'].controls.destinationAssetId.setValue(otherCashId);
 
     await component['onSubmit']();
 
     const [request] = writeRequests(fetchSpy);
     expect(request.url).toContain(`/api/portfolio/bonds/${settledTosBond.assetId}/redemption`);
-    expect(await request.json()).toEqual({ destinationAssetId: otherCashId });
+    expect(await request.json()).toEqual({});
     expect(dialogRef.close).toHaveBeenCalledWith(true);
-  });
-
-  it('requires a Cash account when the bond was bought with new money', async () => {
-    await setup({ ...settledTosBond, fundingAssetId: null, fundingAssetName: null });
-    await vi.waitFor(() => expect(component['candidatesResource'].hasValue()).toBe(true));
-
-    await component['onSubmit']();
-    fixture.detectChanges();
-
-    expect(writeRequests(fetchSpy)).toEqual([]);
-    expect(renderedText(fixture)).toContain('Pick the cash account that receives the money.');
-    expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
   it('with unsettled periods says "Najpierw rozlicz okresy", loads no preview and closes asking to settle', async () => {

@@ -133,28 +133,9 @@
         <p class="early-redeem-bond-dialog__hint" data-testid="fee-note">{{ note | transloco }}</p>
       }
 
-      <mat-form-field appearance="outline" class="early-redeem-bond-dialog__destination">
-        <mat-label>{{ 'bonds.redeem.destination' | transloco }}</mat-label>
-        <mat-select formControlName="destinationAssetId" data-testid="early-redeem-destination">
-          @if (candidatesResource.hasValue()) {
-            @for (candidate of candidatesResource.value(); track candidate.assetId) {
-              <mat-option [value]="candidate.assetId">
-                {{ candidate.name }}
-              </mat-option>
-            }
-          }
-        </mat-select>
-        @if (candidatesResource.error(); as loadError) {
-          <mat-hint>{{ loadError.message }}</mat-hint>
-        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
-          <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
-        }
-        @if (form.controls.destinationAssetId.hasError('required')) {
-          <mat-error>{{ 'bonds.redeem.destinationRequired' | transloco }}</mat-error>
-        } @else if (form.controls.destinationAssetId.hasError('server')) {
-          <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
-        }
-      </mat-form-field>
+      <p class="early-redeem-bond-dialog__hint" data-testid="account-cash">
+        {{ 'bonds.toAccountCash' | transloco: { account: bond.accountName } }}
+      </p>
     }
 
     @if (formError()) {

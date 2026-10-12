@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
 
@@ -24,13 +25,7 @@ public sealed class RedeemBondHandler(
         var plan = planned.Value;
         var bond = plan.Bond;
 
-        var destination = await dbContext.LoadCashDestinationAsync(bond, request.DestinationAssetId, cancellationToken);
-        if (destination.IsFailure)
-        {
-            return destination.Error;
-        }
-
-        var cash = destination.Value;
+        var cash = await dbContext.LoadAccountCashAsync(bond.AccountId!.Value, cancellationToken);
         var (credit, charge) = plan.CreateAdjustments();
         var (outLeg, inLeg) = TransferLegs.Create(bond.Id, cash.Id, plan.Amounts.Proceeds, plan.Date);
         List<Transaction> bondAdded = [.. new[] { credit, charge }.OfType<Transaction>(), outLeg];

@@ -36,9 +36,6 @@ public sealed record AddBondRequest : IValidatableObject
     [Range(typeof(decimal), "0", "100")]
     public required decimal EarlyRedemptionFeePerBond { get; init; }
 
-    /// <summary>The Cash asset the purchase is paid from; omitted for new money from outside the app.</summary>
-    public Guid? FundingAssetId { get; init; }
-
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         BondTermsValidation.Validate(
             validationContext,

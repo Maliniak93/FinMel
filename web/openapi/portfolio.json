@@ -1977,13 +1977,6 @@
               "string"
             ],
             "format": "double"
-          },
-          "fundingAssetId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
           }
         }
       },
@@ -2668,12 +2661,6 @@
             ],
             "format": "double"
           },
-          "destinationAssetName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
           "swapTargetAssetName": {
             "type": [
               "null",
@@ -2797,19 +2784,6 @@
               "string"
             ],
             "format": "double"
-          },
-          "fundingAssetId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "fundingAssetName": {
-            "type": [
-              "null",
-              "string"
-            ]
           },
           "status": {
             "$ref": "#/components/schemas/BondStatus"
@@ -3566,8 +3540,7 @@
       "RedeemBondEarlyRequest": {
         "required": [
           "date",
-          "bondCount",
-          "destinationAssetId"
+          "bondCount"
         ],
         "type": "object",
         "properties": {
@@ -3591,24 +3564,11 @@
               "string"
             ],
             "format": "double"
-          },
-          "destinationAssetId": {
-            "type": "string",
-            "format": "uuid"
           }
         }
       },
       "RedeemBondRequest": {
-        "required": [
-          "destinationAssetId"
-        ],
-        "type": "object",
-        "properties": {
-          "destinationAssetId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
+        "type": "object"
       },
       "RollOverDepositRequest": {
         "required": [
@@ -4057,13 +4017,6 @@
             "items": {
               "$ref": "#/components/schemas/SettleBondPeriodRequest"
             }
-          },
-          "destinationAssetId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
           }
         }
       },
@@ -4184,13 +4137,6 @@
           },
           "newBond": {
             "$ref": "#/components/schemas/SwapNewBondRequest"
-          },
-          "destinationAssetId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
           }
         }
       },

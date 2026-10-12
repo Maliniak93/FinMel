@@ -6,9 +6,8 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
-import { map, merge, of, startWith, switchMap } from 'rxjs';
+import { map, of, startWith, switchMap } from 'rxjs';
 
 import {
   postApiPortfolioBondsByAssetIdInterestSettlements,
@@ -19,9 +18,7 @@ import { readProblemDetails } from '../../../core/auth/problem-details';
 import { formatDate, formatMoney, formatPercent } from '../../../shared/format';
 import {
   buildSettleSection,
-  isCouponBond,
   isSectionValid,
-  loadCashCandidates,
   loadSeriesRates,
   settleRequest,
   usesTermsRate,
@@ -41,7 +38,6 @@ export interface SettleBondInterestDialogData {
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatSelectModule,
     TranslocoPipe,
   ],
   templateUrl: './settle-bond-interest-dialog.html',
@@ -50,7 +46,6 @@ export interface SettleBondInterestDialogData {
 export class SettleBondInterestDialog {
   private readonly dialogRef = inject(MatDialogRef<SettleBondInterestDialog>);
   protected readonly bond = inject<SettleBondInterestDialogData>(MAT_DIALOG_DATA).bond;
-  private readonly coupon = isCouponBond(this.bond);
 
   protected readonly formatDate = formatDate;
   protected readonly formatMoney = formatMoney;
@@ -64,20 +59,14 @@ export class SettleBondInterestDialog {
     loader: ({ abortSignal }) => loadSeriesRates(this.bond.seriesCode, abortSignal),
   });
 
-  protected readonly candidatesResource = resource({
-    params: () => (this.coupon ? { coupon: true } : undefined),
-    loader: ({ abortSignal }) => loadCashCandidates(abortSignal),
-  });
-
-  // Built once both lookups have settled, so the prefilled rates and the default Cash are in place when the form shows.
+  // Built once the series lookup has settled, so the prefilled rates are in place when the form shows.
   protected readonly section = computed<BondSettleSection | null>(() => {
-    if (this.seriesResource.isLoading() || this.candidatesResource.isLoading()) {
+    if (this.seriesResource.isLoading()) {
       return null;
     }
     return buildSettleSection(
       this.bond,
       this.seriesResource.hasValue() ? this.seriesResource.value() : null,
-      this.candidatesResource.hasValue() ? (this.candidatesResource.value() ?? []) : [],
     );
   });
 
@@ -85,7 +74,7 @@ export class SettleBondInterestDialog {
     toObservable(this.section).pipe(
       switchMap((section) =>
         section
-          ? merge(section.rates.valueChanges, section.destination.valueChanges).pipe(
+          ? section.rates.valueChanges.pipe(
               startWith(null),
               map(() => (isSectionValid(section) ? settleRequest(section) : undefined)),
             )
@@ -120,7 +109,6 @@ export class SettleBondInterestDialog {
 
     if (!isSectionValid(section)) {
       section.rates.markAllAsTouched();
-      section.destination.markAsTouched();
       return;
     }
 

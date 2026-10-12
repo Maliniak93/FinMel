@@ -3,7 +3,7 @@ using Skarbiec.Contracts;
 
 namespace Skarbiec.Portfolio.Features.Bonds.SwapBond;
 
-/// <summary>Redeems the whole matured holding and buys bondCount bonds of a new series with it, dated the old maturity date.</summary>
+/// <summary>Redeems the whole matured holding and buys bondCount bonds of a new series with it, dated the old maturity date; the account's cash takes the leftover or pays the shortfall.</summary>
 public sealed record SwapBondRequest
 {
     /// <summary>How many of the held bonds are swapped, from 1 to the holding's count; the rest join the leftover.</summary>
@@ -11,9 +11,6 @@ public sealed record SwapBondRequest
 
     [Required]
     public required SwapNewBondRequest NewBond { get; init; }
-
-    /// <summary>The PLN Cash asset that receives proceeds − bondCount × swapPricePerBond; required when that leftover is above 0.</summary>
-    public Guid? DestinationAssetId { get; init; }
 }
 
 public sealed record SwapNewBondRequest : IValidatableObject

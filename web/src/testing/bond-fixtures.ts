@@ -22,8 +22,6 @@ export interface BondFixture {
   maturityDate: string;
   nominalValue: number;
   bookValue: number;
-  fundingAssetId: string | null;
-  fundingAssetName: string | null;
   status: number;
   duePeriodCount: number;
   lastSettlement: BondSettlementFixture | null;
@@ -53,7 +51,6 @@ export interface BondRedemptionFixture {
   fee: number;
   tax: number;
   proceeds: number;
-  destinationAssetName: string | null;
   swapTargetAssetName: string | null;
 }
 
@@ -92,8 +89,6 @@ export function bondResponse(overrides: Partial<BondFixture> = {}): BondFixture 
     maturityDate: '2036-10-01',
     nominalValue: 5000,
     bookValue: 5000,
-    fundingAssetId: null,
-    fundingAssetName: null,
     status: BOND_STATUS.Active,
     duePeriodCount: 0,
     lastSettlement: null,
@@ -195,9 +190,6 @@ export const septemberOffer: BondSeriesFixture[] = [
   },
 ];
 
-export const fundingCashId = 'c0c0c0c0-1111-1111-1111-111111111111';
-export const otherCashId = 'c0c0c0c0-2222-2222-2222-222222222222';
-
 function rorPeriod(
   index: number,
   start: string,
@@ -217,8 +209,6 @@ export const dueRorBond = bondResponse({
   firstPeriodRatePercent: 4,
   marginPercent: null,
   maturityDate: '2027-06-10',
-  fundingAssetId: fundingCashId,
-  fundingAssetName: 'Wallet cash',
   status: BOND_STATUS.InterestDue,
   duePeriodCount: 3,
   periods: [
@@ -266,8 +256,6 @@ export const settledRorBond = bondResponse({
   firstPeriodRatePercent: 4,
   marginPercent: null,
   maturityDate: '2027-06-10',
-  fundingAssetId: fundingCashId,
-  fundingAssetName: 'Wallet cash',
   status: BOND_STATUS.Active,
   duePeriodCount: 0,
   lastSettlement: secondRorSettlement,
@@ -328,19 +316,6 @@ export const rorPreviewResponse = {
   totals: { gross: 32, tax: 6.09, net: 25.91 },
 };
 
-export const cashCandidates = [
-  {
-    assetId: fundingCashId,
-    name: 'Wallet cash',
-    balance: 1000,
-  },
-  {
-    assetId: otherCashId,
-    name: 'Other cash',
-    balance: 50,
-  },
-];
-
 const tosSettlement = (index: number): BondSettlementFixture => ({
   settlementId: `t0t0t0t0-0000-0000-0000-00000000000${index}`,
   ratePercent: 4.4,
@@ -362,8 +337,6 @@ export const settledTosBond = bondResponse({
   maturityDate: '2029-10-01',
   nominalValue: 1000,
   bookValue: 1137.9,
-  fundingAssetId: fundingCashId,
-  fundingAssetName: 'Wallet cash',
   status: BOND_STATUS.Matured,
   duePeriodCount: 0,
   lastSettlement: tosSettlement(3),
@@ -413,7 +386,6 @@ export const redeemedTosBond = bondResponse({
       fee: 0,
       tax: 26.21,
       proceeds: 1111.69,
-      destinationAssetName: 'Wallet cash',
       swapTargetAssetName: 'EDO0939',
     },
   ],
@@ -474,8 +446,6 @@ export const edoYearOneSettledBond = bondResponse({
   maturityDate: '2035-03-01',
   nominalValue: 1000,
   bookValue: 1053.5,
-  fundingAssetId: fundingCashId,
-  fundingAssetName: 'Wallet cash',
   lastSettlement: edoYearOneSettlement,
   periods: [
     rorPeriod(1, '2025-03-01', '2026-03-01', BOND_PERIOD_STATE.Settled, edoYearOneSettlement),
@@ -520,7 +490,6 @@ export const partiallyRedeemedEdoBond = bondResponse({
       fee: 12,
       tax: 2.43,
       proceeds: 410.33,
-      destinationAssetName: 'Wallet cash',
       swapTargetAssetName: null,
     },
   ],
@@ -547,8 +516,6 @@ export const rorMonthsSettledBond = bondResponse({
   maturityDate: '2027-06-10',
   nominalValue: 2000,
   bookValue: 2000,
-  fundingAssetId: fundingCashId,
-  fundingAssetName: 'Wallet cash',
   lastSettlement: rorMonthSettlement(3),
   periods: [
     rorPeriod(1, '2026-06-10', '2026-07-10', BOND_PERIOD_STATE.Settled, rorMonthSettlement(1)),

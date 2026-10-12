@@ -80,8 +80,6 @@
           form.controls.bondCount.hasError('min') || form.controls.bondCount.hasError('max')
         ) {
           <mat-error>{{ 'bonds.swap.countRange' | transloco: { max: heldCount } }}</mat-error>
-        } @else if (form.controls.bondCount.hasError('exceedsProceeds')) {
-          <mat-error>{{ 'bonds.swap.exceedsProceeds' | transloco }}</mat-error>
         } @else if (form.controls.bondCount.hasError('server')) {
           <mat-error>{{ form.controls.bondCount.getError('server') }}</mat-error>
         }
@@ -200,29 +198,18 @@
       </dl>
     }
 
-    @if (needsDestination()) {
-      <mat-form-field appearance="outline" class="swap-bond-dialog__field">
-        <mat-label>{{ 'bonds.swap.destination' | transloco }}</mat-label>
-        <mat-select formControlName="destinationAssetId" data-testid="swap-destination">
-          @if (candidatesResource.hasValue()) {
-            @for (candidate of candidatesResource.value(); track candidate.assetId) {
-              <mat-option [value]="candidate.assetId">
-                {{ candidate.name }}
-              </mat-option>
-            }
-          }
-        </mat-select>
-        @if (candidatesResource.error(); as loadError) {
-          <mat-hint>{{ loadError.message }}</mat-hint>
-        } @else if (candidatesResource.hasValue() && candidatesResource.value().length === 0) {
-          <mat-hint>{{ 'bonds.settle.noCash' | transloco }}</mat-hint>
-        }
-        @if (form.controls.destinationAssetId.hasError('required')) {
-          <mat-error>{{ 'bonds.swap.destinationRequired' | transloco }}</mat-error>
-        } @else if (form.controls.destinationAssetId.hasError('server')) {
-          <mat-error>{{ form.controls.destinationAssetId.getError('server') }}</mat-error>
-        }
-      </mat-form-field>
+    @if (amounts(); as current) {
+      @if (current.shortfall) {
+        <p class="swap-bond-dialog__hint" data-testid="swap-shortfall">
+          {{
+            'bonds.swap.shortfall' | transloco: { amount: formatMoney(current.shortfall, currency) }
+          }}
+        </p>
+      } @else if (current.leftover) {
+        <p class="swap-bond-dialog__hint" data-testid="account-cash">
+          {{ 'bonds.toAccountCash' | transloco: { account: bond.accountName } }}
+        </p>
+      }
     }
 
     @if (formError()) {

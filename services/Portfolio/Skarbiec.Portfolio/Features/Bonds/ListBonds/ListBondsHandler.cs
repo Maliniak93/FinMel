@@ -20,7 +20,6 @@ public sealed class ListBondsHandler(PortfolioDbContext dbContext, IBondRateLook
 
         var today = WarsawCalendar.Today(timeProvider);
         var assetIds = rows.Select(r => r.Asset.Id).ToList();
-        var funding = await dbContext.LoadFundingSourcesAsync(assetIds, cancellationToken);
         var settlements = (await dbContext.BondInterestSettlements
                 .AsNoTracking()
                 .Where(s => assetIds.Contains(s.AssetId))
@@ -36,7 +35,6 @@ public sealed class ListBondsHandler(PortfolioDbContext dbContext, IBondRateLook
                     r.Asset,
                     r.Account,
                     today,
-                    funding.GetValueOrDefault(r.Asset.Id),
                     bondSettlements,
                     [.. links.Redemptions[r.Asset.Id]],
                     links.SwappedFrom.GetValueOrDefault(r.Asset.Id));

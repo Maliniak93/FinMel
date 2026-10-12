@@ -474,7 +474,19 @@ Content-Type: application/json
 
 ### --- Treasury bonds ---
 
-### Add a treasury bond bought with new money (type 5 = EDO)
+### Deposit money into the Bonds account's cash: every bond purchase, coupon, redemption and swap settles there
+POST {{baseUrl}}/api/portfolio/assets/{{createBondsAccount.response.body.cashAssetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 20000,
+  "unitPrice": 1,
+  "date": "2026-01-01"
+}
+
+### Add a treasury bond paid from the account's cash (type 5 = EDO; 400 Validation.InsufficientFunds when the cash would go negative on any day)
 # @name addBond
 POST {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
@@ -493,7 +505,7 @@ Content-Type: application/json
   "earlyRedemptionFeePerBond": 3.00
 }
 
-### Add a treasury bond funded from cash (type 1 = ROR)
+### Add a second treasury bond (type 1 = ROR)
 # @name addFundedBond
 POST {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
@@ -508,8 +520,7 @@ Content-Type: application/json
   "bondCount": 10,
   "purchasePricePerBond": 100.00,
   "firstPeriodRatePercent": 4.25,
-  "earlyRedemptionFeePerBond": 0.50,
-  "fundingAssetId": "{{addFundingCash.response.body.id}}"
+  "earlyRedemptionFeePerBond": 0.50
 }
 
 ### List every bond — each with estimate {grossValue, netValue, asOf} or null and estimateUnavailableReason (RateMissing | MarketDataUnavailable)
@@ -559,11 +570,10 @@ Content-Type: application/json
     { "periodIndex": 1 },
     { "periodIndex": 2, "ratePercent": 3.75 },
     { "periodIndex": 3, "ratePercent": 3.75 }
-  ],
-  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+  ]
 }
 
-### Settle them: each net coupon is credited and moved Bond → Cash on its period end
+### Settle them: each net coupon is credited and moved Bond → account cash on its period end (400 Validation.InsufficientFunds when undoing a spent coupon)
 POST {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/interest-settlements
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -573,8 +583,7 @@ Content-Type: application/json
     { "periodIndex": 1 },
     { "periodIndex": 2, "ratePercent": 3.75 },
     { "periodIndex": 3, "ratePercent": 3.75 }
-  ],
-  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+  ]
 }
 
 ### Get the funded ROR: settled periods, duePeriodCount and lastSettlement
@@ -590,7 +599,7 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/early-redemption-preview?date=2026-09-05&bondCount=4&runningPeriodRatePercent=3.75
 Authorization: Bearer {{authToken}}
 
-### Redeem them early: accrued interest credited, the full fee and Belka tax charged, the proceeds moved Bond → Cash; 6 bonds remain
+### Redeem them early: accrued interest credited, the full fee and Belka tax charged, the proceeds moved Bond → account cash; 6 bonds remain
 POST {{baseUrl}}/api/portfolio/bonds/{{addFundedBond.response.body.assetId}}/early-redemption
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -598,11 +607,10 @@ Content-Type: application/json
 {
   "date": "2026-09-05",
   "bondCount": 4,
-  "runningPeriodRatePercent": 3.75,
-  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+  "runningPeriodRatePercent": 3.75
 }
 
-### Add a matured 3-month bond funded from cash (type 0 = OTS)
+### Add a matured 3-month bond (type 0 = OTS)
 # @name addMaturedBond
 POST {{baseUrl}}/api/portfolio/bonds
 Authorization: Bearer {{authToken}}
@@ -617,8 +625,7 @@ Content-Type: application/json
   "bondCount": 10,
   "purchasePricePerBond": 100.00,
   "firstPeriodRatePercent": 3.00,
-  "earlyRedemptionFeePerBond": 0.00,
-  "fundingAssetId": "{{addFundingCash.response.body.id}}"
+  "earlyRedemptionFeePerBond": 0.00
 }
 
 ### Settle its only period: the interest is capitalised into the bond
@@ -636,7 +643,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}/redemption-preview
 Authorization: Bearer {{authToken}}
 
-### Swap 6 of the 10 into EDO1036 at the swap price; the rest of the proceeds goes to the cash (send the redemption below instead to pay everything out)
+### Swap 6 of the 10 into a new series at the swap price; the rest of the proceeds goes to the account cash, and a swap costing more than the proceeds takes the shortfall from it (400 Validation.InsufficientFunds when it cannot cover it; send the redemption below instead to pay everything out)
 # @name swapBond
 POST {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}/swap
 Authorization: Bearer {{authToken}}
@@ -652,18 +659,15 @@ Content-Type: application/json
     "firstPeriodRatePercent": 5.35,
     "marginPercent": 2.00,
     "earlyRedemptionFeePerBond": 3.00
-  },
-  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+  }
 }
 
-### Redeem the whole holding to cash instead (409 once it was swapped)
+### Redeem the whole holding to the account cash instead (409 once it was swapped)
 POST {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}/redemption
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
-{
-  "destinationAssetId": "{{addFundingCash.response.body.id}}"
-}
+{}
 
 ### Get the redeemed bond: status Redeemed, its redemption and the swap target's name
 GET {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}

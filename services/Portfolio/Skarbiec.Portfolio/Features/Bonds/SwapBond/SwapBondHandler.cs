@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
 
@@ -33,28 +34,9 @@ public sealed class SwapBondHandler(
         }
 
         var cost = request.BondCount * newBond.SwapPricePerBond;
-        var leftover = amounts.Proceeds - cost;
-        if (leftover < 0)
-        {
-            return BondErrors.SwapExceedsProceeds;
-        }
-
-        Asset? cash = null;
-        if (leftover > 0)
-        {
-            if (request.DestinationAssetId is not { } destinationAssetId)
-            {
-                return BondErrors.SwapLeftoverDestinationRequired;
-            }
-
-            var destination = await dbContext.LoadCashDestinationAsync(bond, destinationAssetId, cancellationToken);
-            if (destination.IsFailure)
-            {
-                return destination.Error;
-            }
-
-            cash = destination.Value;
-        }
+        var leftover = Math.Max(0m, amounts.Proceeds - cost);
+        var shortfall = Math.Max(0m, cost - amounts.Proceeds);
+        var cash = await dbContext.LoadAccountCashAsync(bond.AccountId!.Value, cancellationToken);
 
         // The swap stays in the old bond's account, so an IKE lot stays in IKE with its tax exemption.
         var swapped = new Asset
@@ -68,15 +50,24 @@ public sealed class SwapBondHandler(
         };
 
         var (credit, charge) = plan.CreateAdjustments();
-        var (swapOut, swapIn) = TransferLegs.Create(bond.Id, swapped.Id, cost, plan.Date);
-        Transaction? cashOut = null;
-        Transaction? cashIn = null;
-        if (cash is not null)
+        var (swapOut, swapIn) = TransferLegs.Create(bond.Id, swapped.Id, cost - shortfall, plan.Date);
+        Transaction? leftoverOut = null;
+        Transaction? leftoverIn = null;
+        if (leftover > 0)
         {
-            (cashOut, cashIn) = TransferLegs.Create(bond.Id, cash.Id, leftover, plan.Date);
+            (leftoverOut, leftoverIn) = TransferLegs.Create(bond.Id, cash.Id, leftover, plan.Date);
         }
 
-        List<Transaction> bondAdded = [.. new[] { credit, charge, swapOut, cashOut }.OfType<Transaction>()];
+        Transaction? shortfallOut = null;
+        Transaction? shortfallIn = null;
+        if (shortfall > 0)
+        {
+            (shortfallOut, shortfallIn) = TransferLegs.Create(cash.Id, swapped.Id, shortfall, plan.Date);
+        }
+
+        List<Transaction> bondAdded = [.. new[] { credit, charge, swapOut, leftoverOut }.OfType<Transaction>()];
+        List<Transaction> swappedAdded = [.. new[] { swapIn, shortfallIn }.OfType<Transaction>()];
+        List<Transaction> cashAdded = [.. new[] { leftoverIn, shortfallOut }.OfType<Transaction>()];
 
         var bondQuantity = await dbContext.RecomputeWithAsync(bond.Id, bondAdded, cancellationToken);
         if (bondQuantity.IsFailure)
@@ -84,16 +75,17 @@ public sealed class SwapBondHandler(
             return bondQuantity.Error;
         }
 
-        var swappedQuantity = TransactionQuantityCalculator.Recompute([swapIn]);
+        var swappedQuantity = TransactionQuantityCalculator.Recompute(swappedAdded);
         if (swappedQuantity.IsFailure)
         {
             return swappedQuantity.Error;
         }
 
         decimal? cashQuantity = null;
-        if (cash is not null && cashIn is not null)
+        if (cashAdded.Count > 0)
         {
-            var recomputed = await dbContext.RecomputeWithAsync(cash.Id, [cashIn], cancellationToken);
+            var recomputed = await dbContext.RecomputeWithAsync(
+                cash.Id, cashAdded, cancellationToken, _ => TransferErrors.InsufficientFunds);
             if (recomputed.IsFailure)
             {
                 return recomputed.Error;
@@ -103,8 +95,7 @@ public sealed class SwapBondHandler(
         }
 
         // Every side is PLN: the frozen PLN rate is 1 by definition, so MarketData is not asked.
-        Transaction?[] added = [.. bondAdded, swapIn, cashIn];
-        foreach (var transaction in added.OfType<Transaction>())
+        foreach (var transaction in bondAdded.Concat(swappedAdded).Concat(cashAdded))
         {
             transaction.FxRateToPln = 1m;
             dbContext.Transactions.Add(transaction);
@@ -139,7 +130,7 @@ public sealed class SwapBondHandler(
             Proceeds = amounts.Proceeds,
             CreditTransactionId = credit?.Id,
             ChargeTransactionId = charge?.Id,
-            CashTransferId = cashOut?.TransferId,
+            CashTransferId = leftoverOut?.TransferId,
             SwapTargetAssetId = swapped.Id,
             SwapTransferId = swapOut.TransferId
         });
@@ -151,7 +142,7 @@ public sealed class SwapBondHandler(
         await positionEventPublisher.PublishChangedAsync(bond, cancellationToken);
         await positionEventPublisher.PublishCreatedAsync(swapped, cancellationToken);
 
-        if (cash is not null && cashQuantity is { } quantity)
+        if (cashQuantity is { } quantity)
         {
             cash.Quantity = quantity;
             await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);

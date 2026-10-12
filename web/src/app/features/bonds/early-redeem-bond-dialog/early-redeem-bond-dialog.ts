@@ -13,7 +13,6 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
@@ -30,13 +29,7 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatDate, formatMoney, formatPercent } from '../../../shared/format';
-import {
-  BOND_PERIOD_STATE,
-  isCouponBond,
-  loadCashCandidates,
-  loadSeriesRates,
-  usesTermsRate,
-} from '../bond-interest';
+import { BOND_PERIOD_STATE, isCouponBond, loadSeriesRates, usesTermsRate } from '../bond-interest';
 
 export interface EarlyRedeemBondDialogData {
   bond: BondResponse;
@@ -83,7 +76,6 @@ function sameQuery(a: EarlyRedemptionQuery | undefined, b: EarlyRedemptionQuery 
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatSelectModule,
     TranslocoPipe,
   ],
   templateUrl: './early-redeem-bond-dialog.html',
@@ -125,7 +117,6 @@ export class EarlyRedeemBondDialog {
       null as number | null,
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
-    destinationAssetId: [null as string | null, [Validators.required]],
   });
 
   private readonly formState = toSignal(this.form.valueChanges.pipe(map(() => this.snapshot())), {
@@ -196,10 +187,6 @@ export class EarlyRedeemBondDialog {
     loader: ({ abortSignal }) => loadSeriesRates(this.bond.seriesCode, abortSignal),
   });
 
-  protected readonly candidatesResource = resource({
-    loader: ({ abortSignal }) => loadCashCandidates(abortSignal),
-  });
-
   protected readonly previewResource = resource({
     params: () => this.previewQuery(),
     loader: async ({ params, abortSignal }) => {
@@ -236,23 +223,6 @@ export class EarlyRedeemBondDialog {
     });
   });
 
-  // The Cash the purchase was paid from is where the money most likely returns.
-  private readonly destinationDefault = effect(() => {
-    if (!this.candidatesResource.hasValue()) {
-      return;
-    }
-    const candidates = this.candidatesResource.value();
-    untracked(() => {
-      const destination = this.form.controls.destinationAssetId;
-      if (
-        destination.value === null &&
-        candidates.some((candidate) => candidate.assetId === this.bond.fundingAssetId)
-      ) {
-        destination.setValue(this.bond.fundingAssetId ?? null);
-      }
-    });
-  });
-
   protected settleFirst(): void {
     this.dialogRef.close('settle');
   }
@@ -273,7 +243,7 @@ export class EarlyRedeemBondDialog {
 
     const result = await postApiPortfolioBondsByAssetIdEarlyRedemption({
       path: { assetId: this.bond.assetId },
-      body: { ...query, destinationAssetId: this.form.getRawValue().destinationAssetId! },
+      body: query,
     });
 
     this.submitting.set(false);

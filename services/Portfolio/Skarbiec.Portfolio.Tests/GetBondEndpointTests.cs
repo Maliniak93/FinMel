@@ -80,7 +80,7 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
         await client.SettleBondInterestAsync(
-            funded.Bond.AssetId, [(1, null), (2, 3.75m)], funded.CashAssetId, cancellationToken);
+            funded.Bond.AssetId, [(1, null), (2, 3.75m)], cancellationToken);
 
         var body = await client.GetBondAsync(funded.Bond.AssetId, cancellationToken);
 
@@ -108,7 +108,7 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
         await client.RedeemBondEarlyAsync(
-            funded.Bond.AssetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+            funded.Bond.AssetId, EdoEarlyRedemptionDate, 4, cancellationToken, runningPeriodRatePercent: 4.00m);
 
         var bond = await client.GetBondAsync(funded.Bond.AssetId, cancellationToken);
 
@@ -121,7 +121,6 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(12.00m, redemption.Fee);
         Assert.Equal(2.43m, redemption.Tax);
         Assert.Equal(410.33m, redemption.Proceeds);
-        Assert.Equal("Cash account", redemption.DestinationAssetName);
         Assert.Null(redemption.SwapTargetAssetName);
     }
 
@@ -132,7 +131,7 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await client.CreateSettledTosAsync(cancellationToken);
-        await client.SwapBondAsync(funded.Bond.AssetId, 6, funded.CashAssetId, cancellationToken);
+        await client.SwapBondAsync(funded.Bond.AssetId, 6, cancellationToken);
 
         var tos = await client.GetBondAsync(funded.Bond.AssetId, cancellationToken);
         var edo = await client.FindSwappedBondAsync(funded.Bond.AssetId, cancellationToken);
@@ -146,7 +145,6 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
         Assert.Equal(10, redemption.BondCount);
         Assert.Equal(26.21m, redemption.Tax);
         Assert.Equal(1_111.69m, redemption.Proceeds);
-        Assert.Equal("Cash account", redemption.DestinationAssetName);
         Assert.Equal("EDO1036", redemption.SwapTargetAssetName);
         Assert.Equal(BondStatus.Active, edo.Status);
         Assert.Equal(funded.Bond.AssetId, edo.SwappedFrom!.AssetId);

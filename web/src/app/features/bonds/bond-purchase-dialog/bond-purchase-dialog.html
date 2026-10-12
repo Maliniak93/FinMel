@@ -166,41 +166,20 @@
       }
     </mat-form-field>
 
-    @if (!isEdit) {
-      <mat-form-field appearance="outline" class="bond-purchase-dialog__field">
-        <mat-label>{{ 'bonds.purchase.sourceOfFunds' | transloco }}</mat-label>
-        <mat-select formControlName="fundingAssetId" canSelectNullableOptions>
-          <mat-option [value]="null">{{ 'bonds.purchase.newMoney' | transloco }}</mat-option>
-          @if (fundingCandidatesResource.hasValue()) {
-            @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
-              <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} ({{ formatMoney(candidate.balance, currency) }})
-              </mat-option>
-            }
-          }
-        </mat-select>
-        @if (fundingCandidatesResource.error(); as loadError) {
-          <mat-hint>{{ loadError.message }}</mat-hint>
-        }
-        @if (form.controls.fundingAssetId.hasError('exceedsBalance')) {
-          <mat-error>{{
-            'bonds.purchase.exceedsBalance'
-              | transloco
-                : {
-                    balance: formatMoney(
-                      form.controls.fundingAssetId.getError('exceedsBalance').balance,
-                      currency
-                    ),
-                  }
-          }}</mat-error>
-        } @else if (form.controls.fundingAssetId.hasError('server')) {
-          <mat-error>{{ form.controls.fundingAssetId.getError('server') }}</mat-error>
-        }
-      </mat-form-field>
-    } @else if (data.bond; as bond) {
-      <p class="bond-purchase-dialog__funding">
-        {{ 'bonds.purchase.sourceOfFunds' | transloco }}
-        <strong>{{ bond.fundingAssetName ?? ('bonds.purchase.newMoney' | transloco) }}</strong>
+    @if (accountCash(); as cash) {
+      <p class="bond-purchase-dialog__funding" data-testid="account-cash">
+        {{
+          (cash.amount === null
+            ? 'bonds.purchase.accountCashBalance'
+            : 'bonds.purchase.fromAccountCash'
+          )
+            | transloco
+              : {
+                  account: cash.name,
+                  amount: cash.amount === null ? '' : formatMoney(cash.amount, currency),
+                  balance: formatMoney(cash.balance, currency),
+                }
+        }}
       </p>
     }
 

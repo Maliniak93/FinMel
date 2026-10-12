@@ -6,7 +6,6 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
@@ -17,9 +16,7 @@ import { readProblemDetails } from '../../../core/auth/problem-details';
 import { formatDate, formatPercent } from '../../../shared/format';
 import {
   buildSettleSection,
-  isCouponBond,
   isSectionValid,
-  loadCashCandidates,
   loadSeriesRates,
   settleRequest,
   usesTermsRate,
@@ -47,7 +44,6 @@ interface SettleAllSection extends BondSettleSection {
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatSelectModule,
     TranslocoPipe,
   ],
   templateUrl: './settle-all-bonds-dialog.html',
@@ -72,21 +68,13 @@ export class SettleAllBondsDialog {
     },
   });
 
-  protected readonly candidatesResource = resource({
-    params: () => (this.bonds.some(isCouponBond) ? { coupon: true } : undefined),
-    loader: ({ abortSignal }) => loadCashCandidates(abortSignal),
-  });
-
   protected readonly sections = computed<SettleAllSection[] | null>(() => {
-    if (this.seriesResource.isLoading() || this.candidatesResource.isLoading()) {
+    if (this.seriesResource.isLoading()) {
       return null;
     }
     const series = this.seriesResource.hasValue() ? this.seriesResource.value() : null;
-    const candidates = this.candidatesResource.hasValue()
-      ? (this.candidatesResource.value() ?? [])
-      : [];
     return this.bonds.map((bond) => ({
-      ...buildSettleSection(bond, series?.get(bond.seriesCode) ?? null, candidates),
+      ...buildSettleSection(bond, series?.get(bond.seriesCode) ?? null),
       included: new FormControl(true, { nonNullable: true }),
       settled: signal(false),
       error: signal<string | null>(null),
@@ -105,7 +93,6 @@ export class SettleAllBondsDialog {
     if (pending.length === 0 || invalid.length > 0) {
       for (const section of invalid) {
         section.rates.markAllAsTouched();
-        section.destination.markAsTouched();
       }
       return;
     }
