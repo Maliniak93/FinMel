@@ -20,6 +20,6 @@ public sealed class RestoreAccountHandler(PortfolioDbContext dbContext)
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return account.ToResponse();
+        return await dbContext.ToResponseAsync(account, cancellationToken);
     }
 }

@@ -16,6 +16,12 @@ internal static class PortfolioAssertions
 
     public const string AccountHasHistoryErrorCode = "Conflict.AccountHasHistory";
 
+    public const string AccountCashManagedErrorCode = "Conflict.AccountCashManaged";
+
+    public static async Task AssertAccountCashManagedAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, AccountCashManagedErrorCode, cancellationToken);
+
     public const string DuplicateNameErrorCode = "Conflict.DuplicateName";
 
     public const string AccountRequiredErrorCode = "Validation.AccountRequired";

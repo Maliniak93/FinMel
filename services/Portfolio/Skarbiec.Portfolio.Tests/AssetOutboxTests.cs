@@ -268,7 +268,7 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         await using var verify = Provider.CreateAsyncScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
         Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
-        Assert.Equal(2, await verifyDb.Assets.CountAsync(cancellationToken));
+        Assert.Equal(2, await verifyDb.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
         var cash = await verifyDb.Assets.SingleAsync(a => a.Id == cashAssetId, cancellationToken);
         Assert.Equal(1_000m, cash.Quantity);
         var deposit = await verifyDb.Transactions.SingleAsync(t => t.AssetId == cashAssetId, cancellationToken);
@@ -498,7 +498,8 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
             cancellationToken);
         Assert.True(result.IsSuccess);
 
-        var evt = Assert.Single(await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        var evt = Assert.Single(
+            await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken), e => e.AssetClass == AssetClass.Stock);
         Assert.Null(evt.FirstTransactionDate);
     }
 
@@ -511,8 +512,9 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
         var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
         await AddStockAsync(scope.ServiceProvider, accountId, "Shares", cancellationToken);
 
-        var evt = Assert.Single(await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()
-            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        var evt = Assert.Single(
+            await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>().ReadPublishedAsync<AssetPositionChanged>(cancellationToken),
+            e => e.AssetClass == AssetClass.Stock);
         Assert.Empty(evt.QuantityHistory);
     }
 }

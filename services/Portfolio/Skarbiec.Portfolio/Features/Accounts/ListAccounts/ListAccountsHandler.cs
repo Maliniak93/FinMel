@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Accounts.ListAccounts;
@@ -12,6 +13,11 @@ public sealed class ListAccountsHandler(PortfolioDbContext dbContext)
             .OrderBy(a => a.Name)
             .ToListAsync(cancellationToken);
 
-        return accounts.Select(a => a.ToResponse()).ToList();
+        var cashByAccount = await dbContext.Assets
+            .AsNoTracking()
+            .Where(a => a.AccountId != null && a.AssetClass == AssetClass.Cash)
+            .ToDictionaryAsync(a => a.AccountId!.Value, cancellationToken);
+
+        return accounts.Select(a => a.ToResponse(cashByAccount[a.Id])).ToList();
     }
 }

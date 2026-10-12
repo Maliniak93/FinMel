@@ -28,6 +28,10 @@ public sealed record DashboardAccountValue
     /// <summary>Null groups the lines of assets that sit in no account.</summary>
     public Guid? AccountId { get; init; }
     public required decimal ValuePln { get; init; }
+
+    /// <summary>The part of ValuePln held in Cash-class lines.</summary>
+    public required decimal CashPln { get; init; }
+
     public required decimal Percentage { get; init; }
     public required DateOnly SnapshotDate { get; init; }
     public required bool IsStale { get; init; }

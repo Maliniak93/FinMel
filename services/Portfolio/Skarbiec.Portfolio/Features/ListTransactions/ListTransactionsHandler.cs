@@ -18,9 +18,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
         // The asset lookup doubles as the existence check, and its class tells whether a transfer leg is on a manual route.
         var asset = await dbContext.Assets
             .AsNoTracking()
-            .Where(a => a.Id == assetId)
-            .Select(a => new { a.Currency, a.AssetClass })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == assetId, cancellationToken);
 
         if (asset is null)
         {
@@ -54,9 +52,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                 select new
                 {
                     TransferId = leg.TransferId!.Value,
-                    AssetId = counterpartAsset.Id,
-                    AssetName = counterpartAsset.Name,
-                    counterpartAsset.AssetClass,
+                    Asset = counterpartAsset,
                     AccountName = counterpartAccount.Name
                 })
             .ToDictionaryAsync(c => c.TransferId, cancellationToken);
@@ -83,10 +79,10 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                         {
                             TransferId = transferId,
                             Manual = TransferLegs.DirectionOf(t) == TransferDirection.Out
-                                ? TransferRoutes.IsDeletable(asset.AssetClass, counterpart.AssetClass)
-                                : TransferRoutes.IsDeletable(counterpart.AssetClass, asset.AssetClass),
-                            CounterpartAssetId = counterpart.AssetId,
-                            CounterpartAssetName = counterpart.AssetName,
+                                ? TransferRoutes.IsDeletable(asset, counterpart.Asset)
+                                : TransferRoutes.IsDeletable(counterpart.Asset, asset),
+                            CounterpartAssetId = counterpart.Asset.Id,
+                            CounterpartAssetName = counterpart.Asset.Name,
                             CounterpartAccountName = counterpart.AccountName,
                             Direction = TransferLegs.DirectionOf(t)
                         }

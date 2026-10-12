@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -121,6 +122,43 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         var own = Assert.Single(candidates);
         Assert.Equal(strangerCashId, own.GetProperty("assetId").GetGuid());
         Assert.DoesNotContain(candidates, c => c.GetProperty("assetId").GetGuid() == ownerCashId);
+    }
+
+    [Fact]
+    public async Task AccountCash()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerAccount = await owner.CreateAccountWithCashAsync(cancellationToken, balance: 1_000m, name: "Owner");
+        var ownerTarget = await owner.CreateAccountWithCashAsync(cancellationToken, name: "Owner target");
+        var ownerTransferId = await owner.CreateTransferAsync(
+            cancellationToken, NewTransferRequest(ownerAccount.CashAssetId, ownerTarget.CashAssetId, 400m, CashDay4));
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerAccount = await stranger.CreateAccountWithCashAsync(cancellationToken, balance: 1_000m, name: "Stranger");
+
+        var transferFrom = await stranger.PostAsJsonAsync(
+            TransfersUri,
+            NewTransferRequest(ownerAccount.CashAssetId, strangerAccount.CashAssetId, 100m, CashDay4),
+            cancellationToken);
+        var transferInto = await stranger.PostAsJsonAsync(
+            TransfersUri,
+            NewTransferRequest(strangerAccount.CashAssetId, ownerAccount.CashAssetId, 100m, CashDay4),
+            cancellationToken);
+        var deleteTransfer = await stranger.DeleteAsync(TransferUri(ownerTransferId), cancellationToken);
+        var candidates = await stranger.GetAsync(TransferCandidatesUri("PLN", "Cash", accountCash: true), cancellationToken);
+
+        Assert.All(new[] { transferFrom, transferInto }, response =>
+            Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest));
+        Assert.Equal(HttpStatusCode.NotFound, deleteTransfer.StatusCode);
+        Assert.Equal(600m, await owner.GetCashBalanceAsync(ownerAccount.AccountId, cancellationToken));
+        Assert.Equal(400m, await owner.GetCashBalanceAsync(ownerTarget.AccountId, cancellationToken));
+        Assert.Equal(1_000m, await stranger.GetCashBalanceAsync(strangerAccount.AccountId, cancellationToken));
+        Assert.Equal(HttpStatusCode.OK, candidates.StatusCode);
+        var listed = (await candidates.ReadJsonAsync(cancellationToken)).EnumerateArray()
+            .Select(c => c.GetProperty("assetId").GetGuid()).ToList();
+        Assert.DoesNotContain(ownerAccount.CashAssetId, listed);
+        Assert.DoesNotContain(ownerTarget.CashAssetId, listed);
     }
 
     [Fact]

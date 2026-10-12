@@ -784,6 +784,40 @@
     "valuesLoadFailed": "Failed to load account values.",
     "filteredNotice": "Showing one account only.",
     "showAll": "Show all",
+    "balances": {
+      "cash": "Cash",
+      "securities": "Securities",
+      "total": "Total"
+    },
+    "detail": {
+      "back": "Back to accounts",
+      "holdings": "Holdings",
+      "noHoldings": "This account holds no assets yet.",
+      "cashHistory": "Cash history",
+      "noHistory": "No cash movements yet.",
+      "loadFailed": "Failed to load the account.",
+      "holdingsFailed": "Failed to load the account's holdings.",
+      "historyFailed": "Failed to load the cash history."
+    },
+    "cash": {
+      "deposit": "Deposit",
+      "withdraw": "Withdraw",
+      "depositTitle": "Deposit money",
+      "withdrawTitle": "Withdraw money",
+      "amountRequired": "Amount is required.",
+      "amountPositive": "The amount must be greater than 0.",
+      "dateInFuture": "Date can't be in the future.",
+      "insufficientFunds": "Insufficient funds on the account"
+    },
+    "transfer": {
+      "action": "Transfer",
+      "title": "Transfer between accounts",
+      "target": "Target account",
+      "targetRequired": "Choose the target account.",
+      "noTarget": "You have no other account to transfer to.",
+      "loadFailed": "Failed to load the accounts.",
+      "submit": "Transfer"
+    },
     "archive": {
       "title": "Archive this account?",
       "message": "\"{{ name }}\" will become read-only and hidden from the default list — you can still see it by toggling \"Show archived\".",

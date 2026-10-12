@@ -12,7 +12,7 @@ public sealed class ListCashAccountsHandler(PortfolioDbContext dbContext)
     {
         var accounts = await (
                 from asset in dbContext.Assets.AsNoTracking()
-                where asset.AssetClass == AssetClass.Cash && !asset.IsArchived
+                where asset.AssetClass == AssetClass.Cash && asset.AccountId == null && !asset.IsArchived
                 orderby asset.Name
                 select new CashAccountResponse
                 {

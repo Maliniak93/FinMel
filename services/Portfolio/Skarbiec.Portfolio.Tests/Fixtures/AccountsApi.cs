@@ -5,6 +5,8 @@ using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 using Skarbiec.Portfolio.Features.AddAsset;
+using Skarbiec.Portfolio.Features.RecordTransaction;
+using Skarbiec.Portfolio.Features.UpdateTransaction;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
@@ -76,6 +78,72 @@ internal static class AccountsApi
 
         return assetId;
     }
+
+    public static IQueryable<Asset> ExcludingAccountCash(this IQueryable<Asset> assets) =>
+        assets.Where(a => a.AssetClass != AssetClass.Cash || a.AccountId == null);
+
+    public static readonly DateTimeOffset AccountCashTodayUtc = new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero);
+
+    public static readonly DateOnly CashDay1 = new(2026, 10, 12);
+
+    public static readonly DateOnly CashDay2 = new(2026, 10, 13);
+
+    public static readonly DateOnly CashDay3 = new(2026, 10, 14);
+
+    public static readonly DateOnly CashDay4 = new(2026, 10, 15);
+
+    public static async Task<Guid> GetAccountCashAssetIdAsync(
+        this HttpClient client, Guid accountId, CancellationToken cancellationToken) =>
+        (await client.GetAccountAsync(accountId, cancellationToken)).CashAssetId;
+
+    public sealed record AccountWithCash(Guid AccountId, Guid CashAssetId);
+
+    public static async Task<AccountWithCash> CreateAccountWithCashAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        decimal balance = 0m,
+        string name = "XTB",
+        DateOnly? depositedOn = null)
+    {
+        var accountId = await client.CreateAccountAsync(cancellationToken, name);
+        var cashAssetId = await client.GetAccountCashAssetIdAsync(accountId, cancellationToken);
+        if (balance > 0m)
+        {
+            await client.RecordTransactionAsync(
+                cashAssetId, TransactionType.Deposit, balance, depositedOn ?? CashDay1, cancellationToken, unitPrice: 1m);
+        }
+
+        return new AccountWithCash(accountId, cashAssetId);
+    }
+
+    public static Task<HttpResponseMessage> PostCashTransactionAsync(
+        this HttpClient client,
+        Guid cashAssetId,
+        TransactionType type,
+        decimal amount,
+        DateOnly date,
+        CancellationToken cancellationToken) =>
+        client.PostAsJsonAsync(
+            PortfolioApi.TransactionsUri(cashAssetId),
+            new RecordTransactionRequest { Type = type, Quantity = amount, UnitPrice = 1m, Date = date },
+            cancellationToken);
+
+    public static Task<HttpResponseMessage> PutCashTransactionAsync(
+        this HttpClient client,
+        Guid cashAssetId,
+        Guid transactionId,
+        TransactionType type,
+        decimal amount,
+        DateOnly date,
+        CancellationToken cancellationToken) =>
+        client.PutAsJsonAsync(
+            PortfolioApi.TransactionUri(cashAssetId, transactionId),
+            new UpdateTransactionRequest { Type = type, Quantity = amount, UnitPrice = 1m, Date = date },
+            cancellationToken);
+
+    public static async Task<decimal> GetCashBalanceAsync(
+        this HttpClient client, Guid accountId, CancellationToken cancellationToken) =>
+        (await client.GetAccountAsync(accountId, cancellationToken)).CashBalance;
 
     public static AddAssetRequest NewAccountlessCashRequest(Guid? accountId = null) => new()
     {

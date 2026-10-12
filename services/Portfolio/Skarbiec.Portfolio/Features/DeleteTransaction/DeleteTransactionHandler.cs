@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
@@ -67,7 +68,8 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
             .Where(t => t.AssetId == assetId && t.Id != id)
             .ToListAsync(cancellationToken);
 
-        var recomputed = TransactionQuantityCalculator.Recompute(remainingTransactions, TransactionErrors.MutationBreaksHistory);
+        var recomputed = TransactionQuantityCalculator.Recompute(
+            remainingTransactions, asset.OversellError(TransactionErrors.MutationBreaksHistory));
         if (recomputed.IsFailure)
         {
             return recomputed.Error;

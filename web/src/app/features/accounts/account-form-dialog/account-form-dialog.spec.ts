@@ -20,6 +20,8 @@ const existingAccount: AccountResponse = {
   type: 0,
   wrapper: 1,
   isArchived: false,
+  cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  cashBalance: 0,
 };
 
 describe('AccountFormDialog', () => {

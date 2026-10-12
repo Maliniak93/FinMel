@@ -19,13 +19,8 @@
       <ul class="accounts-card__list">
         @for (row of rows(); track row.id) {
           <li class="accounts-card__row">
-            @if (row.id !== null && row.path !== null) {
-              <a
-                class="accounts-card__name"
-                [routerLink]="row.path"
-                [queryParams]="{ account: row.id }"
-                >{{ row.name }}</a
-              >
+            @if (row.id !== null) {
+              <a class="accounts-card__name" [routerLink]="['/accounts', row.id]">{{ row.name }}</a>
             } @else {
               <span class="accounts-card__name">{{
                 'dashboard.accounts.outside' | transloco

@@ -24,6 +24,11 @@ public sealed class UpdateAssetHandler(
             return AssetErrors.NotFound(assetId);
         }
 
+        if (asset.ManagedError() is { } cashManaged)
+        {
+            return cashManaged;
+        }
+
         if (await dbContext.ReadOnlyErrorAsync(asset, cancellationToken) is { } readOnly)
         {
             return readOnly;

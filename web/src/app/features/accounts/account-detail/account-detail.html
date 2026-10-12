@@ -1,0 +1,216 @@
+<div class="account-detail">
+  <a routerLink="/accounts" class="account-detail__back">
+    <mat-icon>arrow_back</mat-icon>
+    {{ 'accounts.detail.back' | transloco }}
+  </a>
+
+  @if (accountResource.error(); as loadError) {
+    <div class="account-detail__state" role="alert">
+      <p>{{ loadError.message }}</p>
+      <button mat-button type="button" (click)="accountResource.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (accountResource.hasValue()) {
+    @let account = accountResource.value();
+    <div class="account-detail__header">
+      <div>
+        <h1>{{ account.name }}</h1>
+        <div class="account-detail__meta">
+          <span>{{ accountTypeLabel(account.type) | transloco }}</span>
+          <span>{{ taxWrapperLabel(account.wrapper) | transloco }}</span>
+          @if (account.isArchived) {
+            <mat-chip-set>
+              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
+            </mat-chip-set>
+          }
+        </div>
+      </div>
+      <div class="account-detail__actions">
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          [disabled]="account.isArchived"
+          (click)="openCashOperation('deposit')"
+        >
+          {{ 'accounts.cash.deposit' | transloco }}
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="account.isArchived"
+          (click)="openCashOperation('withdraw')"
+        >
+          {{ 'accounts.cash.withdraw' | transloco }}
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="account.isArchived"
+          (click)="openTransfer()"
+        >
+          {{ 'accounts.transfer.action' | transloco }}
+        </button>
+      </div>
+    </div>
+
+    <dl class="account-detail__totals">
+      <div>
+        <dt>{{ 'accounts.balances.cash' | transloco }}</dt>
+        <dd>{{ formatMoney(account.cashBalance) }}</dd>
+      </div>
+      <div>
+        <dt>{{ 'accounts.balances.securities' | transloco }}</dt>
+        <dd>
+          @if (totals()?.securities !== null && totals()?.securities !== undefined) {
+            {{ formatMoney(totals()!.securities!) }}
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>{{ 'accounts.balances.total' | transloco }}</dt>
+        <dd>
+          @if (totals()?.total !== null && totals()?.total !== undefined) {
+            {{ formatMoney(totals()!.total!) }}
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+    </dl>
+
+    <h2>{{ 'accounts.detail.holdings' | transloco }}</h2>
+    @if (holdingsResource.error(); as holdingsError) {
+      <div class="account-detail__state" role="alert">
+        <p>{{ holdingsError.message }}</p>
+        <button mat-button type="button" (click)="holdingsResource.reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (holdingsResource.isLoading() && !holdingsResource.hasValue()) {
+      <div class="account-detail__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (holdingsResource.hasValue() && holdingsResource.value().length === 0) {
+      <p class="account-detail__empty">{{ 'accounts.detail.noHoldings' | transloco }}</p>
+    } @else if (holdingsResource.hasValue()) {
+      <table mat-table [dataSource]="holdingsResource.value()" class="account-detail__table">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+          <td mat-cell *matCellDef="let holding">
+            <a [routerLink]="['/assets', holding.id, 'transactions']">{{ holding.name }}</a>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="quantity">
+          <th mat-header-cell *matHeaderCellDef>{{ 'assets.quantity' | transloco }}</th>
+          <td mat-cell *matCellDef="let holding">{{ formatQuantity(holding.quantity) }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="holdingColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: holdingColumns"></tr>
+      </table>
+    }
+
+    <h2>{{ 'accounts.detail.cashHistory' | transloco }}</h2>
+    @if (historyResource.error(); as historyError) {
+      <div class="account-detail__state" role="alert">
+        <p>{{ historyError.message }}</p>
+        <button mat-button type="button" (click)="historyResource.reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (historyResource.isLoading() && !historyResource.hasValue()) {
+      <div class="account-detail__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (historyResource.hasValue()) {
+      @let page = historyResource.value();
+      @if (page.items.length === 0) {
+        <p class="account-detail__empty">{{ 'accounts.detail.noHistory' | transloco }}</p>
+      } @else {
+        <table mat-table [dataSource]="page.items" class="account-detail__table">
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>{{ 'common.date' | transloco }}</th>
+            <td mat-cell *matCellDef="let transaction">{{ formatDate(transaction.date) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>{{ 'common.type' | transloco }}</th>
+            <td mat-cell *matCellDef="let transaction">
+              {{ transactionTypeLabel(transaction.type) | transloco }}
+              @if (transaction.transfer; as transfer) {
+                @let label = transferLabel(transfer);
+                <span class="account-detail__transfer">{{
+                  label.key | transloco: label.params
+                }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="amount">
+            <th mat-header-cell *matHeaderCellDef>{{ 'common.amount' | transloco }}</th>
+            <td mat-cell *matCellDef="let transaction">
+              {{ formatMoney(transaction.quantity, transaction.currency) }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let transaction">
+              @if (!transaction.transfer) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  [attr.aria-label]="'common.edit' | transloco"
+                  (click)="openEditDialog(transaction)"
+                >
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button
+                  mat-icon-button
+                  type="button"
+                  [attr.aria-label]="'common.delete' | transloco"
+                  (click)="remove(transaction)"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              } @else if (transaction.transfer.manual) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  [attr.aria-label]="'transactions.deleteTransfer.action' | transloco"
+                  (click)="removeTransfer(transaction)"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+          <tr
+            mat-row
+            *matRowDef="let row; columns: displayedColumns()"
+            [attr.data-transaction-id]="row.id"
+          ></tr>
+        </table>
+
+        <mat-paginator
+          [length]="asNumber(page.totalCount)"
+          [pageIndex]="pageIndex()"
+          [pageSize]="pageSize()"
+          [pageSizeOptions]="[10, 20, 50, 100]"
+          (page)="onPage($event)"
+        ></mat-paginator>
+      }
+    }
+  } @else {
+    <div class="account-detail__state">
+      <mat-spinner diameter="32" />
+    </div>
+  }
+</div>

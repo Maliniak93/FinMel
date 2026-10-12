@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 
 namespace Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 
@@ -25,7 +26,7 @@ public sealed class DeleteTransferHandler(PortfolioDbContext dbContext, Position
         var target = await dbContext.Assets.FirstAsync(a => a.Id == inLeg.AssetId, cancellationToken);
 
         // A deposit route belongs to its own entry point.
-        if (!TransferRoutes.IsDeletable(source.AssetClass, target.AssetClass))
+        if (!TransferRoutes.IsDeletable(source, target))
         {
             return TransferErrors.LegManaged;
         }
@@ -41,13 +42,13 @@ public sealed class DeleteTransferHandler(PortfolioDbContext dbContext, Position
         }
 
         // Recompute each side without its leg before removing anything, so a rejected delete leaves the database untouched.
-        var sourceQuantity = await RecomputeWithoutAsync(outLeg, cancellationToken);
+        var sourceQuantity = await RecomputeWithoutAsync(source, outLeg, cancellationToken);
         if (sourceQuantity.IsFailure)
         {
             return sourceQuantity.Error;
         }
 
-        var targetQuantity = await RecomputeWithoutAsync(inLeg, cancellationToken);
+        var targetQuantity = await RecomputeWithoutAsync(target, inLeg, cancellationToken);
         if (targetQuantity.IsFailure)
         {
             return targetQuantity.Error;
@@ -73,13 +74,13 @@ public sealed class DeleteTransferHandler(PortfolioDbContext dbContext, Position
         return Result.Success();
     }
 
-    private async Task<Result<decimal>> RecomputeWithoutAsync(Transaction leg, CancellationToken cancellationToken)
+    private async Task<Result<decimal>> RecomputeWithoutAsync(Asset asset, Transaction leg, CancellationToken cancellationToken)
     {
         var remaining = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => t.AssetId == leg.AssetId && t.Id != leg.Id)
             .ToListAsync(cancellationToken);
 
-        return TransactionQuantityCalculator.Recompute(remaining, TransactionErrors.MutationBreaksHistory);
+        return TransactionQuantityCalculator.Recompute(remaining, asset.OversellError(TransactionErrors.MutationBreaksHistory));
     }
 }

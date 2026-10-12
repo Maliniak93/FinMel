@@ -69,6 +69,7 @@
       "DashboardAccountValue": {
         "required": [
           "valuePln",
+          "cashPln",
           "percentage",
           "snapshotDate",
           "isStale"
@@ -83,6 +84,14 @@
             "format": "uuid"
           },
           "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "cashPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",

@@ -55,6 +55,8 @@ const account: AccountResponse = {
   type: 0,
   wrapper: 0,
   isArchived: false,
+  cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  cashBalance: 0,
 };
 
 const transaction: TransactionResponse = {

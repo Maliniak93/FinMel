@@ -10,6 +10,8 @@ export type AccountResponse = {
     type: AccountType;
     wrapper: TaxWrapper;
     isArchived: boolean;
+    cashAssetId: string;
+    cashBalance: number | string;
 };
 
 export type AccountType = number;
@@ -1483,6 +1485,7 @@ export type GetApiPortfolioTransferCandidatesData = {
     query: {
         currency: string;
         assetClass: AssetClass;
+        accountCash?: boolean;
     };
     url: '/api/portfolio/transfer-candidates';
 };

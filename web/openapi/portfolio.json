@@ -1722,6 +1722,14 @@
             "schema": {
               "$ref": "#/components/schemas/AssetClass"
             }
+          },
+          {
+            "name": "accountCash",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -1802,7 +1810,9 @@
           "name",
           "type",
           "wrapper",
-          "isArchived"
+          "isArchived",
+          "cashAssetId",
+          "cashBalance"
         ],
         "type": "object",
         "properties": {
@@ -1821,6 +1831,18 @@
           },
           "isArchived": {
             "type": "boolean"
+          },
+          "cashAssetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashBalance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },

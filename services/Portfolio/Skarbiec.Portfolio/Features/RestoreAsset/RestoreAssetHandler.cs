@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.RestoreAsset;
@@ -16,6 +17,11 @@ public sealed class RestoreAssetHandler(
         if (asset is null)
         {
             return AssetErrors.NotFound(assetId);
+        }
+
+        if (asset.ManagedError() is { } cashManaged)
+        {
+            return cashManaged;
         }
 
         // An asset in an archived account stays archived until the account is restored.

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
@@ -81,7 +82,8 @@ public sealed class RecordTransactionHandler(
             .Where(t => t.AssetId == assetId)
             .ToListAsync(cancellationToken);
 
-        var recomputed = TransactionQuantityCalculator.Recompute([.. existingTransactions, transaction]);
+        var recomputed = TransactionQuantityCalculator.Recompute(
+            [.. existingTransactions, transaction], asset.OversellError(TransactionErrors.OversellsPosition));
         if (recomputed.IsFailure)
         {
             return recomputed.Error;

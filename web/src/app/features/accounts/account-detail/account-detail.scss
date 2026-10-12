@@ -1,0 +1,73 @@
+.account-detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 0.875rem;
+}
+
+.account-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.account-detail__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  opacity: 0.7;
+}
+
+.account-detail__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.account-detail__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  margin: 0 0 24px;
+
+  dt {
+    opacity: 0.7;
+    font-size: 0.875rem;
+  }
+
+  dd {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 500;
+  }
+}
+
+.account-detail__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.account-detail__empty {
+  opacity: 0.7;
+}
+
+.account-detail__table {
+  width: 100%;
+}
+
+.account-detail__transfer {
+  display: block;
+  font-size: 0.875rem;
+  opacity: 0.7;
+}

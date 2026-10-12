@@ -92,6 +92,27 @@ public sealed class AccountTenancyIsolationTests(SkarbiecContainersFixture conta
     }
 
     [Fact]
+    public async Task Cash()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await owner.CreateAccountWithCashAsync(cancellationToken, balance: 300m);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var deposit = await stranger.PostCashTransactionAsync(
+            account.CashAssetId, TransactionType.Deposit, 50m, CashDay2, cancellationToken);
+        var withdraw = await stranger.PostCashTransactionAsync(
+            account.CashAssetId, TransactionType.Withdraw, 50m, CashDay2, cancellationToken);
+        var read = await stranger.GetAsync(PortfolioApi.AssetUri(account.CashAssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, deposit.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, withdraw.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Equal(300m, await owner.GetCashBalanceAsync(account.AccountId, cancellationToken));
+    }
+
+    [Fact]
     public async Task AddAsset_IntoStrangersAccount_ReturnsNotFoundAndAddsNothing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
