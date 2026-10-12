@@ -86,9 +86,14 @@ function callCost(model, u) {
   return usd / 1e6;
 }
 
+// Several entries share a message id and the first carries a partial output_tokens: keep the largest.
+function keepLargestOutput(byId, id, call) {
+  const prev = byId.get(id);
+  if (!prev || (call.usage.output_tokens || 0) > (prev.usage.output_tokens || 0)) byId.set(id, call);
+}
+
 function transcriptCalls(file) {
-  const seen = new Set();
-  const calls = [];
+  const byId = new Map();
   let first = null;
   for (const line of readFileSync(file, "utf8").split("\n")) {
     if (!line) continue;
@@ -103,15 +108,14 @@ function transcriptCalls(file) {
     }
     const u = entry.message?.usage;
     const model = entry.message?.model;
-    if (entry.type !== "assistant" || !u || model === "<synthetic>" || seen.has(entry.message.id)) continue;
-    seen.add(entry.message.id);
-    calls.push({ model, usage: u });
+    if (entry.type !== "assistant" || !u || model === "<synthetic>") continue;
+    keepLargestOutput(byId, entry.message.id, { model, usage: u });
   }
-  return { first, calls };
+  return { first, calls: [...byId.values()] };
 }
 
 function agentUsage(file) {
-  const seen = new Set();
+  const byId = new Map();
   const models = {};
   const usage = { calls: 0, cacheRead: 0, cacheWrite: 0, input: 0, output: 0, cost: 0, maxContext: 0, bash: {}, model: null };
   for (const line of readFileSync(file, "utf8").split("\n")) {
@@ -131,8 +135,10 @@ function agentUsage(file) {
     }
     const u = entry.message.usage;
     const model = entry.message.model;
-    if (!u || model === "<synthetic>" || seen.has(entry.message.id)) continue;
-    seen.add(entry.message.id);
+    if (!u || model === "<synthetic>") continue;
+    keepLargestOutput(byId, entry.message.id, { model, usage: u });
+  }
+  for (const { model, usage: u } of byId.values()) {
     models[model] = (models[model] || 0) + 1;
     usage.calls++;
     usage.cacheRead += u.cache_read_input_tokens || 0;

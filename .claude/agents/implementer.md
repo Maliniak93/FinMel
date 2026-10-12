@@ -112,8 +112,8 @@ instead, and say in `notes` that you could not verify the API.
 
 ## Run only your own tests while working
 
-Every Bash call running `dotnet test` (filtered too) or `verify.mjs --await` sets Bash `timeout: 600000`
-— the default 2-minute timeout cuts a filtered MarketData run.
+Every Bash call running `dotnet test` (filtered too) sets Bash `timeout: 600000` — the default
+2-minute timeout cuts a filtered MarketData run. `verify.mjs --await` sets `timeout: 3600000`.
 
 **Never run**: a solution-wide `dotnet format` as a habit · `dotnet build` on the solution · an
 unfiltered `dotnet test` · `npm run typecheck` / `lint` / `format:check` / `build` · `npm test`.
@@ -132,14 +132,15 @@ checks only verify that its output is already in the tree.
 Once your filtered tests are green, run the full verification — every test project, `web/` and the
 API client, not just what you touched:
 
-1. Start it in the background (Bash `run_in_background: true`):
-   `node scripts/verify.mjs --all --fix --cache --out .git/verify-result.json`.
-   `--fix` reformats the changed files first; `--cache` answers instantly for a tree already proven
-   green; starting it kills any earlier run.
-2. Wait (Bash `timeout: 600000`): `node scripts/verify.mjs --await .git/verify-result.json`.
-   `VERIFY_PENDING: …` (exit 3) means still running — call `--await` again, as often as it takes (a
-   full run takes 10–20 min). `VERIFY_RESULT: {"ok":…,"failures":[{step,summary,file?}]}` is the
-   answer (exit 0 green, 2 red). Never poll with `sleep`, loops or by re-reading output.
+1. Start it as an ordinary foreground Bash command, never `run_in_background`:
+   `node scripts/verify.mjs --all --fix --cache --out .git/verify-result.json --detach`. It returns at
+   once with `VERIFY_STARTED`; the run goes on as its own process, independent of the Bash call, so
+   nothing cuts it off. `--fix` reformats the changed files first; `--cache` answers instantly for a
+   tree already proven green; starting it kills any earlier run.
+2. Wait (Bash `timeout: 3600000`): `node scripts/verify.mjs --await .git/verify-result.json`. It waits
+   up to 55 min, so one call normally covers a full run (10–20 min). `VERIFY_PENDING: …` (exit 3)
+   means still running — call `--await` again. `VERIFY_RESULT: {"ok":…,"failures":[{step,summary,file?}]}`
+   is the answer (exit 0 green, 2 red). Never poll with `sleep`, loops or by re-reading output.
    Failed tests are retried once; a `flaky: [names]` list on a green result means they passed on the
    retry — the run is green, so do not chase them; mention them in `notes`.
 3. Red → fix the cause in this context and start again from 1. **At most 3 fixes.** Still red after
