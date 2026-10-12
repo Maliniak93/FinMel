@@ -3,11 +3,9 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import {
   BOND_PERIOD_STATE,
-  cashCandidates,
   dueEdoBond,
   dueRorBond,
   edoSeries,
-  fundingCashId,
   rorPreviewResponse,
   rorSeries,
   type BondFixture,
@@ -48,9 +46,6 @@ describe('SettleBondInterestDialog', () => {
       if (requestMethod(input) === 'GET') {
         if (url.includes('/api/marketdata/bond-series/')) {
           return jsonResponse(series);
-        }
-        if (url.includes('/api/portfolio/transfer-candidates')) {
-          return jsonResponse(cashCandidates);
         }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -138,9 +133,13 @@ describe('SettleBondInterestDialog', () => {
     expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
-  it('defaults the Cash picker to the bond funding asset and settles the due periods with the typed rate', async () => {
+  it('shows the account cash line instead of a cash select and settles the due periods with the typed rate', async () => {
     await setup();
     await typeRate(3, '3.75');
+    fixture.detectChanges();
+
+    expect(renderedText(fixture)).toContain(`To the cash of ${dueRorBond.accountName}`);
+    expect(fixture.nativeElement.querySelector('mat-select')).toBeNull();
 
     await component['onSubmit']();
 
@@ -154,7 +153,6 @@ describe('SettleBondInterestDialog', () => {
         { periodIndex: 2, ratePercent: 3.75 },
         { periodIndex: 3, ratePercent: 3.75 },
       ],
-      destinationAssetId: fundingCashId,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
@@ -173,8 +171,10 @@ describe('SettleBondInterestDialog', () => {
     expect(settleRequests()).toEqual([]);
   });
 
-  it('a capitalising bond sends no destination', async () => {
+  it('a capitalising bond shows no account cash line', async () => {
     await setup(dueEdoBond, edoSeries);
+
+    expect(renderedText(fixture)).not.toContain('To the cash of');
 
     await component['onSubmit']();
 

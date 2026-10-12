@@ -21,7 +21,7 @@ public sealed class PreviewBondInterestEndpointTests(SkarbiecContainersFixture c
 
         var response = await client.PostAsJsonAsync(
             BondInterestPreviewUri(assetId),
-            NewSettleBondBody([(1, null), (2, 3.75m), (3, 3.75m)], funded.CashAssetId),
+            NewSettleBondBody([(1, null), (2, 3.75m), (3, 3.75m)]),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

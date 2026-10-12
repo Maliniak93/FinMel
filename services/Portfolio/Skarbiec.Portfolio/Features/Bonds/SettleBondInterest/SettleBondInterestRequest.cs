@@ -4,9 +4,6 @@ namespace Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
 public sealed record SettleBondInterestRequest
 {
     public required IReadOnlyList<SettleBondPeriodRequest> Periods { get; init; }
-
-    /// <summary>The PLN Cash asset a coupon is paid to; required for ROR, DOR and COI, rejected for capitalising types.</summary>
-    public Guid? DestinationAssetId { get; init; }
 }
 
 public sealed record SettleBondPeriodRequest

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.Bonds.UndoBondInterestSettlement;
 
@@ -49,44 +51,31 @@ public sealed class UndoBondInterestSettlementHandler(PortfolioDbContext dbConte
             removed.Add(credit);
         }
 
-        Asset? destination = null;
+        Asset? cash = null;
         if (settlement.TransferId is { } transferId)
         {
             var legs = await dbContext.Transactions.Where(t => t.TransferId == transferId).ToListAsync(cancellationToken);
-            var inLeg = legs.SingleOrDefault(t => t.Type == TransactionType.Deposit);
-
-            // Removing the Cash detached the bond's leg, which can then no longer be told apart from the transfer.
-            if (legs.Count != 2 || inLeg is null)
-            {
-                return BondErrors.SettlementTransferDetached;
-            }
-
-            destination = await dbContext.Assets.FirstAsync(a => a.Id == inLeg.AssetId, cancellationToken);
-            if (await dbContext.ReadOnlyErrorAsync(destination, cancellationToken) is { } destinationReadOnly)
-            {
-                return destinationReadOnly;
-            }
-
+            cash = await dbContext.LoadAccountCashAsync(bond.AccountId!.Value, cancellationToken);
             removed.AddRange(legs);
         }
 
         // Recompute each side without its removed rows before removing anything, so a later Withdraw that spent the coupon fails like DeleteTransfer.
-        var bondQuantity = await RecomputeWithoutAsync(bond.Id, removed, cancellationToken);
+        var bondQuantity = await RecomputeWithoutAsync(bond.Id, removed, TransactionErrors.MutationBreaksHistory, cancellationToken);
         if (bondQuantity.IsFailure)
         {
             return bondQuantity.Error;
         }
 
-        decimal? destinationQuantity = null;
-        if (destination is not null)
+        decimal? cashQuantity = null;
+        if (cash is not null)
         {
-            var recomputed = await RecomputeWithoutAsync(destination.Id, removed, cancellationToken);
+            var recomputed = await RecomputeWithoutAsync(cash.Id, removed, _ => TransferErrors.InsufficientFunds, cancellationToken);
             if (recomputed.IsFailure)
             {
                 return recomputed.Error;
             }
 
-            destinationQuantity = recomputed.Value;
+            cashQuantity = recomputed.Value;
         }
 
         dbContext.Transactions.RemoveRange(removed);
@@ -96,10 +85,10 @@ public sealed class UndoBondInterestSettlementHandler(PortfolioDbContext dbConte
         // Published before SaveChangesAsync so the outbox rows commit with the removal.
         await positionEventPublisher.PublishChangedAsync(bond, cancellationToken);
 
-        if (destination is not null && destinationQuantity is { } quantity)
+        if (cash is not null && cashQuantity is { } quantity)
         {
-            destination.Quantity = quantity;
-            await positionEventPublisher.PublishChangedAsync(destination, cancellationToken);
+            cash.Quantity = quantity;
+            await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
         }
 
         try
@@ -115,7 +104,10 @@ public sealed class UndoBondInterestSettlementHandler(PortfolioDbContext dbConte
     }
 
     private async Task<Result<decimal>> RecomputeWithoutAsync(
-        Guid assetId, IReadOnlyCollection<Transaction> removed, CancellationToken cancellationToken)
+        Guid assetId,
+        IReadOnlyCollection<Transaction> removed,
+        Func<TransactionType, Error> oversellError,
+        CancellationToken cancellationToken)
     {
         var removedIds = removed.Select(t => t.Id).ToList();
         var remaining = await dbContext.Transactions
@@ -123,6 +115,6 @@ public sealed class UndoBondInterestSettlementHandler(PortfolioDbContext dbConte
             .Where(t => t.AssetId == assetId && !removedIds.Contains(t.Id))
             .ToListAsync(cancellationToken);
 
-        return TransactionQuantityCalculator.Recompute(remaining, TransactionErrors.MutationBreaksHistory);
+        return TransactionQuantityCalculator.Recompute(remaining, oversellError);
     }
 }

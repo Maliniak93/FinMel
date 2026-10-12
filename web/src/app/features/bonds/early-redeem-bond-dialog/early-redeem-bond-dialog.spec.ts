@@ -5,13 +5,10 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import {
   BOND_PERIOD_STATE,
   bondResponse,
-  cashCandidates,
   dueRorBond,
   edoEarlyRedemptionPreview,
   edoEarlySeries,
   edoYearOneSettledBond,
-  fundingCashId,
-  otherCashId,
   rorEarlySeries,
   rorMonthsSettledBond,
   type BondFixture,
@@ -40,8 +37,6 @@ const activeTosBond = bondResponse({
   marginPercent: null,
   earlyRedemptionFeePerBond: 1,
   maturityDate: '2028-10-01',
-  fundingAssetId: fundingCashId,
-  fundingAssetName: 'Wallet cash',
   periods: [
     {
       index: 1,
@@ -82,9 +77,6 @@ describe('EarlyRedeemBondDialog', () => {
         }
         if (url.includes('/api/marketdata/bond-series/')) {
           return jsonResponse(series);
-        }
-        if (url.includes('/api/portfolio/transfer-candidates')) {
-          return jsonResponse(cashCandidates);
         }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -130,13 +122,20 @@ describe('EarlyRedeemBondDialog', () => {
     return Object.fromEntries(previewQueries().at(-1) ?? []);
   }
 
-  it('defaults to today, the whole holding and the Cash that funded the purchase', async () => {
+  it('defaults to today and the whole holding', async () => {
     await setup();
-    await vi.waitFor(() => expect(form().destinationAssetId.value).toBe(fundingCashId));
 
     const now = new Date();
     expect(form().date.value).toEqual(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
     expect(form().bondCount.value).toBe(10);
+  });
+
+  it('shows the account cash line instead of a cash select', async () => {
+    await setup();
+    await pick(new Date(2026, 4, 13));
+
+    expect(renderedText(fixture)).toContain(`To the cash of ${edoYearOneSettledBond.accountName}`);
+    expect((fixture.nativeElement as HTMLElement).querySelector('mat-select')).toBeNull();
   });
 
   it("prefills the running period's rate from the catalog and refreshes the preview when the date and count change", async () => {
@@ -243,11 +242,10 @@ describe('EarlyRedeemBondDialog', () => {
     expect(writeRequests(fetchSpy)).toEqual([]);
   });
 
-  it('redeems the picked count on the picked date to the picked Cash and closes with true', async () => {
+  it('redeems the picked count on the picked date with no destination and closes with true', async () => {
     await setup();
     await pick(new Date(2026, 4, 13), 4);
     await vi.waitFor(() => expect(component['previewResource'].hasValue()).toBe(true));
-    form().destinationAssetId.setValue(otherCashId);
 
     await component['onSubmit']();
 
@@ -259,7 +257,6 @@ describe('EarlyRedeemBondDialog', () => {
       date: '2026-05-13',
       bondCount: 4,
       runningPeriodRatePercent: 4,
-      destinationAssetId: otherCashId,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });

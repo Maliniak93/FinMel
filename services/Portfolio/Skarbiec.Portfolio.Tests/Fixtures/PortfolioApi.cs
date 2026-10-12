@@ -258,8 +258,7 @@ internal static class PortfolioApi
         decimal purchasePricePerBond = 100m,
         decimal firstPeriodRatePercent = 5.35m,
         decimal? marginPercent = 2.00m,
-        decimal earlyRedemptionFeePerBond = 3.00m,
-        Guid? fundingAssetId = null) => new()
+        decimal earlyRedemptionFeePerBond = 3.00m) => new()
         {
             Name = name,
             SeriesCode = seriesCode,
@@ -269,8 +268,7 @@ internal static class PortfolioApi
             PurchasePricePerBond = purchasePricePerBond,
             FirstPeriodRatePercent = firstPeriodRatePercent,
             MarginPercent = marginPercent,
-            EarlyRedemptionFeePerBond = earlyRedemptionFeePerBond,
-            FundingAssetId = fundingAssetId
+            EarlyRedemptionFeePerBond = earlyRedemptionFeePerBond
         };
 
     public static UpdateBondRequest ToUpdateRequest(this AddBondRequest request) => new()
@@ -287,8 +285,17 @@ internal static class PortfolioApi
     };
 
     public static async Task<BondResponse> AddBondAsync(
-        this HttpClient client, Guid accountId, CancellationToken cancellationToken, AddBondRequest? request = null)
+        this HttpClient client,
+        Guid accountId,
+        CancellationToken cancellationToken,
+        AddBondRequest? request = null,
+        bool fundAccount = true)
     {
+        if (fundAccount)
+        {
+            await client.FundAccountAsync(accountId, cancellationToken);
+        }
+
         var response = await client.PostAsJsonAsync(
             AllBondsUri, (request ?? NewBondRequest()) with { AccountId = accountId }, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -329,11 +336,11 @@ internal static class PortfolioApi
         TaxWrapper wrapper = TaxWrapper.Regular,
         string accountName = "Bonds")
     {
-        var cashId = await client.AddCashAssetWithBalanceAsync(
-            cancellationToken, balance: cashBalance, toppedUpOn: cashToppedUpOn);
         var bondAccountId = await client.CreateAccountAsync(cancellationToken, accountName, AccountType.Bonds, wrapper);
-        var bond = await client.AddBondAsync(
-            bondAccountId, cancellationToken, (request ?? NewBondRequest()) with { FundingAssetId = cashId });
+        var cashId = await client.GetAccountCashAssetIdAsync(bondAccountId, cancellationToken);
+        await client.RecordTransactionAsync(
+            cashId, TransactionType.Deposit, cashBalance, cashToppedUpOn ?? DefaultTopUpDate, cancellationToken, unitPrice: 1m);
+        var bond = await client.AddBondAsync(bondAccountId, cancellationToken, request, fundAccount: false);
 
         return new FundedBond(cashId, bondAccountId, bond);
     }
@@ -361,29 +368,26 @@ internal static class PortfolioApi
             marginPercent: null);
 
     public static object NewSettleBondBody(
-        IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods, Guid? destinationAssetId = null) => new
+        IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods) => new
         {
-            periods = periods.Select(p => new { periodIndex = p.PeriodIndex, ratePercent = p.RatePercent }).ToList(),
-            destinationAssetId
+            periods = periods.Select(p => new { periodIndex = p.PeriodIndex, ratePercent = p.RatePercent }).ToList()
         };
 
     public static async Task<HttpResponseMessage> SettleBondInterestRawAsync(
         this HttpClient client,
         Guid assetId,
         IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods,
-        Guid? destinationAssetId,
         CancellationToken cancellationToken) =>
         await client.PostAsJsonAsync(
-            BondInterestSettlementsUri(assetId), NewSettleBondBody(periods, destinationAssetId), cancellationToken);
+            BondInterestSettlementsUri(assetId), NewSettleBondBody(periods), cancellationToken);
 
     public static async Task SettleBondInterestAsync(
         this HttpClient client,
         Guid assetId,
         IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods,
-        Guid? destinationAssetId,
         CancellationToken cancellationToken)
     {
-        var response = await client.SettleBondInterestRawAsync(assetId, periods, destinationAssetId, cancellationToken);
+        var response = await client.SettleBondInterestRawAsync(assetId, periods, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -427,7 +431,7 @@ internal static class PortfolioApi
     {
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest(), wrapper: wrapper);
         await client.SettleBondInterestAsync(
-            funded.Bond.AssetId, [(1, null), (2, null), (3, null)], null, cancellationToken);
+            funded.Bond.AssetId, [(1, null), (2, null), (3, null)], cancellationToken);
 
         return funded;
     }
@@ -440,19 +444,19 @@ internal static class PortfolioApi
             request: NewRorBondRequest(bondCount: 10) with { PurchasePricePerBond = purchasePricePerBond },
             wrapper: wrapper);
         var periods = Enumerable.Range(1, 12).Select(index => (index, index == 1 ? (decimal?)null : 3.75m)).ToList();
-        await client.SettleBondInterestAsync(funded.Bond.AssetId, periods, funded.CashAssetId, cancellationToken);
+        await client.SettleBondInterestAsync(funded.Bond.AssetId, periods, cancellationToken);
 
         return funded;
     }
 
     public static async Task<HttpResponseMessage> RedeemBondRawAsync(
-        this HttpClient client, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken) =>
-        await client.PostAsJsonAsync(BondRedemptionUri(assetId), new { destinationAssetId }, cancellationToken);
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken) =>
+        await client.PostAsJsonAsync(BondRedemptionUri(assetId), new { }, cancellationToken);
 
     public static async Task RedeemBondAsync(
-        this HttpClient client, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
     {
-        var response = await client.RedeemBondRawAsync(assetId, destinationAssetId, cancellationToken);
+        var response = await client.RedeemBondRawAsync(assetId, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -478,12 +482,11 @@ internal static class PortfolioApi
         NewBondRequest(purchaseDate: EdoEarlyPurchaseDate, bondCount: bondCount, earlyRedemptionFeePerBond: 3.00m);
 
     public static object NewEarlyRedeemBody(
-        DateOnly date, int bondCount, Guid destinationAssetId, decimal? runningPeriodRatePercent = null) => new
+        DateOnly date, int bondCount, decimal? runningPeriodRatePercent = null) => new
         {
             date,
             bondCount,
-            runningPeriodRatePercent,
-            destinationAssetId
+            runningPeriodRatePercent
         };
 
     public static async Task<HttpResponseMessage> RedeemBondEarlyRawAsync(
@@ -491,12 +494,11 @@ internal static class PortfolioApi
         Guid assetId,
         DateOnly date,
         int bondCount,
-        Guid destinationAssetId,
         CancellationToken cancellationToken,
         decimal? runningPeriodRatePercent = null) =>
         await client.PostAsJsonAsync(
             BondEarlyRedemptionUri(assetId),
-            NewEarlyRedeemBody(date, bondCount, destinationAssetId, runningPeriodRatePercent),
+            NewEarlyRedeemBody(date, bondCount, runningPeriodRatePercent),
             cancellationToken);
 
     public static async Task RedeemBondEarlyAsync(
@@ -504,12 +506,11 @@ internal static class PortfolioApi
         Guid assetId,
         DateOnly date,
         int bondCount,
-        Guid destinationAssetId,
         CancellationToken cancellationToken,
         decimal? runningPeriodRatePercent = null)
     {
         var response = await client.RedeemBondEarlyRawAsync(
-            assetId, date, bondCount, destinationAssetId, cancellationToken, runningPeriodRatePercent);
+            assetId, date, bondCount, cancellationToken, runningPeriodRatePercent);
         response.EnsureSuccessStatusCode();
     }
 
@@ -520,7 +521,7 @@ internal static class PortfolioApi
             cancellationToken, request: NewEdoEarlyBondRequest(), cashToppedUpOn: new DateOnly(2025, 1, 1));
         if (settleYearOne)
         {
-            await client.SettleBondInterestAsync(funded.Bond.AssetId, [(1, null)], null, cancellationToken);
+            await client.SettleBondInterestAsync(funded.Bond.AssetId, [(1, null)], cancellationToken);
         }
 
         return funded;
@@ -532,14 +533,13 @@ internal static class PortfolioApi
         var funded = await client.CreateFundedBondAsync(
             cancellationToken, request: NewRorBondRequest(bondCount: bondCount) with { EarlyRedemptionFeePerBond = 0.50m });
         await client.SettleBondInterestAsync(
-            funded.Bond.AssetId, [(1, null), (2, 3.75m), (3, 3.75m)], funded.CashAssetId, cancellationToken);
+            funded.Bond.AssetId, [(1, null), (2, 3.75m), (3, 3.75m)], cancellationToken);
 
         return funded;
     }
 
     public static object NewSwapBody(
         int bondCount,
-        Guid? destinationAssetId,
         decimal swapPricePerBond = 99.90m,
         string name = "EDO1036",
         string seriesCode = "EDO1036",
@@ -555,8 +555,7 @@ internal static class PortfolioApi
                 firstPeriodRatePercent = 5.35m,
                 marginPercent = (decimal?)2.00m,
                 earlyRedemptionFeePerBond = 3.00m
-            },
-            destinationAssetId
+            }
         };
 
     public static async Task<HttpResponseMessage> SwapBondRawAsync(
@@ -570,10 +569,9 @@ internal static class PortfolioApi
         this HttpClient client,
         Guid assetId,
         int bondCount,
-        Guid? destinationAssetId,
         CancellationToken cancellationToken)
     {
-        var response = await client.SwapBondRawAsync(assetId, NewSwapBody(bondCount, destinationAssetId), cancellationToken);
+        var response = await client.SwapBondRawAsync(assetId, NewSwapBody(bondCount), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

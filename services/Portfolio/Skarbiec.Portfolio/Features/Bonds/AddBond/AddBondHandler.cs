@@ -37,32 +37,15 @@ public sealed class AddBondHandler(
 
         var cost = request.BondCount * request.PurchasePricePerBond;
 
-        // The system-managed opening transaction is the only way the purchase cost reaches Asset.Quantity.
-        FundingTransfer? funding = null;
-        Transaction opening;
+        // The system-managed opening transaction, the In leg of the account cash's transfer, is the only way the purchase cost reaches Asset.Quantity.
+        var cash = await dbContext.LoadAccountCashAsync(account.Id, cancellationToken);
+        var (cashLeg, opening) = TransferLegs.Create(cash.Id, asset.Id, cost, request.PurchaseDate);
 
-        if (request.FundingAssetId is { } fundingAssetId)
+        var cashQuantity = await dbContext.RecomputeWithAsync(
+            cash.Id, [cashLeg], cancellationToken, _ => TransferErrors.InsufficientFunds);
+        if (cashQuantity.IsFailure)
         {
-            var planned = await PlanFundingAsync(fundingAssetId, asset, cost, request.PurchaseDate, cancellationToken);
-            if (planned.IsFailure)
-            {
-                return planned.Error;
-            }
-
-            funding = planned.Value;
-            opening = funding.InLeg;
-        }
-        else
-        {
-            opening = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                AssetId = asset.Id,
-                Type = TransactionType.Deposit,
-                Quantity = cost,
-                UnitPriceAmount = 1m,
-                Date = request.PurchaseDate
-            };
+            return cashQuantity.Error;
         }
 
         var recomputed = TransactionQuantityCalculator.Recompute([opening]);
@@ -71,9 +54,11 @@ public sealed class AddBondHandler(
             return recomputed.Error;
         }
 
-        // A PLN asset: its frozen PLN rate is 1 by definition, so MarketData is not asked.
+        // Both sides are PLN: the frozen PLN rate is 1 by definition, so MarketData is not asked.
         opening.FxRateToPln = 1m;
+        cashLeg.FxRateToPln = 1m;
         asset.Quantity = recomputed.Value;
+        cash.Quantity = cashQuantity.Value;
 
         var terms = new TreasuryBond
         {
@@ -90,20 +75,13 @@ public sealed class AddBondHandler(
         };
 
         dbContext.Assets.Add(asset);
-        dbContext.Transactions.Add(opening);
+        dbContext.Transactions.AddRange(opening, cashLeg);
         dbContext.TreasuryBonds.Add(terms);
 
         await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
 
-        if (funding is not null)
-        {
-            funding.OutLeg.FxRateToPln = 1m;
-            funding.Source.Quantity = funding.SourceQuantity;
-            dbContext.Transactions.Add(funding.OutLeg);
-
-            // The source publishes in the same save as both legs and the bond's own event.
-            await positionEventPublisher.PublishChangedAsync(funding.Source, cancellationToken);
-        }
+        // The account cash publishes in the same save as both legs and the bond's own event.
+        await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
 
         try
         {
@@ -111,46 +89,10 @@ public sealed class AddBondHandler(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // A write racing on the funding Cash asset moved its xmin: nothing is saved, the user retries.
+            // A write racing on the account cash moved its xmin: nothing is saved, the user retries.
             return TransactionErrors.ConcurrentModification();
         }
 
-        var fundingSource = funding is null ? null : new DepositFundingSource(funding.Source.Id, funding.Source.Name);
-
-        return terms.ToResponse(asset, account, WarsawCalendar.Today(timeProvider), fundingSource, [], [], null);
+        return terms.ToResponse(asset, account, WarsawCalendar.Today(timeProvider), [], [], null);
     }
-
-    private async Task<Result<FundingTransfer>> PlanFundingAsync(
-        Guid fundingAssetId, Asset bond, decimal cost, DateOnly purchaseDate, CancellationToken cancellationToken)
-    {
-        var source = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == fundingAssetId, cancellationToken);
-
-        // Bond → Bond is a swap's route only, so a purchase is funded from Cash alone.
-        if (source is null
-            || source.AssetClass != AssetClass.Cash
-            || !TransferRoutes.IsAllowed(source.AssetClass, bond.AssetClass)
-            || source.Currency != bond.Currency
-            || source.IsArchived)
-        {
-            return TransferErrors.InvalidCounterpart;
-        }
-
-        var (outLeg, inLeg) = TransferLegs.Create(source.Id, bond.Id, cost, purchaseDate);
-
-        var sourceHistory = await dbContext.Transactions
-            .AsNoTracking()
-            .Where(t => t.AssetId == source.Id)
-            .ToListAsync(cancellationToken);
-
-        var sourceQuantity = TransactionQuantityCalculator.Recompute(
-            [.. sourceHistory, outLeg], _ => TransferErrors.InsufficientFunds);
-        if (sourceQuantity.IsFailure)
-        {
-            return sourceQuantity.Error;
-        }
-
-        return new FundingTransfer(source, outLeg, inLeg, sourceQuantity.Value);
-    }
-
-    private sealed record FundingTransfer(Asset Source, Transaction OutLeg, Transaction InLeg, decimal SourceQuantity);
 }

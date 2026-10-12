@@ -55,52 +55,48 @@ public sealed class UpdateBondHandler(
 
         var cost = request.BondCount * request.PurchasePricePerBond;
 
-        // A bond holds one opening Deposit, rewritten in place together with its funding leg.
-        var opening = await dbContext.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken);
-        var fundingLeg = opening.TransferId is { } transferId
-            ? await dbContext.Transactions.FirstOrDefaultAsync(t => t.TransferId == transferId && t.Id != opening.Id, cancellationToken)
-            : null;
-        var rewritesOpening = fundingLeg is null || opening.Quantity != cost || opening.Date != request.PurchaseDate;
-
+        // A swap-born bond's opening legs are fixed by the swap; a detached opening (source bond removed) has no cash leg and is rewritten alone.
         Asset? fundingAsset = null;
-        var fundingQuantity = 0m;
-        if (fundingLeg is not null && rewritesOpening)
+        var openings = terms.SwappedFromAssetId is null
+            ? await dbContext.Transactions.Where(t => t.AssetId == assetId).ToListAsync(cancellationToken)
+            : [];
+        if (openings is [var opening] && (opening.Quantity != cost || opening.Date != request.PurchaseDate))
         {
-            fundingAsset = await dbContext.Assets.FirstAsync(a => a.Id == fundingLeg.AssetId, cancellationToken);
+            var fundingLeg = opening.TransferId is { } transferId
+                ? await dbContext.Transactions.FirstOrDefaultAsync(
+                    t => t.TransferId == transferId && t.Id != opening.Id, cancellationToken)
+                : null;
 
-            // The Cash side is read-only while it or its account is archived, so its leg cannot be rewritten.
-            if (await dbContext.ReadOnlyErrorAsync(fundingAsset, cancellationToken) is { } fundingReadOnly)
+            decimal? fundingQuantity = null;
+            if (fundingLeg is not null)
             {
-                return fundingReadOnly;
+                fundingAsset = await dbContext.Assets.FirstAsync(a => a.Id == fundingLeg.AssetId, cancellationToken);
+
+                // The rewritten Out leg must be covered everywhere in the cash history, not just at the end.
+                var fundingHistory = await dbContext.Transactions
+                    .AsNoTracking()
+                    .Where(t => t.AssetId == fundingAsset.Id && t.Id != fundingLeg.Id)
+                    .ToListAsync(cancellationToken);
+                var fundingCandidate = new Transaction
+                {
+                    Id = fundingLeg.Id,
+                    AssetId = fundingAsset.Id,
+                    Type = fundingLeg.Type,
+                    Quantity = cost,
+                    UnitPriceAmount = 1m,
+                    Date = request.PurchaseDate
+                };
+
+                var fundingRecomputed = TransactionQuantityCalculator.Recompute(
+                    [.. fundingHistory, fundingCandidate], _ => TransferErrors.InsufficientFunds);
+                if (fundingRecomputed.IsFailure)
+                {
+                    return fundingRecomputed.Error;
+                }
+
+                fundingQuantity = fundingRecomputed.Value;
             }
 
-            // The rewritten Out leg must be covered everywhere in the Cash history, not just at the end.
-            var fundingHistory = await dbContext.Transactions
-                .AsNoTracking()
-                .Where(t => t.AssetId == fundingAsset.Id && t.Id != fundingLeg.Id)
-                .ToListAsync(cancellationToken);
-            var fundingCandidate = new Transaction
-            {
-                Id = fundingLeg.Id,
-                AssetId = fundingAsset.Id,
-                Type = fundingLeg.Type,
-                Quantity = cost,
-                UnitPriceAmount = 1m,
-                Date = request.PurchaseDate
-            };
-
-            var fundingRecomputed = TransactionQuantityCalculator.Recompute(
-                [.. fundingHistory, fundingCandidate], _ => TransferErrors.InsufficientFunds);
-            if (fundingRecomputed.IsFailure)
-            {
-                return fundingRecomputed.Error;
-            }
-
-            fundingQuantity = fundingRecomputed.Value;
-        }
-
-        if (rewritesOpening)
-        {
             var candidate = new Transaction
             {
                 Id = opening.Id,
@@ -123,13 +119,13 @@ public sealed class UpdateBondHandler(
             opening.FxRateToPln = 1m;
             asset.Quantity = recomputed.Value;
 
-            if (fundingLeg is not null && fundingAsset is not null)
+            if (fundingLeg is not null && fundingAsset is not null && fundingQuantity is { } quantity)
             {
                 fundingLeg.Quantity = cost;
                 fundingLeg.UnitPriceAmount = 1m;
                 fundingLeg.Date = request.PurchaseDate;
                 fundingLeg.FxRateToPln = 1m;
-                fundingAsset.Quantity = fundingQuantity;
+                fundingAsset.Quantity = quantity;
             }
         }
 

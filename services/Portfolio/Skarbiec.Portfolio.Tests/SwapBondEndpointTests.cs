@@ -23,7 +23,7 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
         var funded = await client.CreateSettledTosAsync(cancellationToken);
         var tosId = funded.Bond.AssetId;
 
-        var response = await client.SwapBondRawAsync(tosId, NewSwapBody(10, funded.CashAssetId), cancellationToken);
+        var response = await client.SwapBondRawAsync(tosId, NewSwapBody(10), cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Swap answered {(int)response.StatusCode}.");
 
@@ -79,7 +79,7 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
-    public async Task Swap_Part_PaysRestToCash()
+    public async Task Leftover_ToAccountCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
@@ -87,29 +87,95 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
         var funded = await client.CreateSettledTosAsync(cancellationToken);
         var tosId = funded.Bond.AssetId;
 
-        var response = await client.SwapBondRawAsync(tosId, NewSwapBody(6, funded.CashAssetId), cancellationToken);
+        var response = await client.SwapBondRawAsync(tosId, NewSwapBody(8), cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Swap answered {(int)response.StatusCode}.");
 
         var edo = await client.FindSwappedBondAsync(tosId, cancellationToken);
-        Assert.Equal(6, edo.BondCount);
-        Assert.Equal(599.40m, edo.BookValue);
+        Assert.Equal(funded.BondAccountId, edo.AccountId);
+        Assert.Equal(8, edo.BondCount);
+        Assert.Equal(799.20m, edo.BookValue);
+        var leftover = Assert.Single(
+            (await client.ListTransactionsAsync(funded.CashAssetId, cancellationToken)).Items,
+            t => t.Transfer is { Direction: TransferDirection.In } && t.Transfer.CounterpartAssetId == tosId);
+        Assert.Equal(312.49m, leftover.Quantity);
+        Assert.Equal(TosMaturityDate, leftover.Date);
         Assert.Equal(0m, (await client.GetAssetAsync(tosId, cancellationToken)).Quantity);
-        Assert.Equal(5_512.29m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(5_312.49m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(tosId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(funded.CashAssetId, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Shortfall_FromAccountCash()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        // A discounted ROR pays out 981 for 10 bonds bought at 90; 10 bonds at the 100 swap price cost 1 000.
+        Factory.Clock.SetUtcNow(AfterRorMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateSettledRorAsync(cancellationToken, purchasePricePerBond: 90m);
+        var rorId = funded.Bond.AssetId;
+        var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
+
+        var response = await client.SwapBondRawAsync(rorId, NewSwapBody(10, swapPricePerBond: 100m), cancellationToken);
+
+        Assert.True(response.IsSuccessStatusCode, $"Swap answered {(int)response.StatusCode}.");
+
+        var edo = await client.FindSwappedBondAsync(rorId, cancellationToken);
+        Assert.Equal(funded.BondAccountId, edo.AccountId);
+        Assert.Equal(1_000.00m, edo.BookValue);
+        var edoLegs = (await client.ListTransactionsAsync(edo.AssetId, cancellationToken)).Items;
+        Assert.All(edoLegs, t => Assert.Equal(RorMaturityDate, t.Date));
+        Assert.Equal(981.00m, Assert.Single(edoLegs, t => t.Transfer?.CounterpartAssetId == rorId).Quantity);
+        var shortfall = Assert.Single(edoLegs, t => t.Transfer?.CounterpartAssetId == funded.CashAssetId);
+        Assert.Equal(TransactionType.Deposit, shortfall.Type);
+        Assert.Equal(19.00m, shortfall.Quantity);
+
+        var cashOut = Assert.Single(
+            (await client.ListTransactionsAsync(funded.CashAssetId, cancellationToken)).Items,
+            t => t.Transfer?.CounterpartAssetId == edo.AssetId);
+        Assert.Equal(TransactionType.Withdraw, cashOut.Type);
+        Assert.Equal(19.00m, cashOut.Quantity);
+        Assert.Equal(RorMaturityDate, cashOut.Date);
+        Assert.Null(Assert.Single(await ReadBondRedemptionsAsync(userId, cancellationToken, rorId)).CashTransferId);
+
+        Assert.Equal(1_000.00m, (await client.GetAssetAsync(edo.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(cashBefore - 19.00m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(edo.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(funded.CashAssetId, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Shortfall_ExceedsCash_Returns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterRorMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var funded = await client.CreateSettledRorAsync(cancellationToken, purchasePricePerBond: 90m);
+        var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
+        await client.RecordTransactionAsync(
+            funded.CashAssetId, TransactionType.Withdraw, cashBefore - 5m, RorMaturityDate, cancellationToken, unitPrice: 1m);
+        var rowsBefore = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.SwapBondRawAsync(
+            funded.Bond.AssetId, NewSwapBody(10, swapPricePerBond: 100m), cancellationToken);
+
+        await response.AssertInsufficientFundsAsync(cancellationToken);
+        Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));
+        Assert.Empty(await ReadBondRedemptionsAsync(userId, cancellationToken, funded.Bond.AssetId));
+        Assert.Equal(5m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
     }
 
     public static TheoryData<string, HttpStatusCode, string?> InvalidRequests() => new()
     {
         { "count zero", HttpStatusCode.BadRequest, PortfolioAssertions.BondSwapCountErrorCode },
         { "count above holding", HttpStatusCode.BadRequest, PortfolioAssertions.BondSwapCountErrorCode },
-        { "leftover without destination", HttpStatusCode.BadRequest, PortfolioAssertions.BondPayoutDestinationRequiredErrorCode },
         { "series does not match type", HttpStatusCode.BadRequest, null },
-        { "cost above proceeds", HttpStatusCode.BadRequest, PortfolioAssertions.BondSwapExceedsProceedsErrorCode },
         { "before maturity", HttpStatusCode.Conflict, PortfolioAssertions.BondNotMaturedErrorCode },
         { "unsettled period", HttpStatusCode.Conflict, PortfolioAssertions.BondInterestUnsettledErrorCode },
         { "already redeemed", HttpStatusCode.Conflict, PortfolioAssertions.BondAlreadyRedeemedErrorCode },
-        { "stock as destination", HttpStatusCode.BadRequest, PortfolioAssertions.InvalidTransferCounterpartErrorCode },
         { "archived bond", HttpStatusCode.Conflict, PortfolioAssertions.AssetArchivedErrorCode },
     };
 
@@ -119,9 +185,7 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(
-            scenario == "before maturity" ? BondPurchaseDayUtc
-            : scenario == "cost above proceeds" ? AfterRorMaturityUtc
-            : AfterTosMaturityUtc);
+            scenario == "before maturity" ? BondPurchaseDayUtc : AfterTosMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         FundedBond funded;
@@ -133,10 +197,7 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
             case "unsettled period":
                 funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
                 await client.SettleBondInterestAsync(
-                    funded.Bond.AssetId, [(1, null)], null, cancellationToken);
-                break;
-            case "cost above proceeds":
-                funded = await client.CreateSettledRorAsync(cancellationToken);
+                    funded.Bond.AssetId, [(1, null)], cancellationToken);
                 break;
             default:
                 funded = await client.CreateSettledTosAsync(cancellationToken);
@@ -144,30 +205,20 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
         }
 
         var assetId = funded.Bond.AssetId;
-        var body = NewSwapBody(10, funded.CashAssetId);
+        var body = NewSwapBody(10);
         switch (scenario)
         {
             case "count zero":
-                body = NewSwapBody(0, funded.CashAssetId);
+                body = NewSwapBody(0);
                 break;
             case "count above holding":
-                body = NewSwapBody(11, funded.CashAssetId);
-                break;
-            case "leftover without destination":
-                body = NewSwapBody(10, null);
+                body = NewSwapBody(11);
                 break;
             case "series does not match type":
-                body = NewSwapBody(10, funded.CashAssetId, seriesCode: "COI1030", type: TreasuryBondType.Edo);
-                break;
-            case "cost above proceeds":
-                body = NewSwapBody(10, funded.CashAssetId, swapPricePerBond: 100m);
+                body = NewSwapBody(10, seriesCode: "COI1030", type: TreasuryBondType.Edo);
                 break;
             case "already redeemed":
-                await client.RedeemBondAsync(assetId, funded.CashAssetId, cancellationToken);
-                break;
-            case "stock as destination":
-                body = NewSwapBody(
-                    10, await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken, name: "Stocks"), cancellationToken));
+                await client.RedeemBondAsync(assetId, cancellationToken);
                 break;
             case "archived bond":
                 await client.ArchiveAssetAsync(assetId, cancellationToken);

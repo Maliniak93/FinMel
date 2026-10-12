@@ -13,30 +13,43 @@ import {
   septemberOffer,
   type BondFixture,
 } from '../../../../testing/bond-fixtures';
+import { formatMoney } from '../../../shared/format';
 import {
   findControl,
   jsonResponse,
+  renderedText,
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
-import {
-  plnCashCandidate,
-  selectOptionLabels,
-  pickSelectOption,
-} from '../../deposits/testing/deposit-fixtures';
+import { selectOptionLabels, pickSelectOption } from '../../deposits/testing/deposit-fixtures';
 import { BondPurchaseDialog, type BondPurchaseDialogData } from './bond-purchase-dialog';
 
 const bondsAccountId = 'b1111111-1111-1111-1111-111111111111';
 const reserveBondsAccountId = 'b2222222-2222-2222-2222-222222222222';
 
 const accountList = [
-  { id: bondsAccountId, name: 'Obligacje IKE', type: 1, wrapper: 1, isArchived: false },
-  { id: reserveBondsAccountId, name: 'Obligacje zwykle', type: 1, wrapper: 0, isArchived: false },
+  {
+    id: bondsAccountId,
+    name: 'Obligacje IKE',
+    type: 1,
+    wrapper: 1,
+    isArchived: false,
+    cashBalance: 5000,
+  },
+  {
+    id: reserveBondsAccountId,
+    name: 'Obligacje zwykle',
+    type: 1,
+    wrapper: 0,
+    isArchived: false,
+    cashBalance: 1000,
+  },
   {
     id: 'b3333333-3333-3333-3333-333333333333',
     name: 'Old bonds',
     type: 1,
     wrapper: 0,
     isArchived: true,
+    cashBalance: 0,
   },
   {
     id: 'b4444444-4444-4444-4444-444444444444',
@@ -44,6 +57,7 @@ const accountList = [
     type: 0,
     wrapper: 1,
     isArchived: false,
+    cashBalance: 0,
   },
 ];
 
@@ -86,10 +100,6 @@ describe('BondPurchaseDialog', () => {
       }
       if (method(input) === 'GET' && /\/api\/portfolio\/accounts(\?|$)/.test(url)) {
         return jsonResponse(accountList);
-      }
-      if (method(input) === 'GET' && url.includes('/api/portfolio/transfer-candidates')) {
-        const currency = new URL(url).searchParams.get('currency') ?? '';
-        return jsonResponse(currency === 'PLN' ? [plnCashCandidate] : []);
       }
       return writeResponse();
     });
@@ -262,7 +272,7 @@ describe('BondPurchaseDialog', () => {
       earlyRedemptionFeePerBond: 3,
     });
     expect(body).not.toHaveProperty('taxExempt');
-    expect(body.fundingAssetId ?? null).toBeNull();
+    expect(body).not.toHaveProperty('fundingAssetId');
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
@@ -277,58 +287,73 @@ describe('BondPurchaseDialog', () => {
     expect((await request.json()).accountId).toBe(bondsAccountId);
   });
 
-  describe('funding', () => {
-    it('lists the PLN Cash candidates, defaulting to new money', async () => {
+  describe('account cash', () => {
+    it('shows the cost taken from the account cash and its balance, with no cash select', async () => {
       await setup({ accountId: bondsAccountId });
+      await fill(manualPurchase);
 
-      expect(valueOf('fundingAssetId') ?? null).toBeNull();
-      const candidateRequest = fetchSpy.mock.calls
-        .map((call: unknown[]) => call[0])
-        .filter((input: unknown) =>
-          requestUrl(input).includes('/api/portfolio/transfer-candidates'),
-        )
-        .map((input: unknown) => new URL(requestUrl(input)))
-        .at(-1);
-      expect(candidateRequest?.searchParams.get('currency')).toBe('PLN');
-      expect(['Cash', '0']).toContain(candidateRequest?.searchParams.get('assetClass'));
-      const labels = await selectOptionLabels(fixture, 'fundingAssetId');
-      expect(labels[0]).toContain('New money');
-      expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
-    });
-
-    it('an amount above the selected Cash balance blocks submit', async () => {
-      await setup({ accountId: bondsAccountId });
-      await fill({
-        ...manualPurchase,
-        bondCount: 51,
-        fundingAssetId: plnCashCandidate.assetId,
+      const money = formatMoney(5000, 'PLN').replace(/\s+/g, ' ');
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(renderedText(fixture).replace(/\s+/g, ' ')).toContain(
+          `From the cash of Obligacje IKE: ${money} · balance ${money}`,
+        );
       });
-
-      await component['onSubmit']();
-
-      expect(form().invalid).toBe(true);
-      expect(writeRequests()).toEqual([]);
-      expect(dialogRef.close).not.toHaveBeenCalled();
-
-      await fill({ bondCount: 50 });
-      await component['onSubmit']();
-      expect(writeRequests()).toHaveLength(1);
+      expect(Object.keys(form().controls)).not.toContain('fundingAssetId');
+      expect(
+        fetchSpy.mock.calls.some((call: unknown[]) =>
+          requestUrl(call[0]).includes('/api/portfolio/transfer-candidates'),
+        ),
+      ).toBe(false);
     });
 
-    it('create POSTs the chosen Cash as fundingAssetId', async () => {
-      await setup({ accountId: bondsAccountId });
-      await fill({ ...manualPurchase, fundingAssetId: plnCashCandidate.assetId });
+    it('follows the account picked when none is preset', async () => {
+      await setup({});
+      await fill({ ...manualPurchase, bondCount: 5, accountId: reserveBondsAccountId });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        const text = renderedText(fixture).replace(/\s+/g, ' ');
+        expect(text).toContain('From the cash of Obligacje zwykle');
+        expect(text).toContain(formatMoney(500, 'PLN').replace(/\s+/g, ' '));
+      });
+    });
+
+    it('answers an insufficient-funds rejection with the account message and keeps the dialog open', async () => {
+      await setup({ accountId: bondsAccountId }, () =>
+        jsonResponse(
+          { detail: 'Not enough cash.', errorCode: 'Validation.InsufficientFunds' },
+          400,
+        ),
+      );
+      await fill({ ...manualPurchase, bondCount: 60 });
 
       await component['onSubmit']();
+      fixture.detectChanges();
 
-      const [request] = writeRequests();
-      expect((await request.json()).fundingAssetId).toBe(plnCashCandidate.assetId);
-      expect(dialogRef.close).toHaveBeenCalledWith(true);
+      expect(renderedText(fixture)).toContain('Insufficient funds on the account');
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('shows the insufficient-funds message in Polish', async () => {
+      await setup({ accountId: bondsAccountId }, () =>
+        jsonResponse(
+          { detail: 'Not enough cash.', errorCode: 'Validation.InsufficientFunds' },
+          400,
+        ),
+      );
+      await switchLanguage(fixture, 'pl');
+      await fill({ ...manualPurchase, bondCount: 60 });
+
+      await component['onSubmit']();
+      fixture.detectChanges();
+
+      expect(renderedText(fixture)).toContain('Brak środków na rachunku');
     });
   });
 
   describe('edit', () => {
-    const bond: BondFixture = bondResponse({ fundingAssetId: plnCashCandidate.assetId });
+    const bond: BondFixture = bondResponse();
 
     it('prefills the form from the bond', async () => {
       await setup({ bond });

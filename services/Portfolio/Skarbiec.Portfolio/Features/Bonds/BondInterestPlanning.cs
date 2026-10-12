@@ -1,15 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
-using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.Bonds;
 
 internal sealed record PlannedBondPeriod(BondPeriod Period, decimal RatePercent, int BondCount, BondInterestAmounts Amounts);
 
 internal sealed record BondInterestPlan(
-    Asset Bond, TreasuryBond Terms, IReadOnlyList<PlannedBondPeriod> Periods, Asset? Destination);
+    Asset Bond, TreasuryBond Terms, IReadOnlyList<PlannedBondPeriod> Periods, Asset? Cash);
 
 internal static class BondInterestPlanning
 {
@@ -77,32 +77,9 @@ internal static class BondInterestPlanning
             }
         }
 
-        var coupon = BondSchedule.IsCoupon(terms.Type);
-        if (coupon && request.DestinationAssetId is null)
-        {
-            return BondErrors.PayoutDestinationRequired;
-        }
-
-        if (!coupon && request.DestinationAssetId is not null)
-        {
-            return BondErrors.PayoutDestinationNotAllowed;
-        }
-
-        Asset? destination = null;
-        if (request.DestinationAssetId is { } destinationAssetId)
-        {
-            destination = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == destinationAssetId, cancellationToken);
-
-            // Bond → Bond is a swap's route only, so a coupon is paid to Cash alone.
-            if (destination is null
-                || destination.AssetClass != AssetClass.Cash
-                || !TransferRoutes.IsAllowed(bond.AssetClass, destination.AssetClass)
-                || destination.Currency != bond.Currency
-                || destination.IsArchived)
-            {
-                return TransferErrors.InvalidCounterpart;
-            }
-        }
+        var cash = BondSchedule.IsCoupon(terms.Type)
+            ? await dbContext.LoadAccountCashAsync(bond.AccountId!.Value, cancellationToken)
+            : null;
 
         var taxExempt = await dbContext.IsTaxExemptAsync(bond, cancellationToken);
         var planned = new List<PlannedBondPeriod>(periods.Count);
@@ -117,7 +94,7 @@ internal static class BondInterestPlanning
             planned.Add(new PlannedBondPeriod(period, rate, terms.BondCount, amounts));
         }
 
-        return new BondInterestPlan(bond, terms, planned, destination);
+        return new BondInterestPlan(bond, terms, planned, cash);
     }
 
     // Stored as numeric(7,4).

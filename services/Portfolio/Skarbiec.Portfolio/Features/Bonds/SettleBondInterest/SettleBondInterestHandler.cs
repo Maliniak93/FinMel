@@ -21,7 +21,7 @@ public sealed class SettleBondInterestHandler(
             return plan.Error;
         }
 
-        var (bond, terms, periods, destination) = plan.Value;
+        var (bond, terms, periods, cash) = plan.Value;
         var coupon = BondSchedule.IsCoupon(terms.Type);
 
         var bondHistory = await dbContext.Transactions
@@ -29,7 +29,7 @@ public sealed class SettleBondInterestHandler(
             .Where(t => t.AssetId == bond.Id)
             .ToListAsync(cancellationToken);
         var bondAdded = new List<Transaction>();
-        var destinationAdded = new List<Transaction>();
+        var cashAdded = new List<Transaction>();
         var settlements = new List<BondInterestSettlement>(periods.Count);
 
         foreach (var planned in periods)
@@ -52,11 +52,11 @@ public sealed class SettleBondInterestHandler(
                 };
                 bondAdded.Add(credit);
 
-                if (coupon && destination is not null)
+                if (coupon && cash is not null)
                 {
-                    var (outLeg, inLeg) = TransferLegs.Create(bond.Id, destination.Id, creditAmount, planned.Period.End);
+                    var (outLeg, inLeg) = TransferLegs.Create(bond.Id, cash.Id, creditAmount, planned.Period.End);
                     bondAdded.Add(outLeg);
-                    destinationAdded.Add(inLeg);
+                    cashAdded.Add(inLeg);
                     transferId = outLeg.TransferId;
                 }
             }
@@ -83,25 +83,25 @@ public sealed class SettleBondInterestHandler(
             return bondQuantity.Error;
         }
 
-        decimal? destinationQuantity = null;
-        if (destination is not null && destinationAdded.Count > 0)
+        decimal? cashQuantity = null;
+        if (cash is not null && cashAdded.Count > 0)
         {
-            var destinationHistory = await dbContext.Transactions
+            var cashHistory = await dbContext.Transactions
                 .AsNoTracking()
-                .Where(t => t.AssetId == destination.Id)
+                .Where(t => t.AssetId == cash.Id)
                 .ToListAsync(cancellationToken);
 
-            var recomputed = TransactionQuantityCalculator.Recompute([.. destinationHistory, .. destinationAdded]);
+            var recomputed = TransactionQuantityCalculator.Recompute([.. cashHistory, .. cashAdded]);
             if (recomputed.IsFailure)
             {
                 return recomputed.Error;
             }
 
-            destinationQuantity = recomputed.Value;
+            cashQuantity = recomputed.Value;
         }
 
         // Both sides are PLN: the frozen PLN rate is 1 by definition, so MarketData is not asked.
-        foreach (var transaction in bondAdded.Concat(destinationAdded))
+        foreach (var transaction in bondAdded.Concat(cashAdded))
         {
             transaction.FxRateToPln = 1m;
             dbContext.Transactions.Add(transaction);
@@ -113,10 +113,10 @@ public sealed class SettleBondInterestHandler(
         // The version bump makes the asset row's xmin guard a racing second settlement.
         await positionEventPublisher.PublishChangedAsync(bond, cancellationToken);
 
-        if (destination is not null && destinationQuantity is { } quantity)
+        if (cash is not null && cashQuantity is { } quantity)
         {
-            destination.Quantity = quantity;
-            await positionEventPublisher.PublishChangedAsync(destination, cancellationToken);
+            cash.Quantity = quantity;
+            await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
         }
 
         try

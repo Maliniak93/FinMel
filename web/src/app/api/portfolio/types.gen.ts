@@ -36,7 +36,6 @@ export type AddBondRequest = {
     firstPeriodRatePercent: number | string;
     marginPercent?: null | number | string;
     earlyRedemptionFeePerBond: number | string;
-    fundingAssetId?: null | string;
 };
 
 export type AddDepositRequest = {
@@ -163,7 +162,6 @@ export type BondRedemptionResponse = {
     fee: number | string;
     tax: number | string;
     proceeds: number | string;
-    destinationAssetName?: null | string;
     swapTargetAssetName?: null | string;
 };
 
@@ -185,8 +183,6 @@ export type BondResponse = {
     maturityDate: string;
     nominalValue: number | string;
     bookValue: number | string;
-    fundingAssetId?: null | string;
-    fundingAssetName?: null | string;
     status: BondStatus;
     duePeriodCount: number | string;
     lastSettlement?: null | BondSettlementResponse;
@@ -343,11 +339,10 @@ export type RedeemBondEarlyRequest = {
     date: string;
     bondCount: number | string;
     runningPeriodRatePercent?: null | number | string;
-    destinationAssetId: string;
 };
 
 export type RedeemBondRequest = {
-    destinationAssetId: string;
+    [key: string]: unknown;
 };
 
 export type RollOverDepositRequest = {
@@ -426,7 +421,6 @@ export type SecurityPriceUnavailableReason = number;
 
 export type SettleBondInterestRequest = {
     periods: Array<SettleBondPeriodRequest>;
-    destinationAssetId?: null | string;
 };
 
 export type SettleBondPeriodRequest = {
@@ -450,7 +444,6 @@ export type SettleSavingsInterestRequest = {
 export type SwapBondRequest = {
     bondCount: number | string;
     newBond: SwapNewBondRequest;
-    destinationAssetId?: null | string;
 };
 
 export type SwapNewBondRequest = {

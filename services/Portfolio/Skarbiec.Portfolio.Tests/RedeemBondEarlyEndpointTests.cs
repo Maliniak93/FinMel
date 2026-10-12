@@ -13,7 +13,7 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task Early_PartialCapitalising_ShrinksHolding()
+    public async Task ProceedsToAccountCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(EdoEarlyRedemptionDayUtc);
@@ -23,7 +23,7 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         var assetId = funded.Bond.AssetId;
 
         var response = await client.RedeemBondEarlyRawAsync(
-            assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+            assetId, EdoEarlyRedemptionDate, 4, cancellationToken, runningPeriodRatePercent: 4.00m);
 
         Assert.True(response.IsSuccessStatusCode, $"Early redemption answered {(int)response.StatusCode}.");
 
@@ -76,7 +76,7 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         var cashBefore = (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity;
 
         var response = await client.RedeemBondEarlyRawAsync(
-            assetId, RorEarlyRedemptionDate, 20, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 3.75m);
+            assetId, RorEarlyRedemptionDate, 20, cancellationToken, runningPeriodRatePercent: 3.75m);
 
         Assert.True(response.IsSuccessStatusCode, $"Early redemption answered {(int)response.StatusCode}.");
 
@@ -165,7 +165,7 @@ public sealed class RedeemBondEarlyEndpointTests(SkarbiecContainersFixture conta
         }
 
         var response = await client.RedeemBondEarlyRawAsync(
-            assetId, date, count, funded.CashAssetId, cancellationToken, rate);
+            assetId, date, count, cancellationToken, rate);
 
         await response.AssertProblemAsync(status, errorCode, cancellationToken);
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));

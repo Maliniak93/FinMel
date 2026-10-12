@@ -1,6 +1,6 @@
 namespace Skarbiec.Portfolio.Features.Bonds.RedeemBondEarly;
 
-/// <summary>Redeems some or all of the holding before maturity; every write is dated the request's date.</summary>
+/// <summary>Redeems some or all of the holding before maturity into the account's cash; every write is dated the request's date.</summary>
 public sealed record RedeemBondEarlyRequest
 {
     public required DateOnly Date { get; init; }
@@ -9,7 +9,4 @@ public sealed record RedeemBondEarlyRequest
 
     /// <summary>The MF rate of the running period from the second on; omitted for period 1 and fixed-rate types, which use the terms.</summary>
     public decimal? RunningPeriodRatePercent { get; init; }
-
-    /// <summary>The PLN Cash asset that receives the proceeds.</summary>
-    public required Guid DestinationAssetId { get; init; }
 }

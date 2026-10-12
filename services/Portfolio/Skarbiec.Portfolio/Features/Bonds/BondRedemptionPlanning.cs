@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.Bonds;
 
@@ -91,31 +90,18 @@ internal static class BondRedemptionPlanning
         return new BondRedemptionPlan(bond, terms, amounts);
     }
 
-    public static async Task<Result<Asset>> LoadCashDestinationAsync(
-        this PortfolioDbContext dbContext, Asset bond, Guid destinationAssetId, CancellationToken cancellationToken)
-    {
-        var destination = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == destinationAssetId, cancellationToken);
-
-        if (destination is null
-            || destination.AssetClass != AssetClass.Cash
-            || !TransferRoutes.IsAllowed(bond.AssetClass, destination.AssetClass)
-            || destination.Currency != bond.Currency
-            || destination.IsArchived)
-        {
-            return TransferErrors.InvalidCounterpart;
-        }
-
-        return destination;
-    }
-
     public static async Task<Result<decimal>> RecomputeWithAsync(
-        this PortfolioDbContext dbContext, Guid assetId, IReadOnlyCollection<Transaction> added, CancellationToken cancellationToken)
+        this PortfolioDbContext dbContext,
+        Guid assetId,
+        IReadOnlyCollection<Transaction> added,
+        CancellationToken cancellationToken,
+        Func<TransactionType, Error>? oversellError = null)
     {
         var history = await dbContext.Transactions
             .AsNoTracking()
             .Where(t => t.AssetId == assetId)
             .ToListAsync(cancellationToken);
 
-        return TransactionQuantityCalculator.Recompute([.. history, .. added]);
+        return TransactionQuantityCalculator.Recompute([.. history, .. added], oversellError);
     }
 }

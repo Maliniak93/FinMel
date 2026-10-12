@@ -25,7 +25,7 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         using var client = Factory.CreateAuthenticatedClient(userId);
         var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken);
 
-        var response = await client.SettleBondInterestRawAsync(bond.AssetId, [(1, null)], null, cancellationToken);
+        var response = await client.SettleBondInterestRawAsync(bond.AssetId, [(1, null)], cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         await using (var dbContext = CreateDbContext(userId))
@@ -63,10 +63,10 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         var funded = await client.CreateEdoYearOneSettledAsync(cancellationToken);
         var assetId = funded.Bond.AssetId;
         await client.RedeemBondEarlyAsync(
-            assetId, EdoEarlyRedemptionDate, 4, funded.CashAssetId, cancellationToken, runningPeriodRatePercent: 4.00m);
+            assetId, EdoEarlyRedemptionDate, 4, cancellationToken, runningPeriodRatePercent: 4.00m);
         Factory.Clock.SetUtcNow(new DateTimeOffset(2027, 3, 2, 10, 0, 0, TimeSpan.Zero));
 
-        var response = await client.SettleBondInterestRawAsync(assetId, [(2, 4.00m)], null, cancellationToken);
+        var response = await client.SettleBondInterestRawAsync(assetId, [(2, 4.00m)], cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         await using (var dbContext = CreateDbContext(userId))
@@ -82,7 +82,7 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
     }
 
     [Fact]
-    public async Task Settle_Coupon_PaysNetToCash()
+    public async Task CouponToAccountCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
@@ -91,7 +91,7 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
 
         var response = await client.SettleBondInterestRawAsync(
-            funded.Bond.AssetId, RorThreeMonths, funded.CashAssetId, cancellationToken);
+            funded.Bond.AssetId, RorThreeMonths, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         await using (var dbContext = CreateDbContext(userId))
@@ -147,8 +147,8 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         var regular = await client.CreateFundedBondAsync(
             cancellationToken, request: NewRorBondRequest(), wrapper: TaxWrapper.Regular, accountName: "Obligacje");
 
-        var ikeResponse = await client.SettleBondInterestRawAsync(ike.Bond.AssetId, [(1, null)], ike.CashAssetId, cancellationToken);
-        var regularResponse = await client.SettleBondInterestRawAsync(regular.Bond.AssetId, [(1, null)], regular.CashAssetId, cancellationToken);
+        var ikeResponse = await client.SettleBondInterestRawAsync(ike.Bond.AssetId, [(1, null)], cancellationToken);
+        var regularResponse = await client.SettleBondInterestRawAsync(regular.Bond.AssetId, [(1, null)], cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, ikeResponse.StatusCode);
         Assert.Equal(HttpStatusCode.Created, regularResponse.StatusCode);
@@ -170,9 +170,6 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
         { "period not yet ended", HttpStatusCode.Conflict, PortfolioAssertions.BondInterestNotDueErrorCode },
         { "missing rate", HttpStatusCode.BadRequest, PortfolioAssertions.BondPeriodRateErrorCode },
         { "rate sent for a fixed period", HttpStatusCode.BadRequest, PortfolioAssertions.BondPeriodRateErrorCode },
-        { "coupon without destination", HttpStatusCode.BadRequest, PortfolioAssertions.BondPayoutDestinationRequiredErrorCode },
-        { "capitalising with destination", HttpStatusCode.BadRequest, PortfolioAssertions.BondPayoutDestinationNotAllowedErrorCode },
-        { "stock as destination", HttpStatusCode.BadRequest, PortfolioAssertions.InvalidTransferCounterpartErrorCode },
         { "archived bond", HttpStatusCode.Conflict, PortfolioAssertions.AssetArchivedErrorCode },
     };
 
@@ -181,15 +178,12 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
     public async Task Settle_Invalid_IsRejected(string scenario, HttpStatusCode status, string errorCode)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var capitalising = scenario == "capitalising with destination";
-        Factory.Clock.SetUtcNow(capitalising ? EdoYearOneEndedUtc : BondPurchaseDayUtc);
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var funded = await client.CreateFundedBondAsync(
-            cancellationToken, request: capitalising ? NewBondRequest() : NewRorBondRequest());
+        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewRorBondRequest());
         var assetId = funded.Bond.AssetId;
         (int PeriodIndex, decimal? RatePercent)[] periods = [(1, null)];
-        Guid? destination = funded.CashAssetId;
 
         switch (scenario)
         {
@@ -205,18 +199,12 @@ public sealed class SettleBondInterestEndpointTests(SkarbiecContainersFixture co
             case "rate sent for a fixed period":
                 periods = [(1, 4.00m)];
                 break;
-            case "coupon without destination":
-                destination = null;
-                break;
-            case "stock as destination":
-                destination = await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken, name: "Stocks"), cancellationToken);
-                break;
             case "archived bond":
                 await client.ArchiveAssetAsync(assetId, cancellationToken);
                 break;
         }
 
-        var response = await client.SettleBondInterestRawAsync(assetId, periods, destination, cancellationToken);
+        var response = await client.SettleBondInterestRawAsync(assetId, periods, cancellationToken);
 
         await response.AssertProblemAsync(status, errorCode, cancellationToken);
         Assert.Equal(0, await CountBondSettlementsAsync(userId, cancellationToken, assetId));

@@ -1,6 +1,5 @@
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.Bonds;
 
@@ -69,9 +68,6 @@ public sealed record BondRedemptionResponse
     /// <summary>What the redemption pays out after tax, PLN; a swap spends part of it on the new bond.</summary>
     public required decimal Proceeds { get; init; }
 
-    /// <summary>The Cash asset that received the proceeds or a swap's leftover; null when nothing was paid to Cash or once it was removed.</summary>
-    public string? DestinationAssetName { get; init; }
-
     /// <summary>The bond bought in a swap; null for a maturity redemption or once it was removed.</summary>
     public string? SwapTargetAssetName { get; init; }
 }
@@ -114,11 +110,6 @@ public sealed record BondResponse
     /// <summary>The asset's quantity in PLN; starts at the purchase cost.</summary>
     public required decimal BookValue { get; init; }
 
-    /// <summary>The Cash asset the purchase was paid from; null for new money or once the transfer was detached.</summary>
-    public Guid? FundingAssetId { get; init; }
-
-    public string? FundingAssetName { get; init; }
-
     public required BondStatus Status { get; init; }
 
     /// <summary>Ended periods not settled yet.</summary>
@@ -149,7 +140,6 @@ public static class BondMappingExtensions
         Asset asset,
         Account account,
         DateOnly today,
-        DepositFundingSource? funding,
         IReadOnlyCollection<BondInterestSettlement> settlements,
         IReadOnlyList<BondRedemptionResponse> redemptions,
         BondSwapSourceResponse? swappedFrom)
@@ -189,8 +179,6 @@ public static class BondMappingExtensions
             MaturityDate = terms.MaturityDate,
             NominalValue = terms.BondCount * NominalPerBond,
             BookValue = asset.Quantity,
-            FundingAssetId = funding?.AssetId,
-            FundingAssetName = funding?.AssetName,
             // Maturity and swap redeem the holding whole; early redemptions only once they took every bond.
             Status = terms.BondCount == 0 || redemptions.Any(r => r.Kind != BondRedemptionKind.Early) ? BondStatus.Redeemed
                 : terms.MaturityDate <= today ? BondStatus.Matured

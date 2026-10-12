@@ -1,10 +1,7 @@
-import { Component, effect, inject, resource, signal, untracked } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
@@ -12,13 +9,8 @@ import {
   postApiPortfolioBondsByAssetIdRedemption,
   type BondResponse,
 } from '../../../api/portfolio';
-import {
-  applyFieldErrors,
-  readProblemDetails,
-  type ApiProblemDetails,
-} from '../../../core/auth/problem-details';
+import { readProblemDetails } from '../../../core/auth/problem-details';
 import { formatDate, formatMoney } from '../../../shared/format';
-import { loadCashCandidates } from '../bond-interest';
 
 export interface RedeemBondDialogData {
   bond: BondResponse;
@@ -31,20 +23,11 @@ const BOND_CURRENCY = 'PLN';
 
 @Component({
   selector: 'app-redeem-bond-dialog',
-  imports: [
-    ReactiveFormsModule,
-    MatButtonModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatProgressSpinnerModule,
-    MatSelectModule,
-    TranslocoPipe,
-  ],
+  imports: [MatButtonModule, MatDialogModule, MatProgressSpinnerModule, TranslocoPipe],
   templateUrl: './redeem-bond-dialog.html',
   styleUrl: './redeem-bond-dialog.scss',
 })
 export class RedeemBondDialog {
-  private readonly formBuilder = inject(FormBuilder);
   private readonly dialogRef =
     inject<MatDialogRef<RedeemBondDialog, RedeemBondDialogResult>>(MatDialogRef);
   protected readonly bond = inject<RedeemBondDialogData>(MAT_DIALOG_DATA).bond;
@@ -56,10 +39,6 @@ export class RedeemBondDialog {
 
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
-
-  protected readonly form = this.formBuilder.group({
-    destinationAssetId: [null as string | null, [Validators.required]],
-  });
 
   protected readonly previewResource = resource({
     params: () => (this.unsettled ? undefined : {}),
@@ -77,30 +56,6 @@ export class RedeemBondDialog {
     },
   });
 
-  protected readonly candidatesResource = resource({
-    params: () => (this.unsettled ? undefined : {}),
-    loader: ({ abortSignal }) => loadCashCandidates(abortSignal),
-  });
-
-  constructor() {
-    // The Cash the purchase was paid from is where the money most likely returns.
-    effect(() => {
-      if (!this.candidatesResource.hasValue()) {
-        return;
-      }
-      const candidates = this.candidatesResource.value();
-      untracked(() => {
-        const destination = this.form.controls.destinationAssetId;
-        if (
-          destination.value === null &&
-          candidates.some((candidate) => candidate.assetId === this.bond.fundingAssetId)
-        ) {
-          destination.setValue(this.bond.fundingAssetId ?? null);
-        }
-      });
-    });
-  }
-
   protected settleFirst(): void {
     this.dialogRef.close('settle');
   }
@@ -110,23 +65,20 @@ export class RedeemBondDialog {
       return;
     }
 
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-
     this.submitting.set(true);
     this.formError.set(null);
 
     const result = await postApiPortfolioBondsByAssetIdRedemption({
       path: { assetId: this.bond.assetId },
-      body: { destinationAssetId: this.form.getRawValue().destinationAssetId! },
+      body: {},
     });
 
     this.submitting.set(false);
 
     if (result.error) {
-      this.applyServerErrors(readProblemDetails(result.error));
+      this.formError.set(
+        readProblemDetails(result.error).detail ?? translate('bonds.redeem.failed'),
+      );
       return;
     }
 
@@ -135,13 +87,5 @@ export class RedeemBondDialog {
 
   protected cancel(): void {
     this.dialogRef.close(false);
-  }
-
-  private applyServerErrors(problem: ApiProblemDetails): void {
-    if (applyFieldErrors(this.form, problem)) {
-      return;
-    }
-
-    this.formError.set(problem.detail ?? translate('bonds.redeem.failed'));
   }
 }

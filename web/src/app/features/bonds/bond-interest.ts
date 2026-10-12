@@ -1,18 +1,13 @@
 import { FormArray, FormControl, Validators } from '@angular/forms';
-import { translate } from '@jsverse/transloco';
 
 import { getApiMarketdataBondSeriesByCode } from '../../api/marketdata';
 import {
-  getApiPortfolioTransferCandidates,
   type BondPeriodResponse,
   type BondPeriodState,
   type BondResponse,
   type BondStatus,
   type SettleBondInterestRequest,
-  type TransferCandidateResponse,
 } from '../../api/portfolio';
-import { readProblemDetails } from '../../core/auth/problem-details';
-import { ASSET_CLASS } from '../assets/asset-class';
 import { bondTypeInfo } from './bond-types';
 
 // Mirrors BondPeriodState in declaration order: the enum travels as an int.
@@ -29,8 +24,6 @@ export const BOND_STATUS = {
   Redeemed: 3,
 } as const satisfies Record<string, BondStatus>;
 
-const BOND_CURRENCY = 'PLN';
-
 export type SeriesRates = ReadonlyMap<number, number>;
 
 export interface BondSettleSection {
@@ -38,7 +31,6 @@ export interface BondSettleSection {
   readonly periods: readonly BondPeriodResponse[];
   readonly coupon: boolean;
   readonly rates: FormArray<FormControl<number | null>>;
-  readonly destination: FormControl<string | null>;
 }
 
 export function isDue(period: BondPeriodResponse): boolean {
@@ -97,25 +89,9 @@ export async function loadSeriesRates(
   );
 }
 
-export async function loadCashCandidates(
-  signal: AbortSignal,
-): Promise<TransferCandidateResponse[]> {
-  const result = await getApiPortfolioTransferCandidates({
-    query: { currency: BOND_CURRENCY, assetClass: ASSET_CLASS.Cash },
-    signal,
-  });
-  if (result.error) {
-    throw new Error(
-      readProblemDetails(result.error).detail ?? translate('bonds.settle.cashLoadFailed'),
-    );
-  }
-  return result.data ?? [];
-}
-
 export function buildSettleSection(
   bond: BondResponse,
   seriesRates: SeriesRates | null,
-  candidates: readonly TransferCandidateResponse[],
 ): BondSettleSection {
   const periods = bond.periods.filter(isDue);
   const coupon = isCouponBond(bond);
@@ -133,20 +109,13 @@ export function buildSettleSection(
           ]),
     ),
   );
-  const fundingStillCandidate = candidates.some(
-    (candidate) => candidate.assetId === bond.fundingAssetId,
-  );
-  const destination = new FormControl<string | null>(
-    coupon && fundingStillCandidate ? (bond.fundingAssetId ?? null) : null,
-    coupon ? [Validators.required] : [],
-  );
 
-  return { bond, periods, coupon, rates, destination };
+  return { bond, periods, coupon, rates };
 }
 
 // A FormArray whose controls are all disabled reports neither valid nor invalid, only disabled.
 export function isSectionValid(section: BondSettleSection): boolean {
-  return (section.rates.valid || section.rates.disabled) && section.destination.valid;
+  return section.rates.valid || section.rates.disabled;
 }
 
 export function settleRequest(section: BondSettleSection): SettleBondInterestRequest {
@@ -156,5 +125,5 @@ export function settleRequest(section: BondSettleSection): SettleBondInterestReq
       ? { periodIndex: Number(period.index) }
       : { periodIndex: Number(period.index), ratePercent: Number(values[i]) },
   );
-  return section.coupon ? { periods, destinationAssetId: section.destination.value } : { periods };
+  return { periods };
 }

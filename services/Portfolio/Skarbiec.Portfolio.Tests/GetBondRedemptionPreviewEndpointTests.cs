@@ -33,7 +33,7 @@ public sealed class GetBondRedemptionPreviewEndpointTests(SkarbiecContainersFixt
         Assert.Equal(rowsBefore, await SnapshotUserRowsAsync(userId, cancellationToken));
         Assert.Empty(await ReadBondRedemptionsAsync(userId, cancellationToken));
 
-        await client.RedeemBondAsync(assetId, funded.CashAssetId, cancellationToken);
+        await client.RedeemBondAsync(assetId, cancellationToken);
 
         var row = Assert.Single(await ReadBondRedemptionsAsync(userId, cancellationToken, assetId));
         Assert.Equal(preview.GetProperty("bondCount").GetInt32(), row.BondCount);
