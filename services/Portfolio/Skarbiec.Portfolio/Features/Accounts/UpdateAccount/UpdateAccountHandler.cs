@@ -26,10 +26,14 @@ public sealed class UpdateAccountHandler(PortfolioDbContext dbContext)
             }
         }
 
+        var cash = await dbContext.LoadAccountCashAsync(id, cancellationToken);
+
+        // The cash carries the account's name; no event, since AssetPositionChanged holds no name.
         account.Name = request.Name;
+        cash.Name = request.Name;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return account.ToResponse();
+        return account.ToResponse(cash);
     }
 }

@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
+using Skarbiec.Portfolio.Features.CashAccounts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -29,6 +32,40 @@ public sealed class CreateAccountEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(TaxWrapper.Ike, body.Wrapper);
         Assert.False(body.IsArchived);
         Assert.Equal(AccountUri(body.Id), response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task CreatesAccountCash()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+
+        var response = await client.PostAsJsonAsync(
+            AccountsUri,
+            new CreateAccountRequest { Name = "XTB IKE", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Ike },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<AccountResponse>(cancellationToken);
+        Assert.NotEqual(Guid.Empty, created!.CashAssetId);
+        Assert.Equal(0m, created.CashBalance);
+
+        var account = await client.GetAccountAsync(created.Id, cancellationToken);
+        Assert.Equal(created.CashAssetId, account.CashAssetId);
+        Assert.Equal(0m, account.CashBalance);
+
+        await using var dbContext = CreateDbContext(userId);
+        var cash = await dbContext.Assets.Where(a => a.AccountId == created.Id && a.AssetClass == AssetClass.Cash).ToListAsync(cancellationToken);
+        var asset = Assert.Single(cash);
+        Assert.Equal(created.CashAssetId, asset.Id);
+        Assert.Equal("PLN", asset.Currency);
+        Assert.Equal(AssetValuationMode.CurrencyValued, asset.ValuationMode);
+        Assert.Equal("XTB IKE", asset.Name);
+        Assert.Equal(0m, asset.Quantity);
+
+        var freeCash = await client.GetFromJsonAsync<CashAccountsResponse>(PortfolioApi.AllCashAccountsUri, cancellationToken);
+        Assert.Empty(freeCash!.Accounts);
     }
 
     [Fact]

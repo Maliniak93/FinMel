@@ -94,7 +94,7 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         await intoArchived.AssertAccountArchivedConflictAsync(cancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, intoUnknown.StatusCode);
         await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         await client.AssertCashUntouchedAsync(cashId, cancellationToken, balance: 4_000m);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.AccountId == bondsId, cancellationToken));
+        Assert.False(await dbContext.Assets.ExcludingAccountCash().AnyAsync(a => a.AccountId == bondsId, cancellationToken));
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) :
         await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.AccountId == bondsId, cancellationToken));
+        Assert.False(await dbContext.Assets.ExcludingAccountCash().AnyAsync(a => a.AccountId == bondsId, cancellationToken));
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 }

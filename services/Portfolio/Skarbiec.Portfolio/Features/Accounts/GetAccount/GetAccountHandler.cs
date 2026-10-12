@@ -12,8 +12,11 @@ public sealed class GetAccountHandler(PortfolioDbContext dbContext)
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
-        return account is null
-            ? AccountErrors.NotFound(id)
-            : account.ToResponse();
+        if (account is null)
+        {
+            return AccountErrors.NotFound(id);
+        }
+
+        return await dbContext.ToResponseAsync(account, cancellationToken);
     }
 }

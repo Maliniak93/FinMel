@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.SavingsAccounts;
@@ -91,7 +92,8 @@ public sealed class UpdateTransactionHandler(
             Date = request.Date
         };
 
-        var recomputed = TransactionQuantityCalculator.Recompute([.. otherTransactions, candidate], TransactionErrors.MutationBreaksHistory);
+        var recomputed = TransactionQuantityCalculator.Recompute(
+            [.. otherTransactions, candidate], asset.OversellError(TransactionErrors.MutationBreaksHistory));
         if (recomputed.IsFailure)
         {
             return recomputed.Error;

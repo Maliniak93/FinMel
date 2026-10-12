@@ -1,4 +1,6 @@
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 
 namespace Skarbiec.Portfolio.Features.Transfers;
 
@@ -46,6 +48,15 @@ public static class TransferRoutes
         [(AssetClass.Stock, AssetClass.Cash)] = Access.None,
         [(AssetClass.Etf, AssetClass.Cash)] = Access.None,
     };
+
+    // An account's cash only moves to another account's cash, never to a free Cash or any other class.
+    public static bool IsCreatable(Asset source, Asset target) =>
+        source.IsAccountCash() || target.IsAccountCash()
+            ? source.IsAccountCash() && target.IsAccountCash() && source.AccountId != target.AccountId
+            : IsCreatable(source.AssetClass, target.AssetClass);
+
+    public static bool IsDeletable(Asset source, Asset target) =>
+        (source.IsAccountCash() && target.IsAccountCash()) || IsDeletable(source.AssetClass, target.AssetClass);
 
     public static bool IsAllowed(AssetClass source, AssetClass target) => Routes.ContainsKey((source, target));
 

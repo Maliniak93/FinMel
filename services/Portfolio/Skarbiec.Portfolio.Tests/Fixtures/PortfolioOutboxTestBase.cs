@@ -8,6 +8,7 @@ using Skarbiec.Portfolio.Features.Accounts.ArchiveAccount;
 using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 using Skarbiec.Portfolio.Features.Accounts.DeleteAccount;
 using Skarbiec.Portfolio.Features.Accounts.RestoreAccount;
+using Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.ArchiveAsset;
 using Skarbiec.Portfolio.Features.Bonds.AddBond;
@@ -67,6 +68,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddSingleton(TimeProvider.System);
             services.AddScoped<PositionEventPublisher>();
             services.AddScoped<CreateAccountHandler>();
+            services.AddScoped<UpdateAccountHandler>();
             services.AddScoped<AddAssetHandler>();
             services.AddScoped<UpdateAssetHandler>();
             services.AddScoped<RecordTransactionHandler>();

@@ -46,7 +46,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var created = await intoBrokerage.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Equal(brokerageId, created!.AccountId);
         await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(1, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(1, await dbContext.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
     }
 
     [Fact]
@@ -288,7 +288,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(a => a.AccountId == accountId, cancellationToken));
+        Assert.Equal(0, await dbContext.Assets.ExcludingAccountCash().CountAsync(a => a.AccountId == accountId, cancellationToken));
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
@@ -599,7 +599,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         await response.AssertAccountArchivedConflictAsync(cancellationToken);
 
         await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
@@ -625,7 +625,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         await using var dbContext = CreateDbContext(ownerId);
-        Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Assets.IgnoreQueryFilters().ExcludingAccountCash().CountAsync(cancellationToken));
     }
 
     [Theory]

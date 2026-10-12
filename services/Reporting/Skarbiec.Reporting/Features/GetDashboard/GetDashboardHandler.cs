@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Features.GetDashboard;
@@ -42,6 +43,7 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
                 {
                     AccountId = g.Key,
                     ValuePln = valuePln,
+                    CashPln = g.Where(l => l.AssetClass == AssetClass.Cash).Sum(l => l.ValuePln),
                     Percentage = netWorthPln == 0m ? 0m : Math.Round(valuePln / netWorthPln * 100m, 2),
                     SnapshotDate = snapshot.Date,
                     IsStale = g.Any(l => l.IsStale),

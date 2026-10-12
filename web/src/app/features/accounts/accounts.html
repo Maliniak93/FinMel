@@ -38,11 +38,7 @@
       <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
         <td mat-cell *matCellDef="let account">
-          <a
-            [routerLink]="accountHoldingsPath(account.type)"
-            [queryParams]="{ account: account.id }"
-            >{{ account.name }}</a
-          >
+          <a [routerLink]="['/accounts', account.id]">{{ account.name }}</a>
         </td>
       </ng-container>
 
@@ -55,6 +51,23 @@
         <th mat-header-cell *matHeaderCellDef>{{ 'accounts.wrapper' | transloco }}</th>
         <td mat-cell *matCellDef="let account">
           {{ taxWrapperLabel(account.wrapper) | transloco }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="cash">
+        <th mat-header-cell *matHeaderCellDef>{{ 'accounts.balances.cash' | transloco }}</th>
+        <td mat-cell *matCellDef="let account">{{ formatMoney(account.cashBalance) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="securities">
+        <th mat-header-cell *matHeaderCellDef>{{ 'accounts.balances.securities' | transloco }}</th>
+        <td mat-cell *matCellDef="let account">
+          @let securities = securitiesOf(account);
+          @if (securities !== null) {
+            {{ formatMoney(securities) }}
+          } @else {
+            —
+          }
         </td>
       </ng-container>
 

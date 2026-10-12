@@ -23,6 +23,7 @@ const withOutsideAccounts: DashboardResponse = {
     {
       accountId: BROKERAGE_ID,
       valuePln: 1000,
+      cashPln: 0,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 50,
@@ -30,6 +31,7 @@ const withOutsideAccounts: DashboardResponse = {
     {
       accountId: BONDS_ID,
       valuePln: 600,
+      cashPln: 0,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 30,
@@ -37,6 +39,7 @@ const withOutsideAccounts: DashboardResponse = {
     {
       accountId: null,
       valuePln: 400,
+      cashPln: 0,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 20,
@@ -69,17 +72,17 @@ describe('AccountsCard', () => {
     expect(text).not.toContain('Old brokerage');
   });
 
-  it('links a Brokerage row to the securities page and a Bonds row to the bonds page', async () => {
+  it('links each row to its account page', async () => {
     const { fixture } = await renderCard(AccountsCard, {
       accounts: jsonResponse(accounts),
       dashboard: jsonResponse(withOutsideAccounts),
     });
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(
-      element.querySelector(`a[href="/securities?account=${BROKERAGE_ID}"]`)?.textContent,
-    ).toContain('XTB IKE');
-    expect(element.querySelector(`a[href="/bonds?account=${BONDS_ID}"]`)?.textContent).toContain(
+    expect(element.querySelector(`a[href="/accounts/${BROKERAGE_ID}"]`)?.textContent).toContain(
+      'XTB IKE',
+    );
+    expect(element.querySelector(`a[href="/accounts/${BONDS_ID}"]`)?.textContent).toContain(
       'Obligacje IKE',
     );
   });

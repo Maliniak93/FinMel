@@ -784,6 +784,40 @@
     "valuesLoadFailed": "Nie udało się wczytać wartości rachunków.",
     "filteredNotice": "Widoczny tylko jeden rachunek.",
     "showAll": "Pokaż wszystkie",
+    "balances": {
+      "cash": "Gotówka",
+      "securities": "Papiery",
+      "total": "Razem"
+    },
+    "detail": {
+      "back": "Wróć do rachunków",
+      "holdings": "Pozycje",
+      "noHoldings": "Ten rachunek nie ma jeszcze żadnych aktywów.",
+      "cashHistory": "Historia gotówki",
+      "noHistory": "Brak ruchów gotówki.",
+      "loadFailed": "Nie udało się wczytać rachunku.",
+      "holdingsFailed": "Nie udało się wczytać pozycji rachunku.",
+      "historyFailed": "Nie udało się wczytać historii gotówki."
+    },
+    "cash": {
+      "deposit": "Wpłata",
+      "withdraw": "Wypłata",
+      "depositTitle": "Wpłata środków",
+      "withdrawTitle": "Wypłata środków",
+      "amountRequired": "Kwota jest wymagana.",
+      "amountPositive": "Kwota musi być większa od 0.",
+      "dateInFuture": "Data nie może być z przyszłości.",
+      "insufficientFunds": "Brak środków na rachunku"
+    },
+    "transfer": {
+      "action": "Przelew",
+      "title": "Przelew między rachunkami",
+      "target": "Rachunek docelowy",
+      "targetRequired": "Wybierz rachunek docelowy.",
+      "noTarget": "Nie masz innego rachunku, na który można przelać środki.",
+      "loadFailed": "Nie udało się wczytać rachunków.",
+      "submit": "Przelej"
+    },
     "archive": {
       "title": "Zarchiwizować ten rachunek?",
       "message": "\"{{ name }}\" przejdzie w tryb tylko do odczytu i zniknie z domyślnej listy — zarchiwizowane rachunki zobaczysz po włączeniu opcji \"Pokaż zarchiwizowane\".",

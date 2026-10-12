@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.RemoveAsset;
@@ -18,6 +19,11 @@ public sealed class RemoveAssetHandler(
         if (asset is null)
         {
             return AssetErrors.NotFound(assetId);
+        }
+
+        if (asset.ManagedError() is { } cashManaged)
+        {
+            return cashManaged;
         }
 
         if (await dbContext.AccountArchivedErrorAsync(asset, cancellationToken) is { } accountArchived)

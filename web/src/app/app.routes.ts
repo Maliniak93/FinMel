@@ -29,6 +29,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/accounts/accounts').then((m) => m.Accounts),
       },
       {
+        path: 'accounts/:id',
+        loadComponent: () =>
+          import('./features/accounts/account-detail/account-detail').then((m) => m.AccountDetail),
+      },
+      {
         path: 'assets/:assetId/transactions',
         loadComponent: () =>
           import('./features/transactions/transactions').then((m) => m.Transactions),

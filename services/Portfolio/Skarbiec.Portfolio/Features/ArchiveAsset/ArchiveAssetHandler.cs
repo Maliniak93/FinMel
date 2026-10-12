@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.ArchiveAsset;
@@ -17,6 +18,11 @@ public sealed class ArchiveAssetHandler(
         if (asset is null)
         {
             return AssetErrors.NotFound(assetId);
+        }
+
+        if (asset.ManagedError() is { } cashManaged)
+        {
+            return cashManaged;
         }
 
         // An archived account is read-only as a whole.

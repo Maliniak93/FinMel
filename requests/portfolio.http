@@ -64,7 +64,53 @@ Content-Type: application/json
   "name": "XTB IKE (renamed)"
 }
 
-### Archive an account (409 Conflict.AccountNotEmpty while an asset in it holds a quantity; publishes nothing)
+### Deposit money into the account (its cash is the cashAssetId of the account; unit price is always 1, 400 Validation.InsufficientFunds if a Withdraw would leave the balance below zero on any day)
+# @name accountDeposit
+POST {{baseUrl}}/api/portfolio/assets/{{createBrokerageAccount.response.body.cashAssetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 5000,
+  "unitPrice": 1,
+  "date": "2026-08-18"
+}
+
+### Withdraw money from the account
+POST {{baseUrl}}/api/portfolio/assets/{{createBrokerageAccount.response.body.cashAssetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Withdraw",
+  "quantity": 1000,
+  "unitPrice": 1,
+  "date": "2026-08-19"
+}
+
+### List the other accounts' cash a transfer can go to (free Cash is never listed here)
+GET {{baseUrl}}/api/portfolio/transfer-candidates?currency=PLN&assetClass=Cash&accountCash=true
+Authorization: Bearer {{authToken}}
+
+### Transfer between two accounts (400 Validation.InsufficientFunds above the balance, 400 Validation.InvalidTransferCounterpart to a free Cash or the same account)
+# @name accountTransfer
+POST {{baseUrl}}/api/portfolio/transfers
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "sourceAssetId": "{{createBrokerageAccount.response.body.cashAssetId}}",
+  "targetAssetId": "{{createBondsAccount.response.body.cashAssetId}}",
+  "amount": 3000,
+  "date": "2026-08-20"
+}
+
+### Delete the transfer between accounts (400 Validation.InsufficientFunds once the target spent the money)
+DELETE {{baseUrl}}/api/portfolio/transfers/{{accountTransfer.response.body.transferId}}
+Authorization: Bearer {{authToken}}
+
+### Archive an account (409 Conflict.AccountNotEmpty while its cash or an asset in it holds a quantity; publishes nothing)
 POST {{baseUrl}}/api/portfolio/accounts/{{createBondsAccount.response.body.id}}/archive
 Authorization: Bearer {{authToken}}
 
@@ -91,7 +137,7 @@ Content-Type: application/json
 POST {{baseUrl}}/api/portfolio/accounts/{{createBondsAccount.response.body.id}}/restore
 Authorization: Bearer {{authToken}}
 
-### Delete an account (409 Conflict.AccountHasHistory while it holds any asset)
+### Delete an account (409 Conflict.AccountHasHistory while it holds an asset other than its cash or has a cash transaction; removes its cash and publishes AssetRemoved)
 DELETE {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}
 Authorization: Bearer {{authToken}}
 

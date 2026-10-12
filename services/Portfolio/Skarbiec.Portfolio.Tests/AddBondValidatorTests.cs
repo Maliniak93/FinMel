@@ -44,7 +44,7 @@ public sealed class AddBondValidatorTests(SkarbiecContainersFixture containers) 
 
         await response.AssertFieldValidationErrorAsync(field, cancellationToken);
         await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
     }

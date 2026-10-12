@@ -17,7 +17,7 @@ public sealed class ArchiveAccountHandler(PortfolioDbContext dbContext)
         // Already archived: 200 and nothing to change.
         if (account.IsArchived)
         {
-            return account.ToResponse();
+            return await dbContext.ToResponseAsync(account, cancellationToken);
         }
 
         var holdsQuantity = await dbContext.Assets
@@ -30,6 +30,6 @@ public sealed class ArchiveAccountHandler(PortfolioDbContext dbContext)
         account.IsArchived = true;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return account.ToResponse();
+        return await dbContext.ToResponseAsync(account, cancellationToken);
     }
 }

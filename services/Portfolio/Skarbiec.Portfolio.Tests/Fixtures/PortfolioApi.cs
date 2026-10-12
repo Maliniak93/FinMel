@@ -720,9 +720,14 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken))!;
     }
 
-    public static string TransferCandidatesUri(string? currency = "PLN", string? assetClass = "Cash")
+    public static string TransferCandidatesUri(string? currency = "PLN", string? assetClass = "Cash", bool accountCash = false)
     {
         var query = new List<string>();
+        if (accountCash)
+        {
+            query.Add("accountCash=true");
+        }
+
         if (currency is not null)
         {
             query.Add($"currency={Uri.EscapeDataString(currency)}");

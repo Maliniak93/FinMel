@@ -42,7 +42,8 @@ public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : Port
         Assert.Equal(1, await verifyDb.Transactions.CountAsync(t => t.AssetId == assetId, cancellationToken));
         Assert.True(await verifyDb.Set<TreasuryBond>().AnyAsync(t => t.AssetId == assetId, cancellationToken));
 
-        var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
+        var evt = Assert.Single(
+            await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken), e => e.AssetClass == AssetClass.Bond);
         Assert.Equal(assetId, evt.AssetId);
         Assert.Equal(accountId, evt.AccountId);
         Assert.Equal(UserId, evt.UserId);

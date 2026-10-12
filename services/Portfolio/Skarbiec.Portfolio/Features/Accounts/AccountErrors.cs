@@ -20,6 +20,9 @@ internal static class AccountErrors
     public static Error HasHistory(Guid id) =>
         new("Conflict.AccountHasHistory", $"Account '{id}' holds assets, so it can't be deleted.");
 
+    public static Error CashManaged(Guid assetId) =>
+        new("Conflict.AccountCashManaged", $"Asset '{assetId}' is an account's cash — change it through the account, its deposits, withdrawals and transfers.");
+
     public static Error Required(AssetClass assetClass, AccountType type) =>
         new("Validation.AccountRequired", $"A {assetClass} asset needs an accountId of a {type} account.");
 

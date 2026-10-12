@@ -66,6 +66,34 @@ public sealed class ArchiveAccountEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task NeedsZeroCash()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateAccountWithCashAsync(cancellationToken, balance: 100m, name: "A");
+        var other = await client.CreateAccountWithCashAsync(cancellationToken, balance: 50m, name: "B");
+
+        var blocked = await client.PostAsync(ArchiveAccountUri(account.AccountId), content: null, cancellationToken);
+
+        await blocked.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.AccountNotEmptyErrorCode, cancellationToken);
+        Assert.False((await client.GetAccountAsync(account.AccountId, cancellationToken)).IsArchived);
+
+        await client.RecordTransactionAsync(
+            account.CashAssetId, TransactionType.Withdraw, 100m, CashDay2, cancellationToken, unitPrice: 1m);
+        var archived = await client.PostAsync(ArchiveAccountUri(account.AccountId), content: null, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, archived.StatusCode);
+        var deposit = await client.PostCashTransactionAsync(
+            account.CashAssetId, TransactionType.Deposit, 10m, CashDay3, cancellationToken);
+        var transferIn = await client.PostAsJsonAsync(
+            TransfersUri, NewTransferRequest(other.CashAssetId, account.CashAssetId, 10m, CashDay3), cancellationToken);
+        await deposit.AssertAccountArchivedConflictAsync(cancellationToken);
+        await transferIn.AssertAccountArchivedConflictAsync(cancellationToken);
+        Assert.Equal(50m, await client.GetCashBalanceAsync(other.AccountId, cancellationToken));
+    }
+
+    [Fact]
     public async Task Archive_AlreadyArchivedAccount_IsIdempotent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

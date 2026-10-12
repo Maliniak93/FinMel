@@ -30,8 +30,3 @@ export function accountTypeLabel(value: AccountType): string {
 export function taxWrapperLabel(value: TaxWrapper): string {
   return TAX_WRAPPERS.find((w) => w.value === Number(value))?.label ?? 'enums.taxWrapper.unknown';
 }
-
-// The page that lists what an account holds.
-export function accountHoldingsPath(type: AccountType): string {
-  return Number(type) === ACCOUNT_TYPE.Bonds ? '/bonds' : '/securities';
-}

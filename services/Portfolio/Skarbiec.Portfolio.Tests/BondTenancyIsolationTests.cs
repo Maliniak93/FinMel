@@ -95,7 +95,7 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
         await owner.AssertCashUntouchedAsync(ownerCashId, cancellationToken, balance: 6_000m);
         await using var dbContext = CreateDbContext(strangerId);
         Assert.Equal(0, await dbContext.Set<TreasuryBond>().CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
+        Assert.Equal(0, await dbContext.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
     }
 
     [Fact]

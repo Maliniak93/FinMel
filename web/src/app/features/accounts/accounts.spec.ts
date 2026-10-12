@@ -33,6 +33,8 @@ const brokerage: AccountResponse = {
   type: 0,
   wrapper: 1,
   isArchived: false,
+  cashAssetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+  cashBalance: 2000,
 };
 
 const bonds: AccountResponse = {
@@ -41,6 +43,8 @@ const bonds: AccountResponse = {
   type: 1,
   wrapper: 1,
   isArchived: false,
+  cashAssetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
+  cashBalance: 0,
 };
 
 const archived: AccountResponse = {
@@ -49,6 +53,8 @@ const archived: AccountResponse = {
   type: 0,
   wrapper: 0,
   isArchived: true,
+  cashAssetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
+  cashBalance: 0,
 };
 
 const emptyDashboard: DashboardResponse = {
@@ -147,6 +153,7 @@ describe('Accounts', () => {
         {
           accountId: brokerage.id,
           valuePln: 12345.67,
+          cashPln: 0,
           percentage: 100,
           snapshotDate: '2026-08-10',
           isStale: false,
@@ -158,12 +165,35 @@ describe('Accounts', () => {
     expect(pageText()).toContain(formatMoney(12345.67));
   });
 
-  it('links a Brokerage row to securities and a Bonds row to bonds', async () => {
+  it('links each row to its account page', async () => {
     await setup(jsonResponse([brokerage, bonds]));
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector(`a[href="/securities?account=${brokerage.id}"]`)).not.toBeNull();
-    expect(element.querySelector(`a[href="/bonds?account=${bonds.id}"]`)).not.toBeNull();
+    expect(element.querySelector(`a[href="/accounts/${brokerage.id}"]`)).not.toBeNull();
+    expect(element.querySelector(`a[href="/accounts/${bonds.id}"]`)).not.toBeNull();
+  });
+
+  it('shows the cash from the account and the securities as the total minus the cash', async () => {
+    const dashboard: DashboardResponse = {
+      ...emptyDashboard,
+      netWorthPln: 5000,
+      asOf: '2026-08-10',
+      byAccount: [
+        {
+          accountId: brokerage.id,
+          valuePln: 5000,
+          cashPln: 2000,
+          percentage: 100,
+          snapshotDate: '2026-08-10',
+          isStale: false,
+        },
+      ],
+    };
+    await setup(jsonResponse([brokerage]), jsonResponse(dashboard));
+
+    expect(pageText()).toContain(formatMoney(2000));
+    expect(pageText()).toContain(formatMoney(3000));
+    expect(pageText()).toContain(formatMoney(5000));
   });
 
   it('reloads after a successful create-dialog save', async () => {

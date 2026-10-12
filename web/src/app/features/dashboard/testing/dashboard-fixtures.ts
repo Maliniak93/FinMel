@@ -24,6 +24,7 @@ export const dashboard: DashboardResponse = {
     {
       accountId: RETIREMENT_ID,
       valuePln: 15000,
+      cashPln: 5000,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 100,
@@ -58,6 +59,8 @@ export function accountResponse(overrides: Partial<AccountResponse> = {}): Accou
     type: 0,
     wrapper: 0,
     isArchived: false,
+    cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    cashBalance: 0,
     ...overrides,
   };
 }

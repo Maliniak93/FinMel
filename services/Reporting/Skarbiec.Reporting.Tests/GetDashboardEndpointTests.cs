@@ -149,6 +149,34 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task ByAccount_CashSplit()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var emptyOfCashId = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, snapshotDate, 2_000m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), snapshotDate, 1_000m, cancellationToken, assetClass: AssetClass.Cash);
+            await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Etf);
+            await db.SeedValuationLineAsync(userId, emptyOfCashId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Stock);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var split = Assert.Single(body!.ByAccount, a => a.AccountId == accountId);
+        Assert.Equal(1_500m, split.ValuePln);
+        Assert.Equal(1_000m, split.CashPln);
+        Assert.Equal(0m, Assert.Single(body.ByAccount, a => a.AccountId == emptyOfCashId).CashPln);
+    }
+
+    [Fact]
     public async Task ByAccountCarriesPercentage()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

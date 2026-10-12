@@ -24,7 +24,7 @@ import { getApiReportingDashboard, type DashboardAccountValue } from '../../api/
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { accountHoldingsPath, accountTypeLabel, taxWrapperLabel } from './account-type';
+import { accountTypeLabel, taxWrapperLabel } from './account-type';
 import { AccountFormDialog } from './account-form-dialog/account-form-dialog';
 
 // MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
@@ -53,8 +53,8 @@ export class Accounts {
 
   protected readonly displayedColumns = computed(() =>
     this.includeArchived()
-      ? ['name', 'type', 'wrapper', 'value', 'status', 'actions']
-      : ['name', 'type', 'wrapper', 'value', 'actions'],
+      ? ['name', 'type', 'wrapper', 'cash', 'securities', 'value', 'status', 'actions']
+      : ['name', 'type', 'wrapper', 'cash', 'securities', 'value', 'actions'],
   );
 
   protected readonly accountsResource = resource({
@@ -104,10 +104,16 @@ export class Accounts {
   protected readonly formatMoney = formatMoney;
   protected readonly accountTypeLabel = accountTypeLabel;
   protected readonly taxWrapperLabel = taxWrapperLabel;
-  protected readonly accountHoldingsPath = accountHoldingsPath;
 
   protected valueEntryFor(accountId: string): DashboardAccountValue | undefined {
     return this.accountValues().get(accountId);
+  }
+
+  protected securitiesOf(account: AccountResponse): number | null {
+    const entry = this.valueEntryFor(account.id);
+    return entry
+      ? Math.round((Number(entry.valuePln) - Number(account.cashBalance)) * 100) / 100
+      : null;
   }
 
   protected openCreateDialog(): void {
