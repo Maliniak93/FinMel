@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Usage: node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--threshold 90] [--no-shutdown]
-//   --dry-run      print what would happen per part and the limits; no preflight script, builds, merges, comments or shutdown
+// Usage: node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown]
+//   --dry-run      print what would happen per part; no preflight script, builds, merges, comments or shutdown
 //   --max-tasks N  stop before the (N+1)th build of this run (0 = preflight only)
-//   --threshold P  stop before a build when the 5h or weekly limit is at P % or more (100 skips the probe)
 //   --no-shutdown  do not schedule `shutdown /s /t 600` when the run ends
 //   node scripts/epic.mjs <epic> --stop   creates the stop file; the running driver stops before the next build
-//   last stdout line: EPIC_RESULT: {...}; exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
+//   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
+//   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
 import { spawn, spawnSync } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const REPO = "Maliniak93/FinMel";
 const IS_WIN = process.platform === "win32";
 const BOOLEAN_FLAGS = new Set(["dry-run", "no-shutdown", "stop"]);
+const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks"]);
+const USAGE = "usage: epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] | --stop";
 const BUILD_TIMEOUT_MS = 4 * 3600e3;
 const CI_POLL_MS = 30e3;
 const CI_MISSING_MS = 10 * 60e3;
@@ -32,7 +34,28 @@ class Stop extends Error {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const minutes = (ms) => Math.round(ms / 600) / 100;
-const local = (epochSeconds) => new Date(epochSeconds * 1000).toLocaleString();
+const clock = (date = new Date()) => date.toTimeString().slice(0, 5);
+const pad = (n) => String(n).padStart(2, "0");
+
+let logPath = null;
+let lastSayAt = Date.now();
+
+function say(text) {
+  const [first, ...more] = String(text).split(/\r?\n/);
+  const out = [`${clock()}  ${first}`, ...more.map((l) => `       ${l}`)].join("\n");
+  console.log(out);
+  if (logPath) appendFileSync(logPath, `${out}\n`);
+  lastSayAt = Date.now();
+}
+
+function openLog(epic) {
+  const dir = path.join(REPO_ROOT, "skarbiec-plan", "epic-runs", String(epic));
+  mkdirSync(dir, { recursive: true });
+  const d = new Date();
+  const stamped = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  logPath = path.join(dir, `${stamped}.log`);
+  say(`epic #${epic} · log ${path.relative(REPO_ROOT, logPath).replaceAll("\\", "/")}`);
+}
 
 function run(cmd, argv, options = {}) {
   const res = spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, maxBuffer: 64 * 1024 * 1024, ...options });
@@ -47,8 +70,8 @@ const project = (argv) => run(NODE, ["scripts/gh-project.mjs", ...argv]);
 function parseFlags(argv) {
   const flags = {};
   for (let i = 0; i < argv.length; i++) {
-    if (!argv[i].startsWith("--")) throw new Error(`unexpected argument: ${argv[i]}`);
     const key = argv[i].slice(2);
+    if (!argv[i].startsWith("--") || !KNOWN_FLAGS.has(key)) throw new Stop("usage", `unexpected argument: ${argv[i]}\n${USAGE}`);
     flags[key] = BOOLEAN_FLAGS.has(key) ? true : argv[++i];
   }
   return flags;
@@ -103,7 +126,7 @@ function claudeSpawn(claude, argv) {
 }
 
 function retryShip(part) {
-  console.log(`retrying the ship step of #${part.number} on ${part.branch}`);
+  say(`retrying the ship step of #${part.number} on ${part.branch}`);
   if (currentBranch() !== part.branch) {
     const switched = git(["switch", part.branch]);
     if (!switched.ok) throw new Stop("ship-failed", `git switch ${part.branch}: ${switched.firstErr}`);
@@ -121,39 +144,6 @@ function retryShip(part) {
   throw new Stop("ship-failed", parsed ? `${parsed.failedCommand ?? "ship.mjs"}: ${parsed.error ?? "failed"}` : `ship.mjs gave no result: ${cause}`);
 }
 
-function probeLimits(claude) {
-  const spec = claudeSpawn(claude, ["-p", "ok", "--model", "haiku", "--max-turns", "1", "--output-format", "stream-json", "--verbose"]);
-  const res = spawnSync(spec.cmd, spec.argv, { cwd: os.tmpdir(), encoding: "utf8", windowsHide: true, shell: spec.shell, timeout: 180e3, maxBuffer: 64 * 1024 * 1024 });
-  const lines = (res.stdout ?? "").split(/\r?\n/).filter((l) => l.includes('"rate_limit_event"'));
-  for (const line of lines.reverse()) {
-    try {
-      const windows = JSON.parse(line).rate_limit_info?.unifiedWindows;
-      if (windows?.five_hour && windows?.seven_day) {
-        return {
-          fiveHour: { utilization: windows.five_hour.utilization, resetsAt: windows.five_hour.resetsAt },
-          sevenDay: { utilization: windows.seven_day.utilization, resetsAt: windows.seven_day.resetsAt },
-        };
-      }
-    } catch {
-    }
-  }
-  return null;
-}
-
-const percent = (w) => `${Math.round(w.utilization * 100)}%`;
-const describeLimits = (l) => `5h ${percent(l.fiveHour)} (resets ${local(l.fiveHour.resetsAt)}) · 7d ${percent(l.sevenDay)} (resets ${local(l.sevenDay.resetsAt)})`;
-
-function checkLimits(claude, threshold) {
-  if (threshold >= 100) return null;
-  const limits = probeLimits(claude);
-  if (!limits) throw new Stop("limits-unknown", "Claude Code no longer reports rate_limit_event; pass --threshold 100 to ignore");
-  console.log(`limits: ${describeLimits(limits)}`);
-  if (limits.fiveHour.utilization >= threshold / 100 || limits.sevenDay.utilization >= threshold / 100) {
-    throw new Stop("limit", `usage at or above ${threshold}%: ${describeLimits(limits)}`);
-  }
-  return limits;
-}
-
 let sleepGuard = null;
 
 function startSleepGuard() {
@@ -167,7 +157,7 @@ function startSleepGuard() {
   ].join("; ");
   sleepGuard = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], { windowsHide: true, stdio: "ignore" });
   sleepGuard.on("error", () => {});
-  console.log("sleep blocked while the run lasts (closing the lid still sleeps)");
+  say("sleep blocked while the run lasts (closing the lid still sleeps)");
 }
 
 function killTree(child) {
@@ -180,43 +170,117 @@ process.on("exit", () => killTree(sleepGuard));
 
 let buildChild = null;
 
-function stamp(number, startedAt) {
-  const elapsed = Math.floor((Date.now() - startedAt) / 60e3);
-  return `[#${number} ${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}]`;
+const LIMIT_TEXT = /hit your (session|weekly) limit|usage limit/i;
+const ACTIVE_STATES = new Set(["start", "progress"]);
+const HEARTBEAT_MS = 10 * 60e3;
+
+const short = (text, max = 70) => {
+  const flat = String(text ?? "").replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+};
+const modelName = (model) => String(model ?? "?").replace(/^claude-/, "");
+const kTokens = (n) => `${Math.round((n ?? 0) / 1000)}k`;
+const span = (ms) => {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+};
+// resetsAt is epoch seconds in the stream; accept milliseconds as well
+const resetClock = (t) => (t ? clock(new Date(t > 1e12 ? t : t * 1000)) : "unknown");
+
+function createReporter(number) {
+  const rep = { limitHit: false, resetsAt: null, sessionId: null };
+  const toolNames = new Map();
+  const agents = new Map();
+  const phases = new Set();
+  const bgTasks = new Set();
+  let limitAnnounced = false;
+  let latest = null;
+
+  const markLimit = (resetsAt) => {
+    rep.limitHit = true;
+    rep.resetsAt = resetsAt ?? rep.resetsAt;
+    if (limitAnnounced) return;
+    limitAnnounced = true;
+    say(`LIMIT reached · resets ${resetClock(rep.resetsAt)}`);
+  };
+
+  const onAgent = (a) => {
+    const prev = agents.get(a.agentId);
+    agents.set(a.agentId, a);
+    if (!prev) {
+      if (!phases.has(a.phaseTitle)) {
+        phases.add(a.phaseTitle);
+        say(`── ${a.phaseTitle}`);
+      }
+      say(`   ${a.agentType} (${modelName(a.model)}) start · ${a.label}`);
+    }
+    if (a.state !== prev?.state && !ACTIVE_STATES.has(a.state)) {
+      say(`   ${a.agentType} ${a.state} · ${kTokens(a.tokens)} tokens · ${a.toolCalls ?? 0} tools · ${span(a.durationMs ?? 0)}`);
+    }
+  };
+
+  const onProgress = (obj) => {
+    for (const entry of obj.workflow_progress ?? []) if (entry.type === "workflow_agent") onAgent(entry);
+    const running = [...agents.values()].filter((a) => ACTIVE_STATES.has(a.state)).sort((a, b) => (b.lastProgressAt ?? 0) - (a.lastProgressAt ?? 0))[0];
+    latest = { phase: String(obj.description ?? "").split(":")[0], agent: running?.agentType, tokens: obj.usage?.total_tokens, tools: obj.usage?.tool_uses };
+  };
+
+  const onAssistant = (obj) => {
+    if (obj.error === "rate_limit") markLimit();
+    for (const block of obj.message?.content ?? []) {
+      if (block.type !== "tool_use") continue;
+      toolNames.set(block.id, block.name);
+      if (obj.parent_tool_use_id) continue;
+      const input = block.input ?? {};
+      if (block.name === "Bash") say(`run: ${short(input.description ?? input.command)}`);
+      else if (block.name === "Workflow") say(`workflow: ${input.name ?? /name:\s*'([^']+)'/.exec(input.script ?? "")?.[1] ?? "script"}`);
+      else if (block.name === "Skill") say(`skill: ${input.skill}`);
+    }
+  };
+
+  const onSystem = (obj) => {
+    if (obj.subtype === "init") {
+      rep.sessionId = obj.session_id;
+      say(`#${number} session ${obj.session_id} (full view later: claude --resume ${obj.session_id})`);
+    } else if (obj.subtype === "task_progress") onProgress(obj);
+    else if (obj.subtype === "task_started" && obj.task_type === "local_bash" && obj.is_backgrounded) {
+      bgTasks.add(obj.task_id);
+      say(`bg: ${short(obj.description)}`);
+    } else if (obj.subtype === "task_notification" && bgTasks.delete(obj.task_id)) {
+      say(`bg ${obj.status === "completed" ? "done" : "failed"}: ${short(obj.summary)}`);
+    } else if (obj.subtype === "permission_check_status" && !["checking", "done", "allowed"].includes(obj.status)) {
+      say(`DENIED: ${toolNames.get(obj.tool_use_id) ?? obj.tool_use_id} (${obj.status})`);
+    }
+  };
+
+  const onResult = (obj) => {
+    rep.sessionId ??= obj.session_id;
+    const text = String(obj.result ?? "");
+    if (obj.is_error && LIMIT_TEXT.test(text)) markLimit();
+    const facts = `${Math.round((obj.duration_ms ?? 0) / 60e3)} min · $${(obj.total_cost_usd ?? 0).toFixed(2)}`;
+    if (obj.is_error) say(`#${number} build error: ${short(text.split(/\r?\n/).find(Boolean) ?? obj.subtype, 140)} · ${facts}`);
+    else say(`#${number} build finished · ${facts} · ${obj.permission_denials?.length ?? 0} denials`);
+  };
+
+  rep.handle = (obj) => {
+    if (obj.type === "assistant") onAssistant(obj);
+    else if (obj.type === "system") onSystem(obj);
+    else if (obj.type === "rate_limit_event" && obj.rate_limit_info?.status === "rejected") markLimit(obj.rate_limit_info.resetsAt);
+    else if (obj.type === "result") onResult(obj);
+  };
+
+  rep.heartbeat = () => {
+    if (!latest || Date.now() - lastSayAt < HEARTBEAT_MS) return;
+    say(`   still: ${[latest.phase, latest.agent, `${kTokens(latest.tokens)} tokens`, `${latest.tools ?? 0} tools`].filter(Boolean).join(" · ")}`);
+  };
+
+  return rep;
 }
 
-function toolHint(name, input = {}) {
-  const text = input.command ?? input.description ?? input.name ?? input.file_path ?? input.pattern ?? input.prompt ?? "";
-  return `${name} ${String(text).replace(/\s+/g, " ").slice(0, 80)}`.trim();
-}
-
-function reportEvent(obj, say, seen) {
-  if (obj.type === "assistant") {
-    const nested = obj.parent_tool_use_id ? "  " : "";
-    for (const block of obj.message?.content ?? []) if (block.type === "tool_use") say(`${nested}${toolHint(block.name, block.input)}`);
-  } else if (obj.type === "system" && /permission/i.test(obj.subtype ?? "")) {
-    say(`PERMISSION DENIED ${JSON.stringify(obj).slice(0, 200)}`);
-  } else if (obj.type === "rate_limit_event") {
-    const w = obj.rate_limit_info?.unifiedWindows;
-    const text = w?.five_hour && w?.seven_day ? `limits 5h ${percent(w.five_hour)} · 7d ${percent(w.seven_day)}` : null;
-    if (text && text !== seen.limits) say(text);
-    if (text) seen.limits = text;
-  } else if (obj.type === "result") {
-    const denials = obj.permission_denials?.length ? ` · ${obj.permission_denials.length} permission denial(s)` : "";
-    say(`result ${obj.subtype} · ${obj.num_turns} turns · $${(obj.total_cost_usd ?? 0).toFixed(2)} · ${minutes(obj.duration_ms ?? 0)} min${denials}`);
-  }
-}
-
-function build(claude, epic, number) {
+function build(claude, number, title) {
   const startedAt = Date.now();
-  const stamped = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
-  const dir = path.join(REPO_ROOT, "skarbiec-plan", "epic-runs", String(epic));
-  mkdirSync(dir, { recursive: true });
-  const logPath = path.join(dir, `${number}-${stamped}.jsonl`);
-  const log = createWriteStream(logPath);
-  const say = (text) => console.log(`${stamp(number, startedAt)} ${text}`);
-  const seen = { limits: null };
-  console.log(`building #${number} - log ${path.relative(REPO_ROOT, logPath)}`);
+  const reporter = createReporter(number);
+  say(`══ #${number} ${title} — build`);
 
   const spec = claudeSpawn(claude, ["-p", `/build #${number}`, "--model", "haiku", "--permission-mode", "auto", "--output-format", "stream-json", "--verbose"]);
   return new Promise((resolve) => {
@@ -235,12 +299,12 @@ function build(claude, epic, number) {
       timedOut = true;
       killTree(child);
     }, BUILD_TIMEOUT_MS);
+    const beat = setInterval(reporter.heartbeat, 60e3);
 
     const handleLine = (line) => {
       if (!line.trim()) return;
-      log.write(`${line}\n`);
       try {
-        reportEvent(JSON.parse(line), say, seen);
+        reporter.handle(JSON.parse(line));
       } catch {
       }
     };
@@ -260,11 +324,11 @@ function build(claude, epic, number) {
     });
     child.on("close", (code) => {
       clearTimeout(timer);
+      clearInterval(beat);
       handleLine(buffer);
-      log.end();
       buildChild = null;
       if (code !== 0 && errTail.trim()) say(`exit ${code}: ${errTail.trim().split(/\r?\n/).slice(-3).join(" | ")}`);
-      resolve({ code, timedOut, ms: Date.now() - startedAt });
+      resolve({ code, timedOut, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, sessionId: reporter.sessionId, ms: Date.now() - startedAt });
     });
   });
 }
@@ -290,7 +354,7 @@ async function waitForCi(pr) {
     const count = (...buckets) => checks.filter((c) => buckets.includes(c.bucket)).length;
     const failed = checks.filter((c) => ["fail", "cancel"].includes(c.bucket));
     const status = `pass ${count("pass")} · skipping ${count("skipping")} · pending ${count("pending")} · fail ${failed.length}`;
-    if (checks.length && status !== lastStatus) console.log(`CI PR #${pr.number}: ${status}`);
+    if (checks.length && status !== lastStatus) say(`CI PR #${pr.number}: ${status}`);
     lastStatus = status;
 
     if (failed.length) throw new Stop("ci-failed", `PR ${pr.url}: ${failed.map((c) => `${c.name} (${c.link})`).join(", ")}`);
@@ -309,7 +373,7 @@ async function mergeAndSync(pr, branch, number) {
     const view = gh(["pr", "view", String(pr.number), "--repo", REPO, "--json", "state"]);
     if (!view.ok || JSON.parse(view.out).state !== "MERGED") throw new Stop("merge-failed", `PR ${pr.url}: ${merged.firstErr}`);
   }
-  console.log(`merged PR #${pr.number}`);
+  say(`merged PR #${pr.number}`);
   for (const argv of [["switch", "master"], ["pull", "--ff-only", "origin", "master"]]) {
     const step = git(argv);
     if (!step.ok) throw new Stop("sync-failed", `git ${argv.join(" ")}: ${step.firstErr}`);
@@ -337,11 +401,11 @@ async function handlePart(sub, ctx) {
       pr = openPr(part.branch);
       if (!pr) throw new Stop("ship-failed", `#${part.number}: ship.mjs succeeded but no open PR exists for ${part.branch}`);
     } else {
-      ctx.limits = checkLimits(ctx.claude, ctx.threshold);
       ctx.builds++;
-      const built = await build(ctx.claude, ctx.epic, part.number);
+      const built = await build(ctx.claude, part.number, part.title);
       entry.buildMin = minutes(built.ms);
       if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
+      if (built.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached, resets ${resetClock(built.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
       pr = openPr(part.branch);
       if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
     }
@@ -377,11 +441,11 @@ function preChecks(epic, flags) {
     const part = next ? getIssue(next.number) : null;
     if (part?.branch && currentBranch() === part.branch && !openPr(part.branch)) {
       const verb = partPlan(part, dirty.length) === "ship" ? "retrying the ship step of" : "resuming";
-      console.log(`${flags["dry-run"] ? "dry-run: would be resumed - " : ""}${verb} #${part.number} on ${part.branch} with ${dirty.length} uncommitted file(s)`);
+      say(`${flags["dry-run"] ? "dry-run: would be resumed - " : ""}${verb} #${part.number} on ${part.branch} with ${dirty.length} uncommitted file(s)`);
     } else {
       const listed = `the working tree is not clean:\n${dirty.slice(0, 10).join("\n")}${dirty.length > 10 ? `\n... ${dirty.length - 10} more` : ""}`;
       if (!flags["dry-run"]) throw new Stop("dirty-tree", listed);
-      console.log(`warning: ${listed}\n(a real run would stop: dirty-tree)`);
+      say(`warning: ${listed}\n(a real run would stop: dirty-tree)`);
     }
   }
   const runners = runnerOnline();
@@ -408,7 +472,7 @@ function dryRunTable(issue) {
         else action = "build";
       }
     }
-    console.log(`#${sub.number} ${sub.title} — ${sub.state} — ${action}`);
+    say(`#${sub.number} ${sub.title} — ${sub.state} — ${action}`);
   }
 }
 
@@ -443,22 +507,22 @@ function postComment(epic, body) {
   return res.ok ? null : res.firstErr;
 }
 
+const prNumber = (url) => url?.split("/").pop();
+const partLine = (p) => `#${p.number} PR #${prNumber(p.prUrl)} (${p.shipOnly ? "ship retried" : `build ${Math.round(p.buildMin ?? 0)} min`}, CI ${Math.round(p.ciMin ?? 0)} min)`;
+
 function finishRun(reason, detail, ctx) {
   const ok = reason === "done" || reason === "dry-run";
-  console.log(`\nepic #${ctx.epic ?? "?"}: ${reason}${detail ? `\n${detail}` : ""}`);
-  const result = { ok, epic: ctx.epic, reason, ...(detail ? { detail } : {}), parts: ctx.parts, ...(ctx.dryRun ? { dryRun: true } : {}), ...(ctx.limits ? { limits: ctx.limits } : {}) };
+  say(`epic #${ctx.epic ?? "?"}: ${reason}${detail ? ` — ${detail}` : ""}`);
+  if (ctx.parts.length) say(`done in this run: ${ctx.parts.map(partLine).join("; ")}`);
+  if (!ok && ctx.epic && reason !== "usage") say(`resume: node scripts/epic.mjs ${ctx.epic}`);
   if (!ctx.dryRun && ctx.started) {
     const failure = postComment(ctx.epic, summary(reason, detail, ctx.parts, ctx.epic, ok ? costLine(ctx.parts) : null));
-    if (failure) {
-      result.commentError = failure;
-      console.log(`could not post the epic comment: ${failure}`);
-    }
+    if (failure) say(`could not post the epic comment: ${failure}`);
     if (!ctx.flags["no-shutdown"] && IS_WIN) {
       run("shutdown", ["/s", "/t", "600", "/c", `Skarbiec epic #${ctx.epic}: ${reason}`]);
-      console.log("Shutting down in 10 min — cancel with: shutdown /a");
+      say("shutting down in 10 min — cancel: shutdown /a");
     }
   }
-  console.log(`EPIC_RESULT: ${JSON.stringify(result)}`);
   process.exit(ok ? 0 : 2);
 }
 
@@ -473,46 +537,39 @@ async function runLoop(ctx) {
   }
   gh(["issue", "close", String(ctx.epic), "--repo", REPO, "--reason", "completed"]);
   const moved = project(["set", String(ctx.epic), "Status", "Done"]);
-  if (!moved.ok) console.log(`could not move the epic card to Done: ${moved.firstErr}`);
+  if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
 }
 
-const ctx = { epic: /^[0-9]+$/.test(epicArg ?? "") ? Number(epicArg) : null, parts: [], builds: 0, limits: null, started: false, dryRun: false, flags: {}, threshold: 90, maxTasks: Infinity, claude: null };
+const ctx = { epic: /^[0-9]+$/.test(epicArg ?? "") ? Number(epicArg) : null, parts: [], builds: 0, started: false, dryRun: false, flags: {}, maxTasks: Infinity, claude: null };
 
 process.on("SIGINT", () => {
   killTree(buildChild);
-  console.log("\ninterrupted (Ctrl+C) - no comment, no shutdown");
+  say("interrupted (Ctrl+C) - no comment, no shutdown");
   process.exit(130);
 });
 
 try {
-  if (!/^\d+$/.test(epicArg ?? "")) throw new Stop("usage", "usage: epic.mjs <epic> [--dry-run] [--max-tasks N] [--threshold 90] [--no-shutdown] | --stop");
+  if (!/^\d+$/.test(epicArg ?? "")) throw new Stop("usage", USAGE);
   const flags = parseFlags(rest);
   ctx.flags = flags;
   ctx.dryRun = Boolean(flags["dry-run"]);
-  if (flags.threshold !== undefined) ctx.threshold = Number(flags.threshold);
   if (flags["max-tasks"] !== undefined) ctx.maxTasks = Number(flags["max-tasks"]);
-  if (!(ctx.threshold > 0 && ctx.threshold <= 100) || Number.isNaN(ctx.maxTasks)) throw new Stop("usage", "--threshold must be 1..100 and --max-tasks a number");
+  if (Number.isNaN(ctx.maxTasks)) throw new Stop("usage", "--max-tasks must be a number");
 
   if (flags.stop) {
     writeFileSync(stopFile(ctx.epic), new Date().toISOString());
-    console.log(`stop file written (${stopFile(ctx.epic)}) - the driver stops before the next build`);
+    say(`stop file written (${stopFile(ctx.epic)}) - the driver stops before the next build`);
     process.exit(0);
   }
 
+  if (!ctx.dryRun) openLog(ctx.epic);
   ctx.claude = resolveClaude();
   const { issue, runners } = preChecks(ctx.epic, flags);
   if (issue.state === "CLOSED") finishRun("done", "the epic is already closed - nothing to do", { ...ctx, started: false });
 
   if (ctx.dryRun) {
-    console.log(`runner online: ${runners}`);
+    say(`runner online: ${runners}`);
     dryRunTable(issue);
-    try {
-      ctx.limits = checkLimits(ctx.claude, ctx.threshold) ?? null;
-      if (!ctx.limits) console.log("limits: probe skipped (--threshold 100)");
-    } catch (err) {
-      if (!(err instanceof Stop)) throw err;
-      console.log(`limits: ${err.message}`);
-    }
     finishRun("dry-run", null, ctx);
   }
 
