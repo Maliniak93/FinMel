@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--jobs N] [--deadline-min N] [--out <file>] [--cache] [--cache-check] [--await <file> [--max-min N]]
+// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--jobs N] [--deadline-min N] [--out <file>] [--cache] [--cache-check] [--detach] [--await <file> [--max-min N]]
 //   (no flags)        affected .NET test projects and web/api checks, picked from the files changed against master
 //   --quick           format + build only; overrides everything below
 //   --projects a,b    exactly these .NET test projects; web/api still need --web/--api/--all
@@ -12,11 +12,12 @@
 //   --out <file>      also write the result JSON to <file>
 //   --cache           skip the run when the same working tree and scope already passed (green results only, .git/verify-cache.json)
 //   --cache-check     run nothing: ok if this exact working tree and scope already passed under --cache, else a "cache" failure (exit 2)
-//   --await <file>    do not verify: wait (at most --max-min N, default 9) for a background run's --out file; VERIFY_PENDING (exit 3) while it runs, exit 2 if it died
+//   --detach          needs --out: start the run as an independent process, print VERIFY_STARTED and exit 0 at once (log in <out>.log); collect it with --await
+//   --await <file>    do not verify: wait (at most --max-min N, default 55) for a detached run's --out file; VERIFY_PENDING (exit 3) while it runs, exit 2 if it died
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stopStack } from "./stop-stack.mjs";
@@ -50,8 +51,9 @@ function parseArgs(argv) {
     out: null,
     cache: false,
     cacheCheck: false,
+    detach: false,
     await: null,
-    maxMin: 9,
+    maxMin: 55,
     jobs: 1,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -63,6 +65,7 @@ function parseArgs(argv) {
     else if (a === "--fix") args.fix = true;
     else if (a === "--cache") args.cache = true;
     else if (a === "--cache-check") args.cacheCheck = true;
+    else if (a === "--detach") args.detach = true;
     else if (a === "--jobs") {
       const n = Number(argv[++i]);
       if (!(Number.isInteger(n) && n > 0)) fatal("--jobs requires a positive integer");
@@ -518,7 +521,8 @@ function extractCompilerFailure(stepName, text) {
 const XUNIT_FAIL_RE = /^\s*(?:\[xUnit\.net[^\]]*\]\s+)?(.+?)\s+\[FAIL\]\s*$/;
 const VSTEST_FAIL_RE = /^\s*(?:Failed|Niepowodzenie)\s+([A-Za-z_][\w]*(?:\.[\w]+)+(?:\([^)]*\))?)\s+\[\d+\s*(?:ms|s)\]\s*$/;
 const SUMMARY_COUNT_RE = /(?:Failed!|Niepowodzenie!).*?(\d+)/;
-const DOCKER_UNREACHABLE_RE = /\b(docker|testcontainers|npipe|dockerdesktoplinuxengine)\b/i;
+const DOCKER_UNREACHABLE_RE = /Cannot connect to the Docker daemon|Docker is either not running or misconfigured|DockerUnavailableException|error during connect|\/\/\.\/pipe\/(?:docker_engine|dockerDesktopLinuxEngine)[^\n]*(?:cannot find the file|The system cannot find)|(?:cannot find the file|The system cannot find)[^\n]*\/\/\.\/pipe\/(?:docker_engine|dockerDesktopLinuxEngine)/i;
+const TESTCONTAINERS_TRANSIENT_RE = /Could not find resource 'DockerContainer'|ResourceReaper|Ryuk|port is already allocated|container [^\n]* is not running/i;
 const STACK_FILE_RE = /in\s+(.+?):line\s+\d+/;
 
 // Testcontainers PDBs carry their own build-time paths, which point at no file in this repo.
@@ -823,6 +827,18 @@ function awaitResult(file, maxMin) {
   });
 }
 
+function detach(args) {
+  if (!args.out) fatal("--detach requires --out <file>");
+  rmSync(args.out, { force: true });
+  const logPath = `${args.out}.log`;
+  const fd = openSync(logPath, "w");
+  const argv = process.argv.slice(2).filter((a) => a !== "--detach");
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...argv], { cwd: process.cwd(), detached: true, stdio: ["ignore", fd, fd], windowsHide: true });
+  child.unref();
+  const outArg = path.relative(process.cwd(), args.out).replaceAll("\\", "/") || args.out;
+  console.log(`VERIFY_STARTED: pid ${child.pid} — log ${logPath} — wait with: node scripts/verify.mjs --await ${outArg}`);
+}
+
 function computeScope(args, serviceNames, projectMap) {
   const allProjectRels = () => [...projectMap.values()].map((v) => v.rel);
   let selectedRels;
@@ -933,12 +949,23 @@ function ranTests(result) {
     .some((l) => Number(l.match(SUMMARY_TOTAL_RE)?.[1] ?? 0) > 0);
 }
 
+async function retryAfterTestcontainersError(rel, first) {
+  if (first.deadlineHit || first.timedOut || first.error) return buildFailure("test", first);
+  const text = stripAnsi(`${first.stdout}\n${first.stderr}`);
+  if (DOCKER_UNREACHABLE_RE.test(text) || !TESTCONTAINERS_TRANSIENT_RE.test(text)) return buildFailure("test", first);
+  const retry = await step(`test (retry after a Testcontainers error): ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]), { block: true });
+  if (!retry.ok) return buildFailure("test", retry);
+  flakyTests.add(`${rel} (Testcontainers)`);
+  console.log(`\nnotice: flaky infrastructure — ${rel} passed on a full rerun after a Testcontainers error`);
+  return null;
+}
+
 async function runDotnetTests(rels, jobs) {
   const results = await runPool(orderLongestFirst(rels), jobs, async (rel) => {
     const r = await step(`test: ${rel}`, () => runCommand("dotnet", ["test", rel, "--no-build"]), { block: true });
     if (r.ok) return null;
     const names = retryableFailedNames(r);
-    if (!names) return buildFailure("test", r);
+    if (!names) return retryAfterTestcontainersError(rel, r);
     const filter = names.map((n) => `FullyQualifiedName~${n}`).join("|");
     const retry = await step(
       `test (retry ${names.length} failed): ${rel}`,
@@ -1033,6 +1060,16 @@ async function checkFormat(changed) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.await) return awaitResult(args.await, args.maxMin);
+  if (args.detach) return detach(args);
+
+  if (!args.cacheCheck) {
+    deadlineAt = Date.now() + args.deadlineMin * 60 * 1000;
+    claimPidFile(args.out);
+    if (args.out) {
+      rmSync(args.out, { force: true });
+      outFile = args.out;
+    }
+  }
 
   const serviceNames = discoverServiceNames();
   const projectMap = buildProjectMap(serviceNames);
@@ -1044,13 +1081,6 @@ async function main() {
     if (hit) return finish(true, [], { cached: true });
     const summary = "this working tree has no green verify run in the cache — run node scripts/verify.mjs --all --fix --cache";
     return finish(false, [{ step: "cache", summary }]);
-  }
-
-  deadlineAt = Date.now() + args.deadlineMin * 60 * 1000;
-  claimPidFile(args.out);
-  if (args.out) {
-    rmSync(args.out, { force: true });
-    outFile = args.out;
   }
 
   console.log("Skarbiec verify.mjs");

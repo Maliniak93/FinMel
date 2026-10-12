@@ -5,6 +5,7 @@
 //   --no-shutdown  do not schedule `shutdown /s /t 600` when the run ends
 //   node scripts/epic.mjs <epic> --stop   creates the stop file; the running driver stops before the next build
 //   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
+//   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
 import { spawn, spawnSync } from "node:child_process";
@@ -63,6 +64,20 @@ function run(cmd, argv, options = {}) {
   return { ok: !res.error && res.status === 0, out: (res.stdout ?? "").trim(), err, firstErr: err.split(/\r?\n/).find(Boolean) ?? "" };
 }
 
+const TRANSIENT_RE = /(?:HTTP|status code:?) 5\d\d|Bad Gateway|Internal Server Error|Service Unavailable|Gateway Time-?out|timed? ?out|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|connection reset|TLS handshake/i;
+const RETRY_DELAYS_S = [15, 30, 60, 120, 240];
+
+function retryTransient(label, fn) {
+  let res = fn();
+  for (let i = 0; i < RETRY_DELAYS_S.length && !res.ok && TRANSIENT_RE.test(res.err); i++) {
+    const s = RETRY_DELAYS_S[i];
+    say(`github: ${label} failed (${short(res.firstErr, 100)}), retry ${i + 1}/${RETRY_DELAYS_S.length} in ${s}s`);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, s * 1000);
+    res = fn();
+  }
+  return res;
+}
+
 const gh = (argv) => run("gh", argv);
 const git = (argv) => run("git", argv);
 const project = (argv) => run(NODE, ["scripts/gh-project.mjs", ...argv]);
@@ -81,13 +96,13 @@ const [epicArg, ...rest] = process.argv.slice(2);
 const stopFile = (epic) => path.join(os.tmpdir(), `skarbiec-epic-${epic}.stop`);
 
 function getIssue(number) {
-  const res = project(["get", String(number)]);
+  const res = retryTransient(`project get ${number}`, () => project(["get", String(number)]));
   if (!res.ok) throw new Stop("github", `gh-project.mjs get ${number}: ${res.firstErr}`);
   return JSON.parse(res.out);
 }
 
 function openPr(branch) {
-  const res = gh(["pr", "list", "--repo", REPO, "--head", branch, "--state", "open", "--json", "number,url", "--limit", "1"]);
+  const res = retryTransient("pr list", () => gh(["pr", "list", "--repo", REPO, "--head", branch, "--state", "open", "--json", "number,url", "--limit", "1"]));
   if (!res.ok) throw new Stop("github", `gh pr list: ${res.firstErr}`);
   return JSON.parse(res.out)[0] ?? null;
 }
@@ -96,7 +111,7 @@ const currentBranch = () => git(["rev-parse", "--abbrev-ref", "HEAD"]).out;
 const dirtyFiles = () => git(["status", "--porcelain"]).out.split(/\r?\n/).filter(Boolean);
 
 function lastComment(number) {
-  const res = gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", '.comments[-1].body // ""']);
+  const res = retryTransient(`issue view ${number}`, () => gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", '.comments[-1].body // ""']));
   if (!res.ok) throw new Stop("github", `gh issue view ${number}: ${res.firstErr}`);
   return res.out;
 }
@@ -188,7 +203,7 @@ const span = (ms) => {
 const resetClock = (t) => (t ? clock(new Date(t > 1e12 ? t : t * 1000)) : "unknown");
 
 function createReporter(number) {
-  const rep = { limitHit: false, resetsAt: null, sessionId: null };
+  const rep = { limitHit: false, resetsAt: null, sessionId: null, result: null };
   const toolNames = new Map();
   const agents = new Map();
   const phases = new Set();
@@ -240,8 +255,8 @@ function createReporter(number) {
 
   const onSystem = (obj) => {
     if (obj.subtype === "init") {
+      if (rep.sessionId !== obj.session_id) say(`#${number} session ${obj.session_id} (full view later: claude --resume ${obj.session_id})`);
       rep.sessionId = obj.session_id;
-      say(`#${number} session ${obj.session_id} (full view later: claude --resume ${obj.session_id})`);
     } else if (obj.subtype === "task_progress") onProgress(obj);
     else if (obj.subtype === "task_started" && obj.task_type === "local_bash" && obj.is_backgrounded) {
       bgTasks.add(obj.task_id);
@@ -255,11 +270,8 @@ function createReporter(number) {
 
   const onResult = (obj) => {
     rep.sessionId ??= obj.session_id;
-    const text = String(obj.result ?? "");
-    if (obj.is_error && LIMIT_TEXT.test(text)) markLimit();
-    const facts = `${Math.round((obj.duration_ms ?? 0) / 60e3)} min · $${(obj.total_cost_usd ?? 0).toFixed(2)}`;
-    if (obj.is_error) say(`#${number} build error: ${short(text.split(/\r?\n/).find(Boolean) ?? obj.subtype, 140)} · ${facts}`);
-    else say(`#${number} build finished · ${facts} · ${obj.permission_denials?.length ?? 0} denials`);
+    if (obj.is_error && LIMIT_TEXT.test(String(obj.result ?? ""))) markLimit();
+    rep.result = obj;
   };
 
   rep.handle = (obj) => {
@@ -275,6 +287,14 @@ function createReporter(number) {
   };
 
   return rep;
+}
+
+function reportBuildEnd(number, code, result, ms) {
+  const min = Math.round(ms / 60e3);
+  if (!result) return say(`#${number} build ended without a result · ${min} min (exit ${code})`);
+  const cost = `$${(result.total_cost_usd ?? 0).toFixed(2)}`;
+  if (result.is_error) return say(`#${number} build error: ${short(String(result.result ?? "").split(/\r?\n/).find(Boolean) ?? result.subtype, 140)} · ${min} min · ${cost}`);
+  say(`#${number} build finished · ${min} min · ${cost} · ${result.permission_denials?.length ?? 0} denials`);
 }
 
 function build(claude, number, title) {
@@ -327,6 +347,7 @@ function build(claude, number, title) {
       clearInterval(beat);
       handleLine(buffer);
       buildChild = null;
+      reportBuildEnd(number, code, reporter.result, Date.now() - startedAt);
       if (code !== 0 && errTail.trim()) say(`exit ${code}: ${errTail.trim().split(/\r?\n/).slice(-3).join(" | ")}`);
       resolve({ code, timedOut, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, sessionId: reporter.sessionId, ms: Date.now() - startedAt });
     });
@@ -334,7 +355,7 @@ function build(claude, number, title) {
 }
 
 function readChecks(pr) {
-  const res = gh(["pr", "checks", String(pr), "--repo", REPO, "--json", "name,state,bucket,link"]);
+  const res = retryTransient("pr checks", () => gh(["pr", "checks", String(pr), "--repo", REPO, "--json", "name,state,bucket,link"]));
   try {
     return JSON.parse(res.out);
   } catch {
@@ -370,7 +391,7 @@ async function waitForCi(pr) {
 async function mergeAndSync(pr, branch, number) {
   const merged = gh(["pr", "merge", String(pr.number), "--repo", REPO, "--squash", "--delete-branch"]);
   if (!merged.ok) {
-    const view = gh(["pr", "view", String(pr.number), "--repo", REPO, "--json", "state"]);
+    const view = retryTransient("pr view", () => gh(["pr", "view", String(pr.number), "--repo", REPO, "--json", "state"]));
     if (!view.ok || JSON.parse(view.out).state !== "MERGED") throw new Stop("merge-failed", `PR ${pr.url}: ${merged.firstErr}`);
   }
   say(`merged PR #${pr.number}`);
@@ -418,7 +439,7 @@ async function handlePart(sub, ctx) {
 }
 
 function runnerOnline() {
-  const res = gh(["api", `repos/${REPO}/actions/runners`, "--jq", '[.runners[] | select(.status == "online")] | length']);
+  const res = retryTransient("runners", () => gh(["api", `repos/${REPO}/actions/runners`, "--jq", '[.runners[] | select(.status == "online")] | length']));
   return res.ok ? Number(res.out) : 0;
 }
 
