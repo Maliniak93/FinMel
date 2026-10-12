@@ -77,6 +77,40 @@ A script the user launches from a terminal (not an agent) builds every open part
 - Tier is set (1 or 2).
 - `skip-tests` is set deliberately — only on a spec that changes no behaviour.
 - No open question left in the body.
+- A change visible in the app has its `## Test manualny` section (see Manual test plan).
+
+## Manual test plan
+
+The steps a person runs by hand after a merge, to confirm the feature works. A spec whose change is visible in the app
+ends with `## Test manualny`; an epic holds the whole-feature scenario in the same section. `/design` writes it, `/fix`
+writes the reproduction steps.
+
+- **Skip** it only when the change is not visible in the app: `skip-tests` specs, cleanups, workflow specs. Then the
+  section is absent, and `gh-project.mjs check` warns about it without failing.
+- **Size:** a part plan about 5–15 steps; an epic's scenario about 15–30 steps, from an empty account to the final state.
+- **Shape:** a numbered **Przygotowanie** block (the standard preparation below, plus what the change adds), then
+  numbered **Kroki** on concrete PLN amounts, dates, tickers and routes, each ending in `→ <expected result>`. Write
+  the steps in Polish. Describe behaviour, not exact labels, unless the label is an acceptance criterion.
+- **A part with no UI effect of its own** carries only the line `Weryfikacja w planie epica, krok <n>.`
+- **Checked by `gh-project.mjs check`:** a `- [ ]` or `- [x]` line in the section is an error, and so is a section with
+  neither a numbered step nor the one-line marker.
+
+**Standard preparation** (the start of every plan):
+
+1. Pull `master`, then `node scripts/compose.mjs build` and `node scripts/compose.mjs up` (`status` shows whether the
+   running stack is outdated).
+2. Wait about 3 minutes after `up`: the FX sync runs on a 3-minute cron, so rates appear only after its first run.
+3. Use a fresh account at `http://localhost:8080` (the compose app port).
+
+**Market data facts** a plan can rely on:
+
+- The seeder adds, on every startup, the instruments gold `XAU` and silver `XAG` (per gram of fine metal, GoldApi), `CDR.WA`
+  (CD Projekt, GPW, PLN) and `VWCE.DE` (Vanguard FTSE All-World, Xetra, EUR), plus the currencies PLN, EUR, USD, GBP, CHF.
+- Prices sync on a 2-minute cron. After a holding is added, the sync button on Settings pulls its price at once instead of
+  waiting for the cron.
+- The bond catalog fills at startup when it is empty, so bond series exist right after `up`.
+- FX history covers 365 days. A transaction dated earlier has no rate; a stock or ETF Buy/Sell then fails with
+  `Validation.FxRateMissing`.
 
 ## Definition of Done
 

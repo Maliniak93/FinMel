@@ -133,14 +133,28 @@ function dependsOn(body) {
   return [...new Set([...section(body, "Depends on").matchAll(/#(\d+)/g)].map((m) => Number(m[1])))];
 }
 
+const TEST_PLAN = "Test manualny";
+const PLAN_MARKER = /weryfikacja w planie epica/i;
+
+function testPlanProblems(body) {
+  const plan = section(body, TEST_PLAN);
+  if (!plan) return [];
+  if (/^\s*[-*] \[[ xX]\]/m.test(plan)) return [`\`## ${TEST_PLAN}\` holds a \`- [ ]\` checkbox line — its steps are numbered (\`1.\`), not checkboxes`];
+  if (!/^\s*\d+\.\s/m.test(plan) && !PLAN_MARKER.test(plan)) return [`\`## ${TEST_PLAN}\` has neither a numbered step (\`1.\`) nor the one-line \`Weryfikacja w planie epica, krok <n>.\``];
+  return [];
+}
+
 function lintWarnings(body, { epic }) {
-  if (epic) return [];
-  return section(body, "Code map") ? [] : ["no `## Code map` section — the test-writer, implementer and reviewer will each rediscover the code"];
+  const warnings = [];
+  if (!epic && !section(body, "Code map")) warnings.push("no `## Code map` section — the test-writer, implementer and reviewer will each rediscover the code");
+  if (!section(body, TEST_PLAN)) warnings.push(`no \`## ${TEST_PLAN}\` section — the manual check after the merge has no steps`);
+  return warnings;
 }
 
 function lintBody(body, { epic }) {
   const problems = [];
   if (!/^## Goal\s*$/m.test(body)) problems.push("no `## Goal` section (or it is empty)");
+  problems.push(...testPlanProblems(body));
   if (epic) return problems;
   if (!/^## Out of scope\s*$/m.test(body)) problems.push("no `## Out of scope` section (or it is empty) — it is not optional");
   if (section(body, "Depends on") && !dependsOn(body).length) problems.push("`## Depends on` names no issue as `#<number>`");
