@@ -23,7 +23,7 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | $ at list prices per agent/run; `--sessions` = main sessions per command + Explore; `--timeline` = wall time per agent of the newest run | `node scripts/run-cost.mjs [--since YYYY-MM-DD] [--issue n] [--sessions] [--timeline]` |
 | The uncommitted change incl. untracked files, index untouched | `node scripts/review-diff.mjs [--stat] [-- <path>]` |
 | The Ship step: guard lane, commit, push, PR, run report | `node scripts/ship.mjs <n> --branch b --title t --json '…' [--blocked] [--dry-run]` |
-| Build a whole epic unattended: each part via a fresh `claude -p "/build #n"`, waits for green CI, squash-merges, syncs master; resumes from GitHub state; stops at 90% of the 5h/weekly limit; keeps the PC awake, shuts it down 10 min after the run ends | `node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--threshold 90] [--no-shutdown] \| --stop` |
+| Build a whole epic unattended: each part via a fresh `claude -p "/build #n"`, waits for green CI, squash-merges, syncs master; resumes from GitHub state; stops when the usage limit runs out; keeps the PC awake, shuts it down 10 min after the run ends; readable log in `skarbiec-plan/epic-runs/` | `node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] \| --stop` |
 | Delete local branches whose PR is merged (dry run unless `--apply`) | `node scripts/prune-branches.mjs [--apply]` |
 | Local docker compose stack (built from a commit, rebuilt on ship; started/stopped only by the user) | `node scripts/compose.mjs build|up|down|reset|status` |
 | Frontend dev server | `cd web && npm start` |
