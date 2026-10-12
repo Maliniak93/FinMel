@@ -44,14 +44,41 @@ public sealed class SecurityCostBasisTests
             () => Assert.Null(basis.CostPln));
     }
 
-    private static Transaction NewTransaction(TransactionType type, decimal quantity, decimal unitPrice, decimal? fxRate, DateOnly date) => new()
+    [Fact]
+    public void BuyFee_InCost()
     {
-        Id = Guid.NewGuid(),
-        AssetId = Guid.NewGuid(),
-        Type = type,
-        Quantity = quantity,
-        UnitPriceAmount = unitPrice,
-        FxRateToPln = fxRate,
-        Date = date
-    };
+        Transaction[] plnBuy = [NewTransaction(TransactionType.Buy, 10m, 120m, 1m, new DateOnly(2026, 10, 12), fee: 3m)];
+        Transaction[] usdBuy = [NewTransaction(TransactionType.Buy, 2m, 100m, 4.00m, new DateOnly(2026, 10, 12), fee: 5m)];
+        Transaction[] plnBuyThenSell =
+        [
+            plnBuy[0],
+            NewTransaction(TransactionType.Sell, 4m, 130m, 1m, new DateOnly(2026, 10, 13), fee: 3m)
+        ];
+
+        var pln = SecurityCostBasis.Compute(plnBuy);
+        var usd = SecurityCostBasis.Compute(usdBuy);
+        var afterSell = SecurityCostBasis.Compute(plnBuyThenSell);
+
+        Assert.Multiple(
+            () => Assert.Equal(1_203m, pln.CostQuote),
+            () => Assert.Equal(1_203m, pln.CostPln),
+            () => Assert.Equal(120.3m, pln.AverageBuyPrice),
+            () => Assert.Equal(201.25m, usd.CostQuote),
+            () => Assert.Equal(805m, usd.CostPln),
+            () => Assert.Equal(721.8m, afterSell.CostQuote),
+            () => Assert.Equal(721.8m, afterSell.CostPln));
+    }
+
+    private static Transaction NewTransaction(
+        TransactionType type, decimal quantity, decimal unitPrice, decimal? fxRate, DateOnly date, decimal? fee = null) => new()
+        {
+            FeeAmount = fee,
+            Id = Guid.NewGuid(),
+            AssetId = Guid.NewGuid(),
+            Type = type,
+            Quantity = quantity,
+            UnitPriceAmount = unitPrice,
+            FxRateToPln = fxRate,
+            Date = date
+        };
 }

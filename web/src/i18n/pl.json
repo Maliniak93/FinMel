@@ -19,6 +19,7 @@
     "actionsFor": "Akcje dla: {{ name }}",
     "type": "Typ",
     "unitPrice": "Cena jednostkowa",
+    "feePln": "Prowizja (PLN)",
     "date": "Data",
     "amount": "Kwota",
     "dateRequired": "Data jest wymagana."
@@ -118,6 +119,7 @@
     "quantityField": {
       "quantity": "Ilość",
       "amount": "Kwota",
+      "netAmountPln": "Kwota netto (PLN)",
       "pieces": "Sztuki",
       "pricePerPiece": "Cena za sztukę"
     },
@@ -470,6 +472,7 @@
     "empty": "Nie zapisano jeszcze żadnych transakcji dla tego aktywa.",
     "recordFirst": "Zapisz pierwszą transakcję",
     "valuePln": "Wartość (PLN)",
+    "fee": "Prowizja (PLN)",
     "actionsFor": "Akcje dla: {{ type }} z dnia {{ date }}",
     "assetLoadFailed": "Nie udało się wczytać aktywa.",
     "loadFailed": "Nie udało się wczytać transakcji.",
@@ -487,9 +490,11 @@
       "noCashAccount": "Brak",
       "cashAmountHint": "Kwota przelewu: {{ amount }}",
       "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych.",
-      "cashAmountTaken": "Zostanie pobrane: {{ amount }}",
-      "cashAmountReceived": "Wpłynie: {{ amount }}",
-      "insufficientFunds": "Za mało środków na koncie.",
+      "accountCashTaken": "Z gotówki rachunku {{ account }}: {{ amount }} · saldo {{ balance }}",
+      "accountCashReceived": "Na gotówkę rachunku {{ account }}: {{ amount }} · saldo {{ balance }}",
+      "accountCashBalance": "Gotówka rachunku {{ account }} · saldo {{ balance }}",
+      "insufficientFunds": "Brak środków na rachunku",
+      "fxRateMissing": "Brak kursu waluty z tego dnia",
       "invalidCashAccount": "To konto gotówkowe nie pasuje do tej transakcji.",
       "legManaged": "Edytuj tę transakcję po stronie akcji/ETF."
     },

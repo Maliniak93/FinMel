@@ -45,9 +45,14 @@ public sealed class RecordTransactionHandler(
             return TransactionErrors.TypeNotAllowedForClass(request.Type, asset.AssetClass);
         }
 
-        if (request.CashAssetId is not null && !MovesMoneyThroughCash(asset.AssetClass, request.Type))
+        if (request.CashAssetId is not null && asset.AssetClass != AssetClass.PreciousMetal)
         {
             return TransferErrors.CashLinkNotAllowed;
+        }
+
+        if (BrokerageTrade.FeeError(asset.AssetClass, request.Type, request.FeeAmount) is { } feeError)
+        {
+            return feeError;
         }
 
         var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
@@ -56,25 +61,18 @@ public sealed class RecordTransactionHandler(
             return unitPrice.Error;
         }
 
-        Transaction transaction;
-        Transaction? securityCashLeg = null;
-        if (request.CashAssetId is { } linkedCashAssetId && asset.AssetClass != AssetClass.PreciousMetal)
+        var transaction = new Transaction
         {
-            (transaction, securityCashLeg) = TransferLegs.CreateTrade(
-                assetId, linkedCashAssetId, request.Type, request.Quantity, unitPrice.Value.Amount, request.Date);
-        }
-        else
-        {
-            transaction = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                AssetId = assetId,
-                Type = request.Type,
-                Quantity = request.Quantity,
-                UnitPriceAmount = unitPrice.Value.Amount,
-                Date = request.Date
-            };
-        }
+            Id = Guid.NewGuid(),
+            AssetId = assetId,
+            Type = request.Type,
+            Quantity = request.Quantity,
+            UnitPriceAmount = BrokerageTrade.Applies(asset.AssetClass)
+                ? BrokerageTrade.SecurityUnitPrice(request.Type, unitPrice.Value.Amount)
+                : unitPrice.Value.Amount,
+            FeeAmount = request.FeeAmount,
+            Date = request.Date
+        };
 
         // Recompute over the full history rather than incrementing in place: the one path shared with edit and delete.
         var existingTransactions = await dbContext.Transactions
@@ -89,30 +87,44 @@ public sealed class RecordTransactionHandler(
             return recomputed.Error;
         }
 
+        BrokerageLegs? brokerage = null;
         CashLeg? cashLeg = null;
-        if (request.CashAssetId is { } cashAssetId)
+        if (BrokerageTrade.Applies(asset.AssetClass))
         {
-            var planned = await PlanCashLegAsync(cashAssetId, asset, transaction, securityCashLeg, cancellationToken);
+            var planned = await dbContext.PlanAsync(fxRateLookupClient, asset, transaction, cancellationToken);
             if (planned.IsFailure)
             {
                 return planned.Error;
             }
 
-            cashLeg = planned.Value;
+            brokerage = planned.Value;
         }
-
-        // Last check before the write: only a valid request on an active asset asks MarketData.
-        var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
-        if (fxRateToPln.IsFailure)
+        else
         {
-            return fxRateToPln.Error;
-        }
+            if (request.CashAssetId is { } cashAssetId)
+            {
+                var planned = await PlanCashLegAsync(cashAssetId, asset, transaction, cancellationToken);
+                if (planned.IsFailure)
+                {
+                    return planned.Error;
+                }
 
-        transaction.FxRateToPln = fxRateToPln.Value;
-        if (cashLeg is not null)
-        {
-            // Same currency on both sides: one lookup freezes the rate on both legs.
-            cashLeg.Leg.FxRateToPln = fxRateToPln.Value;
+                cashLeg = planned.Value;
+            }
+
+            // Last check before the write: only a valid request on an active asset asks MarketData.
+            var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
+            if (fxRateToPln.IsFailure)
+            {
+                return fxRateToPln.Error;
+            }
+
+            transaction.FxRateToPln = fxRateToPln.Value;
+            if (cashLeg is not null)
+            {
+                // Same currency on both sides: one lookup freezes the rate on both legs.
+                cashLeg.Leg.FxRateToPln = fxRateToPln.Value;
+            }
         }
 
         asset.Quantity = recomputed.Value;
@@ -120,6 +132,13 @@ public sealed class RecordTransactionHandler(
 
         // The event carries the recomputed quantity, so no consumer has to replay the history.
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
+
+        if (brokerage is not null)
+        {
+            brokerage.Cash.Quantity = brokerage.CashQuantity;
+            dbContext.Transactions.Add(brokerage.CashLeg);
+            await positionEventPublisher.PublishChangedAsync(brokerage.Cash, cancellationToken);
+        }
 
         if (cashLeg is not null)
         {
@@ -140,57 +159,41 @@ public sealed class RecordTransactionHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        return transaction.ToResponse(asset.Currency, cashLeg?.ToTransferResponse(asset, transaction));
+        return transaction.ToResponse(
+            asset.Currency, brokerage?.ToTransferResponse(transaction) ?? cashLeg?.ToTransferResponse(asset, transaction));
     }
 
-    private static bool MovesMoneyThroughCash(AssetClass assetClass, TransactionType type) => assetClass switch
-    {
-        AssetClass.PreciousMetal => type is TransactionType.Buy or TransactionType.Sell,
-        AssetClass.Stock or AssetClass.Etf => type is TransactionType.Buy or TransactionType.Sell or TransactionType.Dividend,
-        _ => false
-    };
-
     private async Task<Result<CashLeg>> PlanCashLegAsync(
-        Guid cashAssetId, Asset holding, Transaction holdingLeg, Transaction? plannedLeg, CancellationToken cancellationToken)
+        Guid cashAssetId, Asset metal, Transaction metalLeg, CancellationToken cancellationToken)
     {
         // Through the tenancy filter: a stranger's Cash gets the same 400 as any unsuitable counterpart.
         var cash = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == cashAssetId, cancellationToken);
-        var isBuy = holdingLeg.Type == TransactionType.Buy;
+        var isBuy = metalLeg.Type == TransactionType.Buy;
 
         if (cash is null
             || cash.AssetClass != AssetClass.Cash
-            || !(isBuy ? TransferRoutes.IsAllowed(cash.AssetClass, holding.AssetClass) : TransferRoutes.IsAllowed(holding.AssetClass, cash.AssetClass))
-            || cash.Currency != holding.Currency
+            || !(isBuy ? TransferRoutes.IsAllowed(cash.AssetClass, metal.AssetClass) : TransferRoutes.IsAllowed(metal.AssetClass, cash.AssetClass))
+            || cash.Currency != metal.Currency
             || cash.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
         }
 
-        var leg = plannedLeg;
-        if (leg is null)
+        var transferId = Guid.NewGuid();
+        metalLeg.TransferId = transferId;
+
+        var leg = new Transaction
         {
-            var transferId = Guid.NewGuid();
-            holdingLeg.TransferId = transferId;
+            Id = Guid.NewGuid(),
+            AssetId = cash.Id,
+            Type = isBuy ? TransactionType.Withdraw : TransactionType.Deposit,
+            Quantity = metalLeg.Quantity * metalLeg.UnitPriceAmount,
+            UnitPriceAmount = 1m,
+            Date = metalLeg.Date,
+            TransferId = transferId
+        };
 
-            leg = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                AssetId = cash.Id,
-                Type = isBuy ? TransactionType.Withdraw : TransactionType.Deposit,
-                Quantity = holdingLeg.Quantity * holdingLeg.UnitPriceAmount,
-                UnitPriceAmount = 1m,
-                Date = holdingLeg.Date,
-                TransferId = transferId
-            };
-        }
-
-        var cashHistory = await dbContext.Transactions
-            .AsNoTracking()
-            .Where(t => t.AssetId == cash.Id)
-            .ToListAsync(cancellationToken);
-
-        var cashQuantity = TransactionQuantityCalculator.Recompute(
-            [.. cashHistory, leg], _ => TransferErrors.InsufficientFunds);
+        var cashQuantity = await dbContext.ReplayCashAsync(cash.Id, leg, cancellationToken);
         if (cashQuantity.IsFailure)
         {
             return cashQuantity.Error;

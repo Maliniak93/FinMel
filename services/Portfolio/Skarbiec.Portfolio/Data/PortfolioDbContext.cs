@@ -63,6 +63,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             transaction.Property(t => t.Quantity).HasPrecision(18, 8);
             transaction.Property(t => t.UnitPriceAmount).HasPrecision(18, 2);
             transaction.Property(t => t.FxRateToPln).HasPrecision(18, 8);
+            transaction.Property(t => t.FeeAmount).HasPrecision(18, 2);
 
             // No FK to Asset, but every transaction query filters by AssetId.
             transaction.HasIndex(t => t.AssetId);

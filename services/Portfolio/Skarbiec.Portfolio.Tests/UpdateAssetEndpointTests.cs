@@ -142,6 +142,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock);
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
         var request = new UpdateAssetRequest
@@ -254,6 +255,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Locked", currency: "PLN");
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
         var request = new UpdateAssetRequest
@@ -303,6 +305,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Euro stock", currency: "EUR");
         await client.RecordTransactionAsync(assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
         await client.RecordTransactionAsync(assetId, TransactionType.Sell, 3m, new DateOnly(2026, 1, 2), cancellationToken);

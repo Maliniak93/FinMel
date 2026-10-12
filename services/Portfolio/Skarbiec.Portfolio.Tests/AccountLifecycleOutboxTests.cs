@@ -27,6 +27,7 @@ public sealed class AccountLifecycleOutboxTests(SkarbiecContainersFixture contai
             new RecordTransactionRequest { Type = TransactionType.Sell, Quantity = 5m, UnitPrice = 10m, Date = new DateOnly(2026, 1, 3) },
             cancellationToken);
         Assert.True(sold.IsSuccess);
+        await DrainAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken);
         var outboxRowsBefore = await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken);
 
         var archived = await scope.ServiceProvider.GetRequiredService<ArchiveAccountHandler>().HandleAsync(accountId, cancellationToken);

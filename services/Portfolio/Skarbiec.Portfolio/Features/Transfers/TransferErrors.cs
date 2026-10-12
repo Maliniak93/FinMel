@@ -8,7 +8,7 @@ internal static class TransferErrors
         new("Validation.InvalidTransferCounterpart", "This asset can't be the other side of the transfer — pick one from the list.");
 
     public static readonly Error CashLinkNotAllowed =
-        new("Validation.CashLinkNotAllowed", "Only a stock, ETF or precious metal trade can be settled through a Cash account.");
+        new("Validation.CashLinkNotAllowed", "Only a precious metal trade can be settled through a Cash account; a stock or ETF settles in its account's cash.");
 
     public static readonly Error InsufficientFunds =
         new("Validation.InsufficientFunds", "The source of funds can't cover this amount on this date.");

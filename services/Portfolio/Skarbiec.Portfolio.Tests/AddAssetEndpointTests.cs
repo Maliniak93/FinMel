@@ -162,6 +162,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Factory.FxRateLookupClient.WithRate("USD", 4.00m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var request = new AddAssetRequest
         {
             AccountId = accountId,
@@ -190,8 +191,8 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var listResponse = await client.GetAsync(TransactionsUri(body.Id), cancellationToken);
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
         var listedJson = Assert.Single((await listResponse.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray());
-        listedJson.AssertCarriesNoFee();
         var listed = listedJson.Deserialize<TransactionResponse>(JsonSerializerOptions.Web)!;
+        Assert.Null(listed.FeeAmount);
         Assert.Equal(TransactionType.Buy, listed.Type);
         Assert.Equal(5m, listed.Quantity);
         Assert.Equal(150m, listed.UnitPrice);
@@ -692,5 +693,56 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
+    }
+
+    [Fact]
+    public async Task InitialBuy_UsesAccountCash()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var poor = await client.CreateAccountWithCashAsync(cancellationToken, balance: 100m, name: "Poor");
+        var rich = await client.CreateAccountWithCashAsync(cancellationToken, balance: 200m, name: "Rich");
+        AddAssetRequest NewStock(Guid accountId) => new()
+        {
+            AccountId = accountId,
+            AssetClass = AssetClass.Stock,
+            Name = "Stock",
+            Currency = "PLN",
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN"),
+            InitialTransaction = new RecordTransactionRequest
+            {
+                Type = TransactionType.Buy,
+                Quantity = 1m,
+                UnitPrice = 120m,
+                Date = CashDay1
+            }
+        };
+
+        var rejected = await client.PostAsJsonAsync(AllAssetsUri, NewStock(poor.AccountId), cancellationToken);
+
+        await rejected.AssertInsufficientFundsAsync(cancellationToken);
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            Assert.Empty(await dbContext.Assets.ExcludingAccountCash().ToListAsync(cancellationToken));
+            Assert.Equal(2, await dbContext.Transactions.CountAsync(cancellationToken));
+            Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+        }
+
+        var created = await client.PostAsJsonAsync(AllAssetsUri, NewStock(rich.AccountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var asset = (await created.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!;
+        Assert.Equal(1m, asset.Quantity);
+        Assert.Equal(80m, await client.GetCashBalanceAsync(rich.AccountId, cancellationToken));
+        await using var db = CreateDbContext(userId);
+        var legs = await db.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
+        Assert.Equal(2, legs.Count);
+        Assert.Single(legs.Select(t => t.TransferId).Distinct());
+        Assert.Equal(TransactionType.Buy, Assert.Single(legs, l => l.AssetId == asset.Id).Type);
+        var withdraw = Assert.Single(legs, l => l.AssetId == rich.CashAssetId);
+        Assert.Equal(TransactionType.Withdraw, withdraw.Type);
+        Assert.Equal(120m, withdraw.Quantity);
     }
 }

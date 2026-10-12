@@ -22,6 +22,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
         var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
+        await FundAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
@@ -33,7 +34,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.True(transactionResult.IsSuccess);
 
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        var recordEvent = Assert.Single(events, e => e.Version > 0);
+        var recordEvent = Assert.Single(events, e => e.AssetId == assetResult.Value.Id && e.Version > 0);
         Assert.Equal(5m, recordEvent.Quantity);
     }
 
@@ -46,6 +47,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
         var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
+        await FundAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
@@ -62,7 +64,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.True(updateResult.IsSuccess);
 
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        var updateEvent = events.Single(e => e.Quantity == 15m);
+        var updateEvent = events.Single(e => e.AssetId == assetResult.Value.Id && e.Quantity == 15m);
         Assert.Equal(assetResult.Value.Id, updateEvent.AssetId);
     }
 
@@ -75,6 +77,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
         var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
+        await FundAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
@@ -94,7 +97,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
 
         // The last event in write order is the delete's; the quantity alone is ambiguous, as the earlier Buy also left 10.
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        var deleteEvent = events[^1];
+        var deleteEvent = events.Last(e => e.AssetId == assetResult.Value.Id);
         Assert.Equal(10m, deleteEvent.Quantity);
         Assert.Equal(assetResult.Value.Id, deleteEvent.AssetId);
     }
@@ -108,6 +111,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
         var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
+        await FundAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
@@ -119,7 +123,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
             cancellationToken);
         Assert.True(later.IsSuccess);
         var afterFirst = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        Assert.Equal(new DateOnly(2025, 1, 10), afterFirst[^1].FirstTransactionDate);
+        Assert.Equal(new DateOnly(2025, 1, 10), afterFirst.Last(e => e.AssetId == assetResult.Value.Id).FirstTransactionDate);
 
         var earlier = await recordHandler.HandleAsync(
             assetResult.Value.Id,
@@ -136,7 +140,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.True(extra.IsSuccess);
 
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        Assert.Equal(new DateOnly(2024, 3, 4), events[^1].FirstTransactionDate);
+        Assert.Equal(new DateOnly(2024, 3, 4), events.Last(e => e.AssetId == assetResult.Value.Id).FirstTransactionDate);
     }
 
     [Fact]
@@ -148,6 +152,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
 
         var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
+        await FundAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken);
         var assetResult = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = "Shares", Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
@@ -172,7 +177,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.True(deleteResult.IsSuccess);
 
         var events = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        Assert.Equal(new DateOnly(2024, 3, 4), events[^1].FirstTransactionDate);
+        Assert.Equal(new DateOnly(2024, 3, 4), events.Last(e => e.AssetId == assetResult.Value.Id).FirstTransactionDate);
 
         await using var deleteEarliestScope = Provider.CreateAsyncScope();
         var deleteEarliest = await deleteEarliestScope.ServiceProvider.GetRequiredService<DeleteTransactionHandler>()
@@ -180,7 +185,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         Assert.True(deleteEarliest.IsSuccess);
 
         var afterEarliest = await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        Assert.Equal(new DateOnly(2025, 1, 10), afterEarliest[^1].FirstTransactionDate);
+        Assert.Equal(new DateOnly(2025, 1, 10), afterEarliest.Last(e => e.AssetId == assetResult.Value.Id).FirstTransactionDate);
     }
 
     [Fact]
@@ -213,7 +218,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var verify = Provider.CreateAsyncScope();
         var events = await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
             .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        var last = events[^1];
+        var last = events.Last(e => e.AssetId == assetId);
         Assert.Equal(10m, last.Quantity);
         Assert.Equal(
             new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2024, 6, 1), 13m), (new DateOnly(2025, 1, 10), 10m) },
@@ -253,7 +258,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var verify = Provider.CreateAsyncScope();
         var events = await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
             .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        var moved = events[^1];
+        var moved = events.Last(e => e.AssetId == assetId);
         Assert.Equal(10m, moved.Quantity);
         Assert.Equal(
             new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2025, 1, 10), 12m), (new DateOnly(2025, 2, 1), 10m) },
@@ -299,7 +304,7 @@ public sealed class TransactionOutboxTests(SkarbiecContainersFixture containers)
         await using var verify = Provider.CreateAsyncScope();
         var events = await verify.ServiceProvider.GetRequiredService<PortfolioDbContext>()
             .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
-        var deleted = events[^1];
+        var deleted = events.Last(e => e.AssetId == assetId);
         Assert.Equal(12m, deleted.Quantity);
         Assert.Equal(
             new (DateOnly Date, decimal Quantity)[] { (new DateOnly(2024, 3, 4), 15m), (new DateOnly(2025, 1, 10), 12m) },

@@ -162,9 +162,41 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         return assetResult.Value.Id;
     }
 
+    // Covers any trade a test records: every stock trade settles in the account's cash.
+    protected static async Task FundAccountCashAsync(
+        IServiceProvider services, Guid accountId, CancellationToken cancellationToken, decimal amount = 1_000_000m)
+    {
+        var cash = await LoadAccountCashAsync(services, accountId, cancellationToken);
+
+        var funded = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+            cash.Id,
+            new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = amount, UnitPrice = 1m, Date = AccountsApi.FundingDay },
+            cancellationToken);
+        Assert.True(funded.IsSuccess, funded.IsFailure ? funded.Error.Code : null);
+    }
+
+    // An account archives only with its cash at zero.
+    protected static async Task DrainAccountCashAsync(
+        IServiceProvider services, Guid accountId, CancellationToken cancellationToken)
+    {
+        var cash = await LoadAccountCashAsync(services, accountId, cancellationToken);
+
+        var drained = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+            cash.Id,
+            new RecordTransactionRequest { Type = TransactionType.Withdraw, Quantity = cash.Quantity, UnitPrice = 1m, Date = AccountsApi.DrainDay },
+            cancellationToken);
+        Assert.True(drained.IsSuccess, drained.IsFailure ? drained.Error.Code : null);
+    }
+
+    protected static Task<Asset> LoadAccountCashAsync(IServiceProvider services, Guid accountId, CancellationToken cancellationToken) =>
+        services.GetRequiredService<PortfolioDbContext>().Assets
+            .AsNoTracking()
+            .SingleAsync(a => a.AccountId == accountId && a.AssetClass == AssetClass.Cash, cancellationToken);
+
     protected static async Task<Guid> AddAssetWithBuyAsync(
         IServiceProvider services, Guid accountId, string name, CancellationToken cancellationToken)
     {
+        await FundAccountCashAsync(services, accountId, cancellationToken);
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);
@@ -186,6 +218,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         IReadOnlyList<(TransactionType Type, decimal Quantity, DateOnly Date)> transactions,
         CancellationToken cancellationToken)
     {
+        await FundAccountCashAsync(services, accountId, cancellationToken);
         var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest { AccountId = accountId, AssetClass = AssetClass.Stock, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN") },
             cancellationToken);

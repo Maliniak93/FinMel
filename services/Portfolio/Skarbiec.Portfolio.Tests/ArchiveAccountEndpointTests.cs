@@ -38,6 +38,13 @@ public sealed class ArchiveAccountEndpointTests(SkarbiecContainersFixture contai
         var accountId = await client.CreateAccountAsync(cancellationToken);
         var stockId = await client.AddStockInAccountAsync(accountId, cancellationToken, quantity: 10m);
         await client.RecordTransactionAsync(stockId, TransactionType.Sell, 10m, DefaultTopUpDate.AddDays(1), cancellationToken);
+        await client.RecordTransactionAsync(
+            await client.GetAccountCashAssetIdAsync(accountId, cancellationToken),
+            TransactionType.Withdraw,
+            100m,
+            DefaultTopUpDate.AddDays(2),
+            cancellationToken,
+            unitPrice: 1m);
 
         var response = await client.PostAsync(ArchiveAccountUri(accountId), content: null, cancellationToken);
 

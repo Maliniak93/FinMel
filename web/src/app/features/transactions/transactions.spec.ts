@@ -286,6 +286,36 @@ describe('Transactions', () => {
     expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
   });
 
+  it('shows the fee column for a security', async () => {
+    await setup(jsonResponse(pagedResponse([{ ...transaction, feeAmount: 3 }])));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const headers = Array.from(element.querySelectorAll('thead th'), (th) =>
+      (th.textContent ?? '').trim(),
+    );
+    const feeIndex = headers.findIndex((text) => text.startsWith('Fee'));
+    expect(feeIndex).toBeGreaterThanOrEqual(0);
+    const row = element.querySelector('tbody tr.mat-mdc-row')!;
+    expect(row.querySelectorAll('td')[feeIndex].textContent).toContain('3.00');
+  });
+
+  it('shows no fee column for a Cash asset', async () => {
+    await setup(
+      jsonResponse(pagedResponse([transaction])),
+      jsonResponse({ ...asset, assetClass: 0, valuationMode: 1, currency: 'PLN' }),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const headers = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('thead th'),
+      (th) => (th.textContent ?? '').trim(),
+    );
+    expect(headers.some((text) => text.startsWith('Fee'))).toBe(false);
+  });
+
   it('renders currency and PLN value columns', async () => {
     const unpriced: TransactionResponse = {
       ...transaction,
@@ -300,10 +330,9 @@ describe('Transactions', () => {
     const element = fixture.nativeElement as HTMLElement;
     const headers = Array.from(element.querySelectorAll('thead th'), (th) =>
       (th.textContent ?? '').trim(),
-    ).filter((text) => text.length > 0);
+    ).filter((text) => text.length > 0 && !text.startsWith('Fee'));
     expect(headers).toEqual(['Date', 'Type', 'Quantity', 'Currency', 'Value (PLN)']);
     expect(headers).not.toContain('Unit price');
-    expect(headers).not.toContain('Fee');
 
     const rows = Array.from(element.querySelectorAll('tbody tr.mat-mdc-row'));
     expect(rows.length).toBe(2);
@@ -863,6 +892,7 @@ describe('Transactions', () => {
         'Quantity',
         'Currency',
         'Value (PLN)',
+        'Fee (PLN)',
         'Buy',
         'Edit',
         'Delete',

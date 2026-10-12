@@ -860,10 +860,12 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
     }
 
+    // The account's cash is funded because every stock trade settles in it.
     public static async Task<(Guid AccountId, Guid AssetId)> CreateAccountWithAssetAsync(
         this HttpClient client, CancellationToken cancellationToken, string currency = "PLN")
     {
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var assetId = await client.AddAssetAsync(accountId, cancellationToken, currency: currency);
 
         return (accountId, assetId);
@@ -877,6 +879,7 @@ internal static class PortfolioApi
         string accountName = "Retirement")
     {
         var accountId = await client.CreateAccountAsync(cancellationToken, accountName);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var assetIds = new List<Guid>();
 
         for (var i = 0; i < assetCount; i++)
@@ -1089,41 +1092,6 @@ internal static class PortfolioApi
         return Assert.Single(
             (await client.ListTransactionsAsync(assetId, cancellationToken)).Items,
             t => t.Type == type && t.Transfer is not null);
-    }
-
-    public static readonly DateOnly TradeDate = new(2026, 2, 10);
-
-    public sealed record CashAndEtf(Guid CashAssetId, Guid EtfAccountId, Guid EtfAssetId);
-
-    public static RecordTransactionRequest NewTradeRequest(
-        Guid? cashAssetId,
-        TransactionType type = TransactionType.Buy,
-        decimal quantity = 15m,
-        decimal unitPrice = 110m,
-        DateOnly? date = null) => new()
-        {
-            Type = type,
-            Quantity = quantity,
-            UnitPrice = unitPrice,
-            Date = date ?? TradeDate,
-            CashAssetId = cashAssetId
-        };
-
-    public static async Task<TransactionResponse> RecordTradeWithCashAsync(
-        this HttpClient client,
-        Guid assetId,
-        Guid cashAssetId,
-        CancellationToken cancellationToken,
-        TransactionType type = TransactionType.Buy,
-        decimal quantity = 15m,
-        decimal unitPrice = 110m,
-        DateOnly? date = null)
-    {
-        var response = await client.PostAsJsonAsync(
-            TransactionsUri(assetId), NewTradeRequest(cashAssetId, type, quantity, unitPrice, date), cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!;
     }
 
     public static async Task<Guid> CreateTransferAsync(

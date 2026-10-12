@@ -13,4 +13,7 @@ public sealed record UpdateTransactionRequest
     public required decimal UnitPrice { get; init; }
 
     public required DateOnly Date { get; init; }
+
+    /// <summary>The broker's fee in PLN on a stock or ETF Buy or Sell; omitted when there is none.</summary>
+    public decimal? FeeAmount { get; init; }
 }

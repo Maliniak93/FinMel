@@ -177,6 +177,12 @@ internal static class PortfolioAssertions
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, CashLinkNotAllowedErrorCode, cancellationToken);
 
+    public const string FeeNotAllowedErrorCode = "Validation.FeeNotAllowed";
+
+    public const string FeeExceedsProceedsErrorCode = "Validation.FeeExceedsProceeds";
+
+    public const string FxRateMissingErrorCode = "Validation.FxRateMissing";
+
     public static async Task AssertInsufficientFundsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, InsufficientFundsErrorCode, cancellationToken);
@@ -223,11 +229,6 @@ internal static class PortfolioAssertions
 
         return problem;
     }
-
-    public static void AssertCarriesNoFee(this JsonElement transaction) =>
-        Assert.DoesNotContain(
-            transaction.EnumerateObject(),
-            p => p.Name.StartsWith("fee", StringComparison.OrdinalIgnoreCase));
 
     public static async Task<JsonElement> ReadJsonAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken)

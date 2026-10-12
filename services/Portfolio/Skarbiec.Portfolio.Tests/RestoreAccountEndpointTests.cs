@@ -28,6 +28,7 @@ public sealed class RestoreAccountEndpointTests(SkarbiecContainersFixture contai
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.False((await response.Content.ReadFromJsonAsync<AccountResponse>(cancellationToken))!.IsArchived);
+        await client.FundAccountAsync(accountId, cancellationToken);
 
         var record = await client.PostAsJsonAsync(
             TransactionsUri(stockId),

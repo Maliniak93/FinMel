@@ -19,6 +19,7 @@
     "actionsFor": "Actions for {{ name }}",
     "type": "Type",
     "unitPrice": "Unit price",
+    "feePln": "Fee (PLN)",
     "date": "Date",
     "amount": "Amount",
     "dateRequired": "Date is required."
@@ -118,6 +119,7 @@
     "quantityField": {
       "quantity": "Quantity",
       "amount": "Amount",
+      "netAmountPln": "Net amount (PLN)",
       "pieces": "Pieces",
       "pricePerPiece": "Price per piece"
     },
@@ -470,6 +472,7 @@
     "empty": "No transactions recorded for this asset yet.",
     "recordFirst": "Record your first transaction",
     "valuePln": "Value (PLN)",
+    "fee": "Fee (PLN)",
     "actionsFor": "Actions for {{ type }} on {{ date }}",
     "assetLoadFailed": "Failed to load asset.",
     "loadFailed": "Failed to load transactions.",
@@ -487,9 +490,11 @@
       "noCashAccount": "None",
       "cashAmountHint": "Moves {{ amount }}",
       "cashAccountsLoadFailed": "Failed to load cash accounts.",
-      "cashAmountTaken": "Will be taken: {{ amount }}",
-      "cashAmountReceived": "Will be received: {{ amount }}",
-      "insufficientFunds": "Not enough funds on the account.",
+      "accountCashTaken": "From the cash of {{ account }}: {{ amount }} · balance {{ balance }}",
+      "accountCashReceived": "To the cash of {{ account }}: {{ amount }} · balance {{ balance }}",
+      "accountCashBalance": "Cash of {{ account }} · balance {{ balance }}",
+      "insufficientFunds": "Insufficient funds on the account",
+      "fxRateMissing": "No exchange rate from that day",
       "invalidCashAccount": "This Cash account can't be used for this transaction.",
       "legManaged": "Edit this transaction on the stock or ETF side."
     },

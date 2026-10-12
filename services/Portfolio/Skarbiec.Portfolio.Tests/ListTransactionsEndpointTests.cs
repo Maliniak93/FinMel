@@ -7,6 +7,7 @@ using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -19,6 +20,7 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Asset A");
         var otherAssetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Asset B");
 
@@ -43,6 +45,7 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
         var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Asset A");
 
         for (var day = 1; day <= 5; day++)
@@ -71,25 +74,22 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var unpricedDate = new DateOnly(2020, 1, 2);
         Factory.FxRateLookupClient.WithRate("EUR", pricedDate, 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken, currency: "EUR");
-        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 2m, pricedDate, cancellationToken, unitPrice: 50m);
+        var assetId = await client.AddCashAssetAsync(cancellationToken, currency: "EUR");
+        await client.RecordTransactionAsync(assetId, TransactionType.Deposit, 100m, pricedDate, cancellationToken, unitPrice: 1m);
         Factory.FxRateLookupClient.WithNotFound("EUR");
-        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 1m, unpricedDate, cancellationToken, unitPrice: 50m);
+        await client.RecordTransactionAsync(assetId, TransactionType.Deposit, 50m, unpricedDate, cancellationToken, unitPrice: 1m);
 
         var response = await client.GetAsync(TransactionsUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
         Assert.Equal(2, items.Count);
-        Assert.All(items, item =>
-        {
-            item.AssertCarriesNoFee();
-            Assert.Equal("EUR", item.GetProperty("currency").GetString());
-        });
+        Assert.All(items, item => Assert.Equal("EUR", item.GetProperty("currency").GetString()));
         var priced = items[0].Deserialize<TransactionResponse>(JsonSerializerOptions.Web)!;
         var unpriced = items[1].Deserialize<TransactionResponse>(JsonSerializerOptions.Web)!;
         Assert.Equal(pricedDate, priced.Date);
         Assert.Equal(430.00m, priced.ValuePln);
+        Assert.Null(priced.FeeAmount);
         Assert.Equal(unpricedDate, unpriced.Date);
         Assert.Null(unpriced.ValuePln);
     }
@@ -234,24 +234,25 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
     public async Task SecurityTrade_ShowsCounterparts()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var setup = await CreateCashAndEtfAsync(client, cancellationToken);
-        await client.RecordTradeWithCashAsync(setup.EtfAssetId, setup.CashAssetId, cancellationToken);
+        var holding = await client.CreateBrokerageHoldingAsync(cancellationToken);
+        await client.RecordBrokerageTradeAsync(holding.AssetId, cancellationToken);
 
-        var buy = Assert.Single((await client.ListTransactionsAsync(setup.EtfAssetId, cancellationToken)).Items);
+        var buy = Assert.Single((await client.ListTransactionsAsync(holding.AssetId, cancellationToken)).Items);
         var withdraw = Assert.Single(
-            (await client.ListTransactionsAsync(setup.CashAssetId, cancellationToken)).Items,
+            (await client.ListTransactionsAsync(holding.CashAssetId, cancellationToken)).Items,
             t => t.Type == TransactionType.Withdraw);
 
         Assert.NotNull(buy.Transfer);
-        Assert.Equal(setup.CashAssetId, buy.Transfer.CounterpartAssetId);
-        Assert.Null(buy.Transfer.CounterpartAccountName);
+        Assert.Equal(holding.CashAssetId, buy.Transfer.CounterpartAssetId);
+        Assert.Equal("XTB IKE", buy.Transfer.CounterpartAccountName);
         Assert.Equal(TransferDirection.In, buy.Transfer.Direction);
         Assert.False(buy.Transfer.Manual);
         Assert.NotNull(withdraw.Transfer);
         Assert.Equal(buy.Transfer.TransferId, withdraw.Transfer.TransferId);
-        Assert.Equal(setup.EtfAssetId, withdraw.Transfer.CounterpartAssetId);
-        Assert.Equal("Brokerage", withdraw.Transfer.CounterpartAccountName);
+        Assert.Equal(holding.AssetId, withdraw.Transfer.CounterpartAssetId);
+        Assert.Equal("XTB IKE", withdraw.Transfer.CounterpartAccountName);
         Assert.Equal(TransferDirection.Out, withdraw.Transfer.Direction);
         Assert.False(withdraw.Transfer.Manual);
     }

@@ -27,9 +27,14 @@ public static class SecurityCostBasis
             {
                 case TransactionType.Buy or TransactionType.Deposit:
                     var amount = transaction.Quantity * transaction.UnitPriceAmount;
+                    var fee = transaction.FeeAmount ?? 0m;
                     quantity += transaction.Quantity;
-                    costQuote += amount;
-                    costPln = costPln is null || transaction.FxRateToPln is null ? null : costPln + amount * transaction.FxRateToPln;
+
+                    // The fee is PLN, so it enters the quote-currency cost at the trade's own rate.
+                    costQuote += transaction.FxRateToPln is { } feeRate ? amount + fee / feeRate : amount;
+                    costPln = costPln is null || transaction.FxRateToPln is null
+                        ? null
+                        : costPln + Math.Round(amount * transaction.FxRateToPln.Value, 2, MidpointRounding.AwayFromZero) + fee;
                     break;
 
                 case TransactionType.Sell or TransactionType.Withdraw:
