@@ -13,6 +13,9 @@ public sealed record AccountResponse
 
     /// <summary>The account's PLN cash, the quantity of its cash asset.</summary>
     public required decimal CashBalance { get; init; }
+
+    /// <summary>Set only by the account reads, for an IKE or IKZE account; null for a Regular one.</summary>
+    public ContributionResponse? Contribution { get; init; }
 }
 
 public static class AccountMappingExtensions

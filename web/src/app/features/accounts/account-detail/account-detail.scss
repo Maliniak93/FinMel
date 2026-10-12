@@ -71,3 +71,15 @@
   font-size: 0.875rem;
   opacity: 0.7;
 }
+
+.account-detail__contribution {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.account-detail__year {
+  width: 96px;
+}

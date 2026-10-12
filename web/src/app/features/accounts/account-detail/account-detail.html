@@ -55,6 +55,30 @@
       </div>
     </div>
 
+    @if (account.contribution; as contribution) {
+      <div class="account-detail__contribution">
+        <app-contribution-bar [contribution]="contribution" />
+        <mat-select
+          class="account-detail__year"
+          [value]="year()"
+          [attr.aria-label]="'accounts.contribution.year' | transloco"
+          (selectionChange)="year.set($event.value)"
+        >
+          @for (option of years; track option) {
+            <mat-option [value]="option">{{ option }}</mat-option>
+          }
+        </mat-select>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="account.isArchived"
+          (click)="openContributionLimit()"
+        >
+          {{ 'accounts.contribution.action' | transloco }}
+        </button>
+      </div>
+    }
+
     <dl class="account-detail__totals">
       <div>
         <dt>{{ 'accounts.balances.cash' | transloco }}</dt>

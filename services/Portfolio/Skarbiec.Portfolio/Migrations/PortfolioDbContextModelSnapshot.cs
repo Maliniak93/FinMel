@@ -225,6 +225,33 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("Accounts");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AccountContributionLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId", "Year")
+                        .IsUnique();
+
+                    b.ToTable("AccountContributionLimits");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Asset", b =>
                 {
                     b.Property<Guid>("Id")

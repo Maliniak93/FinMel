@@ -12,6 +12,7 @@ export type AccountResponse = {
     isArchived: boolean;
     cashAssetId: string;
     cashBalance: number | string;
+    contribution?: null | ContributionResponse;
 };
 
 export type AccountType = number;
@@ -225,6 +226,12 @@ export type CashTotalResponse = {
     balance: number | string;
 };
 
+export type ContributionResponse = {
+    year: number | string;
+    contributedPln: number | string;
+    limitPln?: null | number | string;
+};
+
 export type CreateAccountRequest = {
     name: string;
     type: AccountType;
@@ -419,6 +426,10 @@ export type SecurityHoldingResponse = {
 
 export type SecurityPriceUnavailableReason = number;
 
+export type SetContributionLimitRequest = {
+    amount: number | string;
+};
+
 export type SettleBondInterestRequest = {
     periods: Array<SettleBondPeriodRequest>;
 };
@@ -573,7 +584,9 @@ export type GetApiPortfolioMeResponse = GetApiPortfolioMeResponses[keyof GetApiP
 export type GetApiPortfolioAccountsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        year?: number | string;
+    };
     url: '/api/portfolio/accounts';
 };
 
@@ -625,7 +638,9 @@ export type GetApiPortfolioAccountsByIdData = {
     path: {
         id: string;
     };
-    query?: never;
+    query?: {
+        year?: number | string;
+    };
     url: '/api/portfolio/accounts/{id}';
 };
 
@@ -691,6 +706,44 @@ export type PostApiPortfolioAccountsByIdRestoreResponses = {
 };
 
 export type PostApiPortfolioAccountsByIdRestoreResponse = PostApiPortfolioAccountsByIdRestoreResponses[keyof PostApiPortfolioAccountsByIdRestoreResponses];
+
+export type DeleteApiPortfolioAccountsByIdContributionLimitsByYearData = {
+    body?: never;
+    path: {
+        id: string;
+        year: number;
+    };
+    query?: never;
+    url: '/api/portfolio/accounts/{id}/contribution-limits/{year}';
+};
+
+export type DeleteApiPortfolioAccountsByIdContributionLimitsByYearResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioAccountsByIdContributionLimitsByYearResponse = DeleteApiPortfolioAccountsByIdContributionLimitsByYearResponses[keyof DeleteApiPortfolioAccountsByIdContributionLimitsByYearResponses];
+
+export type PutApiPortfolioAccountsByIdContributionLimitsByYearData = {
+    body: SetContributionLimitRequest;
+    path: {
+        id: string;
+        year: number;
+    };
+    query?: never;
+    url: '/api/portfolio/accounts/{id}/contribution-limits/{year}';
+};
+
+export type PutApiPortfolioAccountsByIdContributionLimitsByYearResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioAccountsByIdContributionLimitsByYearResponse = PutApiPortfolioAccountsByIdContributionLimitsByYearResponses[keyof PutApiPortfolioAccountsByIdContributionLimitsByYearResponses];
 
 export type GetApiPortfolioAssetsData = {
     body?: never;

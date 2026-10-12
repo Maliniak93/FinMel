@@ -110,6 +110,23 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/portfolio/transfers/{{accountTransfer.response.body.transferId}}
 Authorization: Bearer {{authToken}}
 
+### Set the 2026 contribution limit of an IKE/IKZE account (400 Validation.ContributionLimitNotAllowed on a Regular one; PUT replaces it)
+PUT {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}/contribution-limits/2026
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "amount": 26000
+}
+
+### Read the account with its contribution of 2026 (year defaults to the current Europe/Warsaw year)
+GET {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}?year=2026
+Authorization: Bearer {{authToken}}
+
+### Remove the 2026 contribution limit (204, or 404 when none is set)
+DELETE {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}/contribution-limits/2026
+Authorization: Bearer {{authToken}}
+
 ### Archive an account (409 Conflict.AccountNotEmpty while its cash or an asset in it holds a quantity; publishes nothing)
 POST {{baseUrl}}/api/portfolio/accounts/{{createBondsAccount.response.body.id}}/archive
 Authorization: Bearer {{authToken}}

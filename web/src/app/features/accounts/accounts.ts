@@ -26,6 +26,7 @@ import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { accountTypeLabel, taxWrapperLabel } from './account-type';
 import { AccountFormDialog } from './account-form-dialog/account-form-dialog';
+import { ContributionBar } from './contribution-bar/contribution-bar';
 
 // MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({
@@ -39,6 +40,7 @@ import { AccountFormDialog } from './account-form-dialog/account-form-dialog';
     MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
+    ContributionBar,
     RouterLink,
     TranslocoPipe,
   ],

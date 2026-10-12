@@ -1,0 +1,24 @@
+@let data = contribution();
+<div class="contribution-bar" [class.contribution-bar--exceeded]="exceeded()">
+  @if (limit() !== null) {
+    <span>{{
+      'accounts.contribution.withLimit'
+        | transloco
+          : {
+              contributed: formatAmount(data.contributedPln),
+              limit: formatAmount(limit()!),
+              year: data.year,
+            }
+    }}</span>
+    <mat-progress-bar
+      mode="determinate"
+      [value]="percent()"
+      [color]="exceeded() ? 'warn' : 'primary'"
+    />
+  } @else {
+    <span>{{
+      'accounts.contribution.noLimit'
+        | transloco: { contributed: formatAmount(data.contributedPln), year: data.year }
+    }}</span>
+  }
+</div>

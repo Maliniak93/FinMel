@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { MatPaginatorModule, type PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -30,6 +31,8 @@ import { transferLabel } from '../../transactions/transfer-direction';
 import { AccountTransferDialog } from '../account-transfer-dialog/account-transfer-dialog';
 import { accountTypeLabel, taxWrapperLabel } from '../account-type';
 import { CashOperationDialog } from '../cash-operation-dialog/cash-operation-dialog';
+import { ContributionBar } from '../contribution-bar/contribution-bar';
+import { ContributionLimitDialog } from '../contribution-limit-dialog/contribution-limit-dialog';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -40,9 +43,11 @@ const DEFAULT_PAGE_SIZE = 20;
     MatButtonModule,
     MatChipsModule,
     MatIconModule,
+    MatSelectModule,
     MatPaginatorModule,
     MatProgressSpinnerModule,
     MatTableModule,
+    ContributionBar,
     RouterLink,
     TranslocoPipe,
   ],
@@ -57,12 +62,18 @@ export class AccountDetail {
 
   protected readonly pageIndex = signal(0);
   protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
+  protected readonly year = signal(new Date().getFullYear());
+  protected readonly years = Array.from(
+    { length: 7 },
+    (_, index) => new Date().getFullYear() - 5 + index,
+  );
 
   protected readonly accountResource = resource({
-    params: () => ({ id: this.id() }),
+    params: () => ({ id: this.id(), year: this.year() }),
     loader: async ({ params, abortSignal }) => {
       const result = await getApiPortfolioAccountsById({
         path: { id: params.id },
+        query: { year: params.year },
         signal: abortSignal,
       });
       if (result.error) {
@@ -178,6 +189,26 @@ export class AccountDetail {
     const ref = this.dialog.open(CashOperationDialog, {
       width: '480px',
       data: { cashAssetId: this.accountResource.value().cashAssetId, kind },
+    });
+    ref.afterClosed().subscribe((saved: boolean | undefined) => {
+      if (saved) {
+        this.reload();
+      }
+    });
+  }
+
+  protected openContributionLimit(): void {
+    if (!this.accountResource.hasValue()) {
+      return;
+    }
+    const account = this.accountResource.value();
+    const ref = this.dialog.open(ContributionLimitDialog, {
+      width: '480px',
+      data: {
+        accountId: account.id,
+        year: this.year(),
+        limitPln: account.contribution?.limitPln ?? null,
+      },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {

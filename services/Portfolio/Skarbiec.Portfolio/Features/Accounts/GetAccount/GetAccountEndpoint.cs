@@ -15,6 +15,6 @@ public static class GetAccountEndpoint
     }
 
     private static async Task<Results<Ok<AccountResponse>, ProblemHttpResult>> HandleAsync(
-        Guid id, GetAccountHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(id, cancellationToken)).ToHttpResult();
+        Guid id, int? year, GetAccountHandler handler, CancellationToken cancellationToken)
+        => (await handler.HandleAsync(id, year, cancellationToken)).ToHttpResult();
 }

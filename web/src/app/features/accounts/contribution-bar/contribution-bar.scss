@@ -1,0 +1,12 @@
+.contribution-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+  font-size: 0.875rem;
+}
+
+.contribution-bar--exceeded span {
+  color: var(--mat-sys-error);
+  font-weight: 500;
+}

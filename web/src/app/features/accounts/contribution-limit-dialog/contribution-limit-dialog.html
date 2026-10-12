@@ -1,0 +1,51 @@
+<h2 mat-dialog-title>{{ 'accounts.contribution.dialogTitle' | transloco }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" class="contribution-limit-dialog__field">
+      <mat-label>{{ 'accounts.contribution.year' | transloco }}</mat-label>
+      <input matInput type="number" step="1" formControlName="year" />
+      @if (
+        form.controls.year.hasError('required') ||
+        form.controls.year.hasError('min') ||
+        form.controls.year.hasError('max')
+      ) {
+        <mat-error>{{ 'accounts.contribution.yearInvalid' | transloco }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="contribution-limit-dialog__field">
+      <mat-label>{{ 'accounts.contribution.amount' | transloco }}</mat-label>
+      <input matInput type="number" step="0.01" formControlName="amount" />
+      @if (form.controls.amount.hasError('required')) {
+        <mat-error>{{ 'accounts.cash.amountRequired' | transloco }}</mat-error>
+      } @else if (form.controls.amount.hasError('min')) {
+        <mat-error>{{ 'accounts.cash.amountPositive' | transloco }}</mat-error>
+      } @else if (form.controls.amount.hasError('server')) {
+        <mat-error>{{ form.controls.amount.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="contribution-limit-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    @if (hasLimit) {
+      <button mat-button type="button" color="warn" [disabled]="submitting()" (click)="onRemove()">
+        {{ 'accounts.contribution.remove' | transloco }}
+      </button>
+    }
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'common.save' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

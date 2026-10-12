@@ -4,9 +4,9 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Accounts.GetAccount;
 
-public sealed class GetAccountHandler(PortfolioDbContext dbContext)
+public sealed class GetAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
-    public async Task<Result<AccountResponse>> HandleAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Result<AccountResponse>> HandleAsync(Guid id, int? year, CancellationToken cancellationToken)
     {
         var account = await dbContext.Accounts
             .AsNoTracking()
@@ -17,6 +17,10 @@ public sealed class GetAccountHandler(PortfolioDbContext dbContext)
             return AccountErrors.NotFound(id);
         }
 
-        return await dbContext.ToResponseAsync(account, cancellationToken);
+        var cash = await dbContext.LoadAccountCashAsync(id, cancellationToken);
+        var contributions = await dbContext.LoadContributionsAsync(
+            [account], new Dictionary<Guid, Asset> { [id] = cash }, ContributionPeriod.Resolve(year, timeProvider), cancellationToken);
+
+        return account.ToResponse(cash) with { Contribution = contributions.GetValueOrDefault(id) };
     }
 }

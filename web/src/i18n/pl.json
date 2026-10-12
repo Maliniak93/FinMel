@@ -835,6 +835,16 @@
       "nameTooLong": "Nazwa jest za długa.",
       "duplicateName": "Rachunek o tej nazwie już istnieje.",
       "fixedHint": "Typu i opakowania podatkowego nie można zmienić po utworzeniu rachunku."
+    },
+    "contribution": {
+      "withLimit": "Wpłacono {{ contributed }} / {{ limit }} zł w {{ year }}",
+      "noLimit": "Wpłacono {{ contributed }} zł w {{ year }}",
+      "action": "Limit wpłat",
+      "year": "Rok",
+      "amount": "Limit (zł)",
+      "dialogTitle": "Limit wpłat",
+      "yearInvalid": "Podaj rok z zakresu 2000-2100.",
+      "remove": "Usuń limit"
     }
   }
 }
