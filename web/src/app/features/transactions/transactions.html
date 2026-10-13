@@ -130,7 +130,7 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let transaction">
-            @if (!transaction.transfer && !transaction.savingsInterestPeriodEnd) {
+            @if (hasEditMenu(transaction)) {
               <button
                 mat-icon-button
                 type="button"

@@ -27,7 +27,11 @@ import {
   TransactionFormDialog,
   type TransactionFormDialogData,
 } from './transaction-form-dialog/transaction-form-dialog';
-import { isSecurityAssetClass, transactionTypeLabel } from './transaction-type';
+import {
+  isSecurityAssetClass,
+  isSecurityTransactionType,
+  transactionTypeLabel,
+} from './transaction-type';
 import { transferLabel } from './transfer-direction';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -120,6 +124,15 @@ export class Transactions {
     () =>
       this.assetResource.hasValue() && isSecurityAssetClass(this.assetResource.value().assetClass),
   );
+
+  protected hasEditMenu(transaction: TransactionResponse): boolean {
+    if (transaction.savingsInterestPeriodEnd) {
+      return false;
+    }
+    return (
+      !transaction.transfer || (this.isSecurity() && isSecurityTransactionType(transaction.type))
+    );
+  }
 
   protected readonly displayedColumns = computed(() => [
     'date',

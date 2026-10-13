@@ -25,6 +25,7 @@ import type {
   TransactionResponse,
 } from '../../api/portfolio';
 import { Transactions } from './transactions';
+import { TransactionFormDialog } from './transaction-form-dialog/transaction-form-dialog';
 import { provideI18nTesting } from '../../core/i18n/testing';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -573,6 +574,77 @@ describe('Transactions', () => {
       const [legRow] = rows();
       expect(rowText(legRow)).toContain('Transfer from Cash account (Wallet)');
       expect(rowHasActions(legRow)).toBe(false);
+    });
+
+    it('offers Edit and Delete on a security trade settled in account cash', async () => {
+      const etf: AssetResponse = {
+        ...asset,
+        assetClass: 3,
+        valuationMode: 0,
+        name: 'VWCE',
+        currency: 'EUR',
+        quantity: 10,
+      };
+      const buy = {
+        ...transaction,
+        id: '88888888-8888-8888-8888-888888888888',
+        type: 0,
+        quantity: 10,
+        unitPrice: 100,
+        currency: 'EUR',
+        valuePln: 4320,
+        date: '2026-01-10',
+        transfer: {
+          transferId: '12121212-1212-1212-1212-121212121212',
+          manual: false,
+          counterpartAssetId: '77777777-7777-7777-7777-777777777777',
+          counterpartAssetName: 'XTB cash',
+          counterpartAccountName: 'XTB',
+          direction: TRANSFER_DIRECTION.In,
+        },
+      } as TransactionResponse;
+      const menuItem = (label: string): HTMLElement =>
+        Array.from(
+          TestBed.inject(OverlayContainer)
+            .getContainerElement()
+            .querySelectorAll<HTMLElement>('.mat-mdc-menu-item'),
+        ).find((candidate) => (candidate.textContent ?? '').includes(label))!;
+
+      await setup(jsonResponse(pagedResponse([buy])), jsonResponse(etf));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const [buyRow] = rows();
+      expect(rowHasActions(buyRow)).toBe(true);
+      const menuText = await openRowMenu(buyRow);
+      expect(menuText).toContain('Edit');
+      expect(menuText).toContain('Delete');
+
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+      menuItem('Edit').click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledTimes(1);
+      expect(dialog.open.mock.calls[0][0]).toBe(TransactionFormDialog);
+      expect(dialog.open.mock.calls[0][1].data).toEqual(
+        expect.objectContaining({ assetId, transaction: buy }),
+      );
+
+      dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+      const callsBefore = fetchSpy.mock.calls.length;
+      fetchSpy.mockImplementationOnce(async () => new Response(null, { status: 204 }));
+
+      await openRowMenu(buyRow);
+      menuItem('Delete').click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(dialog.open).toHaveBeenCalledTimes(2);
+      await vi.waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore));
+      const deleteCall = fetchSpy.mock.calls[callsBefore][0] as Request;
+      expect(deleteCall.method).toBe('DELETE');
+      expect(deleteCall.url).toContain(`/api/portfolio/assets/${assetId}/transactions/${buy.id}`);
     });
   });
 
