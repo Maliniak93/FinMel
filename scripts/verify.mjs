@@ -1052,7 +1052,7 @@ async function runE2eChecks() {
 }
 
 async function runScriptsTest() {
-  const result = await step("scripts-test", () => runCommand("node", ["--test", "scripts/*.test.mjs", "scripts/docs/*.test.mjs"]));
+  const result = await step("scripts-test", () => runCommand("node", ["--test", "scripts/*.test.mjs", "scripts/docs/*.test.mjs", "scripts/flows/*.test.mjs"]));
   return result.ok ? [] : [buildFailure("scripts-test", result)];
 }
 
