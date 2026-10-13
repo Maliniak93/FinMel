@@ -5,6 +5,7 @@ public sealed class InstrumentUsage
 {
     public required Guid InstrumentId { get; init; }
     public int AssetCount { get; set; }
+    public int WatchCount { get; set; }
 
     public required DateTimeOffset FirstUsedAt { get; init; }
 }

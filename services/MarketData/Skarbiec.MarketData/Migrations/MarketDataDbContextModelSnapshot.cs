@@ -388,9 +388,30 @@ namespace Skarbiec.MarketData.Migrations
                     b.Property<DateTimeOffset>("FirstUsedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("WatchCount")
+                        .HasColumnType("integer");
+
                     b.HasKey("InstrumentId");
 
                     b.ToTable("InstrumentUsages");
+                });
+
+            modelBuilder.Entity("Skarbiec.MarketData.Data.InstrumentWatchLink", b =>
+                {
+                    b.Property<Guid>("WatchlistItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("WatchlistItemId");
+
+                    b.HasIndex("InstrumentId");
+
+                    b.ToTable("InstrumentWatchLinks");
                 });
 
             modelBuilder.Entity("Skarbiec.MarketData.Data.PriceQuote", b =>

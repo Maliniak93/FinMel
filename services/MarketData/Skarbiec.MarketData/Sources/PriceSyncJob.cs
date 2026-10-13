@@ -122,7 +122,7 @@ public sealed class PriceSyncJob(
     {
         var selected = await db.Instruments
             .AsNoTracking()
-            .Where(i => db.InstrumentUsages.Any(u => u.InstrumentId == i.Id && u.AssetCount > 0))
+            .Where(i => db.InstrumentUsages.Any(u => u.InstrumentId == i.Id && (u.AssetCount > 0 || u.WatchCount > 0)))
             .ToListAsync(cancellationToken);
 
         var total = await db.Instruments.CountAsync(cancellationToken);

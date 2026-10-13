@@ -235,7 +235,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 **Consequences:** an e2e run costs an image build and a stack start; the data set and the stub must follow provider payload changes by hand; the Yahoo/NBP base URLs and the Gateway permit limits become configuration.
 
-## ADR-035 🕐 Watchlist in Portfolio; MarketData learns watched instruments from events
+## ADR-035 ✅ Watchlist in Portfolio; MarketData learns watched instruments from events
+
+**Shipped:** 2026-10-13 (securities watchlist parts 1 and 2: Portfolio API and events, MarketData sync).
 
 **Context:** a watchlist is user data about instruments. MarketData holds only global reference data and syncs only instruments in use.
 

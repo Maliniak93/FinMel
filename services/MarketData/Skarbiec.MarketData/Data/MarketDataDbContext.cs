@@ -13,6 +13,7 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<InstrumentUsage> InstrumentUsages => Set<InstrumentUsage>();
     public DbSet<AssetInstrumentLink> AssetInstrumentLinks => Set<AssetInstrumentLink>();
+    public DbSet<InstrumentWatchLink> InstrumentWatchLinks => Set<InstrumentWatchLink>();
     public DbSet<BondSeries> BondSeries => Set<BondSeries>();
     public DbSet<BondSeriesPeriodRate> BondSeriesPeriodRates => Set<BondSeriesPeriodRate>();
 
@@ -85,6 +86,13 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
             link.Property(l => l.AssetId).ValueGeneratedNever();
 
             // The usage consumers recount links per instrument on every change.
+            link.HasIndex(l => l.InstrumentId);
+        });
+
+        modelBuilder.Entity<InstrumentWatchLink>(link =>
+        {
+            link.HasKey(l => l.WatchlistItemId);
+            link.Property(l => l.WatchlistItemId).ValueGeneratedNever();
             link.HasIndex(l => l.InstrumentId);
         });
 
