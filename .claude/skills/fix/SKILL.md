@@ -14,6 +14,10 @@ so the author of the fix is never its reviewer.
 start the reproduction from its "Kroki reprodukcji"; its "Hipotezy" are unverified; its "Powiązane"
 names related issues. After `create` publishes, run `node scripts/idea.mjs mark <slug> used --issue <n>`.
 
+`$ARGUMENTS` = `e2e:#<n>` → **unattended e2e repair**, launched by `scripts/epic.mjs` after e2e part `#<n>` blocked
+at `e2e` (app). Nobody is watching: never call `AskUserQuestion`, never build. Follow **Unattended e2e repair** below
+instead of steps 0 and 4.
+
 ## 0. Is it already known?
 
 `node scripts/plan-status.mjs` lists every open spec issue. One that
@@ -103,6 +107,33 @@ with `--parent <umbrella number>`.
 
 Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the
 previous one has merged. Build it exactly as `/build` steps 1–5 do and report as `/build` does.
+
+## Unattended e2e repair (`e2e:#<n>`)
+
+1. **The failure.** `node scripts/gh-project.mjs get <n>` gives the epic (`parent`). The newest comment on `#<n>`
+   (`gh issue view <n> --comments`) is the block: test, `Krok <k>`, trace, patch, the e2e agent's one-line cause and its
+   deviations. Read the epic's `## Test manualny`, the sibling parts' Goal / ACs / Design decisions
+   (`node scripts/gh-project.mjs get <m>`), the test code in `skarbiec-plan/issues/<n>.e2e.patch` and
+   `e2e/test-results/stack.log`. The closed `Fix:` parts of the same epic are earlier repairs: the same symptom again
+   means the earlier fix missed the cause — go deeper, never repeat it.
+2. **Reproduce** below the browser, as in step 1: a filtered `dotnet test`, an Angular spec, or the stack and an
+   `.http` request. The e2e run counts as the symptom, not as the reproduction. Stop the stack when done; never start
+   `scripts/e2e.mjs` or touch `scripts/compose.mjs`. Leave the working tree clean and on master — `epic.mjs` refuses a dirty one.
+3. **Decide which side is wrong**, with a quoted line as evidence:
+   - **app** — the app contradicts the plan, and nothing in the epic or its parts specifies what the app does → steps 2–3
+     above, then `node scripts/gh-project.mjs check --body-file …` and
+     `create … --kind fix --parent <epic> --before <n>` (the part lands ahead of the e2e part, so the run builds and merges
+     it first). Several causes → one part per cause, each `--before <n>`, in build order. No approval step.
+   - **plan** — a part's AC or Design decision specifies exactly what the app does, and the plan step contradicts it →
+     rewrite only the wrong steps of the epic's `## Test manualny` (numbered, Polish, `→` lines, the whole section) in the
+     scratchpad, then `node scripts/gh-project.mjs section <epic> --heading "Test manualny" --file <path>` and
+     `node scripts/gh-project.mjs comment <epic> --body-file <path>` naming the steps changed and the quoted spec line.
+     Never loosen a step to dodge a defect: when in doubt, it is **app**.
+   - **stop** — no reproduction, a missing design (`/design`), or the cause is outside the app (the e2e harness, the stub,
+     the data set).
+4. The last line of your final message is exactly one line
+   `FIX_RESULT: {"ok":true,"kind":"app","issues":[<numbers>],"summary":"…"}`, or `{"ok":true,"kind":"plan","summary":"…"}`,
+   or `{"ok":false,"kind":"stop","summary":"<what stops it and what the user must decide>"}`.
 
 ## Hard constraints
 
