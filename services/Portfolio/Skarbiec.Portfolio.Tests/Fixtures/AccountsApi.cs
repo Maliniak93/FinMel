@@ -196,14 +196,16 @@ internal static class AccountsApi
         decimal unitPrice = 120m,
         DateOnly? date = null,
         decimal? feeAmount = null,
-        Guid? cashAssetId = null) => new()
+        Guid? cashAssetId = null,
+        decimal? amountPln = null) => new()
         {
             Type = type,
             Quantity = quantity,
             UnitPrice = unitPrice,
             Date = date ?? CashDay1,
             FeeAmount = feeAmount,
-            CashAssetId = cashAssetId
+            CashAssetId = cashAssetId,
+            AmountPln = amountPln
         };
 
     public static async Task<TransactionResponse> RecordBrokerageTradeAsync(
@@ -214,11 +216,12 @@ internal static class AccountsApi
         decimal quantity = 10m,
         decimal unitPrice = 120m,
         DateOnly? date = null,
-        decimal? feeAmount = null)
+        decimal? feeAmount = null,
+        decimal? amountPln = null)
     {
         var response = await client.PostAsJsonAsync(
             PortfolioApi.TransactionsUri(assetId),
-            NewBrokerageTradeRequest(type, quantity, unitPrice, date, feeAmount),
+            NewBrokerageTradeRequest(type, quantity, unitPrice, date, feeAmount, amountPln: amountPln),
             cancellationToken);
         response.EnsureSuccessStatusCode();
 

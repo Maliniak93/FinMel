@@ -247,6 +247,51 @@ public sealed class BrokerageTradeEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task Update_AmountPlnResizesCashLeg()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", CashDay1, 4.00m);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var holding = await client.CreateBrokerageHoldingAsync(cancellationToken, currency: "EUR");
+        var buy = await client.RecordBrokerageTradeAsync(
+            holding.AssetId, cancellationToken, quantity: 10m, unitPrice: 100m, date: CashDay1, feeAmount: 5m);
+        var withAmount = new UpdateTransactionRequest
+        {
+            Type = TransactionType.Buy,
+            Quantity = 10m,
+            UnitPrice = 100m,
+            Date = CashDay1,
+            FeeAmount = 5m,
+            AmountPln = 4_312.50m
+        };
+
+        var set = await client.PutAsJsonAsync(TransactionUri(holding.AssetId, buy.Id), withAmount, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        Assert.Equal(682.50m, await client.GetCashBalanceAsync(holding.AccountId, cancellationToken));
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            var withdraw = await dbContext.Transactions.SingleAsync(
+                t => t.AssetId == holding.CashAssetId && t.TransferId != null, cancellationToken);
+            Assert.Equal(4_317.50m, withdraw.Quantity);
+        }
+
+        var cleared = await client.PutAsJsonAsync(
+            TransactionUri(holding.AssetId, buy.Id), withAmount with { AmountPln = null }, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        Assert.Equal(995m, await client.GetCashBalanceAsync(holding.AccountId, cancellationToken));
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            var withdraw = await dbContext.Transactions.SingleAsync(
+                t => t.AssetId == holding.CashAssetId && t.TransferId != null, cancellationToken);
+            Assert.Equal(4_005m, withdraw.Quantity);
+        }
+    }
+
+    [Fact]
     public async Task DeleteSell_SpentProceeds_Returns400()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

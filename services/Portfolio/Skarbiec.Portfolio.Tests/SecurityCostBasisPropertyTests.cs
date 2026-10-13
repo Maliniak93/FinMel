@@ -42,12 +42,15 @@ public sealed class SecurityCostBasisPropertyTests
                 if (held > 0)
                 {
                     Assert.InRange(Math.Abs(after.AverageBuyPrice!.Value - before.AverageBuyPrice!.Value), 0m, 0.0001m);
+                    Assert.InRange(Math.Abs(after.AveragePricePln!.Value - before.AveragePricePln!.Value), 0m, 0.0001m);
                 }
             }
             else
             {
                 var quantity = random.Next(1, 50);
-                history.Add(NewTransaction(TransactionType.Buy, quantity, random.Next(1, 500), date));
+                var unitPrice = random.Next(1, 500);
+                decimal? amountPln = random.Next(0, 2) == 0 ? Math.Round(quantity * unitPrice * 4.1m, 2) : null;
+                history.Add(NewTransaction(TransactionType.Buy, quantity, unitPrice, date, amountPln));
                 held += quantity;
             }
         }
@@ -76,17 +79,20 @@ public sealed class SecurityCostBasisPropertyTests
             () => Assert.Equal(0m, basis.Quantity),
             () => Assert.Equal(0m, basis.CostQuote),
             () => Assert.Equal(0m, basis.CostPln),
-            () => Assert.Null(basis.AverageBuyPrice));
+            () => Assert.Null(basis.AverageBuyPrice),
+            () => Assert.Null(basis.AveragePricePln));
     }
 
-    private static Transaction NewTransaction(TransactionType type, decimal quantity, decimal unitPrice, DateOnly date) => new()
-    {
-        Id = Guid.NewGuid(),
-        AssetId = Guid.NewGuid(),
-        Type = type,
-        Quantity = quantity,
-        UnitPriceAmount = unitPrice,
-        FxRateToPln = 4m,
-        Date = date
-    };
+    private static Transaction NewTransaction(
+        TransactionType type, decimal quantity, decimal unitPrice, DateOnly date, decimal? amountPln = null) => new()
+        {
+            AmountPln = amountPln,
+            Id = Guid.NewGuid(),
+            AssetId = Guid.NewGuid(),
+            Type = type,
+            Quantity = quantity,
+            UnitPriceAmount = unitPrice,
+            FxRateToPln = 4m,
+            Date = date
+        };
 }

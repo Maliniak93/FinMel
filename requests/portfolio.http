@@ -1012,6 +1012,20 @@ Content-Type: application/json
   "feeAmount": 5.00
 }
 
+### Buy 2 shares of the USD stock paid in PLN: amountPln is what the broker charged without the fee, it sets the rate (amountPln / (quantity x unitPrice)) and the cash leg (amountPln + fee); no MarketData call (400 Validation.PlnAmountNotAllowed on a PLN asset, a Dividend or a non-positive amount)
+POST {{baseUrl}}/api/portfolio/assets/{{addMarketAsset.response.body.id}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Buy",
+  "quantity": 2,
+  "unitPrice": 100.00,
+  "date": "2026-10-05",
+  "feeAmount": 5.00,
+  "amountPln": 812.00
+}
+
 ### Record a dividend: the quantity is the net PLN amount (unit price 1, FX 1), paid into the account's cash at any position size
 POST {{baseUrl}}/api/portfolio/assets/{{addPlnStock.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}

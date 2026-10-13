@@ -65,6 +65,34 @@
       </mat-form-field>
     }
 
+    @if (offersPlnPayment() && isTrade(type)) {
+      <mat-form-field appearance="outline" class="asset-form__field">
+        <mat-label>{{ 'assets.form.paymentCurrency' | transloco }}</mat-label>
+        <mat-select formControlName="paymentCurrency">
+          <mat-option value="asset">{{ currency() }}</mat-option>
+          <mat-option [value]="plnCode">{{ plnCode }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      @if (group().controls.paymentCurrency.value === plnCode) {
+        <mat-form-field appearance="outline" class="asset-form__field">
+          <mat-label>{{ 'assets.form.amountPln' | transloco }}</mat-label>
+          <input matInput type="number" step="0.01" formControlName="amountPln" />
+          @if (group().controls.amountPln.hasError('required')) {
+            <mat-error>{{ 'assets.form.amountPlnRequired' | transloco }}</mat-error>
+          } @else if (group().controls.amountPln.hasError('server')) {
+            <mat-error>{{ group().controls.amountPln.getError('server') }}</mat-error>
+          }
+          @if (plnHint(); as hint) {
+            <mat-hint>{{
+              'assets.form.amountPlnHint'
+                | transloco: { price: formatAmount(hint.price), rate: formatRate(hint.rate) }
+            }}</mat-hint>
+          }
+        </mat-form-field>
+      }
+    }
+
     <mat-form-field appearance="outline" class="asset-form__field">
       <mat-label>{{ 'common.date' | transloco }}</mat-label>
       <input matInput [matDatepicker]="transactionDatePicker" formControlName="date" />

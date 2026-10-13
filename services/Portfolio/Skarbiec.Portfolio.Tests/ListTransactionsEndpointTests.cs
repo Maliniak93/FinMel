@@ -95,6 +95,24 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
+    public async Task List_ReturnsAmountPlnAsValuePln()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", 4.00m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var holding = await client.CreateBrokerageHoldingAsync(cancellationToken, currency: "EUR");
+        await client.RecordBrokerageTradeAsync(
+            holding.AssetId, cancellationToken, quantity: 10m, unitPrice: 100m, date: CashDay1, amountPln: 4_312.50m);
+
+        var items = (await client.ListTransactionsAsync(holding.AssetId, cancellationToken)).Items;
+
+        var buy = Assert.Single(items);
+        Assert.Equal(4_312.50m, buy.AmountPln);
+        Assert.Equal(4_312.50m, buy.ValuePln);
+    }
+
+    [Fact]
     public async Task List_TransferLeg_ReturnsCounterpart()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

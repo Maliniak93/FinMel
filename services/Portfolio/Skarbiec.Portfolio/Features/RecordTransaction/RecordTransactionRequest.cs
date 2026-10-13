@@ -19,4 +19,7 @@ public sealed record RecordTransactionRequest
 
     /// <summary>The broker's fee in PLN on a stock or ETF Buy or Sell; omitted when there is none.</summary>
     public decimal? FeeAmount { get; init; }
+
+    /// <summary>The PLN amount really paid or received, without the fee, for a stock or ETF Buy or Sell in another currency; omitted to settle at the market rate.</summary>
+    public decimal? AmountPln { get; init; }
 }

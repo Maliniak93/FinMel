@@ -3,7 +3,8 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Securities;
 
-public sealed record SecurityCostBasisResult(decimal Quantity, decimal CostQuote, decimal? CostPln, decimal? AverageBuyPrice);
+public sealed record SecurityCostBasisResult(
+    decimal Quantity, decimal CostQuote, decimal? CostPln, decimal? AverageBuyPrice, decimal? AveragePricePln);
 
 public static class SecurityCostBasis
 {
@@ -32,9 +33,11 @@ public static class SecurityCostBasis
 
                     // The fee is PLN, so it enters the quote-currency cost at the trade's own rate.
                     costQuote += transaction.FxRateToPln is { } feeRate ? amount + fee / feeRate : amount;
-                    costPln = costPln is null || transaction.FxRateToPln is null
+                    costPln = costPln is null || (transaction.AmountPln is null && transaction.FxRateToPln is null)
                         ? null
-                        : costPln + Math.Round(amount * transaction.FxRateToPln.Value, 2, MidpointRounding.AwayFromZero) + fee;
+                        : costPln
+                            + (transaction.AmountPln ?? Math.Round(amount * transaction.FxRateToPln!.Value, 2, MidpointRounding.AwayFromZero))
+                            + fee;
                     break;
 
                 case TransactionType.Sell or TransactionType.Withdraw:
@@ -56,6 +59,10 @@ public static class SecurityCostBasis
             ? Math.Round(costQuote / quantity, AveragePriceDecimals, MidpointRounding.AwayFromZero)
             : (decimal?)null;
 
-        return new SecurityCostBasisResult(quantity, costQuote, costPln, average);
+        var averagePln = quantity > 0 && costPln is { } cost
+            ? Math.Round(cost / quantity, AveragePriceDecimals, MidpointRounding.AwayFromZero)
+            : (decimal?)null;
+
+        return new SecurityCostBasisResult(quantity, costQuote, costPln, average, averagePln);
     }
 }

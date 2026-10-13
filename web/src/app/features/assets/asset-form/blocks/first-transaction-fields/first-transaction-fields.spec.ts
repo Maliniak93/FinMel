@@ -29,7 +29,9 @@ describe('FirstTransactionFields', () => {
     await restoreEnglish();
   });
 
-  async function setup(options: { openingDeposit?: boolean } = {}): Promise<void> {
+  async function setup(
+    options: { openingDeposit?: boolean; currency?: string } = {},
+  ): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [FirstTransactionFields],
       providers: [provideNativeDateAdapter(), provideI18nTesting()],
@@ -43,6 +45,9 @@ describe('FirstTransactionFields', () => {
     fixture.componentRef.setInput('group', group);
     if (options.openingDeposit !== undefined) {
       fixture.componentRef.setInput('openingDeposit', options.openingDeposit);
+    }
+    if (options.currency !== undefined) {
+      fixture.componentRef.setInput('currency', options.currency);
     }
     await fixture.whenStable();
   }
@@ -192,6 +197,54 @@ describe('FirstTransactionFields', () => {
     expect(
       (fixture.nativeElement as HTMLElement).querySelector('[formcontrolname="feeAmount"]'),
     ).toBeNull();
+  });
+
+  describe('amountPln', () => {
+    function element(): HTMLElement {
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('amountPln: a EUR Buy paid in PLN builds the entered amount as amountPln', async () => {
+      await setup({ currency: 'EUR' });
+
+      await toggleFirstTransaction(fixture);
+      findControl(group, 'type').setValue(0);
+      findControl(group, 'quantity').setValue(10);
+      findControl(group, 'unitPrice').setValue(100);
+      findControl(group, 'date').setValue(new Date(2026, 9, 12));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(element().querySelector('[formcontrolname="paymentCurrency"]')).not.toBeNull();
+      expect(element().querySelector('[formcontrolname="amountPln"]')).toBeNull();
+      expect(buildInitialTransaction(group)?.amountPln ?? null).toBeNull();
+
+      findControl(group, 'paymentCurrency').setValue('PLN');
+      findControl(group, 'amountPln').setValue(4312.5);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(element().querySelector('[formcontrolname="amountPln"]')).not.toBeNull();
+      expect(buildInitialTransaction(group)).toEqual({
+        type: 0,
+        quantity: 10,
+        unitPrice: 100,
+        date: '2026-10-12',
+        amountPln: 4312.5,
+      });
+    });
+
+    it('amountPln: the payment currency toggle is absent for a PLN instrument', async () => {
+      await setup({ currency: 'PLN' });
+
+      await toggleFirstTransaction(fixture);
+      findControl(group, 'type').setValue(0);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(element().querySelector('[formcontrolname="paymentCurrency"]')).toBeNull();
+      expect(element().querySelector('[formcontrolname="amountPln"]')).toBeNull();
+    });
   });
 
   describe('in Polish', () => {

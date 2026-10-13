@@ -69,9 +69,60 @@ public sealed class SecurityCostBasisTests
             () => Assert.Equal(721.8m, afterSell.CostPln));
     }
 
+    [Fact]
+    public void Buy_WithAmountPln_AddsItToCostPln()
+    {
+        Transaction[] buys =
+        [
+            NewTransaction(TransactionType.Buy, 10m, 100m, 4.3125m, new DateOnly(2026, 1, 1), fee: 5m, amountPln: 4_312.50m),
+            NewTransaction(TransactionType.Buy, 10m, 120m, 4.00m, new DateOnly(2026, 1, 2))
+        ];
+        Transaction[] buysThenSell = [.. buys, NewTransaction(TransactionType.Sell, 5m, 130m, 4.25m, new DateOnly(2026, 1, 3))];
+
+        var bought = SecurityCostBasis.Compute(buys);
+        var afterSell = SecurityCostBasis.Compute(buysThenSell);
+
+        Assert.Multiple(
+            () => Assert.Equal(9_117.50m, bought.CostPln),
+            () => Assert.Equal(6_838.125m, afterSell.CostPln));
+    }
+
+    [Fact]
+    public void AveragePricePln_IsCostPlnPerUnit()
+    {
+        Transaction[] transactions =
+        [
+            NewTransaction(TransactionType.Buy, 10m, 100m, 4.3125m, new DateOnly(2026, 1, 1), fee: 5m, amountPln: 4_312.50m),
+            NewTransaction(TransactionType.Buy, 10m, 120m, 4.00m, new DateOnly(2026, 1, 2)),
+            NewTransaction(TransactionType.Sell, 5m, 130m, 4.25m, new DateOnly(2026, 1, 3))
+        ];
+
+        var basis = SecurityCostBasis.Compute(transactions);
+
+        Assert.Equal(455.8750m, basis.AveragePricePln);
+    }
+
+    [Fact]
+    public void AveragePricePln_NullWhenCostPlnNull()
+    {
+        Transaction[] transactions = [NewTransaction(TransactionType.Buy, 5m, 100m, null, new DateOnly(2026, 1, 1))];
+
+        var basis = SecurityCostBasis.Compute(transactions);
+
+        Assert.Null(basis.CostPln);
+        Assert.Null(basis.AveragePricePln);
+    }
+
     private static Transaction NewTransaction(
-        TransactionType type, decimal quantity, decimal unitPrice, decimal? fxRate, DateOnly date, decimal? fee = null) => new()
+        TransactionType type,
+        decimal quantity,
+        decimal unitPrice,
+        decimal? fxRate,
+        DateOnly date,
+        decimal? fee = null,
+        decimal? amountPln = null) => new()
         {
+            AmountPln = amountPln,
             FeeAmount = fee,
             Id = Guid.NewGuid(),
             AssetId = Guid.NewGuid(),

@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -357,5 +359,54 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         var delete = await client.DeleteAsync(
             TransactionUri(setup.Account.AssetId, leg.Id), cancellationToken);
         await delete.AssertTransferLegManagedAsync(cancellationToken);
+    }
+
+    [Fact]
+    public async Task Update_SetsAndClearsAmountPln()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", CashDay1, 4.00m);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var holding = await client.CreateBrokerageHoldingAsync(cancellationToken, currency: "EUR");
+        var buy = await client.RecordBrokerageTradeAsync(
+            holding.AssetId, cancellationToken, quantity: 10m, unitPrice: 100m, date: CashDay1, feeAmount: 5m);
+        var withAmount = new UpdateTransactionRequest
+        {
+            Type = TransactionType.Buy,
+            Quantity = 10m,
+            UnitPrice = 100m,
+            Date = CashDay1,
+            FeeAmount = 5m,
+            AmountPln = 4_312.50m
+        };
+        var withoutAmount = withAmount with { AmountPln = null };
+
+        var set = await client.PutAsJsonAsync(TransactionUri(holding.AssetId, buy.Id), withAmount, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        var setBody = (await set.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!;
+        Assert.Equal(4_312.50m, setBody.AmountPln);
+        Assert.Equal(4_312.50m, setBody.ValuePln);
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            var stored = await dbContext.Transactions.SingleAsync(t => t.Id == buy.Id, cancellationToken);
+            Assert.Equal(4_312.50m, stored.AmountPln);
+            Assert.Equal(4.3125m, stored.FxRateToPln);
+        }
+
+        var cleared = await client.PutAsJsonAsync(TransactionUri(holding.AssetId, buy.Id), withoutAmount, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        var clearedBody = (await cleared.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!;
+        Assert.Null(clearedBody.AmountPln);
+        Assert.Equal(4_000m, clearedBody.ValuePln);
+        await using (var dbContext = CreateDbContext(userId))
+        {
+            var stored = await dbContext.Transactions.SingleAsync(t => t.Id == buy.Id, cancellationToken);
+            Assert.Null(stored.AmountPln);
+            Assert.Equal(4.00m, stored.FxRateToPln);
+        }
     }
 }

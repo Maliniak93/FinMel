@@ -390,6 +390,24 @@ describe('Securities page', () => {
     expect(textOf(rowFor('CD Projekt'))).toContain('XTB zwykly');
   });
 
+  it('shows the average buy price in PLN', async () => {
+    await setup({
+      holdings: [
+        { ...vwce, averageBuyPricePln: 432.5 },
+        { ...cdr, averageBuyPricePln: null },
+      ],
+      totals: stocks.totals,
+    } as SecuritiesResponse);
+
+    const headers = Array.from(element().querySelectorAll('th'), (th) => textOf(th));
+    const column = headers.indexOf('Śr. cena (PLN)');
+    expect(column).toBeGreaterThanOrEqual(0);
+    const cell = (name: string): string =>
+      textOf(rowFor(name).querySelectorAll<HTMLElement>('td')[column]);
+    expect(cell('Vanguard FTSE All-World').replace(/\s+/g, ' ')).toContain(money(432.5, 'PLN'));
+    expect(cell('CD Projekt')).toBe('—');
+  });
+
   it('shows every holding when no account is selected', async () => {
     await setup();
 

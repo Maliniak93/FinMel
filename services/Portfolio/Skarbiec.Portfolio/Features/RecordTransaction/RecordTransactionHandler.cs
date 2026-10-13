@@ -55,6 +55,12 @@ public sealed class RecordTransactionHandler(
             return feeError;
         }
 
+        if (BrokerageTrade.AmountPlnError(
+            asset.AssetClass, asset.Currency, request.Type, request.Quantity, request.UnitPrice, request.AmountPln) is { } amountPlnError)
+        {
+            return amountPlnError;
+        }
+
         var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
         if (unitPrice.IsFailure)
         {
@@ -71,6 +77,7 @@ public sealed class RecordTransactionHandler(
                 ? BrokerageTrade.SecurityUnitPrice(request.Type, unitPrice.Value.Amount)
                 : unitPrice.Value.Amount,
             FeeAmount = request.FeeAmount,
+            AmountPln = request.AmountPln,
             Date = request.Date
         };
 

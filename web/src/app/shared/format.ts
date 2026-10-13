@@ -37,6 +37,13 @@ export function formatAmount(amount: number | string): string {
   }).format(Number(amount));
 }
 
+export function formatRate(rate: number | string): string {
+  return new Intl.NumberFormat(activeLocale(), {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(Number(rate));
+}
+
 export function formatQuantity(quantity: number | string): string {
   return new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 8 }).format(
     Number(quantity),

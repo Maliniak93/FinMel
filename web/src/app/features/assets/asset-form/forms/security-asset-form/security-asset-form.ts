@@ -1,5 +1,5 @@
 import { Component, computed, forwardRef, inject, input, type OnInit } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder } from '@angular/forms';
 import { translate } from '@jsverse/transloco';
 
@@ -40,6 +40,10 @@ export class SecurityAssetForm implements AssetForm, OnInit {
     basics: createAssetBasicsGroup(this.formBuilder),
     instrument: createInstrumentControl(),
     initialTransaction: createFirstTransactionGroup(this.formBuilder),
+  });
+
+  protected readonly currency = toSignal(this.form.controls.basics.controls.currency.valueChanges, {
+    initialValue: this.form.controls.basics.controls.currency.value,
   });
 
   constructor() {

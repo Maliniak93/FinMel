@@ -29,6 +29,24 @@ internal static class BrokerageTrade
             ? null
             : TransactionErrors.FeeNotAllowed;
 
+    public static Error? AmountPlnError(
+        AssetClass assetClass, string currency, TransactionType type, decimal quantity, decimal unitPrice, decimal? amountPln) =>
+        amountPln is null
+        || (Applies(assetClass) && !IsIncome(type) && currency != Money.BaseCurrency && quantity > 0 && unitPrice > 0 && amountPln > 0)
+            ? null
+            : TransactionErrors.PlnAmountNotAllowed;
+
+    public static async Task<Result<decimal>> ResolveTradeRateAsync(
+        this IFxRateLookupClient fxRateLookupClient, string currency, Transaction trade, CancellationToken cancellationToken)
+    {
+        if (trade.AmountPln is { } amountPln)
+        {
+            return Math.Round(amountPln / (trade.Quantity * trade.UnitPriceAmount), 8, MidpointRounding.AwayFromZero);
+        }
+
+        return await fxRateLookupClient.ResolveRateAsync(currency, trade.Type, trade.Date, cancellationToken);
+    }
+
     // A dividend or interest is a net PLN amount: the quantity is the amount and the unit price 1.
     public static decimal SecurityUnitPrice(TransactionType type, decimal unitPrice) => IsIncome(type) ? 1m : unitPrice;
 
@@ -65,7 +83,7 @@ internal static class BrokerageTrade
             return security.Quantity;
         }
 
-        var gross = Math.Round(
+        var gross = security.AmountPln ?? Math.Round(
             security.Quantity * security.UnitPriceAmount * security.FxRateToPln!.Value, 2, MidpointRounding.AwayFromZero);
         var fee = security.FeeAmount ?? 0m;
         if (security.Type == TransactionType.Buy)
@@ -97,7 +115,7 @@ internal static class BrokerageTrade
         Transaction trade,
         CancellationToken cancellationToken)
     {
-        var rate = await fxRateLookupClient.ResolveRateAsync(security.Currency, trade.Type, trade.Date, cancellationToken);
+        var rate = await fxRateLookupClient.ResolveTradeRateAsync(security.Currency, trade, cancellationToken);
         if (rate.IsFailure)
         {
             return rate.Error;

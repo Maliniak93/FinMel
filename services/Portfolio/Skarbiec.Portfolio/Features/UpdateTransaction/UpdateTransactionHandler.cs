@@ -54,6 +54,12 @@ public sealed class UpdateTransactionHandler(
             return feeError;
         }
 
+        if (BrokerageTrade.AmountPlnError(
+            asset.AssetClass, asset.Currency, request.Type, request.Quantity, request.UnitPrice, request.AmountPln) is { } amountPlnError)
+        {
+            return amountPlnError;
+        }
+
         // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
@@ -167,6 +173,7 @@ public sealed class UpdateTransactionHandler(
             Quantity = request.Quantity,
             UnitPriceAmount = BrokerageTrade.SecurityUnitPrice(request.Type, unitPrice.Value.Amount),
             FeeAmount = request.FeeAmount,
+            AmountPln = request.AmountPln,
             Date = request.Date
         };
 
@@ -177,7 +184,7 @@ public sealed class UpdateTransactionHandler(
         }
 
         // Re-resolved on every update so the stored rate always matches the current date.
-        var fxRateToPln = await fxRateLookupClient.ResolveRateAsync(asset.Currency, request.Type, request.Date, cancellationToken);
+        var fxRateToPln = await fxRateLookupClient.ResolveTradeRateAsync(asset.Currency, candidate, cancellationToken);
         if (fxRateToPln.IsFailure)
         {
             return fxRateToPln.Error;
@@ -211,6 +218,7 @@ public sealed class UpdateTransactionHandler(
         transaction.UnitPriceAmount = candidate.UnitPriceAmount;
         transaction.FeeAmount = candidate.FeeAmount;
         transaction.FxRateToPln = candidate.FxRateToPln;
+        transaction.AmountPln = candidate.AmountPln;
         transaction.Date = candidate.Date;
         cashLeg.Quantity = cashAmount.Value;
         cashLeg.FxRateToPln = 1m;

@@ -346,6 +346,7 @@ export type RecordTransactionRequest = {
     date: string;
     cashAssetId?: null | string;
     feeAmount?: null | number | string;
+    amountPln?: null | number | string;
 };
 
 export type RedeemBondEarlyRequest = {
@@ -420,6 +421,7 @@ export type SecurityHoldingResponse = {
     currency: string;
     quantity: number | string;
     averageBuyPrice: null | number | string;
+    averageBuyPricePln: null | number | string;
     costPln: null | number | string;
     lastPrice: null | number | string;
     lastPriceDate: null | string;
@@ -482,6 +484,7 @@ export type TransactionResponse = {
     quantity: number | string;
     unitPrice: number | string;
     currency: string;
+    amountPln?: null | number | string;
     valuePln?: null | number | string;
     feeAmount?: null | number | string;
     date: string;
@@ -567,6 +570,7 @@ export type UpdateTransactionRequest = {
     unitPrice: number | string;
     date: string;
     feeAmount?: null | number | string;
+    amountPln?: null | number | string;
 };
 
 export type UpdateWatchlistItemRequest = {
