@@ -1,0 +1,160 @@
+<div class="watchlist-table__header">
+  <h2>{{ 'securities.watchlist.title' | transloco }}</h2>
+  <button mat-stroked-button type="button" (click)="openAddDialog()">
+    <mat-icon>visibility</mat-icon>
+    {{ 'securities.watchlist.watch' | transloco }}
+  </button>
+</div>
+
+@if (watchlistResource.error(); as loadError) {
+  <div class="watchlist-table__state" role="alert">
+    <p>{{ loadError.message }}</p>
+    <button mat-button type="button" (click)="watchlistResource.reload()">
+      {{ 'common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (watchlistResource.isLoading() && !watchlistResource.hasValue()) {
+  <div class="watchlist-table__state">
+    <mat-spinner diameter="32" />
+  </div>
+} @else if (watchlistResource.hasValue() && watchlistResource.value().length === 0) {
+  <div class="watchlist-table__state">
+    <p>{{ 'securities.watchlist.empty' | transloco }}</p>
+    <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+      {{ 'securities.watchlist.watch' | transloco }}
+    </button>
+  </div>
+} @else if (watchlistResource.hasValue()) {
+  <table mat-table [dataSource]="watchlistResource.value()" class="watchlist-table__table">
+    <ng-container matColumnDef="instrument">
+      <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.instrument' | transloco }}</th>
+      <td mat-cell *matCellDef="let item">
+        <div>{{ item.name }}</div>
+        <div class="watchlist-table__muted">{{ instrumentLabel(item) }}</div>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="price">
+      <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.price' | transloco }}</th>
+      <td mat-cell *matCellDef="let item">
+        @if (item.lastPrice !== null) {
+          <div>{{ formatMoney(item.lastPrice, item.quoteCurrency) }}</div>
+          @if (item.lastPriceDate) {
+            <div class="watchlist-table__muted">{{ formatDate(item.lastPriceDate) }}</div>
+          }
+        } @else if (unavailableLabel(item); as reasonKey) {
+          <span data-testid="price-unavailable" [matTooltip]="reasonKey | transloco">—</span>
+        } @else {
+          —
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="dailyChange">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ 'securities.watchlist.columns.dailyChange' | transloco }}
+      </th>
+      <td mat-cell *matCellDef="let item">
+        @if (item.dailyChange !== null) {
+          <span
+            data-testid="daily-change"
+            [class]="'watchlist-table__change ' + sign(item.dailyChange)"
+          >
+            {{ formatMoney(item.dailyChange, item.quoteCurrency) }}
+            @if (item.dailyChangePercent !== null) {
+              ({{ formatPercent(item.dailyChangePercent) }})
+            }
+          </span>
+        } @else {
+          —
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="pricePln">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ 'securities.watchlist.columns.pricePln' | transloco }}
+      </th>
+      <td mat-cell *matCellDef="let item">
+        @if (item.lastPricePln !== null) {
+          {{ formatMoney(item.lastPricePln, 'PLN') }}
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="target">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ 'securities.watchlist.columns.target' | transloco }}
+      </th>
+      <td mat-cell *matCellDef="let item">
+        @if (item.targetPrice !== null) {
+          <div>{{ formatMoney(item.targetPrice, item.quoteCurrency) }}</div>
+          @if (item.targetDistancePercent !== null) {
+            <div class="watchlist-table__muted">
+              {{ formatPercent(item.targetDistancePercent) }}
+            </div>
+          }
+        } @else {
+          —
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="held">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ 'securities.watchlist.columns.held' | transloco }}
+      </th>
+      <td mat-cell *matCellDef="let item">
+        @if (isHeld(item)) {
+          <span [matTooltip]="heldTooltip(item)">{{ formatQuantity(item.heldQuantity) }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="note">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ 'securities.watchlist.columns.note' | transloco }}
+      </th>
+      <td mat-cell *matCellDef="let item">
+        @if (item.note) {
+          <span class="watchlist-table__note" [matTooltip]="item.note">{{ item.note }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let item" class="watchlist-table__actions">
+        <button
+          mat-icon-button
+          type="button"
+          [matMenuTriggerFor]="menu"
+          [attr.aria-label]="'common.actionsFor' | transloco: { name: item.ticker }"
+        >
+          <mat-icon>more_vert</mat-icon>
+        </button>
+        <mat-menu #menu="matMenu">
+          <button mat-menu-item type="button" (click)="buy(item)">
+            <mat-icon>add_circle</mat-icon>
+            <span>{{ 'securities.buy' | transloco }}</span>
+          </button>
+          <button mat-menu-item type="button" (click)="openEditDialog(item)">
+            <mat-icon>edit</mat-icon>
+            <span>{{ 'common.edit' | transloco }}</span>
+          </button>
+          <button mat-menu-item type="button" (click)="remove(item)">
+            <mat-icon>delete</mat-icon>
+            <span>{{ 'common.delete' | transloco }}</span>
+          </button>
+        </mat-menu>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr
+      mat-row
+      *matRowDef="let row; columns: displayedColumns"
+      [class.at-target]="row.atOrBelowTarget"
+    ></tr>
+  </table>
+}

@@ -142,7 +142,7 @@ describe('AssetFormDialog', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('POSTs a Cash body without an account and closes with true on success', async () => {
+    it('POSTs a Cash body without an account and closes with the created id', async () => {
       await setup({ assetClass: ASSET_CLASS.Cash }, async () => jsonResponse(cashAsset, 201));
       findControl(activeForm().form, 'name').setValue('Checking account');
 
@@ -158,7 +158,7 @@ describe('AssetFormDialog', () => {
         currency: 'PLN',
         initialTransaction: null,
       });
-      expect(dialogRef.close).toHaveBeenCalledWith(true);
+      expect(dialogRef.close).toHaveBeenCalledWith(cashAsset.id);
     });
 
     it('POSTs a security with the chosen account', async () => {
@@ -178,7 +178,7 @@ describe('AssetFormDialog', () => {
       expect(await post.json()).toEqual(
         expect.objectContaining({ accountId: xtbIkeId, assetClass: ASSET_CLASS.Etf }),
       );
-      expect(dialogRef.close).toHaveBeenCalledWith(true);
+      expect(dialogRef.close).toHaveBeenCalledWith(stockAsset.id);
     });
 
     it('sends nothing while a security has no account chosen', async () => {
@@ -212,6 +212,41 @@ describe('AssetFormDialog', () => {
       await component['onSubmit']();
 
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('opened from a watched instrument', () => {
+    const watchedFetch = async (input: unknown): Promise<Response> => {
+      if (typeof input !== 'string' && (input as Request).method === 'POST') {
+        return jsonResponse(stockAsset, 201);
+      }
+      if (requestUrl(input).includes(`/api/marketdata/instruments/${instrumentId}`)) {
+        return jsonResponse(stockInstrumentDetails);
+      }
+      return jsonResponse(accounts);
+    };
+
+    it('preselects the instrument from data', async () => {
+      await setup({ assetClass: ASSET_CLASS.Stock, instrumentId }, watchedFetch);
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(activeForm().assetClass()).toBe(ASSET_CLASS.Stock);
+        expect(findControl(activeForm().form, 'instrument').value).toEqual(
+          expect.objectContaining({ id: instrumentId, ticker: 'AAPL' }),
+        );
+      });
+    });
+
+    it('closes with the created id', async () => {
+      await setup({ assetClass: ASSET_CLASS.Stock, instrumentId }, watchedFetch);
+      await pickSelectOption(fixture, 'accountId', 'XTB IKE');
+      findControl(activeForm().form, 'name').setValue('Apple');
+      await vi.waitFor(() => fixture.detectChanges());
+
+      await component['onSubmit']();
+
+      expect(dialogRef.close).toHaveBeenCalledWith(stockAsset.id);
     });
   });
 

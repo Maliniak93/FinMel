@@ -32,6 +32,7 @@ export class SecurityAssetForm implements AssetForm, OnInit {
 
   readonly assetClass = input.required<AssetClass>();
   readonly asset = input<AssetResponse>();
+  readonly instrumentId = input<string>();
 
   protected readonly isEdit = computed(() => !!this.asset());
 

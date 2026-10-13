@@ -33,7 +33,7 @@ import {
 } from '../../transactions/transaction-type';
 
 // Mirrors Skarbiec.Portfolio.Features.Securities.SecurityPriceUnavailableReason in declaration order: the enum travels as its int.
-const PRICE_UNAVAILABLE_REASON_LABELS: readonly string[] = [
+export const PRICE_UNAVAILABLE_REASON_LABELS: readonly string[] = [
   'securities.priceUnavailable.noQuote',
   'securities.priceUnavailable.fxRateMissing',
   'securities.priceUnavailable.marketDataUnavailable',
@@ -139,6 +139,10 @@ export class SecuritiesTable {
 
   protected transactionsLink(holding: SecurityHoldingResponse): string[] {
     return ['/assets', holding.assetId, 'transactions'];
+  }
+
+  reload(): void {
+    this.holdingsResource.reload();
   }
 
   protected openAddDialog(): void {

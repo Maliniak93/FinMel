@@ -542,6 +542,32 @@
       "noQuote": "No quote yet",
       "fxRateMissing": "No exchange rate",
       "marketDataUnavailable": "Quotes temporarily unavailable"
+    },
+    "watchlist": {
+      "title": "Watchlist",
+      "watch": "Watch",
+      "empty": "You are not watching any instrument yet",
+      "loadFailed": "Failed to load the watchlist.",
+      "addTitle": "Watch an instrument",
+      "editTitle": "Edit watched instrument",
+      "targetPrice": "Target price",
+      "note": "Note",
+      "alreadyWatched": "You already watch this instrument.",
+      "buyTitle": "Buy into",
+      "buyHolding": "{{ account }} · {{ asset }} (held: {{ quantity }})",
+      "buyNewPosition": "{{ account }} · new position",
+      "columns": {
+        "dailyChange": "Daily change",
+        "pricePln": "Price (PLN)",
+        "target": "Target",
+        "held": "Held",
+        "note": "Note"
+      },
+      "remove": {
+        "title": "Stop watching {{ name }}?",
+        "message": "The instrument leaves your watchlist. Your holdings stay untouched.",
+        "failed": "Failed to remove the item."
+      }
     }
   },
   "metals": {
