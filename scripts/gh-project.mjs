@@ -7,16 +7,18 @@
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
 //   set <n> <field> <value>                                set one project field
 //   get <n> [--out <path> [--raw]]                         print the issue as JSON (parent, lastPart), optionally write a local copy
-//   prepare <n> [--tier 1|2] [--skip tests,review] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch (an e2e part's idle branch is recut from origin/master), moves the card; a last epic part also gets the epic and sibling bodies
+//   prepare <n> [--tier 1|2] [--skip tests,review] [--fresh] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch (an e2e part's idle branch is recut from origin/master), moves the card; a last epic part also gets the epic and sibling bodies; on a resumed dirty branch it replays the interrupted run's finished steps (--fresh starts over)
 //   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise); a shipped one also replaces ## Test manualny per manualTest
 //   list                                                   every issue on the project as JSON
 //   comment <n> --body-file <path>                         post a comment
 //   tick <n>                                               tick every acceptance-criterion checkbox
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { findReplay, renderResumeScript } from "./build-replay.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OWNER = "Maliniak93";
@@ -36,7 +38,7 @@ const LABELS = [
   { name: "e2e", color: "0e8a16", description: "Last part of an epic: automates the epic's manual test plan as Playwright tests" },
 ];
 const KINDS = { new: "New", change: "Change", cleanup: "Cleanup", fix: "Fix" };
-const BOOLEAN_FLAGS = new Set(["skip-tests", "epic", "e2e", "raw", "dry-run"]);
+const BOOLEAN_FLAGS = new Set(["skip-tests", "epic", "e2e", "raw", "dry-run", "fresh"]);
 const SKIPPABLE = new Set(["tests", "review"]);
 
 function gh(argv, input) {
@@ -374,7 +376,7 @@ function get([number, ...rest]) {
 
 function prepare([number, ...rest]) {
   const n = String(number ?? "").replace(/^#/, "");
-  if (!/^\d+$/.test(n)) throw new Error("usage: prepare <issue number> [--tier 1|2] [--skip tests,review] [--dry-run]");
+  if (!/^\d+$/.test(n)) throw new Error("usage: prepare <issue number> [--tier 1|2] [--skip tests,review] [--fresh] [--dry-run]");
   const flags = parseFlags(rest);
   const { result: issue, body } = fetchIssue(n);
   const refuse = (reason, next) => console.log(JSON.stringify({ ok: false, number: issue.number, title: issue.title, reason, next }));
@@ -488,16 +490,72 @@ function prepare([number, ...rest]) {
   }
   const resumed = issue.status === "In progress";
   if (!resumed && !dryRun) setField(issue.url, "Status", "In progress");
+  const workflowArgs = { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic, e2e: issue.e2e };
+  const replay = planReplay({ n, body, workflowArgs, attempt: !flags.fresh && action === "resumed" && dirty.length > 0, dryRun });
   const out = {
     ok: true,
     resumed,
     url: issue.url,
     branch: { name: target, action },
     notes: action === "resumed" ? dirty : [],
-    workflowArgs: { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic, e2e: issue.e2e },
+    workflow: replay.workflow,
+    replay: replay.summary,
+    workflowArgs,
   };
+  if (replay.skipped) out.replaySkipped = replay.skipped;
   if (dryRun) Object.assign(out, { dryRun: true, branchCommands, cardMove: resumed ? null : "Status -> In progress", epicCopies: extraCopies.map((m) => `${ISSUES_DIR}/${m}.md`) });
   console.log(JSON.stringify(out));
+}
+
+// Re-running an interrupted build replays the finished agent steps of its last run from the workflow journal (zero tokens).
+function planReplay({ n, body, workflowArgs, attempt, dryRun }) {
+  const runFile = path.resolve(REPO_ROOT, `${ISSUES_DIR}/${n}.run.json`);
+  const resumeRel = `${ISSUES_DIR}/${n}.resume.js`;
+  const resumeFile = path.resolve(REPO_ROOT, resumeRel);
+  const plain = { workflow: { name: "build-feature" }, summary: null, skipped: null };
+  const bodyHash = createHash("sha256").update(body).digest("hex");
+  let previous = null;
+  try {
+    previous = JSON.parse(readFileSync(runFile, "utf8"));
+  } catch {
+    previous = null;
+  }
+  let found = null;
+  let skipped = null;
+  if (attempt) {
+    if (previous && previous.bodyHash !== bodyHash) skipped = "spec changed since the last run";
+    else {
+      const { tier, skip, e2e } = workflowArgs;
+      found = findReplay({ issue: Number(n), args: { tier, skip, e2e }, previous });
+      if (!found.ok) {
+        skipped = found.reason;
+        found = null;
+      }
+    }
+  }
+  let source = null;
+  try {
+    source = found ? renderResumeScript(readFileSync(path.resolve(REPO_ROOT, ".claude/workflows/build-feature.js"), "utf8"), found) : null;
+  } catch {
+    source = null;
+  }
+  if (found && !source) {
+    skipped = "build-feature.js has no replay marker";
+    found = null;
+  }
+  if (!dryRun) {
+    const { tier, skip, e2e } = workflowArgs;
+    mkdirSync(path.dirname(runFile), { recursive: true });
+    writeFileSync(runFile, `${JSON.stringify({ bodyHash, tier, skip, e2e, replayed: found ? found.steps : [], writtenAt: Date.now() })}\n`);
+    if (source) writeFileSync(resumeFile, source);
+    else rmSync(resumeFile, { force: true });
+  }
+  if (!found) return { ...plain, skipped };
+  return {
+    workflow: { scriptPath: resumeRel },
+    summary: { steps: found.steps.map((s) => s.label), liveFrom: found.liveFrom, runId: found.runId },
+    skipped: null,
+  };
 }
 
 function report([number, ...rest]) {
