@@ -28,6 +28,8 @@ import { SecurityAssetForm } from '../forms/security-asset-form/security-asset-f
 export interface AssetFormDialogData {
   assetClass: AssetClass;
   asset?: AssetResponse;
+  instrumentId?: string;
+  accountId?: string;
 }
 
 type AssetFormKind = 'cash' | 'security';
@@ -70,7 +72,7 @@ export class AssetFormDialog {
   protected readonly choosesAccount = !this.data.asset && this.kind === 'security';
 
   protected readonly accountForm = new FormGroup({
-    accountId: new FormControl('', {
+    accountId: new FormControl(this.data.accountId ?? '', {
       nonNullable: true,
       validators: this.choosesAccount ? [Validators.required] : [],
     }),
@@ -143,7 +145,7 @@ export class AssetFormDialog {
       return;
     }
 
-    this.dialogRef.close(true);
+    this.dialogRef.close(this.data.asset ? true : result.data?.id);
   }
 
   protected cancel(): void {

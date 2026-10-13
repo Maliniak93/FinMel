@@ -1,0 +1,14 @@
+.watchlist-item-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 360px;
+}
+
+.watchlist-item-dialog__instrument {
+  font-weight: 500;
+}
+
+.watchlist-item-dialog__error {
+  color: var(--mat-sys-error);
+}

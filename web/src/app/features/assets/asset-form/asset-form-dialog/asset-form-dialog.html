@@ -32,7 +32,11 @@
         <app-cash-asset-form [assetClass]="data.assetClass" [asset]="data.asset" />
       }
       @case ('security') {
-        <app-security-asset-form [assetClass]="data.assetClass" [asset]="data.asset" />
+        <app-security-asset-form
+          [assetClass]="data.assetClass"
+          [asset]="data.asset"
+          [instrumentId]="data.instrumentId"
+        />
       }
     }
 

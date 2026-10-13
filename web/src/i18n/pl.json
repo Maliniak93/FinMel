@@ -542,6 +542,32 @@
       "noQuote": "Brak notowania",
       "fxRateMissing": "Brak kursu waluty",
       "marketDataUnavailable": "Notowania chwilowo niedostępne"
+    },
+    "watchlist": {
+      "title": "Obserwowane",
+      "watch": "Obserwuj",
+      "empty": "Nie obserwujesz jeszcze żadnego instrumentu",
+      "loadFailed": "Nie udało się wczytać obserwowanych.",
+      "addTitle": "Obserwuj instrument",
+      "editTitle": "Edytuj obserwowany instrument",
+      "targetPrice": "Cena docelowa",
+      "note": "Notatka",
+      "alreadyWatched": "Już obserwujesz ten instrument.",
+      "buyTitle": "Kup na rachunek",
+      "buyHolding": "{{ account }} · {{ asset }} (posiadasz {{ quantity }})",
+      "buyNewPosition": "{{ account }} · nowa pozycja",
+      "columns": {
+        "dailyChange": "Zmiana dzienna",
+        "pricePln": "Kurs (PLN)",
+        "target": "Cel",
+        "held": "Posiadane",
+        "note": "Notatka"
+      },
+      "remove": {
+        "title": "Przestać obserwować {{ name }}?",
+        "message": "Instrument zniknie z obserwowanych. Twoje pozycje pozostają bez zmian.",
+        "failed": "Nie udało się usunąć pozycji."
+      }
     }
   },
   "metals": {

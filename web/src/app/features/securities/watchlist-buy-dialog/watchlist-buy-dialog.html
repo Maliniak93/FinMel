@@ -1,0 +1,33 @@
+<h2 mat-dialog-title>{{ 'securities.watchlist.buyTitle' | transloco }}</h2>
+
+<mat-dialog-content>
+  @if (accountsResource.error(); as loadError) {
+    <p role="alert">{{ loadError.message }}</p>
+  } @else if (!accountsResource.hasValue()) {
+    <mat-spinner diameter="32" />
+  } @else if (options().length === 0) {
+    <p>{{ 'assets.form.noBrokerageAccount' | transloco }}</p>
+  } @else {
+    <mat-radio-group class="watchlist-buy-dialog__options" [formControl]="choice">
+      @for (option of options(); track $index) {
+        <mat-radio-button [value]="option.target">{{
+          option.key | transloco: option.params
+        }}</mat-radio-button>
+      }
+    </mat-radio-group>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">{{ 'common.cancel' | transloco }}</button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    data-testid="buy-confirm"
+    [disabled]="!choice.value"
+    (click)="confirm()"
+  >
+    {{ 'securities.buy' | transloco }}
+  </button>
+</mat-dialog-actions>

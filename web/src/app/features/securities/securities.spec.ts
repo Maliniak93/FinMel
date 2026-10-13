@@ -16,6 +16,8 @@ import { AssetFormDialog } from '../assets/asset-form/asset-form-dialog/asset-fo
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { TransactionFormDialog } from '../transactions/transaction-form-dialog/transaction-form-dialog';
 import { Securities } from './securities';
+import { WatchlistBuyDialog } from './watchlist-buy-dialog/watchlist-buy-dialog';
+import { isWatchlistList, watchlistItem } from './testing/watchlist-fixtures';
 
 const PRICE_UNAVAILABLE_REASON = {
   NoQuote: 0,
@@ -130,6 +132,7 @@ describe('Securities page', () => {
   async function setup(
     stockBody: SecuritiesResponse = stocks,
     etfBody: SecuritiesResponse = etfs,
+    watchlistBody: unknown[] = [],
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
@@ -138,6 +141,9 @@ describe('Securities page', () => {
       }
       if (isClass(url, ASSET_CLASS.Etf, 'Etf')) {
         return jsonResponse(etfBody);
+      }
+      if (isWatchlistList(input)) {
+        return jsonResponse(watchlistBody);
       }
       return jsonResponse({ detail: 'Not found.' }, 404);
     });
@@ -326,6 +332,33 @@ describe('Securities page', () => {
       );
       await vi.waitFor(() => expect(listCalls(ASSET_CLASS.Stock, 'Stock')).toBeGreaterThan(before));
     }
+  });
+
+  it('buy from the watchlist reloads the holdings table of its tab', async () => {
+    await setup(stocks, etfs, [watchlistItem({ assetClass: ASSET_CLASS.Stock })]);
+    dialog.open.mockImplementation((component: unknown) => ({
+      afterClosed: () =>
+        of(
+          component === WatchlistBuyDialog
+            ? { accountId: vwce.accountId, assetId: vwce.assetId }
+            : true,
+        ),
+    }));
+    const holdingsBefore = listCalls(ASSET_CLASS.Stock, 'Stock');
+    const watchlistGets = (): number =>
+      fetchSpy.mock.calls.filter((call: unknown[]) => isWatchlistList(call[0])).length;
+    const watchlistBefore = watchlistGets();
+    const watchlistRow = element().querySelector<HTMLElement>('app-watchlist-table tbody tr');
+    if (!watchlistRow) {
+      throw new Error('No watchlist row rendered.');
+    }
+
+    await clickRowMenuItem(fixture, watchlistRow, /^kup$/i);
+
+    await vi.waitFor(() => {
+      expect(listCalls(ASSET_CLASS.Stock, 'Stock')).toBeGreaterThan(holdingsBefore);
+      expect(watchlistGets()).toBeGreaterThan(watchlistBefore);
+    });
   });
 
   it('links each row to its transactions', async () => {

@@ -4,10 +4,11 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ASSET_CLASS } from '../assets/asset-class';
 import { SecuritiesTable } from './securities-table/securities-table';
+import { WatchlistTable } from './watchlist-table/watchlist-table';
 
 @Component({
   selector: 'app-securities',
-  imports: [MatTabsModule, SecuritiesTable, TranslocoPipe],
+  imports: [MatTabsModule, SecuritiesTable, WatchlistTable, TranslocoPipe],
   templateUrl: './securities.html',
   styleUrl: './securities.scss',
 })
