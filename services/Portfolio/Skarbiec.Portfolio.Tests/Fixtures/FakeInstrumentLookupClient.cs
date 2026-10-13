@@ -7,6 +7,8 @@ namespace Skarbiec.Portfolio.Tests.Fixtures;
 // An unscripted instrument is Found as a Stock quoted in USD, unless its id came from IdFor, which encodes the class and currency it answers with.
 public sealed class FakeInstrumentLookupClient : IInstrumentLookupClient
 {
+    private const string UnscriptedTicker = "TICK";
+
     private static readonly byte[] Marker = [0x5E, 0xED, 0xCA, 0xFE];
 
     private readonly Dictionary<Guid, InstrumentLookupResult> _overrides = [];
@@ -33,9 +35,15 @@ public sealed class FakeInstrumentLookupClient : IInstrumentLookupClient
         return this;
     }
 
-    public FakeInstrumentLookupClient WithInstrument(Guid instrumentId, AssetClass assetClass, string currency)
+    public FakeInstrumentLookupClient WithInstrument(
+        Guid instrumentId,
+        AssetClass assetClass,
+        string currency,
+        string ticker = UnscriptedTicker,
+        string? name = null,
+        string? exchange = null)
     {
-        _overrides[instrumentId] = InstrumentLookupResult.Found(assetClass, currency);
+        _overrides[instrumentId] = InstrumentLookupResult.Found(assetClass, currency, ticker, name ?? ticker, exchange);
         return this;
     }
 
@@ -47,9 +55,10 @@ public sealed class FakeInstrumentLookupClient : IInstrumentLookupClient
         var bytes = instrumentId.ToByteArray();
         if (!bytes.AsSpan(0, Marker.Length).SequenceEqual(Marker))
         {
-            return InstrumentLookupResult.Found(AssetClass.Stock, "USD");
+            return InstrumentLookupResult.Found(AssetClass.Stock, "USD", UnscriptedTicker, UnscriptedTicker, null);
         }
 
-        return InstrumentLookupResult.Found((AssetClass)BitConverter.ToInt32(bytes, 4), Encoding.ASCII.GetString(bytes, 8, 3));
+        return InstrumentLookupResult.Found(
+            (AssetClass)BitConverter.ToInt32(bytes, 4), Encoding.ASCII.GetString(bytes, 8, 3), UnscriptedTicker, UnscriptedTicker, null);
     }
 }

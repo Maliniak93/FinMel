@@ -58,6 +58,11 @@ using Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 using Skarbiec.Portfolio.Features.Transfers.ListTransferCandidates;
 using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
+using Skarbiec.Portfolio.Features.Watchlist.AddWatchlistItem;
+using Skarbiec.Portfolio.Features.Watchlist.GetWatchlistItem;
+using Skarbiec.Portfolio.Features.Watchlist.ListWatchlist;
+using Skarbiec.Portfolio.Features.Watchlist.RemoveWatchlistItem;
+using Skarbiec.Portfolio.Features.Watchlist.UpdateWatchlistItem;
 using Skarbiec.Portfolio.MarketData;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Messaging;
@@ -160,6 +165,11 @@ builder.Services.AddScoped<UndoSavingsInterestSettlementHandler>();
 builder.Services.AddScoped<ListTransferCandidatesHandler>();
 builder.Services.AddScoped<CreateTransferHandler>();
 builder.Services.AddScoped<DeleteTransferHandler>();
+builder.Services.AddScoped<AddWatchlistItemHandler>();
+builder.Services.AddScoped<ListWatchlistHandler>();
+builder.Services.AddScoped<GetWatchlistItemHandler>();
+builder.Services.AddScoped<UpdateWatchlistItemHandler>();
+builder.Services.AddScoped<RemoveWatchlistItemHandler>();
 
 var app = builder.Build();
 
@@ -223,6 +233,11 @@ app.MapUndoSavingsInterestSettlementEndpoint();
 app.MapListTransferCandidatesEndpoint();
 app.MapCreateTransferEndpoint();
 app.MapDeleteTransferEndpoint();
+app.MapAddWatchlistItemEndpoint();
+app.MapListWatchlistEndpoint();
+app.MapGetWatchlistItemEndpoint();
+app.MapUpdateWatchlistItemEndpoint();
+app.MapRemoveWatchlistItemEndpoint();
 
 // Diagnostic endpoint proving a Gateway-forwarded JWT authorizes a call routed to this service.
 app.MapGet("/api/portfolio/me", (ICurrentUser currentUser) => TypedResults.Ok(currentUser.UserId))

@@ -43,6 +43,9 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
    end-of-day quantity on each distinct transaction date, ascending, empty without transactions,
    its last point equal to `Quantity`.
 
+`WatchlistItemAdded` and `WatchlistItemRemoved` (`WatchlistItemId, UserId, InstrumentId, OccurredAtUtc`) are
+Portfolio's facts about a user's watchlist; MarketData counts watchers from them (watchlist part 2).
+
 When ADR-019 is revoked (real data in production), the classic discipline comes back: additive
 only, never rename or remove, breaking change → a new `V2` record published alongside the old one.
 Until then, don't pay for it.

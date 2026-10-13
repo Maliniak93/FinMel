@@ -28,7 +28,7 @@ public sealed class MarketDataInstrumentQuoteLookupClient(HttpClient httpClient)
 
             var instruments = instrumentsBody.Instruments.ToDictionary(
                 i => i.InstrumentId,
-                i => new InstrumentQuote(i.InstrumentId, i.Ticker, i.Name, i.Exchange, i.QuoteCurrency, i.LastPrice, i.LastPriceDate));
+                i => new InstrumentQuote(i.InstrumentId, i.Ticker, i.Name, i.Exchange, i.QuoteCurrency, i.LastPrice, i.LastPriceDate, i.PreviousClose, i.PreviousCloseDate));
 
             var currencies = instruments.Values
                 .Select(i => i.QuoteCurrency)
@@ -83,7 +83,15 @@ public sealed class MarketDataInstrumentQuoteLookupClient(HttpClient httpClient)
     private sealed record InstrumentsBatchRequest(IReadOnlyCollection<Guid> InstrumentIds);
 
     private sealed record InstrumentItem(
-        Guid InstrumentId, string Ticker, string Name, string? Exchange, string QuoteCurrency, decimal? LastPrice, DateOnly? LastPriceDate);
+        Guid InstrumentId,
+        string Ticker,
+        string Name,
+        string? Exchange,
+        string QuoteCurrency,
+        decimal? LastPrice,
+        DateOnly? LastPriceDate,
+        decimal? PreviousClose,
+        DateOnly? PreviousCloseDate);
 
     private sealed record InstrumentsBatchResponse(IReadOnlyList<InstrumentItem> Instruments);
 

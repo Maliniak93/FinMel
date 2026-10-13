@@ -22,8 +22,8 @@ public sealed class MarketDataInstrumentLookupClient(HttpClient httpClient) : II
             }
 
             var body = await response.Content.ReadFromJsonAsync<InstrumentBody>(cancellationToken);
-            return body is { AssetClass: { } assetClass, QuoteCurrency: { Length: > 0 } quoteCurrency }
-                ? InstrumentLookupResult.Found(assetClass, quoteCurrency)
+            return body is { AssetClass: { } assetClass, QuoteCurrency: { Length: > 0 } quoteCurrency, Ticker: { } ticker, Name: { } name }
+                ? InstrumentLookupResult.Found(assetClass, quoteCurrency, ticker, name, body.Exchange)
                 : InstrumentLookupResult.Unavailable;
         }
         catch (OperationCanceledException)
@@ -43,5 +43,5 @@ public sealed class MarketDataInstrumentLookupClient(HttpClient httpClient) : II
         }
     }
 
-    private sealed record InstrumentBody(AssetClass? AssetClass, string? QuoteCurrency);
+    private sealed record InstrumentBody(AssetClass? AssetClass, string? QuoteCurrency, string? Ticker, string? Name, string? Exchange);
 }

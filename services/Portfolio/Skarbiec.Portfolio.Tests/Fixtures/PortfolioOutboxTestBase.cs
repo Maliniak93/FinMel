@@ -37,6 +37,9 @@ using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 using Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Features.UpdateTransaction;
+using Skarbiec.Portfolio.Features.Watchlist.AddWatchlistItem;
+using Skarbiec.Portfolio.Features.Watchlist.RemoveWatchlistItem;
+using Skarbiec.Portfolio.Features.Watchlist.UpdateWatchlistItem;
 using Skarbiec.Portfolio.MarketData;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.Testing.Containers;
@@ -100,6 +103,9 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddScoped<DeleteAccountHandler>();
             services.AddScoped<CreateTransferHandler>();
             services.AddScoped<DeleteTransferHandler>();
+            services.AddScoped<AddWatchlistItemHandler>();
+            services.AddScoped<UpdateWatchlistItemHandler>();
+            services.AddScoped<RemoveWatchlistItemHandler>();
         });
 
         await using (var scope = Provider.CreateAsyncScope())

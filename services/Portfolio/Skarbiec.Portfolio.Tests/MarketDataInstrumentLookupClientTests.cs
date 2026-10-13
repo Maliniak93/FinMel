@@ -80,7 +80,7 @@ public sealed class MarketDataInstrumentLookupClientTests(SkarbiecContainersFixt
         var found = await CheckWithResponseAsync(
             () => new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = JsonContent.Create(new { assetClass = AssetClass.Etf, quoteCurrency = "USD" }),
+                Content = JsonContent.Create(new { assetClass = AssetClass.Etf, quoteCurrency = "USD", ticker = "VWRA", name = "Vanguard" }),
             },
             cancellationToken);
         var notFound = await CheckWithResponseAsync(() => new HttpResponseMessage(HttpStatusCode.NotFound), cancellationToken);
@@ -91,6 +91,30 @@ public sealed class MarketDataInstrumentLookupClientTests(SkarbiecContainersFixt
         Assert.Equal("USD", found.QuoteCurrency);
         Assert.Equal(InstrumentLookupStatus.NotFound, notFound.Status);
         Assert.Equal(InstrumentLookupStatus.Unavailable, serverError.Status);
+    }
+
+    [Fact]
+    public async Task MapsTickerNameExchange()
+    {
+        var found = await CheckWithResponseAsync(
+            () => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    assetClass = AssetClass.Etf,
+                    quoteCurrency = "EUR",
+                    ticker = "VWCE.DE",
+                    name = "Vanguard FTSE All-World",
+                    exchange = "XETRA",
+                }),
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(InstrumentLookupStatus.Found, found.Status);
+        Assert.Multiple(
+            () => Assert.Equal("VWCE.DE", found.Ticker),
+            () => Assert.Equal("Vanguard FTSE All-World", found.Name),
+            () => Assert.Equal("XETRA", found.Exchange));
     }
 
     private static Task<InstrumentLookupResult> CheckWithResponseAsync(

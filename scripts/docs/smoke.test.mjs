@@ -45,6 +45,8 @@ test("facts on this repository lists the contract events, the internal message, 
         "DailyPricesSynced",
         "InstrumentHistoryBackfilled",
         "UserRegistered",
+        "WatchlistItemAdded",
+        "WatchlistItemRemoved",
       ],
     );
     assert.equal(messages.find((m) => m.name === "HistoryRebuildRequested")?.kind, "internal");

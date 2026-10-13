@@ -6,7 +6,7 @@ public enum InstrumentQuoteLookupStatus
     Unavailable,
 }
 
-/// <summary>LastPrice is the latest close on or before the lookup date, in QuoteCurrency; both last-price fields are null when there is none.</summary>
+/// <summary>LastPrice is the latest close on or before the lookup date, in QuoteCurrency; both last-price fields are null when there is none. PreviousClose is the close dated strictly before LastPriceDate.</summary>
 public sealed record InstrumentQuote(
     Guid InstrumentId,
     string Ticker,
@@ -14,7 +14,9 @@ public sealed record InstrumentQuote(
     string? Exchange,
     string QuoteCurrency,
     decimal? LastPrice,
-    DateOnly? LastPriceDate);
+    DateOnly? LastPriceDate,
+    decimal? PreviousClose,
+    DateOnly? PreviousCloseDate);
 
 /// <summary>Rates holds {currency}PLN keyed by the currency code; an instrument MarketData does not know is absent from Instruments.</summary>
 public sealed record InstrumentQuoteLookupResult(

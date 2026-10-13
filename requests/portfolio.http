@@ -738,6 +738,40 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/securities?assetClass=Etf
 Authorization: Bearer {{authToken}}
 
+### Watch an instrument, with an optional note and target price
+# @name addWatchlistItem
+POST {{baseUrl}}/api/portfolio/watchlist
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "instrumentId": "{{addCustomInstrument.response.body.id}}",
+  "note": "Buy on a dip",
+  "targetPrice": 100
+}
+
+### List the watchlist with prices, daily change and holdings — optional assetClass=Stock|Etf
+GET {{baseUrl}}/api/portfolio/watchlist
+Authorization: Bearer {{authToken}}
+
+### Get a watchlist item
+GET {{baseUrl}}/api/portfolio/watchlist/{{addWatchlistItem.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+### Replace a watchlist item's note and target price (null clears one)
+PUT {{baseUrl}}/api/portfolio/watchlist/{{addWatchlistItem.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "note": null,
+  "targetPrice": 95.5
+}
+
+### Remove a watchlist item
+DELETE {{baseUrl}}/api/portfolio/watchlist/{{addWatchlistItem.response.body.id}}
+Authorization: Bearer {{authToken}}
+
 ### Get a savings account
 GET {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}
 Authorization: Bearer {{authToken}}

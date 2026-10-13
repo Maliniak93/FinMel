@@ -95,6 +95,35 @@ public sealed class MarketDataInstrumentQuoteLookupClientTests
     }
 
     [Fact]
+    public async Task MapsPreviousClose()
+    {
+        var withPreviousId = Guid.NewGuid();
+        var withoutPreviousId = Guid.NewGuid();
+        var recorder = new HttpRequestRecorder(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new
+            {
+                instruments = new object[]
+                {
+                    new { instrumentId = withPreviousId, ticker = "CDR", name = "CD Projekt", exchange = "GPW", quoteCurrency = "PLN", lastPrice = (decimal?)200m, lastPriceDate = (string?)"2026-01-30", previousClose = (decimal?)190m, previousCloseDate = (string?)"2026-01-29" },
+                    new { instrumentId = withoutPreviousId, ticker = "NEW", name = "New", exchange = "GPW", quoteCurrency = "PLN", lastPrice = (decimal?)10m, lastPriceDate = (string?)"2026-01-30", previousClose = (decimal?)null, previousCloseDate = (string?)null }
+                }
+            })
+        });
+        using var httpClient = NewHttpClient(recorder);
+        var client = new MarketDataInstrumentQuoteLookupClient(httpClient);
+
+        var result = await client.GetQuotesAsync([withPreviousId, withoutPreviousId], AsOfDate, TestContext.Current.CancellationToken);
+
+        Assert.Equal(InstrumentQuoteLookupStatus.Found, result.Status);
+        Assert.Multiple(
+            () => Assert.Equal(190m, result.Instruments![withPreviousId].PreviousClose),
+            () => Assert.Equal(new DateOnly(2026, 1, 29), result.Instruments![withPreviousId].PreviousCloseDate),
+            () => Assert.Null(result.Instruments![withoutPreviousId].PreviousClose),
+            () => Assert.Null(result.Instruments![withoutPreviousId].PreviousCloseDate));
+    }
+
+    [Fact]
     public async Task GetQuotesAsync_TargetAnswers500_ReturnsUnavailable()
     {
         var recorder = new HttpRequestRecorder(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
