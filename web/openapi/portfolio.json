@@ -1900,6 +1900,153 @@
           }
         }
       }
+    },
+    "/api/portfolio/watchlist": {
+      "post": {
+        "tags": [
+          "AddWatchlistItemEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddWatchlistItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "ListWatchlistEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "assetClass",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AssetClass"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WatchlistItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/watchlist/{id}": {
+      "get": {
+        "tags": [
+          "GetWatchlistItemEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "UpdateWatchlistItemEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWatchlistItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "RemoveWatchlistItemEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2264,6 +2411,36 @@
                 "$ref": "#/components/schemas/OpeningDepositRequest"
               }
             ]
+          }
+        }
+      },
+      "AddWatchlistItemRequest": {
+        "required": [
+          "instrumentId"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "maxLength": 500,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetPrice": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4835,6 +5012,219 @@
           }
         }
       },
+      "UpdateWatchlistItemRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "maxLength": 500,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetPrice": {
+            "maximum": 79228162514264337593543950335,
+            "exclusiveMinimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "WatchlistHoldingResponse": {
+        "required": [
+          "accountId",
+          "accountName",
+          "assetId",
+          "assetName",
+          "quantity"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assetName": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "WatchlistItemResponse": {
+        "required": [
+          "id",
+          "instrumentId",
+          "assetClass",
+          "ticker",
+          "name",
+          "exchange",
+          "quoteCurrency",
+          "note",
+          "targetPrice",
+          "lastPrice",
+          "lastPriceDate",
+          "previousClose",
+          "dailyChange",
+          "dailyChangePercent",
+          "lastPricePln",
+          "targetDistancePercent",
+          "atOrBelowTarget",
+          "priceUnavailableReason",
+          "holdings",
+          "heldQuantity"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "ticker": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quoteCurrency": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastPriceDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "previousClose": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "dailyChange": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "dailyChangePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lastPricePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "targetDistancePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "atOrBelowTarget": {
+            "type": "boolean"
+          },
+          "priceUnavailableReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityPriceUnavailableReason"
+              }
+            ]
+          },
+          "holdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WatchlistHoldingResponse"
+            }
+          },
+          "heldQuantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "WeightUnit": {
         "enum": [
           "Gram",
@@ -5014,6 +5404,21 @@
     },
     {
       "name": "DeleteTransferEndpoint"
+    },
+    {
+      "name": "AddWatchlistItemEndpoint"
+    },
+    {
+      "name": "ListWatchlistEndpoint"
+    },
+    {
+      "name": "GetWatchlistItemEndpoint"
+    },
+    {
+      "name": "UpdateWatchlistItemEndpoint"
+    },
+    {
+      "name": "RemoveWatchlistItemEndpoint"
     }
   ]
 }

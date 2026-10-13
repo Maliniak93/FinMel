@@ -10,6 +10,11 @@ public sealed record InstrumentBatchItem
     public required string QuoteCurrency { get; init; }
     public required decimal? LastPrice { get; init; }
     public required DateOnly? LastPriceDate { get; init; }
+
+    /// <summary>The latest close dated strictly before LastPriceDate; both previous-close fields are null when there is none.</summary>
+    public required decimal? PreviousClose { get; init; }
+
+    public required DateOnly? PreviousCloseDate { get; init; }
 }
 
 public sealed record InstrumentsBatchResponse

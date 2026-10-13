@@ -22,10 +22,21 @@ public sealed class GetInstrumentsBatchHandler(MarketDataDbContext dbContext, Ti
             .Select(g => g.OrderByDescending(q => q.Date).First())
             .ToDictionaryAsync(q => q.InstrumentId, cancellationToken);
 
+        var previousQuotes = await dbContext.PriceQuotes
+            .AsNoTracking()
+            .Where(q => instrumentIds.Contains(q.InstrumentId) && q.Date <= today)
+            .Where(q => q.Date < dbContext.PriceQuotes
+                .Where(l => l.InstrumentId == q.InstrumentId && l.Date <= today)
+                .Max(l => l.Date))
+            .GroupBy(q => q.InstrumentId)
+            .Select(g => g.OrderByDescending(q => q.Date).First())
+            .ToDictionaryAsync(q => q.InstrumentId, cancellationToken);
+
         var items = instruments
             .Select(i =>
             {
                 latestQuotes.TryGetValue(i.Id, out var quote);
+                previousQuotes.TryGetValue(i.Id, out var previous);
 
                 return new InstrumentBatchItem
                 {
@@ -35,7 +46,9 @@ public sealed class GetInstrumentsBatchHandler(MarketDataDbContext dbContext, Ti
                     Exchange = i.Exchange,
                     QuoteCurrency = i.QuoteCurrency,
                     LastPrice = quote?.Close,
-                    LastPriceDate = quote?.Date
+                    LastPriceDate = quote?.Date,
+                    PreviousClose = previous?.Close,
+                    PreviousCloseDate = previous?.Date
                 };
             })
             .ToList();

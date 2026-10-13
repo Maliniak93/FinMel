@@ -49,4 +49,37 @@ public sealed class GetInstrumentsBatchEndpointTests(SkarbiecContainersFixture c
             () => Assert.Equal(JsonValueKind.Null, cdr.GetProperty("lastPrice").ValueKind),
             () => Assert.Equal(JsonValueKind.Null, cdr.GetProperty("lastPriceDate").ValueKind));
     }
+
+    [Fact]
+    public async Task Batch_ReturnsPreviousClose()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Guid threeQuotesId;
+        Guid oneQuoteId;
+        await using (var seedDb = CreateDbContext())
+        {
+            threeQuotesId = await seedDb.SeedInstrumentAsync("SPYL.DE", "SPDR S&P 500", PriceSource.Yahoo, "EUR", cancellationToken);
+            oneQuoteId = await seedDb.SeedInstrumentAsync("PKN.WA", "Orlen", PriceSource.Yahoo, "PLN", cancellationToken);
+            await seedDb.SeedQuoteAsync(threeQuotesId, new DateOnly(2026, 1, 5), 100m, cancellationToken);
+            await seedDb.SeedQuoteAsync(threeQuotesId, new DateOnly(2026, 1, 10), 110m, cancellationToken);
+            await seedDb.SeedQuoteAsync(threeQuotesId, new DateOnly(2026, 1, 20), 120m, cancellationToken);
+            await seedDb.SeedQuoteAsync(oneQuoteId, new DateOnly(2026, 1, 20), 50m, cancellationToken);
+        }
+
+        using var client = Factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            InternalInstrumentsBatchUri, new { instrumentIds = new[] { threeQuotesId, oneQuoteId } }, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var instruments = document.RootElement.GetProperty("instruments").EnumerateArray().ToList();
+        var three = instruments.Single(i => i.GetProperty("instrumentId").GetGuid() == threeQuotesId);
+        var one = instruments.Single(i => i.GetProperty("instrumentId").GetGuid() == oneQuoteId);
+        Assert.Multiple(
+            () => Assert.Equal(120m, three.GetProperty("lastPrice").GetDecimal()),
+            () => Assert.Equal(110m, three.GetProperty("previousClose").GetDecimal()),
+            () => Assert.Equal("2026-01-10", three.GetProperty("previousCloseDate").GetString()),
+            () => Assert.Equal(JsonValueKind.Null, one.GetProperty("previousClose").ValueKind),
+            () => Assert.Equal(JsonValueKind.Null, one.GetProperty("previousCloseDate").ValueKind));
+    }
 }

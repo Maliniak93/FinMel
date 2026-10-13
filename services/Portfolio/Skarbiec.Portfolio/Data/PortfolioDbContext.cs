@@ -21,6 +21,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<SavingsInterestSettlement> SavingsInterestSettlements => Set<SavingsInterestSettlement>();
     public DbSet<BondInterestSettlement> BondInterestSettlements => Set<BondInterestSettlement>();
     public DbSet<BondRedemption> BondRedemptions => Set<BondRedemption>();
+    public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -181,6 +182,19 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             redemption.Property(r => r.Fee).HasPrecision(18, 2);
             redemption.Property(r => r.Tax).HasPrecision(18, 2);
             redemption.Property(r => r.Proceeds).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<WatchlistItem>(item =>
+        {
+            // No FK to the MarketData instrument; the pair is the watch itself.
+            item.HasIndex(i => new { i.UserId, i.InstrumentId }).IsUnique();
+
+            item.Property(i => i.Ticker).HasMaxLength(50);
+            item.Property(i => i.Name).HasMaxLength(200);
+            item.Property(i => i.Exchange).HasMaxLength(50);
+            item.Property(i => i.QuoteCurrency).HasMaxLength(3);
+            item.Property(i => i.Note).HasMaxLength(500);
+            item.Property(i => i.TargetPrice).HasPrecision(18, 8);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

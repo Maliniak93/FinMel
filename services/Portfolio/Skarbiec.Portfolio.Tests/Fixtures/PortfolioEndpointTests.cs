@@ -29,13 +29,31 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         string ticker = "TICK",
         decimal? lastPrice = 100m,
         string? exchange = "XETRA",
-        DateOnly? lastPriceDate = null)
+        DateOnly? lastPriceDate = null,
+        Guid? instrumentId = null)
+    {
+        var id = instrumentId ?? ScriptInstrument(assetClass, currency, ticker, lastPrice, exchange, name, lastPriceDate);
+
+        return await client.AddMarketAssetAsync(accountId, cancellationToken, assetClass, currency, id, name);
+    }
+
+    protected Guid ScriptInstrument(
+        AssetClass assetClass = AssetClass.Etf,
+        string currency = "PLN",
+        string ticker = "TICK",
+        decimal? lastPrice = 100m,
+        string? exchange = "XETRA",
+        string? name = null,
+        DateOnly? lastPriceDate = null,
+        decimal? previousClose = null,
+        DateOnly? previousCloseDate = null)
     {
         var instrumentId = Guid.NewGuid();
-        Factory.InstrumentLookupClient.WithInstrument(instrumentId, assetClass, currency);
-        Factory.InstrumentQuoteLookupClient.WithInstrument(instrumentId, ticker, currency, lastPrice, lastPriceDate, exchange, name);
+        Factory.InstrumentLookupClient.WithInstrument(instrumentId, assetClass, currency, ticker, name, exchange);
+        Factory.InstrumentQuoteLookupClient.WithInstrument(
+            instrumentId, ticker, currency, lastPrice, lastPriceDate, exchange, name, previousClose, previousCloseDate);
 
-        return await client.AddMarketAssetAsync(accountId, cancellationToken, assetClass, currency, instrumentId, name);
+        return instrumentId;
     }
 
     private protected async Task AssertFundedDepositUnchangedAsync(

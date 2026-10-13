@@ -19,10 +19,20 @@ public sealed class FakeInstrumentQuoteLookupClient : IInstrumentQuoteLookupClie
         decimal? lastPrice,
         DateOnly? lastPriceDate = null,
         string? exchange = null,
-        string? name = null)
+        string? name = null,
+        decimal? previousClose = null,
+        DateOnly? previousCloseDate = null)
     {
         _instruments[instrumentId] = new InstrumentQuote(
-            instrumentId, ticker, name ?? ticker, exchange, quoteCurrency, lastPrice, lastPrice is null ? null : lastPriceDate ?? new DateOnly(2026, 1, 30));
+            instrumentId,
+            ticker,
+            name ?? ticker,
+            exchange,
+            quoteCurrency,
+            lastPrice,
+            lastPrice is null ? null : lastPriceDate ?? new DateOnly(2026, 1, 30),
+            previousClose,
+            previousClose is null ? null : previousCloseDate ?? new DateOnly(2026, 1, 29));
         return this;
     }
 

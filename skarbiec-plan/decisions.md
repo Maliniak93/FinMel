@@ -234,3 +234,11 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Decision:** e2e runs only through `node scripts/e2e.mjs`, on a second compose project `skarbiec-e2e`: images `skarbiec-e2e/<svc>` built from the working tree, its own host ports (web `:18080`), Postgres and RabbitMQ on tmpfs, `down --volumes` after every run. A stub container serves a documented data set by impersonating the providers; only the e2e override points MarketData's base URLs at it, so MarketData's sources, parsers and jobs run unchanged and ADR-007 stands. Agents may start and stop this project, and only this one; the user's `skarbiec-local` stack and Aspire stay the user's.
 
 **Consequences:** an e2e run costs an image build and a stack start; the data set and the stub must follow provider payload changes by hand; the Yahoo/NBP base URLs and the Gateway permit limits become configuration.
+
+## ADR-035 🕐 Watchlist in Portfolio; MarketData learns watched instruments from events
+
+**Context:** a watchlist is user data about instruments. MarketData holds only global reference data and syncs only instruments in use.
+
+**Decision:** `WatchlistItem` lives in Portfolio. Adding one validates the instrument through `GET /internal/instruments/{id}` (REST use 1). The list and get read quotes through `POST /internal/instruments/batch`, now with the previous close, plus `/internal/fx/latest-batch`, failing soft (REST use 5, ADR-031). Add and remove publish `WatchlistItemAdded` and `WatchlistItemRemoved` through the outbox. MarketData counts watchers from them and syncs watched instruments. The loser was a watchlist in MarketData: no event, but MarketData's first user-owned entity, and the "held" marker joined in the SPA. Amends ADR-021 and ADR-031.
+
+**Consequences:** a list load costs two internal calls. A watched instrument is synced daily even when nobody holds it.

@@ -71,6 +71,12 @@ export type AddSavingsAccountRequest = {
     openingDeposit?: null | OpeningDepositRequest;
 };
 
+export type AddWatchlistItemRequest = {
+    instrumentId: string;
+    note?: null | string;
+    targetPrice?: null | number | string;
+};
+
 export type AssetClass = number;
 
 export type AssetResponse = {
@@ -561,6 +567,42 @@ export type UpdateTransactionRequest = {
     unitPrice: number | string;
     date: string;
     feeAmount?: null | number | string;
+};
+
+export type UpdateWatchlistItemRequest = {
+    note?: null | string;
+    targetPrice?: null | number | string;
+};
+
+export type WatchlistHoldingResponse = {
+    accountId: string;
+    accountName: string;
+    assetId: string;
+    assetName: string;
+    quantity: number | string;
+};
+
+export type WatchlistItemResponse = {
+    id: string;
+    instrumentId: string;
+    assetClass: AssetClass;
+    ticker: string;
+    name: string;
+    exchange: null | string;
+    quoteCurrency: string;
+    note: null | string;
+    targetPrice: null | number | string;
+    lastPrice: null | number | string;
+    lastPriceDate: null | string;
+    previousClose: null | number | string;
+    dailyChange: null | number | string;
+    dailyChangePercent: null | number | string;
+    lastPricePln: null | number | string;
+    targetDistancePercent: null | number | string;
+    atOrBelowTarget: boolean;
+    priceUnavailableReason: null | SecurityPriceUnavailableReason;
+    holdings: Array<WatchlistHoldingResponse>;
+    heldQuantity: number | string;
 };
 
 export type WeightUnit = 'Gram' | 'TroyOunce';
@@ -1581,3 +1623,91 @@ export type DeleteApiPortfolioTransfersByTransferIdResponses = {
 };
 
 export type DeleteApiPortfolioTransfersByTransferIdResponse = DeleteApiPortfolioTransfersByTransferIdResponses[keyof DeleteApiPortfolioTransfersByTransferIdResponses];
+
+export type GetApiPortfolioWatchlistData = {
+    body?: never;
+    path?: never;
+    query?: {
+        assetClass?: AssetClass;
+    };
+    url: '/api/portfolio/watchlist';
+};
+
+export type GetApiPortfolioWatchlistResponses = {
+    /**
+     * OK
+     */
+    200: Array<WatchlistItemResponse>;
+};
+
+export type GetApiPortfolioWatchlistResponse = GetApiPortfolioWatchlistResponses[keyof GetApiPortfolioWatchlistResponses];
+
+export type PostApiPortfolioWatchlistData = {
+    body: AddWatchlistItemRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/watchlist';
+};
+
+export type PostApiPortfolioWatchlistResponses = {
+    /**
+     * Created
+     */
+    201: WatchlistItemResponse;
+};
+
+export type PostApiPortfolioWatchlistResponse = PostApiPortfolioWatchlistResponses[keyof PostApiPortfolioWatchlistResponses];
+
+export type DeleteApiPortfolioWatchlistByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/watchlist/{id}';
+};
+
+export type DeleteApiPortfolioWatchlistByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioWatchlistByIdResponse = DeleteApiPortfolioWatchlistByIdResponses[keyof DeleteApiPortfolioWatchlistByIdResponses];
+
+export type GetApiPortfolioWatchlistByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/watchlist/{id}';
+};
+
+export type GetApiPortfolioWatchlistByIdResponses = {
+    /**
+     * OK
+     */
+    200: WatchlistItemResponse;
+};
+
+export type GetApiPortfolioWatchlistByIdResponse = GetApiPortfolioWatchlistByIdResponses[keyof GetApiPortfolioWatchlistByIdResponses];
+
+export type PutApiPortfolioWatchlistByIdData = {
+    body: UpdateWatchlistItemRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/watchlist/{id}';
+};
+
+export type PutApiPortfolioWatchlistByIdResponses = {
+    /**
+     * OK
+     */
+    200: WatchlistItemResponse;
+};
+
+export type PutApiPortfolioWatchlistByIdResponse = PutApiPortfolioWatchlistByIdResponses[keyof PutApiPortfolioWatchlistByIdResponses];
