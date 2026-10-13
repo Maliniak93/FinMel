@@ -190,6 +190,7 @@ function run(bin, args, cwd) {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 15_000,
+      windowsHide: true,
     }).trim();
   } catch {
     return null;

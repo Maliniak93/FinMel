@@ -10,7 +10,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const KEEP = new Set(["master", "main"]);
 
 function run(bin, argv) {
-  const res = spawnSync(bin, argv, { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000 });
+  const res = spawnSync(bin, argv, { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000, windowsHide: true });
   if (res.error || res.status !== 0) {
     throw new Error(`${bin} ${argv.join(" ")} failed: ${(res.stderr || res.error?.message || "").trim()}`);
   }
