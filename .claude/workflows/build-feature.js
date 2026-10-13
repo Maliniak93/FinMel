@@ -175,8 +175,22 @@ let review = null
 
 const RESERVE = 40000
 const broke = () => Boolean(budget.total) && budget.remaining() < RESERVE
+const REPLAY = { steps: [], interrupted: null } // @replay
 function step(agentType, label, lines, schema, opts) {
-  return agent(lines.filter(Boolean).join('\n'), Object.assign({ agentType, schema, label }, opts || {}))
+  if (REPLAY.steps.length) {
+    const next = REPLAY.steps[0]
+    if (next.label === label) {
+      REPLAY.steps.shift()
+      log(`replayed: ${label}`)
+      return Promise.resolve(next.result)
+    }
+    log(`replay diverged at ${label} (expected ${next.label}) - running live from here`)
+    REPLAY.steps.length = 0
+  }
+  const resumed = label === REPLAY.interrupted
+  if (resumed) REPLAY.interrupted = null
+  const continueLine = 'A previous run was interrupted during this step; its partial changes are on disk - continue from them rather than starting over.'
+  return agent(lines.concat(resumed ? continueLine : null).filter(Boolean).join('\n'), Object.assign({ agentType, schema, label }, opts || {}))
 }
 
 const clip = (text, n) => (text && String(text).length > n ? `${String(text).slice(0, n)}…` : text)

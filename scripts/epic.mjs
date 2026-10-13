@@ -14,6 +14,7 @@ import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "no
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { findReplay } from "./build-replay.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
@@ -263,7 +264,7 @@ function createReporter(number) {
       if (obj.parent_tool_use_id) continue;
       const input = block.input ?? {};
       if (block.name === "Bash") say(`run: ${short(input.description ?? input.command)}`);
-      else if (block.name === "Workflow") say(`workflow: ${input.name ?? /name:\s*'([^']+)'/.exec(input.script ?? "")?.[1] ?? "script"}`);
+      else if (block.name === "Workflow") say(`workflow: ${input.name ?? input.scriptPath ?? /name:\s*'([^']+)'/.exec(input.script ?? "")?.[1] ?? "script"}`);
       else if (block.name === "Skill") say(`skill: ${input.skill}`);
     }
   };
@@ -478,8 +479,11 @@ function preChecks(epic, flags) {
     const next = issue.subIssues.find((s) => s.state !== "CLOSED");
     const part = next ? getIssue(next.number) : null;
     if (part?.branch && currentBranch() === part.branch && !openPr(part.branch)) {
-      const verb = partPlan(part, dirty.length) === "ship" ? "retrying the ship step of" : "resuming";
-      say(`${flags["dry-run"] ? "dry-run: would be resumed - " : ""}${verb} #${part.number} on ${part.branch} with ${dirty.length} uncommitted file(s)`);
+      const shipping = partPlan(part, dirty.length) === "ship";
+      const verb = shipping ? "retrying the ship step of" : "resuming";
+      const found = shipping ? null : findReplay({ issue: part.number, args: { tier: part.tier, skip: part.skipTests ? ["tests"] : [], e2e: Boolean(part.e2e) } });
+      const replay = !found ? "" : found.ok ? ` - replaying ${found.steps.length} step(s), live from ${found.liveFrom ?? "ship"}` : ` - no replay: ${found.reason}`;
+      say(`${flags["dry-run"] ? "dry-run: would be resumed - " : ""}${verb} #${part.number} on ${part.branch} with ${dirty.length} uncommitted file(s)${replay}`);
     } else {
       const listed = `the working tree is not clean:\n${dirty.slice(0, 10).join("\n")}${dirty.length > 10 ? `\n... ${dirty.length - 10} more` : ""}`;
       if (!flags["dry-run"]) throw new Stop("dirty-tree", listed);
