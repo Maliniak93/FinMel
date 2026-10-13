@@ -1,4 +1,4 @@
-import { Component, computed, inject, resource, signal } from '@angular/core';
+import { Component, computed, effect, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -26,7 +26,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
-import { formatMoney } from '../../../shared/format';
+import { formatAmount, formatMoney, formatRate } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import {
   allowedTransactionTypes,
@@ -48,6 +48,8 @@ const CASH_ERROR_KEYS: Record<string, string> = {
   'Validation.InvalidTransferCounterpart': 'transactions.form.invalidCashAccount',
   'Conflict.TransferLegManaged': 'transactions.form.legManaged',
 };
+
+type PaymentCurrency = 'asset' | 'PLN';
 
 interface CashOption {
   assetId: string;
@@ -111,11 +113,23 @@ export class TransactionFormDialog {
       [Validators.min(0)],
     ],
     cashAssetId: [null as string | null],
+    paymentCurrency: [
+      (this.data.transaction?.amountPln != null ? 'PLN' : 'asset') as PaymentCurrency,
+    ],
+    amountPln: [
+      this.data.transaction?.amountPln != null
+        ? Number(this.data.transaction.amountPln)
+        : (null as number | null),
+    ],
   });
 
   private readonly selectedType = toSignal(this.form.controls.type.valueChanges, {
     initialValue: this.form.controls.type.value,
   });
+  private readonly selectedPaymentCurrency = toSignal(
+    this.form.controls.paymentCurrency.valueChanges,
+    { initialValue: this.form.controls.paymentCurrency.value },
+  );
   protected readonly isPriced = computed(() => isPricedTransactionType(this.selectedType()));
   protected readonly quantityLabel = computed(() =>
     quantityFieldLabel(this.selectedType(), this.data.assetClass),
@@ -133,6 +147,20 @@ export class TransactionFormDialog {
   protected readonly showsFee = computed(() => this.isSecurity && this.isPriced());
   protected readonly cashCurrency = CASH_CURRENCY;
   protected readonly formatMoney = formatMoney;
+  protected readonly formatAmount = formatAmount;
+  protected readonly formatRate = formatRate;
+
+  private readonly offersPlnPayment =
+    this.isSecurity && !!this.data.currency && this.data.currency !== CASH_CURRENCY;
+  protected readonly showsPaymentCurrency = computed(() => {
+    const type = this.selectedType();
+    return (
+      this.offersPlnPayment && (type === TRANSACTION_TYPE_BUY || type === TRANSACTION_TYPE_SELL)
+    );
+  });
+  protected readonly paysInPln = computed(
+    () => this.showsPaymentCurrency() && this.selectedPaymentCurrency() === CASH_CURRENCY,
+  );
 
   private readonly formValue = toSignal(
     this.form.valueChanges.pipe(map(() => this.form.getRawValue())),
@@ -200,8 +228,12 @@ export class TransactionFormDialog {
     let amount: number | null = null;
     if (type === TRANSACTION_TYPE_DIVIDEND || type === TRANSACTION_TYPE_INTEREST) {
       amount = Math.round(quantity * 100) / 100;
-    } else if (this.data.currency === CASH_CURRENCY) {
-      const gross = Math.round(quantity * Math.round(unitPrice * 100));
+    } else if (
+      this.paysInPln() ? Number(values.amountPln) > 0 : this.data.currency === CASH_CURRENCY
+    ) {
+      const gross = this.paysInPln()
+        ? Math.round(Number(values.amountPln) * 100)
+        : Math.round(quantity * Math.round(unitPrice * 100));
       const feeGrosze = Math.round(fee * 100);
       amount = (type === TRANSACTION_TYPE_BUY ? gross + feeGrosze : gross - feeGrosze) / 100;
     }
@@ -217,10 +249,32 @@ export class TransactionFormDialog {
     return { key, name: account.name, balance: account.cashBalance, amount };
   });
 
+  // Display only: the server derives the stored rate from the same amount.
+  protected readonly plnHint = computed(() => {
+    const values = this.formValue();
+    const quantity = Number(values.quantity);
+    const unitPrice = Number(values.unitPrice);
+    const amount = Number(values.amountPln);
+    if (!this.paysInPln() || !(quantity > 0) || !(unitPrice > 0) || !(amount > 0)) {
+      return null;
+    }
+    return { price: amount / quantity, rate: amount / (quantity * unitPrice) };
+  });
+
   constructor() {
     if (this.isEdit && this.isSecurity) {
       this.form.controls.type.disable();
     }
+
+    effect(() => {
+      const amountPln = this.form.controls.amountPln;
+      if (this.paysInPln()) {
+        amountPln.setValidators([Validators.required, Validators.min(0.01)]);
+      } else {
+        amountPln.clearValidators();
+      }
+      amountPln.updateValueAndValidity({ emitEvent: false });
+    });
   }
 
   protected async onSubmit(): Promise<void> {
@@ -238,12 +292,14 @@ export class TransactionFormDialog {
 
     const values = this.form.getRawValue();
     const feeAmount = this.showsFee() ? values.feeAmount : null;
+    const amountPln = this.paysInPln() ? values.amountPln : null;
     const body = {
       type: values.type,
       quantity: values.quantity,
       unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
       date: toDateOnly(values.date),
       ...(feeAmount !== null ? { feeAmount } : {}),
+      ...(amountPln !== null ? { amountPln } : {}),
     };
     const cashAssetId = this.showsCash() ? values.cashAssetId : null;
 

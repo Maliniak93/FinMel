@@ -8,5 +8,8 @@
 />
 
 @if (!isEdit()) {
-  <app-first-transaction-fields [group]="form.controls.initialTransaction" />
+  <app-first-transaction-fields
+    [group]="form.controls.initialTransaction"
+    [currency]="currency()"
+  />
 }

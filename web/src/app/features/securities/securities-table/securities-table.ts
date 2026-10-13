@@ -65,6 +65,7 @@ export class SecuritiesTable {
     'account',
     'quantity',
     'averageBuyPrice',
+    'averageBuyPricePln',
     'price',
     'value',
     'gain',

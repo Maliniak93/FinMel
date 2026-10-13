@@ -745,4 +745,38 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(TransactionType.Withdraw, withdraw.Type);
         Assert.Equal(120m, withdraw.Quantity);
     }
+
+    [Fact]
+    public async Task AddAsset_InitialTransactionWithAmountPln_StoresIt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.FxRateLookupClient.WithUnavailable("EUR");
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var (accountId, _) = await client.CreateAccountWithCashAsync(cancellationToken, 5_000m);
+        var instrumentId = ScriptInstrument(AssetClass.Etf, "EUR", "VWCE");
+        var request = new AddAssetRequest
+        {
+            AccountId = accountId,
+            AssetClass = AssetClass.Etf,
+            Name = "VWCE",
+            Currency = "EUR",
+            InstrumentId = instrumentId,
+            InitialTransaction = NewBrokerageTradeRequest(
+                quantity: 10m, unitPrice: 100m, date: CashDay1, feeAmount: 5m, amountPln: 4_312.50m)
+        };
+
+        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var asset = (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!;
+        var listed = Assert.Single((await client.ListTransactionsAsync(asset.Id, cancellationToken)).Items);
+        Assert.Equal(4_312.50m, listed.AmountPln);
+        await using var dbContext = CreateDbContext(userId);
+        var stored = await dbContext.Transactions.SingleAsync(t => t.AssetId == asset.Id, cancellationToken);
+        Assert.Equal(4_312.50m, stored.AmountPln);
+        Assert.Equal(4.3125m, stored.FxRateToPln);
+        Assert.Equal(682.50m, await client.GetCashBalanceAsync(accountId, cancellationToken));
+    }
 }

@@ -21,6 +21,9 @@ internal static class TransactionErrors
     public static readonly Error FeeNotAllowed =
         new("Validation.FeeNotAllowed", "A fee of zero or more is accepted only on a stock or ETF Buy or Sell.");
 
+    public static readonly Error PlnAmountNotAllowed =
+        new("Validation.PlnAmountNotAllowed", "A positive PLN amount is accepted only on a stock or ETF Buy or Sell with a positive quantity and unit price, in a currency other than PLN.");
+
     public static readonly Error FeeExceedsProceeds =
         new("Validation.FeeExceedsProceeds", "The fee can't be higher than the proceeds of the sale.");
 

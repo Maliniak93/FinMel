@@ -231,6 +231,34 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task List_UsesAmountPlnForPlnCostAndPl()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", new DateOnly(2026, 1, 10), 4.00m);
+        Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken, name: "Main");
+        await client.FundAccountAsync(accountId, cancellationToken);
+        var etf = await AddQuotedHoldingAsync(
+            client, accountId, cancellationToken, AssetClass.Etf, "EUR", "IUSQ", "IUSQ", 120m, "XETRA", new DateOnly(2026, 1, 30));
+        await client.RecordBrokerageTradeAsync(
+            etf, cancellationToken, quantity: 10m, unitPrice: 100m, date: new DateOnly(2026, 1, 10), amountPln: 4_320m);
+
+        var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Etf), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+        var holding = Assert.Single(body.Holdings);
+        Assert.Multiple(
+            () => Assert.Equal(4_320m, holding.CostPln),
+            () => Assert.Equal(432m, holding.AverageBuyPricePln),
+            () => Assert.Equal(5_160.00m, holding.ValuePln),
+            () => Assert.Equal(840m, holding.UnrealizedPlPln),
+            () => Assert.Equal(4_320m, body.Totals.CostPln));
+    }
+
+    [Fact]
     public async Task List_WithoutToken_ReturnsUnauthorized()
     {
         using var client = Factory.CreateClient();

@@ -187,6 +187,8 @@ internal static class PortfolioAssertions
 
     public const string FxRateMissingErrorCode = "Validation.FxRateMissing";
 
+    public const string PlnAmountNotAllowedErrorCode = "Validation.PlnAmountNotAllowed";
+
     public static async Task AssertInsufficientFundsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, InsufficientFundsErrorCode, cancellationToken);

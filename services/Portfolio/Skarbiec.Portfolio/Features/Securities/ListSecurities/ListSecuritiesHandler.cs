@@ -109,6 +109,7 @@ public sealed class ListSecuritiesHandler(
             Currency = currency,
             Quantity = basis.Quantity,
             AverageBuyPrice = basis.AverageBuyPrice,
+            AverageBuyPricePln = basis.AveragePricePln,
             CostPln = costPln,
             LastPrice = null,
             LastPriceDate = null,

@@ -2,12 +2,14 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -412,5 +414,62 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
 
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, "Validation.OversellsPosition", cancellationToken);
         Assert.Equal(10_000m, (await client.GetAssetAsync(account.AssetId, cancellationToken)).Quantity);
+    }
+
+    [Fact]
+    public async Task Record_WithAmountPln_StoresAmountAndEffectiveRate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.FxRateLookupClient.WithUnavailable("EUR");
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var holding = await client.CreateBrokerageHoldingAsync(cancellationToken, currency: "EUR");
+        var request = NewBrokerageTradeRequest(
+            quantity: 10m, unitPrice: 100m, date: CashDay1, feeAmount: 5m, amountPln: 4_312.50m);
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(holding.AssetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<TransactionResponse>(cancellationToken))!;
+        Assert.Equal(4_312.50m, body.AmountPln);
+        Assert.Equal(4_312.50m, body.ValuePln);
+        await using var dbContext = CreateDbContext(userId);
+        var stored = await dbContext.Transactions.SingleAsync(t => t.Id == body.Id, cancellationToken);
+        Assert.Equal(4_312.50m, stored.AmountPln);
+        Assert.Equal(4.3125m, stored.FxRateToPln);
+        Assert.Equal(682.50m, await client.GetCashBalanceAsync(holding.AccountId, cancellationToken));
+        Assert.DoesNotContain(Factory.FxRateLookupClient.Calls, call => call.Currency == "EUR");
+    }
+
+    [Theory]
+    [InlineData("PlnAsset")]
+    [InlineData("Dividend")]
+    [InlineData("NonPositiveAmount")]
+    [InlineData("ZeroUnitPrice")]
+    public async Task Record_AmountPlnNotAllowed_Returns400(string scenario)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var holding = await client.CreateBrokerageHoldingAsync(
+            cancellationToken, currency: scenario == "PlnAsset" ? "PLN" : "EUR");
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+        var amountPln = scenario == "NonPositiveAmount" ? 0m : 1_000m;
+        var request = scenario switch
+        {
+            "Dividend" => NewBrokerageTradeRequest(TransactionType.Dividend, 40m, 1m, CashDay1, amountPln: amountPln),
+            "ZeroUnitPrice" => NewBrokerageTradeRequest(quantity: 10m, unitPrice: 0m, date: CashDay1, amountPln: amountPln),
+            _ => NewBrokerageTradeRequest(quantity: 10m, unitPrice: 100m, date: CashDay1, amountPln: amountPln)
+        };
+
+        var response = await client.PostAsJsonAsync(TransactionsUri(holding.AssetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(
+            HttpStatusCode.BadRequest, PortfolioAssertions.PlnAmountNotAllowedErrorCode, cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+        Assert.Equal(5_000m, await client.GetCashBalanceAsync(holding.AccountId, cancellationToken));
     }
 }

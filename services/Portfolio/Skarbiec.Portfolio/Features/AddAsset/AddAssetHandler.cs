@@ -60,6 +60,12 @@ public sealed class AddAssetHandler(
             {
                 return feeError;
             }
+
+            if (BrokerageTrade.AmountPlnError(
+                request.AssetClass, request.Currency, opening.Type, opening.Quantity, opening.UnitPrice, opening.AmountPln) is { } amountPlnError)
+            {
+                return amountPlnError;
+            }
         }
 
         var account = await dbContext.ResolveAsync(request.AssetClass, request.AccountId, cancellationToken);
@@ -128,6 +134,7 @@ public sealed class AddAssetHandler(
                     ? BrokerageTrade.SecurityUnitPrice(transactionRequest.Type, unitPrice.Value.Amount)
                     : unitPrice.Value.Amount,
                 FeeAmount = transactionRequest.FeeAmount,
+                AmountPln = transactionRequest.AmountPln,
                 Date = transactionRequest.Date
             };
 

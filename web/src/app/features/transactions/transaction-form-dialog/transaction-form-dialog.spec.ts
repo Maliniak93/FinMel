@@ -595,5 +595,109 @@ describe('TransactionFormDialog', () => {
       const body = await put!.json();
       expect(body.feeAmount).toBe(4);
     });
+
+    describe('pays in PLN', () => {
+      const eurData: TransactionFormDialogData = { ...etfData, currency: 'EUR' };
+
+      function toggle(): Element | null {
+        return element().querySelector('[formcontrolname="paymentCurrency"]');
+      }
+
+      async function settle(): Promise<void> {
+        fixture.detectChanges();
+        await fixture.whenStable();
+      }
+
+      it('pays in PLN: shows the per-unit hint and the account-cash hint and posts amountPln', async () => {
+        await render(eurData);
+        component['form'].controls.quantity.setValue(10);
+        component['form'].controls.unitPrice.setValue(100);
+        component['form'].controls.feeAmount.setValue(5);
+        await settle();
+
+        expect(toggle()).not.toBeNull();
+        expect(element().querySelector('[formcontrolname="amountPln"]')).toBeNull();
+
+        component['form'].controls.paymentCurrency.setValue('PLN');
+        await settle();
+        component['form'].controls.amountPln.setValue(4312.5);
+        await settle();
+
+        const text = element().textContent ?? '';
+        expect(text).toContain('431.25');
+        expect(text).toContain('4.3125');
+        expect(text).toContain('4,317.50');
+
+        await component['onSubmit']();
+
+        const body = await postedTransaction()!.json();
+        expect(body.amountPln).toBe(4312.5);
+        expect(body.feeAmount).toBe(5);
+        expect(dialogRef.close).toHaveBeenCalledWith(true);
+      });
+
+      it('pays in PLN: requires the amount once PLN is chosen', async () => {
+        await render(eurData);
+        component['form'].controls.quantity.setValue(10);
+        component['form'].controls.unitPrice.setValue(100);
+        component['form'].controls.paymentCurrency.setValue('PLN');
+        await settle();
+
+        await component['onSubmit']();
+
+        expect(postedTransaction()).toBeUndefined();
+        expect(dialogRef.close).not.toHaveBeenCalled();
+      });
+
+      it('pays in PLN: sends no amountPln while the asset currency is chosen', async () => {
+        await render(eurData);
+        component['form'].controls.quantity.setValue(10);
+        component['form'].controls.unitPrice.setValue(100);
+
+        await component['onSubmit']();
+
+        const body = await postedTransaction()!.json();
+        expect(body.amountPln ?? null).toBeNull();
+      });
+
+      it('pays in PLN: has no toggle for a PLN asset', async () => {
+        await render(etfData);
+
+        expect(toggle()).toBeNull();
+      });
+
+      it('pays in PLN: has no toggle for a Dividend', async () => {
+        await render({ ...eurData, type: 4 });
+
+        expect(toggle()).toBeNull();
+      });
+
+      it('pays in PLN: editing a transaction with amountPln opens on PLN with the amount filled', async () => {
+        const buy: TransactionResponse = {
+          ...existingTransaction,
+          assetId: etfAssetId,
+          currency: 'EUR',
+          valuePln: 4312.5,
+          amountPln: 4312.5,
+        };
+        await render({ ...eurData, transaction: buy });
+
+        expect(component['form'].controls.paymentCurrency.value).toBe('PLN');
+        expect(component['form'].controls.amountPln.value).toBe(4312.5);
+        expect(element().querySelector('[formcontrolname="amountPln"]')).not.toBeNull();
+      });
+
+      it('pays in PLN: shows the toggle and field labels in Polish', async () => {
+        await render(eurData);
+        component['form'].controls.paymentCurrency.setValue('PLN');
+        await settle();
+
+        await switchLanguage(fixture, 'pl');
+
+        const text = element().textContent ?? '';
+        expect(text).toContain('Waluta zapłaty');
+        expect(labelsOf(element(), 'mat-label')).toContain('Kwota w PLN');
+      });
+    });
   });
 });

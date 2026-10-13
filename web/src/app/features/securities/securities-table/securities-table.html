@@ -69,6 +69,20 @@
       <td mat-footer-cell *matFooterCellDef></td>
     </ng-container>
 
+    <ng-container matColumnDef="averageBuyPricePln">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ 'securities.columns.averageBuyPricePln' | transloco }}
+      </th>
+      <td mat-cell *matCellDef="let holding">
+        @if (holding.averageBuyPricePln !== null) {
+          {{ formatMoney(holding.averageBuyPricePln, 'PLN') }}
+        } @else {
+          —
+        }
+      </td>
+      <td mat-footer-cell *matFooterCellDef></td>
+    </ng-container>
+
     <ng-container matColumnDef="price">
       <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.price' | transloco }}</th>
       <td mat-cell *matCellDef="let holding">

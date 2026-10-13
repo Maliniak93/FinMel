@@ -15,6 +15,8 @@ public sealed class Transaction : IUserOwned
 
     public decimal? FxRateToPln { get; set; }
 
+    public decimal? AmountPln { get; set; }
+
     public decimal? FeeAmount { get; set; }
 
     public required DateOnly Date { get; set; }

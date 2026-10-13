@@ -15,7 +15,10 @@ public sealed record TransactionResponse
     /// <summary>The asset's currency, the one UnitPrice is in.</summary>
     public required string Currency { get; init; }
 
-    /// <summary>Quantity × UnitPrice in PLN at the rate frozen on the transaction's date, rounded to 2 places; null when no rate was known.</summary>
+    /// <summary>The PLN amount entered for a stock or ETF Buy or Sell, without the fee; null when settled at the market rate.</summary>
+    public decimal? AmountPln { get; init; }
+
+    /// <summary>AmountPln when set, else Quantity × UnitPrice in PLN at the rate frozen on the transaction's date, rounded to 2 places; null when no rate was known.</summary>
     public decimal? ValuePln { get; init; }
 
     /// <summary>The broker's fee in PLN on a stock or ETF Buy or Sell; null otherwise.</summary>
@@ -48,9 +51,11 @@ public static class TransactionMappingExtensions
             Quantity = transaction.Quantity,
             UnitPrice = transaction.UnitPriceAmount,
             Currency = currency,
-            ValuePln = transaction.FxRateToPln is { } rate
-            ? Math.Round(transaction.Quantity * transaction.UnitPriceAmount * rate, 2, MidpointRounding.AwayFromZero)
-            : null,
+            AmountPln = transaction.AmountPln,
+            ValuePln = transaction.AmountPln
+            ?? (transaction.FxRateToPln is { } rate
+                ? Math.Round(transaction.Quantity * transaction.UnitPriceAmount * rate, 2, MidpointRounding.AwayFromZero)
+                : null),
             FeeAmount = transaction.FeeAmount,
             Date = transaction.Date,
             Transfer = transfer,

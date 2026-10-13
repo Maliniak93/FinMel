@@ -30,7 +30,10 @@ public sealed record SecurityHoldingResponse
     /// <summary>Weighted-average buy price in the quote currency; null at quantity 0.</summary>
     public required decimal? AverageBuyPrice { get; init; }
 
-    /// <summary>Cost of the open position in PLN at each buy's frozen rate; null when any buy had no rate.</summary>
+    /// <summary>Open position's cost in PLN per unit, fees included; null at quantity 0 or when any buy had no rate.</summary>
+    public required decimal? AverageBuyPricePln { get; init; }
+
+    /// <summary>Cost of the open position in PLN: each buy's PLN amount when entered, else at its frozen rate; null when any buy had neither.</summary>
     public required decimal? CostPln { get; init; }
 
     public required decimal? LastPrice { get; init; }
