@@ -20,6 +20,7 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | Spec issues on the FinMel project: read, list, move a card, comment, tick ACs | `node scripts/gh-project.mjs get\|list\|set\|comment\|tick` |
 | /idea prompts (local, gitignored `skarbiec-plan/prompts/`): context digest, list, show, validate + copy, set status, file path | `node scripts/idea.mjs context\|list\|show\|check\|mark\|path` |
 | Local offline code guide (gitignored `skarbiec-plan/przewodnik/`): extract facts, build from Claude's prose; `/docs` drives both | `node scripts/docs.mjs facts\|build` |
+| Local offline workflow map (gitignored `skarbiec-plan/flows/`): extract commands, workflows, agents, scripts, build from Claude's step descriptions; `/flows` drives both | `node scripts/flows.mjs facts\|build` |
 | $ at list prices per agent/run; `--sessions` = main sessions per command + Explore; `--timeline` = wall time per agent of the newest run | `node scripts/run-cost.mjs [--since YYYY-MM-DD] [--issue n] [--sessions] [--timeline]` |
 | The uncommitted change incl. untracked files, index untouched | `node scripts/review-diff.mjs [--stat] [-- <path>]` |
 | The Ship step: guard lane, commit, push, PR, run report | `node scripts/ship.mjs <n> --branch b --title t --json '…' [--blocked] [--dry-run]` |
