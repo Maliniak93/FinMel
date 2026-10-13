@@ -77,6 +77,9 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   entity configuration matches.
 - **Generated client**: API surface changed → `web/src/app/api` regenerated, and the diff there is the
   real schema delta and nothing else.
+- **Manual test plan**: the spec's `## Test manualny`, and any `skarbiec-plan/issues/<n>.manual.md` the
+  implementer wrote (`manualTest`), name only routes, screens and actions that exist in the code. One
+  that names something absent is **blocking**; wording problems are minor.
 - **Docs and requests**: new endpoint → `requests/<service>.http` updated; convention or hard rule
   changed → `.claude/rules/*` / `skarbiec-plan/decisions.md` updated.
 

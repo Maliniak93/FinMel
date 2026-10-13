@@ -25,6 +25,7 @@ agent's report at face value.
 - A migration that doesn't match the model it's supposed to represent.
 - The API surface changed but the generated TS client or `requests/<service>.http` wasn't updated.
 - A convention or hard rule changed without a matching update to `.claude/rules/*` or `skarbiec-plan/decisions.md`.
+- A `## Test manualny` plan — kept from the spec or rewritten in `skarbiec-plan/issues/<n>.manual.md` — that names a route, screen or action absent from the code. Wording problems in it are minor.
 
 Everything else — naming, style, duplication, a "nicer" alternative structure — is `minor`, or not worth reporting at all.
 

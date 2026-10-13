@@ -4,16 +4,17 @@
 //   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n>] [--epic]
 //   check --body-file <p> [--epic]                         dry run of create's cleaning and checking
 //   edit <n> [--body-file <p>] [--tier 1|2] [--parent <n>] replace the body, or attach the issue to an epic
+//   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
 //   set <n> <field> <value>                                set one project field
-//   get <n> [--out <path> [--raw]]                         print the issue as JSON, optionally write a local copy
-//   prepare <n> [--tier 1|2] [--skip tests,review] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch, moves the card
-//   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise)
+//   get <n> [--out <path> [--raw]]                         print the issue as JSON (parent, lastPart), optionally write a local copy
+//   prepare <n> [--tier 1|2] [--skip tests,review] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch, moves the card; a last epic part also gets the epic and sibling bodies
+//   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise); a shipped one also replaces ## Test manualny per manualTest
 //   list                                                   every issue on the project as JSON
 //   comment <n> --body-file <path>                         post a comment
 //   tick <n>                                               tick every acceptance-criterion checkbox
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -129,6 +130,24 @@ function section(body, name) {
     .trim();
 }
 
+function replaceSection(body, name, content) {
+  const lines = body.replace(/\r\n/g, "\n").split("\n");
+  const text = content
+    .replace(/\r\n/g, "\n")
+    .replace(new RegExp(`^\\s*## ${name}[ \\t]*\\n`), "")
+    .trim();
+  const block = [`## ${name}`, "", ...text.split("\n"), ""];
+  const start = lines.findIndex((l) => l.trim() === `## ${name}`);
+  if (start !== -1) {
+    const next = lines.findIndex((l, i) => i > start && /^## /.test(l));
+    const end = next === -1 ? lines.length : next;
+    return [...lines.slice(0, start), ...block, ...lines.slice(end)].join("\n").trim();
+  }
+  const verification = lines.findIndex((l) => l.trim() === "## Verification");
+  if (verification !== -1) return [...lines.slice(0, verification), ...block, ...lines.slice(verification)].join("\n").trim();
+  return [...lines, "", ...block].join("\n").trim();
+}
+
 function dependsOn(body) {
   return [...new Set([...section(body, "Depends on").matchAll(/#(\d+)/g)].map((m) => Number(m[1])))];
 }
@@ -220,6 +239,7 @@ function fetchIssue(number) {
     parent: issue.parent?.number ?? null,
   };
   result.subIssues = result.epic ? subIssues(issue.number) : [];
+  result.lastPart = result.parent !== null && subIssues(result.parent).every((s) => s.number === issue.number || s.state === "CLOSED");
   return { result, body: issue.body.replace(/\r\n/g, "\n").trim() };
 }
 
@@ -307,6 +327,29 @@ function edit([number, ...rest]) {
     done.push(`sub-issue of #${flags.parent}`);
   }
   console.log(`#${number}: ${done.join(", ")}`);
+}
+
+function sectionEdit(number, heading, file) {
+  const content = readFileSync(path.resolve(REPO_ROOT, file), "utf8");
+  const { body } = JSON.parse(gh(["issue", "view", String(number), "--repo", REPO, "--json", "body"]));
+  const next = replaceSection(body, heading, content);
+  if (heading === TEST_PLAN) {
+    const problems = testPlanProblems(next);
+    if (problems.length) throw new Error(`the new section is not publishable:\n- ${problems.join("\n- ")}`);
+  }
+  return next;
+}
+
+function sectionVerb([number, ...rest]) {
+  const flags = parseFlags(rest);
+  if (!number || !flags.heading || !flags.file) throw new Error("usage: section <issue number> --heading <h> --file <f> [--dry-run]");
+  const next = sectionEdit(number, flags.heading, flags.file);
+  if (flags["dry-run"]) {
+    console.log(next);
+    return;
+  }
+  gh(["issue", "edit", String(number), "--repo", REPO, "--body-file", "-"], next);
+  console.log(`#${number}: replaced \`## ${flags.heading}\``);
 }
 
 function set([number, field, value]) {
@@ -410,6 +453,21 @@ function prepare([number, ...rest]) {
 
   const specPath = `${ISSUES_DIR}/${n}.md`;
   const spec = dryRun ? specPath : writeCopy(issue, body, specPath, false);
+  const manualPath = `${ISSUES_DIR}/${n}.manual.md`;
+  if (!dryRun) rmSync(path.resolve(REPO_ROOT, manualPath), { force: true });
+  const epic = issue.parent ? { number: issue.parent, last: issue.lastPart } : null;
+  const extraCopies = [];
+  if (epic?.last) {
+    const siblings = subIssues(epic.number).filter((s) => s.number !== issue.number);
+    extraCopies.push(epic.number, ...siblings.map((s) => s.number));
+    if (!dryRun) {
+      rmSync(path.resolve(REPO_ROOT, `${ISSUES_DIR}/${epic.number}.manual.md`), { force: true });
+      for (const m of extraCopies) {
+        const copy = fetchIssue(m);
+        writeCopy(copy.result, copy.body, `${ISSUES_DIR}/${m}.md`, false);
+      }
+    }
+  }
   const resumed = issue.status === "In progress";
   if (!resumed && !dryRun) setField(issue.url, "Status", "In progress");
   const out = {
@@ -418,9 +476,9 @@ function prepare([number, ...rest]) {
     url: issue.url,
     branch: { name: target, action },
     notes: action === "resumed" ? dirty : [],
-    workflowArgs: { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip },
+    workflowArgs: { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic },
   };
-  if (dryRun) Object.assign(out, { dryRun: true, branchCommands, cardMove: resumed ? null : "Status -> In progress" });
+  if (dryRun) Object.assign(out, { dryRun: true, branchCommands, cardMove: resumed ? null : "Status -> In progress", epicCopies: extraCopies.map((m) => `${ISSUES_DIR}/${m}.md`) });
   console.log(JSON.stringify(out));
 }
 
@@ -457,6 +515,18 @@ function report([number, ...rest]) {
   if (run.deviations?.length) {
     lines.push("", "**Deviations** from the spec or the tests, made by the implementer:");
     for (const d of run.deviations) lines.push(`- ${d.kind}${d.file ? ` \`${d.file}\`` : ""} — ${d.what} (why: ${d.why})`);
+  }
+
+  if (run.status === "shipped" && run.manualTest?.length) {
+    lines.push("");
+    for (const m of run.manualTest) {
+      try {
+        gh(["issue", "edit", String(m.issue), "--repo", REPO, "--body-file", "-"], sectionEdit(m.issue, TEST_PLAN, m.file));
+        lines.push(`Test manualny zaktualizowany w #${m.issue}`);
+      } catch (err) {
+        lines.push(`Test manualny NIE zaktualizowany w #${m.issue}: ${err.message.split("\n")[0]}`);
+      }
+    }
   }
 
   gh(["issue", "comment", String(number), "--repo", REPO, "--body-file", "-"], lines.join("\n"));
@@ -498,7 +568,7 @@ function check(rest) {
   console.log(`publishable — ${body.split("\n").length} lines after cleaning`);
 }
 
-const VERBS = { init, check, create: (rest) => create(parseFlags(rest)), edit, set, get, prepare, report, list, comment, tick };
+const VERBS = { init, check, create: (rest) => create(parseFlags(rest)), edit, section: sectionVerb, set, get, prepare, report, list, comment, tick };
 
 const [command, ...rest] = process.argv.slice(2);
 try {
