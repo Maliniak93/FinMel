@@ -282,6 +282,7 @@ function runSync(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } 
     encoding: "utf8",
     maxBuffer: 256 * 1024 * 1024,
     timeout: timeoutMs,
+    windowsHide: true,
   });
   const durationMs = Date.now() - startedAt;
   const timedOut = res.status === null && res.signal != null && !res.error;
@@ -301,7 +302,7 @@ function runSync(bin, args, { cwd = REPO_ROOT, timeoutMs = DEFAULT_TIMEOUT_MS } 
 function killTree(pid) {
   if (!pid) return;
   if (IS_WIN) {
-    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" });
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8", windowsHide: true });
     return;
   }
   try {
@@ -660,7 +661,7 @@ function gitDir() {
 }
 
 function gitBuffer(args) {
-  const res = spawnSync("git", args, { cwd: REPO_ROOT, maxBuffer: 1024 * 1024 * 1024 });
+  const res = spawnSync("git", args, { cwd: REPO_ROOT, maxBuffer: 1024 * 1024 * 1024, windowsHide: true });
   return res.status === 0 ? res.stdout : null;
 }
 

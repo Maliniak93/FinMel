@@ -41,7 +41,7 @@ function main() {
   if (!FORMATTABLE_EXTENSIONS.has(path.extname(absPath).toLowerCase())) return;
 
   const cmdStr = `${NPX} prettier --write ${quoteArg(absPath)}`;
-  const res = spawnSync(cmdStr, { cwd: WEB_DIR, shell: true, encoding: "utf8", timeout: 20_000 });
+  const res = spawnSync(cmdStr, { cwd: WEB_DIR, shell: true, encoding: "utf8", timeout: 20_000, windowsHide: true });
 
   if (res.error || res.status !== 0) {
     const raw = res.error ? res.error.message : res.stderr || res.stdout || `prettier exited ${res.status}`;

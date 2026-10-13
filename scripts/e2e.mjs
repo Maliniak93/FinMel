@@ -68,7 +68,7 @@ function parseArgs(argv) {
 }
 
 function git(argv) {
-  const res = spawnSync("git", argv, { cwd: REPO_ROOT, encoding: "utf8" });
+  const res = spawnSync("git", argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true });
   return res.status === 0 ? res.stdout.trim() : null;
 }
 
@@ -80,7 +80,7 @@ const resultFile = () => path.join(gitDir(), "e2e-result.json");
 const pidFile = () => path.join(gitDir(), "e2e.pid");
 
 function gitBuffer(argv) {
-  const res = spawnSync("git", argv, { cwd: REPO_ROOT, maxBuffer: 1024 * 1024 * 1024 });
+  const res = spawnSync("git", argv, { cwd: REPO_ROOT, maxBuffer: 1024 * 1024 * 1024, windowsHide: true });
   return res.status === 0 ? res.stdout : null;
 }
 
@@ -106,7 +106,7 @@ function fingerprint() {
 
 function killTree(pid) {
   if (!pid) return;
-  if (IS_WIN) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" });
+  if (IS_WIN) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8", windowsHide: true });
   else {
     try {
       process.kill(-pid, "SIGKILL");

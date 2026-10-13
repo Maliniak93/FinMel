@@ -15,6 +15,7 @@ function listProcesses() {
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
       timeout: 60_000,
+      windowsHide: true,
     });
     if (res.status !== 0) throw new Error(`could not list processes: ${res.stderr || res.error?.message}`);
     return JSON.parse(res.stdout || "[]").map((p) => ({
@@ -60,7 +61,7 @@ function findStack() {
 }
 
 function kill(pid) {
-  if (IS_WIN) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" });
+  if (IS_WIN) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8", windowsHide: true });
   else spawnSync("kill", ["-KILL", String(pid)]);
 }
 
