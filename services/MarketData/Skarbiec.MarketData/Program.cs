@@ -45,6 +45,8 @@ if (!OpenApiBuildTime.IsActive)
         {
             x.AddConsumer<AssetPositionChangedConsumer>(typeof(AssetPositionChangedConsumerDefinition));
             x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedConsumerDefinition));
+            x.AddConsumer<WatchlistItemAddedConsumer>(typeof(WatchlistItemAddedConsumerDefinition));
+            x.AddConsumer<WatchlistItemRemovedConsumer>(typeof(WatchlistItemRemovedConsumerDefinition));
         });
 
     builder.AddNbpSources();

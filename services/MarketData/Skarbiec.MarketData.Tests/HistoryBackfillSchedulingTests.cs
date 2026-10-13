@@ -15,6 +15,7 @@ using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using Skarbiec.Testing.Http;
 
 namespace Skarbiec.MarketData.Tests;
 
@@ -121,5 +122,92 @@ public sealed class HistoryBackfillSchedulingTests(SkarbiecContainersFixture con
 
         Assert.True(response.IsSuccessStatusCode);
         Assert.Empty(Factory.BackfillTrigger.Enqueued);
+    }
+
+    [Fact]
+    public async Task WatchlistItemAdded_EnqueuesRecentWindow()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var instrumentId = await SeedInstrumentAsync(historyCoveredFrom: null, cancellationToken);
+
+        await PublishWatchlistItemAddedAsync(instrumentId, cancellationToken);
+
+        await ConsumerTestHost.WaitForEnqueuedAsync(Factory.BackfillTrigger, instrumentId, 1, cancellationToken);
+        Assert.Equal([DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-14)], Factory.BackfillTrigger.FromsFor(instrumentId));
+    }
+
+    [Fact]
+    public async Task WatchlistItemAdded_HistoryCoveredLaterThanWindow_EnqueuesRecentWindow()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var instrumentId = await SeedInstrumentAsync(historyCoveredFrom: today.AddDays(-7), cancellationToken);
+
+        await PublishWatchlistItemAddedAsync(instrumentId, cancellationToken);
+
+        await ConsumerTestHost.WaitForEnqueuedAsync(Factory.BackfillTrigger, instrumentId, 1, cancellationToken);
+        Assert.Equal([today.AddDays(-14)], Factory.BackfillTrigger.FromsFor(instrumentId));
+    }
+
+    [Fact]
+    public async Task WatchlistItemAdded_CoveredInstrument_EnqueuesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var instrumentId = await SeedInstrumentAsync(historyCoveredFrom: today.AddDays(-14), cancellationToken);
+
+        await PublishWatchlistItemAddedAsync(instrumentId, cancellationToken);
+
+        // The usage row is written before the enqueue decision, so its appearance means the consumer has decided.
+        await WaitForWatchCountAsync(instrumentId, cancellationToken);
+        Assert.Empty(Factory.BackfillTrigger.FromsFor(instrumentId));
+    }
+
+    private async Task<Guid> SeedInstrumentAsync(DateOnly? historyCoveredFrom, CancellationToken cancellationToken)
+    {
+        var instrument = new Instrument
+        {
+            Id = Guid.NewGuid(),
+            Ticker = "MSFT.US",
+            Name = "MSFT.US",
+            Source = PriceSource.Yahoo,
+            QuoteCurrency = "USD",
+            AssetClass = AssetClass.Stock,
+            HistoryCoveredFrom = historyCoveredFrom,
+        };
+
+        await using var db = CreateDbContext();
+        db.Instruments.Add(instrument);
+        await db.SaveChangesAsync(cancellationToken);
+        return instrument.Id;
+    }
+
+    private async Task PublishWatchlistItemAddedAsync(Guid instrumentId, CancellationToken cancellationToken)
+    {
+        // The host's bus binds its queues on start, so readiness is awaited before publishing.
+        using var client = Factory.CreateClient();
+        using var ready = await client.GetReadyAsync(cancellationToken);
+        Assert.True(ready.IsSuccessStatusCode);
+
+        // The scoped publish endpoint is bus-outbox backed and would wait for a SaveChanges; the bus publishes straight away.
+        var bus = Factory.Services.GetRequiredService<IBus>();
+        await bus.Publish(WatchlistEvents.Added(Guid.NewGuid(), instrumentId), cancellationToken);
+    }
+
+    private async Task WaitForWatchCountAsync(Guid instrumentId, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            await using var db = CreateDbContext();
+            if (await db.InstrumentUsages.AnyAsync(u => u.InstrumentId == instrumentId && u.WatchCount == 1, cancellationToken))
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
+
+        throw new TimeoutException($"No watch count recorded for instrument {instrumentId} within the deadline.");
     }
 }

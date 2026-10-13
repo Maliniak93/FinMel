@@ -81,11 +81,25 @@ public partial class InitialCreate : Migration
             {
                 InstrumentId = table.Column<Guid>(type: "uuid", nullable: false),
                 AssetCount = table.Column<int>(type: "integer", nullable: false),
+                WatchCount = table.Column<int>(type: "integer", nullable: false),
                 FirstUsedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
             },
             constraints: table =>
             {
                 table.PrimaryKey("PK_InstrumentUsages", x => x.InstrumentId);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "InstrumentWatchLinks",
+            columns: table => new
+            {
+                WatchlistItemId = table.Column<Guid>(type: "uuid", nullable: false),
+                InstrumentId = table.Column<Guid>(type: "uuid", nullable: false),
+                IsRemoved = table.Column<bool>(type: "boolean", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_InstrumentWatchLinks", x => x.WatchlistItemId);
             });
 
         migrationBuilder.CreateTable(
@@ -256,6 +270,11 @@ public partial class InitialCreate : Migration
             unique: true);
 
         migrationBuilder.CreateIndex(
+            name: "IX_InstrumentWatchLinks_InstrumentId",
+            table: "InstrumentWatchLinks",
+            column: "InstrumentId");
+
+        migrationBuilder.CreateIndex(
             name: "IX_Instruments_Source_Ticker",
             table: "Instruments",
             columns: new[] { "Source", "Ticker" },
@@ -323,6 +342,9 @@ public partial class InitialCreate : Migration
 
         migrationBuilder.DropTable(
             name: "InstrumentUsages");
+
+        migrationBuilder.DropTable(
+            name: "InstrumentWatchLinks");
 
         migrationBuilder.DropTable(
             name: "Instruments");

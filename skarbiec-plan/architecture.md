@@ -9,7 +9,7 @@ Target state (the approved redesign, Część II). Four services + gateway — S
 | **Gateway** (YARP) | routing `/api/<service>/*`, JWT validation, rate limiting, CORS | — | — | — |
 | **Identity** | registration, login, refresh/logout | `identity_db` | `UserRegistered` | — |
 | **Portfolio** | accounts (Brokerage / Bonds, with a tax wrapper), assets (3 valuation modes), transactions = source of truth for quantity | `portfolio_db` | `AssetPositionChanged`, `AssetRemoved`, `WatchlistItemAdded`, `WatchlistItemRemoved` | — |
-| **MarketData** | currency catalog, instruments, FX rates, quotes, sync jobs, ticker verification (ADR-018) | `marketdata_db` | `DailyPricesSynced` | `AssetPositionChanged`, `AssetRemoved` (→ `InstrumentUsage`) |
+| **MarketData** | currency catalog, instruments, FX rates, quotes, sync jobs, ticker verification (ADR-018) | `marketdata_db` | `DailyPricesSynced` | `AssetPositionChanged`, `AssetRemoved`, `WatchlistItemAdded`, `WatchlistItemRemoved` (→ `InstrumentUsage`) |
 | **Reporting** | positions read model with a quantity timeline, valuations (snapshots + per-asset lines) incl. the past-day history rebuild (ADR-032), dashboard, history, insights (allocation, rebalancing, emergency fund, goals) | `reporting_db` | later: `AllocationDriftDetected`, `EmergencyFundBelowThreshold` | `AssetPositionChanged`, `AssetRemoved`, `DailyPricesSynced`, `InstrumentHistoryBackfilled` |
 
 Angular talks only to the Gateway (ADR-013).

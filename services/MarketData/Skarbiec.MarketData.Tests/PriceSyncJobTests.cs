@@ -119,13 +119,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var activities = new ConcurrentBag<Activity>();
-        using var listener = new ActivityListener
-        {
-            ShouldListenTo = source => source.Name == PriceSyncJob.ActivitySourceName,
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
-            ActivityStopped = activities.Add,
-        };
-        ActivitySource.AddActivityListener(listener);
+        using var listener = ListenToPriceSyncJob(activities);
 
         await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
         await using var scope = provider.CreateAsyncScope();
@@ -160,6 +154,63 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         Assert.Equal(1, Assert.IsType<int>(jobActivity.GetTagItem("skarbiec.sync_run.skipped")));
     }
 
+    [Fact]
+    public async Task RunAsync_SyncsWatchedInstruments()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var activities = new ConcurrentBag<Activity>();
+        using var listener = ListenToPriceSyncJob(activities);
+
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var heldInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "PLN", AssetClass.Stock);
+        var watchedInstrument = NewWatchedInstrument(db, "MSFT.US", PriceSource.Yahoo, "PLN", AssetClass.Stock);
+        var unseenInstrument = NewInstrument("GOOG.US", PriceSource.Yahoo, "PLN", AssetClass.Stock);
+        db.Instruments.Add(unseenInstrument);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
+        [
+            new InstrumentQuote(heldInstrument.Id, Today, 190m),
+            new InstrumentQuote(watchedInstrument.Id, Today, 400m),
+        ]));
+
+        var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken);
+
+        Assert.Equal(2, source.LatestFetchedInstrumentIds.Count);
+        Assert.Contains(heldInstrument.Id, source.LatestFetchedInstrumentIds);
+        Assert.Contains(watchedInstrument.Id, source.LatestFetchedInstrumentIds);
+        Assert.DoesNotContain(unseenInstrument.Id, source.LatestFetchedInstrumentIds);
+
+        Assert.True(await db.PriceQuotes.AnyAsync(q => q.InstrumentId == watchedInstrument.Id, cancellationToken));
+        Assert.False(await db.PriceQuotes.AnyAsync(q => q.InstrumentId == unseenInstrument.Id, cancellationToken));
+
+        var run = await db.SyncRuns.SingleAsync(cancellationToken);
+        Assert.Equal(SyncRunStatus.Completed, run.Status);
+        Assert.Equal(2, run.SyncedCount);
+
+        var jobActivity = Assert.Single(
+            activities, a => a.OperationName == "PriceSyncJob.Run" && Equals(a.GetTagItem("skarbiec.sync_run.id"), run.Id));
+        Assert.Equal(1, Assert.IsType<int>(jobActivity.GetTagItem("skarbiec.sync_run.skipped")));
+    }
+
+    private static ActivityListener ListenToPriceSyncJob(ConcurrentBag<Activity> activities)
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == PriceSyncJob.ActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStopped = activities.Add,
+        };
+        ActivitySource.AddActivityListener(listener);
+        return listener;
+    }
+
     // The job syncs only instruments in use, so every instrument a fact expects synced needs a usage row.
     private static Instrument NewUsedInstrument(
         MarketDataDbContext db, string ticker, PriceSource source, string quoteCurrency, AssetClass assetClass)
@@ -170,6 +221,22 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         {
             InstrumentId = instrument.Id,
             AssetCount = 1,
+            FirstUsedAt = DateTimeOffset.UtcNow,
+        });
+        return instrument;
+    }
+
+    // A watched instrument is in use without any holding: it has a usage row with WatchCount set and AssetCount 0.
+    private static Instrument NewWatchedInstrument(
+        MarketDataDbContext db, string ticker, PriceSource source, string quoteCurrency, AssetClass assetClass)
+    {
+        var instrument = NewInstrument(ticker, source, quoteCurrency, assetClass);
+        db.Instruments.Add(instrument);
+        db.InstrumentUsages.Add(new InstrumentUsage
+        {
+            InstrumentId = instrument.Id,
+            AssetCount = 0,
+            WatchCount = 1,
             FirstUsedAt = DateTimeOffset.UtcNow,
         });
         return instrument;

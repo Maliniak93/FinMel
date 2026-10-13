@@ -1,32 +1,19 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.MarketData.Data;
-using Skarbiec.MarketData.Messaging;
 using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
-using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.MarketData.Tests;
 
-// Builds its own provider, with no HTTP host, on a queue unique to this class.
+// Builds its own provider, with no HTTP host, through the shared consumer harness.
 public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture containers) : IAsyncLifetime, IClassFixture<SkarbiecContainersFixture>
 {
-    private const string PositionChangedQueueName = "instrument-usage-position-changed-test";
-    private const string RemovedQueueName = "instrument-usage-removed-test";
-
-    public async ValueTask InitializeAsync()
-    {
-        await using var provider = BuildProvider(out _);
-        await using var scope = provider.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<MarketDataDbContext>().Database.MigrateAsync();
-
-        await containers.ResetDatabaseAsync();
-    }
+    public ValueTask InitializeAsync() => new(ConsumerTestHost.MigrateAndResetAsync(containers));
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -37,12 +24,12 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var instrumentId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, _) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, _) =>
         {
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(PositionChanged(assetId, instrumentId, version: 0), cancellationToken);
 
-            var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken);
+            var usage = await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken);
 
             Assert.Equal(1, usage.AssetCount);
             Assert.NotEqual(default, usage.FirstUsedAt);
@@ -57,14 +44,14 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var firstAssetId = Guid.NewGuid();
         var secondAssetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, _) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, _) =>
         {
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(PositionChanged(firstAssetId, instrumentId, version: 0), cancellationToken);
-            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
 
             await bus.Publish(PositionChanged(secondAssetId, instrumentId, version: 0), cancellationToken);
-            var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 2);
+            var usage = await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 2);
 
             Assert.Equal(2, usage.AssetCount);
         }, cancellationToken);
@@ -78,13 +65,13 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var firstAssetId = Guid.NewGuid();
         var secondAssetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, _) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, _) =>
         {
             var bus = provider.GetRequiredService<IBus>();
             await bus.Publish(PositionChanged(firstAssetId, instrumentId, version: 0), cancellationToken);
-            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
             await bus.Publish(PositionChanged(secondAssetId, instrumentId, version: 0), cancellationToken);
-            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 2);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 2);
 
             await bus.Publish(new AssetRemoved
             {
@@ -94,8 +81,38 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
 
-            var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+            var usage = await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
             Assert.Equal(1, usage.AssetCount);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task AssetRemoved_KeepsWatchCount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var instrumentId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await ConsumerTestHost.RunAsync(containers, async (provider, _) =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+            await bus.Publish(WatchlistEvents.Added(Guid.NewGuid(), instrumentId), cancellationToken);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.WatchCount == 1);
+
+            await bus.Publish(PositionChanged(assetId, instrumentId, version: 0), cancellationToken);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+
+            await bus.Publish(new AssetRemoved
+            {
+                AssetId = assetId,
+                AccountId = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            var usage = await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 0);
+            Assert.Equal(0, usage.AssetCount);
+            Assert.Equal(1, usage.WatchCount);
         }, cancellationToken);
     }
 
@@ -106,14 +123,14 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var instrumentId = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, _) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, _) =>
         {
             var bus = provider.GetRequiredService<IBus>();
             var messageId = Guid.NewGuid();
             var @event = PositionChanged(assetId, instrumentId, version: 0);
 
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
-            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
 
             // Same MessageId: the inbox must skip the consumer body.
             await bus.Publish(@event, ctx => ctx.MessageId = messageId, cancellationToken);
@@ -136,12 +153,12 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var instrumentB = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, trigger) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, trigger) =>
         {
             var bus = provider.GetRequiredService<IBus>();
 
             await bus.Publish(PositionChanged(assetId, instrumentA, version: 5), cancellationToken);
-            await WaitForUsageAsync(provider, instrumentA, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentA, cancellationToken, u => u.AssetCount == 1);
 
             // The late event names another instrument, so only the Version guard keeps the state below.
             await bus.Publish(PositionChanged(assetId, instrumentB, version: 3), cancellationToken);
@@ -173,15 +190,15 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var instrumentB = Guid.NewGuid();
         var assetId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, _) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, _) =>
         {
             var bus = provider.GetRequiredService<IBus>();
 
             await bus.Publish(PositionChanged(assetId, instrumentA, version: 0), cancellationToken);
-            await WaitForUsageAsync(provider, instrumentA, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentA, cancellationToken, u => u.AssetCount == 1);
 
             await bus.Publish(PositionChanged(assetId, instrumentB, version: 1), cancellationToken);
-            await WaitForUsageAsync(provider, instrumentB, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentB, cancellationToken, u => u.AssetCount == 1);
 
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
@@ -200,7 +217,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var cancellationToken = TestContext.Current.CancellationToken;
         var instrumentId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, trigger) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, trigger) =>
         {
             await SeedInstrumentAsync(provider, instrumentId, historyCoveredFrom: null, cancellationToken);
 
@@ -208,9 +225,9 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             await bus.Publish(
                 PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: new DateOnly(2023, 5, 2)),
                 cancellationToken);
-            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
 
-            await WaitForEnqueuedAsync(trigger, instrumentId, 1, cancellationToken);
+            await ConsumerTestHost.WaitForEnqueuedAsync(trigger, instrumentId, 1, cancellationToken);
             Assert.Equal([new DateOnly(2023, 5, 2)], trigger.FromsFor(instrumentId));
         }, cancellationToken);
     }
@@ -221,7 +238,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var cancellationToken = TestContext.Current.CancellationToken;
         var instrumentId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, trigger) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, trigger) =>
         {
             await SeedInstrumentAsync(provider, instrumentId, historyCoveredFrom: new DateOnly(2023, 5, 2), cancellationToken);
 
@@ -229,7 +246,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             await bus.Publish(
                 PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: new DateOnly(2024, 1, 1)),
                 cancellationToken);
-            await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+            await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
 
             // Nothing signals a skipped enqueue, so give it time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
@@ -238,7 +255,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             await bus.Publish(
                 PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: new DateOnly(2022, 11, 15)),
                 cancellationToken);
-            await WaitForEnqueuedAsync(trigger, instrumentId, 1, cancellationToken);
+            await ConsumerTestHost.WaitForEnqueuedAsync(trigger, instrumentId, 1, cancellationToken);
 
             Assert.Equal([new DateOnly(2022, 11, 15)], trigger.FromsFor(instrumentId));
         }, cancellationToken);
@@ -250,7 +267,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         var cancellationToken = TestContext.Current.CancellationToken;
         var instrumentId = Guid.NewGuid();
 
-        await RunConsumersAsync(async (provider, trigger) =>
+        await ConsumerTestHost.RunAsync(containers, async (provider, trigger) =>
         {
             await SeedInstrumentAsync(provider, instrumentId, historyCoveredFrom: null, cancellationToken);
 
@@ -258,7 +275,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             await bus.Publish(
                 PositionChanged(Guid.NewGuid(), instrumentId, version: 0, firstTransactionDate: null),
                 cancellationToken);
-            var usage = await WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
+            var usage = await ConsumerTestHost.WaitForUsageAsync(provider, instrumentId, cancellationToken, u => u.AssetCount == 1);
 
             // Nothing signals a skipped enqueue, so give it time to land before asserting it never did.
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
@@ -286,18 +303,6 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task WaitForEnqueuedAsync(
-        FakeHistoryBackfillTrigger trigger, Guid instrumentId, int count, CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
-        while (DateTimeOffset.UtcNow < deadline && trigger.CountFor(instrumentId) < count)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
-        }
-
-        Assert.True(trigger.CountFor(instrumentId) >= count, "The backfill was not enqueued within the deadline.");
-    }
-
     private static AssetPositionChanged PositionChanged(
         Guid assetId, Guid instrumentId, long version, DateOnly? firstTransactionDate = null) => new()
         {
@@ -316,97 +321,4 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             FirstTransactionDate = firstTransactionDate,
             OccurredAtUtc = DateTimeOffset.UtcNow,
         };
-
-    private async Task RunConsumersAsync(
-        Func<ServiceProvider, FakeHistoryBackfillTrigger, Task> action, CancellationToken cancellationToken)
-    {
-        await using var provider = BuildProvider(out var trigger);
-        var hostedServices = provider.GetServices<IHostedService>().ToList();
-
-        foreach (var hostedService in hostedServices)
-        {
-            await hostedService.StartAsync(cancellationToken);
-        }
-
-        try
-        {
-            // StartAsync does not wait for RabbitMQ to apply the bindings, so a publish right after it could be dropped.
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-
-            await action(provider, trigger);
-        }
-        finally
-        {
-            for (var i = hostedServices.Count - 1; i >= 0; i--)
-            {
-                await hostedServices[i].StopAsync(cancellationToken);
-            }
-        }
-    }
-
-    private static async Task<InstrumentUsage> WaitForUsageAsync(
-        ServiceProvider provider, Guid instrumentId, CancellationToken cancellationToken, Func<InstrumentUsage, bool>? predicate = null)
-    {
-        predicate ??= _ => true;
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            await using var scope = provider.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
-            var usage = await db.InstrumentUsages.SingleOrDefaultAsync(u => u.InstrumentId == instrumentId, cancellationToken);
-
-            if (usage is not null && predicate(usage))
-            {
-                return usage;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
-        }
-
-        throw new TimeoutException($"No matching InstrumentUsage for instrument {instrumentId} within the deadline.");
-    }
-
-    private ServiceProvider BuildProvider(out FakeHistoryBackfillTrigger trigger)
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-
-        var fakeTrigger = new FakeHistoryBackfillTrigger();
-        services.AddSingleton<IHistoryBackfillTrigger>(fakeTrigger);
-        trigger = fakeTrigger;
-
-        services.AddDbContext<MarketDataDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
-
-        services.AddMassTransit(x =>
-        {
-            x.SetKebabCaseEndpointNameFormatter();
-
-            // No UseBusOutbox(): only the consumer-side inbox is under test.
-            x.AddEntityFrameworkOutbox<MarketDataDbContext>(o => o.UsePostgres());
-
-            x.AddConsumer<AssetPositionChangedConsumer>(typeof(TestAssetPositionChangedConsumerDefinition));
-            x.AddConsumer<AssetRemovedConsumer>(typeof(TestAssetRemovedConsumerDefinition));
-
-            x.UsingRabbitMq((context, cfg) =>
-            {
-                cfg.Host(new Uri(containers.RabbitMqConnectionString));
-
-                cfg.ConfigureEndpoints(context);
-            });
-        });
-
-        return services.BuildServiceProvider();
-    }
-
-    private sealed class TestAssetPositionChangedConsumerDefinition
-        : IdempotentConsumerDefinition<AssetPositionChangedConsumer, MarketDataDbContext>
-    {
-        public TestAssetPositionChangedConsumerDefinition() => Endpoint(e => e.Name = PositionChangedQueueName);
-    }
-
-    private sealed class TestAssetRemovedConsumerDefinition
-        : IdempotentConsumerDefinition<AssetRemovedConsumer, MarketDataDbContext>
-    {
-        public TestAssetRemovedConsumerDefinition() => Endpoint(e => e.Name = RemovedQueueName);
-    }
 }
