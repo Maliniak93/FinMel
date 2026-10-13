@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Usage: node scripts/gh-project.mjs <verb> ...
 //   init                                                   create the custom fields and labels when missing
-//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n>] [--epic] [--e2e]   --e2e needs --parent and excludes --skip-tests
+//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e]   --e2e needs --parent and excludes --skip-tests; --before puts the new part ahead of sibling #m
 //   check --body-file <p> [--epic] [--e2e]                 dry run of create's cleaning and checking
 //   edit <n> [--body-file <p>] [--tier 1|2] [--parent <n>] replace the body, or attach the issue to an epic
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
@@ -290,6 +290,7 @@ function create(flags) {
   if (!["1", "2"].includes(flags.tier)) throw new Error("--tier must be 1 or 2");
   if (flags.e2e && flags["skip-tests"]) throw new Error("--e2e and --skip-tests exclude each other: an e2e part writes tests");
   if (flags.e2e && !flags.parent) throw new Error("--e2e needs --parent <epic number>: an e2e part is the last part of an epic");
+  if (flags.before && !flags.parent) throw new Error("--before needs --parent <epic number>");
   const branch = flags.epic ? null : `${flags.kind === "fix" ? "fix" : "feat"}/${flags.slug}`;
   const body = preparedBody(flags["body-file"], flags.epic, flags.e2e);
 
@@ -306,10 +307,18 @@ function create(flags) {
     setField(url, "Tier", flags.tier);
     setField(url, "Kind", kind);
     if (branch) setField(url, "Branch", branch);
+    if (flags.before) placeBefore(flags.parent, Number(url.split("/").pop()), Number(flags.before));
   } catch (err) {
     throw new Error(`${err.message}\nissue already created: ${url}`);
   }
   console.log(JSON.stringify({ number: Number(url.split("/").pop()), url, branch }));
+}
+
+function placeBefore(parent, number, before) {
+  const id = (n) => gh(["api", `repos/${REPO}/issues/${n}`, "--jq", ".id"]);
+  gh(["api", "--method", "PATCH", `repos/${REPO}/issues/${parent}/sub_issues/priority`, "-F", `sub_issue_id=${id(number)}`, "-F", `before_id=${id(before)}`]);
+  const order = subIssues(parent).map((s) => s.number);
+  if (order.indexOf(number) < 0 || order.indexOf(number) > order.indexOf(before)) throw new Error(`#${number} is not ahead of #${before} in epic #${parent}: ${order.join(", ")}`);
 }
 
 function edit([number, ...rest]) {

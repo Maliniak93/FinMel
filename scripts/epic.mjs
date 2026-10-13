@@ -5,7 +5,8 @@
 //   --no-shutdown  do not schedule `shutdown /s /t 600` when the run ends
 //   node scripts/epic.mjs <epic> --stop   creates the stop file; the running driver stops before the next build
 //   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
-//   an e2e part blocked at `e2e` ends the run with reason `e2e app` or `e2e environment` and the trace path; resuming rebuilds it from master
+//   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it or corrects the epic's plan, the loop builds and merges them, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
+//   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
@@ -27,6 +28,8 @@ const CI_POLL_MS = 30e3;
 const CI_MISSING_MS = 10 * 60e3;
 const CI_TIMEOUT_MS = 90 * 60e3;
 const NODE = process.execPath;
+const MAX_E2E_REPAIRS = 3;
+const FIX_MODEL = "claude-opus-5-5";
 
 class Stop extends Error {
   constructor(reason, detail) {
@@ -120,6 +123,14 @@ function lastComment(number) {
 
 const SHIP_BLOCKED = "**Blocked** at `ship`";
 const E2E_BLOCKED = "**Blocked** at `e2e`";
+const E2E_APP_BLOCKED = `${E2E_BLOCKED} (app)`;
+
+function e2eAppBlocks(number) {
+  const jq = `[.comments[].body | select(startswith(${JSON.stringify(E2E_APP_BLOCKED)}))] | length`;
+  const res = retryTransient(`issue view ${number}`, () => gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", jq]));
+  if (!res.ok) throw new Stop("github", `gh issue view ${number}: ${res.firstErr}`);
+  return Number(res.out);
+}
 
 // "ship" retries a failed ship step, "resume" continues an interrupted build on the tree on disk, "build" starts fresh
 // (a part blocked at e2e commits nothing and ship cleaned the tree: prepare recuts its branch from master)
@@ -139,7 +150,7 @@ function e2eBlock(number) {
   const cls = /^\*\*Blocked\*\* at `e2e` \((\w+)\)/.exec(last)?.[1] ?? "app";
   const trace = /trace: `([^`]+)`/.exec(last)?.[1];
   const report = /report: `([^`]+)`/.exec(last)?.[1];
-  return { reason: `e2e ${cls}`, where: trace ? `trace ${trace}` : report ? `report ${report}` : "see the report on the issue" };
+  return { cls, reason: `e2e ${cls}`, where: trace ? `trace ${trace}` : report ? `report ${report}` : "see the report on the issue" };
 }
 
 function resolveClaude() {
@@ -314,11 +325,15 @@ function reportBuildEnd(number, code, result, ms) {
 }
 
 function build(claude, number, title) {
+  return runClaude(claude, number, `${title} — build`, `/build #${number}`, "haiku");
+}
+
+function runClaude(claude, number, heading, prompt, model) {
   const startedAt = Date.now();
   const reporter = createReporter(number);
-  say(`══ #${number} ${title} — build`);
+  say(`══ #${number} ${heading}`);
 
-  const spec = claudeSpawn(claude, ["-p", `/build #${number}`, "--model", "haiku", "--permission-mode", "auto", "--output-format", "stream-json", "--verbose"]);
+  const spec = claudeSpawn(claude, ["-p", prompt, "--model", model, "--permission-mode", "auto", "--output-format", "stream-json", "--verbose"]);
   return new Promise((resolve) => {
     const child = spawn(spec.cmd, spec.argv, {
       cwd: REPO_ROOT,
@@ -365,7 +380,7 @@ function build(claude, number, title) {
       buildChild = null;
       reportBuildEnd(number, code, reporter.result, Date.now() - startedAt);
       if (code !== 0 && errTail.trim()) say(`exit ${code}: ${errTail.trim().split(/\r?\n/).slice(-3).join(" | ")}`);
-      resolve({ code, timedOut, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, sessionId: reporter.sessionId, ms: Date.now() - startedAt });
+      resolve({ code, timedOut, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, sessionId: reporter.sessionId, text: String(reporter.result?.result ?? ""), ms: Date.now() - startedAt });
     });
   });
 }
@@ -445,7 +460,7 @@ async function handlePart(sub, ctx) {
       if (built.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached, resets ${resetClock(built.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
       pr = openPr(part.branch);
       const blockedAtE2e = pr ? null : e2eBlock(part.number);
-      if (blockedAtE2e) throw new Stop(blockedAtE2e.reason, `#${part.number}: ${blockedAtE2e.reason} failure, ${blockedAtE2e.where} - fix it, then resume with node scripts/epic.mjs ${ctx.epic}`);
+      if (blockedAtE2e) return repairE2e(part, blockedAtE2e, ctx);
       if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
     }
   }
@@ -454,6 +469,41 @@ async function handlePart(sub, ctx) {
   ctx.parts.push(entry);
   entry.ciMin = minutes(await waitForCi(pr));
   await mergeAndSync(pr, part.branch, part.number);
+}
+
+// returns after a repair so runLoop picks the next open part: a fix part placed ahead of the e2e part, or the e2e part again
+async function repairE2e(part, block, ctx) {
+  const giveUp = (why) => new Stop(block.reason, `#${part.number}: ${block.reason} failure, ${block.where} - ${why}, then resume with node scripts/epic.mjs ${ctx.epic}`);
+  if (block.cls === "environment") {
+    if (ctx.envRetried.has(part.number)) throw giveUp("the environment failed twice in this run; fix the machine");
+    ctx.envRetried.add(part.number);
+    say(`#${part.number}: e2e environment failure, ${block.where} - stopping the stack and rebuilding once`);
+    run(NODE, ["scripts/stop-stack.mjs"], { timeout: 10 * 60e3 });
+    return;
+  }
+  const blocks = e2eAppBlocks(part.number);
+  if (blocks > MAX_E2E_REPAIRS) throw giveUp(`${blocks} app blocks, ${MAX_E2E_REPAIRS} unattended repairs did not make it green; fix it with /fix`);
+  if (existsSync(stopFile(ctx.epic))) throw new Stop("stopped", "stop file found");
+  if (ctx.builds >= ctx.maxTasks) throw new Stop("max-tasks", `${ctx.maxTasks} build(s) done in this run`);
+  ctx.builds++;
+  say(`#${part.number}: e2e app failure, ${block.where} - unattended repair ${blocks}/${MAX_E2E_REPAIRS}`);
+  const fixed = await runClaude(ctx.claude, part.number, `${part.title} — e2e repair`, `/fix e2e:#${part.number}`, FIX_MODEL);
+  if (fixed.timedOut) throw new Stop("timeout", `#${part.number}: the e2e repair exceeded 4 h and was killed`);
+  if (fixed.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached during the e2e repair, resets ${resetClock(fixed.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
+  const line = fixed.text.split(/\r?\n/).reverse().find((l) => l.trim().startsWith("FIX_RESULT: "));
+  let result = null;
+  try {
+    result = JSON.parse(line.trim().slice("FIX_RESULT: ".length));
+  } catch {
+  }
+  if (!result?.ok) throw giveUp(result ? `the repair stopped: ${result.summary}` : `the repair gave no FIX_RESULT (exit ${fixed.code})`);
+  const dirty = dirtyFiles();
+  if (dirty.length || currentBranch() !== "master") throw new Stop("dirty-tree", `the e2e repair left ${currentBranch()} with ${dirty.length} uncommitted file(s): ${dirty.slice(0, 5).join(", ")}`);
+  if (result.kind === "app") {
+    const next = getIssue(ctx.epic).subIssues.find((s) => s.state !== "CLOSED");
+    if (!result.issues?.length || !next || !result.issues.includes(next.number)) throw new Stop("blocked", `#${part.number}: the repair reported fix part(s) ${(result.issues ?? []).join(", ") || "none"}, but the next open part is #${next?.number}`);
+    say(`repair: fix part(s) ${result.issues.map((n) => `#${n}`).join(", ")} ahead of #${part.number} - ${short(result.summary, 120)}`);
+  } else say(`repair: the epic's plan corrected - ${short(result.summary, 120)}`);
 }
 
 function runnerOnline() {
@@ -582,7 +632,7 @@ async function runLoop(ctx) {
   if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
 }
 
-const ctx = { epic: /^[0-9]+$/.test(epicArg ?? "") ? Number(epicArg) : null, parts: [], builds: 0, started: false, dryRun: false, flags: {}, maxTasks: Infinity, claude: null };
+const ctx = { epic: /^[0-9]+$/.test(epicArg ?? "") ? Number(epicArg) : null, parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, claude: null };
 
 process.on("SIGINT", () => {
   killTree(buildChild);

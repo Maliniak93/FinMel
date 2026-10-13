@@ -45,7 +45,7 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
   stays on its branch.
 - `blocked` at `e2e` → the `class` (`app` or `environment`), the failed test, its `Krok <n>` step, the trace
   path and the patch path from the report. `ship.mjs` has saved the diff and cleaned the tree back to master:
-  an `app` failure is fixed with `/fix`, an `environment` one by fixing the machine; then re-run `/build #<n>`
+  an `app` failure is fixed with `/fix e2e:#<n>` (diagnoses it and publishes the fix ahead of the e2e part), an `environment` one by fixing the machine; then re-run `/build #<n>`
   (the branch is recut from master and the tests are written again).
 
 Never commit, push, open or merge anything yourself — `ship.mjs` ships, the user merges — and never touch the issue.
