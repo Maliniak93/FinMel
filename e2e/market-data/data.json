@@ -1,0 +1,40 @@
+{
+  "fx": {
+    "USD": "4.0000",
+    "EUR": "4.2500",
+    "GBP": "5.0000",
+    "CHF": "4.5000"
+  },
+  "listings": [
+    {
+      "symbol": "CDR.WA",
+      "name": "CD Projekt",
+      "exchange": "WSE",
+      "quoteType": "EQUITY",
+      "currency": "PLN",
+      "close": "100.00"
+    },
+    {
+      "symbol": "VWCE.DE",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "exchange": "GER",
+      "quoteType": "ETF",
+      "currency": "EUR",
+      "close": "100.00"
+    },
+    {
+      "symbol": "PKO.WA",
+      "name": "Powszechna Kasa Oszczednosci Bank Polski",
+      "exchange": "WSE",
+      "quoteType": "EQUITY",
+      "currency": "PLN",
+      "close": "50.00"
+    }
+  ],
+  "metals": {
+    "XAU": { "usdPerOunce": "9331.04304" },
+    "XAG": { "usdPerOunce": "93.3104304" }
+  },
+  "bondFile": "mf-bonds.xls",
+  "bondFileName": "Dane_dotyczace_obligacji_detalicznych.xls"
+}

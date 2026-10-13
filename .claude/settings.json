@@ -39,6 +39,7 @@
       "Bash(npm run build:*)",
       "Bash(node scripts/verify.mjs:*)",
       "Bash(node scripts/stop-stack.mjs:*)",
+      "Bash(node scripts/e2e.mjs:*)",
       "Bash(node scripts/preflight.mjs:*)",
       "Bash(node scripts/run-cost.mjs:*)",
       "Bash(node scripts/idea.mjs:*)",

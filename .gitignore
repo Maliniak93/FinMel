@@ -43,3 +43,7 @@ skarbiec-plan/prompts/
 skarbiec-plan/przewodnik/
 # Logs of unattended epic runs (scripts/epic.mjs)
 skarbiec-plan/epic-runs/
+
+# e2e run output (scripts/e2e.mjs)
+e2e/test-results/
+e2e/playwright-report/

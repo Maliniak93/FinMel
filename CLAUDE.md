@@ -25,7 +25,8 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | The Ship step: guard lane, commit, push, PR, run report | `node scripts/ship.mjs <n> --branch b --title t --json '…' [--blocked] [--dry-run]` |
 | Build a whole epic unattended: each part via a fresh `claude -p "/build #n"`, waits for green CI, squash-merges, syncs master; resumes from GitHub state; stops when the usage limit runs out; keeps the PC awake, shuts it down 10 min after the run ends; readable log in `skarbiec-plan/epic-runs/` | `node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] \| --stop` |
 | Delete local branches whose PR is merged (dry run unless `--apply`) | `node scripts/prune-branches.mjs [--apply]` |
-| Local docker compose stack (built from a commit, rebuilt on ship; started/stopped only by the user) | `node scripts/compose.mjs build|up|down|reset|status` |
+| Local docker compose stack (built from a commit, rebuilt on ship; started/stopped only by the user — agents never touch it, the one exception is the isolated e2e project below) | `node scripts/compose.mjs build|up|down|reset|status` |
+| Browser e2e on an isolated `skarbiec-e2e` compose project (images from the working tree, market data from a stub, tmpfs data; agents may start and stop this project only) → `.git/e2e-result.json`; exit 0 green, 1 a test failed, 3 environment | `node scripts/e2e.mjs run [--headed|--ui] [--grep p] [--keep] [--detach|--await]|up|down|status|report` |
 | Frontend dev server | `cd web && npm start` |
 | Frontend unit tests (Vitest) | `cd web && npm test` |
 | Regenerate the TS client after an API change — reads the build-time OpenAPI files once spec-00 lands, until then needs the stack running | `cd web && npm run gen:api` |
@@ -79,6 +80,7 @@ No agent runs a git mutation: in a build run `gh-project.mjs prepare` cuts the b
 
 ## Gotchas
 - A running local stack (AppHost, services, `ng serve`) locks build outputs and `node_modules` binaries — any agent blocked by it (MSB3021/3026/3027, EBUSY/EPERM, port in use) runs `node scripts/stop-stack.mjs` and retries; `verify.mjs` does this itself. Never restart the stack afterwards.
+- e2e (`.claude/rules/e2e.md`, ADR-034): web `:18080`, market stub `:18081`, dashboard `:18898`; `verify.mjs` only typechecks and formats `e2e/`, it never runs Playwright, and `stop-stack.mjs` never touches the e2e containers.
 - `dotnet test` needs Docker running; test hosts set `Testing:DisableBackgroundJobs`, so Quartz jobs are off and triggers are NoOp.
 - After a destructive migration, drop the local databases — `skarbiec-plan/runbooks/local-dev.md`.
 - The Gateway rate limit is 100 requests / 10 s; seed and smoke scripts trip it.

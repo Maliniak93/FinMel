@@ -5,7 +5,7 @@
 //   --projects a,b    exactly these .NET test projects; web/api still need --web/--api/--all
 //   --web             force the web checks
 //   --api             force the generated TS client check
-//   --all             every test project + web + api
+//   --all             every test project + web + api + e2e (the e2e project is typecheck and prettier only; it never runs Playwright)
 //   --fix             first reformat the changed files (dotnet format, prettier, eslint --fix)
 //   --jobs N          run N .NET test projects at once, alongside the web checks (default 1: sequential, then web)
 //   --deadline-min N  wall-clock budget for the whole run (default 120)
@@ -25,6 +25,7 @@ import { stopStack } from "./stop-stack.mjs";
 const IS_WIN = process.platform === "win32";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WEB_DIR = path.join(REPO_ROOT, "web");
+const E2E_DIR = path.join(REPO_ROOT, "e2e");
 const NPM = IS_WIN ? "npm.cmd" : "npm";
 const NPX = IS_WIN ? "npx.cmd" : "npx";
 const DEFAULT_TIMEOUT_MS = 120 * 60 * 1000;
@@ -226,6 +227,7 @@ function computeAffected(changedFiles, serviceNames) {
   const serviceKeys = serviceNames.map((s) => s.toLowerCase());
   let web = false;
   let api = false;
+  let e2e = false;
 
   for (const raw of changedFiles) {
     const f = normalizeSlashes(raw);
@@ -257,10 +259,11 @@ function computeAffected(changedFiles, serviceNames) {
     }
 
     if (lower.startsWith("web/")) web = true;
+    if (lower.startsWith("e2e/")) e2e = true;
     if (isApiSurfaceFile(lower)) api = true;
   }
 
-  return { affectedKeys, web, api };
+  return { affectedKeys, web, api, e2e };
 }
 
 function quoteArg(a) {
@@ -398,14 +401,17 @@ function existingCsFiles(changedFiles) {
 }
 
 const WEB_GENERATED_RE = /^web\/(node_modules|dist|openapi|src\/app\/api)\//i;
+const E2E_GENERATED_RE = /^e2e\/(node_modules|test-results|playwright-report|market-data)\//i;
 
 async function applyFixes(changedFiles) {
   const existing = [...new Set(changedFiles.map(normalizeSlashes))].filter((f) => existsSync(path.join(REPO_ROOT, f)));
   const cs = existingCsFiles(changedFiles);
+  const e2e = existing.filter((f) => /^e2e\//i.test(f) && !E2E_GENERATED_RE.test(f)).map((f) => f.slice("e2e/".length));
   const web = existing.filter((f) => /^web\//i.test(f) && !WEB_GENERATED_RE.test(f)).map((f) => f.slice("web/".length));
   const lintable = web.filter((f) => /\.(ts|html)$/i.test(f));
   const prettierable = web.filter((f) => /\.(ts|html|scss|css|json|md|mjs|js)$/i.test(f));
-  const targets = [...cs, ...prettierable.map((f) => `web/${f}`)];
+  const e2ePrettierable = e2e.filter((f) => /\.(ts|json|md|mjs|js|yaml)$/i.test(f));
+  const targets = [...cs, ...prettierable.map((f) => `web/${f}`), ...e2ePrettierable.map((f) => `e2e/${f}`)];
   const before = new Map(targets.map((f) => [f, hashOf(f)]));
 
   for (const part of chunks(cs)) {
@@ -419,6 +425,11 @@ async function applyFixes(changedFiles) {
   for (const part of chunks(prettierable)) {
     await step(`fix: prettier --write (${part.length} file(s))`, () =>
       runCommand(NPX, ["prettier", "--write", "--ignore-unknown", ...part], { cwd: WEB_DIR }),
+    );
+  }
+  if (e2ePrettierable.length && existsSync(path.join(E2E_DIR, "node_modules"))) {
+    await step(`fix: prettier --write e2e (${e2ePrettierable.length} file(s))`, () =>
+      runCommand(NPX, ["prettier", "--write", "--ignore-unknown", ...e2ePrettierable], { cwd: E2E_DIR }),
     );
   }
 
@@ -632,6 +643,7 @@ function buildFailure(stepName, result) {
     case "format":
     case "build":
     case "web-typecheck":
+    case "e2e-typecheck":
       return extractCompilerFailure(stepName, text);
     case "test":
       return extractDotnetTestFailure(text);
@@ -844,6 +856,7 @@ function computeScope(args, serviceNames, projectMap) {
   let selectedRels;
   let runWeb;
   let runApi;
+  let runE2e;
   let modeDescription;
   let changed = null;
 
@@ -851,20 +864,23 @@ function computeScope(args, serviceNames, projectMap) {
     selectedRels = allProjectRels();
     runWeb = true;
     runApi = true;
-    modeDescription = "--all: every test project + web + api";
+    runE2e = true;
+    modeDescription = "--all: every test project + web + api + e2e";
   } else if (args.projects) {
     const includesWeb = args.projects.some((t) => t.toLowerCase() === "web");
-    const dotnetTokens = args.projects.filter((t) => t.toLowerCase() !== "web");
+    const includesE2e = args.projects.some((t) => t.toLowerCase() === "e2e");
+    const dotnetTokens = args.projects.filter((t) => !["web", "e2e"].includes(t.toLowerCase()));
     const { rels, unknown } = resolveProjectsArg(dotnetTokens, projectMap);
     if (unknown.length > 0) {
       fatal(
         `unknown --projects entr${unknown.length > 1 ? "ies" : "y"}: ${unknown.join(", ")} ` +
-          `(known short names: ${[...projectMap.values()].map((v) => v.shortName).join(", ")}, web, or a path to a test project)`,
+          `(known short names: ${[...projectMap.values()].map((v) => v.shortName).join(", ")}, web, e2e, or a path to a test project)`,
       );
     }
     selectedRels = rels;
     runWeb = args.web || includesWeb;
     runApi = args.api;
+    runE2e = includesE2e;
     modeDescription = `--projects ${args.projects.join(",")}`;
   } else {
     changed = getChangedFiles();
@@ -873,20 +889,22 @@ function computeScope(args, serviceNames, projectMap) {
       selectedRels = allProjectRels();
       runWeb = true;
       runApi = true;
+      runE2e = true;
       modeDescription = "auto: no master or origin/master ref found — treating as --all";
     } else {
-      const { affectedKeys, web, api } = computeAffected(files, serviceNames);
+      const { affectedKeys, web, api, e2e } = computeAffected(files, serviceNames);
       selectedRels = affectedKeys.has("__all__")
         ? allProjectRels()
         : [...affectedKeys].map((k) => projectMap.get(k)?.rel).filter(Boolean);
       runWeb = args.web || web;
       runApi = args.api || api;
+      runE2e = e2e;
       modeDescription = `auto (diff base: ${base}): ${files.length} changed path(s)`;
     }
   }
 
   selectedRels = [...new Set(selectedRels)].sort();
-  return { selectedRels, runWeb, runApi, modeDescription, changed };
+  return { selectedRels, runWeb, runApi, runE2e, modeDescription, changed };
 }
 
 function lookupCache(args, scope) {
@@ -895,6 +913,7 @@ function lookupCache(args, scope) {
     all: args.all,
     web: scope.runWeb,
     api: scope.runApi,
+    e2e: scope.runE2e,
     projects: scope.selectedRels,
   });
   const fingerprint = computeFingerprint(scopeKey);
@@ -1010,6 +1029,27 @@ async function runWebChecks() {
   return [];
 }
 
+// Typecheck and prettier only: Playwright runs through scripts/e2e.mjs, never from here.
+async function runE2eChecks() {
+  if (!existsSync(E2E_DIR)) {
+    console.log("\nnotice: e2e/ not found — skipping e2e checks");
+    return [];
+  }
+  console.log("\n==> e2e checks (typecheck, format:check)");
+  if (!existsSync(path.join(E2E_DIR, "node_modules"))) {
+    const install = await step("e2e-install", () => runCommand(NPM, ["ci"], { cwd: E2E_DIR }));
+    if (!install.ok) return [buildFailure("e2e-install", install)];
+  }
+  const checks = [
+    ["e2e-typecheck", ["run", "typecheck"]],
+    ["e2e-format", ["run", "format:check"]],
+  ];
+  const results = await Promise.all(
+    checks.map(([name, npmArgs]) => step(name, () => runCommand(NPM, npmArgs, { cwd: E2E_DIR }), { block: true })),
+  );
+  return results.map((r, i) => (r.ok ? null : buildFailure(checks[i][0], r))).filter(Boolean);
+}
+
 async function runScriptsTest() {
   const result = await step("scripts-test", () => runCommand("node", ["--test", "scripts/docs/*.test.mjs"]));
   return result.ok ? [] : [buildFailure("scripts-test", result)];
@@ -1074,7 +1114,7 @@ async function main() {
   const serviceNames = discoverServiceNames();
   const projectMap = buildProjectMap(serviceNames);
   const scope = computeScope(args, serviceNames, projectMap);
-  const { selectedRels, runWeb, runApi } = scope;
+  const { selectedRels, runWeb, runApi, runE2e } = scope;
 
   if (args.cacheCheck) {
     const { hit } = lookupCache(args, scope);
@@ -1089,6 +1129,7 @@ async function main() {
   console.log(`test projects: ${selectedRels.length ? selectedRels.join(", ") : "(none)"}`);
   console.log(`web checks: ${runWeb ? "yes" : "no"}${args.quick && runWeb ? " (skipped by --quick)" : ""}`);
   console.log(`api check: ${runApi ? "yes" : "no"}${args.quick && runApi ? " (skipped by --quick)" : ""}`);
+  console.log(`e2e checks: ${runE2e ? "yes" : "no"}${args.quick && runE2e ? " (skipped by --quick)" : ""}`);
   console.log(`fix: ${args.fix ? "yes" : "no"} · deadline: ${args.deadlineMin} min`);
 
   const changed = args.fix || !args.all ? (scope.changed ?? getChangedFiles()) : null;
@@ -1129,7 +1170,8 @@ async function main() {
     args.jobs > 1
       ? await Promise.all([runDotnetTests(selectedRels, args.jobs), runWeb ? runWebChecks() : []])
       : [await runDotnetTests(selectedRels, 1), runWeb ? await runWebChecks() : []];
-  const failures = [...scriptsFailures, ...testFailures, ...webFailures];
+  const e2eFailures = runE2e ? await runE2eChecks() : [];
+  const failures = [...scriptsFailures, ...testFailures, ...webFailures, ...e2eFailures];
 
   if (runApi && webFailures.length === 0) {
     const apiFailure = await runApiCheck();
