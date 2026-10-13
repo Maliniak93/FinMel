@@ -15,7 +15,8 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
    `"status": "fixed"` → one line saying what was started, stopped or installed, then continue.
 2. Run `node scripts/gh-project.mjs prepare <issue> [--tier …] [--skip …]` with the issue number and any
    `--tier`/`--skip` from `$ARGUMENTS`. Never pass a `+Nk` token to it — that is the turn's budget
-   directive and the workflow reads it itself. It also cuts or switches the issue branch.
+   directive and the workflow reads it itself. It also cuts or switches the issue branch, and the
+   `epic` info in `workflowArgs` (the last part of an epic also gets the epic and sibling bodies written locally).
 3. `"ok": false` → print `reason` and `next`, and stop. `stage: "branch"` → the tree held changes that are
    not this spec: name the `files` and stop; never offer to sweep them into the branch.
 4. `"ok": true` → call the `Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`
@@ -30,7 +31,8 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
 - `ready` and SHIP_RESULT `ok` → the `prUrl` (the merge is the user's), the issue `url`, `branch` and
   `commit`, tests (`tests`, or "none — skip-tests"), `filesTouched` count, `rounds`, each of
   `minorFindings` as `file:line — claim` ("none" when empty), and `images` (the rebuilt compose
-  image `revision` from `scripts/compose.mjs build`, or its `error`; a failed image build does not make the ship fail).
+  image `revision` from `scripts/compose.mjs build`, or its `error`; a failed image build does not make the ship fail),
+  and the issues whose `## Test manualny` the run updated (`manualTest[].issue`, or "none").
 - `ready` and SHIP_RESULT not `ok` → `failedCommand` and `error`, then the remaining steps to finish by
   hand (commit, push, `gh pr create --base master`); the change is verified and reviewed.
 - `blocked` → `stage`, then `reason`/`failures`/`findings` trimmed to one line each, then: fix the

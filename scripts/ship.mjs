@@ -123,6 +123,7 @@ try {
     }
     for (const s of steps) console.log(`would run: ${s.cmd} ${s.argv.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ")}`);
     console.log("would run: node scripts/compose.mjs build --ref <sha>");
+    for (const m of report.manualTest ?? []) console.log(`would replace: ## Test manualny in #${m.issue} from ${m.file}`);
     console.log(`would post: gh-project.mjs report ${issue} --json ${JSON.stringify({ ...report, status: "shipped" })}`);
     result = { ok: !failed, dryRun: true, branch, ...(failed ? { failedCommand: failed.command, error: failed.error } : {}) };
     exitCode = failed ? 2 : 0;

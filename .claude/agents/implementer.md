@@ -165,6 +165,13 @@ verify cache before committing, so a `verified: true` on a tree verify never saw
   appended to `skarbiec-plan/decisions.md`, referenced from the spec. Neither happens silently.
 - Migration added → it is reviewed for destructiveness and named after the change, and the runbook
   note in the spec's Verification section still holds.
+- Manual test plan → compare the spec's `## Test manualny` with what you built. On a deviation
+  (screen, route, action, amount shown) write the full corrected section to
+  `skarbiec-plan/issues/<n>.manual.md` and return it in `manualTest`. When the delegation says the
+  part is an epic's last (`epic.last`), always write the refreshed whole-feature plan to
+  `skarbiec-plan/issues/<epic>.manual.md`, built from the epic draft (`<epic>.md`), the sibling parts'
+  plans (`<m>.md`) and the code. Numbered steps (`1.`), no checkboxes; name only routes, screens and
+  actions that exist in the code. The files are gitignored, so writing them does not touch the verified tree.
 
 Zero warnings and a formatted tree are part of done; your verify run checks them.
 
@@ -200,7 +207,8 @@ otherwise make the JSON your entire final message, with nothing before or after 
   "commandsRun": ["dotnet test services/Portfolio/Skarbiec.Portfolio.Tests"],
   "notes": ["what a reviewer would otherwise have to reverse-engineer"],
   "deviations": [{ "kind": "test", "file": "web/src/.../x.spec.ts", "what": "expected order fixed", "why": "the component sorts by date" }],
-  "openQuestions": ["only things the spec must answer before this can be finished"]
+  "openQuestions": ["only things the spec must answer before this can be finished"],
+  "manualTest": [{ "issue": 12, "file": "skarbiec-plan/issues/12.manual.md" }]
 }
 ```
 

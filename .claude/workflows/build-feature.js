@@ -64,6 +64,14 @@ const IMPL = {
         required: ['kind', 'what', 'why'],
       },
     },
+    manualTest: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { issue: { type: 'number' }, file: { type: 'string' } },
+        required: ['issue', 'file'],
+      },
+    },
   },
   required: ['status', 'verified', 'filesTouched', 'projects'],
 }
@@ -93,7 +101,7 @@ const REVIEW = {
 
 // ---------------------------------------------------------------- setup
 
-const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [] } = args || {}
+const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null } = args || {}
 
 if (!(spec && issue && branch && title)) {
   return {
@@ -120,6 +128,8 @@ let tests = { tests: [], projects: [], notes: [] }
 let impl = null
 // Every test or design change the implementer made, across all its rounds.
 const deviations = []
+// Plan files the implementer wrote (by issue), across all its rounds; a later round overrides an earlier one.
+const manualTest = new Map()
 let review = null
 
 const RESERVE = 40000
@@ -164,17 +174,24 @@ function stop(stage, extra) {
 
 const OWN =
   'You own the design and the tests: a wrong test or a wrong design decision is yours to fix - list each change in `deviations` with why. Every acceptance criterion must still be proven by a test.'
+const epicLast = Boolean(epic && epic.last)
+const MANUAL_LINE = epicLast
+  ? `This is the last part of epic #${epic.number}: compare the spec's \`## Test manualny\` with what you built (rewrite \`skarbiec-plan/issues/${issue}.manual.md\` on a deviation) and ALWAYS write the refreshed whole-feature plan to \`skarbiec-plan/issues/${epic.number}.manual.md\`, built from the epic draft \`skarbiec-plan/issues/${epic.number}.md\`, the sibling parts' plans (\`skarbiec-plan/issues/<m>.md\`) and the code. Return both in \`manualTest\` as \`{ issue, file }\`.`
+  : "Compare the spec's `## Test manualny` with what you built. On a deviation (screen, route, action, amount shown) write the full corrected section to `skarbiec-plan/issues/" +
+    issue +
+    '.manual.md` and return `manualTest: [{ issue, file }]`; otherwise return no `manualTest`.'
 const VERIFY_LINE =
   'Before you return, run the full verification (`scripts/verify.mjs --all`) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it.'
 async function implement(label, lines) {
   const result = await step(
     'implementer',
     label,
-    [`Work on the spec at \`${spec}\`. You are already on its branch \`${branch}\`.`].concat(lines, [OWN, VERIFY_LINE]),
+    [`Work on the spec at \`${spec}\`. You are already on its branch \`${branch}\`.`].concat(lines, [OWN, MANUAL_LINE, VERIFY_LINE]),
     IMPL,
     level,
   )
   if (result && result.deviations) deviations.push(...result.deviations)
+  if (result && result.manualTest) for (const m of result.manualTest) manualTest.set(m.issue, m)
   return result
 }
 
@@ -358,5 +375,6 @@ return {
     reviewRan: Boolean(review),
     minor: findingsOf(minor),
     deviations: compact().deviations,
+    manualTest: [...manualTest.values()],
   }),
 }
