@@ -17,6 +17,8 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
    `--tier`/`--skip` from `$ARGUMENTS`. Never pass a `+Nk` token to it — that is the turn's budget
    directive and the workflow reads it itself. It also cuts or switches the issue branch, and the
    `epic` info in `workflowArgs` (the last part of an epic also gets the epic and sibling bodies written locally).
+   `"e2e": true` in `workflowArgs` marks an epic's e2e part: pass it through verbatim, the workflow then runs the
+   e2e agent and the review instead of the test-writer and implementer.
 3. `"ok": false` → print `reason` and `next`, and stop. `stage: "branch"` → the tree held changes that are
    not this spec: name the `files` and stop; never offer to sweep them into the branch.
 4. `"ok": true` → call the `Workflow` tool with `{ name: 'build-feature', args: <workflowArgs, verbatim> }`
@@ -32,11 +34,16 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
   `commit`, tests (`tests`, or "none — skip-tests"), `filesTouched` count, `rounds`, each of
   `minorFindings` as `file:line — claim` ("none" when empty), and `images` (the rebuilt compose
   image `revision` from `scripts/compose.mjs build`, or its `error`; a failed image build does not make the ship fail),
-  and the issues whose `## Test manualny` the run updated (`manualTest[].issue`, or "none").
+  and the issues whose `## Test manualny` the run updated (`manualTest[].issue`, or "none"). An e2e part
+  adds the line `e2e: <passed>/<total> green` from SHIP_RESULT `e2e`, plus its `flaky` tests when any.
 - `ready` and SHIP_RESULT not `ok` → `failedCommand` and `error`, then the remaining steps to finish by
   hand (commit, push, `gh pr create --base master`); the change is verified and reviewed.
 - `blocked` → `stage`, then `reason`/`failures`/`findings` trimmed to one line each, then: fix the
   spec (`/design` amends the issue) or the named problem by hand, and re-run `/build #<n>` — the work
   stays on its branch.
+- `blocked` at `e2e` → the `class` (`app` or `environment`), the failed test, its `Krok <n>` step, the trace
+  path and the patch path from the report. `ship.mjs` has saved the diff and cleaned the tree back to master:
+  an `app` failure is fixed with `/fix`, an `environment` one by fixing the machine; then re-run `/build #<n>`
+  (the branch is recut from master and the tests are written again).
 
 Never commit, push, open or merge anything yourself — `ship.mjs` ships, the user merges — and never touch the issue.

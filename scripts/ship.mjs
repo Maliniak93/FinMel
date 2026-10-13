@@ -2,10 +2,13 @@
 // Usage: node scripts/ship.mjs <issue> --branch <b> --title <t> --json '<run report>' [--blocked] [--dry-run]
 //   --blocked   only post the report, no git; --dry-run prints the commands and runs the read-only guards only
 //   a shipping run first needs the tree proven green: node scripts/verify.mjs --all --cache-check
+//   an e2e part ("e2e": true in --json) instead needs node scripts/verify.mjs --projects e2e --cache-check and a green node scripts/e2e.mjs check
+//   --blocked at stage e2e also saves the uncommitted diff to skarbiec-plan/issues/<issue>.e2e.patch, restores the tree and switches to master
 //   after a successful ship it rebuilds the local compose images from the shipped commit (result.images; never fails the ship)
 //   last stdout line: SHIP_RESULT: {...}; exit 0 ok, 2 failed
 
 import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,8 +16,10 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const REPO = "Maliniak93/FinMel";
 const BOOLEAN_FLAGS = new Set(["blocked", "dry-run"]);
 const VERIFY_ARGV = ["scripts/verify.mjs", "--all", "--cache-check"];
-const VERIFY_COMMAND = `node ${VERIFY_ARGV.join(" ")}`;
+const E2E_VERIFY_ARGV = ["scripts/verify.mjs", "--projects", "e2e", "--cache-check"];
+const E2E_CHECK_ARGV = ["scripts/e2e.mjs", "check"];
 const NOT_GREEN = "the tree was not proven green by verify.mjs (cache miss)";
+const NOT_E2E_GREEN = "the e2e gate failed: no green whole-suite e2e run of this tree";
 
 function run(cmd, argv) {
   const res = spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
@@ -46,8 +51,9 @@ function finish() {
   process.exit(exitCode);
 }
 
-function checkVerified() {
-  const res = run(process.execPath, VERIFY_ARGV);
+function checkVerified(e2e) {
+  const argv = e2e ? E2E_VERIFY_ARGV : VERIFY_ARGV;
+  const res = run(process.execPath, argv);
   const line = res.all.split(/\r?\n/).reverse().find((l) => l.startsWith("VERIFY_RESULT: "));
   let parsed = null;
   try {
@@ -57,8 +63,69 @@ function checkVerified() {
   if (res.ok && parsed?.ok === true) return { ok: true };
   return {
     ok: false,
-    error: parsed ? `${NOT_GREEN}; run node scripts/verify.mjs --all --fix --cache first` : `${NOT_GREEN}; ${VERIFY_COMMAND} gave no result: ${res.firstErr}`,
+    error: parsed
+      ? `${NOT_GREEN}; run node scripts/verify.mjs ${e2e ? "--projects e2e" : "--all"} --fix --cache first`
+      : `${NOT_GREEN}; node ${argv.join(" ")} gave no result: ${res.firstErr}`,
   };
+}
+
+function checkE2e() {
+  const res = run(process.execPath, E2E_CHECK_ARGV);
+  const line = res.all.split(/\r?\n/).reverse().find((l) => l.startsWith("E2E_CHECK: "));
+  let parsed = null;
+  try {
+    parsed = JSON.parse(line.slice("E2E_CHECK: ".length));
+  } catch {
+  }
+  if (res.ok && parsed?.ok === true) return { ok: true, total: parsed.total, flaky: parsed.flaky };
+  return { ok: false, error: `${NOT_E2E_GREEN}; ${parsed?.error ?? `node ${E2E_CHECK_ARGV.join(" ")} gave no result: ${res.firstErr}`}` };
+}
+
+function checkGate(e2e) {
+  const verified = checkVerified(e2e);
+  if (!e2e) return verified;
+  const suite = checkE2e();
+  if (verified.ok && suite.ok) return suite;
+  return { ok: false, error: [verified.ok ? null : verified.error, suite.ok ? null : suite.error].filter(Boolean).join("; ") };
+}
+
+function gateCommand(e2e) {
+  return `node ${(e2e ? E2E_VERIFY_ARGV : VERIFY_ARGV).join(" ")}${e2e ? ` && node ${E2E_CHECK_ARGV.join(" ")}` : ""}`;
+}
+
+function blockedE2e(issue, branch, report, dryRun) {
+  const patch = `skarbiec-plan/issues/${issue}.e2e.patch`;
+  const withPatch = { ...report, status: "blocked", patch };
+  const cleanup = [
+    ["git", ["reset", "--hard", "HEAD"]],
+    ["git", ["clean", "-fd"]],
+    ["git", ["switch", "master"]],
+  ];
+  if (dryRun) {
+    console.log(`e2e blocked (${report.class ?? "?"}): ${report.reason ?? ""}`);
+    for (const f of report.failed ?? []) console.log(`  test: ${f.test} | step: ${f.step ?? "?"} | trace: ${f.trace ?? "none"}`);
+    if (report.reportPath) console.log(`  report: ${report.reportPath}`);
+    console.log(`would write: ${patch} (the uncommitted diff, untracked files included)`);
+    console.log(`would post: gh-project.mjs report ${issue} --json ${JSON.stringify(withPatch)}`);
+    for (const [cmd, argv] of cleanup) console.log(`would run: ${cmd} ${argv.join(" ")}`);
+    return { ok: true, dryRun: true, branch, patch };
+  }
+  const current = run("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (!current.ok || current.out !== branch || !/^(feat|fix|chore)\//.test(branch)) {
+    return { ok: false, branch, failedCommand: "guard", error: `current branch is ${current.out}, expected ${branch}: the tree was left as it is` };
+  }
+  const diff = spawnSync(process.execPath, ["scripts/review-diff.mjs"], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, maxBuffer: 256 * 1024 * 1024 });
+  if (diff.error || diff.status !== 0) return { ok: false, branch, failedCommand: "review-diff.mjs", error: diff.error?.message ?? (diff.stderr ?? "").trim() };
+  const patchFile = path.join(REPO_ROOT, patch);
+  mkdirSync(path.dirname(patchFile), { recursive: true });
+  writeFileSync(patchFile, diff.stdout);
+  const posted = postReport(withPatch);
+  if (!posted.ok) return { ok: false, branch, patch, reportPosted: false, failedCommand: "gh-project.mjs report", error: posted.error };
+  for (const [cmd, argv] of cleanup) {
+    const res = run(cmd, argv);
+    if (!res.ok) return { ok: false, branch, patch, reportPosted: true, failedCommand: `${cmd} ${argv.join(" ")}`, error: res.firstErr };
+  }
+  return { ok: true, branch, patch, reportPosted: true, cleaned: true };
 }
 
 function buildImages(ref) {
@@ -92,6 +159,14 @@ try {
   const report = JSON.parse(flags.json);
   result = { ok: false, branch };
 
+  const e2e = Boolean(report.e2e);
+
+  if (flags.blocked && report.stage === "e2e") {
+    result = blockedE2e(issue, branch, report, Boolean(flags["dry-run"]));
+    exitCode = result.ok ? 0 : 2;
+    finish();
+  }
+
   if (flags.blocked) {
     const posted = postReport({ ...report, status: "blocked" });
     result = { ok: posted.ok, branch, reportPosted: posted.ok, ...(posted.ok ? {} : { failedCommand: "gh-project.mjs report", error: posted.error }) };
@@ -115,11 +190,11 @@ try {
 
   if (flags["dry-run"]) {
     if (failed) console.log(`guard failed: ${failed.error}`);
-    console.log(`would run: ${VERIFY_COMMAND}`);
+    console.log(`would run: ${gateCommand(e2e)}`);
     if (!failed) {
-      const verified = checkVerified();
-      console.log(verified.ok ? "verify cache: green" : `verify cache: ${verified.error}`);
-      if (!verified.ok) failed = { command: VERIFY_COMMAND, error: verified.error };
+      const verified = checkGate(e2e);
+      console.log(verified.ok ? `${e2e ? "verify and e2e gate" : "verify cache"}: green` : `${e2e ? "gate" : "verify cache"}: ${verified.error}`);
+      if (!verified.ok) failed = { command: gateCommand(e2e), error: verified.error };
     }
     for (const s of steps) console.log(`would run: ${s.cmd} ${s.argv.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ")}`);
     console.log("would run: node scripts/compose.mjs build --ref <sha>");
@@ -131,13 +206,14 @@ try {
   }
 
   if (!failed) {
-    const verified = checkVerified();
+    const verified = checkGate(e2e);
     if (!verified.ok) {
-      const posted = postReport({ deviations: report.deviations, status: "blocked", stage: "verify", reason: NOT_GREEN });
-      result = { ok: false, branch, reportPosted: posted.ok, failedCommand: VERIFY_COMMAND, error: verified.error };
+      const posted = postReport({ deviations: report.deviations, status: "blocked", stage: "verify", reason: e2e ? NOT_E2E_GREEN : NOT_GREEN });
+      result = { ok: false, branch, reportPosted: posted.ok, failedCommand: gateCommand(e2e), error: verified.error };
       exitCode = 2;
       finish();
     }
+    if (e2e) report.e2e = { passed: verified.total, total: verified.total, flaky: verified.flaky };
   }
 
   let prUrl = null;
@@ -175,6 +251,7 @@ try {
     branch,
     commit: sha.ok ? sha.out : null,
     prUrl,
+    ...(e2e && typeof report.e2e === "object" ? { e2e: report.e2e } : {}),
     reportPosted: posted.ok,
     ...(failed ? { failedCommand: failed.command, error: failed.error } : posted.ok ? {} : { failedCommand: "gh-project.mjs report", error: posted.error }),
   };

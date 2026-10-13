@@ -12,7 +12,7 @@ Browser tests live in `e2e/` and run only through `node scripts/e2e.mjs run`. Mo
 ## The stack
 
 - A second compose project `skarbiec-e2e` (`deploy/compose/compose.yaml` + `compose.e2e.yaml`): images `skarbiec-e2e/<svc>` built from the working tree, web `:18080`, market stub `:18081`, dashboard `:18898`, Postgres and RabbitMQ unpublished on tmpfs, `down --volumes` after every run.
-- **Agent exception:** an agent may start and stop this project, and only through `node scripts/e2e.mjs`. The user's `skarbiec-local` stack, `compose.mjs` and Aspire stay the user's; `e2e.mjs` never retags `skarbiec-local/*`.
+- **Agent exception:** an agent may start and stop this project, and only through `node scripts/e2e.mjs`. The user's `skarbiec-local` stack, `compose.mjs` and Aspire stay the user's; `e2e.mjs` never retags `skarbiec-local/*`. In a build run only the `e2e` agent of an epic's e2e part starts it; the implementer and the test-writer never do. `node scripts/e2e.mjs check` is the read-only gate `ship.mjs` uses: a green whole-suite run (no `--grep`) of the exact working tree.
 - MarketData runs unchanged and reads the stub through `Yahoo:BaseUrl`, `Nbp:BaseUrl`, `GoldApi:BaseUrl` and `BondCatalog:PageUrl`. The Gateway limits are raised through `RateLimiting:*:PermitLimit`. Both only in the e2e override.
 
 ## Writing tests

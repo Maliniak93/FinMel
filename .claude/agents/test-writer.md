@@ -66,6 +66,7 @@ spec does not ask for. Every extra test is paid for again by the implementer and
   `services/*/Skarbiec.<Service>/`, `contracts/`, `gateway/` or `web/src/app` except `*.spec.ts`.
 - Never run `git add`, `git commit`, `git push`, `git checkout` or any other git mutation.
 - No test may be `[Fact(Skip = ...)]` or commented out.
+- Never run `node scripts/e2e.mjs` and never start the `skarbiec-e2e` stack: the e2e suite belongs to the e2e agent of an epic's e2e part.
 - A running local stack (Aspire AppHost, the services, `ng serve`) can block your test runs: MSB3021 / MSB3026 /
   MSB3027 ("being used by another process") on a build, EBUSY / EPERM on a file under `web/node_modules`,
   a port already in use. Then run `node scripts/stop-stack.mjs` (it stops only the stack and prints what

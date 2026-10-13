@@ -122,8 +122,17 @@ per part from `issue-template.md` as `<slug>-<n>-<part-slug>.md`, each with its 
 skip-tests. The umbrella gets the **whole-feature plan**: its `## Test manualny` is one continuous
 scenario of about 15–30 steps, from an empty account to the final state, assuming all parts merged;
 each part carries its own part plan or the `Weryfikacja w planie epica, krok <n>.` line (step 8).
-Check the umbrella with `check --epic` and every part with `check`. The approval summary
+Check the umbrella with `check --epic` and every part with `check` (the e2e part with `check --e2e`). The approval summary
 lists the parts one line each (title, tier, kind, AC count, plan step count).
+
+**The e2e part.** Every epic whose change is visible in the app ends with a last part drafted from
+`.claude/skills/design/e2e-part-template.md` as `<slug>-<n>-e2e.md`: fill only its placeholders, keep its four fixed ACs.
+It is created with `--e2e --parent <umbrella> --tier 1 --kind new` (never `--skip-tests`), attached last, and
+depends on the part before it. Its `/build` run automates the umbrella's `## Test manualny` as Playwright tests,
+refreshes that plan and runs the whole e2e suite; a stable app failure blocks it and stops `scripts/epic.mjs`. It has
+no `## Test manualny` of its own. Add no e2e part to an epic with no app-visible change (infrastructure, workflow,
+cleanup), nor to the e2e epic itself, whose smoke is its e2e. The approval summary lists the e2e part like any other
+part (title, tier 1, kind new, 4 ACs, `brak planu`).
 
 Converting an already published spec (the user asks, or `/build` blocked on it): the existing issue
 stays a part — narrow its body to that part with `edit --body-file`, never delete and re-create it —
@@ -150,7 +159,7 @@ node scripts/gh-project.mjs create --title "<title>" --body-file <scratchpad>/<s
 
 For a split: first the umbrella with `--epic` (its `--tier` is the highest of its parts, its
 `--kind` the one most parts share), then each part in build order with `--parent <umbrella number>`
-and its own `--slug`, `--tier`, `--kind`, `--skip-tests`. The script prints `{"number","url","branch"}` per issue; if it fails
+and its own `--slug`, `--tier`, `--kind`, `--skip-tests`, the e2e part last with `--e2e`. The script prints `{"number","url","branch"}` per issue; if it fails
 after the issue exists, it prints the URL — finish the missing fields with
 `node scripts/gh-project.mjs set <number> <field> <value>` instead of creating a duplicate.
 
