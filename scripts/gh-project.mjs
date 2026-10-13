@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Usage: node scripts/gh-project.mjs <verb> ...
 //   init                                                   create the custom fields and labels when missing
-//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n>] [--epic]
-//   check --body-file <p> [--epic]                         dry run of create's cleaning and checking
+//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n>] [--epic] [--e2e]   --e2e needs --parent and excludes --skip-tests
+//   check --body-file <p> [--epic] [--e2e]                 dry run of create's cleaning and checking
 //   edit <n> [--body-file <p>] [--tier 1|2] [--parent <n>] replace the body, or attach the issue to an epic
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
 //   set <n> <field> <value>                                set one project field
 //   get <n> [--out <path> [--raw]]                         print the issue as JSON (parent, lastPart), optionally write a local copy
-//   prepare <n> [--tier 1|2] [--skip tests,review] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch, moves the card; a last epic part also gets the epic and sibling bodies
+//   prepare <n> [--tier 1|2] [--skip tests,review] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch (an e2e part's idle branch is recut from origin/master), moves the card; a last epic part also gets the epic and sibling bodies
 //   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise); a shipped one also replaces ## Test manualny per manualTest
 //   list                                                   every issue on the project as JSON
 //   comment <n> --body-file <path>                         post a comment
@@ -33,9 +33,10 @@ const LABELS = [
   { name: "spec", color: "5319e7", description: "Build-ready spec written by /design" },
   { name: "epic", color: "3e4b9e", description: "Umbrella of a split spec; its sub-issues are built one by one" },
   { name: "skip-tests", color: "c5def5", description: "Spec adds or alters no behaviour; /build skips the test phase" },
+  { name: "e2e", color: "0e8a16", description: "Last part of an epic: automates the epic's manual test plan as Playwright tests" },
 ];
 const KINDS = { new: "New", change: "Change", cleanup: "Cleanup", fix: "Fix" };
-const BOOLEAN_FLAGS = new Set(["skip-tests", "epic", "raw", "dry-run"]);
+const BOOLEAN_FLAGS = new Set(["skip-tests", "epic", "e2e", "raw", "dry-run"]);
 const SKIPPABLE = new Set(["tests", "review"]);
 
 function gh(argv, input) {
@@ -163,10 +164,10 @@ function testPlanProblems(body) {
   return [];
 }
 
-function lintWarnings(body, { epic }) {
+function lintWarnings(body, { epic, e2e }) {
   const warnings = [];
   if (!epic && !section(body, "Code map")) warnings.push("no `## Code map` section — the test-writer, implementer and reviewer will each rediscover the code");
-  if (!section(body, TEST_PLAN)) warnings.push(`no \`## ${TEST_PLAN}\` section — the manual check after the merge has no steps`);
+  if (!e2e && !section(body, TEST_PLAN)) warnings.push(`no \`## ${TEST_PLAN}\` section — the manual check after the merge has no steps`);
   return warnings;
 }
 
@@ -191,11 +192,11 @@ function lintBody(body, { epic }) {
   return problems;
 }
 
-function preparedBody(file, epic) {
+function preparedBody(file, epic, e2e = false) {
   const body = cleanBody(readFileSync(path.resolve(REPO_ROOT, file), "utf8"));
   const problems = lintBody(body, { epic });
   if (problems.length) throw new Error(`the draft is not publishable:\n- ${problems.join("\n- ")}`);
-  for (const w of lintWarnings(body, { epic })) process.stderr.write(`warning: ${w}\n`);
+  for (const w of lintWarnings(body, { epic, e2e })) process.stderr.write(`warning: ${w}\n`);
   return body;
 }
 
@@ -219,6 +220,7 @@ function fieldsOf(item, labels) {
     branch: item?.branch ?? null,
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),
+    e2e: labels.includes("e2e"),
   };
 }
 
@@ -251,6 +253,7 @@ function writeCopy(result, body, out, raw) {
     result.tier && `Tier: ${result.tier}`,
     result.branch && `Branch: \`${result.branch}\``,
     result.skipTests && "skip-tests",
+    result.e2e && "e2e",
   ].filter(Boolean);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, raw ? `${body}\n` : `# ${result.title}\n\n${meta.join(" · ")}\n\n${body}\n`);
@@ -283,12 +286,15 @@ function create(flags) {
   const kind = KINDS[flags.kind];
   if (!kind) throw new Error(`--kind must be one of: ${Object.keys(KINDS).join(", ")}`);
   if (!["1", "2"].includes(flags.tier)) throw new Error("--tier must be 1 or 2");
+  if (flags.e2e && flags["skip-tests"]) throw new Error("--e2e and --skip-tests exclude each other: an e2e part writes tests");
+  if (flags.e2e && !flags.parent) throw new Error("--e2e needs --parent <epic number>: an e2e part is the last part of an epic");
   const branch = flags.epic ? null : `${flags.kind === "fix" ? "fix" : "feat"}/${flags.slug}`;
-  const body = preparedBody(flags["body-file"], flags.epic);
+  const body = preparedBody(flags["body-file"], flags.epic, flags.e2e);
 
   const argv = ["issue", "create", "--repo", REPO, "--title", flags.title, "--body-file", "-"];
   argv.push("--label", flags.epic ? "epic" : "spec");
   if (flags["skip-tests"]) argv.push("--label", "skip-tests");
+  if (flags.e2e) argv.push("--label", "e2e");
   if (flags.parent) argv.push("--parent", flags.parent);
   const url = gh(argv, body).split(/\r?\n/).pop();
 
@@ -312,7 +318,7 @@ function edit([number, ...rest]) {
   const done = [];
   if (flags["body-file"]) {
     const labels = JSON.parse(gh(["issue", "view", number, "--repo", REPO, "--json", "labels"])).labels.map((l) => l.name);
-    const body = preparedBody(flags["body-file"], labels.includes("epic"));
+    const body = preparedBody(flags["body-file"], labels.includes("epic"), labels.includes("e2e"));
     gh(["issue", "edit", number, "--repo", REPO, "--body-file", "-"], body);
     done.push("body replaced");
   }
@@ -437,11 +443,23 @@ function prepare([number, ...rest]) {
       });
     }
   }
-  if (head.out !== target) {
-    const exists = git(["rev-parse", "--verify", "--quiet", `refs/heads/${target}`]).ok || git(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${target}`]).ok;
-    action = exists ? "switched" : "created";
+  const local = git(["rev-parse", "--verify", "--quiet", `refs/heads/${target}`]).ok;
+  const exists = local || git(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${target}`]).ok;
+  let recut = false;
+  if (issue.e2e && exists && !dirty.length) {
+    const ref = local ? target : `origin/${target}`;
+    const ahead = git(["rev-list", "--count", `origin/master..${ref}`]);
+    const behind = git(["rev-list", "--count", `${ref}..origin/master`]);
+    recut = ahead.ok && behind.ok && ahead.out === "0" && Number(behind.out) > 0;
+  }
+  if (head.out !== target || recut) {
+    action = recut ? "recut" : exists ? "switched" : "created";
     const cmd = exists ? "git" : "gh";
-    const argv = exists ? ["switch", target] : ["issue", "develop", n, "--repo", REPO, "--name", target, "--base", "master", "--checkout"];
+    const argv = recut
+      ? ["switch", "-C", target, "origin/master"]
+      : exists
+        ? ["switch", target]
+        : ["issue", "develop", n, "--repo", REPO, "--name", target, "--base", "master", "--checkout"];
     branchCommands.push([cmd, ...argv].join(" "));
     if (!dryRun) {
       const res = spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
@@ -476,7 +494,7 @@ function prepare([number, ...rest]) {
     url: issue.url,
     branch: { name: target, action },
     notes: action === "resumed" ? dirty : [],
-    workflowArgs: { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic },
+    workflowArgs: { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic, e2e: issue.e2e },
   };
   if (dryRun) Object.assign(out, { dryRun: true, branchCommands, cardMove: resumed ? null : "Status -> In progress", epicCopies: extraCopies.map((m) => `${ISSUES_DIR}/${m}.md`) });
   console.log(JSON.stringify(out));
@@ -495,20 +513,33 @@ function report([number, ...rest]) {
     if (run.resumedShip) {
       lines.push("- Shipped by `scripts/epic.mjs` after the earlier ship step failed — tests and review are in the blocked report above.");
     } else {
-      lines.push(`- Tests: ${run.tests?.length ? run.tests.map((t) => `\`${t}\``).join(", ") : "none — skip-tests"}`);
+      if (run.e2e) {
+        const flaky = run.e2e.flaky ?? [];
+        lines.push(`- **e2e:** ${run.e2e.passed ?? 0}/${run.e2e.total ?? 0} green${flaky.length ? `, flaky: ${flaky.map((t) => `\`${t}\``).join(", ")}` : ""}`);
+      } else lines.push(`- Tests: ${run.tests?.length ? run.tests.map((t) => `\`${t}\``).join(", ") : "none — skip-tests"}`);
       lines.push(`- Fix rounds: ${run.rounds ?? 0}`);
       lines.push(`- Review: ${run.reviewRan ? `clean, ${run.minor?.length ?? 0} minor finding(s)` : "skipped"}`);
       for (const f of run.minor ?? []) lines.push(`  - \`${where(f)}\` — ${f.claim}`);
     }
   } else {
-    lines.push(`**Blocked** at \`${run.stage ?? "?"}\`${run.reason ? ` — ${run.reason}` : ""}`, "");
+    const e2eBlock = run.stage === "e2e";
+    lines.push(`**Blocked** at \`${run.stage ?? "?"}\`${e2eBlock && run.class ? ` (${run.class})` : ""}${run.reason ? ` — ${run.reason}` : ""}`, "");
     for (const f of run.failures ?? []) lines.push(`- ${f.step}: ${f.summary}${f.file ? ` (\`${f.file}\`)` : ""}`);
     for (const f of run.blocking ?? []) lines.push(`- \`${where(f)}\` — ${f.claim}`);
+    if (e2eBlock) {
+      for (const f of run.failed ?? []) lines.push(`- test \`${f.test}\`${f.step ? ` — ${f.step}` : ""}${f.trace ? ` — trace: \`${f.trace}\`` : ""}`);
+      if (run.reportPath) lines.push(`- report: \`${run.reportPath}\``);
+      if (run.patch) lines.push(`- patch: \`${run.patch}\``);
+    }
     lines.push(
       "",
       run.stage === "ship"
         ? "Verified and reviewed, but not shipped: finish the commit, push and PR by hand — a re-run of `/build` would repeat the whole pipeline."
-        : `Fix the spec or the named problem, then re-run \`/build #${number}\` — the work stays on its branch.`,
+        : e2eBlock
+          ? run.class === "environment"
+            ? `An environment problem, not an app defect: fix the machine, then re-run \`/build #${number}\` (or \`node scripts/epic.mjs <epic>\`) — the e2e tests are written again from master.`
+            : `A stable app failure: fix the app with \`/fix\` and merge it, then re-run \`/build #${number}\` (or \`node scripts/epic.mjs <epic>\`) — the branch is recut from master and the e2e tests are written again; the patch is for reference only.`
+          : `Fix the spec or the named problem, then re-run \`/build #${number}\` — the work stays on its branch.`,
     );
   }
 
@@ -563,8 +594,8 @@ function tick([number]) {
 
 function check(rest) {
   const flags = parseFlags(rest);
-  if (!flags["body-file"]) throw new Error("usage: check --body-file <path> [--epic]");
-  const body = preparedBody(flags["body-file"], flags.epic);
+  if (!flags["body-file"]) throw new Error("usage: check --body-file <path> [--epic] [--e2e]");
+  const body = preparedBody(flags["body-file"], flags.epic, flags.e2e);
   console.log(`publishable — ${body.split("\n").length} lines after cleaning`);
 }
 

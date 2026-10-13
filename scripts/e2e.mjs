@@ -9,6 +9,7 @@
 //   --await        wait (at most --max-min N, default 55) for a detached run; E2E_PENDING (exit 4) while it runs
 //   up             build and start the stack, leave it up      down  stop it and remove its volumes
 //   status         container states of the skarbiec-e2e project   report  open the HTML report
+//   check          ok (exit 0) if .git/e2e-result.json is a green whole-suite run of this exact working tree, else exit 2 (ship.mjs gate)
 //   run writes .git/e2e-result.json and prints E2E_RESULT: {...}; exit 0 green, 1 a test failed, 3 environment (Docker, port, stack health, deadline)
 // The skarbiec-local stack, its images and Aspire are never touched: this project has its own name, images, ports and tmpfs data.
 
@@ -292,7 +293,7 @@ async function run(args) {
   claimPidFile();
   rmSync(resultFile(), { force: true });
 
-  const result = { ok: false, class: "environment", failed: [], flaky: [], summary: "", reportPath: null, fingerprint: null, startedAt: new Date(startedAt).toISOString() };
+  const result = { ok: false, class: "environment", total: 0, failed: [], flaky: [], summary: "", reportPath: null, grep: args.grep, fingerprint: null, startedAt: new Date(startedAt).toISOString() };
   let stackUp = false;
   try {
     await requireDocker();
@@ -309,12 +310,12 @@ async function run(args) {
     if (!outcome) {
       result.summary = "Playwright produced no results (configuration or browser error)";
     } else if (outcome.failed.length > 0) {
-      Object.assign(result, { class: "fail", failed: outcome.failed, flaky: outcome.flaky, summary: `${outcome.failed.length} of ${outcome.total} test(s) failed` });
+      Object.assign(result, { class: "fail", total: outcome.total, failed: outcome.failed, flaky: outcome.flaky, summary: `${outcome.failed.length} of ${outcome.total} test(s) failed` });
       await saveStackLogs();
     } else if (!playwright.ok) {
       result.summary = `Playwright exited ${playwright.status} without a failed test`;
     } else {
-      Object.assign(result, { ok: true, class: "pass", flaky: outcome.flaky, summary: `${outcome.total} test(s) passed` });
+      Object.assign(result, { ok: true, class: "pass", total: outcome.total, flaky: outcome.flaky, summary: `${outcome.total} test(s) passed` });
     }
   } catch (err) {
     if (!(err instanceof EnvironmentError)) throw err;
@@ -401,6 +402,24 @@ async function awaitResult(maxMin) {
   }
 }
 
+function checkResult() {
+  const fail = (error) => {
+    console.log(`E2E_CHECK: ${JSON.stringify({ ok: false, error })}`);
+    return 2;
+  };
+  let result;
+  try {
+    result = JSON.parse(readFileSync(resultFile(), "utf8"));
+  } catch {
+    return fail("no .git/e2e-result.json - run: node scripts/e2e.mjs run");
+  }
+  if (!result.ok) return fail(`the last e2e run was not green (${result.class}: ${result.summary})`);
+  if (result.grep) return fail(`the last e2e run covered only --grep "${result.grep}", not the whole suite`);
+  if (!result.fingerprint || result.fingerprint !== fingerprint()) return fail("the last green e2e run was not on this working tree - run: node scripts/e2e.mjs run");
+  console.log(`E2E_CHECK: ${JSON.stringify({ ok: true, total: result.total ?? 0, flaky: result.flaky ?? [] })}`);
+  return 0;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   switch (args.command) {
@@ -431,11 +450,13 @@ async function main() {
     case "status":
       deadlineAt = Date.now() + 60 * 1000;
       return (await compose(["ps", "--all"])).ok ? 0 : 2;
+    case "check":
+      return checkResult();
     case "report":
       if (!existsSync(REPORT_DIR)) fatal("no HTML report yet; run: node scripts/e2e.mjs run");
       return (await exec(process.execPath, [PLAYWRIGHT_CLI, "show-report", REPORT_DIR], { cwd: E2E_DIR })).ok ? 0 : 2;
     default:
-      return fatal("usage: node scripts/e2e.mjs <run [--headed|--ui] [--grep <p>] [--keep] [--detach|--await]|up|down|status|report>");
+      return fatal("usage: node scripts/e2e.mjs <run [--headed|--ui] [--grep <p>] [--keep] [--detach|--await]|up|down|status|check|report>");
   }
 }
 

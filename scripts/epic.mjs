@@ -5,6 +5,7 @@
 //   --no-shutdown  do not schedule `shutdown /s /t 600` when the run ends
 //   node scripts/epic.mjs <epic> --stop   creates the stop file; the running driver stops before the next build
 //   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
+//   an e2e part blocked at `e2e` ends the run with reason `e2e app` or `e2e environment` and the trace path; resuming rebuilds it from master
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
@@ -117,13 +118,27 @@ function lastComment(number) {
 }
 
 const SHIP_BLOCKED = "**Blocked** at `ship`";
+const E2E_BLOCKED = "**Blocked** at `e2e`";
 
 // "ship" retries a failed ship step, "resume" continues an interrupted build on the tree on disk, "build" starts fresh
+// (a part blocked at e2e commits nothing and ship cleaned the tree: prepare recuts its branch from master)
 function partPlan(part, dirtyCount) {
   const onBranch = currentBranch() === part.branch;
   if (!onBranch && dirtyCount) return "build";
-  if (lastComment(part.number).startsWith(SHIP_BLOCKED)) return "ship";
+  const last = lastComment(part.number);
+  if (last.startsWith(SHIP_BLOCKED)) return "ship";
+  if (last.startsWith(E2E_BLOCKED)) return "build";
   return onBranch && dirtyCount ? "resume" : "build";
+}
+
+// "e2e app: <trace>" / "e2e environment: <trace>" when the part's last comment is the e2e block, else null
+function e2eBlock(number) {
+  const last = lastComment(number);
+  if (!last.startsWith(E2E_BLOCKED)) return null;
+  const cls = /^\*\*Blocked\*\* at `e2e` \((\w+)\)/.exec(last)?.[1] ?? "app";
+  const trace = /trace: `([^`]+)`/.exec(last)?.[1];
+  const report = /report: `([^`]+)`/.exec(last)?.[1];
+  return { reason: `e2e ${cls}`, where: trace ? `trace ${trace}` : report ? `report ${report}` : "see the report on the issue" };
 }
 
 function resolveClaude() {
@@ -428,6 +443,8 @@ async function handlePart(sub, ctx) {
       if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
       if (built.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached, resets ${resetClock(built.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
       pr = openPr(part.branch);
+      const blockedAtE2e = pr ? null : e2eBlock(part.number);
+      if (blockedAtE2e) throw new Stop(blockedAtE2e.reason, `#${part.number}: ${blockedAtE2e.reason} failure, ${blockedAtE2e.where} - fix it, then resume with node scripts/epic.mjs ${ctx.epic}`);
       if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
     }
   }

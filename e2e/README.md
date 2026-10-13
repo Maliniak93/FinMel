@@ -10,6 +10,7 @@ node scripts/e2e.mjs run --ui               # Playwright UI, no retries
 node scripts/e2e.mjs run --keep             # leave the stack up afterwards
 node scripts/e2e.mjs up | down | status | report
 node scripts/e2e.mjs run --detach           # then: node scripts/e2e.mjs run --await
+node scripts/e2e.mjs check                  # exit 0 only for a green whole-suite run of this exact tree (the ship gate of an e2e part)
 ```
 
 Docker must be running. The first run installs `e2e/` dependencies and Chromium, then builds six service images and the stub from the working tree (uncommitted changes included), so a run costs a few minutes. The user's `skarbiec-local` stack is not touched.
@@ -27,7 +28,7 @@ Project `skarbiec-e2e`, images `skarbiec-e2e/<svc>`, override `deploy/compose/co
 
 ## Result and failures
 
-`run` writes `.git/e2e-result.json` (`ok`, `class` = `pass` / `fail` / `environment`, `failed[]` with the test, failing step, error line and trace path, `flaky[]`, `reportPath`, working-tree `fingerprint`) and exits 0, 1 or 3. `--await` exits 4 while a detached run is still going.
+`run` writes `.git/e2e-result.json` (`ok`, `class` = `pass` / `fail` / `environment`, `total`, `grep`, `failed[]` with the test, failing step, error line and trace path, `flaky[]`, `reportPath`, working-tree `fingerprint`) and exits 0, 1 or 3. `--await` exits 4 while a detached run is still going.
 
 After a failure:
 

@@ -189,6 +189,7 @@ Zero warnings and a formatted tree are part of done; your verify run checks them
   it stopped), re-run the command once, and say so in `notes`. Never start the stack again afterwards.
 - Formatting is never yours to chase by hand — `verify.mjs --fix` does it. Fix the cause of a red
   verify; never route around it.
+- Never run `node scripts/e2e.mjs` and never start the `skarbiec-e2e` stack: the e2e suite belongs to the e2e agent of an epic's e2e part.
 
 ## Return
 
