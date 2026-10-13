@@ -45,6 +45,10 @@ export function isSecurityAssetClass(assetClass: AssetClass | undefined): boolea
   );
 }
 
+export function isSecurityTransactionType(value: TransactionType): boolean {
+  return SECURITY_TYPES.includes(Number(value));
+}
+
 function isSecurityIncome(value: TransactionType, assetClass: AssetClass | undefined): boolean {
   const type = Number(value);
   return isSecurityAssetClass(assetClass) && (type === DIVIDEND || type === INTEREST);
