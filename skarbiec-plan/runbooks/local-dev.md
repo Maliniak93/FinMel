@@ -42,6 +42,10 @@ Both Postgres and RabbitMQ use named Docker volumes (`.WithDataVolume()`), so st
 
 To try a shipped build without the working tree, the container stack runs from locally built images: `node scripts/compose.mjs build`, then `up` — see `deploy/README.md` "Local: docker compose". `stop-stack.mjs` and `/build` never touch it.
 
+## The e2e stack
+
+Browser tests run on a second compose project, `skarbiec-e2e`, next to the one above and independent of it: `node scripts/e2e.mjs run` builds the images from the working tree (`skarbiec-e2e/<svc>`), starts the stack, runs Playwright from `e2e/` and removes the stack and its data. Its ports: web `http://localhost:18080`, market-data stub `http://localhost:18081/__requests`, Aspire dashboard `http://localhost:18898`; Postgres and RabbitMQ are not published and live on tmpfs. `run --headed` or `run --ui` shows the browser; `run --keep` or `e2e.mjs up` leaves the stack up until `e2e.mjs down`. MarketData reads fixed prices from the stub, never from Yahoo, NBP, gold-api or the MF page. See `e2e/README.md`.
+
 ## Frontend dev server
 
 ```bash

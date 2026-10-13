@@ -1,0 +1,17 @@
+{
+  "name": "skarbiec-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@types/node": "26.6.4",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.2"
+  }
+}

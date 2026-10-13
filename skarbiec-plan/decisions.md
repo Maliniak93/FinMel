@@ -226,3 +226,11 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** snapshots, rebuilds and locks are per portfolio, net worth sums snapshots from different dates, and portfolios are being replaced by accounts that not every asset belongs to.
 **Decision:** Reporting keys snapshots, rebuild requests and the advisory lock by `UserId`, and lines carry the container id only for the dashboard split. From part 4, `AccountId?` replaces `PortfolioId`, null means outside every account, and the `Portfolio*` events are deleted. Archiving an account publishes nothing, because it needs a zero balance and no positions. Amends ADR-025 and ADR-032.
 **Consequences:** a rebuild rewrites every position of the user, not one portfolio's, which is the same cost for a one-user app, and the daily writer and the event path finally share one lock.
+
+## ADR-034 ✅ An isolated e2e stack on stubbed market data, started by agents
+
+**Context:** the e2e suite needs exact expected amounts, so market data must be fixed and must never come from Yahoo, gold-api, NBP or MF. It must also run unattended inside `epic.mjs`, while CLAUDE.md reserves starting and stopping the stack for the user.
+
+**Decision:** e2e runs only through `node scripts/e2e.mjs`, on a second compose project `skarbiec-e2e`: images `skarbiec-e2e/<svc>` built from the working tree, its own host ports (web `:18080`), Postgres and RabbitMQ on tmpfs, `down --volumes` after every run. A stub container serves a documented data set by impersonating the providers; only the e2e override points MarketData's base URLs at it, so MarketData's sources, parsers and jobs run unchanged and ADR-007 stands. Agents may start and stop this project, and only this one; the user's `skarbiec-local` stack and Aspire stay the user's.
+
+**Consequences:** an e2e run costs an image build and a stack start; the data set and the stub must follow provider payload changes by hand; the Yahoo/NBP base URLs and the Gateway permit limits become configuration.

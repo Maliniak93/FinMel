@@ -1,0 +1,88 @@
+# Override for the isolated e2e stack: docker compose -p skarbiec-e2e -f compose.yaml -f compose.e2e.yaml (scripts/e2e.mjs).
+# Own images, own host ports, tmpfs data, and a stub standing in for every market-data provider.
+
+x-build: &build
+  context: ../..
+  labels:
+    skarbiec.stack: e2e
+
+services:
+  postgres:
+    ports: !reset []
+    volumes: !override
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+
+  rabbitmq:
+    volumes: !override
+      - type: tmpfs
+        target: /var/lib/rabbitmq
+
+  dashboard:
+    ports: !override
+      - "18898:18888"
+
+  market-stub:
+    image: skarbiec-e2e/market-stub:latest
+    pull_policy: never
+    build:
+      <<: *build
+      dockerfile: e2e/stub/Dockerfile
+    ports:
+      - "18081:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  identity:
+    image: skarbiec-e2e/identity:latest
+    build:
+      <<: *build
+      dockerfile: services/Identity/Skarbiec.Identity/Dockerfile
+
+  marketdata:
+    image: skarbiec-e2e/marketdata:latest
+    build:
+      <<: *build
+      dockerfile: services/MarketData/Skarbiec.MarketData/Dockerfile
+    environment:
+      Yahoo__BaseUrl: http://market-stub:8080/yahoo/
+      Nbp__BaseUrl: http://market-stub:8080/nbp/api/
+      GoldApi__BaseUrl: http://market-stub:8080/gold/
+      BondCatalog__PageUrl: http://market-stub:8080/mf/page
+      PriceSync__Cron: "0/15 * * * * ?"
+      FxSync__Cron: "0/15 * * * * ?"
+    depends_on:
+      market-stub: { condition: service_healthy }
+
+  portfolio:
+    image: skarbiec-e2e/portfolio:latest
+    build:
+      <<: *build
+      dockerfile: services/Portfolio/Skarbiec.Portfolio/Dockerfile
+
+  reporting:
+    image: skarbiec-e2e/reporting:latest
+    build:
+      <<: *build
+      dockerfile: services/Reporting/Skarbiec.Reporting/Dockerfile
+
+  gateway:
+    image: skarbiec-e2e/gateway:latest
+    build:
+      <<: *build
+      dockerfile: gateway/Skarbiec.Gateway/Dockerfile
+    environment:
+      RateLimiting__Standard__PermitLimit: "10000"
+      RateLimiting__Auth__PermitLimit: "1000"
+
+  web:
+    image: skarbiec-e2e/web:latest
+    build:
+      <<: *build
+      dockerfile: web/Dockerfile
+    ports: !override
+      - "18080:80"

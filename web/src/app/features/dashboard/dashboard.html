@@ -29,7 +29,9 @@
             <div>
               <p class="dashboard-page__kpi-label">{{ 'dashboard.netWorth' | transloco }}</p>
               <div class="dashboard-page__net-worth-row">
-                <p class="dashboard-page__net-worth">{{ formatMoney(dashboard.netWorthPln) }}</p>
+                <p class="dashboard-page__net-worth" data-testid="net-worth">
+                  {{ formatMoney(dashboard.netWorthPln) }}
+                </p>
                 @if (dashboard.isStale) {
                   <mat-chip-set>
                     <mat-chip [matTooltip]="'dashboard.staleTooltip' | transloco">

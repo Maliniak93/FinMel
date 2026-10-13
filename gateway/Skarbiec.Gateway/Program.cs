@@ -14,6 +14,9 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod());
 });
 
+var standardPermitLimit = builder.Configuration.GetValue("RateLimiting:Standard:PermitLimit", 100);
+var authPermitLimit = builder.Configuration.GetValue("RateLimiting:Auth:PermitLimit", 5);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -21,7 +24,7 @@ builder.Services.AddRateLimiter(options =>
     // Default applied to every route.
     options.AddFixedWindowLimiter("standard", limiter =>
     {
-        limiter.PermitLimit = 100;
+        limiter.PermitLimit = standardPermitLimit;
         limiter.Window = TimeSpan.FromSeconds(10);
         limiter.QueueLimit = 0;
     });
@@ -29,7 +32,7 @@ builder.Services.AddRateLimiter(options =>
     // Stricter on the anonymous auth endpoints, which an attacker can hammer without a token.
     options.AddFixedWindowLimiter("auth", limiter =>
     {
-        limiter.PermitLimit = 5;
+        limiter.PermitLimit = authPermitLimit;
         limiter.Window = TimeSpan.FromSeconds(10);
         limiter.QueueLimit = 0;
     });

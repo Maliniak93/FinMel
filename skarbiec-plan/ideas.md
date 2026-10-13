@@ -24,7 +24,6 @@ Tier is a starting guess (see `workflow.md` → Tier rule); `/design` sets the r
 ## Platform
 
 - **Notifications** (tier 2) — a consumer inside Reporting plus an `IEmailSender` abstraction, no new service; starts with allocation-drift and emergency-fund-below-threshold e-mails, deduplicated per user per day.
-- **Playwright e2e smoke** (tier 1) — register → login → add asset → see valuation, through the Gateway, running in CI.
 - **Per-service test databases** (tier 1) — split the shared Testcontainers Postgres into one container per service test run, if cross-service test flakiness ever shows up.
 - **gRPC exercise: Reporting → MarketData `latest-batch`** (tier 2) — optional; the only gRPC candidate left standing after ADR-022 withdrew it from the required plan.
 - **VPS deploy (docker compose)** (tier 2) — the `deploy/deploy.sh` target, `.env` secrets, the compose half of `deploy/README.md`; currently deferred, development stays local-only until this is picked up.
