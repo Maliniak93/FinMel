@@ -28,43 +28,51 @@
 
     @if (!isEdit) {
       <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>{{ 'common.currency' | transloco }}</mat-label>
-        <mat-select formControlName="currency">
-          @for (currency of currencies; track currency.code) {
-            <mat-option [value]="currency.code">{{ currency.label | transloco }}</mat-option>
+        <mat-label>{{ 'deposits.form.sourceAccount' | transloco }}</mat-label>
+        <mat-select formControlName="sourceAccountId">
+          @for (account of accounts(); track account.id) {
+            <mat-option [value]="account.id">
+              {{ account.name }} ({{ account.currency }} {{ formatAmount(account.cashBalance) }})
+            </mat-option>
           }
         </mat-select>
-        @if (form.controls.currency.hasError('required')) {
-          <mat-error>{{ 'deposits.form.currencyRequired' | transloco }}</mat-error>
-        } @else if (form.controls.currency.hasError('server')) {
-          <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
+        @if (form.controls.sourceAccountId.hasError('required')) {
+          <mat-error>{{ 'deposits.form.sourceAccountRequired' | transloco }}</mat-error>
+        } @else if (form.controls.sourceAccountId.hasError('server')) {
+          <mat-error>{{ form.controls.sourceAccountId.getError('server') }}</mat-error>
         }
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="deposit-form-dialog__field">
-        <mat-label>{{ 'deposits.form.sourceOfFunds' | transloco }}</mat-label>
-        <mat-select formControlName="fundingAssetId" canSelectNullableOptions>
-          <mat-option [value]="null">{{ 'deposits.form.newMoney' | transloco }}</mat-option>
-          @if (fundingCandidatesResource.hasValue()) {
-            @for (candidate of fundingCandidatesResource.value(); track candidate.assetId) {
-              <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} ({{
-                  formatMoney(candidate.balance, form.controls.currency.value)
-                }})
-              </mat-option>
-            }
-          }
-        </mat-select>
-        @if (fundingCandidatesResource.error(); as loadError) {
+        @if (accountsResource.error(); as loadError) {
           <mat-hint>{{ loadError.message }}</mat-hint>
         }
       </mat-form-field>
     } @else if (data.deposit; as deposit) {
       <p class="deposit-form-dialog__funding">
-        {{ 'deposits.form.sourceOfFunds' | transloco }}
-        <strong>{{ deposit.fundingAssetName ?? ('deposits.form.newMoney' | transloco) }}</strong>
+        {{ 'deposits.form.sourceAccount' | transloco }}
+        <strong>{{ deposit.sourceAccountName }}</strong>
       </p>
     }
+
+    @if (currency(); as currencyCode) {
+      <p class="deposit-form-dialog__funding">
+        {{ 'common.currency' | transloco }}
+        <strong>{{ currencyCode }}</strong>
+      </p>
+    }
+
+    <mat-form-field appearance="outline" class="deposit-form-dialog__field">
+      <mat-label>{{ 'deposits.form.returnAccount' | transloco }}</mat-label>
+      <mat-select formControlName="returnAccountId" canSelectNullableOptions>
+        @if (!isEdit) {
+          <mat-option [value]="null">{{ 'deposits.form.returnToSource' | transloco }}</mat-option>
+        }
+        @for (account of returnAccounts(); track account.id) {
+          <mat-option [value]="account.id">{{ account.name }}</mat-option>
+        }
+      </mat-select>
+      @if (form.controls.returnAccountId.hasError('server')) {
+        <mat-error>{{ form.controls.returnAccountId.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
       <mat-label>{{ 'deposits.principal' | transloco }}</mat-label>
@@ -73,17 +81,8 @@
         <mat-error>{{ 'deposits.form.principalRequired' | transloco }}</mat-error>
       } @else if (form.controls.principal.hasError('min')) {
         <mat-error>{{ 'deposits.form.principalPositive' | transloco }}</mat-error>
-      } @else if (form.controls.principal.hasError('exceedsBalance')) {
-        <mat-error>{{
-          'deposits.form.exceedsBalance'
-            | transloco
-              : {
-                  balance: formatMoney(
-                    form.controls.principal.getError('exceedsBalance').balance,
-                    form.controls.currency.value
-                  ),
-                }
-        }}</mat-error>
+      } @else if (form.controls.principal.hasError('insufficientFunds')) {
+        <mat-error>{{ 'deposits.form.insufficientFunds' | transloco }}</mat-error>
       } @else if (form.controls.principal.hasError('server')) {
         <mat-error>{{ form.controls.principal.getError('server') }}</mat-error>
       }
@@ -165,10 +164,6 @@
         }
       </mat-select>
     </mat-form-field>
-
-    <mat-slide-toggle formControlName="taxExempt" class="deposit-form-dialog__toggle">
-      {{ 'deposits.form.taxExempt' | transloco }}
-    </mat-slide-toggle>
 
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
       <mat-label>{{ 'deposits.form.earlyBreakLoss' | transloco }}</mat-label>

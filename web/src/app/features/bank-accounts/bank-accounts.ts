@@ -246,10 +246,13 @@ export class BankAccounts {
 
   private finishChange(error: unknown, failedKey: string): void {
     if (error) {
-      this.snackBar.open(
-        readProblemDetails(error).detail ?? translate(failedKey),
-        translate('common.dismiss'),
-      );
+      const problem = readProblemDetails(error);
+      const fallback = translate(failedKey);
+      const message =
+        problem.errorCode === 'Conflict.AccountHasOpenDeposit'
+          ? translate('bankAccounts.hasOpenDeposit')
+          : (problem.detail ?? fallback);
+      this.snackBar.open(message, translate('common.dismiss'));
       return;
     }
 

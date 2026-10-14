@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
@@ -14,29 +14,25 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import {
-  getApiPortfolioTransferCandidates,
+  getApiPortfolioAccounts,
   postApiPortfolioDeposits,
   putApiPortfolioDepositsByAssetId,
   type DepositCapitalization,
   type DepositResponse,
   type DepositTermUnit,
-  type TransferCandidateResponse,
-  type UpdateDepositRequest,
 } from '../../../api/portfolio';
 import {
   applyFieldErrors,
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
-import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
-import { formatDate, formatMoney } from '../../../shared/format';
-import { ASSET_CLASS } from '../../assets/asset-class';
+import { formatAmount, formatDate } from '../../../shared/format';
+import { ACCOUNT_TYPE } from '../../accounts/account-type';
 import {
   DEPOSIT_CAPITALIZATIONS,
   DEPOSIT_TERM_UNIT,
@@ -69,7 +65,6 @@ function termLengthWithinCap(control: AbstractControl): ValidationErrors | null 
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
-    MatSlideToggleModule,
     TranslocoPipe,
   ],
   templateUrl: './deposit-form-dialog.html',
@@ -86,40 +81,25 @@ export class DepositFormDialog {
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 
-  protected readonly currencies = SUPPORTED_CURRENCIES;
   protected readonly termUnits = DEPOSIT_TERM_UNITS;
   protected readonly capitalizations = DEPOSIT_CAPITALIZATIONS;
-  protected readonly formatMoney = formatMoney;
+  protected readonly formatAmount = formatAmount;
   protected readonly formatDate = formatDate;
-
-  private readonly principalWithinBalance = (control: AbstractControl): ValidationErrors | null => {
-    const fundingAssetId = control.parent?.get('fundingAssetId')?.value as
-      string | null | undefined;
-    if (!fundingAssetId || control.value === null || control.value === '') {
-      return null;
-    }
-    const source = this.fundingSource(fundingAssetId);
-    if (!source) {
-      return null;
-    }
-    return Number(control.value) > Number(source.balance)
-      ? { exceedsBalance: { balance: source.balance } }
-      : null;
-  };
 
   protected readonly form = this.formBuilder.nonNullable.group({
     name: [this.deposit?.name ?? '', [Validators.required, Validators.maxLength(200)]],
     bankName: [this.deposit?.bankName ?? '', [Validators.maxLength(100)]],
-    currency: [
-      { value: this.deposit?.currency ?? DEFAULT_CURRENCY, disabled: this.isEdit },
+    sourceAccountId: [
+      { value: null as string | null, disabled: this.isEdit },
       [Validators.required],
     ],
+    returnAccountId: [this.deposit?.returnAccountId ?? (null as string | null)],
     principal: [
       {
         value: this.deposit ? Number(this.deposit.principal) : (null as number | null),
         disabled: this.isRolledOver,
       },
-      [Validators.required, Validators.min(0.01), this.principalWithinBalance],
+      [Validators.required, Validators.min(0.01)],
     ],
     startDate: [
       {
@@ -144,12 +124,10 @@ export class DepositFormDialog {
       (this.deposit ? Number(this.deposit.capitalization) : 0) as DepositCapitalization,
       [Validators.required],
     ],
-    taxExempt: [this.deposit?.taxExempt ?? false],
     earlyBreakInterestLossPercent: [
       this.deposit ? Number(this.deposit.earlyBreakInterestLossPercent) : (100 as number | null),
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
-    fundingAssetId: [{ value: null as string | null, disabled: this.isEdit }],
   });
 
   private readonly formValue = toSignal(
@@ -166,22 +144,36 @@ export class DepositFormDialog {
     return depositMaturityDate(startDate, length, termUnit);
   });
 
-  private readonly selectedCurrency = computed(() => this.formValue().currency);
-
-  protected readonly fundingCandidatesResource = resource({
-    params: () => (this.isEdit ? undefined : { currency: this.selectedCurrency() }),
-    loader: async ({ params, abortSignal }) => {
-      const result = await getApiPortfolioTransferCandidates({
-        query: { currency: params.currency, assetClass: ASSET_CLASS.Cash },
+  protected readonly accountsResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioAccounts({
+        query: { type: ACCOUNT_TYPE.Bank },
         signal: abortSignal,
       });
       if (result.error) {
         throw new Error(
-          readProblemDetails(result.error).detail ?? translate('deposits.form.fundingLoadFailed'),
+          readProblemDetails(result.error).detail ?? translate('deposits.form.accountsLoadFailed'),
         );
       }
-      return result.data ?? [];
+      return (result.data ?? []).filter((account) => !account.isArchived);
     },
+  });
+
+  protected readonly accounts = computed(() =>
+    this.accountsResource.hasValue() ? this.accountsResource.value() : [],
+  );
+
+  protected readonly currency = computed(
+    () =>
+      this.deposit?.currency ??
+      this.accounts().find((account) => account.id === this.formValue().sourceAccountId)
+        ?.currency ??
+      null,
+  );
+
+  protected readonly returnAccounts = computed(() => {
+    const currency = this.currency();
+    return currency ? this.accounts().filter((account) => account.currency === currency) : [];
   });
 
   constructor() {
@@ -190,32 +182,19 @@ export class DepositFormDialog {
     this.form.controls.termUnit.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.termLength.updateValueAndValidity());
-    this.form.controls.fundingAssetId.valueChanges
+    this.form.controls.sourceAccountId.valueChanges
       .pipe(takeUntilDestroyed())
-      .subscribe(() => this.form.controls.principal.updateValueAndValidity());
-
-    effect(() => {
-      if (!this.fundingCandidatesResource.hasValue()) {
-        return;
-      }
-      const candidates = this.fundingCandidatesResource.value();
-      untracked(() => {
-        const fundingAssetId = this.form.controls.fundingAssetId;
-        if (
-          fundingAssetId.value !== null &&
-          !candidates.some((candidate) => candidate.assetId === fundingAssetId.value)
-        ) {
-          fundingAssetId.setValue(null);
-        }
-        this.form.controls.principal.updateValueAndValidity();
-      });
-    });
+      .subscribe((sourceAccountId) => this.dropForeignCurrencyReturn(sourceAccountId));
   }
 
-  private fundingSource(assetId: string): TransferCandidateResponse | undefined {
-    return this.fundingCandidatesResource.hasValue()
-      ? this.fundingCandidatesResource.value().find((candidate) => candidate.assetId === assetId)
-      : undefined;
+  private dropForeignCurrencyReturn(sourceAccountId: string | null): void {
+    const returnControl = this.form.controls.returnAccountId;
+    const accounts = this.accounts();
+    const source = accounts.find((account) => account.id === sourceAccountId);
+    const chosen = accounts.find((account) => account.id === returnControl.value);
+    if (chosen && chosen.currency !== source?.currency) {
+      returnControl.setValue(null);
+    }
   }
 
   protected async onSubmit(): Promise<void> {
@@ -232,7 +211,7 @@ export class DepositFormDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const terms: UpdateDepositRequest = {
+    const terms = {
       name: values.name,
       bankName: values.bankName.trim() || null,
       principal: Number(values.principal),
@@ -241,20 +220,19 @@ export class DepositFormDialog {
       termUnit: values.termUnit,
       annualInterestRatePercent: Number(values.annualInterestRatePercent),
       capitalization: values.capitalization,
-      taxExempt: values.taxExempt,
       earlyBreakInterestLossPercent: Number(values.earlyBreakInterestLossPercent),
     };
 
     const result = this.deposit
       ? await putApiPortfolioDepositsByAssetId({
           path: { assetId: this.deposit.assetId },
-          body: terms,
+          body: { ...terms, returnAccountId: values.returnAccountId ?? undefined },
         })
       : await postApiPortfolioDeposits({
           body: {
             ...terms,
-            currency: values.currency,
-            fundingAssetId: values.fundingAssetId ?? undefined,
+            sourceAccountId: values.sourceAccountId!,
+            returnAccountId: values.returnAccountId ?? undefined,
           },
         });
 
@@ -274,9 +252,7 @@ export class DepositFormDialog {
 
   private applyServerErrors(problem: ApiProblemDetails): void {
     if (problem.errorCode === 'Validation.InsufficientFunds') {
-      this.form.controls.principal.setErrors({
-        server: problem.detail ?? translate('deposits.form.insufficientFunds'),
-      });
+      this.form.controls.principal.setErrors({ insufficientFunds: true });
       this.form.controls.principal.markAsTouched();
       return;
     }

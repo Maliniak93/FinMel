@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Usage: node scripts/ship.mjs <issue> --branch <b> --title <t> --json '<run report>' [--blocked] [--dry-run]
+// Usage: node scripts/ship.mjs <issue> (--from-run | --branch <b> --title <t> --json '<run report>' [--blocked]) [--dry-run]
+//   --from-run  branch, title, report and --blocked come from the newest build-feature workflow record of <issue>
 //   --blocked   only post the report, no git; --dry-run prints the commands and runs the read-only guards only
 //   a shipping run first needs the tree proven green: node scripts/verify.mjs --all --cache-check
 //   an e2e part ("e2e": true in --json) instead needs node scripts/verify.mjs --projects e2e --cache-check and a green node scripts/e2e.mjs check
@@ -11,10 +12,11 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { latestRunRecord } from "./build-replay.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
-const BOOLEAN_FLAGS = new Set(["blocked", "dry-run"]);
+const BOOLEAN_FLAGS = new Set(["blocked", "dry-run", "from-run"]);
 const VERIFY_ARGV = ["scripts/verify.mjs", "--all", "--cache-check"];
 const E2E_VERIFY_ARGV = ["scripts/verify.mjs", "--projects", "e2e", "--cache-check"];
 const E2E_CHECK_ARGV = ["scripts/e2e.mjs", "check"];
@@ -151,9 +153,16 @@ function postReport(report) {
   return res.ok ? { ok: true } : { ok: false, error: res.firstErr };
 }
 
+function fromRun(issue) {
+  const record = latestRunRecord({ issue });
+  if (!record) throw new Error(`--from-run: no finished build-feature run of #${issue} with a ship report in the Claude Code history`);
+  return { branch: record.args.branch, title: record.args.title, json: JSON.stringify(record.result.ship.report), blocked: Boolean(record.result.ship.blocked) };
+}
+
 try {
-  if (!/^\d+$/.test(issue ?? "")) throw new Error("usage: ship.mjs <issue> --branch <b> --title <t> --json '<run report>' [--blocked] [--dry-run]");
+  if (!/^\d+$/.test(issue ?? "")) throw new Error("usage: ship.mjs <issue> (--from-run | --branch <b> --title <t> --json '<run report>' [--blocked]) [--dry-run]");
   const flags = parseFlags(rest);
+  if (flags["from-run"]) Object.assign(flags, fromRun(issue));
   for (const required of ["branch", "title", "json"]) if (!flags[required]) throw new Error(`--${required} is required`);
   const { branch, title } = flags;
   const report = JSON.parse(flags.json);

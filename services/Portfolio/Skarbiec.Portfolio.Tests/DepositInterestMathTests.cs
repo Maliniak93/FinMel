@@ -15,8 +15,7 @@ public sealed class DepositInterestMathTests
             TermLength = 3,
             TermUnit = DepositTermUnit.Months,
             AnnualInterestRatePercent = 6m,
-            Capitalization = DepositCapitalization.AtMaturity,
-            TaxExempt = false
+            Capitalization = DepositCapitalization.AtMaturity
         });
 
         Assert.Equal(new DateOnly(2026, 4, 15), projection.MaturityDate);
@@ -38,8 +37,7 @@ public sealed class DepositInterestMathTests
             TermLength = 3,
             TermUnit = DepositTermUnit.Months,
             AnnualInterestRatePercent = 6m,
-            Capitalization = DepositCapitalization.Monthly,
-            TaxExempt = false
+            Capitalization = DepositCapitalization.Monthly
         });
 
         Assert.Equal(new DateOnly(2026, 4, 1), projection.MaturityDate);
@@ -74,8 +72,7 @@ public sealed class DepositInterestMathTests
             TermLength = 45,
             TermUnit = DepositTermUnit.Days,
             AnnualInterestRatePercent = 5m,
-            Capitalization = DepositCapitalization.Monthly,
-            TaxExempt = true
+            Capitalization = DepositCapitalization.Monthly
         });
 
         Assert.Equal(new DateOnly(2026, 3, 1), projection.MaturityDate);
@@ -111,8 +108,7 @@ public sealed class DepositInterestMathTests
             TermLength = termMonths,
             TermUnit = DepositTermUnit.Months,
             AnnualInterestRatePercent = 4m,
-            Capitalization = capitalization,
-            TaxExempt = false
+            Capitalization = capitalization
         });
 
         Assert.Equal(expectedPeriods, projection.Periods.Count);
@@ -128,25 +124,5 @@ public sealed class DepositInterestMathTests
             Assert.Equal(start.AddMonths(k * step), projection.Periods[k].StartDate);
             Assert.Equal(start.AddMonths((k + 1) * step), projection.Periods[k].EndDate);
         }
-    }
-
-    [Fact]
-    public void TaxExempt_AtMaturity_NetEqualsGross()
-    {
-        var projection = DepositInterestMath.Project(new DepositTerms
-        {
-            Principal = 10_000.00m,
-            StartDate = new DateOnly(2026, 1, 15),
-            TermLength = 3,
-            TermUnit = DepositTermUnit.Months,
-            AnnualInterestRatePercent = 6m,
-            Capitalization = DepositCapitalization.AtMaturity,
-            TaxExempt = true
-        });
-
-        Assert.Equal(147.95m, projection.GrossInterest);
-        Assert.Equal(0m, projection.Tax);
-        Assert.Equal(147.95m, projection.NetInterest);
-        Assert.Equal(10_147.95m, projection.FinalAmount);
     }
 }

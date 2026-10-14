@@ -15,29 +15,6 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task AddDeposit_FundedFromStrangersCash_ReturnsInvalidCounterpartAndWritesNothing()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var ownerId = Guid.NewGuid();
-        using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
-        var strangerId = Guid.NewGuid();
-        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
-        var ownerBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
-        var strangerBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
-
-        var response = await stranger.PostAsJsonAsync(
-            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: ownerCashId), cancellationToken);
-
-        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        Assert.Equal(ownerBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
-        Assert.Equal(strangerBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
-        await owner.AssertCashUntouchedAsync(ownerCashId, cancellationToken);
-        await using var dbContext = CreateDbContext(ownerId);
-        Assert.False(await dbContext.Transactions.IgnoreQueryFilters().AnyAsync(t => t.TransferId != null, cancellationToken));
-    }
-
-    [Fact]
     public async Task RecordMetalBuy_FundedFromStrangersCash_ReturnsInvalidCounterpartAndWritesNothing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

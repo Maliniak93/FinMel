@@ -154,10 +154,9 @@ internal static class BankAccountsApi
     public static async Task<DepositPaidIntoBank> CreateDepositPaidIntoBankAsync(
         this HttpClient client, CancellationToken cancellationToken)
     {
-        var deposit = await client.AddDepositAsync(cancellationToken);
         var account = await client.CreateBankAccountAsync(cancellationToken, "Savings account", SavingsVariant, annualInterestRatePercent: 5.25m);
-        await client.SettleDepositAsync(
-            deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: account.MoneyAssetId));
+        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(returnAccountId: account.AccountId));
+        await client.SettleDepositAsync(deposit.AssetId, cancellationToken, NewSettleRequest(payOut: true));
 
         return new DepositPaidIntoBank(deposit, account);
     }

@@ -19,6 +19,7 @@ import {
   getApiPortfolioAccountsById,
   getApiPortfolioAssets,
   getApiPortfolioAssetsByAssetIdTransactions,
+  getApiPortfolioDeposits,
   type TransactionResponse,
 } from '../../../api/portfolio';
 import { getApiReportingDashboard } from '../../../api/reporting';
@@ -121,6 +122,22 @@ export class AccountDetail {
     },
   });
 
+  protected readonly depositsResource = resource({
+    params: () => (this.isBank() ? { accountId: this.id() } : undefined),
+    loader: async ({ params, abortSignal }) => {
+      const result = await getApiPortfolioDeposits({
+        query: { accountId: params.accountId },
+        signal: abortSignal,
+      });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('accounts.detail.depositsFailed'),
+        );
+      }
+      return result.data ?? [];
+    },
+  });
+
   protected readonly historyResource = resource({
     params: () => {
       const cashAssetId = this.accountResource.hasValue()
@@ -176,6 +193,7 @@ export class AccountDetail {
   ]);
 
   protected readonly holdingColumns = ['name', 'quantity'];
+  protected readonly depositColumns = ['name', 'principal', 'maturityDate'];
 
   protected readonly accountTypeLabel = accountTypeLabel;
   protected readonly bankVariantLabel = bankVariantLabel;

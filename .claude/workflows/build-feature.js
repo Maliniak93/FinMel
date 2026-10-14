@@ -195,9 +195,6 @@ function step(agentType, label, lines, schema, opts) {
 
 const clip = (text, n) => (text && String(text).length > n ? `${String(text).slice(0, n)}…` : text)
 const findingsOf = (list) => (list || []).map((f) => ({ file: f.file, line: f.line, claim: clip(f.claim, 300) }))
-// Single-quoted for bash (a `'` inside becomes `'"'"'`), so the command stays one line that matches its
-// permission rule and runs without a prompt.
-const sq = (text) => `'${String(text).replace(/'/g, `'"'"'`)}'`
 
 const compact = () => ({
   tests: tests.tests.map((t) => t.name),
@@ -206,13 +203,12 @@ const compact = () => ({
   deviations: deviations.map((d) => ({ kind: d.kind, file: d.file, what: clip(d.what, 200), why: clip(d.why, 300) })),
 })
 
-// No model touches git or the issue: the caller runs `nextCommand` verbatim, and ship.mjs commits, pushes,
-// opens the PR and posts the run report (or, with --blocked, only the report).
-const shipCommand = (run, blocked) =>
-  `node scripts/ship.mjs ${issue} --branch ${sq(branch)} --title ${sq(title)} --json ${sq(JSON.stringify(run))}${blocked ? ' --blocked' : ''}`
+// No model touches git or the issue: the caller runs the short `nextCommand`, and ship.mjs reads `ship` (the run
+// report) from this run's workflow record, so a truncated result never loses it; nextCommand goes first for the same reason.
+const nextCommand = `node scripts/ship.mjs ${issue} --from-run`
 
 function stop(stage, extra) {
-  const result = Object.assign({ status: 'blocked', stage, issue, tier, rounds, branch }, compact(), extra)
+  const result = Object.assign({ nextCommand, status: 'blocked', stage, issue, tier, rounds, branch }, compact(), extra)
   const run = {
     status: 'blocked',
     stage,
@@ -229,7 +225,7 @@ function stop(stage, extra) {
       reportPath: result.e2eBlock.reportPath,
     })
   }
-  result.nextCommand = shipCommand(run, true)
+  result.ship = { report: run, blocked: true }
   return result
 }
 
@@ -464,6 +460,7 @@ const minor = review ? review.findings.filter((f) => f.severity === 'minor') : [
 log(`${branch} is verified${review ? ' and reviewed' : ''} - the caller ships it with nextCommand; merging is yours`)
 
 return {
+  nextCommand,
   status: 'ready',
   branch,
   review: review ? clip(review.summary, 400) : 'review skipped',
@@ -473,15 +470,18 @@ return {
   issue,
   tier,
   ...compact(),
-  nextCommand: shipCommand({
-    status: 'shipped',
-    branch,
-    tests: tests.tests.map((t) => t.name),
-    e2e: e2e ? true : undefined,
-    rounds,
-    reviewRan: Boolean(review),
-    minor: findingsOf(minor),
-    deviations: compact().deviations,
-    manualTest: [...manualTest.values()],
-  }),
+  ship: {
+    blocked: false,
+    report: {
+      status: 'shipped',
+      branch,
+      tests: tests.tests.map((t) => t.name),
+      e2e: e2e ? true : undefined,
+      rounds,
+      reviewRan: Boolean(review),
+      minor: findingsOf(minor),
+      deviations: compact().deviations,
+      manualTest: [...manualTest.values()],
+    },
+  },
 }

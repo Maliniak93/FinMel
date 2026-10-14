@@ -19,17 +19,8 @@ import {
 import {
   dueDeposit,
   dueDepositSettlementPreview,
-  eurCashCandidate,
-  eurBankCandidate,
-  pickSelectOption,
-  plnCashCandidate,
-  plnBankCandidate,
-  requestedCandidateClasses,
-  selectOptionLabels,
-  selectTriggerState,
+  nestAccount,
   settledDeposit,
-  transferCandidateRequests,
-  transferCandidatesFor,
 } from '../testing/deposit-fixtures';
 import { SettleDepositDialog } from './settle-deposit-dialog';
 
@@ -58,9 +49,6 @@ describe('SettleDepositDialog', () => {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (method(input) === 'GET') {
-        if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
-          return jsonResponse(transferCandidatesFor(new URL(requestUrl(input))));
-        }
         return requestUrl(input).includes('/settlement-preview')
           ? jsonResponse(dueDepositSettlementPreview)
           : jsonResponse({ detail: 'Not found.' }, 404);
@@ -200,11 +188,14 @@ describe('SettleDepositDialog', () => {
     await component['onSubmit']();
 
     const [request] = writeRequests();
-    expect(await request.json()).toEqual({
+    const body = await request.json();
+    expect(body).toMatchObject({
       settledOn: '2026-04-15',
       grossInterest: 147.95,
       tax: 28.12,
     });
+    expect(body.payOut ?? false).toBe(false);
+    expect(body).not.toHaveProperty('destinationAssetId');
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
@@ -255,112 +246,42 @@ describe('SettleDepositDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  describe('move to', () => {
-    function hintText(): string {
-      return Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll(
-          'mat-hint, .mat-mdc-form-field-hint',
-        ),
-        (hint) => hint.textContent ?? '',
-      ).join(' ');
+  describe('pay out', () => {
+    function checkbox(): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector('mat-checkbox');
     }
 
-    it('defaults to keeping the money in the deposit and lists the Cash candidates in its currency', async () => {
+    it('offers a "Wypłać na konto" checkbox for the return account, unchecked by default', async () => {
       await setup();
+      await switchLanguage(fixture, 'pl');
 
-      expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
-      const requested = requestedCandidateClasses(fetchSpy);
-      expect(requested).toContain('Cash');
-      expect(requested).toContain('BankAccount');
-      for (const url of transferCandidateRequests(fetchSpy)) {
-        expect(url.searchParams.get('currency')).toBe(dueDeposit.currency);
-      }
-
-      const labels = await selectOptionLabels(fixture, 'destinationAssetId');
-      expect(labels[0]).toMatch(/keep in the deposit/i);
-      expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
-      expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
-      expect(labels.some((label) => label.includes(plnBankCandidate.name))).toBe(true);
-      expect(labels.some((label) => label.includes(eurBankCandidate.name))).toBe(false);
+      expect(findControl(form(), 'payOut').value).toBe(false);
+      expect(checkbox()?.textContent).toContain(`Wypłać na konto ${nestAccount.name}`);
+      expect(hasControl(form(), 'destinationAssetId')).toBe(false);
+      expect(
+        fetchSpy.mock.calls.some((call: unknown[]) =>
+          requestUrl(call[0]).includes('/api/portfolio/transfer-candidates'),
+        ),
+      ).toBe(false);
     });
 
-    it('picking a savings account POSTs it as destinationAssetId', async () => {
+    it('checking it POSTs payOut with the settlement and no destination', async () => {
       await setup();
-      await pickSelectOption(fixture, 'destinationAssetId', plnBankCandidate.name);
+      await fill({ payOut: true });
 
       await component['onSubmit']();
 
       const [request] = writeRequests();
       expect(request.url).toContain(`/api/portfolio/deposits/${dueDeposit.assetId}/settle`);
-      expect(await request.json()).toEqual({
+      const body = await request.json();
+      expect(body).toMatchObject({
         settledOn: '2026-04-15',
         grossInterest: 147.95,
         tax: 28.12,
-        destinationAssetId: plnBankCandidate.assetId,
+        payOut: true,
       });
+      expect(body).not.toHaveProperty('destinationAssetId');
       expect(dialogRef.close).toHaveBeenCalledWith(true);
-    });
-
-    it('picking a Cash destination POSTs it as destinationAssetId', async () => {
-      await setup();
-      await fill({ destinationAssetId: plnCashCandidate.assetId });
-
-      await component['onSubmit']();
-
-      const [request] = writeRequests();
-      expect(request.url).toContain(`/api/portfolio/deposits/${dueDeposit.assetId}/settle`);
-      expect(await request.json()).toEqual({
-        settledOn: '2026-04-15',
-        grossInterest: 147.95,
-        tax: 28.12,
-        destinationAssetId: plnCashCandidate.assetId,
-      });
-      expect(dialogRef.close).toHaveBeenCalledWith(true);
-    });
-
-    it('keeping the money in the deposit sends no destination', async () => {
-      await setup();
-      await fill({ destinationAssetId: plnCashCandidate.assetId });
-      await fill({ destinationAssetId: null });
-
-      await component['onSubmit']();
-
-      const [request] = writeRequests();
-      expect((await request.json()).destinationAssetId ?? null).toBeNull();
-      expect(dialogRef.close).toHaveBeenCalledWith(true);
-    });
-
-    it('a hint states the final amount that will move, following the edits', async () => {
-      await setup();
-
-      await fill({ destinationAssetId: plnCashCandidate.assetId });
-      expect(hintText()).toContain(formatMoney(10119.83, 'PLN'));
-
-      await fill({ grossInterest: 150, tax: 28.5 });
-      expect(hintText()).toContain(formatMoney(10121.5, 'PLN'));
-    });
-
-    it('moveTo_KeepInDepositChosen_ShowsKeepInDepositInTrigger', async () => {
-      await setup();
-
-      expect(selectTriggerState(fixture, 'destinationAssetId')).toEqual({
-        triggerText: 'Keep in the deposit',
-        empty: false,
-      });
-      expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
-
-      await pickSelectOption(fixture, 'destinationAssetId', plnCashCandidate.name);
-      expect(selectTriggerState(fixture, 'destinationAssetId').triggerText).toContain(
-        plnCashCandidate.name,
-      );
-
-      await pickSelectOption(fixture, 'destinationAssetId', 'Keep in the deposit');
-
-      expect(selectTriggerState(fixture, 'destinationAssetId')).toEqual({
-        triggerText: 'Keep in the deposit',
-        empty: false,
-      });
-      expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
     });
   });
 
@@ -376,57 +297,6 @@ describe('SettleDepositDialog', () => {
       await fixture.whenStable();
       return errors();
     }
-
-    it('renders in Polish', async () => {
-      await setup();
-      const element = fixture.nativeElement as HTMLElement;
-      const texts = () => [
-        ...labelsOf(element, 'h2'),
-        ...labelsOf(element, 'dt'),
-        ...labelsOf(element, 'mat-label'),
-        selectTriggerState(fixture, 'destinationAssetId').triggerText,
-        ...labelsOf(element, 'mat-dialog-actions button'),
-      ];
-
-      const english = texts();
-      expect(english).toEqual([
-        'Settle deposit',
-        'Principal',
-        'Maturity',
-        'Net interest',
-        'Final amount',
-        'Settlement date',
-        'Gross interest',
-        'Tax',
-        'Move to',
-        'Keep in the deposit',
-        'Cancel',
-        'Settle',
-      ]);
-
-      await switchLanguage(fixture, 'pl');
-
-      expect(polishProblems(english, texts())).toEqual([]);
-    });
-
-    it('shows the amount that moves out in Polish', async () => {
-      await setup();
-      await fill({ destinationAssetId: plnCashCandidate.assetId });
-      const element = fixture.nativeElement as HTMLElement;
-      const hint = () => labelsOf(element, 'mat-hint');
-
-      const english = hint();
-      expect(english).toHaveLength(1);
-      expect(english[0]).toContain('moves out of the deposit');
-
-      await switchLanguage(fixture, 'pl');
-
-      const [polish] = hint();
-      expect(polishProblems(english, [polish])).toEqual([]);
-      expect(polish.replace(/\s+/g, ' ')).toContain(
-        formatMoney(10119.83, 'PLN').replace(/\s+/g, ' '),
-      );
-    });
 
     it('shows validation in Polish', async () => {
       await setup();

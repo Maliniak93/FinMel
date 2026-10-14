@@ -13,8 +13,8 @@ public sealed record SettleDepositRequest : IValidatableObject
     [Range(typeof(decimal), "0", "79228162514264337593543950335")]
     public required decimal Tax { get; init; }
 
-    /// <summary>The Cash or BankAccount asset the whole balance is paid out to; omitted, the money stays in the deposit.</summary>
-    public Guid? DestinationAssetId { get; init; }
+    /// <summary>Pays the whole balance out to the return account on SettledOn; false, the money stays in the deposit.</summary>
+    public bool PayOut { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

@@ -142,7 +142,6 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.NotNull(inLeg.Transfer);
         Assert.Equal(funded.CashAssetId, inLeg.Transfer.CounterpartAssetId);
         Assert.Equal("Cash account", inLeg.Transfer.CounterpartAssetName);
-        Assert.Null(inLeg.Transfer.CounterpartAccountName);
         Assert.Equal(TransferDirection.In, inLeg.Transfer.Direction);
     }
 

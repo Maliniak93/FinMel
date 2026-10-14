@@ -32,10 +32,10 @@ public sealed class UpdateDepositHandler(
             return readOnly;
         }
 
-        // A settled deposit's terms are immutable; delete it instead.
+        // A settled deposit's terms are immutable; only its return account may still move, until it is paid out.
         if (terms.SettledOn is not null)
         {
-            return DepositErrors.Settled;
+            return await ChangeSettledReturnAccountAsync(asset, terms, request, cancellationToken);
         }
 
         // A rolled-over deposit's principal and start date came from earlier terms, so they are fixed.
@@ -44,53 +44,64 @@ public sealed class UpdateDepositHandler(
             return DepositErrors.RolledOver;
         }
 
+        // The return account may change until the deposit is paid out; the source never does.
+        var returnAccountId = request.ReturnAccountId ?? terms.ReturnAccountId;
+        if (returnAccountId != terms.ReturnAccountId)
+        {
+            var resolved = await dbContext.ResolveReturnAsync(returnAccountId, asset.Currency, cancellationToken);
+            if (resolved.IsFailure)
+            {
+                return resolved.Error;
+            }
+        }
+
         // An unsettled, never rolled-over deposit holds one opening Deposit, rewritten in place.
         var opening = terms.RolloverCount == 0
             ? await dbContext.Transactions.SingleAsync(t => t.AssetId == assetId, cancellationToken)
             : null;
 
-        // A funded deposit's legs move together, and only when the principal or the start date changes.
-        var fundingLeg = opening?.TransferId is { } transferId
+        // The deposit's legs move together with the bank account's, and only when the principal or the start date changes.
+        var bankLeg = opening?.TransferId is { } transferId
             ? await dbContext.Transactions.FirstOrDefaultAsync(t => t.TransferId == transferId && t.Id != opening.Id, cancellationToken)
             : null;
         var rewritesOpening = opening is not null
-            && (fundingLeg is null || opening.Quantity != request.Principal || opening.Date != request.StartDate);
+            && (bankLeg is null || opening.Quantity != request.Principal || opening.Date != request.StartDate);
 
-        Asset? fundingAsset = null;
-        var fundingQuantity = 0m;
-        if (fundingLeg is not null && rewritesOpening)
+        Asset? bankAsset = null;
+        var bankQuantity = 0m;
+        if (bankLeg is not null && rewritesOpening)
         {
-            fundingAsset = await dbContext.Assets.FirstAsync(a => a.Id == fundingLeg.AssetId, cancellationToken);
+            bankAsset = await dbContext.Assets.FirstAsync(a => a.Id == bankLeg.AssetId, cancellationToken);
 
-            // The Cash side is read-only while it is archived, so its leg cannot be rewritten.
-            if (await dbContext.ReadOnlyErrorAsync(fundingAsset, cancellationToken) is { } fundingReadOnly)
+            // The bank account is read-only while it is archived, so its leg cannot be rewritten.
+            if (await dbContext.ReadOnlyErrorAsync(bankAsset, cancellationToken) is { } bankReadOnly)
             {
-                return fundingReadOnly;
+                return bankReadOnly;
             }
 
-            // The rewritten Out leg must be covered everywhere in the Cash history, not just at the end.
-            var fundingHistory = await dbContext.Transactions
+            // The rewritten Out leg must be covered everywhere in the bank account's history, not just at the end.
+            var bankHistory = await dbContext.Transactions
                 .AsNoTracking()
-                .Where(t => t.AssetId == fundingAsset.Id && t.Id != fundingLeg.Id)
+                .Where(t => t.AssetId == bankAsset.Id && t.Id != bankLeg.Id)
                 .ToListAsync(cancellationToken);
-            var fundingCandidate = new Transaction
+            var bankCandidate = new Transaction
             {
-                Id = fundingLeg.Id,
-                AssetId = fundingAsset.Id,
-                Type = fundingLeg.Type,
+                Id = bankLeg.Id,
+                AssetId = bankAsset.Id,
+                Type = bankLeg.Type,
                 Quantity = request.Principal,
                 UnitPriceAmount = 1m,
                 Date = request.StartDate
             };
 
-            var fundingRecomputed = TransactionQuantityCalculator.Recompute(
-                [.. fundingHistory, fundingCandidate], _ => TransferErrors.InsufficientFunds);
-            if (fundingRecomputed.IsFailure)
+            var bankRecomputed = TransactionQuantityCalculator.Recompute(
+                [.. bankHistory, bankCandidate], _ => TransferErrors.InsufficientFunds);
+            if (bankRecomputed.IsFailure)
             {
-                return fundingRecomputed.Error;
+                return bankRecomputed.Error;
             }
 
-            fundingQuantity = fundingRecomputed.Value;
+            bankQuantity = bankRecomputed.Value;
         }
 
         if (rewritesOpening && opening is not null)
@@ -124,19 +135,20 @@ public sealed class UpdateDepositHandler(
             opening.FxRateToPln = fxRateToPln.Value;
             asset.Quantity = recomputed.Value;
 
-            if (fundingLeg is not null && fundingAsset is not null)
+            if (bankLeg is not null && bankAsset is not null)
             {
-                fundingLeg.Quantity = request.Principal;
-                fundingLeg.UnitPriceAmount = 1m;
-                fundingLeg.Date = request.StartDate;
-                fundingLeg.FxRateToPln = fxRateToPln.Value;
-                fundingAsset.Quantity = fundingQuantity;
+                bankLeg.Quantity = request.Principal;
+                bankLeg.UnitPriceAmount = 1m;
+                bankLeg.Date = request.StartDate;
+                bankLeg.FxRateToPln = fxRateToPln.Value;
+                bankAsset.Quantity = bankQuantity;
             }
         }
 
         asset.Name = request.Name;
 
         terms.BankName = request.BankName;
+        terms.ReturnAccountId = returnAccountId;
         terms.Principal = request.Principal;
         terms.StartDate = request.StartDate;
         terms.TermLength = request.TermLength;
@@ -144,15 +156,14 @@ public sealed class UpdateDepositHandler(
         terms.MaturityDate = DepositInterestMath.MaturityDate(request.StartDate, request.TermLength, request.TermUnit);
         terms.AnnualInterestRatePercent = request.AnnualInterestRatePercent;
         terms.Capitalization = request.Capitalization;
-        terms.TaxExempt = request.TaxExempt;
         terms.EarlyBreakInterestLossPercent = request.EarlyBreakInterestLossPercent;
 
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
 
         // Both assets publish in the same save as both legs.
-        if (fundingAsset is not null)
+        if (bankAsset is not null)
         {
-            await positionEventPublisher.PublishChangedAsync(fundingAsset, cancellationToken);
+            await positionEventPublisher.PublishChangedAsync(bankAsset, cancellationToken);
         }
 
         try
@@ -164,9 +175,53 @@ public sealed class UpdateDepositHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+        var accountNames = await dbContext.LoadAccountNamesAsync([terms], cancellationToken);
 
         // Never paid out: only a settled deposit can be, and its terms are immutable.
-        return terms.ToResponse(asset, WarsawCalendar.Today(timeProvider), funding, payout: null);
+        return terms.ToResponse(asset, WarsawCalendar.Today(timeProvider), accountNames, paidOutOn: null);
+    }
+
+    private async Task<Result<DepositResponse>> ChangeSettledReturnAccountAsync(
+        Asset asset, TermDeposit terms, UpdateDepositRequest request, CancellationToken cancellationToken)
+    {
+        var termsUnchanged = request.Name == asset.Name
+            && request.BankName == terms.BankName
+            && request.Principal == terms.Principal
+            && request.StartDate == terms.StartDate
+            && request.TermLength == terms.TermLength
+            && request.TermUnit == terms.TermUnit
+            && request.AnnualInterestRatePercent == terms.AnnualInterestRatePercent
+            && request.Capitalization == terms.Capitalization
+            && request.EarlyBreakInterestLossPercent == terms.EarlyBreakInterestLossPercent;
+        if (!termsUnchanged || request.ReturnAccountId is not { } returnAccountId || returnAccountId == terms.ReturnAccountId)
+        {
+            return DepositErrors.Settled;
+        }
+
+        var paidOutOn = await dbContext.LoadPayoutDateAsync(asset.Id, cancellationToken);
+        if (paidOutOn is not null)
+        {
+            return DepositErrors.Settled;
+        }
+
+        var resolved = await dbContext.ResolveReturnAsync(returnAccountId, asset.Currency, cancellationToken);
+        if (resolved.IsFailure)
+        {
+            return resolved.Error;
+        }
+
+        terms.ReturnAccountId = returnAccountId;
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return TransactionErrors.ConcurrentModification();
+        }
+
+        var accountNames = await dbContext.LoadAccountNamesAsync([terms], cancellationToken);
+        return terms.ToResponse(asset, WarsawCalendar.Today(timeProvider), accountNames, paidOutOn: null);
     }
 }

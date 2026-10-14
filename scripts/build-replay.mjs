@@ -171,6 +171,28 @@ function replayOf({ c, record, runArgs, args, previous, issue }) {
   return { ok: true, runId: c.runId, session: c.session, issue, steps, interrupted, liveFrom, note };
 }
 
+// Read from the run records, not the journals: a fully replayed run starts no agent and may leave no journal.
+export function latestRunRecord({ issue, since = 0, history = HISTORY } = {}) {
+  const n = Number(issue);
+  let best = null;
+  for (const session of dirs(history)) {
+    const dir = path.join(history, session, "workflows");
+    let files = [];
+    try {
+      files = readdirSync(dir).filter((f) => /^wf_.*\.json$/.test(f));
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      const record = readJson(path.join(dir, file));
+      if (record?.workflowName !== WORKFLOW || Number(record.args?.issue) !== n || !record.result) continue;
+      const at = Date.parse(record.timestamp ?? "") || statSync(path.join(dir, file)).mtimeMs;
+      if (!best || at > best.at) best = { at, runId: file.replace(/\.json$/, ""), session, args: record.args, result: record.result };
+    }
+  }
+  return best && best.at >= since && best.result.ship ? best : null;
+}
+
 export function renderResumeScript(source, { steps, interrupted }) {
   if (!REPLAY_MARKER.test(source)) return null;
   const line = `const REPLAY = ${JSON.stringify({ steps, interrupted: interrupted ?? null })} // @replay`;

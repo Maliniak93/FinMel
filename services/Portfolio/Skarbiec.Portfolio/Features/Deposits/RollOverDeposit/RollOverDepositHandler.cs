@@ -135,9 +135,9 @@ public sealed class RollOverDepositHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+        var accountNames = await dbContext.LoadAccountNamesAsync([terms], cancellationToken);
 
         // Never paid out: a paid-out deposit is rejected above.
-        return terms.ToResponse(asset, today, funding, payout: null);
+        return terms.ToResponse(asset, today, accountNames, paidOutOn: null);
     }
 }

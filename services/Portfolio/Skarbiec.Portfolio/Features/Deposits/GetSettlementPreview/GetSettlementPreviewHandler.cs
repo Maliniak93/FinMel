@@ -40,8 +40,7 @@ public sealed class GetSettlementPreviewHandler(PortfolioDbContext dbContext, Ti
             TermLength = terms.TermLength,
             TermUnit = terms.TermUnit,
             AnnualInterestRatePercent = terms.AnnualInterestRatePercent,
-            Capitalization = terms.Capitalization,
-            TaxExempt = terms.TaxExempt
+            Capitalization = terms.Capitalization
         });
 
         return new DepositSettlementPreviewResponse

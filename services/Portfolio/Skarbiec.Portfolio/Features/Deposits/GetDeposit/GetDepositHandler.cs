@@ -21,10 +21,10 @@ public sealed class GetDepositHandler(PortfolioDbContext dbContext, TimeProvider
             return DepositErrors.NotFound(assetId);
         }
 
-        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
-        var payout = await dbContext.LoadPayoutAsync(assetId, cancellationToken);
+        var accountNames = await dbContext.LoadAccountNamesAsync([row.Terms], cancellationToken);
+        var paidOutOn = await dbContext.LoadPayoutDateAsync(assetId, cancellationToken);
 
         return row.Terms.ToResponse(
-            row.Asset, WarsawCalendar.Today(timeProvider), funding, payout);
+            row.Asset, WarsawCalendar.Today(timeProvider), accountNames, paidOutOn);
     }
 }

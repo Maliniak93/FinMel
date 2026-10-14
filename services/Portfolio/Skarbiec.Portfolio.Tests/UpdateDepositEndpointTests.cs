@@ -8,6 +8,7 @@ using Skarbiec.Portfolio.Features.Deposits.UpdateDeposit;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -31,7 +32,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
             termUnit: DepositTermUnit.Months,
             annualInterestRatePercent: 5m,
             capitalization: DepositCapitalization.Quarterly,
-            taxExempt: true,
             earlyBreakInterestLossPercent: 50m).ToUpdateRequest();
 
         var response = await client.PutAsJsonAsync(DepositUri(deposit.AssetId), request, cancellationToken);
@@ -49,9 +49,8 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(new DateOnly(2026, 8, 1), body.MaturityDate);
         Assert.Equal(5m, body.AnnualInterestRatePercent);
         Assert.Equal(DepositCapitalization.Quarterly, body.Capitalization);
-        Assert.True(body.TaxExempt);
         Assert.Equal(50m, body.EarlyBreakInterestLossPercent);
-        Assert.Equal(0m, body.Projection.Tax);
+        Assert.True(body.Projection.Tax > 0m);
 
         var asset = await client.GetAssetAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(AssetClass.Deposit, asset.AssetClass);
@@ -75,7 +74,7 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
-    public async Task Update_FundedDeposit_RewritesBothLegs()
+    public async Task RewritesBankLegs()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
@@ -90,8 +89,8 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal(1_500m, body.Principal);
-        Assert.Equal(funded.CashAssetId, body.FundingAssetId);
-        Assert.Equal("Cash account", body.FundingAssetName);
+        Assert.Equal(funded.AccountId, body.SourceAccountId);
+        Assert.Equal("Cash account", body.SourceAccountName);
 
         Assert.Equal(3_500m, (await client.GetAssetAsync(funded.CashAssetId, cancellationToken)).Quantity);
         Assert.Equal(1_500m, (await client.GetAssetAsync(funded.Deposit.AssetId, cancellationToken)).Quantity);
@@ -118,15 +117,18 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
-    public async Task Update_FundedEurDepositNewStartDate_ReFreezesRateOnBothLegs()
+    public async Task Update_EurDepositNewStartDate_ReFreezesRateOnBothLegs()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.FxRateLookupClient
             .WithRate("EUR", new DateOnly(2026, 1, 15), 4.20m)
             .WithRate("EUR", new DateOnly(2026, 2, 1), 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "EUR cash");
-        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(currency: "EUR", principal: 1_000m, fundingAssetId: cashId));
+        var eur = await client.CreateBankAccountAsync(
+            cancellationToken, "mBank EUR", currency: "EUR", balance: 5_000m, depositedOn: DefaultTopUpDate);
+        var cashId = eur.MoneyAssetId;
+        var deposit = await client.AddDepositAsync(
+            cancellationToken, NewDepositRequest(principal: 1_000m, sourceAccountId: eur.AccountId));
         var request = NewDepositRequest(principal: 1_000m, startDate: new DateOnly(2026, 2, 1)).ToUpdateRequest();
 
         var response = await client.PutAsJsonAsync(DepositUri(deposit.AssetId), request, cancellationToken);
@@ -156,29 +158,96 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
-    public async Task Update_FundedDepositWithArchivedCash_RejectsLegChangesOnly()
+    public async Task ChangesReturnAccount()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var funded = await client.CreateFundedDepositAsync(cancellationToken);
-        await client.ArchiveAssetAsync(funded.CashAssetId, cancellationToken);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mBank = await client.CreateBankAccountAsync(
+            cancellationToken, "mBank", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        var deposit = await client.AddDepositAsync(
+            cancellationToken, NewDepositRequest(sourceAccountId: mBank.AccountId));
+        Assert.Equal(mBank.AccountId, deposit.ReturnAccountId);
+        var request = NewDepositRequest(returnAccountId: nest.AccountId).ToUpdateRequest();
 
-        var legChange = await client.PutAsJsonAsync(
-            DepositUri(funded.Deposit.AssetId),
-            NewDepositRequest(principal: 1_500m).ToUpdateRequest(),
-            cancellationToken);
+        var response = await client.PutAsJsonAsync(DepositUri(deposit.AssetId), request, cancellationToken);
 
-        await legChange.AssertAssetArchivedConflictAsync(cancellationToken);
-        await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(mBank.AccountId, body.SourceAccountId);
+        Assert.Equal(nest.AccountId, body.ReturnAccountId);
+        Assert.Equal("Nest", body.ReturnAccountName);
+        var stored = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
+        Assert.Equal(nest.AccountId, stored.ReturnAccountId);
+        Assert.Equal(mBank.AccountId, stored.SourceAccountId);
+    }
 
-        var rename = await client.PutAsJsonAsync(
-            DepositUri(funded.Deposit.AssetId),
-            NewDepositRequest(name: "Renamed deposit", principal: 1_000m).ToUpdateRequest(),
-            cancellationToken);
+    [Fact]
+    public async Task ChangesReturnAccount_AfterSettlementBeforePayOut()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mBank = await client.CreateBankAccountAsync(
+            cancellationToken, "mBank", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        var deposit = await client.AddDepositAsync(
+            cancellationToken, NewDepositRequest(sourceAccountId: mBank.AccountId));
+        await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
+        var request = NewDepositRequest(returnAccountId: nest.AccountId).ToUpdateRequest();
 
-        Assert.Equal(HttpStatusCode.OK, rename.StatusCode);
-        Assert.Equal("Renamed deposit", (await client.GetDepositAsync(funded.Deposit.AssetId, cancellationToken)).Name);
+        var response = await client.PutAsJsonAsync(DepositUri(deposit.AssetId), request, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.NotNull(body);
+        Assert.Equal(DepositStatus.Settled, body.Status);
+        Assert.Equal(nest.AccountId, body.ReturnAccountId);
+        Assert.Equal("Nest", body.ReturnAccountName);
+        var stored = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
+        Assert.Equal(nest.AccountId, stored.ReturnAccountId);
+        Assert.Equal(147.95m, stored.SettledGrossInterest);
+        Assert.Equal(2, (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).TransactionCount);
+    }
+
+    [Fact]
+    public async Task Update_SettledDepositReturnAccountWithOtherTerms_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mBank = await client.CreateBankAccountAsync(
+            cancellationToken, "mBank", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        var deposit = await client.AddDepositAsync(
+            cancellationToken, NewDepositRequest(sourceAccountId: mBank.AccountId));
+        await client.SettleDepositAsync(deposit.AssetId, cancellationToken);
+        var request = NewDepositRequest(returnAccountId: nest.AccountId, annualInterestRatePercent: 7m).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(DepositUri(deposit.AssetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositSettledErrorCode, cancellationToken);
+        var unchanged = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
+        Assert.Equal(mBank.AccountId, unchanged.ReturnAccountId);
+        Assert.Equal(6m, unchanged.AnnualInterestRatePercent);
+    }
+
+    [Fact]
+    public async Task Update_PaidOutDepositReturnAccount_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        var request = NewDepositRequest(returnAccountId: nest.AccountId).ToUpdateRequest();
+
+        var response = await client.PutAsJsonAsync(DepositUri(paidOut.Deposit.AssetId), request, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.DepositSettledErrorCode, cancellationToken);
+        var unchanged = await client.GetDepositAsync(paidOut.Deposit.AssetId, cancellationToken);
+        Assert.Equal(paidOut.Deposit.ReturnAccountId, unchanged.ReturnAccountId);
     }
 
     [Fact]
@@ -197,24 +266,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal("Term deposit", unchanged.Name);
         Assert.Equal(10_000m, unchanged.Principal);
         Assert.Equal(10_000m, (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
-    }
-
-    [Fact]
-    public async Task Update_ArchivedFundingAsset_Returns409()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var funded = await client.CreateFundedDepositAsync(cancellationToken);
-        await client.ArchiveAssetAsync(funded.CashAssetId, cancellationToken);
-
-        var response = await client.PutAsJsonAsync(
-            DepositUri(funded.Deposit.AssetId),
-            NewDepositRequest(principal: 1_500m).ToUpdateRequest(),
-            cancellationToken);
-
-        await response.AssertAssetArchivedConflictAsync(cancellationToken);
-        await AssertFundedDepositUnchangedAsync(client, userId, funded, cancellationToken);
     }
 
     [Fact]
@@ -263,7 +314,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
             termUnit: DepositTermUnit.Months,
             annualInterestRatePercent: 4.5m,
             capitalization: DepositCapitalization.Quarterly,
-            taxExempt: true,
             earlyBreakInterestLossPercent: 50m).ToUpdateRequest();
 
         var response = await client.PutAsJsonAsync(DepositUri(deposit.AssetId), request, cancellationToken);
@@ -279,7 +329,6 @@ public sealed class UpdateDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(new DateOnly(2026, 10, 15), body.MaturityDate);
         Assert.Equal(4.5m, body.AnnualInterestRatePercent);
         Assert.Equal(DepositCapitalization.Quarterly, body.Capitalization);
-        Assert.True(body.TaxExempt);
         Assert.Equal(50m, body.EarlyBreakInterestLossPercent);
         Assert.Equal(1, body.RolloverCount);
         Assert.Equal(DepositStatus.Active, body.Status);

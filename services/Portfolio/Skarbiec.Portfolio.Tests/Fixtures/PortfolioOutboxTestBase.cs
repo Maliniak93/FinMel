@@ -172,6 +172,24 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         return new CreatedBank(created.Value.Id, created.Value.CashAssetId);
     }
 
+    protected sealed record OpenedDeposit(Guid AssetId, Guid SourceAccountId, Guid SourceMoneyAssetId);
+
+    // Opens a deposit from a fresh PLN bank account holding far more than the deposit needs.
+    protected static async Task<OpenedDeposit> OpenDepositAsync(
+        IServiceProvider services,
+        CancellationToken cancellationToken,
+        AddDepositRequest? request = null,
+        decimal sourceBalance = 1_000_000m)
+    {
+        var source = await CreateBankAccountAsync(
+            services, $"Funding {Guid.NewGuid():N}", "PLN", 0m, cancellationToken, balance: sourceBalance);
+        var added = await services.GetRequiredService<AddDepositHandler>().HandleAsync(
+            (request ?? PortfolioApi.NewDepositRequest()) with { SourceAccountId = source.Id }, cancellationToken);
+        Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+
+        return new OpenedDeposit(added.Value.AssetId, source.Id, source.CashAssetId);
+    }
+
     protected static async Task<Guid> AddCashWithBalanceAsync(
         IServiceProvider services, decimal balance, CancellationToken cancellationToken)
     {

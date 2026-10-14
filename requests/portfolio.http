@@ -379,7 +379,19 @@ Authorization: Bearer {{authToken}}
 
 ### --- Term deposits ---
 
-### Add a term deposit
+### Fund the mBank account (a deposit is always opened from a Bank account; the deposit takes its currency)
+POST {{baseUrl}}/api/portfolio/assets/{{createMbankAccount.response.body.cashAssetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 40000,
+  "unitPrice": 1,
+  "date": "2025-12-31"
+}
+
+### Add a term deposit from the mBank account (returnAccountId defaults to the source; 400 Validation.InsufficientFunds when the balance is short on any day, 400 Validation.BankAccountRequired for a non-Bank source)
 # @name addDeposit
 POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
@@ -388,40 +400,17 @@ Content-Type: application/json
 {
   "name": "3-month deposit",
   "bankName": "Example bank",
-  "currency": "PLN",
+  "sourceAccountId": "{{createMbankAccount.response.body.id}}",
   "principal": 10000.00,
   "startDate": "2026-01-15",
   "termLength": 3,
   "termUnit": 1,
   "annualInterestRatePercent": 6,
   "capitalization": 0,
-  "taxExempt": false,
   "earlyBreakInterestLossPercent": 100
 }
 
-### Add a Cash account to fund a deposit from
-# @name addFundingCash
-POST {{baseUrl}}/api/portfolio/assets
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "assetClass": "Cash",
-  "name": "Current account",
-  "currency": "PLN",
-  "initialTransaction": {
-    "type": "Deposit",
-    "quantity": 5000,
-    "unitPrice": 1,
-    "date": "2026-01-01"
-  }
-}
-
-### List transfer candidates (the deposit form's sources of funds)
-GET {{baseUrl}}/api/portfolio/transfer-candidates?currency=PLN&assetClass=Cash
-Authorization: Bearer {{authToken}}
-
-### Add a term deposit funded from cash
+### Add a term deposit that returns to the savings Bank account
 # @name addFundedDeposit
 POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
@@ -430,27 +419,30 @@ Content-Type: application/json
 {
   "name": "Funded deposit",
   "bankName": "Example bank",
-  "currency": "PLN",
+  "sourceAccountId": "{{createMbankAccount.response.body.id}}",
+  "returnAccountId": "{{createNestAccount.response.body.id}}",
   "principal": 1000.00,
   "startDate": "2026-01-15",
   "termLength": 3,
   "termUnit": 1,
   "annualInterestRatePercent": 6,
   "capitalization": 0,
-  "taxExempt": false,
-  "earlyBreakInterestLossPercent": 100,
-  "fundingAssetId": "{{addFundingCash.response.body.id}}"
+  "earlyBreakInterestLossPercent": 100
 }
 
 ### List every deposit
 GET {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 
+### List the deposits a Bank account funds or receives
+GET {{baseUrl}}/api/portfolio/deposits?accountId={{createMbankAccount.response.body.id}}
+Authorization: Bearer {{authToken}}
+
 ### Get a deposit
 GET {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
-### Update a deposit
+### Update a deposit (the source is fixed; returnAccountId is optional and keeps the stored one when left out; a settled deposit not yet paid out accepts a returnAccountId change alone)
 PUT {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -458,13 +450,13 @@ Content-Type: application/json
 {
   "name": "6-month deposit",
   "bankName": "Example bank",
+  "returnAccountId": "{{createMbankAccount.response.body.id}}",
   "principal": 15000.00,
   "startDate": "2026-02-01",
   "termLength": 6,
   "termUnit": 1,
   "annualInterestRatePercent": 5.5,
   "capitalization": 2,
-  "taxExempt": false,
   "earlyBreakInterestLossPercent": 100
 }
 
@@ -496,13 +488,12 @@ Content-Type: application/json
   "tax": {{settlementPreview.response.body.tax}}
 }
 
-### Pay the settled deposit out to cash
+### Pay the settled deposit out to its return account
 POST {{baseUrl}}/api/portfolio/deposits/{{addDeposit.response.body.assetId}}/payout
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "destinationAssetId": "{{addFundingCash.response.body.id}}",
   "date": "{{settlementPreview.response.body.settledOn}}"
 }
 
@@ -520,7 +511,7 @@ Content-Type: application/json
   "settledOn": "{{fundedSettlementPreview.response.body.settledOn}}",
   "grossInterest": {{fundedSettlementPreview.response.body.grossInterest}},
   "tax": {{fundedSettlementPreview.response.body.tax}},
-  "destinationAssetId": "{{addFundingCash.response.body.id}}"
+  "payOut": true
 }
 
 ### Add a matured deposit to roll over
@@ -532,14 +523,13 @@ Content-Type: application/json
 {
   "name": "Renewable deposit",
   "bankName": "Example bank",
-  "currency": "PLN",
+  "sourceAccountId": "{{createMbankAccount.response.body.id}}",
   "principal": 10000.00,
   "startDate": "2026-01-15",
   "termLength": 3,
   "termUnit": 1,
   "annualInterestRatePercent": 6,
   "capitalization": 0,
-  "taxExempt": false,
   "earlyBreakInterestLossPercent": 100
 }
 
@@ -833,7 +823,7 @@ Authorization: Bearer {{authToken}}
 
 ### --- Paying a deposit out into a bank account ---
 
-### Add a matured deposit to pay out into a bank account
+### Add a matured deposit that returns to the savings Bank account (400 Validation.TransferCurrencyMismatch for a return account in another currency)
 # @name addBankBoundDeposit
 POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
@@ -842,14 +832,14 @@ Content-Type: application/json
 {
   "name": "Deposit for the bank account",
   "bankName": "Example bank",
-  "currency": "PLN",
+  "sourceAccountId": "{{createMbankAccount.response.body.id}}",
+  "returnAccountId": "{{createNestAccount.response.body.id}}",
   "principal": 10000.00,
   "startDate": "2026-01-15",
   "termLength": 3,
   "termUnit": 1,
   "annualInterestRatePercent": 6,
   "capitalization": 0,
-  "taxExempt": false,
   "earlyBreakInterestLossPercent": 100
 }
 
@@ -858,7 +848,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/deposits/{{addBankBoundDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
-### Settle the deposit and pay it out into the bank account (400 Validation.TransferCurrencyMismatch for another currency)
+### Settle the deposit and pay it out to its return account at once
 POST {{baseUrl}}/api/portfolio/deposits/{{addBankBoundDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -867,10 +857,28 @@ Content-Type: application/json
   "settledOn": "{{bankBoundPreview.response.body.settledOn}}",
   "grossInterest": {{bankBoundPreview.response.body.grossInterest}},
   "tax": {{bankBoundPreview.response.body.tax}},
-  "destinationAssetId": "{{createNestAccount.response.body.cashAssetId}}"
+  "payOut": true
 }
 
 ### --- Precious metals ---
+
+### Add a Cash account to pay metals from
+# @name addFundingCash
+POST {{baseUrl}}/api/portfolio/assets
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetClass": "Cash",
+  "name": "Current account",
+  "currency": "PLN",
+  "initialTransaction": {
+    "type": "Deposit",
+    "quantity": 5000,
+    "unitPrice": 1,
+    "date": "2026-01-01"
+  }
+}
 
 ### Add a silver coin with a first purchase (metal 1 = Silver; weightUnit Gram | TroyOunce)
 # @name addMetal

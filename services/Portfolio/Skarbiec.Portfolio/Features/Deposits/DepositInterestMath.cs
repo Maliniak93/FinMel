@@ -10,7 +10,6 @@ public sealed record DepositTerms
     public required DepositTermUnit TermUnit { get; init; }
     public required decimal AnnualInterestRatePercent { get; init; }
     public required DepositCapitalization Capitalization { get; init; }
-    public required bool TaxExempt { get; init; }
 }
 
 public sealed record DepositInterestPeriod
@@ -71,7 +70,7 @@ public static class DepositInterestMath
 
             var gross = Math.Round(
                 balance * terms.AnnualInterestRatePercent / 100m * days / 365m, 2, MidpointRounding.AwayFromZero);
-            var tax = BelkaTax.On(gross, terms.TaxExempt);
+            var tax = BelkaTax.On(gross, taxExempt: false);
             var net = gross - tax;
             balance += net;
 

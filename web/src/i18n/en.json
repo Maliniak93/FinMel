@@ -35,7 +35,7 @@
       "dashboard": "Dashboard",
       "cash": "Cash",
       "securities": "Stocks & ETFs",
-      "deposits": "Deposits & savings",
+      "deposits": "Deposits",
       "bonds": "Bonds",
       "metals": "Precious metals",
       "settings": "Settings",
@@ -633,6 +633,8 @@
     "empty": "You don't have any term deposits yet.",
     "addFirst": "Add your first deposit",
     "bank": "Bank",
+    "source": "Source",
+    "returnTo": "Return to",
     "principal": "Principal",
     "rate": "Rate",
     "start": "Start",
@@ -655,8 +657,7 @@
       "maturesOn": "Matures on",
       "capitalisation": "Capitalisation",
       "grossInterest": "Gross interest",
-      "tax": "Tax",
-      "moveTo": "Move to"
+      "tax": "Tax"
     },
     "errors": {
       "grossInterestRequired": "Gross interest is required.",
@@ -666,8 +667,6 @@
       "taxOverGross": "Tax can't exceed the gross interest.",
       "interestRateRequired": "Interest rate is required.",
       "interestRateRange": "Interest rate must be between 0 and 100.",
-      "cashAccountsLoadFailed": "Failed to load the Cash accounts.",
-      "payoutDestinationsLoadFailed": "Failed to load the accounts to pay out to.",
       "previewLoadFailed": "Failed to load the settlement preview."
     },
     "form": {
@@ -676,12 +675,13 @@
       "nameRequired": "Name is required.",
       "nameTooLong": "Name is too long.",
       "bankNameTooLong": "Bank name is too long.",
-      "currencyRequired": "Currency is required.",
-      "sourceOfFunds": "Source of funds",
-      "newMoney": "New money (from outside)",
+      "sourceAccount": "From account",
+      "sourceAccountRequired": "Source account is required.",
+      "returnAccount": "Return to",
+      "returnToSource": "Source account",
+      "accountsLoadFailed": "Failed to load the bank accounts.",
       "principalRequired": "Principal is required.",
       "principalPositive": "Principal must be greater than 0.",
-      "exceedsBalance": "Principal is above the source's balance ({{ balance }}).",
       "startDate": "Start date",
       "startDateRequired": "Start date is required.",
       "termRequired": "Term is required.",
@@ -689,18 +689,13 @@
       "termMax": "Term is at most {{ max }}.",
       "unit": "Unit",
       "annualInterestRate": "Annual interest rate (%)",
-      "taxExempt": "IKE/IKZE — no Belka tax",
       "earlyBreakLoss": "Interest lost on early break (%)",
       "earlyBreakRequired": "Early-break loss is required.",
       "earlyBreakRange": "Early-break loss must be between 0 and 100.",
-      "fundingLoadFailed": "Failed to load the sources of funds.",
-      "insufficientFunds": "The source of funds cannot cover this principal."
+      "insufficientFunds": "Insufficient funds on the account"
     },
     "payOut": {
-      "noCashAccount": "You have no Cash or bank account in {{ currency }} to move the money to.",
-      "cashGroup": "Cash",
-      "bankGroup": "Bank accounts",
-      "destinationRequired": "Pick where the money goes.",
+      "goesTo": "The balance goes to {{ name }}.",
       "dateBeforeSettlement": "Date can't be before the settlement date.",
       "dateInFuture": "Date can't be in the future.",
       "submit": "Transfer"
@@ -711,7 +706,7 @@
       "settlementDateRequired": "Settlement date is required.",
       "beforeStart": "Settlement date can't be before the start date.",
       "inFuture": "Settlement date can't be in the future.",
-      "keepInDeposit": "Keep in the deposit",
+      "payOutTo": "Pay out to {{ name }}",
       "movesOut": "{{ amount }} moves out of the deposit.",
       "netInterest": "Net interest",
       "submit": "Settle"
@@ -743,6 +738,7 @@
     "interestCredited": "Interest credited",
     "interestDue": "Interest due",
     "back": "Back to bank accounts",
+    "hasOpenDeposit": "An open deposit will return to this account",
     "interest": {
       "settle": "Settle interest",
       "settleMonths": "Settle interest ({{ count }} months due)",
@@ -798,6 +794,9 @@
       "noHistory": "No cash movements yet.",
       "loadFailed": "Failed to load the account.",
       "holdingsFailed": "Failed to load the account's holdings.",
+      "deposits": "Deposits",
+      "noDeposits": "No deposit is funded from or returns to this account.",
+      "depositsFailed": "Failed to load the account's deposits.",
       "historyFailed": "Failed to load the cash history."
     },
     "cash": {

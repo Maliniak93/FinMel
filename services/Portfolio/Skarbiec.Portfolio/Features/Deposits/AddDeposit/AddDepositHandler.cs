@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
@@ -15,43 +16,50 @@ public sealed class AddDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         AddDepositRequest request, CancellationToken cancellationToken)
     {
+        var source = await dbContext.ResolveSourceAsync(request.SourceAccountId, cancellationToken);
+        if (source.IsFailure)
+        {
+            return source.Error;
+        }
+
+        var sourceAccount = source.Value;
+        var returnAccount = sourceAccount;
+        if (request.ReturnAccountId is { } returnAccountId && returnAccountId != sourceAccount.Id)
+        {
+            var resolved = await dbContext.ResolveReturnAsync(returnAccountId, sourceAccount.Currency, cancellationToken);
+            if (resolved.IsFailure)
+            {
+                return resolved.Error;
+            }
+
+            returnAccount = resolved.Value;
+        }
+
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
             AssetClass = AssetClass.Deposit,
             Name = request.Name,
-            Currency = request.Currency,
+            Currency = sourceAccount.Currency,
             ValuationMode = AssetValuationMode.CurrencyValued,
         };
 
-        // The system-managed opening transaction is the only way the principal reaches Asset.Quantity.
-        FundingTransfer? funding = null;
-        Transaction opening;
+        var bankMoney = await dbContext.LoadAccountCashAsync(sourceAccount.Id, cancellationToken);
+        var (outLeg, opening) = TransferLegs.Create(bankMoney.Id, asset.Id, request.Principal, request.StartDate);
 
-        if (request.FundingAssetId is { } fundingAssetId)
-        {
-            var planned = await PlanFundingAsync(fundingAssetId, asset, request, cancellationToken);
-            if (planned.IsFailure)
-            {
-                return planned.Error;
-            }
+        var bankHistory = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(t => t.AssetId == bankMoney.Id)
+            .ToListAsync(cancellationToken);
 
-            funding = planned.Value;
-            opening = funding.InLeg;
-        }
-        else
+        var bankQuantity = TransactionQuantityCalculator.Recompute(
+            [.. bankHistory, outLeg], _ => TransferErrors.InsufficientFunds);
+        if (bankQuantity.IsFailure)
         {
-            opening = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                AssetId = asset.Id,
-                Type = TransactionType.Deposit,
-                Quantity = request.Principal,
-                UnitPriceAmount = 1m,
-                Date = request.StartDate
-            };
+            return bankQuantity.Error;
         }
 
+        // The opening In leg is the only way the principal reaches Asset.Quantity.
         var recomputed = TransactionQuantityCalculator.Recompute([opening]);
         if (recomputed.IsFailure)
         {
@@ -66,12 +74,16 @@ public sealed class AddDepositHandler(
         }
 
         opening.FxRateToPln = fxRateToPln.Value;
+        outLeg.FxRateToPln = fxRateToPln.Value;
         asset.Quantity = recomputed.Value;
+        bankMoney.Quantity = bankQuantity.Value;
 
         var terms = new TermDeposit
         {
             AssetId = asset.Id,
             BankName = request.BankName,
+            SourceAccountId = sourceAccount.Id,
+            ReturnAccountId = returnAccount.Id,
             Principal = request.Principal,
             StartDate = request.StartDate,
             TermLength = request.TermLength,
@@ -79,25 +91,17 @@ public sealed class AddDepositHandler(
             MaturityDate = DepositInterestMath.MaturityDate(request.StartDate, request.TermLength, request.TermUnit),
             AnnualInterestRatePercent = request.AnnualInterestRatePercent,
             Capitalization = request.Capitalization,
-            TaxExempt = request.TaxExempt,
             EarlyBreakInterestLossPercent = request.EarlyBreakInterestLossPercent
         };
 
         dbContext.Assets.Add(asset);
         dbContext.Transactions.Add(opening);
+        dbContext.Transactions.Add(outLeg);
         dbContext.TermDeposits.Add(terms);
 
+        // The bank account publishes in the same save as both legs and the deposit's own event.
         await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
-
-        if (funding is not null)
-        {
-            funding.OutLeg.FxRateToPln = fxRateToPln.Value;
-            funding.Source.Quantity = funding.SourceQuantity;
-            dbContext.Transactions.Add(funding.OutLeg);
-
-            // The source publishes in the same save as both legs and the deposit's own event.
-            await positionEventPublisher.PublishChangedAsync(funding.Source, cancellationToken);
-        }
+        await positionEventPublisher.PublishChangedAsync(bankMoney, cancellationToken);
 
         try
         {
@@ -105,48 +109,16 @@ public sealed class AddDepositHandler(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // A write racing on the funding Cash asset moved its xmin: nothing is saved, the user retries.
+            // A write racing on the bank account's money moved its xmin: nothing is saved, the user retries.
             return TransactionErrors.ConcurrentModification();
         }
 
-        var fundingSource = funding is null ? null : new DepositFundingSource(funding.Source.Id, funding.Source.Name);
+        var accountNames = new Dictionary<Guid, string>
+        {
+            [sourceAccount.Id] = sourceAccount.Name,
+            [returnAccount.Id] = returnAccount.Name
+        };
 
-        return terms.ToResponse(asset, WarsawCalendar.Today(timeProvider), fundingSource, payout: null);
+        return terms.ToResponse(asset, WarsawCalendar.Today(timeProvider), accountNames, paidOutOn: null);
     }
-
-    private async Task<Result<FundingTransfer>> PlanFundingAsync(
-        Guid fundingAssetId, Asset deposit, AddDepositRequest request, CancellationToken cancellationToken)
-    {
-        var source = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == fundingAssetId, cancellationToken);
-
-        if (source is null
-            || !TransferRoutes.IsAllowed(source.AssetClass, deposit.AssetClass)
-            || source.IsArchived)
-        {
-            return TransferErrors.InvalidCounterpart;
-        }
-
-        if (source.Currency != deposit.Currency)
-        {
-            return TransferErrors.CurrencyMismatch;
-        }
-
-        var (outLeg, inLeg) = TransferLegs.Create(source.Id, deposit.Id, request.Principal, request.StartDate);
-
-        var sourceHistory = await dbContext.Transactions
-            .AsNoTracking()
-            .Where(t => t.AssetId == source.Id)
-            .ToListAsync(cancellationToken);
-
-        var sourceQuantity = TransactionQuantityCalculator.Recompute(
-            [.. sourceHistory, outLeg], _ => TransferErrors.InsufficientFunds);
-        if (sourceQuantity.IsFailure)
-        {
-            return sourceQuantity.Error;
-        }
-
-        return new FundingTransfer(source, outLeg, inLeg, sourceQuantity.Value);
-    }
-
-    private sealed record FundingTransfer(Asset Source, Transaction OutLeg, Transaction InLeg, decimal SourceQuantity);
 }

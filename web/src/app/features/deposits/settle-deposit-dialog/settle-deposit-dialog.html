@@ -79,18 +79,16 @@
       </mat-form-field>
     </div>
 
-    @let moved = movedAmount();
-    <app-payout-destination-field
-      formControlName="destinationAssetId"
-      [currency]="deposit.currency"
-      [offerKeep]="true"
-      [hint]="
-        moved === null
-          ? null
-          : ('deposits.settle.movesOut'
-            | transloco: { amount: formatMoney(moved, deposit.currency) })
-      "
-    />
+    <mat-checkbox formControlName="payOut" class="settle-deposit-dialog__pay-out">
+      {{ 'deposits.settle.payOutTo' | transloco: { name: deposit.returnAccountName } }}
+    </mat-checkbox>
+    @if (movedAmount(); as moved) {
+      <p class="settle-deposit-dialog__moves-out">
+        {{
+          'deposits.settle.movesOut' | transloco: { amount: formatMoney(moved, deposit.currency) }
+        }}
+      </p>
+    }
 
     <dl class="settle-deposit-dialog__summary">
       <div>

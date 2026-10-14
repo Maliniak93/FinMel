@@ -181,6 +181,48 @@
       }
     }
 
+    @if (account.bank) {
+      <h2>{{ 'accounts.detail.deposits' | transloco }}</h2>
+      @if (depositsResource.error(); as depositsError) {
+        <div class="account-detail__state" role="alert">
+          <p>{{ depositsError.message }}</p>
+          <button mat-button type="button" (click)="depositsResource.reload()">
+            {{ 'common.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (depositsResource.isLoading() && !depositsResource.hasValue()) {
+        <div class="account-detail__state">
+          <mat-spinner diameter="24" />
+        </div>
+      } @else if (depositsResource.hasValue() && depositsResource.value().length === 0) {
+        <p class="account-detail__empty">{{ 'accounts.detail.noDeposits' | transloco }}</p>
+      } @else if (depositsResource.hasValue()) {
+        <table mat-table [dataSource]="depositsResource.value()" class="account-detail__table">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              <a routerLink="/deposits">{{ deposit.name }}</a>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="principal">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.principal' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">
+              {{ formatMoney(deposit.principal, deposit.currency) }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="maturityDate">
+            <th mat-header-cell *matHeaderCellDef>{{ 'deposits.maturity' | transloco }}</th>
+            <td mat-cell *matCellDef="let deposit">{{ formatDate(deposit.maturityDate) }}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="depositColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: depositColumns"></tr>
+        </table>
+      }
+    }
+
     <h2>{{ 'accounts.detail.cashHistory' | transloco }}</h2>
     @if (historyResource.error(); as historyError) {
       <div class="account-detail__state" role="alert">

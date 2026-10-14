@@ -14,6 +14,6 @@ public static class ListDepositsEndpoint
     }
 
     private static async Task<Ok<IReadOnlyList<DepositResponse>>> HandleAsync(
-        ListDepositsHandler handler, CancellationToken cancellationToken)
-        => TypedResults.Ok(await handler.HandleAsync(cancellationToken));
+        ListDepositsHandler handler, CancellationToken cancellationToken, Guid? accountId = null)
+        => TypedResults.Ok(await handler.HandleAsync(accountId, cancellationToken));
 }

@@ -3,13 +3,7 @@ import type { FormGroup } from '@angular/forms';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-import {
-  labelsOf,
-  matchesTranslation,
-  polishProblems,
-  restoreEnglish,
-  switchLanguage,
-} from '../../../../testing/i18n';
+import { labelsOf, polishProblems, restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { toDateOnly } from '../../../shared/date-only';
@@ -22,21 +16,11 @@ import {
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
 import {
-  eurCashCandidate,
-  eurBankCandidate,
+  nestAccount,
   paidOutDeposit,
-  pickSelectOption,
-  plnCashCandidate,
-  plnBankCandidate,
-  requestedCandidateClasses,
   requestMethod,
-  bankCandidatesByCurrency,
-  selectOptionLabels,
   settledDeposit,
   settledDepositFinalAmount,
-  transferCandidateRequests,
-  transferCandidatesByCurrency,
-  transferCandidatesFor,
   writeRequests,
 } from '../testing/deposit-fixtures';
 import { PayOutDepositDialog } from './pay-out-deposit-dialog';
@@ -58,20 +42,10 @@ describe('PayOutDepositDialog', () => {
 
   async function setup(
     writeResponse: () => Response = () => jsonResponse(paidOutDeposit),
-    candidatesByCurrency: typeof transferCandidatesByCurrency = transferCandidatesByCurrency,
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (requestMethod(input) === 'GET') {
-        if (requestUrl(input).includes('/api/portfolio/transfer-candidates')) {
-          return jsonResponse(
-            transferCandidatesFor(
-              new URL(requestUrl(input)),
-              candidatesByCurrency,
-              candidatesByCurrency === transferCandidatesByCurrency ? bankCandidatesByCurrency : {},
-            ),
-          );
-        }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
       return writeResponse();
@@ -134,23 +108,17 @@ describe('PayOutDepositDialog', () => {
     }
   });
 
-  it('lists the Cash and savings candidates in the deposit currency, with no destination preselected', async () => {
+  it('names the return account instead of asking for a destination', async () => {
     await setup();
 
-    expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
-    const requested = requestedCandidateClasses(fetchSpy);
-    expect(requested).toContain('Cash');
-    expect(requested).toContain('BankAccount');
-    for (const url of transferCandidateRequests(fetchSpy)) {
-      expect(url.searchParams.get('currency')).toBe(settledDeposit.currency);
-    }
-
-    const labels = await selectOptionLabels(fixture, 'destinationAssetId');
-    expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
-    expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
-    expect(labels.some((label) => label.includes(plnBankCandidate.name))).toBe(true);
-    expect(labels.some((label) => label.includes(eurBankCandidate.name))).toBe(false);
-    expect(labels.some((label) => /keep in the deposit/i.test(label))).toBe(false);
+    expect(renderedText(fixture)).toContain(nestAccount.name);
+    expect(hasControl(form(), 'destinationAssetId')).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('mat-select')).toBeNull();
+    expect(
+      fetchSpy.mock.calls.some((call: unknown[]) =>
+        requestUrl(call[0]).includes('/api/portfolio/transfer-candidates'),
+      ),
+    ).toBe(false);
   });
 
   it('defaults the date to today', async () => {
@@ -161,15 +129,8 @@ describe('PayOutDepositDialog', () => {
   });
 
   it.each([
-    ['no destination', { destinationAssetId: null }],
-    [
-      'a date before the settlement date',
-      { destinationAssetId: plnCashCandidate.assetId, date: new Date(2026, 3, 16) },
-    ],
-    [
-      'a date in the future',
-      { destinationAssetId: plnCashCandidate.assetId, date: daysFromToday(1) },
-    ],
+    ['a date before the settlement date', { date: new Date(2026, 3, 16) }],
+    ['a date in the future', { date: daysFromToday(1) }],
   ])('%s blocks submit', async (_case, values) => {
     await setup();
 
@@ -184,30 +145,13 @@ describe('PayOutDepositDialog', () => {
   it('the settlement date itself is a valid payout date', async () => {
     await setup();
 
-    await fill({ destinationAssetId: plnCashCandidate.assetId, date: new Date(2026, 3, 17) });
+    await fill({ date: new Date(2026, 3, 17) });
 
     expect(form().valid).toBe(true);
   });
 
-  it('submit POSTs {destinationAssetId, date} and closes with true', async () => {
+  it('submit POSTs only the date and closes with true', async () => {
     await setup();
-    await fill({ destinationAssetId: plnCashCandidate.assetId, date: new Date(2026, 3, 18) });
-
-    await component['onSubmit']();
-
-    const [request] = writeRequests(fetchSpy);
-    expect(request.method).toBe('POST');
-    expect(request.url).toContain(`/api/portfolio/deposits/${settledDeposit.assetId}/payout`);
-    expect(await request.json()).toEqual({
-      destinationAssetId: plnCashCandidate.assetId,
-      date: '2026-04-18',
-    });
-    expect(dialogRef.close).toHaveBeenCalledWith(true);
-  });
-
-  it('submit POSTs a savings account as destinationAssetId', async () => {
-    await setup();
-    await pickSelectOption(fixture, 'destinationAssetId', plnBankCandidate.name);
     await fill({ date: new Date(2026, 3, 18) });
 
     await component['onSubmit']();
@@ -215,28 +159,8 @@ describe('PayOutDepositDialog', () => {
     const [request] = writeRequests(fetchSpy);
     expect(request.method).toBe('POST');
     expect(request.url).toContain(`/api/portfolio/deposits/${settledDeposit.assetId}/payout`);
-    expect(await request.json()).toEqual({
-      destinationAssetId: plnBankCandidate.assetId,
-      date: '2026-04-18',
-    });
+    expect(await request.json()).toEqual({ date: '2026-04-18' });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
-  });
-
-  it('a server 400 is shown and the dialog stays open', async () => {
-    const detail = "This asset can't be the other side of the transfer — pick one from the list.";
-    await setup(() =>
-      jsonResponse(
-        { status: 400, detail, errorCode: 'Validation.InvalidTransferCounterpart' },
-        400,
-      ),
-    );
-    await fill({ destinationAssetId: plnCashCandidate.assetId });
-
-    await component['onSubmit']();
-    await render();
-
-    expect(renderedText(fixture)).toContain(detail);
-    expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
   it('a server 409 is shown and the dialog stays open', async () => {
@@ -244,7 +168,6 @@ describe('PayOutDepositDialog', () => {
     await setup(() =>
       jsonResponse({ status: 409, detail, errorCode: 'Conflict.DepositAlreadyPaidOut' }, 409),
     );
-    await fill({ destinationAssetId: plnCashCandidate.assetId });
 
     await component['onSubmit']();
     await render();
@@ -267,45 +190,16 @@ describe('PayOutDepositDialog', () => {
       return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
     }
 
-    async function touchAll(): Promise<void> {
-      await component['onSubmit']();
-      await render();
-    }
-
-    it('renders in Polish', async () => {
-      await setup();
-      const element = fixture.nativeElement as HTMLElement;
-      const texts = () => [
-        ...labelsOf(element, 'h2'),
-        ...labelsOf(element, 'dt'),
-        ...labelsOf(element, 'mat-label'),
-        ...labelsOf(element, 'mat-dialog-actions button'),
-      ];
-
-      const english = texts();
-      expect(english).toEqual(['Pay out', 'Amount', 'Move to', 'Date', 'Cancel', 'Transfer']);
-
-      await switchLanguage(fixture, 'pl');
-
-      expect(polishProblems(english, texts(), ['Transfer'])).toEqual([]);
-    });
-
     it('shows validation in Polish', async () => {
       await setup();
       const scenarios: [string, Record<string, unknown>][] = [
-        ['Pick where the money goes.', { destinationAssetId: null, date: daysFromToday(0) }],
-        [
-          "Date can't be before the settlement date.",
-          { destinationAssetId: plnCashCandidate.assetId, date: new Date(2026, 3, 16) },
-        ],
-        [
-          "Date can't be in the future.",
-          { destinationAssetId: plnCashCandidate.assetId, date: daysFromToday(1) },
-        ],
+        ["Date can't be before the settlement date.", { date: new Date(2026, 3, 16) }],
+        ["Date can't be in the future.", { date: daysFromToday(1) }],
       ];
       const read = async (values: Record<string, unknown>) => {
         await fill(values);
-        await touchAll();
+        await component['onSubmit']();
+        await render();
         return errors();
       };
 
@@ -320,23 +214,6 @@ describe('PayOutDepositDialog', () => {
       for (const [index, [, values]] of scenarios.entries()) {
         expect(polishProblems(english[index], await read(values))).toEqual([]);
       }
-    });
-
-    it('shows the missing-account hint in Polish', async () => {
-      await setup(undefined, { PLN: [] });
-      const element = fixture.nativeElement as HTMLElement;
-      const hint = () => labelsOf(element, 'mat-hint');
-
-      const english = hint();
-      expect(english).toEqual(['You have no Cash or bank account in PLN to move the money to.']);
-
-      await switchLanguage(fixture, 'pl');
-
-      expect(polishProblems(english, hint())).toEqual([]);
-      expect(hint()[0]).toContain('PLN');
-      expect(matchesTranslation('pl', hint()[0]), `"${hint()[0]}" is not a pl.json value`).toBe(
-        true,
-      );
     });
   });
 });
