@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LABELS } from "./extract.mjs";
+import { LEVEL_WORKFLOW, levelRows, PIPELINE } from "./pipeline.mjs";
 
 const MERMAID = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "docs", "vendor", "mermaid.min.js");
 
@@ -33,7 +34,9 @@ th { background: #eef1f6; }
 code { background: #eef1f6; padding: 0 0.25rem; border-radius: 3px; }
 pre.mermaid { background: #fff; border: 1px solid #d9dee8; padding: 1rem; overflow-x: auto; }
 .card { display: none; background: #fff; border: 1px solid #d9dee8; border-left: 4px solid #3b6fd4; padding: 0.5rem 1.5rem 1rem; margin: 1.5rem 0; }
-.card:target { display: block; }
+.card:target, .card:has(.step-panel:target) { display: block; }
+.step-panel { display: none; background: #f3f6fc; border: 1px solid #d9dee8; padding: 0.25rem 1rem; margin: 0.5rem 0; }
+.step-panel:target { display: block; }
 .kind { font-size: 0.8rem; color: #6b7487; font-weight: 400; margin-left: 0.5rem; }
 .badge-stale { background: #c77d0a; color: #fff; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 3px; margin-left: 0.5rem; }
 .marker { display: inline-block; background: #fdecea; color: #8a1c10; padding: 0.1rem 0.5rem; border-radius: 3px; margin: 0 0.4rem 0.3rem 0; font-size: 0.85rem; }
@@ -80,7 +83,7 @@ function renderFacts(node) {
       value !== undefined &&
       value !== "" &&
       key !== "description" &&
-      !["flags", "limits", "phases", "levels", "usage"].includes(key) &&
+      !["flags", "limits", "phases", "levels", "constants", "usage"].includes(key) &&
       !(Array.isArray(value) && value.length === 0),
   );
   if (f.usage) parts.push(`<p><code>${esc(f.usage)}</code></p>`);
@@ -120,19 +123,84 @@ function renderMarkers(node) {
   return `<h3>Uprawnienia</h3><p>${items.join("")}</p>`;
 }
 
-function renderSteps(description) {
+function limitHtml(limit, facts) {
+  const parts = [];
+  if (limit.ref) {
+    const [nodeId, name] = limit.ref.split("#");
+    const found = facts.nodes[nodeId]?.facts.limits?.find((l) => l.name === name);
+    parts.push(`<code>${esc(name)}</code> (${link(nodeId)}) = ${esc(found?.value)}${found?.unit ? ` ${esc(found.unit)}` : ""}`);
+  }
+  if (limit.text) parts.push(esc(limit.text));
+  return parts.join(" · ");
+}
+
+function agentHtml(nodeId, step, facts) {
+  const agentId = `agent:${step.agent}`;
+  const rows = nodeId === LEVEL_WORKFLOW ? levelRows(facts.nodes[nodeId].facts, step.agent) : null;
+  if (!rows) {
+    const agent = facts.nodes[agentId].facts;
+    return `agent: ${link(agentId)} — ${esc(agent.model ?? "?")}/${esc(agent.effort ?? "?")}`;
+  }
+  const list = (items) => `<ul>${items.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>`;
+  const escalation = rows.escalation.length ? `<br>eskalacja:${list(rows.escalation)}` : "";
+  return `agent: ${link(agentId)}<br>poziom startowy:${list(rows.start)}${escalation}`;
+}
+
+function stepExtras(nodeId, s, facts) {
+  return [
+    s.condition ? `<em>warunek: ${esc(s.condition)}</em>` : "",
+    s.agent ? agentHtml(nodeId, s, facts) : "",
+    s.retries !== undefined ? `ponowienia: ${esc(s.retries)}` : "",
+    s.limit ? `limit: ${limitHtml(s.limit, facts)}` : "",
+    s.calls ? `wywołuje: ${link(s.calls)}` : "",
+  ].filter(Boolean);
+}
+
+function renderSteps(nodeId, description, facts) {
   const steps = description.steps
     .map((s) => {
-      const extra = [
-        s.condition ? `<em>warunek: ${esc(s.condition)}</em>` : "",
-        s.agent ? `agent: ${link(`agent:${s.agent}`)}` : "",
-        s.retries !== undefined ? `ponowienia: ${esc(s.retries)}` : "",
-        s.limit ? `limit: ${esc(s.limit)}` : "",
-      ].filter(Boolean);
+      const extra = stepExtras(nodeId, s, facts);
       return `<li><strong>${esc(s.title)}</strong> — ${esc(s.detail)}${extra.length ? `<br>${extra.join(" · ")}` : ""}</li>`;
     })
     .join("");
   return `<p>${esc(description.summary)}</p><ol>${steps}</ol>`;
+}
+
+const stepSlug = (nodeId, stepId) => `step-${nodeId.replace(/[^A-Za-z0-9_-]/g, "-")}-${stepId.replace(/[^A-Za-z0-9_-]/g, "-")}`;
+const mermaidText = (text) => String(text).replace(/["\r\n|]/g, (c) => (c === '"' ? "'" : " "));
+
+function stepDiagram(nodeId, description) {
+  const steps = description.steps;
+  const alias = new Map(steps.map((s, i) => [s.id, `s${i}`]));
+  const lines = ["flowchart TD", "  classDef agent fill:#e3edff,stroke:#3b6fd4,stroke-width:2px"];
+  for (const s of steps) lines.push(`  ${alias.get(s.id)}["${mermaidText(s.title)}"]`);
+  for (const s of steps) {
+    for (const edge of s.next) {
+      const label = edge.when ? `|"${mermaidText(edge.when)}"|` : "";
+      lines.push(`  ${alias.get(s.id)} -->${label} ${alias.get(edge.to)}`);
+    }
+  }
+  const withAgent = steps.filter((s) => s.agent).map((s) => alias.get(s.id));
+  if (withAgent.length) lines.push(`  class ${withAgent.join(",")} agent`);
+  for (const s of steps) lines.push(`  click ${alias.get(s.id)} "#${stepSlug(nodeId, s.id)}"`);
+  return lines.join("\n");
+}
+
+function renderPipeline(nodeId, description, facts) {
+  const index = description.steps.map((s) => `<li><a href="#${stepSlug(nodeId, s.id)}">${esc(s.title)}</a></li>`).join("");
+  const panels = description.steps
+    .map((s) => {
+      const extra = stepExtras(nodeId, s, facts);
+      const next = s.next.map((e) => `${e.when ? `${esc(e.when)} → ` : ""}${esc(description.steps.find((t) => t.id === e.to).title)}`);
+      return `<div class="step-panel" id="${stepSlug(nodeId, s.id)}"><h4>${esc(s.title)}</h4><p>${esc(s.detail)}</p>${extra.length ? `<p>${extra.join("<br>")}</p>` : ""}${next.length ? `<p>dalej: ${next.join(" · ")}</p>` : "<p>koniec</p>"}</div>`;
+    })
+    .join("");
+  return `<p>${esc(description.summary)}</p>
+<pre class="mermaid">
+${esc(stepDiagram(nodeId, description))}
+</pre>
+<ol>${index}</ol>
+${panels}`;
 }
 
 function renderCard(id, facts, descriptions, stale) {
@@ -147,7 +215,7 @@ ${node.facts.description ? `<p>${esc(node.facts.description)}</p>` : ""}
 ${renderFacts(node)}
 ${renderMarkers(node)}
 <p><strong>Wywołują:</strong> ${links(callers)}<br><strong>Wywołuje:</strong> ${links(callees)}</p>
-${description ? renderSteps(description) : "<p><em>Brak opisu kroków.</em></p>"}
+${description ? (PIPELINE.includes(id) ? renderPipeline(id, description, facts) : renderSteps(id, description, facts)) : "<p><em>Brak opisu kroków.</em></p>"}
 </section>`;
 }
 
@@ -174,7 +242,7 @@ export function renderPage(facts, descriptions, stale, meta) {
 <main>
 <h1>Mapa workflow</h1>
 <p>Kliknij węzeł, aby otworzyć jego kartę.</p>
-<pre class="mermaid">
+<pre class="mermaid" id="map">
 ${esc(mermaidSource(facts))}
 </pre>
 <h2>Legenda</h2>
@@ -185,7 +253,15 @@ ${ids.map((id) => renderCard(id, facts, descriptions, stale)).join("\n")}
 </main>
 <footer>${footer}</footer>
 <script>${mermaid}</script>
-<script>mermaid.initialize({ startOnLoad: true, securityLevel: "loose" });</script>
+<script>
+mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
+function renderVisible() {
+  const nodes = [...document.querySelectorAll("pre.mermaid")].filter((el) => el.offsetParent !== null && !el.hasAttribute("data-processed"));
+  if (nodes.length) mermaid.run({ nodes });
+}
+window.addEventListener("hashchange", renderVisible);
+window.addEventListener("load", renderVisible);
+</script>
 </body>
 </html>
 `;

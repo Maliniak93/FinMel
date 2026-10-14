@@ -70,12 +70,12 @@ export const descPath = (sb, id) => path.join(sb.out, ".work", "desc", `${id.rep
 
 export function descriptionFor(id, hash, extra = {}) {
   return {
-    schema: 1,
+    schema: 2,
     sources: hash,
     summary: `Podsumowanie ${id}`,
     steps: [
       { id: "s1", title: `Unikat-${id}-1`, detail: "pierwszy krok" },
-      { id: "s2", title: `Unikat-${id}-2`, detail: "drugi krok", condition: "gdy trzeba", retries: 2, limit: "10 min" },
+      { id: "s2", title: `Unikat-${id}-2`, detail: "drugi krok", condition: "gdy trzeba", retries: 2, limit: { text: "10 min" } },
     ],
     ...extra,
   };
@@ -118,3 +118,85 @@ export const edgeCount = (facts, from, to) => facts.edges.filter((e) => e.from =
 export const has = (node, text) => JSON.stringify(node).includes(text);
 
 export const markerOf = (node, label) => (node.markers ?? []).find((m) => m.label === label);
+
+const BUILD_FEATURE = `export const meta = {
+  name: 'build-feature',
+  description: 'Fixture pipeline workflow',
+  phases: [{ title: 'Implement', detail: 'write the code' }],
+}
+
+const OPUS = 'claude-opus-5-5'
+const startLevel =
+  tier >= 2 ? { model: 'sonnet', effort: 'high' } : noTests ? { model: 'haiku', effort: 'high' } : { model: 'sonnet', effort: 'medium' }
+const escalatedLevel = { model: OPUS, effort: tier >= 2 ? 'high' : 'medium' }
+const e2eStartLevel = { model: 'sonnet', effort: tier >= 2 ? 'high' : 'medium' }
+const testWriter = tier >= 2 ? { model: 'sonnet', effort: 'medium' } : { model: 'haiku', effort: 'high' }
+const reviewEffort = tier >= 2 ? 'high' : 'medium'
+
+await step('implementer', 'Implement', ['go'])
+await step('scout', 'Scout', ['go'])
+`;
+
+export const epicSource = (minutes) => `#!/usr/bin/env node
+// Usage: node scripts/epic.mjs <epic> [--dry-run]
+
+const CI_TIMEOUT_MS = ${minutes} * 60 * 1000;
+const MAX_E2E_REPAIRS = 3;
+
+console.log(CI_TIMEOUT_MS, MAX_E2E_REPAIRS);
+`;
+
+export function addPipelineFixture(sb) {
+  put(sb, ".claude/workflows/build-feature.js", BUILD_FEATURE);
+  put(sb, ".claude/agents/implementer.md", `---
+name: implementer
+description: Writes the code.
+model: sonnet
+effort: medium
+---
+
+# Implementer
+`);
+  put(sb, ".claude/agents/scout.md", `---
+name: scout
+description: Looks around.
+model: opus
+effort: xhigh
+---
+
+# Scout
+`);
+  put(sb, ".claude/skills/build/SKILL.md", `---
+name: build
+description: Builds a spec.
+---
+
+Run the build-feature workflow.
+`);
+  put(sb, "scripts/epic.mjs", epicSource(90));
+}
+
+export const step = (id, extra = {}) => ({ id, title: `Unikat-${id}`, detail: `Opis-${id}`, ...extra });
+
+export function writeDescription(sb, id, steps) {
+  const facts = readFacts(sb);
+  const desc = descriptionFor(id, facts.nodes[id].hash, { steps });
+  mkdirSync(path.dirname(descPath(sb, id)), { recursive: true });
+  writeFileSync(descPath(sb, id), JSON.stringify(desc, null, 2));
+}
+
+export const GRAPH = [
+  step("krok-a", { next: [{ to: "krok-b" }] }),
+  step("krok-b", { next: [{ to: "krok-c", when: "Unikat-zielony" }, { to: "krok-d", when: "Unikat-skip" }] }),
+  step("krok-c", { next: [{ to: "krok-d" }] }),
+  step("krok-d", { next: [{ to: "krok-b", when: "Unikat-powtorka" }, { to: "krok-e", when: "Unikat-gotowe" }] }),
+  step("krok-e", { next: [] }),
+];
+
+export function pipelineReady(sb, { build = GRAPH, wf, epic } = {}) {
+  addPipelineFixture(sb);
+  readyToBuild(sb);
+  writeDescription(sb, "cmd:build", build);
+  writeDescription(sb, "wf:build-feature", wf ?? [step("a", { agent: "implementer", next: [{ to: "b" }] }), step("b", { agent: "scout", next: [] })]);
+  writeDescription(sb, "script:epic", epic ?? [step("e1", { next: [{ to: "e2" }] }), step("e2", { next: [] })]);
+}

@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { appendFileSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { descPath, makeSandbox, put, readFacts, readyToBuild, runBuild, runFacts } from "./helpers.mjs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { descPath, descriptionFor, makeSandbox, put, readFacts, readyToBuild, runBuild, runFacts } from "./helpers.mjs";
 
 const ALL = ["agent:worker", "cmd:alpha", "script:beta", "script:gamma", "wf:flow-one"];
 
@@ -122,6 +123,20 @@ test("facts after a script is deleted drops its node and build removes its descr
     assert.equal(build.status, 0, build.output);
     assert.ok(!existsSync(descPath(sb, "script:gamma")), "gamma description deleted");
     assert.ok(existsSync(descPath(sb, "script:beta")), "other descriptions kept");
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("facts reports every node stale when its description is stamped with schema 1", () => {
+  const sb = described();
+  try {
+    const facts = readFacts(sb);
+    for (const [id, node] of Object.entries(facts.nodes)) {
+      mkdirSync(path.dirname(descPath(sb, id)), { recursive: true });
+      writeFileSync(descPath(sb, id), JSON.stringify(descriptionFor(id, node.hash, { schema: 1 })));
+    }
+    assert.deepEqual(staleOf(runFacts(sb)), ALL);
   } finally {
     sb.cleanup();
   }

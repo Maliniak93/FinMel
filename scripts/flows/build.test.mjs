@@ -53,7 +53,7 @@ test("build with an invalid description fails naming the node and the field and 
 
     const cases = [
       { id: "script:beta", content: "{ not json", field: /json/i },
-      { id: "cmd:alpha", content: JSON.stringify({ schema: 1, sources: facts.nodes["cmd:alpha"].hash, summary: "x" }), field: /steps/ },
+      { id: "cmd:alpha", content: JSON.stringify({ schema: 2, sources: facts.nodes["cmd:alpha"].hash, summary: "x" }), field: /steps/ },
       {
         id: "wf:flow-one",
         content: JSON.stringify(

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { LEVEL_WORKFLOW, REQUIRED_LEVELS } from "./pipeline.mjs";
 
 export class ExtractError extends Error {}
 
@@ -288,7 +289,7 @@ function extractLevels(text) {
     if (!rows.every((r) => EFFORTS.has(r.text) || /^[\w.-]+\/[a-z]+$/.test(r.text))) continue;
     levels.push({ name: m[1], rows: rows.map((r) => `${r.cond ?? "always"} → ${r.text}`) });
   }
-  return levels;
+  return { levels, constants: Object.fromEntries(Object.entries(constants).filter(([name]) => /^[A-Z][A-Z0-9_]*$/.test(name))) };
 }
 
 function extractWorkflows(root) {
@@ -309,6 +310,11 @@ function extractWorkflows(root) {
       fail(rel, `the \`meta\` literal is not parsable: ${error.message}`);
     }
     if (!meta || typeof meta.name !== "string" || !meta.name) fail(rel, "the `meta` literal has no name");
+    const { levels, constants } = extractLevels(text);
+    if (`wf:${meta.name}` === LEVEL_WORKFLOW) {
+      const missing = [...REQUIRED_LEVELS.filter((n) => !levels.some((l) => l.name === n)), ...("OPUS" in constants ? [] : ["OPUS"])];
+      if (missing.length) fail(rel, `the level constants ${missing.join(", ")} the agent -> level table names are missing or not parsable`);
+    }
     nodes.push({
       id: `wf:${meta.name}`,
       kind: "workflow",
@@ -319,7 +325,8 @@ function extractWorkflows(root) {
         description: meta.description,
         whenToUse: meta.whenToUse,
         phases: (meta.phases ?? []).map((p) => ({ title: p.title, detail: p.detail, model: p.model })),
-        levels: extractLevels(text),
+        levels,
+        constants,
       },
     });
   }
@@ -330,7 +337,7 @@ function scriptLimits(text) {
   const limits = [];
   for (const line of text.split("\n")) {
     const m = line.match(/^(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*=\s*([^;,]+?)\s*;?\s*(?:\/\/.*)?$/);
-    if (!m || !LIMIT_NAME.test(m[1]) || !/^[\d\s_*+\-/().]+$/.test(m[2])) continue;
+    if (!m || !LIMIT_NAME.test(m[1]) || !/^(?:\d+(?:\.\d+)?(?:e\d+)?|[\s_*+\-/().])+$/.test(m[2])) continue;
     let value;
     try {
       value = new Function(`return (${m[2]});`)();
