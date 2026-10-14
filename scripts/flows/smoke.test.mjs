@@ -33,3 +33,21 @@ test("facts on this repository finds the core nodes, edges and markers and no pl
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("facts on this repository lists the referable limits of the pipeline scripts and has all 7 pipeline nodes", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "flows-smoke-"));
+  try {
+    const run = runFlows(["facts", "--root", REPO_ROOT, "--out", path.join(dir, "out")]);
+    assert.equal(run.status, 0, run.output);
+    const facts = readFacts({ out: path.join(dir, "out") });
+    for (const id of ["cmd:idea", "cmd:design", "cmd:build", "cmd:fix", "wf:build-feature", "script:ship", "script:epic"]) {
+      assert.ok(id in facts.nodes, `${id} present`);
+    }
+    const limit = (node) => (facts.nodes[node].facts.limits ?? []).map((l) => l.name);
+    assert.ok(limit("script:verify").includes("DEFAULT_DEADLINE_MIN"));
+    assert.ok(limit("script:epic").includes("MAX_E2E_REPAIRS"));
+    assert.ok(limit("script:epic").includes("CI_TIMEOUT_MS"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

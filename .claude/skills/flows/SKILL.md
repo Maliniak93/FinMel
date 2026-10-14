@@ -17,9 +17,16 @@ Regenerate the workflow map. Talk to the user in Polish; write the descriptions 
 2. For each stale node run `node scripts/flows.mjs facts --node <id>` to read its facts and `sources`, read
    those source files, then write `skarbiec-plan/flows/.work/desc/<id>.json` (the `:` of the id becomes `-`,
    e.g. `script:ship` -> `script-ship.json`) as JSON:
-   `{ "schema": 1, "sources": "<hash of that node from skarbiec-plan/flows/.work/facts.json>", "summary": "...", "steps": [ { "id": "s1", "title": "...", "detail": "...", "condition": "...", "agent": "...", "retries": 2, "limit": "..." } ] }`
-   - `summary`, `title`, `detail`, `condition`, `limit` in Polish; `condition`, `agent`, `retries` and `limit` only
-     when the sources state them; `agent` must be the name of an existing agent;
+   `{ "schema": 2, "sources": "<hash of that node from skarbiec-plan/flows/.work/facts.json>", "summary": "...", "steps": [ { "id": "s1", "title": "...", "detail": "...", "condition": "...", "agent": "...", "retries": 2, "limit": { "ref": "<node id>#<CONSTANT>", "text": "..." }, "calls": "<node id>", "next": [ { "to": "s2", "when": "..." } ] } ] }`
+   - `summary`, `title`, `detail`, `condition`, `limit.text`, `next.when` in Polish; `condition`, `agent`, `retries`,
+     `limit` and `calls` only when the sources state them; `agent` must be the name of an existing agent;
+   - the 7 pipeline nodes (`cmd:idea`, `cmd:design`, `cmd:build`, `cmd:fix`, `wf:build-feature`, `script:ship`,
+     `script:epic`) are graphs: every step has `next` (`[]` on a terminal step), every `to` is a step of the same node, every
+     step is reachable from the first. Name every branch the sources state (labels, tier, `skip-tests`, `e2e` part,
+     blocked/ready, escalation, CI result) as a `next` with a `when`; a loop is a `next` back to an earlier step;
+   - `limit.ref` whenever the limit is one of the `limitKeys` that `facts --node <id>` prints for that node (any node
+     may use it); `limit.text` only for a prose limit with no such constant; `calls` for a step that runs another node;
+   - other nodes keep a plain list: `next` may be omitted;
    - every step comes from the sources you read - never invent a step, a branch, a retry or a limit;
    - steps in the order the node does them, one per real action, not per line of code.
 3. Run `node scripts/flows.mjs build`. A failure names the node and the field and leaves the previous map

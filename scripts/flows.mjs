@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Usage: node scripts/flows.mjs <verb> [--root <repo>] [--out <dir>]
-//   facts [--all] [--node <id>]   extract the workflow facts into <out>/.work/facts.json; lists the nodes whose description (<out>/.work/desc/<id>.json) is missing or stale (all with --all); --node prints one node's facts and source files; last line FLOWS_RESULT: {json}
+//   facts [--all] [--node <id>]   extract the workflow facts into <out>/.work/facts.json; lists the nodes whose description (<out>/.work/desc/<id>.json) is missing or stale (all with --all); --node prints one node's facts, source files and referable limit keys (plus the v2 graph reminder for a pipeline node); last line FLOWS_RESULT: {json}
 //   build                         validate every description and render the offline map and node cards; all-or-nothing replace of <out>/index.html and <out>/manifest.json
 
 import { spawnSync } from "node:child_process";
@@ -9,7 +9,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { descDir, DESC_SCHEMA_VERSION, isStale, readDescription, removeOrphans, validateDescription } from "./flows/describe.mjs";
 import { collect, ExtractError } from "./flows/extract.mjs";
+import { limitKeys, PIPELINE } from "./flows/pipeline.mjs";
 import { renderPage } from "./flows/render.mjs";
+
+const PIPELINE_REMINDER =
+  'pipeline node: describe it as a graph - every step needs "next": [{ "to": "<step id>", "when": "<branch>" }] ("next": [] on a terminal step), every step must be reachable from the first; add "calls": "<node id>" for a step that runs another node and "limit": { "ref": "<limitKeys entry>", "text": "..." } for a listed constant';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -53,7 +57,9 @@ function facts(argv) {
   if (flags.node !== undefined) {
     const calls = (key, other) => found.edges.filter((e) => e[key] === flags.node).map((e) => e[other]);
     const node = found.nodes[flags.node];
-    console.log(JSON.stringify({ id: flags.node, ...node, callers: calls("to", "from"), callees: calls("from", "to") }, null, 2));
+    const extra = { limitKeys: limitKeys(flags.node, node) };
+    if (PIPELINE.includes(flags.node)) extra.pipeline = PIPELINE_REMINDER;
+    console.log(JSON.stringify({ id: flags.node, ...node, ...extra, callers: calls("to", "from"), callees: calls("from", "to") }, null, 2));
   }
   console.log(stale.length ? `stale nodes: ${stale.join(", ")}` : "no stale nodes");
   console.log(`FLOWS_RESULT: ${JSON.stringify({ ok: true, out, stale, nodes: Object.keys(found.nodes) })}`);
@@ -69,7 +75,7 @@ function build(argv) {
   for (const id of Object.keys(found.nodes)) {
     const description = readDescription(out, id);
     if (!description.exists) continue;
-    const problem = description.error ?? validateDescription(description.value, found.nodes);
+    const problem = description.error ?? validateDescription(description.value, found.nodes, id);
     if (problem) problems.push(`node ${id} (${path.relative(root, description.file) || description.file}): ${problem}`);
     else descriptions[id] = description.value;
   }
