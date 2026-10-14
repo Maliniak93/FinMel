@@ -3,6 +3,8 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -148,58 +150,58 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Delete_SavingsAccountTransaction_MovesBalance()
+    public async Task Delete_BankAccountTransaction_MovesBalance()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var account = await client.AddSavingsAccountAsync(cancellationToken);
+        var account = await client.CreateSavingsBankAccountAsync(cancellationToken);
         var withdrawId = await client.RecordTransactionAsync(
-            account.AssetId, TransactionType.Withdraw, 4_000m, SavingsToday, cancellationToken, unitPrice: 1m);
-        Assert.Equal(6_000m, (await client.GetSavingsAccountAsync(account.AssetId, cancellationToken)).Balance);
+            account.MoneyAssetId, TransactionType.Withdraw, 4_000m, FixedToday, cancellationToken, unitPrice: 1m);
+        Assert.Equal(6_000m, await client.GetCashBalanceAsync(account.AccountId, cancellationToken));
 
-        var response = await client.DeleteAsync(TransactionUri(account.AssetId, withdrawId), cancellationToken);
+        var response = await client.DeleteAsync(TransactionUri(account.MoneyAssetId, withdrawId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(10_000m, (await client.GetSavingsAccountAsync(account.AssetId, cancellationToken)).Balance);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(account.AssetId, cancellationToken);
+        Assert.Equal(10_000m, await client.GetCashBalanceAsync(account.AccountId, cancellationToken));
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(account.MoneyAssetId, cancellationToken);
     }
 
     [Fact]
-    public async Task Delete_SavingsInterestCredit_ReturnsConflict()
+    public async Task Delete_BankInterestCredit_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var account = await client.CreateInterestAccountAsync(cancellationToken);
+        await client.SettlePreviewedInterestAsync(account.AccountId, cancellationToken);
         var credit = Assert.Single(
-            (await client.ListTransactionsAsync(account.AssetId, cancellationToken)).Items,
-            t => t.SavingsInterestPeriodEnd is not null);
+            (await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items,
+            t => t.BankInterestPeriodEnd is not null);
 
-        var response = await client.DeleteAsync(TransactionUri(account.AssetId, credit.Id), cancellationToken);
+        var response = await client.DeleteAsync(TransactionUri(account.MoneyAssetId, credit.Id), cancellationToken);
 
-        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.SavingsInterestManagedErrorCode, cancellationToken);
-        Assert.Equal(10_033.29m, (await client.GetAssetAsync(account.AssetId, cancellationToken)).Quantity);
-        Assert.Contains((await client.ListTransactionsAsync(account.AssetId, cancellationToken)).Items, t => t.Id == credit.Id);
-        Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.BankInterestManagedErrorCode, cancellationToken);
+        Assert.Equal(10_033.29m, (await client.GetAssetAsync(account.MoneyAssetId, cancellationToken)).Quantity);
+        Assert.Contains((await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items, t => t.Id == credit.Id);
+        Assert.Equal(1, await CountBankSettlementsAsync(userId, cancellationToken, account.MoneyAssetId));
     }
 
     [Fact]
-    public async Task Delete_OrdinarySavingsWithdrawAfterSettlement_StaysAllowed()
+    public async Task Delete_OrdinaryBankWithdrawAfterSettlement_StaysAllowed()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var account = await client.CreateInterestAccountAsync(cancellationToken);
+        await client.SettlePreviewedInterestAsync(account.AccountId, cancellationToken);
         var withdrawId = await client.RecordTransactionAsync(
-            account.AssetId, TransactionType.Withdraw, 500m, new DateOnly(2026, 10, 1), cancellationToken, unitPrice: 1m);
+            account.MoneyAssetId, TransactionType.Withdraw, 500m, new DateOnly(2026, 10, 1), cancellationToken, unitPrice: 1m);
 
-        var response = await client.DeleteAsync(TransactionUri(account.AssetId, withdrawId), cancellationToken);
+        var response = await client.DeleteAsync(TransactionUri(account.MoneyAssetId, withdrawId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(10_033.29m, (await client.GetAssetAsync(account.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(10_033.29m, (await client.GetAssetAsync(account.MoneyAssetId, cancellationToken)).Quantity);
     }
 }

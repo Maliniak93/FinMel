@@ -3,7 +3,7 @@ import type { FormGroup } from '@angular/forms';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-import { restoreEnglish } from '../../../../testing/i18n';
+import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import {
@@ -23,6 +23,7 @@ const data: AccountTransferDialogData = {
     name: 'XTB IKE',
     type: 0,
     wrapper: 1,
+    currency: 'PLN',
     isArchived: false,
     cashAssetId: sourceCashId,
     cashBalance: 5000,
@@ -53,6 +54,7 @@ describe('AccountTransferDialog', () => {
   async function setup(
     writeResponse: () => Response = () =>
       jsonResponse({ transferId: '44444444-4444-4444-4444-444444444444' }, 201),
+    dialogData: AccountTransferDialogData = data,
   ): Promise<void> {
     // The dates the specs fill must not be in the future, whatever the real clock says.
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -72,7 +74,7 @@ describe('AccountTransferDialog', () => {
       providers: [
         provideI18nTesting(),
         provideNativeDateAdapter(),
-        { provide: MAT_DIALOG_DATA, useValue: data },
+        { provide: MAT_DIALOG_DATA, useValue: dialogData },
         { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
@@ -179,5 +181,41 @@ describe('AccountTransferDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  it('loads the candidates in the currency of the account', async () => {
+    await setup(undefined, { account: { ...data.account, currency: 'USD' } });
+
+    const url = new URL(
+      requestUrl(
+        fetchSpy.mock.calls
+          .map((call: unknown[]) => call[0])
+          .find((input: unknown) => requestUrl(input).includes('/transfer-candidates')),
+      ),
+    );
+    expect(url.searchParams.get('currency')).toBe('USD');
+  });
+
+  it('a server 400 TransferCurrencyMismatch shows "Różne waluty" and keeps the dialog open', async () => {
+    await setup(() =>
+      jsonResponse(
+        {
+          title: 'Validation Failed',
+          status: 400,
+          detail: 'The accounts hold different currencies.',
+          errorCode: 'Validation.TransferCurrencyMismatch',
+        },
+        400,
+      ),
+    );
+    await switchLanguage(fixture, 'pl');
+    await fill({ targetAssetId: targetCashId, amount: 100 });
+
+    await component['onSubmit']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(renderedText(fixture)).toContain('Różne waluty');
+    expect(dialogRef.close).not.toHaveBeenCalled();
   });
 });

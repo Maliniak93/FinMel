@@ -24,7 +24,7 @@ import { getApiReportingDashboard, type DashboardAccountValue } from '../../api/
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { accountTypeLabel, taxWrapperLabel } from './account-type';
+import { ACCOUNT_TYPE, accountTypeLabel, taxWrapperLabel } from './account-type';
 import { AccountFormDialog } from './account-form-dialog/account-form-dialog';
 import { ContributionBar } from './contribution-bar/contribution-bar';
 
@@ -87,7 +87,11 @@ export class Accounts {
     this.accountsResource.hasValue()
       ? this.accountsResource
           .value()
-          .filter((account) => this.includeArchived() || !account.isArchived)
+          .filter(
+            (account) =>
+              Number(account.type) !== ACCOUNT_TYPE.Bank &&
+              (this.includeArchived() || !account.isArchived),
+          )
       : [],
   );
 

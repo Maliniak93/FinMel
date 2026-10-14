@@ -158,26 +158,4 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.False(assets.Single(a => a.Id == due.AssetId).DepositSettled);
         Assert.Null(assets.Single(a => a.Id == cashId).DepositSettled);
     }
-
-    [Fact]
-    public async Task List_SavingsAccount_FlagsInterestDue()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var settledUp = await client.AddSavingsAccountAsync(
-            cancellationToken, NewInterestAccountRequest(name: "Settled up"));
-        var due = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest(name: "Due"));
-        var cashId = await client.AddCashAssetAsync(cancellationToken);
-        await client.SettlePreviewedSavingsInterestAsync(settledUp.AssetId, cancellationToken);
-
-        var response = await client.GetAsync(AllAssetsUri, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var assets = await response.Content.ReadFromJsonAsync<List<AssetResponse>>(cancellationToken);
-        Assert.NotNull(assets);
-        Assert.True(assets.Single(a => a.Id == due.AssetId).SavingsInterestDue);
-        Assert.False(assets.Single(a => a.Id == settledUp.AssetId).SavingsInterestDue);
-        Assert.Null(assets.Single(a => a.Id == cashId).SavingsInterestDue);
-    }
 }

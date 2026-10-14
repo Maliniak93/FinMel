@@ -8,6 +8,7 @@ using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -234,7 +235,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
 
     [Theory]
     [InlineData("stock")]
-    [InlineData("eur-cash")]
     [InlineData("archived-cash")]
     [InlineData("deposit-asset")]
     [InlineData("unknown-id")]
@@ -249,7 +249,6 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         var sourceId = invalidCase switch
         {
             "stock" => await client.AddAssetAsync(accountId, cancellationToken, name: "Shares", assetClass: AssetClass.Stock),
-            "eur-cash" => await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "EUR cash"),
             "archived-cash" => await client.AddArchivedCashAssetAsync(cancellationToken),
             "deposit-asset" => (await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Other deposit"))).AssetId,
             "unknown-id" => Guid.NewGuid(),
@@ -264,6 +263,22 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
         await using var dbContext = CreateDbContext(userId);
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+    }
+
+    [Fact]
+    public async Task Add_ForeignCurrencyFundingSource_ReturnsTransferCurrencyMismatch()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var eurCashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "EUR cash");
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            AllDepositsUri, NewDepositRequest(principal: 1_000m, fundingAssetId: eurCashId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, TransferCurrencyMismatchErrorCode, cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
     }
 
     [Fact]

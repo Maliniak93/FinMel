@@ -1,4 +1,4 @@
-import type { BondResponse, DepositResponse, SavingsAccountResponse } from '../../api/portfolio';
+import type { AccountResponse, BondResponse, DepositResponse } from '../../api/portfolio';
 import { fromDateOnly, toDateOnly } from '../../shared/date-only';
 import { BOND_STATUS } from '../bonds/bond-interest';
 import { DEPOSIT_STATUS } from '../deposits/deposit-terms';
@@ -11,7 +11,7 @@ export type UpcomingKind =
   | 'bondMatured'
   | 'bondMaturing'
   | 'bondInterestDue'
-  | 'savingsInterestDue';
+  | 'bankInterestDue';
 
 export interface UpcomingItem {
   name: string;
@@ -21,7 +21,7 @@ export interface UpcomingItem {
   count: number | null;
   amount: number | string | null;
   currency: string;
-  link: '/deposits' | '/bonds';
+  link: '/deposits' | '/bonds' | '/bank-accounts';
 }
 
 function isActive(item: { isArchived: boolean }): boolean {
@@ -47,7 +47,7 @@ function compareItems(a: UpcomingItem, b: UpcomingItem): number {
 export function upcomingItems(
   deposits: DepositResponse[],
   bonds: BondResponse[],
-  savings: SavingsAccountResponse[],
+  bankAccounts: AccountResponse[],
   today: string,
 ): UpcomingItem[] {
   const horizonDate = fromDateOnly(today);
@@ -109,17 +109,17 @@ export function upcomingItems(
     }
   }
 
-  for (const account of savings.filter(isActive)) {
-    if (account.interestDue) {
+  for (const account of bankAccounts.filter(isActive)) {
+    if (account.bank?.interestDue) {
       items.push({
         name: account.name,
-        kind: 'savingsInterestDue',
+        kind: 'bankInterestDue',
         actionNeeded: true,
         date: null,
-        count: Number(account.duePeriodCount),
+        count: Number(account.bank.duePeriodCount),
         amount: null,
         currency: account.currency,
-        link: '/deposits',
+        link: '/bank-accounts',
       });
     }
   }

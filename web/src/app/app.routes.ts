@@ -34,6 +34,11 @@ export const routes: Routes = [
           import('./features/accounts/account-detail/account-detail').then((m) => m.AccountDetail),
       },
       {
+        path: 'bank-accounts',
+        loadComponent: () =>
+          import('./features/bank-accounts/bank-accounts').then((m) => m.BankAccounts),
+      },
+      {
         path: 'assets/:assetId/transactions',
         loadComponent: () =>
           import('./features/transactions/transactions').then((m) => m.Transactions),

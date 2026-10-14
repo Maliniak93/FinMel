@@ -41,7 +41,7 @@ public sealed class RemoveAssetHandler(
         // Detach, never reverse: a leg on another asset stays an ordinary transaction, so nothing is published for it.
         await dbContext.DetachCounterpartsAsync(transactions, cancellationToken);
 
-        // A term deposit's terms go here; a savings account's go through the FK cascade alone.
+        // A term deposit's terms go here.
         var termDeposit = await dbContext.TermDeposits.FirstOrDefaultAsync(t => t.AssetId == assetId, cancellationToken);
         if (termDeposit is not null)
         {
@@ -49,8 +49,6 @@ public sealed class RemoveAssetHandler(
         }
 
         // Interest settlements carry no FK, so they go here, with the asset.
-        dbContext.SavingsInterestSettlements.RemoveRange(
-            await dbContext.SavingsInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
         dbContext.BondInterestSettlements.RemoveRange(
             await dbContext.BondInterestSettlements.Where(s => s.AssetId == assetId).ToListAsync(cancellationToken));
         dbContext.BondRedemptions.RemoveRange(

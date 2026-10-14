@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -116,27 +117,17 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Remove_SavingsAccount_DeletesTerms()
+    public async Task Remove_BankAccountMoney_ReturnsAccountCashManaged()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var account = await client.AddSavingsAccountAsync(cancellationToken);
-        await client.RecordTransactionAsync(
-            account.AssetId, TransactionType.Withdraw, 100m, SavingsToday, cancellationToken, unitPrice: 1m);
-        var kept = await client.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(name: "Kept"));
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateSavingsBankAccountAsync(cancellationToken);
 
-        var response = await client.DeleteAsync(AssetUri(account.AssetId), cancellationToken);
+        var response = await client.DeleteAsync(AssetUri(account.MoneyAssetId), cancellationToken);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(account.AssetId), cancellationToken)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(SavingsAccountUri(account.AssetId), cancellationToken)).StatusCode);
-        await using var dbContext = CreateDbContext(userId);
-        Assert.False(await dbContext.Assets.AnyAsync(a => a.Id == account.AssetId, cancellationToken));
-        Assert.False(await dbContext.Transactions.AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
-        Assert.False(await dbContext.Set<SavingsAccount>().IgnoreQueryFilters().AnyAsync(t => t.AssetId == account.AssetId, cancellationToken));
-        Assert.True(await dbContext.Set<SavingsAccount>().AnyAsync(t => t.AssetId == kept.AssetId, cancellationToken));
+        await response.AssertAccountCashManagedAsync(cancellationToken);
+        Assert.Equal(10_000m, (await client.GetAssetAsync(account.MoneyAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]
@@ -298,65 +289,20 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Remove_SavingsAccount_DeletesSettlements()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SeptemberEndedUtc);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        var kept = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest(name: "Kept"));
-        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
-        await client.SettlePreviewedSavingsInterestAsync(kept.AssetId, cancellationToken);
-
-        var response = await client.DeleteAsync(AssetUri(account.AssetId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(0, await CountSavingsSettlementsAsync(userId, cancellationToken, account.AssetId));
-        Assert.Equal(1, await CountSavingsSettlementsAsync(userId, cancellationToken, kept.AssetId));
-        await using var dbContext = CreateDbContext(userId);
-        Assert.False(await dbContext.Set<SavingsInterestSettlement>().IgnoreQueryFilters().AnyAsync(s => s.AssetId == account.AssetId, cancellationToken));
-    }
-
-    [Fact]
-    public async Task Remove_SavingsAccountPaidFromDeposit_KeepsDepositPaidOut()
+    public async Task Remove_DepositPaidIntoBankAccount_KeepsBankBalance()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
-
-        var response = await client.DeleteAsync(AssetUri(setup.Account.AssetId), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        var deposit = await client.GetDepositAsync(setup.Deposit.AssetId, cancellationToken);
-        Assert.Equal(DepositStatus.PaidOut, deposit.Status);
-        Assert.Null(deposit.PaidOutToAssetName);
-        Assert.Equal(0m, (await client.GetAssetAsync(setup.Deposit.AssetId, cancellationToken)).Quantity);
-        var withdraw = Assert.Single(
-            (await client.ListTransactionsAsync(setup.Deposit.AssetId, cancellationToken)).Items,
-            t => t.Type == TransactionType.Withdraw);
-        Assert.Null(withdraw.Transfer);
-        await using var dbContext = CreateDbContext(userId);
-        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
-    }
-
-    [Fact]
-    public async Task Remove_DepositPaidIntoSavings_KeepsSavingsBalance()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
-        var leg = Assert.Single((await client.ListTransactionsAsync(setup.Account.AssetId, cancellationToken)).Items);
+        var setup = await client.CreateDepositPaidIntoBankAsync(cancellationToken);
+        var leg = Assert.Single((await client.ListTransactionsAsync(setup.Account.MoneyAssetId, cancellationToken)).Items);
 
         var response = await client.DeleteAsync(AssetUri(setup.Deposit.AssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(10_119.83m, (await client.GetAssetAsync(setup.Account.AssetId, cancellationToken)).Quantity);
-        var kept = Assert.Single((await client.ListTransactionsAsync(setup.Account.AssetId, cancellationToken)).Items);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(setup.Account.MoneyAssetId, cancellationToken)).Quantity);
+        var kept = Assert.Single((await client.ListTransactionsAsync(setup.Account.MoneyAssetId, cancellationToken)).Items);
         Assert.Equal(leg.Id, kept.Id);
         Assert.Equal(TransactionType.Deposit, kept.Type);
         Assert.Equal(10_119.83m, kept.Quantity);

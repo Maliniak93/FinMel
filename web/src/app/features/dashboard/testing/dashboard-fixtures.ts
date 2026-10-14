@@ -58,6 +58,7 @@ export function accountResponse(overrides: Partial<AccountResponse> = {}): Accou
     name: 'Retirement',
     type: 0,
     wrapper: 0,
+    currency: 'PLN',
     isArchived: false,
     cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     cashBalance: 0,
@@ -82,7 +83,6 @@ export const API_PATHS = {
   cash: '/api/portfolio/cash-accounts',
   deposits: '/api/portfolio/deposits',
   bonds: '/api/portfolio/bonds',
-  savings: '/api/portfolio/savings-accounts',
 } as const;
 
 export type ApiRoute = keyof typeof API_PATHS;
@@ -97,7 +97,6 @@ const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   cash: jsonResponse(cashAccountsResponse([])),
   deposits: jsonResponse([]),
   bonds: jsonResponse([]),
-  savings: jsonResponse([]),
 };
 
 export function mockApi(overrides: Partial<Record<ApiRoute, Responder>> = {}) {

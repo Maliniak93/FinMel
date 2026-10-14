@@ -8,7 +8,7 @@ export const ASSET_CLASSES: readonly { value: AssetClass; label: string }[] = [
   { value: 3, label: 'enums.assetClass.etf' },
   { value: 4, label: 'enums.assetClass.bond' },
   { value: 6, label: 'enums.assetClass.preciousMetal' },
-  { value: 9, label: 'enums.assetClass.savings' },
+  { value: 9, label: 'enums.assetClass.bankAccount' },
 ];
 
 export const ASSET_CLASS = {
@@ -18,7 +18,7 @@ export const ASSET_CLASS = {
   Etf: 3,
   Bond: 4,
   PreciousMetal: 6,
-  Savings: 9,
+  BankAccount: 9,
 } as const satisfies Record<string, AssetClass>;
 
 export function assetClassLabel(value: AssetClass): string {
@@ -32,7 +32,7 @@ const ASSET_CLASS_PAGES: Record<number, string> = {
   [ASSET_CLASS.Etf]: '/securities',
   [ASSET_CLASS.Bond]: '/bonds',
   [ASSET_CLASS.PreciousMetal]: '/metals',
-  [ASSET_CLASS.Savings]: '/deposits',
+  [ASSET_CLASS.BankAccount]: '/bank-accounts',
 };
 
 export function assetClassPage(value: AssetClass): string {

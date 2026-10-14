@@ -10,29 +10,17 @@ import {
 } from '@angular/core';
 import { NgControl, type ControlValueAccessor } from '@angular/forms';
 import { ErrorStateMatcher } from '@angular/material/core';
-import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelect, MatSelectModule, type MatSelectChange } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioTransferCandidates,
-  type SavingsAccountResponse,
   type TransferCandidateResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { formatMoney } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
-import {
-  SavingsAccountFormDialog,
-  type SavingsAccountFormDialogData,
-} from '../savings-account-form-dialog/savings-account-form-dialog';
-
-const NEW_SAVINGS_ACCOUNT = '__new-savings-account__';
-
-function isSavingsAccount(result: unknown): result is SavingsAccountResponse {
-  return typeof result === 'object' && result !== null && 'assetId' in result;
-}
 
 @Component({
   selector: 'app-payout-destination-field',
@@ -45,13 +33,11 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
   readonly offerKeep = input(false);
   readonly hint = input<string | null>(null);
 
-  private readonly dialog = inject(MatDialog);
   private readonly changeDetector = inject(ChangeDetectorRef);
   // Set below rather than provided, so it can read the control's errors without a circular dependency.
   protected readonly ngControl = inject(NgControl, { self: true, optional: true });
   private readonly select = viewChild(MatSelect);
 
-  protected readonly newSavingsAccount = NEW_SAVINGS_ACCOUNT;
   protected readonly value = signal<string | null>(null);
   protected readonly disabled = signal(false);
 
@@ -65,8 +51,8 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
   protected readonly candidatesResource = resource({
     params: () => ({ currency: this.currency() }),
     loader: async ({ params, abortSignal }) => {
-      const [cash, savings] = await Promise.all(
-        [ASSET_CLASS.Cash, ASSET_CLASS.Savings].map(async (assetClass) => {
+      const [cash, bank] = await Promise.all(
+        [ASSET_CLASS.Cash, ASSET_CLASS.BankAccount].map(async (assetClass) => {
           const result = await getApiPortfolioTransferCandidates({
             query: { currency: params.currency, assetClass },
             signal: abortSignal,
@@ -80,7 +66,7 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
           return result.data ?? [];
         }),
       );
-      return { cash, savings };
+      return { cash, bank };
     },
   });
 
@@ -128,10 +114,6 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
   }
 
   protected onSelectionChange(change: MatSelectChange): void {
-    if (change.value === NEW_SAVINGS_ACCOUNT) {
-      this.openNewSavingsAccount();
-      return;
-    }
     this.choose(change.value as string | null);
   }
 
@@ -139,28 +121,6 @@ export class PayoutDestinationField implements ControlValueAccessor, DoCheck {
     if (!opened) {
       this.onTouched();
     }
-  }
-
-  private openNewSavingsAccount(): void {
-    const previous = this.value();
-    const data: SavingsAccountFormDialogData = {
-      currency: this.currency(),
-    };
-    this.dialog
-      .open(SavingsAccountFormDialog, { width: '560px', data })
-      .afterClosed()
-      .subscribe((result: unknown) => {
-        if (isSavingsAccount(result)) {
-          this.candidatesResource.reload();
-          this.choose(result.assetId);
-          return;
-        }
-        const select = this.select();
-        if (select) {
-          select.value = previous;
-        }
-        this.value.set(previous);
-      });
   }
 
   private choose(value: string | null): void {

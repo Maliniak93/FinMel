@@ -4,6 +4,8 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -14,17 +16,17 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
     public async Task Delete_ManualTransfer_RemovesBothLegs()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
-        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
+        var setup = await client.CreateCurrentAndSavingsAsync(cancellationToken);
+        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.Current.MoneyAssetId, setup.Savings.MoneyAssetId, 2_000m));
 
         var response = await client.DeleteAsync(TransferUri(transferId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        await client.AssertCashUntouchedAsync(setup.CashAssetId, cancellationToken);
-        var savings = await client.GetAssetAsync(setup.SavingsAssetId, cancellationToken);
+        await client.AssertCashUntouchedAsync(setup.Current.MoneyAssetId, cancellationToken);
+        var savings = await client.GetAssetAsync(setup.Savings.MoneyAssetId, cancellationToken);
         Assert.Equal(0m, savings.Quantity);
         Assert.Equal(0, savings.TransactionCount);
         await using var dbContext = CreateDbContext(userId);
@@ -96,20 +98,20 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
     public async Task Delete_WouldBreakTargetHistory_IsRejected()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
-        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
+        var setup = await client.CreateCurrentAndSavingsAsync(cancellationToken);
+        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.Current.MoneyAssetId, setup.Savings.MoneyAssetId, 2_000m));
         await client.RecordTransactionAsync(
-            setup.SavingsAssetId, TransactionType.Withdraw, 2_000m, new DateOnly(2026, 1, 25), cancellationToken, unitPrice: 1m);
+            setup.Savings.MoneyAssetId, TransactionType.Withdraw, 2_000m, new DateOnly(2026, 1, 25), cancellationToken, unitPrice: 1m);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.DeleteAsync(TransferUri(transferId), cancellationToken);
 
-        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.OversellsPositionErrorCode, cancellationToken);
+        await response.AssertInsufficientFundsAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        Assert.Equal(3_000m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(3_000m, (await client.GetAssetAsync(setup.Current.MoneyAssetId, cancellationToken)).Quantity);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(2, await dbContext.Transactions.CountAsync(t => t.TransferId == transferId, cancellationToken));
     }
@@ -125,20 +127,20 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
-    public async Task Delete_DepositPayoutIntoSavings_ReturnsConflict()
+    public async Task Delete_DepositPayoutIntoBankAccount_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
-        var leg = Assert.Single((await client.ListTransactionsAsync(setup.Account.AssetId, cancellationToken)).Items);
+        var setup = await client.CreateDepositPaidIntoBankAsync(cancellationToken);
+        var leg = Assert.Single((await client.ListTransactionsAsync(setup.Account.MoneyAssetId, cancellationToken)).Items);
         Assert.NotNull(leg.Transfer);
 
         var response = await client.DeleteAsync(TransferUri(leg.Transfer.TransferId), cancellationToken);
 
         await response.AssertTransferLegManagedAsync(cancellationToken);
-        Assert.Equal(10_119.83m, (await client.GetAssetAsync(setup.Account.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(setup.Account.MoneyAssetId, cancellationToken)).Quantity);
         Assert.Equal(0m, (await client.GetAssetAsync(setup.Deposit.AssetId, cancellationToken)).Quantity);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(2, await dbContext.Transactions.CountAsync(t => t.TransferId == leg.Transfer.TransferId, cancellationToken));
@@ -147,20 +149,26 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
     [Theory]
     [InlineData("source")]
     [InlineData("target")]
-    public async Task Delete_ArchivedAsset_ReturnsConflict(string archivedSide)
+    public async Task Delete_ArchivedAccount_ReturnsConflict(string archivedSide)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
-        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
-        await client.ArchiveAssetAsync(archivedSide == "source" ? setup.CashAssetId : setup.SavingsAssetId, cancellationToken);
+        var setup = await client.CreateCurrentAndSavingsAsync(cancellationToken);
+        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.Current.MoneyAssetId, setup.Savings.MoneyAssetId, 5_000m));
+        if (archivedSide == "target")
+        {
+            await client.RecordTransactionAsync(
+                setup.Savings.MoneyAssetId, TransactionType.Withdraw, 5_000m, new DateOnly(2026, 1, 25), cancellationToken, unitPrice: 1m);
+        }
+
+        await client.ArchiveAccountAsync(archivedSide == "source" ? setup.Current.AccountId : setup.Savings.AccountId, cancellationToken);
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.DeleteAsync(TransferUri(transferId), cancellationToken);
 
-        await response.AssertAssetArchivedConflictAsync(cancellationToken);
+        await response.AssertAccountArchivedConflictAsync(cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
     }
 }

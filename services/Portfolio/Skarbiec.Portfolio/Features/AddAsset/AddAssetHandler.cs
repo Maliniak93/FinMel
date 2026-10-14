@@ -5,7 +5,6 @@ using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Metals;
-using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
@@ -31,10 +30,10 @@ public sealed class AddAssetHandler(
             return BondErrors.UseBondEndpoints;
         }
 
-        // Likewise only AddSavingsAccount creates a Savings-class asset.
-        if (request.AssetClass == AssetClass.Savings)
+        // Likewise only CreateAccount creates a BankAccount-class asset.
+        if (request.AssetClass == AssetClass.BankAccount)
         {
-            return SavingsAccountErrors.UseSavingsAccountEndpoints;
+            return AccountErrors.UseAccountEndpoints;
         }
 
         // And only AddMetal creates a PreciousMetal-class asset, with its fixed instrument and fine weight.

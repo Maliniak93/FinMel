@@ -25,14 +25,57 @@
       </mat-select>
     </mat-form-field>
 
-    <mat-form-field appearance="outline" class="account-form-dialog__field">
-      <mat-label>{{ 'accounts.wrapper' | transloco }}</mat-label>
-      <mat-select formControlName="wrapper">
-        @for (wrapper of wrappers; track wrapper.value) {
-          <mat-option [value]="wrapper.value">{{ wrapper.label | transloco }}</mat-option>
+    @if (isBank()) {
+      <mat-form-field appearance="outline" class="account-form-dialog__field">
+        <mat-label>{{ 'common.currency' | transloco }}</mat-label>
+        <mat-select formControlName="currency">
+          @for (currency of currencies; track currency.code) {
+            <mat-option [value]="currency.code">{{ currency.label | transloco }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="account-form-dialog__field">
+        <mat-label>{{ 'accounts.form.variant' | transloco }}</mat-label>
+        <mat-select formControlName="variant">
+          @for (variant of variants; track variant.value) {
+            <mat-option [value]="variant.value">{{ variant.label | transloco }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="account-form-dialog__field">
+        <mat-label>{{ 'deposits.bank' | transloco }}</mat-label>
+        <input matInput type="text" formControlName="bankName" autocomplete="off" />
+        @if (form.controls.bankName.hasError('maxlength')) {
+          <mat-error>{{ 'deposits.form.bankNameTooLong' | transloco }}</mat-error>
         }
-      </mat-select>
-    </mat-form-field>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="account-form-dialog__field">
+        <mat-label>{{ 'deposits.form.annualInterestRate' | transloco }}</mat-label>
+        <input matInput type="number" step="0.01" formControlName="annualInterestRatePercent" />
+        @if (form.controls.annualInterestRatePercent.hasError('required')) {
+          <mat-error>{{ 'deposits.errors.interestRateRequired' | transloco }}</mat-error>
+        } @else if (
+          form.controls.annualInterestRatePercent.hasError('min') ||
+          form.controls.annualInterestRatePercent.hasError('max')
+        ) {
+          <mat-error>{{ 'deposits.errors.interestRateRange' | transloco }}</mat-error>
+        } @else if (form.controls.annualInterestRatePercent.hasError('server')) {
+          <mat-error>{{ form.controls.annualInterestRatePercent.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    } @else {
+      <mat-form-field appearance="outline" class="account-form-dialog__field">
+        <mat-label>{{ 'accounts.wrapper' | transloco }}</mat-label>
+        <mat-select formControlName="wrapper">
+          @for (wrapper of wrappers; track wrapper.value) {
+            <mat-option [value]="wrapper.value">{{ wrapper.label | transloco }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
 
     @if (isEdit) {
       <p class="account-form-dialog__hint">{{ 'accounts.form.fixedHint' | transloco }}</p>

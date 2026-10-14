@@ -55,6 +55,7 @@ const account: AccountResponse = {
   name: 'Retirement',
   type: 0,
   wrapper: 0,
+  currency: 'PLN',
   isArchived: false,
   cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
   cashBalance: 0,
@@ -141,7 +142,7 @@ describe('Transactions', () => {
     [3, '/securities'],
     [4, '/bonds'],
     [6, '/metals'],
-    [9, '/deposits'],
+    [9, '/bank-accounts'],
   ])('links back to the class page of an asset of class %i', async (assetClass, path) => {
     await setup(jsonResponse(pagedResponse([transaction])), jsonResponse({ ...asset, assetClass }));
 
@@ -786,12 +787,12 @@ describe('Transactions', () => {
     });
   });
 
-  describe('savings interest credits', () => {
-    const savingsAsset: AssetResponse = {
+  describe('bank interest credits', () => {
+    const bankAsset: AssetResponse = {
       ...asset,
       assetClass: 9,
       valuationMode: 2,
-      name: 'Savings account',
+      name: 'Nest Oszczędnościowe',
       currency: 'PLN',
       quantity: 10033.29,
     };
@@ -814,7 +815,7 @@ describe('Transactions', () => {
       currency: 'PLN',
       valuePln: 33.29,
       date: '2026-09-30',
-      savingsInterestPeriodEnd: '2026-09-30',
+      bankInterestPeriodEnd: '2026-09-30',
     } as TransactionResponse;
 
     function rows(): HTMLElement[] {
@@ -836,7 +837,7 @@ describe('Transactions', () => {
     }
 
     it('labels the credit "Interest · <Month yyyy>" and offers it no edit / delete', async () => {
-      await setup(jsonResponse(pagedResponse([credit, opening])), jsonResponse(savingsAsset));
+      await setup(jsonResponse(pagedResponse([credit, opening])), jsonResponse(bankAsset));
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -849,8 +850,8 @@ describe('Transactions', () => {
     });
 
     it('labels the credit with the settled month, not the month of a later date', async () => {
-      const october = { ...credit, date: '2026-10-31', savingsInterestPeriodEnd: '2026-10-31' };
-      await setup(jsonResponse(pagedResponse([october])), jsonResponse(savingsAsset));
+      const october = { ...credit, date: '2026-10-31', bankInterestPeriodEnd: '2026-10-31' };
+      await setup(jsonResponse(pagedResponse([october])), jsonResponse(bankAsset));
       fixture.detectChanges();
       await fixture.whenStable();
 

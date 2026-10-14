@@ -1,7 +1,7 @@
 import { BOND_STATUS } from '../bonds/bond-interest';
 import { DEPOSIT_STATUS } from '../deposits/deposit-terms';
 import { depositResponse } from '../deposits/testing/deposit-fixtures';
-import { savingsAccountResponse } from '../deposits/testing/savings-account-fixtures';
+import { bankAccountResponse } from '../../../testing/bank-account-fixtures';
 import { bondResponse } from '../../../testing/bond-fixtures';
 import { upcomingItems } from './upcoming';
 
@@ -34,7 +34,12 @@ describe('upcomingItems', () => {
           maturityDate: '2030-01-01',
         }),
       ],
-      [savingsAccountResponse({ name: 'Savings interest', interestDue: true, duePeriodCount: 3 })],
+      [
+        bankAccountResponse({
+          name: 'Savings interest',
+          bank: { interestDue: true, duePeriodCount: 3 },
+        }),
+      ],
       TODAY,
     );
 
@@ -67,10 +72,9 @@ describe('upcomingItems', () => {
         }),
       ],
       [
-        savingsAccountResponse({
+        bankAccountResponse({
           name: 'Archived savings',
-          interestDue: true,
-          duePeriodCount: 1,
+          bank: { interestDue: true, duePeriodCount: 1 },
           isArchived: true,
         }),
       ],
@@ -141,7 +145,12 @@ describe('upcomingItems', () => {
           maturityDate: '2026-09-30',
         }),
       ],
-      [savingsAccountResponse({ name: 'Savings interest', interestDue: true, duePeriodCount: 1 })],
+      [
+        bankAccountResponse({
+          name: 'Savings interest',
+          bank: { interestDue: true, duePeriodCount: 1 },
+        }),
+      ],
       TODAY,
     );
 
@@ -153,5 +162,26 @@ describe('upcomingItems', () => {
       'Active bond',
       'Active deposit',
     ]);
+  });
+
+  it('lists a bank account with interest due, linking to /bank-accounts', () => {
+    const items = upcomingItems(
+      [],
+      [],
+      [
+        bankAccountResponse({ name: 'Nest', bank: { interestDue: true, duePeriodCount: 2 } }),
+        bankAccountResponse({ name: 'mBank', bank: { interestDue: false } }),
+      ],
+      TODAY,
+    );
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      name: 'Nest',
+      kind: 'bankInterestDue',
+      actionNeeded: true,
+      count: 2,
+      link: '/bank-accounts',
+    });
   });
 });

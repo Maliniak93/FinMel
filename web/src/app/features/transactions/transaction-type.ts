@@ -27,7 +27,7 @@ export const TRANSACTION_TYPE_INTEREST: TransactionType = INTEREST;
 const CASH_LIKE_CLASSES: readonly number[] = [
   ASSET_CLASS.Cash,
   ASSET_CLASS.Deposit,
-  ASSET_CLASS.Savings,
+  ASSET_CLASS.BankAccount,
   ASSET_CLASS.Bond,
 ];
 const CASH_LIKE_TYPES: readonly number[] = [TRANSACTION_TYPE_DEPOSIT, WITHDRAW];

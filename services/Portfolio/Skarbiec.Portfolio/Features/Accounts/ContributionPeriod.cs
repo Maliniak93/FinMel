@@ -52,7 +52,7 @@ internal static class ContributionPeriod
                 join asset in dbContext.Assets.AsNoTracking() on leg.AssetId equals asset.Id
                 where leg.TransferId != null && transferIds.Contains(leg.TransferId.Value)
                     && leg.Type == TransactionType.Withdraw
-                    && asset.AssetClass == AssetClass.Cash && asset.AccountId != null
+                    && (asset.AssetClass == AssetClass.Cash || asset.AssetClass == AssetClass.BankAccount) && asset.AccountId != null
                 select new { TransferId = leg.TransferId!.Value, AccountId = asset.AccountId!.Value })
                 .ToListAsync(cancellationToken);
             sourceAccountByTransfer = sources.ToDictionary(s => s.TransferId, s => s.AccountId);

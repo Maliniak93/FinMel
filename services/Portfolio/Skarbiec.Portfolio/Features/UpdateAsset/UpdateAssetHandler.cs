@@ -5,7 +5,6 @@ using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Metals;
-using Skarbiec.Portfolio.Features.SavingsAccounts;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.UpdateAsset;
@@ -46,10 +45,10 @@ public sealed class UpdateAssetHandler(
             return BondErrors.UseBondEndpoints;
         }
 
-        // The same for a savings account and its terms.
-        if (asset.AssetClass == AssetClass.Savings || request.AssetClass == AssetClass.Savings)
+        // A bank account's money is created with its account, so no asset becomes one here.
+        if (request.AssetClass == AssetClass.BankAccount)
         {
-            return SavingsAccountErrors.UseSavingsAccountEndpoints;
+            return AccountErrors.UseAccountEndpoints;
         }
 
         // The same for a precious metal holding.

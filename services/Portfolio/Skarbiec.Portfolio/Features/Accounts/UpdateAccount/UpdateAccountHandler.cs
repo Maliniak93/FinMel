@@ -4,7 +4,7 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
 
-public sealed class UpdateAccountHandler(PortfolioDbContext dbContext)
+public sealed class UpdateAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<AccountResponse>> HandleAsync(Guid id, UpdateAccountRequest request, CancellationToken cancellationToken)
     {
@@ -12,6 +12,21 @@ public sealed class UpdateAccountHandler(PortfolioDbContext dbContext)
         if (account is null)
         {
             return AccountErrors.NotFound(id);
+        }
+
+        BankAccountTerms? terms = null;
+        if (account.Type == AccountType.Bank)
+        {
+            if (request.Variant is null)
+            {
+                return AccountErrors.BankVariantRequired;
+            }
+
+            terms = await dbContext.BankAccountTerms.FirstAsync(t => t.AccountId == id, cancellationToken);
+        }
+        else if (request.Variant is not null || request.BankName is not null || request.AnnualInterestRatePercent is not null)
+        {
+            return AccountErrors.BankFieldsNotAllowed;
         }
 
         if (!string.Equals(account.Name, request.Name, StringComparison.Ordinal))
@@ -32,8 +47,15 @@ public sealed class UpdateAccountHandler(PortfolioDbContext dbContext)
         account.Name = request.Name;
         cash.Name = request.Name;
 
+        if (terms is not null)
+        {
+            terms.Variant = request.Variant!.Value;
+            terms.BankName = request.BankName;
+            terms.AnnualInterestRatePercent = request.AnnualInterestRatePercent ?? 0m;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return account.ToResponse(cash);
+        return await dbContext.ToResponseAsync(account, timeProvider, cancellationToken);
     }
 }

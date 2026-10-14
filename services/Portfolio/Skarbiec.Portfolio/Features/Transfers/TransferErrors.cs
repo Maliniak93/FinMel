@@ -7,6 +7,9 @@ internal static class TransferErrors
     public static readonly Error InvalidCounterpart =
         new("Validation.InvalidTransferCounterpart", "This asset can't be the other side of the transfer — pick one from the list.");
 
+    public static readonly Error CurrencyMismatch =
+        new("Validation.TransferCurrencyMismatch", "Both sides of a transfer must be in the same currency.");
+
     public static readonly Error CashLinkNotAllowed =
         new("Validation.CashLinkNotAllowed", "Only a precious metal trade can be settled through a Cash account; a stock or ETF settles in its account's cash.");
 

@@ -10,7 +10,6 @@ import { formatMoney } from '../../shared/format';
 import { clickRowMenuItem } from '../../../testing/archive';
 import { ASSET_CLASS } from '../assets/asset-class';
 import { AssetFormDialog } from '../assets/asset-form/asset-form-dialog/asset-form-dialog';
-import { SavingsTransferDialog } from '../deposits/savings-transfer-dialog/savings-transfer-dialog';
 import { TransactionFormDialog } from '../transactions/transaction-form-dialog/transaction-form-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { Cash } from './cash';
@@ -214,18 +213,5 @@ describe('Cash', () => {
       );
       await vi.waitFor(() => expect(cashListCalls()).toBeGreaterThan(before));
     }
-  });
-
-  it('opens the savings transfer for the row and reloads', async () => {
-    await setup();
-    const before = cashListCalls();
-
-    await clickRowMenuItem(fixture, rowFor('EUR wallet'), /transfer with savings/i);
-
-    expect(dialog.open).toHaveBeenCalledWith(
-      SavingsTransferDialog,
-      expect.objectContaining({ data: { cash: eurWallet } }),
-    );
-    await vi.waitFor(() => expect(cashListCalls()).toBeGreaterThan(before));
   });
 });

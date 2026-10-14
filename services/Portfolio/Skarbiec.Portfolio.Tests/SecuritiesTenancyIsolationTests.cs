@@ -15,7 +15,7 @@ public sealed class SecuritiesTenancyIsolationTests(SkarbiecContainersFixture co
     public async Task List_ForeignHoldings_Absent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var ownerAccountId = await owner.CreateAccountAsync(cancellationToken);
         await owner.FundAccountAsync(ownerAccountId, cancellationToken);

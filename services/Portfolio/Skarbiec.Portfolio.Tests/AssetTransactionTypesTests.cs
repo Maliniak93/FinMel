@@ -43,7 +43,7 @@ public sealed class AssetTransactionTypesTests
     [Theory]
     [InlineData(AssetClass.Cash)]
     [InlineData(AssetClass.Deposit)]
-    [InlineData(AssetClass.Savings)]
+    [InlineData(AssetClass.BankAccount)]
     [InlineData(AssetClass.Bond)]
     public void Allowed_CashLikeClass_ReturnsOnlyDepositAndWithdraw(AssetClass assetClass)
     {

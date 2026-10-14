@@ -8,6 +8,7 @@ using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -318,13 +319,11 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Theory]
-    [InlineData("eur-cash")]
     [InlineData("stock")]
     [InlineData("archived-cash")]
     [InlineData("strangers-cash")]
-    [InlineData("eur-savings")]
-    [InlineData("archived-savings")]
-    [InlineData("strangers-savings")]
+    [InlineData("archived-bank-account")]
+    [InlineData("strangers-bank-account")]
     public async Task Settle_InvalidDestination_ReturnsBadRequestAndSettlesNothing(string invalidCase)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -334,17 +333,11 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         var deposit = await client.AddDepositAsync(cancellationToken);
         var (destinationClient, destinationId) = invalidCase switch
         {
-            "eur-cash" => (client, await client.AddCashAssetAsync(cancellationToken, currency: "EUR", name: "EUR account")),
             "stock" => (client, await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken), cancellationToken, name: "Some stock")),
             "archived-cash" => (client, await client.AddArchivedCashAssetAsync(cancellationToken)),
             "strangers-cash" => (stranger, await stranger.AddCashAssetAsync(cancellationToken)),
-            "eur-savings" => (
-                client,
-                (await client.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(currency: "EUR", withOpeningDeposit: false))).AssetId),
-            "archived-savings" => (client, await client.AddArchivedSavingsAccountAsync(cancellationToken)),
-            "strangers-savings" => (
-                stranger,
-                (await stranger.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).AssetId),
+            "archived-bank-account" => (client, await client.CreateArchivedBankAccountAsync(cancellationToken)),
+            "strangers-bank-account" => (stranger, (await stranger.CreateBankAccountAsync(cancellationToken)).MoneyAssetId),
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 
@@ -358,20 +351,39 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(invalidCase == "archived-cash" ? 1 : 0, destination.TransactionCount);
     }
 
+    [Theory]
+    [InlineData("EUR", false)]
+    [InlineData("USD", true)]
+    public async Task Settle_ForeignCurrencyDestination_ReturnsTransferCurrencyMismatch(string currency, bool bankAccount)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var deposit = await client.AddDepositAsync(cancellationToken);
+        var destinationId = bankAccount
+            ? (await client.CreateBankAccountAsync(cancellationToken, currency: currency)).MoneyAssetId
+            : await client.AddCashAssetAsync(cancellationToken, currency: currency, name: "Foreign cash");
+
+        var response = await client.PostAsJsonAsync(
+            SettleDepositUri(deposit.AssetId), NewSettleRequest(destinationAssetId: destinationId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, TransferCurrencyMismatchErrorCode, cancellationToken);
+        await client.AssertDepositUnsettledAsync(deposit.AssetId, cancellationToken);
+    }
+
     [Fact]
-    public async Task Settle_WithSavingsDestination_PaysOutWholeBalance()
+    public async Task Settle_WithBankAccountDestination_PaysOutWholeBalance()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var deposit = await client.AddDepositAsync(cancellationToken);
-        var account = await client.AddSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false));
+        var account = await client.CreateBankAccountAsync(cancellationToken, "Savings account", SavingsVariant, annualInterestRatePercent: 5.25m);
         var settledOn = new DateOnly(2026, 4, 15);
 
         var response = await client.PostAsJsonAsync(
-            SettleDepositUri(deposit.AssetId), NewSettleRequest(destinationAssetId: account.AssetId), cancellationToken);
+            SettleDepositUri(deposit.AssetId), NewSettleRequest(destinationAssetId: account.MoneyAssetId), cancellationToken);
 
         Assert.True(response.IsSuccessStatusCode, $"Settle answered {(int)response.StatusCode}.");
 
@@ -381,26 +393,26 @@ public sealed class SettleDepositEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(10_119.83m, withdraw.Quantity);
         Assert.Equal(settledOn, withdraw.Date);
         Assert.NotNull(withdraw.Transfer);
-        Assert.Equal(account.AssetId, withdraw.Transfer.CounterpartAssetId);
+        Assert.Equal(account.MoneyAssetId, withdraw.Transfer.CounterpartAssetId);
         Assert.Equal(TransferDirection.Out, withdraw.Transfer.Direction);
 
-        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(account.AssetId, cancellationToken)).Items);
-        Assert.Equal(TransactionType.Deposit, savingsLeg.Type);
-        Assert.Equal(10_119.83m, savingsLeg.Quantity);
-        Assert.Equal(settledOn, savingsLeg.Date);
-        Assert.NotNull(savingsLeg.Transfer);
-        Assert.Equal(deposit.AssetId, savingsLeg.Transfer.CounterpartAssetId);
-        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
-        Assert.Equal(withdraw.Transfer.TransferId, savingsLeg.Transfer.TransferId);
+        var bankLeg = Assert.Single((await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items);
+        Assert.Equal(TransactionType.Deposit, bankLeg.Type);
+        Assert.Equal(10_119.83m, bankLeg.Quantity);
+        Assert.Equal(settledOn, bankLeg.Date);
+        Assert.NotNull(bankLeg.Transfer);
+        Assert.Equal(deposit.AssetId, bankLeg.Transfer.CounterpartAssetId);
+        Assert.Equal(TransferDirection.In, bankLeg.Transfer.Direction);
+        Assert.Equal(withdraw.Transfer.TransferId, bankLeg.Transfer.TransferId);
 
         Assert.Equal(0m, (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
-        Assert.Equal(10_119.83m, (await client.GetAssetAsync(account.AssetId, cancellationToken)).Quantity);
+        Assert.Equal(10_119.83m, (await client.GetAssetAsync(account.MoneyAssetId, cancellationToken)).Quantity);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(deposit.AssetId, cancellationToken);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(account.AssetId, cancellationToken);
+        await client.AssertQuantityMatchesRecomputeFromScratchAsync(account.MoneyAssetId, cancellationToken);
 
         var paidOut = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.PaidOut, paidOut.Status);
         Assert.Equal(settledOn, paidOut.PaidOutOn);
-        Assert.Equal(account.Name, paidOut.PaidOutToAssetName);
+        Assert.Equal("Savings account", paidOut.PaidOutToAssetName);
     }
 }

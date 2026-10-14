@@ -665,12 +665,12 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     [Theory]
     [InlineData("currency-valued")]
     [InlineData("currency-valued-with-opening-deposit")]
-    public async Task Add_SavingsClass_ReturnsUseSavingsAccountEndpoints(string shape)
+    public async Task Add_BankAccountClass_ReturnsUseAccountEndpoints(string shape)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var request = new AddAssetRequest { AssetClass = AssetClass.Savings, Name = "Savings account", Currency = "PLN" };
+        var request = new AddAssetRequest { AssetClass = AssetClass.BankAccount, Name = "Bank account", Currency = "PLN" };
         request = shape switch
         {
             "currency-valued" => request,
@@ -689,7 +689,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
 
         var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
 
-        await response.AssertUseSavingsAccountEndpointsAsync(cancellationToken);
+        await response.AssertUseAccountEndpointsAsync(cancellationToken);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));

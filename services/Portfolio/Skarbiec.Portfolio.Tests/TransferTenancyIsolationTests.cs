@@ -7,6 +7,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -225,37 +226,37 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
     public async Task Create_ForeignAsset_IsRejected()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var ownerSetup = await owner.CreateCashAndSavingsAsync(cancellationToken);
+        var ownerSetup = await owner.CreateCurrentAndSavingsAsync(cancellationToken);
         var strangerId = Guid.NewGuid();
         using var stranger = Factory.CreateAuthenticatedClient(strangerId);
-        var strangerSetup = await stranger.CreateCashAndSavingsAsync(cancellationToken);
+        var strangerSetup = await stranger.CreateCurrentAndSavingsAsync(cancellationToken);
         var ownerBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
         var strangerBefore = await SnapshotUserRowsAsync(strangerId, cancellationToken);
 
-        var fromOwnersCash = await stranger.PostAsJsonAsync(
-            TransfersUri, NewTransferRequest(ownerSetup.CashAssetId, strangerSetup.SavingsAssetId), cancellationToken);
-        var toOwnersSavings = await stranger.PostAsJsonAsync(
-            TransfersUri, NewTransferRequest(strangerSetup.CashAssetId, ownerSetup.SavingsAssetId), cancellationToken);
+        var fromOwnersBank = await stranger.PostAsJsonAsync(
+            TransfersUri, NewTransferRequest(ownerSetup.Current.MoneyAssetId, strangerSetup.Savings.MoneyAssetId), cancellationToken);
+        var toOwnersBank = await stranger.PostAsJsonAsync(
+            TransfersUri, NewTransferRequest(strangerSetup.Current.MoneyAssetId, ownerSetup.Savings.MoneyAssetId), cancellationToken);
 
-        await fromOwnersCash.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        await toOwnersSavings.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, fromOwnersBank.StatusCode);
+        await toOwnersBank.AssertInvalidTransferCounterpartAsync(cancellationToken);
         Assert.Equal(ownerBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
         Assert.Equal(strangerBefore, await SnapshotUserRowsAsync(strangerId, cancellationToken));
-        await owner.AssertCashUntouchedAsync(ownerSetup.CashAssetId, cancellationToken);
+        await owner.AssertCashUntouchedAsync(ownerSetup.Current.MoneyAssetId, cancellationToken);
     }
 
     [Fact]
     public async Task Delete_ForeignTransfer_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var ownerId = Guid.NewGuid();
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
-        var setup = await owner.CreateCashAndSavingsAsync(cancellationToken);
-        var transferId = await owner.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
+        var setup = await owner.CreateCurrentAndSavingsAsync(cancellationToken);
+        var transferId = await owner.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.Current.MoneyAssetId, setup.Savings.MoneyAssetId, 2_000m));
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var before = await SnapshotUserRowsAsync(ownerId, cancellationToken);
 
@@ -263,7 +264,29 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(before, await SnapshotUserRowsAsync(ownerId, cancellationToken));
-        Assert.Equal(3_000m, (await owner.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
-        Assert.Equal(2_000m, (await owner.GetAssetAsync(setup.SavingsAssetId, cancellationToken)).Quantity);
+        Assert.Equal(3_000m, (await owner.GetAssetAsync(setup.Current.MoneyAssetId, cancellationToken)).Quantity);
+        Assert.Equal(2_000m, (await owner.GetAssetAsync(setup.Savings.MoneyAssetId, cancellationToken)).Quantity);
+    }
+
+    [Fact]
+    public async Task BankAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var mBank = await owner.CreateBankAccountAsync(cancellationToken, balance: 5_000m);
+        var strangerId = Guid.NewGuid();
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var strangerAccount = await stranger.CreateBankAccountAsync(cancellationToken, "Mine");
+        var ownerBefore = await SnapshotUserRowsAsync(ownerId, cancellationToken);
+
+        var response = await stranger.PostAsJsonAsync(
+            TransfersUri, NewTransferRequest(mBank.MoneyAssetId, strangerAccount.MoneyAssetId, 1_000m, CashDay4), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(ownerBefore, await SnapshotUserRowsAsync(ownerId, cancellationToken));
+        Assert.Equal(5_000m, await owner.GetCashBalanceAsync(mBank.AccountId, cancellationToken));
+        Assert.Equal(0m, await stranger.GetCashBalanceAsync(strangerAccount.AccountId, cancellationToken));
     }
 }

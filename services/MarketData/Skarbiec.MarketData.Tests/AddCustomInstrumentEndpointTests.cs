@@ -113,7 +113,7 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     [Theory]
     [InlineData(AssetClass.Cash)]
     [InlineData(AssetClass.Deposit)]
-    [InlineData(AssetClass.Savings)]
+    [InlineData(AssetClass.BankAccount)]
     public async Task Add_AssetClassWithNoMarketProvider_ReturnsBadRequest(AssetClass assetClass)
     {
         var cancellationToken = TestContext.Current.CancellationToken;

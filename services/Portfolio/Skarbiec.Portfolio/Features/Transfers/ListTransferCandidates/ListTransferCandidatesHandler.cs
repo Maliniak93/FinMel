@@ -17,11 +17,12 @@ public sealed class ListTransferCandidatesHandler(PortfolioDbContext dbContext)
 
         IReadOnlyList<TransferCandidateResponse> candidates = await (
                 from asset in dbContext.Assets.AsNoTracking()
-                where asset.AssetClass == assetClass && asset.Currency == currency && !asset.IsArchived
-                // An account's cash is its own list: free Cash never mixes with it.
+                where asset.Currency == currency && !asset.IsArchived
+                where !dbContext.Accounts.Any(a => a.Id == asset.AccountId && a.IsArchived)
+                // The accounts' money is its own list, whatever its class: free Cash never mixes with it.
                 where accountCash
-                    ? asset.AssetClass == AssetClass.Cash && asset.AccountId != null
-                    : asset.AssetClass != AssetClass.Cash || asset.AccountId == null
+                    ? asset.AccountId != null && (asset.AssetClass == AssetClass.Cash || asset.AssetClass == AssetClass.BankAccount)
+                    : asset.AssetClass == assetClass && (asset.AssetClass != AssetClass.Cash || asset.AccountId == null)
                 orderby asset.Name
                 select new TransferCandidateResponse
                 {

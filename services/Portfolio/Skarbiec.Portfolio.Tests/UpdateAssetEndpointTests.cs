@@ -8,6 +8,7 @@ using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -455,40 +456,41 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(originalQuantity, unchanged.Quantity);
     }
 
-    [Theory]
-    [InlineData("cash-to-savings")]
-    [InlineData("savings-to-cash")]
-    public async Task Update_ToOrFromSavings_ReturnsUseSavingsAccountEndpoints(string change)
+    [Fact]
+    public async Task Update_CashToBankAccount_ReturnsUseAccountEndpoints()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        Guid assetId;
-        AssetClass originalClass;
-        string originalName;
-        decimal originalQuantity;
-        AssetClass requestedClass;
-        if (change == "cash-to-savings")
-        {
-            assetId = await client.AddCashAssetAsync(cancellationToken, name: "Wallet");
-            await client.RecordTransactionAsync(assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
-            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Cash, "Wallet", 300m, AssetClass.Savings);
-        }
-        else
-        {
-            assetId = (await client.AddSavingsAccountAsync(cancellationToken)).AssetId;
-            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Savings, "Savings account", 10_000m, AssetClass.Cash);
-        }
-
-        var request = new UpdateAssetRequest { AssetClass = requestedClass, Name = "Edited through assets", Currency = "PLN" };
+        var assetId = await client.AddCashAssetAsync(cancellationToken, name: "Wallet");
+        await client.RecordTransactionAsync(assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.BankAccount, Name = "Edited through assets", Currency = "PLN" };
 
         var response = await client.PutAsJsonAsync(AssetUri(assetId), request, cancellationToken);
 
-        await response.AssertUseSavingsAccountEndpointsAsync(cancellationToken);
+        await response.AssertUseAccountEndpointsAsync(cancellationToken);
         var unchanged = await client.GetAssetAsync(assetId, cancellationToken);
-        Assert.Equal(originalClass, unchanged.AssetClass);
-        Assert.Equal(originalName, unchanged.Name);
-        Assert.Equal(originalQuantity, unchanged.Quantity);
+        Assert.Equal(AssetClass.Cash, unchanged.AssetClass);
+        Assert.Equal("Wallet", unchanged.Name);
+        Assert.Equal(300m, unchanged.Quantity);
+    }
+
+    [Fact]
+    public async Task Update_BankAccountMoney_ReturnsAccountCashManaged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateSavingsBankAccountAsync(cancellationToken);
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Edited through assets", Currency = "PLN" };
+
+        var response = await client.PutAsJsonAsync(AssetUri(account.MoneyAssetId), request, cancellationToken);
+
+        await response.AssertAccountCashManagedAsync(cancellationToken);
+        var unchanged = await client.GetAssetAsync(account.MoneyAssetId, cancellationToken);
+        Assert.Equal(AssetClass.BankAccount, unchanged.AssetClass);
+        Assert.Equal("Savings account", unchanged.Name);
+        Assert.Equal(10_000m, unchanged.Quantity);
     }
 
     [Theory]

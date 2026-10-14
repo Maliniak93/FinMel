@@ -126,7 +126,7 @@ export class Transactions {
   );
 
   protected hasEditMenu(transaction: TransactionResponse): boolean {
-    if (transaction.savingsInterestPeriodEnd) {
+    if (transaction.bankInterestPeriodEnd) {
       return false;
     }
     return (

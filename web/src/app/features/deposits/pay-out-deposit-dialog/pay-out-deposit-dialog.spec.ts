@@ -23,14 +23,14 @@ import {
 } from '../../assets/asset-form/testing/asset-form-fixtures';
 import {
   eurCashCandidate,
-  eurSavingsCandidate,
+  eurBankCandidate,
   paidOutDeposit,
   pickSelectOption,
   plnCashCandidate,
-  plnSavingsCandidate,
+  plnBankCandidate,
   requestedCandidateClasses,
   requestMethod,
-  savingsCandidatesByCurrency,
+  bankCandidatesByCurrency,
   selectOptionLabels,
   settledDeposit,
   settledDepositFinalAmount,
@@ -68,9 +68,7 @@ describe('PayOutDepositDialog', () => {
             transferCandidatesFor(
               new URL(requestUrl(input)),
               candidatesByCurrency,
-              candidatesByCurrency === transferCandidatesByCurrency
-                ? savingsCandidatesByCurrency
-                : {},
+              candidatesByCurrency === transferCandidatesByCurrency ? bankCandidatesByCurrency : {},
             ),
           );
         }
@@ -142,7 +140,7 @@ describe('PayOutDepositDialog', () => {
     expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
     const requested = requestedCandidateClasses(fetchSpy);
     expect(requested).toContain('Cash');
-    expect(requested).toContain('Savings');
+    expect(requested).toContain('BankAccount');
     for (const url of transferCandidateRequests(fetchSpy)) {
       expect(url.searchParams.get('currency')).toBe(settledDeposit.currency);
     }
@@ -150,8 +148,8 @@ describe('PayOutDepositDialog', () => {
     const labels = await selectOptionLabels(fixture, 'destinationAssetId');
     expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
     expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
-    expect(labels.some((label) => label.includes(plnSavingsCandidate.name))).toBe(true);
-    expect(labels.some((label) => label.includes(eurSavingsCandidate.name))).toBe(false);
+    expect(labels.some((label) => label.includes(plnBankCandidate.name))).toBe(true);
+    expect(labels.some((label) => label.includes(eurBankCandidate.name))).toBe(false);
     expect(labels.some((label) => /keep in the deposit/i.test(label))).toBe(false);
   });
 
@@ -209,7 +207,7 @@ describe('PayOutDepositDialog', () => {
 
   it('submit POSTs a savings account as destinationAssetId', async () => {
     await setup();
-    await pickSelectOption(fixture, 'destinationAssetId', plnSavingsCandidate.name);
+    await pickSelectOption(fixture, 'destinationAssetId', plnBankCandidate.name);
     await fill({ date: new Date(2026, 3, 18) });
 
     await component['onSubmit']();
@@ -218,7 +216,7 @@ describe('PayOutDepositDialog', () => {
     expect(request.method).toBe('POST');
     expect(request.url).toContain(`/api/portfolio/deposits/${settledDeposit.assetId}/payout`);
     expect(await request.json()).toEqual({
-      destinationAssetId: plnSavingsCandidate.assetId,
+      destinationAssetId: plnBankCandidate.assetId,
       date: '2026-04-18',
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
@@ -330,7 +328,7 @@ describe('PayOutDepositDialog', () => {
       const hint = () => labelsOf(element, 'mat-hint');
 
       const english = hint();
-      expect(english).toEqual(['You have no Cash or savings account in PLN to move the money to.']);
+      expect(english).toEqual(['You have no Cash or bank account in PLN to move the money to.']);
 
       await switchLanguage(fixture, 'pl');
 

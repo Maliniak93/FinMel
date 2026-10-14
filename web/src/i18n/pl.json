@@ -39,7 +39,8 @@
       "bonds": "Obligacje",
       "metals": "Metale szlachetne",
       "settings": "Ustawienia",
-      "accounts": "Rachunki"
+      "accounts": "Rachunki",
+      "bankAccounts": "Konta bankowe"
     },
     "toggleNavigation": "Pokaż lub ukryj nawigację",
     "logOut": "Wyloguj",
@@ -104,7 +105,7 @@
       "etf": "ETF",
       "bond": "Obligacje",
       "preciousMetal": "Metale szlachetne",
-      "savings": "Konto oszczędnościowe",
+      "bankAccount": "Konta bankowe",
       "unknown": "Nieznana"
     },
     "transactionType": {
@@ -174,6 +175,12 @@
     "accountType": {
       "brokerage": "Maklerski",
       "bonds": "Obligacji",
+      "bank": "Bankowy",
+      "unknown": "Nieznany"
+    },
+    "bankVariant": {
+      "current": "Bieżące",
+      "savings": "Oszczędnościowe",
       "unknown": "Nieznany"
     },
     "taxWrapper": {
@@ -401,7 +408,7 @@
         "bondMatured": "Obligacja zapadła",
         "bondMaturing": "Obligacja zapada",
         "bondInterestDue": "Odsetki od obligacji do rozliczenia, okresy: {{ count }}",
-        "savingsInterestDue": "Odsetki od oszczędności do rozliczenia, miesiące: {{ count }}"
+        "bankInterestDue": "Odsetki na koncie bankowym do rozliczenia, miesiące: {{ count }}"
       }
     },
     "goToAccounts": "Przejdź do rachunków",
@@ -459,7 +466,7 @@
     }
   },
   "transactions": {
-    "savingsInterest": "Odsetki · {{ month }}",
+    "bankInterest": "Odsetki · {{ month }}",
     "title": "Transakcje",
     "titleWithName": "Transakcje — {{ name }}",
     "newTransaction": "Nowa transakcja",
@@ -517,8 +524,7 @@
     "loadFailed": "Nie udało się wczytać kont gotówkowych.",
     "add": "Dodaj konto gotówkowe",
     "deposit": "Wpłata",
-    "withdraw": "Wypłata",
-    "transferWithSavings": "Przelew z kontem oszczędnościowym"
+    "withdraw": "Wypłata"
   },
   "securities": {
     "title": "Akcje i ETF",
@@ -622,11 +628,7 @@
     }
   },
   "deposits": {
-    "title": "Lokaty i oszczędności",
-    "tabs": {
-      "termDeposits": "Lokaty terminowe",
-      "savingsAccounts": "Konta oszczędnościowe"
-    },
+    "title": "Lokaty",
     "add": "Dodaj lokatę",
     "empty": "Nie masz jeszcze żadnych lokat terminowych.",
     "addFirst": "Dodaj pierwszą lokatę",
@@ -695,10 +697,9 @@
       "insufficientFunds": "Źródło środków nie pokrywa tego kapitału."
     },
     "payOut": {
-      "noCashAccount": "Nie masz konta gotówkowego ani oszczędnościowego w walucie {{ currency }}, na które można przenieść pieniądze.",
+      "noCashAccount": "Nie masz konta gotówkowego ani bankowego w walucie {{ currency }}, na które można przenieść pieniądze.",
       "cashGroup": "Gotówka",
-      "savingsGroup": "Konta oszczędnościowe",
-      "newSavingsAccount": "Nowe konto oszczędnościowe…",
+      "bankGroup": "Konta bankowe",
       "destinationRequired": "Wybierz, dokąd trafią pieniądze.",
       "dateBeforeSettlement": "Data nie może być wcześniejsza niż data rozliczenia.",
       "dateInFuture": "Data nie może być z przyszłości.",
@@ -727,14 +728,25 @@
       }
     }
   },
-  "savings": {
-    "lastInterest": "Ostatnie odsetki",
+  "bankAccounts": {
+    "title": "Konta bankowe",
+    "add": "Dodaj konto",
+    "addFirst": "Dodaj pierwsze konto bankowe",
+    "empty": "Nie masz jeszcze żadnych kont bankowych.",
+    "noMatch": "Żadne konto bankowe nie pasuje do filtra.",
+    "loadFailed": "Nie udało się wczytać kont bankowych.",
+    "showArchived": "Pokaż zarchiwizowane",
+    "variant": "Wariant",
+    "variantFilter": "Filtruj po wariancie",
+    "allVariants": "Wszystkie",
+    "balance": "Saldo",
+    "interestCredited": "Naliczone odsetki",
+    "interestDue": "Odsetki do rozliczenia",
+    "back": "Wróć do kont bankowych",
     "interest": {
       "settle": "Rozlicz odsetki",
       "settleMonths": "Rozlicz odsetki (miesiące do rozliczenia: {{ count }})",
-      "settleOf": "Rozlicz odsetki konta {{ name }}",
       "undo": "Cofnij ostatnie rozliczenie",
-      "undoOf": "Cofnij ostatnie rozliczenie konta {{ name }}",
       "undoTitle": "Cofnąć ostatnie rozliczenie odsetek?",
       "undoMessage": "Rozliczenie za {{ month }} konta \"{{ name }}\" i jego wpłata odsetek zostaną usunięte, a miesiąc znów będzie do rozliczenia.",
       "undoConfirm": "Cofnij",
@@ -743,48 +755,6 @@
       "period": "Okres",
       "averageDailyBalance": "Średnie saldo dzienne",
       "previewLoadFailed": "Nie udało się wczytać podglądu odsetek."
-    },
-    "add": "Dodaj konto oszczędnościowe",
-    "empty": "Nie masz jeszcze żadnych kont oszczędnościowych.",
-    "addFirst": "Dodaj pierwsze konto oszczędnościowe",
-    "balance": "Saldo",
-    "taxFree": "Bez podatku",
-    "loadFailed": "Nie udało się wczytać kont oszczędnościowych.",
-    "delete": {
-      "title": "Usunąć to konto oszczędnościowe?",
-      "message": "\"{{ name }}\", jego warunki i transakcje zostaną trwale usunięte. Tej operacji nie można cofnąć.",
-      "failed": "Nie udało się usunąć konta oszczędnościowego."
-    },
-    "form": {
-      "newTitle": "Nowe konto oszczędnościowe",
-      "editTitle": "Edytuj konto oszczędnościowe",
-      "openingAmount": "Wpłata początkowa (opcjonalnie)",
-      "openingAmountPositive": "Wpłata początkowa musi być większa od 0.",
-      "openingDate": "Data wpłaty początkowej",
-      "openingDateRequired": "Data jest wymagana.",
-      "openingDateInFuture": "Data nie może być z przyszłości."
-    },
-    "transfer": {
-      "action": "Przelew",
-      "actionOf": "Przelej środki na konto {{ name }} lub z niego",
-      "title": "Przelew",
-      "direction": "Kierunek",
-      "into": "Na to konto",
-      "out": "Na gotówkę",
-      "cash": "Konto gotówkowe",
-      "cashRequired": "Wybierz konto gotówkowe.",
-      "noCashAccount": "Nie masz konta gotówkowego w {{ currency }}, z którym można zrobić przelew.",
-      "amountRequired": "Kwota jest wymagana.",
-      "amountPositive": "Kwota musi być większa od 0.",
-      "exceedsBalance": "Kwota przekracza saldo źródła ({{ balance }}).",
-      "insufficientFunds": "Źródło nie pokrywa tej kwoty w tym dniu.",
-      "dateInFuture": "Data nie może być z przyszłości.",
-      "submit": "Przelej",
-      "toSavings": "Na konto oszczędnościowe",
-      "fromSavings": "Z konta oszczędnościowego",
-      "savingsAccount": "Konto oszczędnościowe",
-      "savingsRequired": "Wybierz konto oszczędnościowe.",
-      "noSavingsAccount": "Nie masz konta oszczędnościowego w {{ currency }}, z którym można zrobić przelew."
     }
   },
   "assetArchive": {
@@ -846,6 +816,7 @@
       "target": "Rachunek docelowy",
       "targetRequired": "Wybierz rachunek docelowy.",
       "noTarget": "Nie masz innego rachunku, na który można przelać środki.",
+      "currencyMismatch": "Różne waluty",
       "loadFailed": "Nie udało się wczytać rachunków.",
       "submit": "Przelej"
     },
@@ -869,7 +840,8 @@
       "nameRequired": "Nazwa jest wymagana.",
       "nameTooLong": "Nazwa jest za długa.",
       "duplicateName": "Rachunek o tej nazwie już istnieje.",
-      "fixedHint": "Typu i opakowania podatkowego nie można zmienić po utworzeniu rachunku."
+      "variant": "Wariant",
+      "fixedHint": "Typu, opakowania podatkowego i waluty nie można zmienić po utworzeniu rachunku."
     },
     "contribution": {
       "withLimit": "Wpłacono {{ contributed }} / {{ limit }} zł w {{ year }}",

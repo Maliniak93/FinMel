@@ -15,10 +15,10 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
-    public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
+    public DbSet<BankAccountTerms> BankAccountTerms => Set<BankAccountTerms>();
     public DbSet<TreasuryBond> TreasuryBonds => Set<TreasuryBond>();
     public DbSet<MetalHolding> MetalHoldings => Set<MetalHolding>();
-    public DbSet<SavingsInterestSettlement> SavingsInterestSettlements => Set<SavingsInterestSettlement>();
+    public DbSet<BankInterestSettlement> BankInterestSettlements => Set<BankInterestSettlement>();
     public DbSet<BondInterestSettlement> BondInterestSettlements => Set<BondInterestSettlement>();
     public DbSet<BondRedemption> BondRedemptions => Set<BondRedemption>();
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
@@ -35,6 +35,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             account.Property(a => a.Name).HasMaxLength(200);
             account.Property(a => a.Type).HasConversion<string>().HasMaxLength(20);
             account.Property(a => a.Wrapper).HasConversion<string>().HasMaxLength(20);
+            account.Property(a => a.Currency).HasMaxLength(3);
 
             // Case-sensitive exact match on Postgres's default collation; the client trims before submit.
             account.HasIndex(a => new { a.UserId, a.Name }).IsUnique();
@@ -105,17 +106,18 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             termDeposit.Property(t => t.SettledTax).HasPrecision(18, 2);
         });
 
-        modelBuilder.Entity<SavingsAccount>(savingsAccount =>
+        modelBuilder.Entity<BankAccountTerms>(terms =>
         {
-            // Keyed and FK-cascaded exactly like TermDeposit.
-            savingsAccount.HasKey(s => s.AssetId);
-            savingsAccount.HasOne<Asset>()
+            // Keyed and FK-cascaded exactly like TermDeposit, to the account.
+            terms.HasKey(t => t.AccountId);
+            terms.HasOne<Account>()
                 .WithOne()
-                .HasForeignKey<SavingsAccount>(s => s.AssetId)
+                .HasForeignKey<BankAccountTerms>(t => t.AccountId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            savingsAccount.Property(s => s.BankName).HasMaxLength(100);
-            savingsAccount.Property(s => s.AnnualInterestRatePercent).HasPrecision(7, 4);
+            terms.Property(t => t.Variant).HasConversion<string>().HasMaxLength(20);
+            terms.Property(t => t.BankName).HasMaxLength(100);
+            terms.Property(t => t.AnnualInterestRatePercent).HasPrecision(7, 4);
         });
 
         modelBuilder.Entity<MetalHolding>(metalHolding =>
@@ -146,7 +148,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             treasuryBond.Property(b => b.EarlyRedemptionFeePerBond).HasPrecision(18, 2);
         });
 
-        modelBuilder.Entity<SavingsInterestSettlement>(settlement =>
+        modelBuilder.Entity<BankInterestSettlement>(settlement =>
         {
             // No FK to the asset or the credit: RemoveAsset deletes the rows explicitly.
             settlement.HasIndex(s => new { s.AssetId, s.PeriodEnd }).IsUnique();

@@ -5,6 +5,7 @@ using Skarbiec.Portfolio.Features.CashAccounts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -15,13 +16,13 @@ public sealed class ListCashAccountsEndpointTests(SkarbiecContainersFixture cont
     public async Task List_ReturnsCashAccountsByNameWithBalance()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var cashB = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 300m, name: "B wallet");
         var cashA = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 120.50m, currency: "EUR", name: "A wallet");
         await client.AddAssetAsync(await client.CreateAccountAsync(cancellationToken), cancellationToken, name: "Some stock");
         var cashZ = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 75m, name: "Z wallet");
-        await client.AddSavingsAccountAsync(cancellationToken);
+        await client.CreateSavingsBankAccountAsync(cancellationToken);
 
         var response = await client.GetAsync(AllCashAccountsUri, cancellationToken);
 

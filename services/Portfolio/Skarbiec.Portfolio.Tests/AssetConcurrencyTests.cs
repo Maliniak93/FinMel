@@ -17,7 +17,7 @@ public sealed class AssetConcurrencyTests(SkarbiecContainersFixture containers) 
 
         await using (var seedContext = CreateDbContext(ownerId))
         {
-            seedContext.Accounts.Add(new Account { Id = accountId, Name = "Retirement", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Regular });
+            seedContext.Accounts.Add(new Account { Id = accountId, Name = "Retirement", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Regular, Currency = "PLN" });
             seedContext.Assets.Add(new Asset
             {
                 Id = assetId,

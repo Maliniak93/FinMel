@@ -224,4 +224,32 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(2, body.ByAccount.Count);
         Assert.All(body.ByAccount, p => Assert.Equal(0m, p.Percentage));
     }
+
+    [Fact]
+    public async Task BankAccount_OwnClassAndAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var bankAccountId = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, snapshotDate, 2_000m, cancellationToken);
+            await db.SeedValuationLineAsync(
+                userId, bankAccountId, Guid.NewGuid(), snapshotDate, 2_000m, cancellationToken, assetClass: AssetClass.BankAccount);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bank = Assert.Single(body!.ByAssetClass);
+        Assert.Equal(AssetClass.BankAccount, bank.AssetClass);
+        Assert.Equal(2_000m, bank.ValuePln);
+        var account = Assert.Single(body.ByAccount);
+        Assert.Equal(bankAccountId, account.AccountId);
+        Assert.Equal(2_000m, account.ValuePln);
+    }
 }

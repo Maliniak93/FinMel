@@ -8,7 +8,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
@@ -35,7 +34,6 @@ import {
   RollOverDepositDialog,
   type RollOverDepositDialogData,
 } from './roll-over-deposit-dialog/roll-over-deposit-dialog';
-import { SavingsAccounts } from './savings-accounts/savings-accounts';
 import {
   SettleDepositDialog,
   type SettleDepositDialogData,
@@ -51,9 +49,7 @@ import {
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
-    MatTabsModule,
     MatTooltipModule,
-    SavingsAccounts,
     TranslocoPipe,
   ],
   templateUrl: './deposits.html',

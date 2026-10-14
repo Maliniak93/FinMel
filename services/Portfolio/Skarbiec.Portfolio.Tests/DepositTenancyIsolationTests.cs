@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -165,18 +166,18 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var ownerCashId = await owner.AddCashAssetAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerCashId = await stranger.AddCashAssetAsync(cancellationToken);
-        var strangerSavings = await stranger.AddSavingsAccountAsync(cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false));
+        var strangerBank = await stranger.CreateBankAccountAsync(cancellationToken);
 
         var response = await stranger.PostAsJsonAsync(
             PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
         var intoStrangersCash = await owner.PostAsJsonAsync(
             PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
 
-        var intoStrangersSavings = await owner.PostAsJsonAsync(
-            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerSavings.AssetId), cancellationToken);
+        var intoStrangersBank = await owner.PostAsJsonAsync(
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerBank.MoneyAssetId), cancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         await intoStrangersCash.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        await intoStrangersSavings.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        await intoStrangersBank.AssertInvalidTransferCounterpartAsync(cancellationToken);
 
         var unchanged = await owner.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.Settled, unchanged.Status);
@@ -185,9 +186,9 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var strangerCash = await stranger.GetAssetAsync(strangerCashId, cancellationToken);
         Assert.Equal(0m, strangerCash.Quantity);
         Assert.Equal(0, strangerCash.TransactionCount);
-        var strangerSavingsAfter = await stranger.GetAssetAsync(strangerSavings.AssetId, cancellationToken);
-        Assert.Equal(0m, strangerSavingsAfter.Quantity);
-        Assert.Equal(0, strangerSavingsAfter.TransactionCount);
+        var strangerBankAfter = await stranger.GetAssetAsync(strangerBank.MoneyAssetId, cancellationToken);
+        Assert.Equal(0m, strangerBankAfter.Quantity);
+        Assert.Equal(0, strangerBankAfter.TransactionCount);
         await using (var dbContext = CreateDbContext(ownerId))
         {
             Assert.False(await dbContext.Transactions.IgnoreQueryFilters().AnyAsync(t => t.TransferId != null, cancellationToken));

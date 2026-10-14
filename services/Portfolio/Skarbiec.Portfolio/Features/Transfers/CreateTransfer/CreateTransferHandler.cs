@@ -19,17 +19,22 @@ public sealed class CreateTransferHandler(
             return TransferErrors.DateInFuture;
         }
 
-        // Both through the tenancy filter: a stranger's id gets the same 400 as any unsuitable asset, so nothing leaks.
+        // Both through the tenancy filter: a stranger's source is a 404, a stranger's target an unsuitable counterpart.
         var source = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == request.SourceAssetId, cancellationToken);
-        var target = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == request.TargetAssetId, cancellationToken);
+        if (source is null)
+        {
+            return AssetErrors.NotFound(request.SourceAssetId);
+        }
 
-        if (source is null
-            || target is null
-            || source.Id == target.Id
-            || !TransferRoutes.IsCreatable(source, target)
-            || source.Currency != target.Currency)
+        var target = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == request.TargetAssetId, cancellationToken);
+        if (target is null || source.Id == target.Id || !TransferRoutes.IsCreatable(source, target))
         {
             return TransferErrors.InvalidCounterpart;
+        }
+
+        if (source.Currency != target.Currency)
+        {
+            return TransferErrors.CurrencyMismatch;
         }
 
         // Both ids come from the body, so both sides get the read-only check.

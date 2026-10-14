@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.UpdateTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -75,7 +76,7 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
     }
 
     [Theory]
-    [InlineData("savings")]
+    [InlineData("bank-account")]
     [InlineData("eur-cash")]
     [InlineData("archived-cash")]
     [InlineData("holding-itself")]
@@ -89,9 +90,8 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         Guid cashAssetId;
         switch (scenario)
         {
-            case "savings":
-                cashAssetId = (await client.AddSavingsAccountAsync(
-                    cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false))).AssetId;
+            case "bank-account":
+                cashAssetId = (await client.CreateBankAccountAsync(cancellationToken)).MoneyAssetId;
                 break;
             case "eur-cash":
                 cashAssetId = await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "Euro cash");

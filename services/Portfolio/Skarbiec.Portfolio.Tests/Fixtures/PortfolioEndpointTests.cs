@@ -110,11 +110,11 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         (int Assets, int Transactions, int Terms, decimal TotalQuantity) Rows,
         string Transactions);
 
-    protected async Task<int> CountSavingsSettlementsAsync(
+    protected async Task<int> CountBankSettlementsAsync(
         Guid userId, CancellationToken cancellationToken, Guid? assetId = null)
     {
         await using var dbContext = CreateDbContext(userId);
-        return await dbContext.Set<SavingsInterestSettlement>()
+        return await dbContext.Set<BankInterestSettlement>()
             .CountAsync(s => assetId == null || s.AssetId == assetId, cancellationToken);
     }
 

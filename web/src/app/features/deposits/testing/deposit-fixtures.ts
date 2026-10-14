@@ -120,16 +120,16 @@ export const paidOutDepositWithRemovedDestination: DepositResponse = depositResp
   paidOutToAssetName: null,
 } as Partial<DepositResponse>);
 
-export const paidOutIntoSavingsDeposit: DepositResponse = depositResponse({
+export const paidOutIntoBankDeposit: DepositResponse = depositResponse({
   assetId: 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1',
-  name: 'Deposit paid into savings',
+  name: 'Deposit paid into a bank account',
   bankName: 'Bank J',
   status: DEPOSIT_STATUS.PaidOut,
   settledOn: '2026-04-17',
   settledGrossInterest: 150,
   settledTax: 28.5,
   paidOutOn: '2026-04-20',
-  paidOutToAssetName: 'Emergency fund',
+  paidOutToAssetName: 'Nest Oszczędnościowe',
 } as Partial<DepositResponse>);
 
 export const rolledOverDeposit: DepositResponse = depositResponse({
@@ -167,38 +167,38 @@ export const transferCandidatesByCurrency: Record<string, TransferCandidateFixtu
   EUR: [eurCashCandidate],
 };
 
-export const plnSavingsCandidate: TransferCandidateFixture = {
+export const plnBankCandidate: TransferCandidateFixture = {
   assetId: 'cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd',
-  name: 'Emergency fund',
+  name: 'Nest Oszczędnościowe',
   balance: 750,
 };
 
-export const eurSavingsCandidate: TransferCandidateFixture = {
+export const eurBankCandidate: TransferCandidateFixture = {
   assetId: 'efefefef-efef-efef-efef-efefefefefef',
-  name: 'EUR savings',
+  name: 'EUR bank account',
   balance: 300,
 };
 
-export const savingsCandidatesByCurrency: Record<string, TransferCandidateFixture[]> = {
-  PLN: [plnSavingsCandidate],
-  EUR: [eurSavingsCandidate],
+export const bankCandidatesByCurrency: Record<string, TransferCandidateFixture[]> = {
+  PLN: [plnBankCandidate],
+  EUR: [eurBankCandidate],
 };
 
 export function transferCandidatesFor(
   url: URL,
   cash: Record<string, TransferCandidateFixture[]> = transferCandidatesByCurrency,
-  savings: Record<string, TransferCandidateFixture[]> = savingsCandidatesByCurrency,
+  bank: Record<string, TransferCandidateFixture[]> = bankCandidatesByCurrency,
 ): TransferCandidateFixture[] {
   const currency = url.searchParams.get('currency') ?? '';
   const assetClass = url.searchParams.get('assetClass');
-  const bySavings = assetClass === 'Savings' || assetClass === '9';
-  return (bySavings ? savings : cash)[currency] ?? [];
+  const byBank = assetClass === 'BankAccount' || assetClass === '9';
+  return (byBank ? bank : cash)[currency] ?? [];
 }
 
 export function requestedCandidateClasses(fetchSpy: { mock: { calls: unknown[][] } }): string[] {
   return transferCandidateRequests(fetchSpy).map((url) => {
     const value = url.searchParams.get('assetClass');
-    return value === '0' ? 'Cash' : value === '9' ? 'Savings' : (value ?? '');
+    return value === '0' ? 'Cash' : value === '9' ? 'BankAccount' : (value ?? '');
   });
 }
 

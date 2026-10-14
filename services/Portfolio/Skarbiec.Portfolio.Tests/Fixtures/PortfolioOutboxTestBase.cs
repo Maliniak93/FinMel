@@ -5,6 +5,8 @@ using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.Accounts.ArchiveAccount;
+using Skarbiec.Portfolio.Features.Accounts.BankInterest.SettleBankInterest;
+using Skarbiec.Portfolio.Features.Accounts.BankInterest.UndoBankInterestSettlement;
 using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 using Skarbiec.Portfolio.Features.Accounts.DeleteAccount;
 using Skarbiec.Portfolio.Features.Accounts.RestoreAccount;
@@ -29,10 +31,6 @@ using Skarbiec.Portfolio.Features.Metals.UpdateMetal;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Features.RemoveAsset;
 using Skarbiec.Portfolio.Features.RestoreAsset;
-using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
-using Skarbiec.Portfolio.Features.SavingsAccounts.SettleSavingsInterest;
-using Skarbiec.Portfolio.Features.SavingsAccounts.UndoSavingsInterestSettlement;
-using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 using Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 using Skarbiec.Portfolio.Features.UpdateAsset;
@@ -88,10 +86,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddScoped<SwapBondHandler>();
             services.AddScoped<AddMetalHandler>();
             services.AddScoped<UpdateMetalHandler>();
-            services.AddScoped<AddSavingsAccountHandler>();
-            services.AddScoped<UpdateSavingsAccountHandler>();
-            services.AddScoped<SettleSavingsInterestHandler>();
-            services.AddScoped<UndoSavingsInterestSettlementHandler>();
+            services.AddScoped<SettleBankInterestHandler>();
+            services.AddScoped<UndoBankInterestSettlementHandler>();
             services.AddScoped<UpdateDepositHandler>();
             services.AddScoped<SettleDepositHandler>();
             services.AddScoped<PayOutDepositHandler>();
@@ -138,6 +134,42 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         Assert.True(result.IsSuccess);
 
         return result.Value.Id;
+    }
+
+    protected sealed record CreatedBank(Guid Id, Guid CashAssetId);
+
+    protected static async Task<CreatedBank> CreateBankAccountAsync(
+        IServiceProvider services,
+        string name,
+        string currency,
+        decimal annualInterestRatePercent,
+        CancellationToken cancellationToken,
+        decimal balance = 0m)
+    {
+        var created = await services.GetRequiredService<CreateAccountHandler>().HandleAsync(
+            new CreateAccountRequest
+            {
+                Name = name,
+                Type = AccountType.Bank,
+                Wrapper = TaxWrapper.Regular,
+                Currency = currency,
+                Variant = BankVariant.Savings,
+                BankName = name,
+                AnnualInterestRatePercent = annualInterestRatePercent
+            },
+            cancellationToken);
+        Assert.True(created.IsSuccess, created.IsFailure ? created.Error.Code : null);
+
+        if (balance > 0m)
+        {
+            var deposited = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+                created.Value.CashAssetId,
+                new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = balance, UnitPrice = 1m, Date = PortfolioApi.DefaultTopUpDate },
+                cancellationToken);
+            Assert.True(deposited.IsSuccess, deposited.IsFailure ? deposited.Error.Code : null);
+        }
+
+        return new CreatedBank(created.Value.Id, created.Value.CashAssetId);
     }
 
     protected static async Task<Guid> AddCashWithBalanceAsync(

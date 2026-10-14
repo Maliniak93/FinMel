@@ -3,7 +3,7 @@
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
     <p class="account-transfer-dialog__name">
-      {{ account.name }} · {{ formatMoney(account.cashBalance) }}
+      {{ account.name }} · {{ formatMoney(account.cashBalance, account.currency) }}
     </p>
 
     <mat-form-field appearance="outline" class="account-transfer-dialog__field">
@@ -11,7 +11,7 @@
       <mat-select formControlName="targetAssetId">
         @for (candidate of targets(); track candidate.assetId) {
           <mat-option [value]="candidate.assetId">
-            {{ candidate.name }} ({{ formatMoney(candidate.balance) }})
+            {{ candidate.name }} ({{ formatMoney(candidate.balance, account.currency) }})
           </mat-option>
         }
       </mat-select>
