@@ -14,9 +14,9 @@ public sealed class AssetValuationModesTests
     }
 
     [Fact]
-    public void Default_Savings_IsCurrencyValued()
+    public void Default_BankAccount_IsCurrencyValued()
     {
-        Assert.Equal(AssetValuationMode.CurrencyValued, AssetValuationModes.Default(AssetClass.Savings));
+        Assert.Equal(AssetValuationMode.CurrencyValued, AssetValuationModes.Default(AssetClass.BankAccount));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class AssetValuationModesTests
         Assert.Equal(3, (int)AssetClass.Etf);
         Assert.Equal(4, (int)AssetClass.Bond);
         Assert.Equal(6, (int)AssetClass.PreciousMetal);
-        Assert.Equal(9, (int)AssetClass.Savings);
+        Assert.Equal(9, (int)AssetClass.BankAccount);
         Assert.Equal(0, (int)AssetValuationMode.Market);
         Assert.Equal(2, (int)AssetValuationMode.CurrencyValued);
     }

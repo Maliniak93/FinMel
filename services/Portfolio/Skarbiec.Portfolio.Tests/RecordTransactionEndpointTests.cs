@@ -10,6 +10,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -375,23 +376,23 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     [InlineData(TransactionType.Sell, false)]
     [InlineData(TransactionType.Dividend, false)]
     [InlineData(TransactionType.Interest, false)]
-    public async Task Record_OnSavingsAccount_AcceptsDepositAndWithdrawOnly(TransactionType type, bool accepted)
+    public async Task Record_OnBankAccount_AcceptsDepositAndWithdrawOnly(TransactionType type, bool accepted)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var account = await client.AddSavingsAccountAsync(cancellationToken);
-        var request = new RecordTransactionRequest { Type = type, Quantity = 100m, UnitPrice = 1m, Date = SavingsToday };
+        var account = await client.CreateSavingsBankAccountAsync(cancellationToken);
+        var request = new RecordTransactionRequest { Type = type, Quantity = 100m, UnitPrice = 1m, Date = FixedToday };
 
-        var response = await client.PostAsJsonAsync(TransactionsUri(account.AssetId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(TransactionsUri(account.MoneyAssetId), request, cancellationToken);
 
-        var asset = await client.GetAssetAsync(account.AssetId, cancellationToken);
+        var asset = await client.GetAssetAsync(account.MoneyAssetId, cancellationToken);
         if (accepted)
         {
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
             Assert.Equal(type == TransactionType.Deposit ? 10_100m : 9_900m, asset.Quantity);
             Assert.Equal(2, asset.TransactionCount);
-            Assert.Equal(asset.Quantity, (await client.GetSavingsAccountAsync(account.AssetId, cancellationToken)).Balance);
+            Assert.Equal(asset.Quantity, await client.GetCashBalanceAsync(account.AccountId, cancellationToken));
         }
         else
         {
@@ -402,18 +403,18 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Record_OnSavingsAccount_WithdrawBeyondBalance_ReturnsOversell()
+    public async Task Record_OnBankAccount_WithdrawBeyondBalance_ReturnsInsufficientFunds()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var account = await client.AddSavingsAccountAsync(cancellationToken);
-        var request = new RecordTransactionRequest { Type = TransactionType.Withdraw, Quantity = 10_000.01m, UnitPrice = 1m, Date = SavingsToday };
+        var account = await client.CreateSavingsBankAccountAsync(cancellationToken);
+        var request = new RecordTransactionRequest { Type = TransactionType.Withdraw, Quantity = 10_000.01m, UnitPrice = 1m, Date = FixedToday };
 
-        var response = await client.PostAsJsonAsync(TransactionsUri(account.AssetId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(TransactionsUri(account.MoneyAssetId), request, cancellationToken);
 
-        await response.AssertProblemAsync(HttpStatusCode.BadRequest, "Validation.OversellsPosition", cancellationToken);
-        Assert.Equal(10_000m, (await client.GetAssetAsync(account.AssetId, cancellationToken)).Quantity);
+        await response.AssertInsufficientFundsAsync(cancellationToken);
+        Assert.Equal(10_000m, (await client.GetAssetAsync(account.MoneyAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]

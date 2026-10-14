@@ -41,12 +41,11 @@ import {
   paidOutDeposit,
   paidOutDepositDestinationName,
   paidOutDepositWithRemovedDestination,
-  paidOutIntoSavingsDeposit,
-  plnSavingsCandidate,
+  paidOutIntoBankDeposit,
+  plnBankCandidate,
   settledDeposit,
   settledDepositFinalAmount,
 } from './testing/deposit-fixtures';
-import { activeSavingsAccount, taxFreeEurSavingsAccount } from './testing/savings-account-fixtures';
 import { provideI18nTesting } from '../../core/i18n/testing';
 
 describe('Deposits', () => {
@@ -73,9 +72,6 @@ describe('Deposits', () => {
       }
       if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
         return jsonResponse({});
-      }
-      if (requestUrl(input).includes('/api/portfolio/savings-accounts')) {
-        return jsonResponse([activeSavingsAccount, taxFreeEurSavingsAccount]);
       }
       return requestUrl(input).includes('/api/portfolio/deposits')
         ? jsonResponse(deposits)
@@ -143,67 +139,18 @@ describe('Deposits', () => {
     );
   }
 
-  describe('tabs', () => {
-    function tabs(): HTMLElement[] {
-      return Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
-      );
-    }
+  it('is titled "Deposits" and shows only the term deposits, with no tabs', async () => {
+    await setup();
 
-    function tabFor(label: RegExp): HTMLElement {
-      const tab = tabs().find((candidate) => label.test(candidate.textContent ?? ''));
-      if (!tab) {
-        throw new Error(`No tab matching ${label}.`);
-      }
-      return tab;
-    }
-
-    it('is titled "Deposits & savings"', async () => {
-      await setup();
-
-      expect((fixture.nativeElement as HTMLElement).querySelector('h1')?.textContent).toContain(
-        'Deposits & savings',
-      );
-    });
-
-    it('renders the Term deposits and Savings accounts tabs', async () => {
-      await setup();
-
-      expect(tabs()).toHaveLength(2);
-      expect(tabFor(/term deposits/i)).toBeDefined();
-      expect(tabFor(/savings accounts/i)).toBeDefined();
-    });
-
-    it('opens on Term deposits, which lists the term deposits', async () => {
-      await setup();
-
-      expect(tabFor(/term deposits/i).getAttribute('aria-selected')).toBe('true');
-      expect(tabFor(/savings accounts/i).getAttribute('aria-selected')).toBe('false');
-      expect(rows()).toHaveLength(2);
-      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain(
-        activeSavingsAccount.name,
-      );
-    });
-
-    it('the Savings accounts tab lists the savings accounts', async () => {
-      await setup();
-
-      tabFor(/savings accounts/i).click();
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      await vi.waitFor(() => {
-        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-        expect(text).toContain(activeSavingsAccount.name);
-        expect(text).toContain(taxFreeEurSavingsAccount.name);
-      });
-      expect(tabFor(/savings accounts/i).getAttribute('aria-selected')).toBe('true');
-      expect(
-        fetchSpy.mock.calls.some((call: unknown[]) =>
-          requestUrl(call[0]).includes('/api/portfolio/savings-accounts'),
-        ),
-      ).toBe(true);
-    });
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('h1')?.textContent).toContain('Deposits');
+    expect(element.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(rows()).toHaveLength(2);
+    expect(
+      fetchSpy.mock.calls.some((call: unknown[]) =>
+        requestUrl(call[0]).includes('/api/portfolio/savings'),
+      ),
+    ).toBe(false);
   });
 
   it('lists every deposit with its terms and projection columns', async () => {
@@ -399,16 +346,16 @@ describe('Deposits', () => {
       ).toBe(false);
     });
 
-    it('a PaidOut row shows the name of a savings destination', async () => {
-      await setup([paidOutIntoSavingsDeposit]);
+    it('a PaidOut row shows the name of a bank account destination', async () => {
+      await setup([paidOutIntoBankDeposit]);
 
-      const row = rowFor('Deposit paid into savings');
+      const row = rowFor('Deposit paid into a bank account');
 
       expect(row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip')?.textContent).toContain(
         'Paid out',
       );
       expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
-      expect(row.textContent).toContain(plnSavingsCandidate.name);
+      expect(row.textContent).toContain(plnBankCandidate.name);
       expect(transferButton(row)).toBeUndefined();
     });
 
@@ -708,7 +655,7 @@ describe('Deposits', () => {
 
       const english = await texts();
       expect(english).toEqual([
-        'Deposits & savings',
+        'Deposits',
         'Add deposit',
         'Name',
         'Bank',

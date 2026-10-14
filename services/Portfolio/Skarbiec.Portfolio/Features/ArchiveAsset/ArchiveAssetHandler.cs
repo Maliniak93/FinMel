@@ -2,12 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
-using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.ArchiveAsset;
 
 public sealed class ArchiveAssetHandler(
-    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, TimeProvider timeProvider)
+    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid assetId, CancellationToken cancellationToken)
     {
@@ -42,6 +41,6 @@ public sealed class ArchiveAssetHandler(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return await dbContext.ToFullResponseAsync(asset, WarsawCalendar.Today(timeProvider), cancellationToken);
+        return await dbContext.ToFullResponseAsync(asset, cancellationToken);
     }
 }

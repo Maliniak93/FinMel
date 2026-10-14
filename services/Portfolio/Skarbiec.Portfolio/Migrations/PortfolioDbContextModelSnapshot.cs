@@ -196,6 +196,11 @@ namespace Skarbiec.Portfolio.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
@@ -306,6 +311,71 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasIndex("InstrumentId");
 
                     b.ToTable("Assets");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.BankAccountTerms", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AnnualInterestRatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Variant")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("AccountId");
+
+                    b.ToTable("BankAccountTerms");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.BankInterestSettlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("GrossInterest")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Tax")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransactionId");
+
+                    b.HasIndex("AssetId", "PeriodEnd")
+                        .IsUnique();
+
+                    b.ToTable("BankInterestSettlements");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.BondInterestSettlement", b =>
@@ -445,69 +515,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasKey("AssetId");
 
                     b.ToTable("MetalHoldings");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsAccount", b =>
-                {
-                    b.Property<Guid>("AssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("AnnualInterestRatePercent")
-                        .HasPrecision(7, 4)
-                        .HasColumnType("numeric(7,4)");
-
-                    b.Property<string>("BankName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("TaxExempt")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("AssetId");
-
-                    b.ToTable("SavingsAccounts");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsInterestSettlement", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("GrossInterest")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateOnly>("PeriodEnd")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly>("PeriodStart")
-                        .HasColumnType("date");
-
-                    b.Property<decimal>("Tax")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid?>("TransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TransactionId");
-
-                    b.HasIndex("AssetId", "PeriodEnd")
-                        .IsUnique();
-
-                    b.ToTable("SavingsInterestSettlements");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
@@ -741,20 +748,20 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasPrincipalKey("MessageId", "ConsumerId");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.BankAccountTerms", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithOne()
+                        .HasForeignKey("Skarbiec.Portfolio.Data.BankAccountTerms", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.MetalHolding", b =>
                 {
                     b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
                         .WithOne()
                         .HasForeignKey("Skarbiec.Portfolio.Data.MetalHolding", "AssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.SavingsAccount", b =>
-                {
-                    b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
-                        .WithOne()
-                        .HasForeignKey("Skarbiec.Portfolio.Data.SavingsAccount", "AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

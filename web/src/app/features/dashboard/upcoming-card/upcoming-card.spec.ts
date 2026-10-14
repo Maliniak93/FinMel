@@ -3,7 +3,7 @@ import { bondResponse } from '../../../../testing/bond-fixtures';
 import { BOND_STATUS } from '../../bonds/bond-interest';
 import { DEPOSIT_STATUS } from '../../deposits/deposit-terms';
 import { depositResponse } from '../../deposits/testing/deposit-fixtures';
-import { savingsAccountResponse } from '../../deposits/testing/savings-account-fixtures';
+import { bankAccountResponse } from '../../../../testing/bank-account-fixtures';
 import { formatDate, formatMoney } from '../../../shared/format';
 import { dateOnlyFromToday, jsonResponse, renderCard } from '../testing/dashboard-fixtures';
 import { UpcomingCard } from './upcoming-card';
@@ -37,8 +37,11 @@ describe('UpcomingCard', () => {
     const { fixture } = await renderCard(UpcomingCard, {
       deposits: jsonResponse([dueDeposit]),
       bonds: jsonResponse([soonBond, interestBond]),
-      savings: jsonResponse([
-        savingsAccountResponse({ name: 'Savings interest', interestDue: true, duePeriodCount: 3 }),
+      accounts: jsonResponse([
+        bankAccountResponse({
+          name: 'Bank interest',
+          bank: { interestDue: true, duePeriodCount: 3 },
+        }),
       ]),
     });
     const element = fixture.nativeElement as HTMLElement;
@@ -48,7 +51,7 @@ describe('UpcomingCard', () => {
     expect(kinds).toContain('Deposit due');
     expect(kinds).toContain('Bond matures');
     expect(kinds).toContain('Bond interest due, periods: 2');
-    expect(kinds).toContain('Savings interest due, months: 3');
+    expect(kinds).toContain('Bank interest due, months: 3');
 
     expect(text).toContain('Mature deposit');
     expect(text).toContain(formatDate('2026-10-05'));
@@ -58,13 +61,14 @@ describe('UpcomingCard', () => {
     expect(text).toContain(formatMoney(5000, 'PLN'));
     expect(element.querySelector('a[href="/deposits"]')).not.toBeNull();
     expect(element.querySelector('a[href="/bonds"]')).not.toBeNull();
+    expect(element.querySelector('a[href="/bank-accounts"]')).not.toBeNull();
   });
 
   it('empty', async () => {
     const { fixture } = await renderCard(UpcomingCard, {
       deposits: EMPTY,
       bonds: EMPTY,
-      savings: EMPTY,
+      accounts: EMPTY,
     });
     const element = fixture.nativeElement as HTMLElement;
 
@@ -76,7 +80,7 @@ describe('UpcomingCard', () => {
     const { fixture } = await renderCard(UpcomingCard, {
       deposits: EMPTY,
       bonds: EMPTY,
-      savings: EMPTY,
+      accounts: EMPTY,
     });
     const element = fixture.nativeElement as HTMLElement;
     const texts = () => [
@@ -109,8 +113,11 @@ describe('UpcomingCard', () => {
           maturityDate: '2030-01-01',
         }),
       ]),
-      savings: jsonResponse([
-        savingsAccountResponse({ name: 'Savings interest', interestDue: true, duePeriodCount: 3 }),
+      accounts: jsonResponse([
+        bankAccountResponse({
+          name: 'Bank interest',
+          bank: { interestDue: true, duePeriodCount: 3 },
+        }),
       ]),
     });
     const element = fixture.nativeElement as HTMLElement;
@@ -128,7 +135,7 @@ describe('UpcomingCard', () => {
     const { fixture } = await renderCard(UpcomingCard, {
       deposits: jsonResponse({}, 500),
       bonds: EMPTY,
-      savings: EMPTY,
+      accounts: EMPTY,
     });
     const element = fixture.nativeElement as HTMLElement;
     const texts = () => [

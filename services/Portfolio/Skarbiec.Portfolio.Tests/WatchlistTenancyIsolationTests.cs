@@ -68,7 +68,7 @@ public sealed class WatchlistTenancyIsolationTests(SkarbiecContainersFixture con
     public async Task List_ForeignHoldings_Absent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var instrumentId = ScriptInstrument(AssetClass.Etf, "PLN", "SHARED");
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         await owner.AddWatchlistItemAsync(instrumentId, cancellationToken);

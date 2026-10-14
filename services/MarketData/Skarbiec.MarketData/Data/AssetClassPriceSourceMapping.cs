@@ -9,7 +9,7 @@ public static class AssetClassPriceSourceMapping
     {
         AssetClass.Stock or AssetClass.Etf => PriceSource.Yahoo,
         AssetClass.PreciousMetal => PriceSource.GoldApi,
-        AssetClass.Cash or AssetClass.Deposit or AssetClass.Savings or AssetClass.Bond => null,
+        AssetClass.Cash or AssetClass.Deposit or AssetClass.BankAccount or AssetClass.Bond => null,
         _ => throw new ArgumentOutOfRangeException(nameof(assetClass), assetClass, "Unmapped AssetClass — add it to AssetClassPriceSourceMapping.Resolve."),
     };
 }

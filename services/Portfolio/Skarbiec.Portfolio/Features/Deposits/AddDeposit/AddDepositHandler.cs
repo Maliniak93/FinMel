@@ -121,10 +121,14 @@ public sealed class AddDepositHandler(
 
         if (source is null
             || !TransferRoutes.IsAllowed(source.AssetClass, deposit.AssetClass)
-            || source.Currency != deposit.Currency
             || source.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
+        }
+
+        if (source.Currency != deposit.Currency)
+        {
+            return TransferErrors.CurrencyMismatch;
         }
 
         var (outLeg, inLeg) = TransferLegs.Create(source.Id, deposit.Id, request.Principal, request.StartDate);

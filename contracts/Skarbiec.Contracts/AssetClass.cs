@@ -9,5 +9,5 @@ public enum AssetClass
     Etf = 3,
     Bond = 4,
     PreciousMetal = 6,
-    Savings = 9,
+    BankAccount = 9,
 }

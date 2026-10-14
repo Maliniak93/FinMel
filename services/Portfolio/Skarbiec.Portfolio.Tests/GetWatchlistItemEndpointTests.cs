@@ -18,7 +18,7 @@ public sealed class GetWatchlistItemEndpointTests(SkarbiecContainersFixture cont
     public async Task Get_ReturnsTheListEntry()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithRate("USD", 4.00m);
         var instrumentId = ScriptInstrument(AssetClass.Etf, "USD", "ETFA", 110m, "NYSE", "Alpha ETF", previousClose: 100m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());

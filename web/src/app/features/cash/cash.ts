@@ -21,10 +21,6 @@ import {
   type AssetFormDialogData,
 } from '../assets/asset-form/asset-form-dialog/asset-form-dialog';
 import {
-  SavingsTransferDialog,
-  type SavingsTransferDialogData,
-} from '../deposits/savings-transfer-dialog/savings-transfer-dialog';
-import {
   TransactionFormDialog,
   type TransactionFormDialogData,
 } from '../transactions/transaction-form-dialog/transaction-form-dialog';
@@ -82,11 +78,6 @@ export class Cash {
       type,
     };
     this.reloadWhenDone(this.dialog.open(TransactionFormDialog, { width: '480px', data }));
-  }
-
-  protected openTransferDialog(account: CashAccountResponse): void {
-    const data: SavingsTransferDialogData = { cash: account };
-    this.reloadWhenDone(this.dialog.open(SavingsTransferDialog, { width: '520px', data }));
   }
 
   private reloadWhenDone(ref: MatDialogRef<unknown, boolean>): void {

@@ -12,7 +12,7 @@ Content-Type: application/json
 
 ### --- Accounts ---
 
-### Create a Brokerage account (type 0 = Brokerage, 1 = Bonds; wrapper 0 = Regular, 1 = Ike, 2 = Ikze)
+### Create a Brokerage account (type 0 = Brokerage, 1 = Bonds, 2 = Bank; wrapper 0 = Regular, 1 = Ike, 2 = Ikze; 400 Validation.BankFieldsNotAllowed for a bank field or a non-PLN currency)
 # @name createBrokerageAccount
 POST {{baseUrl}}/api/portfolio/accounts
 Authorization: Bearer {{authToken}}
@@ -55,7 +55,7 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### Rename an account (type and wrapper never change)
+### Rename an account (type, wrapper and currency never change)
 PUT {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -89,11 +89,11 @@ Content-Type: application/json
   "date": "2026-08-19"
 }
 
-### List the other accounts' cash a transfer can go to (free Cash is never listed here)
+### List the other accounts' money a transfer can go to, bank accounts included (free Cash is never listed here)
 GET {{baseUrl}}/api/portfolio/transfer-candidates?currency=PLN&assetClass=Cash&accountCash=true
 Authorization: Bearer {{authToken}}
 
-### Transfer between two accounts (400 Validation.InsufficientFunds above the balance, 400 Validation.InvalidTransferCounterpart to a free Cash or the same account)
+### Transfer between two accounts (400 Validation.InsufficientFunds above the balance, 400 Validation.InvalidTransferCounterpart to a free Cash or the same account, 400 Validation.TransferCurrencyMismatch between currencies)
 # @name accountTransfer
 POST {{baseUrl}}/api/portfolio/transfers
 Authorization: Bearer {{authToken}}
@@ -109,6 +109,101 @@ Content-Type: application/json
 ### Delete the transfer between accounts (400 Validation.InsufficientFunds once the target spent the money)
 DELETE {{baseUrl}}/api/portfolio/transfers/{{accountTransfer.response.body.transferId}}
 Authorization: Bearer {{authToken}}
+
+### --- Bank accounts ---
+
+### Create a current Bank account (variant 0 = Current, 1 = Savings; the wrapper must be 0 = Regular, else 400 Validation.WrapperNotAllowed; currency PLN, EUR or USD)
+# @name createMbankAccount
+POST {{baseUrl}}/api/portfolio/accounts
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "mBank",
+  "type": 2,
+  "wrapper": 0,
+  "currency": "PLN",
+  "variant": 0,
+  "bankName": "mBank",
+  "annualInterestRatePercent": 0
+}
+
+### Create a savings Bank account
+# @name createNestAccount
+POST {{baseUrl}}/api/portfolio/accounts
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Nest Oszczednosciowe",
+  "type": 2,
+  "wrapper": 0,
+  "currency": "PLN",
+  "variant": 1,
+  "bankName": "Nest Bank",
+  "annualInterestRatePercent": 5
+}
+
+### List the Bank accounts only (type=Bank)
+GET {{baseUrl}}/api/portfolio/accounts?type=Bank
+Authorization: Bearer {{authToken}}
+
+### Change a Bank account's variant, bank and rate (the rate applies from the next unsettled month)
+PUT {{baseUrl}}/api/portfolio/accounts/{{createNestAccount.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Nest Oszczednosciowe",
+  "variant": 1,
+  "bankName": "Nest Bank",
+  "annualInterestRatePercent": 4
+}
+
+### Deposit into the savings Bank account (its money is the cashAssetId of the account)
+POST {{baseUrl}}/api/portfolio/assets/{{createNestAccount.response.body.cashAssetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 10000,
+  "unitPrice": 1,
+  "date": "2026-08-01"
+}
+
+### Preview the Bank account's next due interest month (400 Validation.InterestNotSupported for a non-Bank account, 409 Conflict.AccountArchived)
+# @name bankInterestPreview
+GET {{baseUrl}}/api/portfolio/accounts/{{createNestAccount.response.body.id}}/interest-preview
+Authorization: Bearer {{authToken}}
+
+### Settle the previewed interest month
+# @name settleBankInterest
+POST {{baseUrl}}/api/portfolio/accounts/{{createNestAccount.response.body.id}}/interest-settlements
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "periodEnd": "{{bankInterestPreview.response.body.periodEnd}}",
+  "grossInterest": {{bankInterestPreview.response.body.grossInterest}},
+  "tax": {{bankInterestPreview.response.body.tax}}
+}
+
+### Undo the latest interest settlement
+DELETE {{baseUrl}}/api/portfolio/accounts/{{createNestAccount.response.body.id}}/interest-settlements/{{settleBankInterest.response.body.settlementId}}
+Authorization: Bearer {{authToken}}
+
+### Transfer from a Bank account to a brokerage account (counts toward an IKE or IKZE contribution)
+POST {{baseUrl}}/api/portfolio/transfers
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "sourceAssetId": "{{createNestAccount.response.body.cashAssetId}}",
+  "targetAssetId": "{{createBrokerageAccount.response.body.cashAssetId}}",
+  "amount": 3000,
+  "date": "2026-08-20"
+}
 
 ### Set the 2026 contribution limit of an IKE/IKZE account (400 Validation.ContributionLimitNotAllowed on a Regular one; PUT replaces it)
 PUT {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}/contribution-limits/2026
@@ -169,7 +264,7 @@ Content-Type: application/json
 
 {
   "assetClass": "Cash",
-  "name": "Savings account",
+  "name": "Wallet",
   "currency": "PLN",
   "quantity": 1
 }
@@ -204,7 +299,7 @@ Content-Type: application/json
 
 {
   "assetClass": "Cash",
-  "name": "Savings account (renamed)",
+  "name": "Wallet (renamed)",
   "currency": "PLN",
   "quantity": 1
 }
@@ -690,42 +785,6 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
-### --- Savings accounts ---
-
-### Add a savings account
-# @name addSavingsAccount
-POST {{baseUrl}}/api/portfolio/savings-accounts
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "name": "Savings account",
-  "bankName": "Example bank",
-  "currency": "PLN",
-  "annualInterestRatePercent": 5.25,
-  "taxExempt": false,
-  "openingDeposit": {
-    "amount": 10000.00,
-    "date": "2026-02-01"
-  }
-}
-
-### Pay into the savings account
-POST {{baseUrl}}/api/portfolio/assets/{{addSavingsAccount.response.body.assetId}}/transactions
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "type": "Deposit",
-  "quantity": 500.00,
-  "unitPrice": 1,
-  "date": "2026-02-10"
-}
-
-### List every savings account
-GET {{baseUrl}}/api/portfolio/savings-accounts
-Authorization: Bearer {{authToken}}
-
 ### List every active cash account, with per-currency totals
 GET {{baseUrl}}/api/portfolio/cash-accounts
 Authorization: Bearer {{authToken}}
@@ -772,72 +831,16 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/portfolio/watchlist/{{addWatchlistItem.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### Get a savings account
-GET {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}
-Authorization: Bearer {{authToken}}
+### --- Paying a deposit out into a bank account ---
 
-### Update a savings account
-PUT {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "name": "Emergency fund",
-  "bankName": "Example bank",
-  "annualInterestRatePercent": 4.75,
-  "taxExempt": true
-}
-
-### Preview the savings account's next due interest month
-# @name savingsInterestPreview
-GET {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-preview
-Authorization: Bearer {{authToken}}
-
-### Settle the previewed interest month
-# @name settleSavingsInterest
-POST {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "periodEnd": "{{savingsInterestPreview.response.body.periodEnd}}",
-  "grossInterest": {{savingsInterestPreview.response.body.grossInterest}},
-  "tax": {{savingsInterestPreview.response.body.tax}}
-}
-
-### Undo the latest interest settlement
-DELETE {{baseUrl}}/api/portfolio/savings-accounts/{{addSavingsAccount.response.body.assetId}}/interest-settlements/{{settleSavingsInterest.response.body.settlementId}}
-Authorization: Bearer {{authToken}}
-
-### --- Transfers between cash and savings ---
-
-### Transfer cash into the savings account
-# @name createTransfer
-POST {{baseUrl}}/api/portfolio/transfers
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "sourceAssetId": "{{addFundingCash.response.body.id}}",
-  "targetAssetId": "{{addSavingsAccount.response.body.assetId}}",
-  "amount": 500.00,
-  "date": "2026-02-02"
-}
-
-### Delete the transfer
-DELETE {{baseUrl}}/api/portfolio/transfers/{{createTransfer.response.body.transferId}}
-Authorization: Bearer {{authToken}}
-
-### --- Paying a deposit out into a savings account ---
-
-### Add a matured deposit to pay out into savings
-# @name addSavingsBoundDeposit
+### Add a matured deposit to pay out into a bank account
+# @name addBankBoundDeposit
 POST {{baseUrl}}/api/portfolio/deposits
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "name": "Deposit for savings",
+  "name": "Deposit for the bank account",
   "bankName": "Example bank",
   "currency": "PLN",
   "principal": 10000.00,
@@ -850,21 +853,21 @@ Content-Type: application/json
   "earlyBreakInterestLossPercent": 100
 }
 
-### Preview the settlement of the deposit bound for savings
-# @name savingsBoundPreview
-GET {{baseUrl}}/api/portfolio/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settlement-preview
+### Preview the settlement of the deposit bound for the bank account
+# @name bankBoundPreview
+GET {{baseUrl}}/api/portfolio/deposits/{{addBankBoundDeposit.response.body.assetId}}/settlement-preview
 Authorization: Bearer {{authToken}}
 
-### Settle the deposit and pay it out into the savings account
-POST {{baseUrl}}/api/portfolio/deposits/{{addSavingsBoundDeposit.response.body.assetId}}/settle
+### Settle the deposit and pay it out into the bank account (400 Validation.TransferCurrencyMismatch for another currency)
+POST {{baseUrl}}/api/portfolio/deposits/{{addBankBoundDeposit.response.body.assetId}}/settle
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "settledOn": "{{savingsBoundPreview.response.body.settledOn}}",
-  "grossInterest": {{savingsBoundPreview.response.body.grossInterest}},
-  "tax": {{savingsBoundPreview.response.body.tax}},
-  "destinationAssetId": "{{addSavingsAccount.response.body.assetId}}"
+  "settledOn": "{{bankBoundPreview.response.body.settledOn}}",
+  "grossInterest": {{bankBoundPreview.response.body.grossInterest}},
+  "tax": {{bankBoundPreview.response.body.tax}},
+  "destinationAssetId": "{{createNestAccount.response.body.cashAssetId}}"
 }
 
 ### --- Precious metals ---

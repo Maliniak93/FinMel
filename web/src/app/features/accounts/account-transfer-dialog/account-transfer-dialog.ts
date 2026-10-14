@@ -33,8 +33,6 @@ export interface AccountTransferDialogData {
   account: AccountResponse;
 }
 
-const ACCOUNT_CURRENCY = 'PLN';
-
 function today(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -84,7 +82,7 @@ export class AccountTransferDialog {
   protected readonly candidatesResource = resource({
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioTransferCandidates({
-        query: { currency: ACCOUNT_CURRENCY, assetClass: ASSET_CLASS.Cash, accountCash: true },
+        query: { currency: this.account.currency, assetClass: ASSET_CLASS.Cash, accountCash: true },
         signal: abortSignal,
       });
       if (result.error) {
@@ -145,6 +143,14 @@ export class AccountTransferDialog {
     if (problem.errorCode === 'Validation.InsufficientFunds') {
       this.form.controls.amount.setErrors({ server: translate('accounts.cash.insufficientFunds') });
       this.form.controls.amount.markAsTouched();
+      return;
+    }
+
+    if (problem.errorCode === 'Validation.TransferCurrencyMismatch') {
+      this.form.controls.targetAssetId.setErrors({
+        server: translate('accounts.transfer.currencyMismatch'),
+      });
+      this.form.controls.targetAssetId.markAsTouched();
       return;
     }
 

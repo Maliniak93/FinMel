@@ -7,7 +7,9 @@ using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using Skarbiec.Portfolio.Data;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -156,5 +158,48 @@ public sealed class AccountTransferEndpointTests(SkarbiecContainersFixture conta
         Assert.Contains(b.CashAssetId, listed);
         Assert.DoesNotContain(freeCashId, listed);
         Assert.Equal(700m, candidates.Single(c => c.GetProperty("assetId").GetGuid() == b.CashAssetId).GetProperty("balance").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BankToBrokerage_CountsTowardLimit()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mBank = await client.CreateBankAccountAsync(cancellationToken, "mBank", balance: 5_000m, depositedOn: new DateOnly(2026, 10, 1));
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest Oszczędnościowe", SavingsVariant, annualInterestRatePercent: 5m);
+        var ike = await client.CreateAccountWithCashAsync(cancellationToken, name: "XTB IKE", wrapper: TaxWrapper.Ike);
+        var transferDate = new DateOnly(2026, 10, 5);
+
+        var toIke = await client.PostAsJsonAsync(
+            TransfersUri, NewTransferRequest(mBank.MoneyAssetId, ike.CashAssetId, 3_000m, transferDate), cancellationToken);
+        var toNest = await client.PostAsJsonAsync(
+            TransfersUri, NewTransferRequest(mBank.MoneyAssetId, nest.MoneyAssetId, 500m, transferDate), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, toIke.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, toNest.StatusCode);
+        Assert.Equal(1_500m, await client.GetCashBalanceAsync(mBank.AccountId, cancellationToken));
+        Assert.Equal(3_000m, await client.GetCashBalanceAsync(ike.AccountId, cancellationToken));
+        Assert.Equal(500m, await client.GetCashBalanceAsync(nest.AccountId, cancellationToken));
+        var contribution = await client.GetContributionAsync(ike.AccountId, 2026, cancellationToken);
+        Assert.Equal(3_000m, contribution!.ContributedPln);
+    }
+
+    [Fact]
+    public async Task DifferentCurrency_Returns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.FxRateLookupClient.WithRate("USD", CashDay1, 4m).WithRate("USD", CashDay4, 4m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var usd = await client.CreateBankAccountAsync(cancellationToken, "mBank USD", currency: "USD", balance: 100m);
+        var ike = await client.CreateAccountWithCashAsync(cancellationToken, name: "XTB IKE", wrapper: TaxWrapper.Ike);
+
+        var response = await client.PostAsJsonAsync(
+            TransfersUri, NewTransferRequest(usd.MoneyAssetId, ike.CashAssetId, 50m, CashDay4), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, TransferCurrencyMismatchErrorCode, cancellationToken);
+        Assert.Equal(100m, await client.GetCashBalanceAsync(usd.AccountId, cancellationToken));
+        Assert.Equal(0m, await client.GetCashBalanceAsync(ike.AccountId, cancellationToken));
     }
 }

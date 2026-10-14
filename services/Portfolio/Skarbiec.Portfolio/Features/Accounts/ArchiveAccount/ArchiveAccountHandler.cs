@@ -4,7 +4,7 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Accounts.ArchiveAccount;
 
-public sealed class ArchiveAccountHandler(PortfolioDbContext dbContext)
+public sealed class ArchiveAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<AccountResponse>> HandleAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -17,7 +17,7 @@ public sealed class ArchiveAccountHandler(PortfolioDbContext dbContext)
         // Already archived: 200 and nothing to change.
         if (account.IsArchived)
         {
-            return await dbContext.ToResponseAsync(account, cancellationToken);
+            return await dbContext.ToResponseAsync(account, timeProvider, cancellationToken);
         }
 
         var holdsQuantity = await dbContext.Assets
@@ -30,6 +30,6 @@ public sealed class ArchiveAccountHandler(PortfolioDbContext dbContext)
         account.IsArchived = true;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return await dbContext.ToResponseAsync(account, cancellationToken);
+        return await dbContext.ToResponseAsync(account, timeProvider, cancellationToken);
     }
 }

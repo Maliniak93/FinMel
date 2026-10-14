@@ -2,11 +2,11 @@ import { ASSET_CLASS } from '../assets/asset-class';
 import { allowedTransactionTypes, TRANSACTION_TYPES } from './transaction-type';
 
 describe('transaction-type', () => {
-  it('allowedTransactionTypes limits Cash, Deposit, Savings and Bond to Deposit/Withdraw, a precious metal to Buy/Sell and a stock or ETF to Buy/Sell/Dividend/Interest', () => {
+  it('allowedTransactionTypes limits Cash, Deposit, BankAccount and Bond to Deposit/Withdraw, a precious metal to Buy/Sell and a stock or ETF to Buy/Sell/Dividend/Interest', () => {
     const cashLike: number[] = [
       ASSET_CLASS.Cash,
       ASSET_CLASS.Deposit,
-      ASSET_CLASS.Savings,
+      ASSET_CLASS.BankAccount,
       ASSET_CLASS.Bond,
     ];
 

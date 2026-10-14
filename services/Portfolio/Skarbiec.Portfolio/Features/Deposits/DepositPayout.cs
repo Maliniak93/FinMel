@@ -21,10 +21,15 @@ internal static class DepositPayout
 
         if (destination is null
             || !TransferRoutes.IsAllowed(deposit.AssetClass, destination.AssetClass)
-            || destination.Currency != deposit.Currency
-            || destination.IsArchived)
+            || destination.IsArchived
+            || await dbContext.IsAccountArchivedAsync(destination.AccountId, cancellationToken))
         {
             return TransferErrors.InvalidCounterpart;
+        }
+
+        if (destination.Currency != deposit.Currency)
+        {
+            return TransferErrors.CurrencyMismatch;
         }
 
         // A payout always moves the whole balance: the bank closes the deposit and pays everything out.

@@ -10,6 +10,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
@@ -120,5 +121,55 @@ public sealed class CreateAccountEndpointTests(SkarbiecContainersFixture contain
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BankAccount_CreatedWithTerms()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+
+        var mBank = await client.PostAsJsonAsync(
+            AccountsUri, NewBankAccountBody("mBank", CurrentVariant, "PLN", "mBank", 0m), cancellationToken);
+        var nest = await client.PostAsJsonAsync(
+            AccountsUri, NewBankAccountBody("Nest Oszczędnościowe", SavingsVariant, "PLN", "Nest Bank", 5m), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, mBank.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, nest.StatusCode);
+        var mBankBody = await mBank.ReadJsonAsync(cancellationToken);
+        var nestBody = await nest.ReadJsonAsync(cancellationToken);
+        Assert.Equal("PLN", mBankBody.GetProperty("currency").GetString());
+        Assert.Equal(CurrentVariant, mBankBody.Bank().VariantName());
+        Assert.Equal(0m, mBankBody.Bank().GetProperty("annualInterestRatePercent").GetDecimal());
+        Assert.Equal(SavingsVariant, nestBody.Bank().VariantName());
+        Assert.Equal(5m, nestBody.Bank().GetProperty("annualInterestRatePercent").GetDecimal());
+        Assert.Equal("Nest Bank", nestBody.Bank().GetProperty("bankName").GetString());
+        Assert.Equal((int)TaxWrapper.Regular, nestBody.GetProperty("wrapper").GetInt32());
+
+        await using var dbContext = CreateDbContext(userId);
+        var accountId = nestBody.GetProperty("id").GetGuid();
+        var money = await dbContext.Assets.SingleAsync(a => a.AccountId == accountId, cancellationToken);
+        Assert.Equal(nestBody.GetProperty("cashAssetId").GetGuid(), money.Id);
+        Assert.Equal(AssetClass.BankAccount, money.AssetClass);
+        Assert.Equal("PLN", money.Currency);
+        Assert.Equal(AssetValuationMode.CurrencyValued, money.ValuationMode);
+    }
+
+    [Fact]
+    public async Task BankFields_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var ikeBank = await client.PostAsJsonAsync(
+            AccountsUri, NewBankAccountBody(wrapper: TaxWrapper.Ike), cancellationToken);
+        var usdBrokerage = await client.PostAsJsonAsync(
+            AccountsUri,
+            new { name = "XTB USD", type = (int)AccountType.Brokerage, wrapper = (int)TaxWrapper.Regular, currency = "USD" },
+            cancellationToken);
+
+        await ikeBank.AssertProblemAsync(HttpStatusCode.BadRequest, WrapperNotAllowedErrorCode, cancellationToken);
+        await usdBrokerage.AssertProblemAsync(HttpStatusCode.BadRequest, BankFieldsNotAllowedErrorCode, cancellationToken);
     }
 }

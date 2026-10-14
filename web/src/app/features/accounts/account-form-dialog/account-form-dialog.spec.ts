@@ -19,6 +19,7 @@ const existingAccount: AccountResponse = {
   name: 'XTB IKE',
   type: 0,
   wrapper: 1,
+  currency: 'PLN',
   isArchived: false,
   cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
   cashBalance: 0,
@@ -139,5 +140,84 @@ describe('AccountFormDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  it('shows currency, variant, bank and rate for Bank and hides the wrapper', async () => {
+    await setup({});
+    const element = fixture.nativeElement as HTMLElement;
+    const has = (name: string) => element.querySelector(`[formControlName="${name}"]`) !== null;
+    expect(has('wrapper')).toBe(true);
+    expect(has('currency')).toBe(false);
+
+    component['form'].controls.type.setValue(2);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(has('currency')).toBe(true);
+    expect(has('variant')).toBe(true);
+    expect(has('bankName')).toBe(true);
+    expect(has('annualInterestRatePercent')).toBe(true);
+    expect(has('wrapper')).toBe(false);
+  });
+
+  it('creates a Bank account with its terms', async () => {
+    await setup({});
+    fetchSpy.mockResolvedValue(jsonResponse({ ...existingAccount, type: 2 }, 201));
+
+    component['form'].controls.name.setValue('Nest Oszczędnościowe');
+    component['form'].controls.type.setValue(2);
+    component['form'].controls.currency.setValue('PLN');
+    component['form'].controls.variant.setValue(1);
+    component['form'].controls.bankName.setValue('Nest Bank');
+    component['form'].controls.annualInterestRatePercent.setValue(5);
+    await component['onSubmit']();
+
+    const request = fetchSpy.mock.calls[0][0] as Request;
+    expect(request.method).toBe('POST');
+    expect(JSON.parse(await request.text())).toMatchObject({
+      name: 'Nest Oszczędnościowe',
+      type: 2,
+      currency: 'PLN',
+      variant: 1,
+      bankName: 'Nest Bank',
+      annualInterestRatePercent: 5,
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('on edit of a Bank account disables currency and sends variant, bank and rate', async () => {
+    const bank = {
+      ...existingAccount,
+      name: 'mBank',
+      type: 2,
+      wrapper: 0,
+      currency: 'PLN',
+      bank: {
+        variant: 0,
+        bankName: 'mBank',
+        annualInterestRatePercent: 0,
+        interestDue: false,
+        duePeriodCount: 0,
+        lastSettlement: null,
+        interestCreditedNet: 0,
+      },
+    } as AccountResponse;
+    await setup({ account: bank });
+    fetchSpy.mockResolvedValue(jsonResponse(bank));
+
+    expect(component['form'].controls.currency.disabled).toBe(true);
+    expect(component['form'].controls.type.disabled).toBe(true);
+
+    component['form'].controls.annualInterestRatePercent.setValue(4);
+    await component['onSubmit']();
+
+    const request = fetchSpy.mock.calls[0][0] as Request;
+    expect(request.method).toBe('PUT');
+    expect(JSON.parse(await request.text())).toEqual({
+      name: 'mBank',
+      variant: 0,
+      bankName: 'mBank',
+      annualInterestRatePercent: 4,
+    });
   });
 });

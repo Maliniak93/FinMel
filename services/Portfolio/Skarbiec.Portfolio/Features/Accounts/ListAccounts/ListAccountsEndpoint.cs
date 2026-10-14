@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Accounts.ListAccounts;
 
@@ -14,6 +15,6 @@ public static class ListAccountsEndpoint
     }
 
     private static async Task<Ok<IReadOnlyList<AccountResponse>>> HandleAsync(
-        int? year, ListAccountsHandler handler, CancellationToken cancellationToken)
-        => TypedResults.Ok(await handler.HandleAsync(year, cancellationToken));
+        int? year, AccountType? type, ListAccountsHandler handler, CancellationToken cancellationToken)
+        => TypedResults.Ok(await handler.HandleAsync(year, type, cancellationToken));
 }

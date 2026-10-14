@@ -127,21 +127,21 @@ internal static class PortfolioAssertions
 
     public const string BondSwapExceedsProceedsErrorCode = "Validation.BondSwapExceedsProceeds";
 
-    public const string SavingsInterestNotDueErrorCode = "Conflict.SavingsInterestNotDue";
+    public const string BankInterestNotDueErrorCode = "Conflict.BankInterestNotDue";
 
-    public const string SavingsInterestPeriodMismatchErrorCode = "Conflict.SavingsInterestPeriodMismatch";
+    public const string BankInterestPeriodMismatchErrorCode = "Conflict.BankInterestPeriodMismatch";
 
-    public const string SavingsSettlementNotLatestErrorCode = "Conflict.SavingsSettlementNotLatest";
+    public const string BankSettlementNotLatestErrorCode = "Conflict.BankSettlementNotLatest";
 
-    public const string SavingsInterestManagedErrorCode = "Conflict.SavingsInterestManaged";
+    public const string BankInterestManagedErrorCode = "Conflict.BankInterestManaged";
 
     public const string OversellsPositionErrorCode = "Conflict.OversellsPosition";
 
-    public const string UseSavingsAccountEndpointsErrorCode = "Validation.UseSavingsAccountEndpoints";
+    public const string UseAccountEndpointsErrorCode = "Validation.UseAccountEndpoints";
 
-    public static async Task AssertUseSavingsAccountEndpointsAsync(
+    public static async Task AssertUseAccountEndpointsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
-        await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseSavingsAccountEndpointsErrorCode, cancellationToken);
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, UseAccountEndpointsErrorCode, cancellationToken);
 
     public const string UseMetalEndpointsErrorCode = "Validation.UseMetalEndpoints";
 

@@ -4,7 +4,7 @@ using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Accounts.RestoreAccount;
 
-public sealed class RestoreAccountHandler(PortfolioDbContext dbContext)
+public sealed class RestoreAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<AccountResponse>> HandleAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -20,6 +20,6 @@ public sealed class RestoreAccountHandler(PortfolioDbContext dbContext)
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return await dbContext.ToResponseAsync(account, cancellationToken);
+        return await dbContext.ToResponseAsync(account, timeProvider, cancellationToken);
     }
 }

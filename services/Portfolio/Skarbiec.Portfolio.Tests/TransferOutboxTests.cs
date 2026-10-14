@@ -7,7 +7,6 @@ using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.Metals.AddMetal;
 using Skarbiec.Portfolio.Features.RecordTransaction;
-using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
 using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 using Skarbiec.Portfolio.Features.Transfers.DeleteTransfer;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -22,14 +21,14 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var (cashId, savingsAssetId) = await ArrangeCashAndSavingsAsync(cancellationToken);
+        var (mBankId, nestAssetId) = await ArrangeTwoBankAccountsAsync(cancellationToken);
         var positionEventsBefore = await CountPositionEventsAsync(cancellationToken);
         SaveChanges.Reset();
 
         await using (var act = Provider.CreateAsyncScope())
         {
             var result = await act.ServiceProvider.GetRequiredService<CreateTransferHandler>()
-                .HandleAsync(PortfolioApi.NewTransferRequest(cashId, savingsAssetId, 2_000m), cancellationToken);
+                .HandleAsync(PortfolioApi.NewTransferRequest(mBankId, nestAssetId, 2_000m), cancellationToken);
             Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         }
 
@@ -39,14 +38,14 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
         var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(positionEventsBefore).ToList();
         Assert.Equal(2, events.Count);
-        var cashEvent = Assert.Single(events, e => e.AssetId == cashId);
-        Assert.Equal(3_000m, cashEvent.Quantity);
-        Assert.Null(cashEvent.AccountId);
-        Assert.Equal(UserId, cashEvent.UserId);
-        var savingsEvent = Assert.Single(events, e => e.AssetId == savingsAssetId);
-        Assert.Equal(2_000m, savingsEvent.Quantity);
-        Assert.Null(savingsEvent.AccountId);
-        Assert.Equal(AssetClass.Savings, savingsEvent.AssetClass);
+        var mBankEvent = Assert.Single(events, e => e.AssetId == mBankId);
+        Assert.Equal(3_000m, mBankEvent.Quantity);
+        Assert.NotNull(mBankEvent.AccountId);
+        Assert.Equal(UserId, mBankEvent.UserId);
+        var nestEvent = Assert.Single(events, e => e.AssetId == nestAssetId);
+        Assert.Equal(2_000m, nestEvent.Quantity);
+        Assert.NotNull(nestEvent.AccountId);
+        Assert.Equal(AssetClass.BankAccount, nestEvent.AssetClass);
 
         var legs = await verifyDb.Transactions.Where(t => t.TransferId != null).ToListAsync(cancellationToken);
         Assert.Equal(2, legs.Count);
@@ -58,12 +57,12 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var (cashId, savingsAssetId) = await ArrangeCashAndSavingsAsync(cancellationToken);
+        var (mBankId, nestAssetId) = await ArrangeTwoBankAccountsAsync(cancellationToken);
         Guid transferId;
         await using (var create = Provider.CreateAsyncScope())
         {
             var created = await create.ServiceProvider.GetRequiredService<CreateTransferHandler>()
-                .HandleAsync(PortfolioApi.NewTransferRequest(cashId, savingsAssetId, 2_000m), cancellationToken);
+                .HandleAsync(PortfolioApi.NewTransferRequest(mBankId, nestAssetId, 2_000m), cancellationToken);
             Assert.True(created.IsSuccess, created.IsFailure ? created.Error.Code : null);
             transferId = created.Value.TransferId;
         }
@@ -84,8 +83,8 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
         var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Skip(positionEventsBefore).ToList();
         Assert.Equal(2, events.Count);
-        Assert.Equal(5_000m, Assert.Single(events, e => e.AssetId == cashId).Quantity);
-        Assert.Equal(0m, Assert.Single(events, e => e.AssetId == savingsAssetId).Quantity);
+        Assert.Equal(5_000m, Assert.Single(events, e => e.AssetId == mBankId).Quantity);
+        Assert.Equal(0m, Assert.Single(events, e => e.AssetId == nestAssetId).Quantity);
         Assert.False(await verifyDb.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
     }
 
@@ -213,15 +212,13 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         return (cashId, metal.Value.AssetId);
     }
 
-    private async Task<(Guid CashId, Guid SavingsAssetId)> ArrangeCashAndSavingsAsync(
+    private async Task<(Guid MBankId, Guid NestAssetId)> ArrangeTwoBankAccountsAsync(
         CancellationToken cancellationToken)
     {
         await using var arrange = Provider.CreateAsyncScope();
-        var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
-        var account = await arrange.ServiceProvider.GetRequiredService<AddSavingsAccountHandler>()
-            .HandleAsync(PortfolioApi.NewSavingsAccountRequest(withOpeningDeposit: false), cancellationToken);
-        Assert.True(account.IsSuccess, account.IsFailure ? account.Error.Code : null);
+        var mBank = await CreateBankAccountAsync(arrange.ServiceProvider, "mBank", "PLN", 0m, cancellationToken, balance: 5_000m);
+        var nest = await CreateBankAccountAsync(arrange.ServiceProvider, "Nest Oszczędnościowe", "PLN", 5m, cancellationToken);
 
-        return (cashId, account.Value.AssetId);
+        return (mBank.CashAssetId, nest.CashAssetId);
     }
 }

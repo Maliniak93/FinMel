@@ -39,8 +39,8 @@ public sealed class AssetClassPriceSourceMappingTests
     }
 
     [Fact]
-    public void Resolve_Savings_IsPricedByNoSource()
+    public void Resolve_BankAccount_IsPricedByNoSource()
     {
-        Assert.Null(AssetClassPriceSourceMapping.Resolve(AssetClass.Savings));
+        Assert.Null(AssetClassPriceSourceMapping.Resolve(AssetClass.BankAccount));
     }
 }

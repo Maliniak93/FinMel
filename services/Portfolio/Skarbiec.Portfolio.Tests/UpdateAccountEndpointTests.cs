@@ -7,6 +7,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
@@ -56,5 +57,33 @@ public sealed class UpdateAccountEndpointTests(SkarbiecContainersFixture contain
             AccountUri(Guid.NewGuid()), new UpdateAccountRequest { Name = "Anything" }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BankTerms()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mBank = await client.CreateBankAccountAsync(cancellationToken, balance: 1_000m);
+
+        var response = await client.PutAsJsonAsync(
+            AccountUri(mBank.AccountId),
+            NewUpdateBankBody("mBank", SavingsVariant, "mBank S.A.", 3.5m),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var account = await client.GetAccountJsonAsync(mBank.AccountId, cancellationToken);
+        Assert.Equal("mBank", account.GetProperty("name").GetString());
+        Assert.Equal((int)AccountType.Bank, account.GetProperty("type").GetInt32());
+        Assert.Equal((int)TaxWrapper.Regular, account.GetProperty("wrapper").GetInt32());
+        Assert.Equal("PLN", account.GetProperty("currency").GetString());
+        Assert.Equal(1_000m, account.GetProperty("cashBalance").GetDecimal());
+        Assert.Equal(SavingsVariant, account.Bank().VariantName());
+        Assert.Equal("mBank S.A.", account.Bank().GetProperty("bankName").GetString());
+        Assert.Equal(3.5m, account.Bank().GetProperty("annualInterestRatePercent").GetDecimal());
+
+        var archive = await client.PostAsync(ArchiveAccountUri(mBank.AccountId), content: null, cancellationToken);
+
+        await archive.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.AccountNotEmptyErrorCode, cancellationToken);
     }
 }

@@ -4,7 +4,7 @@ using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
-using Skarbiec.Portfolio.Features.SavingsAccounts;
+using Skarbiec.Portfolio.Features.Accounts.BankInterest;
 using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.DeleteTransaction;
@@ -55,11 +55,11 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
                 : TransferErrors.LegManaged;
         }
 
-        // A savings interest credit goes only by undoing its settlement, so a settlement never loses its credit.
-        if (asset.AssetClass == AssetClass.Savings
-            && await dbContext.SavingsInterestSettlements.AnyAsync(s => s.TransactionId == id, cancellationToken))
+        // A bank interest credit goes only by undoing its settlement, so a settlement never loses its credit.
+        if (asset.AssetClass == AssetClass.BankAccount
+            && await dbContext.BankInterestSettlements.AnyAsync(s => s.TransactionId == id, cancellationToken))
         {
-            return SavingsAccountErrors.InterestManaged;
+            return BankInterestErrors.InterestManaged;
         }
 
         // Recompute without the deleted transaction before removing it, so a rejected delete leaves the database untouched.

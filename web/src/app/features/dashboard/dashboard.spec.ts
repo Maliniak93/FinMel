@@ -114,22 +114,26 @@ describe('Dashboard', () => {
     ]);
   });
 
-  it('gives the Savings class a colour of its own', async () => {
+  it('gives the BankAccount class a colour and the label "Konta bankowe"', async () => {
     await setup(
       jsonResponse({
         ...dashboard,
         byAssetClass: [
           { assetClass: ASSET_CLASS.Cash, valuePln: 5000, percentage: 50 },
-          { assetClass: ASSET_CLASS.Savings, valuePln: 5000, percentage: 50 },
+          { assetClass: ASSET_CLASS.BankAccount, valuePln: 5000, percentage: 50 },
         ],
       } satisfies DashboardResponse),
     );
 
-    const [cash, savings] = component['pieSegments']();
+    const [cash, bank] = component['pieSegments']();
 
-    expect(savings.label).toBe(assetClassLabel(ASSET_CLASS.Savings));
-    expect(savings.color).toBeTruthy();
-    expect(savings.color).not.toBe(cash.color);
+    expect(bank.label).toBe(assetClassLabel(ASSET_CLASS.BankAccount));
+    expect(bank.color).toBeTruthy();
+    expect(bank.color).not.toBe(cash.color);
+
+    await switchLanguage(fixture, 'pl');
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Konta bankowe');
   });
 
   it('shows an empty state when no snapshot has ever been computed', async () => {

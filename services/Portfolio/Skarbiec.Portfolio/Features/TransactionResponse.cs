@@ -29,8 +29,8 @@ public sealed record TransactionResponse
     /// <summary>The counterpart of a transfer leg; null on an ordinary transaction.</summary>
     public TransactionTransferResponse? Transfer { get; init; }
 
-    /// <summary>The last day of the settled month when this is a savings account's interest credit; null otherwise.</summary>
-    public DateOnly? SavingsInterestPeriodEnd { get; init; }
+    /// <summary>The last day of the settled month when this is a bank account's interest credit; null otherwise.</summary>
+    public DateOnly? BankInterestPeriodEnd { get; init; }
 
     /// <summary>The settled period's 1-based index when this is a treasury bond's interest credit; null otherwise.</summary>
     public int? BondInterestPeriodIndex { get; init; }
@@ -42,7 +42,7 @@ public static class TransactionMappingExtensions
         this Transaction transaction,
         string currency,
         TransactionTransferResponse? transfer = null,
-        DateOnly? savingsInterestPeriodEnd = null,
+        DateOnly? bankInterestPeriodEnd = null,
         int? bondInterestPeriodIndex = null) => new()
         {
             Id = transaction.Id,
@@ -59,7 +59,7 @@ public static class TransactionMappingExtensions
             FeeAmount = transaction.FeeAmount,
             Date = transaction.Date,
             Transfer = transfer,
-            SavingsInterestPeriodEnd = savingsInterestPeriodEnd,
+            BankInterestPeriodEnd = bankInterestPeriodEnd,
             BondInterestPeriodIndex = bondInterestPeriodIndex
         };
 }

@@ -1,11 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.GetAsset;
 
-public sealed class GetAssetHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
+public sealed class GetAssetHandler(PortfolioDbContext dbContext)
 {
     public async Task<Result<AssetResponse>> HandleAsync(Guid assetId, CancellationToken cancellationToken)
     {
@@ -36,9 +35,7 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext, TimeProvider t
             return AssetErrors.NotFound(assetId);
         }
 
-        var savingsInterestDue = await dbContext.SavingsInterestDueAsync(row.Asset, WarsawCalendar.Today(timeProvider), cancellationToken);
-
         return row.Asset.ToResponse(
-            row.TransactionCount, row.DepositMaturityDate, row.DepositSettled, savingsInterestDue, row.FineWeightGramsPerPiece);
+            row.TransactionCount, row.DepositMaturityDate, row.DepositSettled, row.FineWeightGramsPerPiece);
     }
 }

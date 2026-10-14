@@ -9,10 +9,12 @@ export type AccountResponse = {
     name: string;
     type: AccountType;
     wrapper: TaxWrapper;
+    currency: string;
     isArchived: boolean;
     cashAssetId: string;
     cashBalance: number | string;
     contribution?: null | ContributionResponse;
+    bank?: null | BankTermsResponse;
 };
 
 export type AccountType = number;
@@ -62,15 +64,6 @@ export type AddMetalRequest = {
     firstPurchase?: null | FirstPurchaseRequest;
 };
 
-export type AddSavingsAccountRequest = {
-    name: string;
-    bankName?: null | string;
-    currency: string;
-    annualInterestRatePercent: number | string;
-    taxExempt?: boolean;
-    openingDeposit?: null | OpeningDepositRequest;
-};
-
 export type AddWatchlistItemRequest = {
     instrumentId: string;
     note?: null | string;
@@ -91,12 +84,43 @@ export type AssetResponse = {
     transactionCount: number | string;
     depositMaturityDate?: null | string;
     depositSettled?: null | boolean;
-    savingsInterestDue?: null | boolean;
     fineWeightGramsPerPiece?: null | number | string;
     isArchived: boolean;
 };
 
 export type AssetValuationMode = number;
+
+export type BankInterestPreviewResponse = {
+    periodStart: string;
+    periodEnd: string;
+    annualInterestRatePercent: number | string;
+    averageDailyBalance: number | string;
+    grossInterest: number | string;
+    tax: number | string;
+    netInterest: number | string;
+    duePeriodCount: number | string;
+};
+
+export type BankInterestSettlementResponse = {
+    settlementId: string;
+    periodStart: string;
+    periodEnd: string;
+    grossInterest: number | string;
+    tax: number | string;
+    netInterest: number | string;
+};
+
+export type BankTermsResponse = {
+    variant: BankVariant;
+    bankName?: null | string;
+    annualInterestRatePercent: number | string;
+    interestDue: boolean;
+    duePeriodCount: number | string;
+    lastSettlement?: null | BankInterestSettlementResponse;
+    interestCreditedNet: number | string;
+};
+
+export type BankVariant = number;
 
 export type BondEarlyRedemptionPreviewResponse = {
     periodIndex: number | string;
@@ -242,6 +266,10 @@ export type CreateAccountRequest = {
     name: string;
     type: AccountType;
     wrapper: TaxWrapper;
+    currency?: null | string;
+    variant?: null | BankVariant;
+    bankName?: null | string;
+    annualInterestRatePercent?: null | number | string;
 };
 
 export type CreateTransferRequest = {
@@ -322,11 +350,6 @@ export type MetalResponse = {
     totalFineGrams: number | string;
 };
 
-export type OpeningDepositRequest = {
-    amount: number | string;
-    date: string;
-};
-
 export type PagedResponseOfTransactionResponse = {
     items: Array<TransactionResponse>;
     page: number | string;
@@ -363,40 +386,6 @@ export type RollOverDepositRequest = {
     annualInterestRatePercent: number | string;
     grossInterest?: null | number | string;
     tax?: null | number | string;
-};
-
-export type SavingsAccountResponse = {
-    assetId: string;
-    isArchived: boolean;
-    name: string;
-    bankName?: null | string;
-    currency: string;
-    balance: number | string;
-    annualInterestRatePercent: number | string;
-    taxExempt: boolean;
-    interestDue: boolean;
-    duePeriodCount: number | string;
-    lastSettlement?: null | SavingsInterestSettlementResponse;
-};
-
-export type SavingsInterestPreviewResponse = {
-    periodStart: string;
-    periodEnd: string;
-    annualInterestRatePercent: number | string;
-    averageDailyBalance: number | string;
-    grossInterest: number | string;
-    tax: number | string;
-    netInterest: number | string;
-    duePeriodCount: number | string;
-};
-
-export type SavingsInterestSettlementResponse = {
-    settlementId: string;
-    periodStart: string;
-    periodEnd: string;
-    grossInterest: number | string;
-    tax: number | string;
-    netInterest: number | string;
 };
 
 export type SecuritiesResponse = {
@@ -438,6 +427,12 @@ export type SetContributionLimitRequest = {
     amount: number | string;
 };
 
+export type SettleBankInterestRequest = {
+    periodEnd: string;
+    grossInterest: number | string;
+    tax: number | string;
+};
+
 export type SettleBondInterestRequest = {
     periods: Array<SettleBondPeriodRequest>;
 };
@@ -452,12 +447,6 @@ export type SettleDepositRequest = {
     grossInterest: number | string;
     tax: number | string;
     destinationAssetId?: null | string;
-};
-
-export type SettleSavingsInterestRequest = {
-    periodEnd: string;
-    grossInterest: number | string;
-    tax: number | string;
 };
 
 export type SwapBondRequest = {
@@ -489,7 +478,7 @@ export type TransactionResponse = {
     feeAmount?: null | number | string;
     date: string;
     transfer?: null | TransactionTransferResponse;
-    savingsInterestPeriodEnd?: null | string;
+    bankInterestPeriodEnd?: null | string;
     bondInterestPeriodIndex?: null | number | string;
 };
 
@@ -516,6 +505,9 @@ export type TreasuryBondType = number;
 
 export type UpdateAccountRequest = {
     name: string;
+    variant?: null | BankVariant;
+    bankName?: null | string;
+    annualInterestRatePercent?: null | number | string;
 };
 
 export type UpdateAssetRequest = {
@@ -555,13 +547,6 @@ export type UpdateMetalRequest = {
     metal: Metal;
     fineWeight: number | string;
     weightUnit: WeightUnit;
-};
-
-export type UpdateSavingsAccountRequest = {
-    name: string;
-    bankName?: null | string;
-    annualInterestRatePercent: number | string;
-    taxExempt?: boolean;
 };
 
 export type UpdateTransactionRequest = {
@@ -632,6 +617,7 @@ export type GetApiPortfolioAccountsData = {
     path?: never;
     query?: {
         year?: number | string;
+        type?: AccountType;
     };
     url: '/api/portfolio/accounts';
 };
@@ -1417,74 +1403,6 @@ export type PutApiPortfolioMetalsByAssetIdResponses = {
 
 export type PutApiPortfolioMetalsByAssetIdResponse = PutApiPortfolioMetalsByAssetIdResponses[keyof PutApiPortfolioMetalsByAssetIdResponses];
 
-export type GetApiPortfolioSavingsAccountsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/portfolio/savings-accounts';
-};
-
-export type GetApiPortfolioSavingsAccountsResponses = {
-    /**
-     * OK
-     */
-    200: Array<SavingsAccountResponse>;
-};
-
-export type GetApiPortfolioSavingsAccountsResponse = GetApiPortfolioSavingsAccountsResponses[keyof GetApiPortfolioSavingsAccountsResponses];
-
-export type PostApiPortfolioSavingsAccountsData = {
-    body: AddSavingsAccountRequest;
-    path?: never;
-    query?: never;
-    url: '/api/portfolio/savings-accounts';
-};
-
-export type PostApiPortfolioSavingsAccountsResponses = {
-    /**
-     * Created
-     */
-    201: SavingsAccountResponse;
-};
-
-export type PostApiPortfolioSavingsAccountsResponse = PostApiPortfolioSavingsAccountsResponses[keyof PostApiPortfolioSavingsAccountsResponses];
-
-export type GetApiPortfolioSavingsAccountsByAssetIdData = {
-    body?: never;
-    path: {
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/savings-accounts/{assetId}';
-};
-
-export type GetApiPortfolioSavingsAccountsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: SavingsAccountResponse;
-};
-
-export type GetApiPortfolioSavingsAccountsByAssetIdResponse = GetApiPortfolioSavingsAccountsByAssetIdResponses[keyof GetApiPortfolioSavingsAccountsByAssetIdResponses];
-
-export type PutApiPortfolioSavingsAccountsByAssetIdData = {
-    body: UpdateSavingsAccountRequest;
-    path: {
-        assetId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/savings-accounts/{assetId}';
-};
-
-export type PutApiPortfolioSavingsAccountsByAssetIdResponses = {
-    /**
-     * OK
-     */
-    200: SavingsAccountResponse;
-};
-
-export type PutApiPortfolioSavingsAccountsByAssetIdResponse = PutApiPortfolioSavingsAccountsByAssetIdResponses[keyof PutApiPortfolioSavingsAccountsByAssetIdResponses];
-
 export type GetApiPortfolioCashAccountsData = {
     body?: never;
     path?: never;
@@ -1519,60 +1437,60 @@ export type GetApiPortfolioSecuritiesResponses = {
 
 export type GetApiPortfolioSecuritiesResponse = GetApiPortfolioSecuritiesResponses[keyof GetApiPortfolioSecuritiesResponses];
 
-export type GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewData = {
+export type GetApiPortfolioAccountsByIdInterestPreviewData = {
     body?: never;
     path: {
-        assetId: string;
+        id: string;
     };
     query?: never;
-    url: '/api/portfolio/savings-accounts/{assetId}/interest-preview';
+    url: '/api/portfolio/accounts/{id}/interest-preview';
 };
 
-export type GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses = {
+export type GetApiPortfolioAccountsByIdInterestPreviewResponses = {
     /**
      * OK
      */
-    200: SavingsInterestPreviewResponse;
+    200: BankInterestPreviewResponse;
 };
 
-export type GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponse = GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses[keyof GetApiPortfolioSavingsAccountsByAssetIdInterestPreviewResponses];
+export type GetApiPortfolioAccountsByIdInterestPreviewResponse = GetApiPortfolioAccountsByIdInterestPreviewResponses[keyof GetApiPortfolioAccountsByIdInterestPreviewResponses];
 
-export type PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsData = {
-    body: SettleSavingsInterestRequest;
+export type PostApiPortfolioAccountsByIdInterestSettlementsData = {
+    body: SettleBankInterestRequest;
     path: {
-        assetId: string;
+        id: string;
     };
     query?: never;
-    url: '/api/portfolio/savings-accounts/{assetId}/interest-settlements';
+    url: '/api/portfolio/accounts/{id}/interest-settlements';
 };
 
-export type PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses = {
+export type PostApiPortfolioAccountsByIdInterestSettlementsResponses = {
     /**
      * Created
      */
-    201: SavingsInterestSettlementResponse;
+    201: BankInterestSettlementResponse;
 };
 
-export type PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponse = PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses[keyof PostApiPortfolioSavingsAccountsByAssetIdInterestSettlementsResponses];
+export type PostApiPortfolioAccountsByIdInterestSettlementsResponse = PostApiPortfolioAccountsByIdInterestSettlementsResponses[keyof PostApiPortfolioAccountsByIdInterestSettlementsResponses];
 
-export type DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdData = {
+export type DeleteApiPortfolioAccountsByIdInterestSettlementsBySettlementIdData = {
     body?: never;
     path: {
-        assetId: string;
+        id: string;
         settlementId: string;
     };
     query?: never;
-    url: '/api/portfolio/savings-accounts/{assetId}/interest-settlements/{settlementId}';
+    url: '/api/portfolio/accounts/{id}/interest-settlements/{settlementId}';
 };
 
-export type DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses = {
+export type DeleteApiPortfolioAccountsByIdInterestSettlementsBySettlementIdResponses = {
     /**
      * No Content
      */
     204: void;
 };
 
-export type DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioSavingsAccountsByAssetIdInterestSettlementsBySettlementIdResponses];
+export type DeleteApiPortfolioAccountsByIdInterestSettlementsBySettlementIdResponse = DeleteApiPortfolioAccountsByIdInterestSettlementsBySettlementIdResponses[keyof DeleteApiPortfolioAccountsByIdInterestSettlementsBySettlementIdResponses];
 
 export type GetApiPortfolioTransferCandidatesData = {
     body?: never;

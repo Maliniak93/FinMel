@@ -10,8 +10,7 @@ public static class TransferRoutes
     private enum Access
     {
         None = 0,
-        Create = 1,
-        Delete = 2
+        Delete = 1
     }
 
     private static readonly Dictionary<(AssetClass Source, AssetClass Target), Access> Routes = new()
@@ -25,18 +24,14 @@ public static class TransferRoutes
         // Paying a settled deposit out to cash, through SettleDeposit's destinationAssetId and PayOutDeposit.
         [(AssetClass.Deposit, AssetClass.Cash)] = Access.None,
 
-        // Paying a settled deposit out into a savings account, through the same two payout slices.
-        [(AssetClass.Deposit, AssetClass.Savings)] = Access.None,
+        // Paying a settled deposit out into a bank account, through the same two payout slices.
+        [(AssetClass.Deposit, AssetClass.BankAccount)] = Access.None,
 
         // A treasury bond's coupon, redemption proceeds and swap leftover, paid to its own account's cash by SettleBondInterest, RedeemBond, RedeemBondEarly and SwapBond.
         [(AssetClass.Bond, AssetClass.Cash)] = Access.None,
 
         // Buying a new series with a matured bond's proceeds, through SwapBond.
         [(AssetClass.Bond, AssetClass.Bond)] = Access.None,
-
-        // Moving money between a current account and a savings account, through CreateTransfer and DeleteTransfer.
-        [(AssetClass.Cash, AssetClass.Savings)] = Access.Create | Access.Delete,
-        [(AssetClass.Savings, AssetClass.Cash)] = Access.Create | Access.Delete,
 
         // A metal Buy paid from cash and a Sell paid into it, through RecordTransaction's cashAssetId; removed through DeleteTransfer.
         [(AssetClass.Cash, AssetClass.PreciousMetal)] = Access.Delete,
@@ -49,18 +44,14 @@ public static class TransferRoutes
         [(AssetClass.Etf, AssetClass.Cash)] = Access.None,
     };
 
-    // An account's cash only moves to another account's cash, never to a free Cash or any other class.
+    // An account's money only moves to another account's money, never to a free Cash or any other class.
     public static bool IsCreatable(Asset source, Asset target) =>
-        source.IsAccountCash() || target.IsAccountCash()
-            ? source.IsAccountCash() && target.IsAccountCash() && source.AccountId != target.AccountId
-            : IsCreatable(source.AssetClass, target.AssetClass);
+        source.IsAccountCash() && target.IsAccountCash() && source.AccountId != target.AccountId;
 
     public static bool IsDeletable(Asset source, Asset target) =>
         (source.IsAccountCash() && target.IsAccountCash()) || IsDeletable(source.AssetClass, target.AssetClass);
 
     public static bool IsAllowed(AssetClass source, AssetClass target) => Routes.ContainsKey((source, target));
-
-    public static bool IsCreatable(AssetClass source, AssetClass target) => Has(source, target, Access.Create);
 
     public static bool IsDeletable(AssetClass source, AssetClass target) => Has(source, target, Access.Delete);
 

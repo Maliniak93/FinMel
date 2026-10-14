@@ -1,4 +1,5 @@
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts.BankInterest;
 
 namespace Skarbiec.Portfolio.Features.Accounts;
 
@@ -8,14 +9,18 @@ public sealed record AccountResponse
     public required string Name { get; init; }
     public required AccountType Type { get; init; }
     public required TaxWrapper Wrapper { get; init; }
+    public required string Currency { get; init; }
     public required bool IsArchived { get; init; }
     public required Guid CashAssetId { get; init; }
 
-    /// <summary>The account's PLN cash, the quantity of its cash asset.</summary>
+    /// <summary>The account's money in its currency, the quantity of its cash asset.</summary>
     public required decimal CashBalance { get; init; }
 
     /// <summary>Set only by the account reads, for an IKE or IKZE account; null for a Regular one.</summary>
     public ContributionResponse? Contribution { get; init; }
+
+    /// <summary>Set only for a Bank account.</summary>
+    public BankTermsResponse? Bank { get; init; }
 }
 
 public static class AccountMappingExtensions
@@ -26,6 +31,7 @@ public static class AccountMappingExtensions
         Name = account.Name,
         Type = account.Type,
         Wrapper = account.Wrapper,
+        Currency = account.Currency,
         IsArchived = account.IsArchived,
         CashAssetId = cash.Id,
         CashBalance = cash.Quantity

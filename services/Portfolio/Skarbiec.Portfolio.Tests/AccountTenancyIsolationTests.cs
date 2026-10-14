@@ -11,6 +11,7 @@ using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using Skarbiec.Testing.Tenancy;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
@@ -155,5 +156,29 @@ public sealed class AccountTenancyIsolationTests(SkarbiecContainersFixture conta
         Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
         Assert.Equal(26_000m, (await owner.GetContributionAsync(accountId, 2026, cancellationToken))!.LimitPln);
+    }
+
+    [Fact]
+    public async Task BankInterest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BankInterestSeptemberEndedUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var nest = await owner.CreateBankAccountAsync(
+            cancellationToken, "Nest Oszczędnościowe", SavingsVariant, annualInterestRatePercent: 5m, balance: 10_000m, depositedOn: AugustOpening);
+        await owner.SettlePreviewedInterestAsync(nest.AccountId, cancellationToken);
+        var settlementId = (await owner.GetAccountJsonAsync(nest.AccountId, cancellationToken))
+            .Bank().GetProperty("lastSettlement").GetProperty("settlementId").GetGuid();
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var preview = await stranger.GetAsync(InterestPreviewUri(nest.AccountId), cancellationToken);
+        var settle = await stranger.PostAsJsonAsync(
+            InterestSettlementsUri(nest.AccountId), NewSettleInterestBody(AugustEnd, 1m, 0m), cancellationToken);
+        var undo = await stranger.DeleteAsync(InterestSettlementUri(nest.AccountId, settlementId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, settle.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, undo.StatusCode);
+        Assert.Equal(10_034.40m, await owner.GetCashBalanceAsync(nest.AccountId, cancellationToken));
     }
 }

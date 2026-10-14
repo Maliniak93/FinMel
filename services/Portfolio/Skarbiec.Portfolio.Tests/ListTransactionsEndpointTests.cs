@@ -8,6 +8,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -167,44 +168,44 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
-    public async Task List_SavingsInterestCredit_ReturnsPeriodEnd()
+    public async Task List_BankInterestCredit_ReturnsPeriodEnd()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var account = await client.AddSavingsAccountAsync(cancellationToken, NewInterestAccountRequest());
-        await client.SettlePreviewedSavingsInterestAsync(account.AssetId, cancellationToken);
+        var account = await client.CreateInterestAccountAsync(cancellationToken);
+        await client.SettlePreviewedInterestAsync(account.AccountId, cancellationToken);
 
-        var response = await client.GetAsync(TransactionsUri(account.AssetId), cancellationToken);
+        var response = await client.GetAsync(TransactionsUri(account.MoneyAssetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var items = (await response.ReadJsonAsync(cancellationToken)).GetProperty("items").EnumerateArray().ToList();
         Assert.Equal(2, items.Count);
         var credit = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 33.29m);
-        Assert.Equal("2026-09-30", credit.GetProperty("savingsInterestPeriodEnd").GetString());
+        Assert.Equal("2026-09-30", credit.GetProperty("bankInterestPeriodEnd").GetString());
         var opening = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 10_000m);
-        Assert.True(!opening.TryGetProperty("savingsInterestPeriodEnd", out var value) || value.ValueKind == JsonValueKind.Null);
+        Assert.True(!opening.TryGetProperty("bankInterestPeriodEnd", out var value) || value.ValueKind == JsonValueKind.Null);
     }
 
     [Fact]
     public async Task List_ManualTransferLeg_IsManual()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var setup = await client.CreateCashAndSavingsAsync(cancellationToken);
-        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.CashAssetId, setup.SavingsAssetId, 2_000m));
+        var setup = await client.CreateCurrentAndSavingsAsync(cancellationToken);
+        var transferId = await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.Current.MoneyAssetId, setup.Savings.MoneyAssetId, 2_000m));
 
-        var cashLeg = await client.GetCashWithdrawAsync(setup.CashAssetId, cancellationToken);
-        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.SavingsAssetId, cancellationToken)).Items);
+        var cashLeg = await client.GetCashWithdrawAsync(setup.Current.MoneyAssetId, cancellationToken);
+        var bankLeg = Assert.Single((await client.ListTransactionsAsync(setup.Savings.MoneyAssetId, cancellationToken)).Items);
 
         Assert.NotNull(cashLeg.Transfer);
         Assert.Equal(transferId, cashLeg.Transfer.TransferId);
         Assert.True(cashLeg.Transfer.Manual);
-        Assert.NotNull(savingsLeg.Transfer);
-        Assert.Equal(transferId, savingsLeg.Transfer.TransferId);
-        Assert.True(savingsLeg.Transfer.Manual);
-        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
+        Assert.NotNull(bankLeg.Transfer);
+        Assert.Equal(transferId, bankLeg.Transfer.TransferId);
+        Assert.True(bankLeg.Transfer.Manual);
+        Assert.Equal(TransferDirection.In, bankLeg.Transfer.Direction);
 
         using var fundingClient = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var funded = await fundingClient.CreateFundedDepositAsync(cancellationToken);
@@ -276,24 +277,24 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
-    public async Task List_DepositPayoutLegOnSavings_IsNotManual()
+    public async Task List_DepositPayoutLegOnBankAccount_IsNotManual()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var setup = await client.CreateDepositPaidIntoSavingsAsync(cancellationToken);
+        var setup = await client.CreateDepositPaidIntoBankAsync(cancellationToken);
 
-        var savingsLeg = Assert.Single((await client.ListTransactionsAsync(setup.Account.AssetId, cancellationToken)).Items);
+        var bankLeg = Assert.Single((await client.ListTransactionsAsync(setup.Account.MoneyAssetId, cancellationToken)).Items);
         var depositLeg = Assert.Single(
             (await client.ListTransactionsAsync(setup.Deposit.AssetId, cancellationToken)).Items,
             t => t.Type == TransactionType.Withdraw);
 
-        Assert.NotNull(savingsLeg.Transfer);
-        Assert.False(savingsLeg.Transfer.Manual);
-        Assert.Equal(TransferDirection.In, savingsLeg.Transfer.Direction);
+        Assert.NotNull(bankLeg.Transfer);
+        Assert.False(bankLeg.Transfer.Manual);
+        Assert.Equal(TransferDirection.In, bankLeg.Transfer.Direction);
         Assert.NotNull(depositLeg.Transfer);
         Assert.False(depositLeg.Transfer.Manual);
-        Assert.Equal(savingsLeg.Transfer.TransferId, depositLeg.Transfer.TransferId);
+        Assert.Equal(bankLeg.Transfer.TransferId, depositLeg.Transfer.TransferId);
     }
 
     [Fact]

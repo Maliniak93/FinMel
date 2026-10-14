@@ -19,7 +19,7 @@ public sealed class ListWatchlistEndpointTests(SkarbiecContainersFixture contain
     public async Task List_ComputesPriceFields()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithRate("USD", 4.00m);
         var etfId = ScriptInstrument(AssetClass.Etf, "USD", "ETFA", 110m, "NYSE", "Alpha ETF", new DateOnly(2026, 1, 30), 100m, new DateOnly(2026, 1, 29));
         var stockId = ScriptInstrument(AssetClass.Stock, "PLN", "STKB", 50m, "GPW", "Beta stock", new DateOnly(2026, 1, 30));
@@ -63,7 +63,7 @@ public sealed class ListWatchlistEndpointTests(SkarbiecContainersFixture contain
     public async Task List_FiltersByClassAndOrdersByTicker()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         foreach (var (assetClass, ticker) in new[] { (AssetClass.Etf, "ZZZ"), (AssetClass.Stock, "BBB"), (AssetClass.Etf, "AAA") })
         {
@@ -93,7 +93,7 @@ public sealed class ListWatchlistEndpointTests(SkarbiecContainersFixture contain
     public async Task List_ReturnsUnarchivedHoldings()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var instrumentId = ScriptInstrument(AssetClass.Etf, "PLN", "HELD");
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         await client.AddWatchlistItemAsync(instrumentId, cancellationToken);
@@ -126,7 +126,7 @@ public sealed class ListWatchlistEndpointTests(SkarbiecContainersFixture contain
     public async Task List_MarketDataDown_FailsSoft()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var instrumentId = ScriptInstrument(AssetClass.Etf, "USD", "DOWN", 110m, "NYSE", "Down ETF", previousClose: 100m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         await client.AddWatchlistItemAsync(instrumentId, cancellationToken, targetPrice: 120m);
@@ -154,7 +154,7 @@ public sealed class ListWatchlistEndpointTests(SkarbiecContainersFixture contain
     public async Task List_NoQuote()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var instrumentId = ScriptInstrument(AssetClass.Stock, "PLN", "NOQ", lastPrice: null);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         await client.AddWatchlistItemAsync(instrumentId, cancellationToken, targetPrice: 10m);
@@ -175,7 +175,7 @@ public sealed class ListWatchlistEndpointTests(SkarbiecContainersFixture contain
     public async Task List_FxRateMissing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         var instrumentId = ScriptInstrument(AssetClass.Etf, "USD", "NOFX", 110m, "NYSE", "No rate ETF");
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         await client.AddWatchlistItemAsync(instrumentId, cancellationToken);

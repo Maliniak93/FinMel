@@ -6,13 +6,14 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
+  getApiPortfolioAccounts,
   getApiPortfolioBonds,
   getApiPortfolioDeposits,
-  getApiPortfolioSavingsAccounts,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { toDateOnly } from '../../../shared/date-only';
 import { formatDate, formatMoney } from '../../../shared/format';
+import { ACCOUNT_TYPE } from '../../accounts/account-type';
 import { upcomingItems } from '../upcoming';
 
 @Component({
@@ -46,9 +47,12 @@ export class UpcomingCard {
     },
   });
 
-  private readonly savingsResource = resource({
+  private readonly bankAccountsResource = resource({
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioSavingsAccounts({ signal: abortSignal });
+      const result = await getApiPortfolioAccounts({
+        query: { type: ACCOUNT_TYPE.Bank },
+        signal: abortSignal,
+      });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ?? translate('dashboard.upcoming.loadFailed'),
@@ -60,21 +64,23 @@ export class UpcomingCard {
 
   protected readonly loadError = computed(
     () =>
-      this.depositsResource.error() ?? this.bondsResource.error() ?? this.savingsResource.error(),
+      this.depositsResource.error() ??
+      this.bondsResource.error() ??
+      this.bankAccountsResource.error(),
   );
 
   protected readonly loading = computed(
     () =>
       this.depositsResource.isLoading() ||
       this.bondsResource.isLoading() ||
-      this.savingsResource.isLoading(),
+      this.bankAccountsResource.isLoading(),
   );
 
   protected readonly ready = computed(
     () =>
       this.depositsResource.hasValue() &&
       this.bondsResource.hasValue() &&
-      this.savingsResource.hasValue(),
+      this.bankAccountsResource.hasValue(),
   );
 
   protected readonly items = computed(() =>
@@ -82,7 +88,7 @@ export class UpcomingCard {
       ? upcomingItems(
           this.depositsResource.value() ?? [],
           this.bondsResource.value() ?? [],
-          this.savingsResource.value() ?? [],
+          this.bankAccountsResource.value() ?? [],
           toDateOnly(new Date()),
         )
       : [],
@@ -94,6 +100,6 @@ export class UpcomingCard {
   protected reload(): void {
     this.depositsResource.reload();
     this.bondsResource.reload();
-    this.savingsResource.reload();
+    this.bankAccountsResource.reload();
   }
 }

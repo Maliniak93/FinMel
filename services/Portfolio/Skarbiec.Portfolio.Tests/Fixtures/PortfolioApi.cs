@@ -17,9 +17,6 @@ using Skarbiec.Portfolio.Features.Metals;
 using Skarbiec.Portfolio.Features.Metals.AddMetal;
 using Skarbiec.Portfolio.Features.Metals.UpdateMetal;
 using Skarbiec.Portfolio.Features.RecordTransaction;
-using Skarbiec.Portfolio.Features.SavingsAccounts;
-using Skarbiec.Portfolio.Features.SavingsAccounts.AddSavingsAccount;
-using Skarbiec.Portfolio.Features.SavingsAccounts.UpdateSavingsAccount;
 using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
@@ -147,30 +144,6 @@ internal static class PortfolioApi
             deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: cashId));
 
         return new PaidOutDeposit(deposit, cashId);
-    }
-
-    public sealed record DepositPaidIntoSavings(DepositResponse Deposit, SavingsAccountResponse Account);
-
-    public static async Task<DepositPaidIntoSavings> CreateDepositPaidIntoSavingsAsync(
-        this HttpClient client, CancellationToken cancellationToken)
-    {
-        var deposit = await client.AddDepositAsync(cancellationToken);
-        var account = await client.AddSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false));
-        await client.SettleDepositAsync(
-            deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: account.AssetId));
-
-        return new DepositPaidIntoSavings(deposit, account);
-    }
-
-    public static async Task<Guid> AddArchivedSavingsAccountAsync(
-        this HttpClient client, CancellationToken cancellationToken)
-    {
-        var account = await client.AddSavingsAccountAsync(
-            cancellationToken, NewSavingsAccountRequest(withOpeningDeposit: false, name: "Old savings"));
-        await client.ArchiveAssetAsync(account.AssetId, cancellationToken);
-
-        return account.AssetId;
     }
 
     public static async Task SettleDepositAsync(
@@ -600,66 +573,9 @@ internal static class PortfolioApi
 
     public const string AllCashAccountsUri = "/api/portfolio/cash-accounts";
 
-    public const string AllSavingsAccountsUri = "/api/portfolio/savings-accounts";
+    public static readonly DateTimeOffset FixedTodayUtc = new(2026, 2, 1, 10, 0, 0, TimeSpan.Zero);
 
-    public static string SavingsAccountUri(Guid assetId) =>
-        $"/api/portfolio/savings-accounts/{assetId}";
-
-    public static readonly DateTimeOffset SavingsTodayUtc = new(2026, 2, 1, 10, 0, 0, TimeSpan.Zero);
-
-    public static readonly DateOnly SavingsToday = new(2026, 2, 1);
-
-    public static AddSavingsAccountRequest NewSavingsAccountRequest(
-        string name = "Savings account",
-        string? bankName = "Test bank",
-        string currency = "PLN",
-        decimal annualInterestRatePercent = 5.25m,
-        bool taxExempt = false,
-        bool withOpeningDeposit = true,
-        decimal openingAmount = 10_000m,
-        DateOnly? openingDate = null) => new()
-        {
-            Name = name,
-            BankName = bankName,
-            Currency = currency,
-            AnnualInterestRatePercent = annualInterestRatePercent,
-            TaxExempt = taxExempt,
-            OpeningDeposit = withOpeningDeposit
-                ? new OpeningDepositRequest { Amount = openingAmount, Date = openingDate ?? SavingsToday }
-                : null
-        };
-
-    public static UpdateSavingsAccountRequest NewUpdateSavingsAccountRequest(
-        string name = "Renamed savings",
-        string? bankName = "Other bank",
-        decimal annualInterestRatePercent = 3m,
-        bool taxExempt = true) => new()
-        {
-            Name = name,
-            BankName = bankName,
-            AnnualInterestRatePercent = annualInterestRatePercent,
-            TaxExempt = taxExempt
-        };
-
-    public static async Task<SavingsAccountResponse> AddSavingsAccountAsync(
-        this HttpClient client, CancellationToken cancellationToken, AddSavingsAccountRequest? request = null)
-    {
-        var response = await client.PostAsJsonAsync(
-            AllSavingsAccountsUri, request ?? NewSavingsAccountRequest(), cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
-    }
-
-    public static async Task<SavingsAccountResponse> GetSavingsAccountAsync(
-        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
-    {
-        var response = await client.GetAsync(SavingsAccountUri(assetId), cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content.ReadFromJsonAsync<SavingsAccountResponse>(cancellationToken))!;
-    }
-
+    public static readonly DateOnly FixedToday = new(2026, 2, 1);
     public const string AllMetalsUri = "/api/portfolio/metals";
 
     public static string MetalUri(Guid assetId) =>
@@ -931,85 +847,6 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<PagedResponse<TransactionResponse>>(cancellationToken))!;
     }
 
-    public static string SavingsInterestPreviewUri(Guid assetId) =>
-        $"{SavingsAccountUri(assetId)}/interest-preview";
-
-    public static string SavingsInterestSettlementsUri(Guid assetId) =>
-        $"{SavingsAccountUri(assetId)}/interest-settlements";
-
-    public static string SavingsInterestSettlementUri(Guid assetId, Guid settlementId) =>
-        $"{SavingsInterestSettlementsUri(assetId)}/{settlementId}";
-
-    public static readonly DateOnly InterestOpeningDate = new(2026, 9, 1);
-
-    public static readonly DateOnly SeptemberEnd = new(2026, 9, 30);
-
-    public static readonly DateOnly OctoberEnd = new(2026, 10, 31);
-
-    public static readonly DateTimeOffset SeptemberLastDayUtc = new(2026, 9, 30, 10, 0, 0, TimeSpan.Zero);
-
-    public static readonly DateTimeOffset SeptemberEndedUtc = new(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
-
-    public static readonly DateTimeOffset OctoberEndedUtc = new(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
-
-    public static readonly DateTimeOffset NovemberEndedUtc = new(2026, 12, 1, 10, 0, 0, TimeSpan.Zero);
-
-    public static AddSavingsAccountRequest NewInterestAccountRequest(
-        string name = "Interest account", bool taxExempt = false, decimal annualInterestRatePercent = 5m, DateOnly? openingDate = null) =>
-        NewSavingsAccountRequest(
-            name: name,
-            annualInterestRatePercent: annualInterestRatePercent,
-            taxExempt: taxExempt,
-            openingDate: openingDate ?? InterestOpeningDate);
-
-    public static object NewSettleInterestBody(DateOnly periodEnd, decimal grossInterest, decimal tax) =>
-        new { periodEnd, grossInterest, tax };
-
-    public static async Task<System.Text.Json.JsonElement> GetSavingsInterestPreviewAsync(
-        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
-    {
-        var response = await client.GetAsync(SavingsInterestPreviewUri(assetId), cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        return await response.ReadJsonAsync(cancellationToken);
-    }
-
-    public static async Task SettleSavingsInterestAsync(
-        this HttpClient client,
-        Guid assetId,
-        DateOnly periodEnd,
-        decimal grossInterest,
-        decimal tax,
-        CancellationToken cancellationToken)
-    {
-        var response = await client.PostAsJsonAsync(
-            SavingsInterestSettlementsUri(assetId), NewSettleInterestBody(periodEnd, grossInterest, tax), cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task<DateOnly> SettlePreviewedSavingsInterestAsync(
-        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
-    {
-        var preview = await client.GetSavingsInterestPreviewAsync(assetId, cancellationToken);
-        var periodEnd = DateOnly.Parse(preview.GetProperty("periodEnd").GetString()!, System.Globalization.CultureInfo.InvariantCulture);
-        await client.SettleSavingsInterestAsync(
-            assetId,
-            periodEnd,
-            preview.GetProperty("grossInterest").GetDecimal(),
-            preview.GetProperty("tax").GetDecimal(),
-            cancellationToken);
-
-        return periodEnd;
-    }
-
-    public static async Task<Guid> GetLastSettlementIdAsync(
-        this HttpClient client, Guid assetId, CancellationToken cancellationToken)
-    {
-        var account = await client.GetSavingsAccountAsync(assetId, cancellationToken);
-
-        return account.LastSettlement!.SettlementId;
-    }
-
     public const string TransfersUri = "/api/portfolio/transfers";
 
     public static string TransferUri(Guid transferId) => $"{TransfersUri}/{transferId}";
@@ -1024,22 +861,6 @@ internal static class PortfolioApi
             Amount = amount,
             Date = date ?? DefaultTransferDate
         };
-
-    public sealed record CashAndSavings(Guid CashAssetId, Guid SavingsAssetId);
-
-    public static async Task<CashAndSavings> CreateCashAndSavingsAsync(
-        this HttpClient client,
-        CancellationToken cancellationToken,
-        decimal cashBalance = 5_000m,
-        DateOnly? toppedUpOn = null,
-        AddSavingsAccountRequest? savingsRequest = null)
-    {
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: cashBalance, toppedUpOn: toppedUpOn);
-        var account = await client.AddSavingsAccountAsync(
-            cancellationToken, savingsRequest ?? NewSavingsAccountRequest(withOpeningDeposit: false));
-
-        return new CashAndSavings(cashId, account.AssetId);
-    }
 
     public static readonly DateOnly MetalCashDate = MetalPurchaseDate.AddDays(1);
 

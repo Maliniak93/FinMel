@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
@@ -30,5 +31,22 @@ public sealed class ListAccountsEndpointTests(SkarbiecContainersFixture containe
         Assert.True(bonds.IsArchived);
         Assert.Equal(AccountType.Bonds, bonds.Type);
         Assert.Equal(TaxWrapper.Ike, bonds.Wrapper);
+    }
+
+    [Fact]
+    public async Task FilterByType()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await client.CreateAccountAsync(cancellationToken, "XTB");
+        var mBank = await client.CreateBankAccountAsync(cancellationToken, "mBank");
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest Oszczędnościowe", SavingsVariant, annualInterestRatePercent: 5m);
+
+        var response = await client.GetAsync(AccountsOfTypeUri(AccountType.Bank), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var accounts = await response.Content.ReadFromJsonAsync<List<AccountResponse>>(cancellationToken);
+        Assert.Equal(new[] { mBank.AccountId, nest.AccountId }.Order(), accounts!.Select(a => a.Id).Order());
+        Assert.All(accounts!, a => Assert.Equal(AccountType.Bank, a.Type));
     }
 }

@@ -38,6 +38,18 @@ internal static class AccountErrors
     public static Error ContributionLimitNotFound(Guid id, int year) =>
         new("NotFound.ContributionLimit", $"Account '{id}' has no contribution limit for {year}.");
 
+    public static Error UseAccountEndpoints { get; } =
+        new("Validation.UseAccountEndpoints", "A BankAccount asset is a bank account's money — create a Bank account instead.");
+
+    public static Error BankVariantRequired { get; } =
+        new("Validation.BankVariantRequired", "A Bank account needs a variant, Current or Savings.");
+
+    public static Error WrapperNotAllowed { get; } =
+        new("Validation.WrapperNotAllowed", "A Bank account has no tax wrapper — it must be Regular.");
+
+    public static Error BankFieldsNotAllowed { get; } =
+        new("Validation.BankFieldsNotAllowed", "Only a Bank account has a variant, bank name or rate, and only a Bank account can hold a currency other than PLN.");
+
     public static Error NotAllowed(AssetClass assetClass) =>
         new("Validation.AccountNotAllowed", $"A {assetClass} asset sits in no account.");
 }

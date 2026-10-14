@@ -69,6 +69,13 @@
               ],
               "format": "int32"
             }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AccountType"
+            }
           }
         ],
         "responses": {
@@ -1534,123 +1541,6 @@
         }
       }
     },
-    "/api/portfolio/savings-accounts": {
-      "post": {
-        "tags": [
-          "AddSavingsAccountEndpoint"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddSavingsAccountRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SavingsAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "ListSavingsAccountsEndpoint"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SavingsAccountResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/portfolio/savings-accounts/{assetId}": {
-      "put": {
-        "tags": [
-          "UpdateSavingsAccountEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "assetId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSavingsAccountRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SavingsAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "GetSavingsAccountEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "assetId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SavingsAccountResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/portfolio/cash-accounts": {
       "get": {
         "tags": [
@@ -1699,14 +1589,14 @@
         }
       }
     },
-    "/api/portfolio/savings-accounts/{assetId}/interest-preview": {
+    "/api/portfolio/accounts/{id}/interest-preview": {
       "get": {
         "tags": [
-          "GetSavingsInterestPreviewEndpoint"
+          "GetBankInterestPreviewEndpoint"
         ],
         "parameters": [
           {
-            "name": "assetId",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1721,7 +1611,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SavingsInterestPreviewResponse"
+                  "$ref": "#/components/schemas/BankInterestPreviewResponse"
                 }
               }
             }
@@ -1729,14 +1619,14 @@
         }
       }
     },
-    "/api/portfolio/savings-accounts/{assetId}/interest-settlements": {
+    "/api/portfolio/accounts/{id}/interest-settlements": {
       "post": {
         "tags": [
-          "SettleSavingsInterestEndpoint"
+          "SettleBankInterestEndpoint"
         ],
         "parameters": [
           {
-            "name": "assetId",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1749,7 +1639,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SettleSavingsInterestRequest"
+                "$ref": "#/components/schemas/SettleBankInterestRequest"
               }
             }
           },
@@ -1761,7 +1651,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SavingsInterestSettlementResponse"
+                  "$ref": "#/components/schemas/BankInterestSettlementResponse"
                 }
               }
             }
@@ -1769,14 +1659,14 @@
         }
       }
     },
-    "/api/portfolio/savings-accounts/{assetId}/interest-settlements/{settlementId}": {
+    "/api/portfolio/accounts/{id}/interest-settlements/{settlementId}": {
       "delete": {
         "tags": [
-          "UndoSavingsInterestSettlementEndpoint"
+          "UndoBankInterestSettlementEndpoint"
         ],
         "parameters": [
           {
-            "name": "assetId",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
@@ -2057,6 +1947,7 @@
           "name",
           "type",
           "wrapper",
+          "currency",
           "isArchived",
           "cashAssetId",
           "cashBalance"
@@ -2075,6 +1966,9 @@
           },
           "wrapper": {
             "$ref": "#/components/schemas/TaxWrapper"
+          },
+          "currency": {
+            "type": "string"
           },
           "isArchived": {
             "type": "boolean"
@@ -2098,6 +1992,16 @@
               },
               {
                 "$ref": "#/components/schemas/ContributionResponse"
+              }
+            ]
+          },
+          "bank": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BankTermsResponse"
               }
             ]
           }
@@ -2367,53 +2271,6 @@
           }
         }
       },
-      "AddSavingsAccountRequest": {
-        "required": [
-          "name",
-          "currency",
-          "annualInterestRatePercent"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "maxLength": 200,
-            "type": "string"
-          },
-          "bankName": {
-            "maxLength": 100,
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "currency": {
-            "type": "string"
-          },
-          "annualInterestRatePercent": {
-            "maximum": 100,
-            "minimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "taxExempt": {
-            "type": "boolean"
-          },
-          "openingDeposit": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/OpeningDepositRequest"
-              }
-            ]
-          }
-        }
-      },
       "AddWatchlistItemRequest": {
         "required": [
           "instrumentId"
@@ -2519,12 +2376,6 @@
               "boolean"
             ]
           },
-          "savingsInterestDue": {
-            "type": [
-              "null",
-              "boolean"
-            ]
-          },
           "fineWeightGramsPerPiece": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -2540,6 +2391,187 @@
         }
       },
       "AssetValuationMode": {
+        "type": "integer"
+      },
+      "BankInterestPreviewResponse": {
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "annualInterestRatePercent",
+          "averageDailyBalance",
+          "grossInterest",
+          "tax",
+          "netInterest",
+          "duePeriodCount"
+        ],
+        "type": "object",
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "annualInterestRatePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "averageDailyBalance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "grossInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "netInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "duePeriodCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "BankInterestSettlementResponse": {
+        "required": [
+          "settlementId",
+          "periodStart",
+          "periodEnd",
+          "grossInterest",
+          "tax",
+          "netInterest"
+        ],
+        "type": "object",
+        "properties": {
+          "settlementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "grossInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "netInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "BankTermsResponse": {
+        "required": [
+          "variant",
+          "annualInterestRatePercent",
+          "interestDue",
+          "duePeriodCount",
+          "interestCreditedNet"
+        ],
+        "type": "object",
+        "properties": {
+          "variant": {
+            "$ref": "#/components/schemas/BankVariant"
+          },
+          "bankName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "annualInterestRatePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "interestDue": {
+            "type": "boolean"
+          },
+          "duePeriodCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastSettlement": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BankInterestSettlementResponse"
+              }
+            ]
+          },
+          "interestCreditedNet": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "BankVariant": {
         "type": "integer"
       },
       "BondEarlyRedemptionPreviewResponse": {
@@ -3325,6 +3357,40 @@
           },
           "wrapper": {
             "$ref": "#/components/schemas/TaxWrapper"
+          },
+          "currency": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "variant": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BankVariant"
+              }
+            ]
+          },
+          "bankName": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "annualInterestRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -3726,29 +3792,6 @@
           }
         }
       },
-      "OpeningDepositRequest": {
-        "required": [
-          "amount",
-          "date"
-        ],
-        "type": "object",
-        "properties": {
-          "amount": {
-            "maximum": 79228162514264337593543950335,
-            "exclusiveMinimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
       "PagedResponseOfTransactionResponse": {
         "required": [
           "items",
@@ -3933,201 +3976,6 @@
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
-      "SavingsAccountResponse": {
-        "required": [
-          "assetId",
-          "isArchived",
-          "name",
-          "currency",
-          "balance",
-          "annualInterestRatePercent",
-          "taxExempt",
-          "interestDue",
-          "duePeriodCount"
-        ],
-        "type": "object",
-        "properties": {
-          "assetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "isArchived": {
-            "type": "boolean"
-          },
-          "name": {
-            "type": "string"
-          },
-          "bankName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "currency": {
-            "type": "string"
-          },
-          "balance": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "annualInterestRatePercent": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "taxExempt": {
-            "type": "boolean"
-          },
-          "interestDue": {
-            "type": "boolean"
-          },
-          "duePeriodCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "lastSettlement": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/SavingsInterestSettlementResponse"
-              }
-            ]
-          }
-        }
-      },
-      "SavingsInterestPreviewResponse": {
-        "required": [
-          "periodStart",
-          "periodEnd",
-          "annualInterestRatePercent",
-          "averageDailyBalance",
-          "grossInterest",
-          "tax",
-          "netInterest",
-          "duePeriodCount"
-        ],
-        "type": "object",
-        "properties": {
-          "periodStart": {
-            "type": "string",
-            "format": "date"
-          },
-          "periodEnd": {
-            "type": "string",
-            "format": "date"
-          },
-          "annualInterestRatePercent": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "averageDailyBalance": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "grossInterest": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "tax": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "netInterest": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "duePeriodCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          }
-        }
-      },
-      "SavingsInterestSettlementResponse": {
-        "required": [
-          "settlementId",
-          "periodStart",
-          "periodEnd",
-          "grossInterest",
-          "tax",
-          "netInterest"
-        ],
-        "type": "object",
-        "properties": {
-          "settlementId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "periodStart": {
-            "type": "string",
-            "format": "date"
-          },
-          "periodEnd": {
-            "type": "string",
-            "format": "date"
-          },
-          "grossInterest": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "tax": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "netInterest": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
               "number",
               "string"
             ],
@@ -4362,6 +4210,40 @@
           }
         }
       },
+      "SettleBankInterestRequest": {
+        "required": [
+          "periodEnd",
+          "grossInterest",
+          "tax"
+        ],
+        "type": "object",
+        "properties": {
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "grossInterest": {
+            "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "tax": {
+            "maximum": 79228162514264337593543950335,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "SettleBondInterestRequest": {
         "required": [
           "periods"
@@ -4439,40 +4321,6 @@
               "string"
             ],
             "format": "uuid"
-          }
-        }
-      },
-      "SettleSavingsInterestRequest": {
-        "required": [
-          "periodEnd",
-          "grossInterest",
-          "tax"
-        ],
-        "type": "object",
-        "properties": {
-          "periodEnd": {
-            "type": "string",
-            "format": "date"
-          },
-          "grossInterest": {
-            "maximum": 79228162514264337593543950335,
-            "minimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "tax": {
-            "maximum": 79228162514264337593543950335,
-            "minimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
           }
         }
       },
@@ -4647,7 +4495,7 @@
               }
             ]
           },
-          "savingsInterestPeriodEnd": {
+          "bankInterestPeriodEnd": {
             "type": [
               "null",
               "string"
@@ -4743,6 +4591,34 @@
           "name": {
             "maxLength": 200,
             "type": "string"
+          },
+          "variant": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BankVariant"
+              }
+            ]
+          },
+          "bankName": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "annualInterestRatePercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4960,39 +4836,6 @@
           },
           "weightUnit": {
             "$ref": "#/components/schemas/WeightUnit"
-          }
-        }
-      },
-      "UpdateSavingsAccountRequest": {
-        "required": [
-          "name",
-          "annualInterestRatePercent"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "maxLength": 200,
-            "type": "string"
-          },
-          "bankName": {
-            "maxLength": 100,
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "annualInterestRatePercent": {
-            "maximum": 100,
-            "minimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "taxExempt": {
-            "type": "boolean"
           }
         }
       },
@@ -5407,31 +5250,19 @@
       "name": "GetMetalEndpoint"
     },
     {
-      "name": "AddSavingsAccountEndpoint"
-    },
-    {
-      "name": "ListSavingsAccountsEndpoint"
-    },
-    {
-      "name": "UpdateSavingsAccountEndpoint"
-    },
-    {
-      "name": "GetSavingsAccountEndpoint"
-    },
-    {
       "name": "ListCashAccountsEndpoint"
     },
     {
       "name": "ListSecuritiesEndpoint"
     },
     {
-      "name": "GetSavingsInterestPreviewEndpoint"
+      "name": "GetBankInterestPreviewEndpoint"
     },
     {
-      "name": "SettleSavingsInterestEndpoint"
+      "name": "SettleBankInterestEndpoint"
     },
     {
-      "name": "UndoSavingsInterestSettlementEndpoint"
+      "name": "UndoBankInterestSettlementEndpoint"
     },
     {
       "name": "ListTransferCandidatesEndpoint"

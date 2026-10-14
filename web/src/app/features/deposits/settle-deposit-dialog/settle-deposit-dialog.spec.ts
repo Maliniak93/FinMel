@@ -20,10 +20,10 @@ import {
   dueDeposit,
   dueDepositSettlementPreview,
   eurCashCandidate,
-  eurSavingsCandidate,
+  eurBankCandidate,
   pickSelectOption,
   plnCashCandidate,
-  plnSavingsCandidate,
+  plnBankCandidate,
   requestedCandidateClasses,
   selectOptionLabels,
   selectTriggerState,
@@ -271,7 +271,7 @@ describe('SettleDepositDialog', () => {
       expect(findControl(form(), 'destinationAssetId').value ?? null).toBeNull();
       const requested = requestedCandidateClasses(fetchSpy);
       expect(requested).toContain('Cash');
-      expect(requested).toContain('Savings');
+      expect(requested).toContain('BankAccount');
       for (const url of transferCandidateRequests(fetchSpy)) {
         expect(url.searchParams.get('currency')).toBe(dueDeposit.currency);
       }
@@ -280,13 +280,13 @@ describe('SettleDepositDialog', () => {
       expect(labels[0]).toMatch(/keep in the deposit/i);
       expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(true);
       expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
-      expect(labels.some((label) => label.includes(plnSavingsCandidate.name))).toBe(true);
-      expect(labels.some((label) => label.includes(eurSavingsCandidate.name))).toBe(false);
+      expect(labels.some((label) => label.includes(plnBankCandidate.name))).toBe(true);
+      expect(labels.some((label) => label.includes(eurBankCandidate.name))).toBe(false);
     });
 
     it('picking a savings account POSTs it as destinationAssetId', async () => {
       await setup();
-      await pickSelectOption(fixture, 'destinationAssetId', plnSavingsCandidate.name);
+      await pickSelectOption(fixture, 'destinationAssetId', plnBankCandidate.name);
 
       await component['onSubmit']();
 
@@ -296,7 +296,7 @@ describe('SettleDepositDialog', () => {
         settledOn: '2026-04-15',
         grossInterest: 147.95,
         tax: 28.12,
-        destinationAssetId: plnSavingsCandidate.assetId,
+        destinationAssetId: plnBankCandidate.assetId,
       });
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });

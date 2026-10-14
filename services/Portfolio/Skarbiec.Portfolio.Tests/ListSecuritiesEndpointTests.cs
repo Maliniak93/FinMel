@@ -17,7 +17,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     public async Task Etf_ValuesAndGains()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         Factory.FxRateLookupClient
             .WithRate("EUR", new DateOnly(2026, 1, 10), 4.00m)
             .WithRate("EUR", new DateOnly(2026, 1, 20), 4.20m);
@@ -76,7 +76,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     public async Task List_OneBatchCallEach()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m).WithRate("USD", 3.90m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var firstAccount = await client.CreateAccountAsync(cancellationToken, name: "First");
@@ -104,7 +104,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     public async Task MissingQuoteOrRate_ReasonAndNulls()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithRate("USD", 4.00m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
@@ -151,7 +151,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     public async Task MarketDataDown_FailsSoft()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithUnavailable();
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken);
@@ -187,7 +187,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     public async Task ReturnsAccount_SkipsArchivedAccount()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var secondId = await client.CreateAccountAsync(cancellationToken, "B account");
         var firstId = await client.CreateAccountAsync(cancellationToken, "A account");
@@ -210,7 +210,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     public async Task Excludes_ArchivedAndUnsupportedClasses()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var accountId = await client.CreateAccountAsync(cancellationToken, name: "Live");
         var live = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "Live stock", ticker: "LIVE");
@@ -234,7 +234,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     public async Task List_UsesAmountPlnForPlnCostAndPl()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(SavingsTodayUtc);
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
         Factory.FxRateLookupClient.WithRate("EUR", new DateOnly(2026, 1, 10), 4.00m);
         Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());

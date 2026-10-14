@@ -59,7 +59,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
 
         // The settled month of every interest credit on this page, in one query.
         var transactionIds = transactions.Select(t => (Guid?)t.Id).ToList();
-        var creditPeriodEnds = await dbContext.SavingsInterestSettlements
+        var creditPeriodEnds = await dbContext.BankInterestSettlements
             .AsNoTracking()
             .Where(s => transactionIds.Contains(s.TransactionId))
             .ToDictionaryAsync(s => s.TransactionId!.Value, s => s.PeriodEnd, cancellationToken);

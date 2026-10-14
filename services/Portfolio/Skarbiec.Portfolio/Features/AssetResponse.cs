@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.SavingsAccounts;
 
 namespace Skarbiec.Portfolio.Features;
 
@@ -22,8 +21,6 @@ public sealed record AssetResponse
 
     public bool? DepositSettled { get; init; }
 
-    public bool? SavingsInterestDue { get; init; }
-
     /// <summary>PreciousMetal only: grams of fine metal per piece, the multiplier on the per-gram price.</summary>
     public decimal? FineWeightGramsPerPiece { get; init; }
 
@@ -37,7 +34,6 @@ public static class AssetMappingExtensions
         int transactionCount,
         DateOnly? depositMaturityDate = null,
         bool? depositSettled = null,
-        bool? savingsInterestDue = null,
         decimal? fineWeightGramsPerPiece = null) => new()
         {
             Id = asset.Id,
@@ -51,13 +47,12 @@ public static class AssetMappingExtensions
             TransactionCount = transactionCount,
             DepositMaturityDate = depositMaturityDate,
             DepositSettled = depositSettled,
-            SavingsInterestDue = savingsInterestDue,
             FineWeightGramsPerPiece = fineWeightGramsPerPiece,
             IsArchived = asset.IsArchived
         };
 
     internal static async Task<AssetResponse> ToFullResponseAsync(
-        this PortfolioDbContext dbContext, Asset asset, DateOnly today, CancellationToken cancellationToken)
+        this PortfolioDbContext dbContext, Asset asset, CancellationToken cancellationToken)
     {
         var transactionCount = await dbContext.Transactions.CountAsync(t => t.AssetId == asset.Id, cancellationToken);
         var terms = await dbContext.TermDeposits
@@ -66,25 +61,12 @@ public static class AssetMappingExtensions
             .Select(t => new { t.MaturityDate, Settled = t.SettledOn != null })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var savingsInterestDue = await dbContext.SavingsInterestDueAsync(asset, today, cancellationToken);
         var fineWeight = await dbContext.MetalHoldings
             .AsNoTracking()
             .Where(m => m.AssetId == asset.Id)
             .Select(m => (decimal?)m.FineWeightGramsPerPiece)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return asset.ToResponse(transactionCount, terms?.MaturityDate, terms?.Settled, savingsInterestDue, fineWeight);
-    }
-
-    internal static async Task<bool?> SavingsInterestDueAsync(
-        this PortfolioDbContext dbContext, Asset asset, DateOnly today, CancellationToken cancellationToken)
-    {
-        if (asset.AssetClass != AssetClass.Savings)
-        {
-            return null;
-        }
-
-        var status = await dbContext.LoadSavingsInterestStatusAsync([asset.Id], today, cancellationToken);
-        return status.TryGetValue(asset.Id, out var interest) ? interest.Due is not null : null;
+        return asset.ToResponse(transactionCount, terms?.MaturityDate, terms?.Settled, fineWeight);
     }
 }

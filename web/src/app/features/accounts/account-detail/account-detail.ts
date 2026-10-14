@@ -13,6 +13,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
+  deleteApiPortfolioAccountsByIdInterestSettlementsBySettlementId,
   deleteApiPortfolioAssetsByAssetIdTransactionsById,
   deleteApiPortfolioTransfersByTransferId,
   getApiPortfolioAccountsById,
@@ -23,13 +24,20 @@ import {
 import { getApiReportingDashboard } from '../../../api/reporting';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
-import { formatDate, formatMoney, formatQuantity } from '../../../shared/format';
+import {
+  formatDate,
+  formatMonth,
+  formatMoney,
+  formatPercent,
+  formatQuantity,
+} from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { TransactionFormDialog } from '../../transactions/transaction-form-dialog/transaction-form-dialog';
 import { transactionTypeLabel } from '../../transactions/transaction-type';
 import { transferLabel } from '../../transactions/transfer-direction';
+import { SettleInterestDialog } from '../../bank-accounts/settle-interest-dialog/settle-interest-dialog';
 import { AccountTransferDialog } from '../account-transfer-dialog/account-transfer-dialog';
-import { accountTypeLabel, taxWrapperLabel } from '../account-type';
+import { accountTypeLabel, bankVariantLabel, taxWrapperLabel } from '../account-type';
 import { CashOperationDialog } from '../cash-operation-dialog/cash-operation-dialog';
 import { ContributionBar } from '../contribution-bar/contribution-bar';
 import { ContributionLimitDialog } from '../contribution-limit-dialog/contribution-limit-dialog';
@@ -137,6 +145,10 @@ export class AccountDetail {
     },
   });
 
+  protected readonly isBank = computed(
+    () => this.accountResource.hasValue() && !!this.accountResource.value().bank,
+  );
+
   protected readonly isArchived = computed(
     () => this.accountResource.hasValue() && this.accountResource.value().isArchived,
   );
@@ -166,12 +178,15 @@ export class AccountDetail {
   protected readonly holdingColumns = ['name', 'quantity'];
 
   protected readonly accountTypeLabel = accountTypeLabel;
+  protected readonly bankVariantLabel = bankVariantLabel;
   protected readonly taxWrapperLabel = taxWrapperLabel;
   protected readonly transactionTypeLabel = transactionTypeLabel;
   protected readonly transferLabel = transferLabel;
   protected readonly formatMoney = formatMoney;
   protected readonly formatQuantity = formatQuantity;
   protected readonly formatDate = formatDate;
+  protected readonly formatPercent = formatPercent;
+  protected readonly formatMonth = formatMonth;
 
   protected asNumber(value: number | string): number {
     return Number(value);
@@ -232,6 +247,56 @@ export class AccountDetail {
     });
   }
 
+  protected openSettleInterest(): void {
+    if (!this.accountResource.hasValue()) {
+      return;
+    }
+    const ref = this.dialog.open(SettleInterestDialog, {
+      width: '520px',
+      data: { account: this.accountResource.value() },
+    });
+    ref.afterClosed().subscribe((saved: boolean | undefined) => {
+      if (saved) {
+        this.reload();
+      }
+    });
+  }
+
+  protected async undoLastSettlement(): Promise<void> {
+    if (!this.accountResource.hasValue()) {
+      return;
+    }
+    const account = this.accountResource.value();
+    const settlement = account.bank?.lastSettlement;
+    if (!settlement) {
+      return;
+    }
+
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('bankAccounts.interest.undoTitle'),
+            message: translate('bankAccounts.interest.undoMessage', {
+              month: formatMonth(settlement.periodEnd),
+              name: account.name,
+            }),
+            confirmLabel: translate('bankAccounts.interest.undoConfirm'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioAccountsByIdInterestSettlementsBySettlementId({
+      path: { id: account.id, settlementId: settlement.settlementId },
+    });
+    this.finishChange(result.error, 'bankAccounts.interest.undoFailed');
+  }
+
   protected openEditDialog(transaction: TransactionResponse): void {
     if (!this.accountResource.hasValue()) {
       return;
@@ -240,8 +305,8 @@ export class AccountDetail {
       width: '480px',
       data: {
         assetId: this.accountResource.value().cashAssetId,
-        assetClass: ASSET_CLASS.Cash,
-        currency: 'PLN',
+        assetClass: this.isBank() ? ASSET_CLASS.BankAccount : ASSET_CLASS.Cash,
+        currency: this.accountResource.value().currency,
         transaction,
       },
     });
