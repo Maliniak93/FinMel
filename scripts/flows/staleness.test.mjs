@@ -3,7 +3,8 @@ import { appendFileSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { descPath, descriptionFor, makeSandbox, put, readFacts, readyToBuild, runBuild, runFacts } from "./helpers.mjs";
+import { readFileSync } from "node:fs";
+import { T0, descPath, descriptionFor, historyDir, makeSandbox, pipelineReady, put, readFacts, readyToBuild, runBuild, runFacts, step, writeRun } from "./helpers.mjs";
 
 const ALL = ["agent:worker", "cmd:alpha", "script:beta", "script:gamma", "wf:flow-one"];
 
@@ -137,6 +138,33 @@ test("facts reports every node stale when its description is stamped with schema
       writeFileSync(descPath(sb, id), JSON.stringify(descriptionFor(id, node.hash, { schema: 1 })));
     }
     assert.deepEqual(staleOf(runFacts(sb)), ALL);
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("facts after only the run records change reports no stale node and the next build shows the new numbers; schema 2 descriptions are all stale", () => {
+  const sb = makeSandbox();
+  try {
+    const h = historyDir(sb);
+    writeRun(h, { id: "p1", startMs: T0, durationSec: 100, status: "ready", agents: [{ type: "implementer", label: "implement the spec", atSec: 0 }] });
+    pipelineReady(sb, { wf: [step("a", { agent: "implementer", measure: "run:build-feature", next: [{ to: "b" }] }), step("b", { agent: "scout", next: [] })] });
+    assert.deepEqual(staleOf(runFacts(sb, ["--history", h])), []);
+    assert.equal(runBuild(sb, ["--history", h]).status, 0);
+    assert.match(readFileSync(path.join(sb.out, "index.html"), "utf8"), /n=1\b/);
+
+    writeRun(h, { id: "p2", startMs: T0 + 100000, durationSec: 300, status: "ready", agents: [{ type: "implementer", label: "implement the spec", atSec: 0 }] });
+    const run = runFacts(sb, ["--history", h]);
+    assert.equal(run.status, 0, run.output);
+    assert.deepEqual(staleOf(run), []);
+    assert.equal(runBuild(sb, ["--history", h]).status, 0);
+    assert.match(readFileSync(path.join(sb.out, "index.html"), "utf8"), /n=2\b/);
+
+    const facts = readFacts(sb);
+    for (const [id, node] of Object.entries(facts.nodes)) {
+      writeFileSync(descPath(sb, id), JSON.stringify(descriptionFor(id, node.hash, { schema: 2 })));
+    }
+    assert.equal(staleOf(runFacts(sb, ["--history", h])).length, Object.keys(facts.nodes).length);
   } finally {
     sb.cleanup();
   }

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LABELS } from "./extract.mjs";
+import { formatDuration } from "./measure.mjs";
 import { LEVEL_WORKFLOW, levelRows, PIPELINE } from "./pipeline.mjs";
 
 const MERMAID = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "docs", "vendor", "mermaid.min.js");
@@ -146,34 +147,58 @@ function agentHtml(nodeId, step, facts) {
   return `agent: ${link(agentId)}<br>poziom startowy:${list(rows.start)}${escalation}`;
 }
 
-function stepExtras(nodeId, s, facts) {
+const NO_MEASURE = "brak pomiarów";
+
+function measureOf(step, measurements) {
+  const m = step.measure ? measurements[step.measure] : null;
+  return m && m.n > 0 ? m : null;
+}
+
+function measureText(m) {
+  return `mediana ${formatDuration(m.median, m.unit)} · maks. ${formatDuration(m.max, m.unit)} · n=${m.n}`;
+}
+
+function stepExtras(nodeId, s, facts, measurements) {
+  const m = measureOf(s, measurements);
   return [
     s.condition ? `<em>warunek: ${esc(s.condition)}</em>` : "",
     s.agent ? agentHtml(nodeId, s, facts) : "",
     s.retries !== undefined ? `ponowienia: ${esc(s.retries)}` : "",
     s.limit ? `limit: ${limitHtml(s.limit, facts)}` : "",
     s.calls ? `wywołuje: ${link(s.calls)}` : "",
+    `czas: ${m ? esc(measureText(m)) : NO_MEASURE}`,
   ].filter(Boolean);
 }
 
-function renderSteps(nodeId, description, facts) {
+function sampleRange(description, measurements) {
+  const used = description.steps.map((s) => measureOf(s, measurements)).filter(Boolean);
+  if (!used.length) return "";
+  const from = used.map((m) => m.from).sort()[0];
+  const to = used.map((m) => m.to).sort().at(-1);
+  return `<p>Pomiary z okresu ${esc(from)} – ${esc(to)}</p>`;
+}
+
+function renderSteps(nodeId, description, facts, measurements) {
   const steps = description.steps
     .map((s) => {
-      const extra = stepExtras(nodeId, s, facts);
+      const extra = stepExtras(nodeId, s, facts, measurements);
       return `<li><strong>${esc(s.title)}</strong> — ${esc(s.detail)}${extra.length ? `<br>${extra.join(" · ")}` : ""}</li>`;
     })
     .join("");
-  return `<p>${esc(description.summary)}</p><ol>${steps}</ol>`;
+  return `<p>${esc(description.summary)}</p>${sampleRange(description, measurements)}<ol>${steps}</ol>`;
 }
 
 const stepSlug = (nodeId, stepId) => `step-${nodeId.replace(/[^A-Za-z0-9_-]/g, "-")}-${stepId.replace(/[^A-Za-z0-9_-]/g, "-")}`;
 const mermaidText = (text) => String(text).replace(/["\r\n|]/g, (c) => (c === '"' ? "'" : " "));
 
-function stepDiagram(nodeId, description) {
+function stepDiagram(nodeId, description, measurements) {
   const steps = description.steps;
   const alias = new Map(steps.map((s, i) => [s.id, `s${i}`]));
   const lines = ["flowchart TD", "  classDef agent fill:#e3edff,stroke:#3b6fd4,stroke-width:2px"];
-  for (const s of steps) lines.push(`  ${alias.get(s.id)}["${mermaidText(s.title)}"]`);
+  for (const s of steps) {
+    const m = measureOf(s, measurements);
+    lines.push(`  ${alias.get(s.id)}["${mermaidText(s.title)}${m ? ` · ${mermaidText(measureText(m))}` : ""}"]`);
+  }
   for (const s of steps) {
     for (const edge of s.next) {
       const label = edge.when ? `|"${mermaidText(edge.when)}"|` : "";
@@ -186,24 +211,29 @@ function stepDiagram(nodeId, description) {
   return lines.join("\n");
 }
 
-function renderPipeline(nodeId, description, facts) {
-  const index = description.steps.map((s) => `<li><a href="#${stepSlug(nodeId, s.id)}">${esc(s.title)}</a></li>`).join("");
+function renderPipeline(nodeId, description, facts, measurements) {
+  const index = description.steps
+    .map((s) => {
+      const m = measureOf(s, measurements);
+      return `<li><a href="#${stepSlug(nodeId, s.id)}">${esc(s.title)}</a>${m ? ` <small>${esc(measureText(m))}</small>` : ""}</li>`;
+    })
+    .join("");
   const panels = description.steps
     .map((s) => {
-      const extra = stepExtras(nodeId, s, facts);
+      const extra = stepExtras(nodeId, s, facts, measurements);
       const next = s.next.map((e) => `${e.when ? `${esc(e.when)} → ` : ""}${esc(description.steps.find((t) => t.id === e.to).title)}`);
       return `<div class="step-panel" id="${stepSlug(nodeId, s.id)}"><h4>${esc(s.title)}</h4><p>${esc(s.detail)}</p>${extra.length ? `<p>${extra.join("<br>")}</p>` : ""}${next.length ? `<p>dalej: ${next.join(" · ")}</p>` : "<p>koniec</p>"}</div>`;
     })
     .join("");
-  return `<p>${esc(description.summary)}</p>
+  return `<p>${esc(description.summary)}</p>${sampleRange(description, measurements)}
 <pre class="mermaid">
-${esc(stepDiagram(nodeId, description))}
+${esc(stepDiagram(nodeId, description, measurements))}
 </pre>
 <ol>${index}</ol>
 ${panels}`;
 }
 
-function renderCard(id, facts, descriptions, stale) {
+function renderCard(id, facts, descriptions, stale, measurements) {
   const node = facts.nodes[id];
   const callers = facts.edges.filter((e) => e.to === id).map((e) => e.from);
   const callees = facts.edges.filter((e) => e.from === id).map((e) => e.to);
@@ -215,11 +245,11 @@ ${node.facts.description ? `<p>${esc(node.facts.description)}</p>` : ""}
 ${renderFacts(node)}
 ${renderMarkers(node)}
 <p><strong>Wywołują:</strong> ${links(callers)}<br><strong>Wywołuje:</strong> ${links(callees)}</p>
-${description ? (PIPELINE.includes(id) ? renderPipeline(id, description, facts) : renderSteps(id, description, facts)) : "<p><em>Brak opisu kroków.</em></p>"}
+${description ? (PIPELINE.includes(id) ? renderPipeline(id, description, facts, measurements) : renderSteps(id, description, facts, measurements)) : "<p><em>Brak opisu kroków.</em></p>"}
 </section>`;
 }
 
-export function renderPage(facts, descriptions, stale, meta) {
+export function renderPage(facts, descriptions, stale, meta, measurements = {}) {
   const ids = Object.keys(facts.nodes);
   const index = Object.keys(KIND_TITLE)
     .map((kind) => {
@@ -249,7 +279,7 @@ ${esc(mermaidSource(facts))}
 ${legend}
 <h2>Węzły</h2>
 ${index}
-${ids.map((id) => renderCard(id, facts, descriptions, stale)).join("\n")}
+${ids.map((id) => renderCard(id, facts, descriptions, stale, measurements)).join("\n")}
 </main>
 <footer>${footer}</footer>
 <script>${mermaid}</script>

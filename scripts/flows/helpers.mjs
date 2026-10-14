@@ -58,8 +58,8 @@ export function runFacts(sb, extra = []) {
   return runFlows(["facts", "--root", sb.root, "--out", sb.out, ...extra]);
 }
 
-export function runBuild(sb) {
-  return runFlows(["build", "--root", sb.root, "--out", sb.out]);
+export function runBuild(sb, extra = []) {
+  return runFlows(["build", "--root", sb.root, "--out", sb.out, ...extra]);
 }
 
 export function readFacts(sb) {
@@ -70,7 +70,7 @@ export const descPath = (sb, id) => path.join(sb.out, ".work", "desc", `${id.rep
 
 export function descriptionFor(id, hash, extra = {}) {
   return {
-    schema: 2,
+    schema: 3,
     sources: hash,
     summary: `Podsumowanie ${id}`,
     steps: [
@@ -199,4 +199,72 @@ export function pipelineReady(sb, { build = GRAPH, wf, epic } = {}) {
   writeDescription(sb, "cmd:build", build);
   writeDescription(sb, "wf:build-feature", wf ?? [step("a", { agent: "implementer", next: [{ to: "b" }] }), step("b", { agent: "scout", next: [] })]);
   writeDescription(sb, "script:epic", epic ?? [step("e1", { next: [{ to: "e2" }] }), step("e2", { next: [] })]);
+}
+
+const iso = (ms) => new Date(ms).toISOString();
+
+export function bashPair(id, startMs, seconds, command) {
+  return [
+    { type: "assistant", timestamp: iso(startMs), message: { content: [{ type: "tool_use", name: "Bash", id, input: { command } }] } },
+    { type: "user", timestamp: iso(startMs + seconds * 1000), message: { content: [{ type: "tool_result", tool_use_id: id, content: "ok" }] } },
+  ];
+}
+
+export function writeRun(history, run, session = "session-1") {
+  const wfDir = path.join(history, session, "workflows");
+  mkdirSync(wfDir, { recursive: true });
+  const runId = `wf_${run.id}`;
+  const progress = (run.agents ?? []).map((a, i) => ({
+    type: "workflow_agent",
+    agentId: `${run.id}a${i}`,
+    agentType: a.type,
+    label: a.label,
+    startedAt: run.startMs + a.atSec * 1000,
+  }));
+  writeFileSync(
+    path.join(wfDir, `${runId}.json`),
+    JSON.stringify({
+      runId,
+      workflowName: run.workflowName ?? "build-feature",
+      timestamp: iso(run.startMs),
+      startTime: run.startMs,
+      durationMs: run.durationSec * 1000,
+      args: { issue: 1, tier: 1 },
+      result: { status: run.status },
+      workflowProgress: progress,
+    }),
+  );
+  (run.agents ?? []).forEach((a, i) => {
+    if (!a.bash) return;
+    const dir = path.join(history, session, "subagents", "workflows", runId);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, `agent-${run.id}a${i}.meta.json`), JSON.stringify({ agentType: a.type }));
+    let t = run.startMs + a.atSec * 1000;
+    const lines = [];
+    a.bash.forEach((b, k) => {
+      lines.push(...bashPair(`tu_${run.id}_${i}_${k}`, t, b.seconds, b.command));
+      t += b.seconds * 1000 + 1000;
+    });
+    writeFileSync(path.join(dir, `agent-${run.id}a${i}.jsonl`), `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`);
+  });
+}
+
+export function putEpicLog(sb, epic, stamp, lines) {
+  put(sb, `skarbiec-plan/epic-runs/${epic}/${stamp}.log`, `${lines.join("\n")}\n`);
+}
+
+export function historyDir(sb) {
+  const dir = path.join(sb.dir, "history");
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export const T0 = Date.parse("2026-03-01T10:00:00Z");
+export const DAY = 86400000;
+
+export const VERIFY = "cd /repo && node scripts/verify.mjs --all --fix --cache";
+export const OTHER = "dotnet test --filter Foo";
+
+export function measurementsOf(sb) {
+  return readFacts(sb).measurements ?? {};
 }

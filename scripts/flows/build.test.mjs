@@ -2,7 +2,21 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { descPath, descriptionFor, makeSandbox, readFacts, readyToBuild, runBuild, snapshot } from "./helpers.mjs";
+import {
+  T0,
+  descPath,
+  descriptionFor,
+  historyDir,
+  makeSandbox,
+  pipelineReady,
+  readFacts,
+  readyToBuild,
+  runBuild,
+  snapshot,
+  step,
+  writeDescription,
+  writeRun,
+} from "./helpers.mjs";
 
 const badges = (html) => html.match(/nieaktualny/g)?.length ?? 0;
 
@@ -53,7 +67,7 @@ test("build with an invalid description fails naming the node and the field and 
 
     const cases = [
       { id: "script:beta", content: "{ not json", field: /json/i },
-      { id: "cmd:alpha", content: JSON.stringify({ schema: 2, sources: facts.nodes["cmd:alpha"].hash, summary: "x" }), field: /steps/ },
+      { id: "cmd:alpha", content: JSON.stringify({ schema: 3, sources: facts.nodes["cmd:alpha"].hash, summary: "x" }), field: /steps/ },
       {
         id: "wf:flow-one",
         content: JSON.stringify(
@@ -74,6 +88,54 @@ test("build with an invalid description fails naming the node and the field and 
       assert.deepEqual(snapshot(sb.out, { skip: [".work"] }), before, `${c.id} output untouched`);
       writeFileSync(descPath(sb, c.id), good);
     }
+  } finally {
+    sb.cleanup();
+  }
+});
+
+function measuredSandbox() {
+  const sb = makeSandbox();
+  const h = historyDir(sb);
+  writeRun(h, { id: "m1", startMs: T0, durationSec: 120, status: "ready", agents: [{ type: "implementer", label: "implement the spec", atSec: 0 }] });
+  pipelineReady(sb, {
+    wf: [
+      step("a", { agent: "implementer", measure: "run:build-feature", next: [{ to: "b" }] }),
+      step("b", { agent: "scout", measure: "verify:implementer", next: [{ to: "c" }] }),
+      step("c", { next: [] }),
+    ],
+  });
+  return { sb, h };
+}
+
+test("build shows median, max and n for a measured step and brak pomiarow for a step without samples or without measure, never zero", () => {
+  const { sb, h } = measuredSandbox();
+  try {
+    const run = runBuild(sb, ["--history", h]);
+    assert.equal(run.status, 0, run.output);
+    const html = readFileSync(path.join(sb.out, "index.html"), "utf8");
+    assert.match(html, /mediana/);
+    assert.match(html, /maks\./);
+    assert.match(html, /n=1\b/);
+    assert.ok((html.match(/brak pomiarów/g) ?? []).length >= 2, "two steps without numbers");
+    assert.doesNotMatch(html, /maks\.[^<\n]*n=0\b/);
+    assert.doesNotMatch(html, /mediana\s+0\b/);
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("build with a measure naming an unknown key fails naming the node and the step", () => {
+  const { sb, h } = measuredSandbox();
+  try {
+    writeDescription(sb, "wf:build-feature", [
+      step("a", { agent: "implementer", next: [{ to: "zle-krok" }] }),
+      step("zle-krok", { measure: "bogus:key", next: [] }),
+    ]);
+    const run = runBuild(sb, ["--history", h]);
+    assert.notEqual(run.status, 0, run.output);
+    assert.ok(run.output.includes("build-feature"), run.output);
+    assert.ok(run.output.includes("zle-krok"), run.output);
+    assert.match(run.output, /measure/);
   } finally {
     sb.cleanup();
   }
