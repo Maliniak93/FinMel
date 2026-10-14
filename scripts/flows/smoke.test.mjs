@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -47,6 +47,23 @@ test("facts on this repository lists the referable limits of the pipeline script
     assert.ok(limit("script:verify").includes("DEFAULT_DEADLINE_MIN"));
     assert.ok(limit("script:epic").includes("MAX_E2E_REPAIRS"));
     assert.ok(limit("script:epic").includes("CI_TIMEOUT_MS"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("facts on this repository with an empty history exits 0 and every measurement has n=0", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "flows-smoke-"));
+  try {
+    const history = path.join(dir, "history");
+    const epicRuns = path.join(dir, "epic-runs");
+    mkdirSync(history);
+    mkdirSync(epicRuns);
+    const run = runFlows(["facts", "--root", REPO_ROOT, "--out", path.join(dir, "out"), "--history", history, "--epic-runs", epicRuns]);
+    assert.equal(run.status, 0, run.output);
+    const measurements = Object.entries(readFacts({ out: path.join(dir, "out") }).measurements ?? {});
+    assert.ok(measurements.length > 0, "measurement keys listed");
+    for (const [key, m] of measurements) assert.equal(m.n, 0, `${key} has no samples`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

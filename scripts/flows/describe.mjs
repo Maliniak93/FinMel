@@ -1,8 +1,9 @@
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
+import { measurableKeys } from "./measure.mjs";
 import { PIPELINE } from "./pipeline.mjs";
 
-export const DESC_SCHEMA_VERSION = 2;
+export const DESC_SCHEMA_VERSION = 3;
 
 export const descName = (id) => `${id.replace(":", "-")}.json`;
 
@@ -57,7 +58,7 @@ function validateGraph(steps) {
   return lost ? `field steps (step "${lost.id}"): unreachable from the first step "${steps[0].id}"` : null;
 }
 
-export function validateDescription(value, nodes, nodeId) {
+export function validateDescription(value, nodes, nodeId, measurements = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "field json: the description must be a JSON object";
   if (value.schema !== DESC_SCHEMA_VERSION) return `field schema: expected ${DESC_SCHEMA_VERSION}, found ${JSON.stringify(value.schema)}`;
   if (!isText(value.sources)) return "field sources: missing or not a string";
@@ -74,6 +75,9 @@ export function validateDescription(value, nodes, nodeId) {
       if (problem) return `field ${named}.limit: ${problem}`;
     }
     if (step.retries !== undefined && !Number.isInteger(step.retries)) return `field ${named}.retries: not an integer`;
+    if (step.measure !== undefined && !(isText(step.measure) && measurableKeys(nodeId, measurements).includes(step.measure))) {
+      return `field ${named}.measure: "${step.measure}" is not a measurable key of ${nodeId} (keys: ${measurableKeys(nodeId, measurements).join(", ") || "none"})`;
+    }
     if (step.agent !== undefined && !(isText(step.agent) && `agent:${step.agent}` in nodes)) {
       return `field ${named}.agent: "${step.agent}" is not an existing agent`;
     }

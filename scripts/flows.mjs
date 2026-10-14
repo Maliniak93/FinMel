@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// Usage: node scripts/flows.mjs <verb> [--root <repo>] [--out <dir>]
-//   facts [--all] [--node <id>]   extract the workflow facts into <out>/.work/facts.json; lists the nodes whose description (<out>/.work/desc/<id>.json) is missing or stale (all with --all); --node prints one node's facts, source files and referable limit keys (plus the v2 graph reminder for a pipeline node); last line FLOWS_RESULT: {json}
-//   build                         validate every description and render the offline map and node cards; all-or-nothing replace of <out>/index.html and <out>/manifest.json
+// Usage: node scripts/flows.mjs <verb> [--root <repo>] [--out <dir>] [--history <dir>] [--epic-runs <dir>]
+//   facts [--all] [--node <id>]   extract the workflow facts into <out>/.work/facts.json; lists the nodes whose description (<out>/.work/desc/<id>.json) is missing or stale (all with --all); --node prints one node's facts, source files, referable limit keys and measurable keys with their sample counts (plus the graph reminder for a pipeline node); facts.json also gets the measurements block read from the workflow run records in --history (default: the Claude Code history folder of --root) and the epic logs in --epic-runs (default: <root>/skarbiec-plan/epic-runs); last line FLOWS_RESULT: {json}
+//   build                         validate every description (a step's measure must be a measurable key) and render the offline map and node cards with the measured times; all-or-nothing replace of <out>/index.html and <out>/manifest.json
 
 import { spawnSync } from "node:child_process";
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { collectMeasurements, defaultEpicRuns, defaultHistory, measurableKeys } from "./flows/measure.mjs";
 import { descDir, DESC_SCHEMA_VERSION, isStale, readDescription, removeOrphans, validateDescription } from "./flows/describe.mjs";
 import { collect, ExtractError } from "./flows/extract.mjs";
 import { limitKeys, PIPELINE } from "./flows/pipeline.mjs";
@@ -35,7 +36,9 @@ function parseFlags(argv) {
 function resolveTargets(flags) {
   const root = path.resolve(flags.root ?? REPO_ROOT);
   const out = path.resolve(flags.out ?? path.join(root, "skarbiec-plan", "flows"));
-  return { root, out };
+  const history = path.resolve(flags.history ?? defaultHistory(root));
+  const epicRuns = path.resolve(flags["epic-runs"] ?? defaultEpicRuns(root));
+  return { root, out, history, epicRuns };
 }
 
 function git(root, ...args) {
@@ -45,19 +48,23 @@ function git(root, ...args) {
 
 function facts(argv) {
   const flags = parseFlags(argv);
-  const { root, out } = resolveTargets(flags);
+  const { root, out, history, epicRuns } = resolveTargets(flags);
   const found = collect(root);
+  const measurements = collectMeasurements(history, epicRuns);
   if (flags.node !== undefined && !(flags.node in found.nodes)) {
     fail(`unknown node "${flags.node}" (nodes: ${Object.keys(found.nodes).join(", ")})`);
   }
   mkdirSync(path.join(out, ".work"), { recursive: true });
-  writeFileSync(path.join(out, ".work", "facts.json"), `${JSON.stringify({ schema: DESC_SCHEMA_VERSION, ...found }, null, 2)}\n`);
+  writeFileSync(path.join(out, ".work", "facts.json"), `${JSON.stringify({ schema: DESC_SCHEMA_VERSION, ...found, measurements }, null, 2)}\n`);
 
   const stale = Object.keys(found.nodes).filter((id) => flags.all || isStale(out, id, found.nodes[id]));
   if (flags.node !== undefined) {
     const calls = (key, other) => found.edges.filter((e) => e[key] === flags.node).map((e) => e[other]);
     const node = found.nodes[flags.node];
-    const extra = { limitKeys: limitKeys(flags.node, node) };
+    const extra = {
+      limitKeys: limitKeys(flags.node, node),
+      measurableKeys: Object.fromEntries(measurableKeys(flags.node, measurements).map((key) => [key, measurements[key].n])),
+    };
     if (PIPELINE.includes(flags.node)) extra.pipeline = PIPELINE_REMINDER;
     console.log(JSON.stringify({ id: flags.node, ...node, ...extra, callers: calls("to", "from"), callees: calls("from", "to") }, null, 2));
   }
@@ -67,15 +74,16 @@ function facts(argv) {
 
 function build(argv) {
   const flags = parseFlags(argv);
-  const { root, out } = resolveTargets(flags);
+  const { root, out, history, epicRuns } = resolveTargets(flags);
   const found = collect(root);
+  const measurements = collectMeasurements(history, epicRuns);
 
   const problems = [];
   const descriptions = {};
   for (const id of Object.keys(found.nodes)) {
     const description = readDescription(out, id);
     if (!description.exists) continue;
-    const problem = description.error ?? validateDescription(description.value, found.nodes, id);
+    const problem = description.error ?? validateDescription(description.value, found.nodes, id, measurements);
     if (problem) problems.push(`node ${id} (${path.relative(root, description.file) || description.file}): ${problem}`);
     else descriptions[id] = description.value;
   }
@@ -90,7 +98,7 @@ function build(argv) {
   const stage = path.join(out, ".work", "out");
   rmSync(stage, { recursive: true, force: true });
   mkdirSync(stage, { recursive: true });
-  writeFileSync(path.join(stage, "index.html"), renderPage(found, descriptions, stale, meta));
+  writeFileSync(path.join(stage, "index.html"), renderPage(found, descriptions, stale, meta, measurements));
   const manifest = {
     generatedAt,
     commit,
@@ -112,7 +120,7 @@ const VERBS = { facts, build };
 
 const [command, ...rest] = process.argv.slice(2);
 try {
-  if (!VERBS[command]) fail(`usage: node scripts/flows.mjs <${Object.keys(VERBS).join("|")}> [--root <repo>] [--out <dir>]`);
+  if (!VERBS[command]) fail(`usage: node scripts/flows.mjs <${Object.keys(VERBS).join("|")}> [--root <repo>] [--out <dir>] [--history <dir>] [--epic-runs <dir>]`);
   VERBS[command](rest);
 } catch (error) {
   if (!(error instanceof ExtractError)) throw error;
