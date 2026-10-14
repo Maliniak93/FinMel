@@ -4,7 +4,7 @@ description: Interview the user about a feature, a change to existing behaviour,
 argument-hint: "<feature, change or refactor description | idea:<slug>>"
 disable-model-invocation: true
 model: claude-opus-5-5
-effort: xhigh
+effort: high
 ---
 
 Turn `$ARGUMENTS` into a spec that `/build` can execute unattended. The spec is drafted locally,
