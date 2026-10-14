@@ -11,6 +11,9 @@ public sealed record UpdateDepositRequest : IValidatableObject
     [MaxLength(100)]
     public string? BankName { get; init; }
 
+    /// <summary>An unarchived Bank account in the deposit's currency; omitted, the stored one stays.</summary>
+    public Guid? ReturnAccountId { get; init; }
+
     [Range(typeof(decimal), "0", "79228162514264337593543950335", MinimumIsExclusive = true)]
     public required decimal Principal { get; init; }
 
@@ -26,9 +29,6 @@ public sealed record UpdateDepositRequest : IValidatableObject
     public required decimal AnnualInterestRatePercent { get; init; }
 
     public required DepositCapitalization Capitalization { get; init; }
-
-    /// <summary>IKE/IKZE: no Belka tax.</summary>
-    public bool TaxExempt { get; init; }
 
     [Range(typeof(decimal), "0", "100")]
     public decimal EarlyBreakInterestLossPercent { get; init; } = 100m;

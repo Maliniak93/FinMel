@@ -15,16 +15,13 @@ public static class TransferRoutes
 
     private static readonly Dictionary<(AssetClass Source, AssetClass Target), Access> Routes = new()
     {
-        // Funding a term deposit from cash — entered through AddDeposit's fundingAssetId.
-        [(AssetClass.Cash, AssetClass.Deposit)] = Access.None,
+        // Opening a term deposit from a bank account, through AddDeposit and UpdateDeposit.
+        [(AssetClass.BankAccount, AssetClass.Deposit)] = Access.None,
 
         // A treasury bond's purchase and a swap's shortfall, paid from its own account's cash by AddBond, UpdateBond and SwapBond.
         [(AssetClass.Cash, AssetClass.Bond)] = Access.None,
 
-        // Paying a settled deposit out to cash, through SettleDeposit's destinationAssetId and PayOutDeposit.
-        [(AssetClass.Deposit, AssetClass.Cash)] = Access.None,
-
-        // Paying a settled deposit out into a bank account, through the same two payout slices.
+        // Paying a settled deposit out into its return account, through SettleDeposit's payOut and PayOutDeposit.
         [(AssetClass.Deposit, AssetClass.BankAccount)] = Access.None,
 
         // A treasury bond's coupon, redemption proceeds and swap leftover, paid to its own account's cash by SettleBondInterest, RedeemBond, RedeemBondEarly and SwapBond.

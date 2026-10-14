@@ -35,7 +35,7 @@
       "dashboard": "Pulpit",
       "cash": "Gotówka",
       "securities": "Akcje i ETF",
-      "deposits": "Lokaty i oszczędności",
+      "deposits": "Lokaty",
       "bonds": "Obligacje",
       "metals": "Metale szlachetne",
       "settings": "Ustawienia",
@@ -633,6 +633,8 @@
     "empty": "Nie masz jeszcze żadnych lokat terminowych.",
     "addFirst": "Dodaj pierwszą lokatę",
     "bank": "Bank",
+    "source": "Źródło",
+    "returnTo": "Zwrot na",
     "principal": "Kapitał",
     "rate": "Oprocentowanie",
     "start": "Start",
@@ -655,8 +657,7 @@
       "maturesOn": "Zapada dnia",
       "capitalisation": "Kapitalizacja",
       "grossInterest": "Odsetki brutto",
-      "tax": "Podatek",
-      "moveTo": "Przenieś do"
+      "tax": "Podatek"
     },
     "errors": {
       "grossInterestRequired": "Odsetki brutto są wymagane.",
@@ -666,8 +667,6 @@
       "taxOverGross": "Podatek nie może przekraczać odsetek brutto.",
       "interestRateRequired": "Oprocentowanie jest wymagane.",
       "interestRateRange": "Oprocentowanie musi mieścić się w przedziale od 0 do 100.",
-      "cashAccountsLoadFailed": "Nie udało się wczytać kont gotówkowych.",
-      "payoutDestinationsLoadFailed": "Nie udało się wczytać kont, na które można wypłacić pieniądze.",
       "previewLoadFailed": "Nie udało się wczytać podglądu rozliczenia."
     },
     "form": {
@@ -676,12 +675,13 @@
       "nameRequired": "Nazwa jest wymagana.",
       "nameTooLong": "Nazwa jest za długa.",
       "bankNameTooLong": "Nazwa banku jest za długa.",
-      "currencyRequired": "Waluta jest wymagana.",
-      "sourceOfFunds": "Źródło środków",
-      "newMoney": "Nowe środki (z zewnątrz)",
+      "sourceAccount": "Z konta",
+      "sourceAccountRequired": "Konto źródłowe jest wymagane.",
+      "returnAccount": "Zwrot na",
+      "returnToSource": "Konto źródłowe",
+      "accountsLoadFailed": "Nie udało się wczytać kont bankowych.",
       "principalRequired": "Kapitał jest wymagany.",
       "principalPositive": "Kapitał musi być większy od 0.",
-      "exceedsBalance": "Kapitał przekracza saldo źródła ({{ balance }}).",
       "startDate": "Data rozpoczęcia",
       "startDateRequired": "Data rozpoczęcia jest wymagana.",
       "termRequired": "Okres jest wymagany.",
@@ -689,18 +689,13 @@
       "termMax": "Okres wynosi co najwyżej {{ max }}.",
       "unit": "Jednostka",
       "annualInterestRate": "Roczne oprocentowanie (%)",
-      "taxExempt": "IKE/IKZE — bez podatku Belki",
       "earlyBreakLoss": "Odsetki tracone przy zerwaniu lokaty (%)",
       "earlyBreakRequired": "Strata przy zerwaniu jest wymagana.",
       "earlyBreakRange": "Strata przy zerwaniu musi mieścić się w przedziale od 0 do 100.",
-      "fundingLoadFailed": "Nie udało się wczytać źródeł środków.",
-      "insufficientFunds": "Źródło środków nie pokrywa tego kapitału."
+      "insufficientFunds": "Brak środków na koncie"
     },
     "payOut": {
-      "noCashAccount": "Nie masz konta gotówkowego ani bankowego w walucie {{ currency }}, na które można przenieść pieniądze.",
-      "cashGroup": "Gotówka",
-      "bankGroup": "Konta bankowe",
-      "destinationRequired": "Wybierz, dokąd trafią pieniądze.",
+      "goesTo": "Saldo trafi na konto {{ name }}.",
       "dateBeforeSettlement": "Data nie może być wcześniejsza niż data rozliczenia.",
       "dateInFuture": "Data nie może być z przyszłości.",
       "submit": "Przenieś"
@@ -711,7 +706,7 @@
       "settlementDateRequired": "Data rozliczenia jest wymagana.",
       "beforeStart": "Data rozliczenia nie może być wcześniejsza niż data rozpoczęcia.",
       "inFuture": "Data rozliczenia nie może być z przyszłości.",
-      "keepInDeposit": "Zostaw w lokacie",
+      "payOutTo": "Wypłać na konto {{ name }}",
       "movesOut": "Kwota {{ amount }} opuszcza lokatę.",
       "netInterest": "Odsetki netto",
       "submit": "Rozlicz"
@@ -743,6 +738,7 @@
     "interestCredited": "Naliczone odsetki",
     "interestDue": "Odsetki do rozliczenia",
     "back": "Wróć do kont bankowych",
+    "hasOpenDeposit": "Na to konto wróci otwarta lokata",
     "interest": {
       "settle": "Rozlicz odsetki",
       "settleMonths": "Rozlicz odsetki (miesiące do rozliczenia: {{ count }})",
@@ -798,6 +794,9 @@
       "noHistory": "Brak ruchów gotówki.",
       "loadFailed": "Nie udało się wczytać rachunku.",
       "holdingsFailed": "Nie udało się wczytać pozycji rachunku.",
+      "deposits": "Lokaty",
+      "noDeposits": "Żadna lokata nie jest finansowana z tego konta ani nie wraca na nie.",
+      "depositsFailed": "Nie udało się wczytać lokat rachunku.",
       "historyFailed": "Nie udało się wczytać historii gotówki."
     },
     "cash": {

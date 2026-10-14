@@ -26,7 +26,6 @@ import {
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
 import { settlementAmounts } from '../deposit-terms';
-import { PayoutDestinationField } from '../payout-destination-field/payout-destination-field';
 
 export interface PayOutDepositDialogData {
   deposit: DepositResponse;
@@ -47,7 +46,6 @@ function today(): Date {
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    PayoutDestinationField,
     TranslocoPipe,
   ],
   templateUrl: './pay-out-deposit-dialog.html',
@@ -71,7 +69,6 @@ export class PayOutDepositDialog {
   protected readonly formError = signal<string | null>(null);
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    destinationAssetId: [null as string | null, [Validators.required]],
     date: [
       today() as Date | null,
       [
@@ -98,10 +95,7 @@ export class PayOutDepositDialog {
     const values = this.form.getRawValue();
     const result = await postApiPortfolioDepositsByAssetIdPayout({
       path: { assetId: this.deposit.assetId },
-      body: {
-        destinationAssetId: values.destinationAssetId!,
-        date: toDateOnly(values.date!),
-      },
+      body: { date: toDateOnly(values.date!) },
     });
 
     this.submitting.set(false);

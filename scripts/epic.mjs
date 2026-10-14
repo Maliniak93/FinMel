@@ -7,6 +7,7 @@
 //   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
 //   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it or corrects the epic's plan, the loop builds and merges them, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
+//   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
@@ -15,7 +16,7 @@ import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "no
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { findReplay } from "./build-replay.mjs";
+import { findReplay, latestRunRecord } from "./build-replay.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
@@ -121,6 +122,15 @@ function lastComment(number) {
   return res.out;
 }
 
+// ship.mjs posts a report on every run, so a comment newer than the build start means the relay did ship (or block)
+function commentedSince(number, since) {
+  const iso = new Date(since).toISOString().replace(/\.\d+Z$/, "Z");
+  const jq = `[.comments[] | select(.createdAt >= ${JSON.stringify(iso)})] | length`;
+  const res = retryTransient(`issue view ${number}`, () => gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", jq]));
+  if (!res.ok) throw new Stop("github", `gh issue view ${number}: ${res.firstErr}`);
+  return Number(res.out) > 0;
+}
+
 const SHIP_BLOCKED = "**Blocked** at `ship`";
 const E2E_BLOCKED = "**Blocked** at `e2e`";
 const E2E_APP_BLOCKED = `${E2E_BLOCKED} (app)`;
@@ -174,7 +184,20 @@ function retryShip(part) {
     if (!switched.ok) throw new Stop("ship-failed", `git switch ${part.branch}: ${switched.firstErr}`);
   }
   const json = JSON.stringify({ deviations: [], resumedShip: true });
-  const res = spawnSync(NODE, ["scripts/ship.mjs", String(part.number), "--branch", part.branch, "--title", part.title, "--json", json], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, timeout: 3600e3, maxBuffer: 64 * 1024 * 1024 });
+  ship(part.number, ["--branch", part.branch, "--title", part.title, "--json", json]);
+}
+
+// The build session can end without running nextCommand (a confused relay); a ready run is then shipped from its record.
+function shipUnshippedRun(part, since) {
+  const record = latestRunRecord({ issue: part.number, since });
+  if (record?.result?.status !== "ready" || commentedSince(part.number, since)) return false;
+  say(`#${part.number}: the build session did not ship its ready run - shipping it from workflow ${record.runId}`);
+  ship(part.number, ["--from-run"]);
+  return true;
+}
+
+function ship(number, flags) {
+  const res = spawnSync(NODE, ["scripts/ship.mjs", String(number), ...flags], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, timeout: 3600e3, maxBuffer: 64 * 1024 * 1024 });
   const line = (res.stdout ?? "").split(/\r?\n/).reverse().find((l) => l.startsWith("SHIP_RESULT: "));
   let parsed = null;
   try {
@@ -454,6 +477,7 @@ async function handlePart(sub, ctx) {
       if (!pr) throw new Stop("ship-failed", `#${part.number}: ship.mjs succeeded but no open PR exists for ${part.branch}`);
     } else {
       ctx.builds++;
+      const buildStart = Date.now();
       const built = await build(ctx.claude, part.number, part.title);
       entry.buildMin = minutes(built.ms);
       if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
@@ -461,6 +485,7 @@ async function handlePart(sub, ctx) {
       pr = openPr(part.branch);
       const blockedAtE2e = pr ? null : e2eBlock(part.number);
       if (blockedAtE2e) return repairE2e(part, blockedAtE2e, ctx);
+      if (!pr && shipUnshippedRun(part, buildStart)) pr = openPr(part.branch);
       if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
     }
   }

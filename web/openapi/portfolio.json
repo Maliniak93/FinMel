@@ -743,6 +743,16 @@
         "tags": [
           "ListDepositsEndpoint"
         ],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -2144,7 +2154,7 @@
       "AddDepositRequest": {
         "required": [
           "name",
-          "currency",
+          "sourceAccountId",
           "principal",
           "startDate",
           "termLength",
@@ -2165,8 +2175,16 @@
               "string"
             ]
           },
-          "currency": {
-            "type": "string"
+          "sourceAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnAccountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "principal": {
             "maximum": 79228162514264337593543950335,
@@ -2208,9 +2226,6 @@
           "capitalization": {
             "$ref": "#/components/schemas/DepositCapitalization"
           },
-          "taxExempt": {
-            "type": "boolean"
-          },
           "earlyBreakInterestLossPercent": {
             "maximum": 100,
             "minimum": 0,
@@ -2220,13 +2235,6 @@
               "string"
             ],
             "format": "double"
-          },
-          "fundingAssetId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
           }
         }
       },
@@ -3507,10 +3515,13 @@
           "maturityDate",
           "annualInterestRatePercent",
           "capitalization",
-          "taxExempt",
           "earlyBreakInterestLossPercent",
           "projection",
           "status",
+          "sourceAccountId",
+          "sourceAccountName",
+          "returnAccountId",
+          "returnAccountName",
           "rolloverCount"
         ],
         "type": "object",
@@ -3572,9 +3583,6 @@
           "capitalization": {
             "$ref": "#/components/schemas/DepositCapitalization"
           },
-          "taxExempt": {
-            "type": "boolean"
-          },
           "earlyBreakInterestLossPercent": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -3614,18 +3622,19 @@
             ],
             "format": "double"
           },
-          "fundingAssetId": {
-            "type": [
-              "null",
-              "string"
-            ],
+          "sourceAccountId": {
+            "type": "string",
             "format": "uuid"
           },
-          "fundingAssetName": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "sourceAccountName": {
+            "type": "string"
+          },
+          "returnAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnAccountName": {
+            "type": "string"
           },
           "paidOutOn": {
             "type": [
@@ -3634,7 +3643,7 @@
             ],
             "format": "date"
           },
-          "paidOutToAssetName": {
+          "paidOutToAccountName": {
             "type": [
               "null",
               "string"
@@ -3835,15 +3844,10 @@
       },
       "PayOutDepositRequest": {
         "required": [
-          "destinationAssetId",
           "date"
         ],
         "type": "object",
         "properties": {
-          "destinationAssetId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "date": {
             "type": "string",
             "format": "date"
@@ -4315,12 +4319,8 @@
             ],
             "format": "double"
           },
-          "destinationAssetId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
+          "payOut": {
+            "type": "boolean"
           }
         }
       },
@@ -4753,6 +4753,13 @@
               "string"
             ]
           },
+          "returnAccountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "principal": {
             "maximum": 79228162514264337593543950335,
             "exclusiveMinimum": 0,
@@ -4792,9 +4799,6 @@
           },
           "capitalization": {
             "$ref": "#/components/schemas/DepositCapitalization"
-          },
-          "taxExempt": {
-            "type": "boolean"
           },
           "earlyBreakInterestLossPercent": {
             "maximum": 100,

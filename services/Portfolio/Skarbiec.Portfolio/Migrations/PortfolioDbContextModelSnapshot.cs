@@ -544,6 +544,9 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid>("ReturnAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("RolloverCount")
                         .HasColumnType("integer");
 
@@ -558,11 +561,11 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid>("SourceAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
-
-                    b.Property<bool>("TaxExempt")
-                        .HasColumnType("boolean");
 
                     b.Property<int>("TermLength")
                         .HasColumnType("integer");

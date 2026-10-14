@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.Accounts.DeleteAccount;
 
@@ -15,6 +16,11 @@ public sealed class DeleteAccountHandler(
         if (account is null)
         {
             return AccountErrors.NotFound(id);
+        }
+
+        if (await dbContext.IsReturnOfOpenDepositAsync(id, cancellationToken))
+        {
+            return AccountErrors.HasOpenDeposit(id);
         }
 
         var cash = await dbContext.LoadAccountCashAsync(id, cancellationToken);

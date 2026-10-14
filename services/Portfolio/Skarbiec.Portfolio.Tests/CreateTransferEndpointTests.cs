@@ -130,6 +130,8 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        var transferLegsBefore = await dbContext.Transactions.CountAsync(t => t.TransferId != null, cancellationToken);
 
         var response = await client.PostAsJsonAsync(TransfersUri, request, cancellationToken);
 
@@ -147,8 +149,7 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         }
 
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
-        await using var dbContext = CreateDbContext(userId);
-        Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+        Assert.Equal(transferLegsBefore, await dbContext.Transactions.CountAsync(t => t.TransferId != null, cancellationToken));
     }
 
     [Fact]

@@ -9,6 +9,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -123,5 +124,33 @@ public sealed class ArchiveAccountEndpointTests(SkarbiecContainersFixture contai
             ArchiveAccountUri(Guid.NewGuid()), content: null, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OpenDepositBlocks()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mBank = await client.CreateBankAccountAsync(
+            cancellationToken, "mBank", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        var later = await client.CreateBankAccountAsync(cancellationToken, "Later", SavingsVariant);
+        await client.AddDepositAsync(
+            cancellationToken,
+            NewDepositRequest(
+                name: "Active", startDate: new DateOnly(2026, 4, 1), termLength: 6, sourceAccountId: mBank.AccountId, returnAccountId: nest.AccountId));
+        var paidOut = await client.AddDepositAsync(
+            cancellationToken,
+            NewDepositRequest(name: "Paid out", sourceAccountId: mBank.AccountId, returnAccountId: later.AccountId));
+        await client.SettleDepositAsync(paidOut.AssetId, cancellationToken, NewSettleRequest(payOut: true));
+
+        var blocked = await client.PostAsync(ArchiveAccountUri(nest.AccountId), content: null, cancellationToken);
+
+        await blocked.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.AccountHasOpenDepositErrorCode, cancellationToken);
+        Assert.False((await client.GetAccountAsync(nest.AccountId, cancellationToken)).IsArchived);
+
+        await client.ArchiveAccountAsync(later.AccountId, cancellationToken);
+        Assert.True((await client.GetAccountAsync(later.AccountId, cancellationToken)).IsArchived);
     }
 }

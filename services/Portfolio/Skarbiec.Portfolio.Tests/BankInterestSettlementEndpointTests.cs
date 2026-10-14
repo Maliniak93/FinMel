@@ -101,13 +101,13 @@ public sealed class BankInterestSettlementEndpointTests(SkarbiecContainersFixtur
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(SeptemberEndedUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var deposit = await client.AddDepositAsync(cancellationToken);
-        await client.SettleDepositAsync(
-            deposit.AssetId, cancellationToken, NewSettleRequest(grossInterest: 0m, tax: 0m));
         var account = await client.CreateBankAccountAsync(
             cancellationToken, "Nest Oszczędnościowe", SavingsVariant, annualInterestRatePercent: 5m);
-        await client.PayOutDepositAsync(
-            deposit.AssetId, account.MoneyAssetId, cancellationToken, new DateOnly(2026, 9, 16));
+        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(returnAccountId: account.AccountId));
+        await client.SettleDepositAsync(
+            deposit.AssetId,
+            cancellationToken,
+            NewSettleRequest(settledOn: new DateOnly(2026, 9, 16), grossInterest: 0m, tax: 0m, payOut: true));
 
         var preview = await client.GetInterestPreviewAsync(account.AccountId, cancellationToken);
 

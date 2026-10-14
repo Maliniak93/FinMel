@@ -58,7 +58,7 @@ public sealed class PayOutDepositHandler(
             return DepositErrors.PayoutDateInFuture;
         }
 
-        var planned = await dbContext.PlanPayoutAsync(asset, history, request.DestinationAssetId, request.Date, cancellationToken);
+        var planned = await dbContext.PlanPayoutAsync(asset, history, terms.ReturnAccountId, request.Date, cancellationToken);
         if (planned.IsFailure)
         {
             return planned.Error;
@@ -89,8 +89,8 @@ public sealed class PayOutDepositHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+        var accountNames = await dbContext.LoadAccountNamesAsync([terms], cancellationToken);
 
-        return terms.ToResponse(asset, today, funding, payout.ToInfo());
+        return terms.ToResponse(asset, today, accountNames, payout.OutLeg.Date);
     }
 }

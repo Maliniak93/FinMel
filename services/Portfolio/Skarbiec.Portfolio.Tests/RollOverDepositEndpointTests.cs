@@ -55,7 +55,8 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(3, rolled.TermLength);
         Assert.Equal(DepositTermUnit.Months, rolled.TermUnit);
         Assert.Equal(DepositCapitalization.AtMaturity, rolled.Capitalization);
-        Assert.False(rolled.TaxExempt);
+        Assert.Equal(deposit.ReturnAccountId, rolled.ReturnAccountId);
+        Assert.Equal(deposit.SourceAccountId, rolled.SourceAccountId);
         Assert.Equal(50m, rolled.EarlyBreakInterestLossPercent);
         Assert.Equal("Test bank", rolled.BankName);
         Assert.Equal("Term deposit", rolled.Name);
@@ -78,7 +79,9 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             .WithRate("EUR", new DateOnly(2026, 4, 20), 4.10m);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(currency: "EUR"));
+        var eur = await client.CreateBankAccountAsync(
+            cancellationToken, "mBank EUR", currency: "EUR", balance: 50_000m, depositedOn: DefaultTopUpDate);
+        var deposit = await client.AddDepositAsync(cancellationToken, NewDepositRequest(sourceAccountId: eur.AccountId));
 
         var response = await client.PostAsJsonAsync(
             RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
@@ -311,7 +314,8 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var deposit = await client.AddDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(cancellationToken);
+        var cashId = await client.GetAccountCashAssetIdAsync(deposit.ReturnAccountId, cancellationToken);
+        var cashBefore = (await client.GetAssetAsync(cashId, cancellationToken)).Quantity;
 
         // Period 1 → 2: 10 119.83 from 2026-04-15 to 2026-07-15 at 5.5 %.
         var first = await client.PostAsJsonAsync(RollOverDepositUri(deposit.AssetId), NewRollOverRequest(), cancellationToken);
@@ -331,8 +335,7 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
             TermLength = 3,
             TermUnit = DepositTermUnit.Months,
             AnnualInterestRatePercent = 5.5m,
-            Capitalization = DepositCapitalization.AtMaturity,
-            TaxExempt = false
+            Capitalization = DepositCapitalization.AtMaturity
         });
         Assert.Equal(new DateOnly(2026, 7, 15), preview.SettledOn);
         Assert.Equal(expected.GrossInterest, preview.GrossInterest);
@@ -379,11 +382,11 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         Assert.Equal(balanceAfterSecondTerm + thirdPreview.NetInterest, wholeBalance);
 
         var payOut = await client.PostAsJsonAsync(
-            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(cashId, new DateOnly(2026, 10, 16)), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(new DateOnly(2026, 10, 16)), cancellationToken);
 
         Assert.True(payOut.IsSuccessStatusCode, $"The payout answered {(int)payOut.StatusCode}.");
         Assert.Equal(0m, (await client.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
-        Assert.Equal(wholeBalance, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
+        Assert.Equal(cashBefore + wholeBalance, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
         await client.AssertQuantityMatchesRecomputeFromScratchAsync(deposit.AssetId, cancellationToken);
         var paidOut = await client.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.PaidOut, paidOut.Status);

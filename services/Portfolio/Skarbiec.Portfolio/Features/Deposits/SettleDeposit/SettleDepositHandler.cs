@@ -79,11 +79,11 @@ public sealed class SettleDepositHandler(
             return recomputed.Error;
         }
 
-        // Checked before anything is staged, so an invalid destination leaves the deposit unsettled.
+        // Checked before anything is staged, so an invalid return account leaves the deposit unsettled.
         PayoutTransfer? payout = null;
-        if (request.DestinationAssetId is { } destinationAssetId)
+        if (request.PayOut)
         {
-            var planned = await dbContext.PlanPayoutAsync(asset, history, destinationAssetId, request.SettledOn, cancellationToken);
+            var planned = await dbContext.PlanPayoutAsync(asset, history, terms.ReturnAccountId, request.SettledOn, cancellationToken);
             if (planned.IsFailure)
             {
                 return planned.Error;
@@ -113,7 +113,7 @@ public sealed class SettleDepositHandler(
 
         asset.Quantity = recomputed.Value;
 
-        // Empties the deposit: its quantity becomes 0 and the destination's rises by the whole balance.
+        // Empties the deposit: its quantity becomes 0 and the return account's rises by the whole balance.
         payout?.Stage(dbContext, asset, fxRateToPln);
 
         terms.SettledOn = request.SettledOn;
@@ -138,8 +138,8 @@ public sealed class SettleDepositHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        var funding = await dbContext.LoadFundingSourceAsync(assetId, cancellationToken);
+        var accountNames = await dbContext.LoadAccountNamesAsync([terms], cancellationToken);
 
-        return terms.ToResponse(asset, today, funding, payout?.ToInfo());
+        return terms.ToResponse(asset, today, accountNames, payout?.OutLeg.Date);
     }
 }

@@ -4,6 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import { bankTerms } from '../../../../testing/bank-account-fixtures';
 import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../../api/reporting/client.gen';
@@ -11,6 +12,7 @@ import { provideI18nTesting } from '../../../core/i18n/testing';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../../shared/format';
 import { jsonResponse, requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { depositResponse } from '../../deposits/testing/deposit-fixtures';
 import { AccountTransferDialog } from '../account-transfer-dialog/account-transfer-dialog';
 import { CashOperationDialog } from '../cash-operation-dialog/cash-operation-dialog';
 import { ContributionLimitDialog } from '../contribution-limit-dialog/contribution-limit-dialog';
@@ -91,6 +93,15 @@ const transactions = {
   totalCount: 3,
 };
 
+const fundedDeposit = depositResponse({
+  assetId: '77777777-7777-7777-7777-777777777777',
+  name: 'Autumn deposit',
+  sourceAccountId: accountId,
+  sourceAccountName: 'mBank',
+  returnAccountId: accountId,
+  returnAccountName: 'mBank',
+});
+
 const dashboard = {
   netWorthPln: 5000,
   asOf: '2026-10-15',
@@ -136,6 +147,9 @@ describe('AccountDetail', () => {
       }
       if (url.includes('/api/portfolio/assets') && url.includes(`accountId=${accountId}`)) {
         return jsonResponse(holdings);
+      }
+      if (url.includes('/api/portfolio/deposits')) {
+        return jsonResponse([fundedDeposit]);
       }
       if (url.includes(`/api/portfolio/accounts/${accountId}`)) {
         return jsonResponse({ ...account, ...accountOverrides });
@@ -212,6 +226,24 @@ describe('AccountDetail', () => {
     expect(text()).toContain(formatMoney(2000, 'PLN').replace(/\s+/g, ' '));
     expect(text()).toContain(formatMoney(3000, 'PLN').replace(/\s+/g, ' '));
     expect(text()).toContain(formatMoney(5000, 'PLN').replace(/\s+/g, ' '));
+  });
+
+  it('lists the deposits a bank account funds or receives and links to the deposits page', async () => {
+    await setup({ type: 2, wrapper: 0, currency: 'PLN', bank: bankTerms() });
+
+    const request = fetchSpy.mock.calls
+      .map((call: unknown[]) => requestUrl(call[0]))
+      .find((url: string) => url.includes('/api/portfolio/deposits'));
+    expect(request).toBeDefined();
+    expect(new URL(request!).searchParams.get('accountId')).toBe(accountId);
+    expect(text()).toContain('Autumn deposit');
+    expect(root().querySelector('a[href="/deposits"]')).not.toBeNull();
+  });
+
+  it('does not look for deposits on a brokerage account', async () => {
+    await setup();
+
+    expect(getCalls('/api/portfolio/deposits')).toBe(0);
   });
 
   it('lists the holdings and links each to its transactions', async () => {

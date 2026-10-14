@@ -44,16 +44,15 @@ export type AddBondRequest = {
 export type AddDepositRequest = {
     name: string;
     bankName?: null | string;
-    currency: string;
+    sourceAccountId: string;
+    returnAccountId?: null | string;
     principal: number | string;
     startDate: string;
     termLength: number | string;
     termUnit: DepositTermUnit;
     annualInterestRatePercent: number | string;
     capitalization: DepositCapitalization;
-    taxExempt?: boolean;
     earlyBreakInterestLossPercent?: number | string;
-    fundingAssetId?: null | string;
 };
 
 export type AddMetalRequest = {
@@ -306,17 +305,18 @@ export type DepositResponse = {
     maturityDate: string;
     annualInterestRatePercent: number | string;
     capitalization: DepositCapitalization;
-    taxExempt: boolean;
     earlyBreakInterestLossPercent: number | string;
     projection: DepositProjectionResponse;
     status: DepositStatus;
     settledOn?: null | string;
     settledGrossInterest?: null | number | string;
     settledTax?: null | number | string;
-    fundingAssetId?: null | string;
-    fundingAssetName?: null | string;
+    sourceAccountId: string;
+    sourceAccountName: string;
+    returnAccountId: string;
+    returnAccountName: string;
     paidOutOn?: null | string;
-    paidOutToAssetName?: null | string;
+    paidOutToAccountName?: null | string;
     rolloverCount: number | string;
 };
 
@@ -358,7 +358,6 @@ export type PagedResponseOfTransactionResponse = {
 };
 
 export type PayOutDepositRequest = {
-    destinationAssetId: string;
     date: string;
 };
 
@@ -446,7 +445,7 @@ export type SettleDepositRequest = {
     settledOn: string;
     grossInterest: number | string;
     tax: number | string;
-    destinationAssetId?: null | string;
+    payOut?: boolean;
 };
 
 export type SwapBondRequest = {
@@ -532,13 +531,13 @@ export type UpdateBondRequest = {
 export type UpdateDepositRequest = {
     name: string;
     bankName?: null | string;
+    returnAccountId?: null | string;
     principal: number | string;
     startDate: string;
     termLength: number | string;
     termUnit: DepositTermUnit;
     annualInterestRatePercent: number | string;
     capitalization: DepositCapitalization;
-    taxExempt?: boolean;
     earlyBreakInterestLossPercent?: number | string;
 };
 
@@ -981,7 +980,9 @@ export type PutApiPortfolioAssetsByAssetIdTransactionsByIdResponse = PutApiPortf
 export type GetApiPortfolioDepositsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        accountId?: string;
+    };
     url: '/api/portfolio/deposits';
 };
 

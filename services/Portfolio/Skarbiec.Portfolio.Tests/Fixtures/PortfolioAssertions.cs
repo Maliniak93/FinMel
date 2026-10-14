@@ -18,6 +18,10 @@ internal static class PortfolioAssertions
 
     public const string AccountCashManagedErrorCode = "Conflict.AccountCashManaged";
 
+    public const string AccountHasOpenDepositErrorCode = "Conflict.AccountHasOpenDeposit";
+
+    public const string BankAccountRequiredErrorCode = "Validation.BankAccountRequired";
+
     public static async Task AssertAccountCashManagedAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, AccountCashManagedErrorCode, cancellationToken);

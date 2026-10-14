@@ -47,6 +47,16 @@
         <td mat-cell *matCellDef="let deposit">{{ deposit.bankName ?? '—' }}</td>
       </ng-container>
 
+      <ng-container matColumnDef="sourceAccount">
+        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.source' | transloco }}</th>
+        <td mat-cell *matCellDef="let deposit">{{ deposit.sourceAccountName }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="returnAccount">
+        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.returnTo' | transloco }}</th>
+        <td mat-cell *matCellDef="let deposit">{{ deposit.returnAccountName }}</td>
+      </ng-container>
+
       <ng-container matColumnDef="principal">
         <th mat-header-cell *matHeaderCellDef>{{ 'deposits.principal' | transloco }}</th>
         <td mat-cell *matCellDef="let deposit">
@@ -98,7 +108,7 @@
           </mat-chip-set>
           @if (isPaidOut(deposit)) {
             <div class="deposits-page__payout">
-              {{ formatDate(deposit.paidOutOn) }} → {{ deposit.paidOutToAssetName ?? '—' }}
+              {{ formatDate(deposit.paidOutOn) }} → {{ deposit.paidOutToAccountName ?? '—' }}
             </div>
           }
         </td>

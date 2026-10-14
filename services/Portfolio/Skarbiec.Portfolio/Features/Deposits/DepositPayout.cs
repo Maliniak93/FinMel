@@ -1,11 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.Deposits;
-
-public sealed record DepositPayoutInfo(DateOnly PaidOutOn, string? DestinationAssetName);
 
 internal static class DepositPayout
 {
@@ -13,23 +12,21 @@ internal static class DepositPayout
         this PortfolioDbContext dbContext,
         Asset deposit,
         IReadOnlyCollection<Transaction> depositHistory,
-        Guid destinationAssetId,
+        Guid returnAccountId,
         DateOnly date,
         CancellationToken cancellationToken)
     {
-        var destination = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == destinationAssetId, cancellationToken);
+        var destination = await dbContext.Assets.FirstOrDefaultAsync(
+            a => a.AccountId == returnAccountId && a.AssetClass == AssetClass.BankAccount, cancellationToken);
 
-        if (destination is null
-            || !TransferRoutes.IsAllowed(deposit.AssetClass, destination.AssetClass)
-            || destination.IsArchived
-            || await dbContext.IsAccountArchivedAsync(destination.AccountId, cancellationToken))
+        if (destination is null)
         {
             return TransferErrors.InvalidCounterpart;
         }
 
-        if (destination.Currency != deposit.Currency)
+        if (await dbContext.ReadOnlyErrorAsync(destination, cancellationToken) is { } readOnly)
         {
-            return TransferErrors.CurrencyMismatch;
+            return readOnly;
         }
 
         // A payout always moves the whole balance: the bank closes the deposit and pays everything out.
@@ -61,37 +58,27 @@ internal static class DepositPayout
         return new PayoutTransfer(destination, outLeg, inLeg, depositQuantity.Value, destinationQuantity.Value);
     }
 
-    public static async Task<IReadOnlyDictionary<Guid, DepositPayoutInfo>> LoadPayoutsAsync(
+    public static async Task<IReadOnlyDictionary<Guid, DateOnly>> LoadPayoutDatesAsync(
         this PortfolioDbContext dbContext, IReadOnlyCollection<Guid> depositIds, CancellationToken cancellationToken)
     {
         // A plain list parameter, whatever collection the caller passed.
         var ids = depositIds.ToList();
 
-        // The deposit's Withdraw is the Out leg; the destination is the In leg's asset, missing once detached.
-        var rows = await (
-                from outLeg in dbContext.Transactions.AsNoTracking()
-                where ids.Contains(outLeg.AssetId) && outLeg.Type == TransactionType.Withdraw
-                select new
-                {
-                    DepositId = outLeg.AssetId,
-                    outLeg.Date,
-                    DestinationName = (
-                            from inLeg in dbContext.Transactions
-                            where outLeg.TransferId != null && inLeg.TransferId == outLeg.TransferId && inLeg.Id != outLeg.Id
-                            join destination in dbContext.Assets on inLeg.AssetId equals destination.Id
-                            select destination.Name)
-                        .FirstOrDefault()
-                })
+        // Only a payout writes a Withdraw on a deposit.
+        var rows = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(t => ids.Contains(t.AssetId) && t.Type == TransactionType.Withdraw)
+            .Select(t => new { t.AssetId, t.Date })
             .ToListAsync(cancellationToken);
 
         return rows
-            .DistinctBy(r => r.DepositId)
-            .ToDictionary(r => r.DepositId, r => new DepositPayoutInfo(r.Date, r.DestinationName));
+            .DistinctBy(r => r.AssetId)
+            .ToDictionary(r => r.AssetId, r => r.Date);
     }
 
-    public static async Task<DepositPayoutInfo?> LoadPayoutAsync(
+    public static async Task<DateOnly?> LoadPayoutDateAsync(
         this PortfolioDbContext dbContext, Guid depositId, CancellationToken cancellationToken)
-        => (await dbContext.LoadPayoutsAsync([depositId], cancellationToken)).GetValueOrDefault(depositId);
+        => (await dbContext.LoadPayoutDatesAsync([depositId], cancellationToken)).TryGetValue(depositId, out var date) ? date : null;
 }
 
 internal sealed record PayoutTransfer(
@@ -106,6 +93,4 @@ internal sealed record PayoutTransfer(
         deposit.Quantity = DepositQuantity;
         Destination.Quantity = DestinationQuantity;
     }
-
-    public DepositPayoutInfo ToInfo() => new(OutLeg.Date, Destination.Name);
 }

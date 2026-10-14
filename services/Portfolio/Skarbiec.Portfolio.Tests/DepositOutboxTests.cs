@@ -27,12 +27,22 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
+        Guid sourceMoneyId;
+        Guid sourceAccountId;
+        await using (var arrange = Provider.CreateAsyncScope())
+        {
+            var source = await CreateBankAccountAsync(
+                arrange.ServiceProvider, "mBank", "PLN", 0m, cancellationToken, balance: 20_000m);
+            sourceMoneyId = source.CashAssetId;
+            sourceAccountId = source.Id;
+        }
+
         await using var scope = Provider.CreateAsyncScope();
 
         SaveChanges.Reset();
 
         var result = await scope.ServiceProvider.GetRequiredService<AddDepositHandler>()
-            .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
+            .HandleAsync(PortfolioApi.NewDepositRequest(sourceAccountId: sourceAccountId), cancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, SaveChanges.Count);
@@ -46,8 +56,11 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Assert.Equal(1, await verifyDb.Transactions.CountAsync(t => t.AssetId == assetId, cancellationToken));
         Assert.True(await verifyDb.Set<TermDeposit>().AnyAsync(t => t.AssetId == assetId, cancellationToken));
 
-        var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
-        Assert.Equal(assetId, evt.AssetId);
+        var published = await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        var bankEvent = published.Where(e => e.AssetId == sourceMoneyId).MaxBy(e => e.Version)!;
+        Assert.Equal(10_000m, bankEvent.Quantity);
+        Assert.Equal(AssetClass.BankAccount, bankEvent.AssetClass);
+        var evt = Assert.Single(published, e => e.AssetId == assetId);
         Assert.Null(evt.AccountId);
         Assert.Equal(UserId, evt.UserId);
         Assert.Equal(AssetClass.Deposit, evt.AssetClass);
@@ -65,10 +78,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
-            Assert.True(added.IsSuccess);
-            assetId = added.Value.AssetId;
+            assetId = (await OpenDepositAsync(arrange.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest())).AssetId;
         }
 
         SaveChanges.Reset();
@@ -86,9 +96,10 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
 
         await using var verify = Provider.CreateAsyncScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
-        var events = await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Where(e => e.AssetId == assetId)
+            .ToList();
         Assert.Equal(2, events.Count);
-        Assert.All(events, e => Assert.Equal(assetId, e.AssetId));
         Assert.Equal(10_000m, events[0].Quantity);
         Assert.Equal(15_000m, events[1].Quantity);
         Assert.True(events[1].Version > events[0].Version);
@@ -108,10 +119,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
-            Assert.True(added.IsSuccess);
-            assetId = added.Value.AssetId;
+            assetId = (await OpenDepositAsync(arrange.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest())).AssetId;
         }
 
         SaveChanges.Reset();
@@ -127,9 +135,10 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
 
         await using var verify = Provider.CreateAsyncScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
-        var events = await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+        var events = (await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Where(e => e.AssetId == assetId)
+            .ToList();
         Assert.Equal(2, events.Count);
-        Assert.All(events, e => Assert.Equal(assetId, e.AssetId));
         Assert.Equal(10_000m, events[0].Quantity);
         Assert.Equal(10_119.83m, events[1].Quantity);
         Assert.True(events[1].Version > events[0].Version);
@@ -154,10 +163,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
-            Assert.True(added.IsSuccess);
-            assetId = added.Value.AssetId;
+            assetId = (await OpenDepositAsync(arrange.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest())).AssetId;
         }
 
         SaveChanges.Reset();
@@ -191,10 +197,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
-            Assert.True(added.IsSuccess);
-            assetId = added.Value.AssetId;
+            assetId = (await OpenDepositAsync(arrange.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest())).AssetId;
             Assert.True((await arrange.ServiceProvider.GetRequiredService<ArchiveAssetHandler>()
                 .HandleAsync(assetId, cancellationToken)).IsSuccess);
         }
@@ -228,7 +231,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         await using var verify = Provider.CreateAsyncScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
         Assert.Equal(outboxRowsBefore, await verifyDb.Set<OutboxMessage>().CountAsync(cancellationToken));
-        Assert.Equal(1, await verifyDb.Assets.CountAsync(cancellationToken));
+        Assert.Equal(2, await verifyDb.Assets.CountAsync(cancellationToken));
         Assert.Equal(10_000m, (await verifyDb.Set<TermDeposit>().SingleAsync(t => t.AssetId == assetId, cancellationToken)).Principal);
     }
 
@@ -240,10 +243,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
-            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
-            assetId = added.Value.AssetId;
+            assetId = (await OpenDepositAsync(arrange.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest())).AssetId;
         }
 
         IReadOnlyList<AssetPositionChanged> eventsBefore;
@@ -297,10 +297,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         Guid assetId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(), cancellationToken);
-            Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
-            assetId = added.Value.AssetId;
+            assetId = (await OpenDepositAsync(arrange.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest())).AssetId;
             var settled = await arrange.ServiceProvider.GetRequiredService<SettleDepositHandler>()
                 .HandleAsync(assetId, PortfolioApi.NewSettleRequest(), cancellationToken);
             Assert.True(settled.IsSuccess, settled.IsFailure ? settled.Error.Code : null);
@@ -344,19 +341,10 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         var cancellationToken = TestContext.Current.CancellationToken;
 
         Guid assetId;
-        Guid cashId;
         await using (var arrange = Provider.CreateAsyncScope())
         {
-            var added = await arrange.ServiceProvider.GetRequiredService<AddDepositHandler>()
-                .HandleAsync(PortfolioApi.NewDepositRequest(startDate: new DateOnly(2026, 1, 1)), cancellationToken);
-            Assert.True(added.IsSuccess);
-            assetId = added.Value.AssetId;
+            assetId = (await OpenDepositAsync(arrange.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest(startDate: new DateOnly(2026, 1, 1)))).AssetId;
 
-            var cash = await arrange.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
-                new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
-                cancellationToken);
-            Assert.True(cash.IsSuccess);
-            cashId = cash.Value.Id;
         }
 
         await using (var settle = Provider.CreateAsyncScope())
@@ -369,7 +357,7 @@ public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : P
         await using (var payOut = Provider.CreateAsyncScope())
         {
             var paidOut = await payOut.ServiceProvider.GetRequiredService<PayOutDepositHandler>()
-                .HandleAsync(assetId, PortfolioApi.NewPayOutRequest(cashId), cancellationToken);
+                .HandleAsync(assetId, PortfolioApi.NewPayOutRequest(), cancellationToken);
             Assert.True(paidOut.IsSuccess, paidOut.IsFailure ? paidOut.Error.Code : null);
         }
 

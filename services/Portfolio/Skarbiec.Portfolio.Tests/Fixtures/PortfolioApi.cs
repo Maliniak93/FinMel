@@ -60,6 +60,9 @@ internal static class PortfolioApi
 
     public const string AllDepositsUri = "/api/portfolio/deposits";
 
+    public static string DepositsOfAccountUri(Guid accountId) =>
+        $"{AllDepositsUri}?accountId={accountId}";
+
     public static string DepositUri(Guid assetId) =>
         $"/api/portfolio/deposits/{assetId}";
 
@@ -75,28 +78,26 @@ internal static class PortfolioApi
         DateOnly? settledOn = null,
         decimal grossInterest = 147.95m,
         decimal tax = 28.12m,
-        Guid? destinationAssetId = null) => new()
+        bool payOut = false) => new()
         {
             SettledOn = settledOn ?? new DateOnly(2026, 4, 15),
             GrossInterest = grossInterest,
             Tax = tax,
-            DestinationAssetId = destinationAssetId
+            PayOut = payOut
         };
 
     public static string PayOutDepositUri(Guid assetId) =>
         $"{DepositUri(assetId)}/payout";
 
-    public static PayOutDepositRequest NewPayOutRequest(Guid destinationAssetId, DateOnly? date = null) => new()
+    public static PayOutDepositRequest NewPayOutRequest(DateOnly? date = null) => new()
     {
-        DestinationAssetId = destinationAssetId,
         Date = date ?? new DateOnly(2026, 4, 18)
     };
 
     public static async Task PayOutDepositAsync(
-        this HttpClient client, Guid assetId, Guid destinationAssetId, CancellationToken cancellationToken, DateOnly? date = null)
+        this HttpClient client, Guid assetId, CancellationToken cancellationToken, DateOnly? date = null)
     {
-        var response = await client.PostAsJsonAsync(
-            PayOutDepositUri(assetId), NewPayOutRequest(destinationAssetId, date), cancellationToken);
+        var response = await client.PostAsJsonAsync(PayOutDepositUri(assetId), NewPayOutRequest(date), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -136,14 +137,14 @@ internal static class PortfolioApi
 
     public sealed record PaidOutDeposit(DepositResponse Deposit, Guid CashAssetId);
 
+    // CashAssetId is the money asset of the deposit's return account, which received the payout.
     public static async Task<PaidOutDeposit> CreatePaidOutDepositAsync(this HttpClient client, CancellationToken cancellationToken)
     {
         var deposit = await client.AddDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(cancellationToken);
-        await client.SettleDepositAsync(
-            deposit.AssetId, cancellationToken, NewSettleRequest(destinationAssetId: cashId));
+        await client.SettleDepositAsync(deposit.AssetId, cancellationToken, NewSettleRequest(payOut: true));
+        var moneyAssetId = await client.GetAccountCashAssetIdAsync(deposit.ReturnAccountId, cancellationToken);
 
-        return new PaidOutDeposit(deposit, cashId);
+        return new PaidOutDeposit(deposit, moneyAssetId);
     }
 
     public static async Task SettleDepositAsync(
@@ -165,49 +166,63 @@ internal static class PortfolioApi
     public static AddDepositRequest NewDepositRequest(
         string name = "Term deposit",
         string? bankName = "Test bank",
-        string currency = "PLN",
         decimal principal = 10_000m,
         DateOnly? startDate = null,
         int termLength = 3,
         DepositTermUnit termUnit = DepositTermUnit.Months,
         decimal annualInterestRatePercent = 6m,
         DepositCapitalization capitalization = DepositCapitalization.AtMaturity,
-        bool taxExempt = false,
         decimal earlyBreakInterestLossPercent = 100m,
-        Guid? fundingAssetId = null) => new()
+        Guid? sourceAccountId = null,
+        Guid? returnAccountId = null) => new()
         {
             Name = name,
             BankName = bankName,
-            Currency = currency,
+            SourceAccountId = sourceAccountId ?? Guid.Empty,
+            ReturnAccountId = returnAccountId,
             Principal = principal,
             StartDate = startDate ?? new DateOnly(2026, 1, 15),
             TermLength = termLength,
             TermUnit = termUnit,
             AnnualInterestRatePercent = annualInterestRatePercent,
             Capitalization = capitalization,
-            TaxExempt = taxExempt,
-            EarlyBreakInterestLossPercent = earlyBreakInterestLossPercent,
-            FundingAssetId = fundingAssetId
+            EarlyBreakInterestLossPercent = earlyBreakInterestLossPercent
         };
 
     public static UpdateDepositRequest ToUpdateRequest(this AddDepositRequest request) => new()
     {
         Name = request.Name,
         BankName = request.BankName,
+        ReturnAccountId = request.ReturnAccountId,
         Principal = request.Principal,
         StartDate = request.StartDate,
         TermLength = request.TermLength,
         TermUnit = request.TermUnit,
         AnnualInterestRatePercent = request.AnnualInterestRatePercent,
         Capitalization = request.Capitalization,
-        TaxExempt = request.TaxExempt,
         EarlyBreakInterestLossPercent = request.EarlyBreakInterestLossPercent
     };
+
+    // A request without a source account is funded from a fresh PLN bank account that holds far more than any deposit needs.
+    public static async Task<AddDepositRequest> WithFundingAsync(
+        this HttpClient client, AddDepositRequest request, CancellationToken cancellationToken)
+    {
+        if (request.SourceAccountId != Guid.Empty)
+        {
+            return request;
+        }
+
+        var source = await client.CreateBankAccountAsync(
+            cancellationToken, $"Funding {Guid.NewGuid():N}", balance: 1_000_000m, depositedOn: new DateOnly(2025, 1, 1));
+
+        return request with { SourceAccountId = source.AccountId };
+    }
 
     public static async Task<DepositResponse> AddDepositAsync(
         this HttpClient client, CancellationToken cancellationToken, AddDepositRequest? request = null)
     {
-        var response = await client.PostAsJsonAsync(AllDepositsUri, request ?? NewDepositRequest(), cancellationToken);
+        var funded = await client.WithFundingAsync(request ?? NewDepositRequest(), cancellationToken);
+        var response = await client.PostAsJsonAsync(AllDepositsUri, funded, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken))!;
@@ -686,7 +701,8 @@ internal static class PortfolioApi
         return cashId;
     }
 
-    public sealed record FundedDeposit(Guid CashAssetId, DepositResponse Deposit);
+    // CashAssetId is the money asset of the PLN bank account the deposit was opened from.
+    public sealed record FundedDeposit(Guid CashAssetId, DepositResponse Deposit, Guid AccountId);
 
     public static async Task<FundedDeposit> CreateFundedDepositAsync(
         this HttpClient client,
@@ -694,11 +710,12 @@ internal static class PortfolioApi
         decimal cashBalance = 5_000m,
         decimal principal = 1_000m)
     {
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: cashBalance);
+        var source = await client.CreateBankAccountAsync(
+            cancellationToken, "Cash account", balance: cashBalance, depositedOn: DefaultTopUpDate);
         var deposit = await client.AddDepositAsync(
-            cancellationToken, NewDepositRequest(principal: principal, fundingAssetId: cashId));
+            cancellationToken, NewDepositRequest(principal: principal, sourceAccountId: source.AccountId));
 
-        return new FundedDeposit(cashId, deposit);
+        return new FundedDeposit(source.MoneyAssetId, deposit, source.AccountId);
     }
 
     public static async Task<TransactionResponse> GetCashWithdrawAsync(

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
-import { findReplay, renderResumeScript } from "./build-replay.mjs";
+import { findReplay, latestRunRecord, renderResumeScript } from "./build-replay.mjs";
 
 const roots = [];
 after(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
@@ -184,4 +184,28 @@ test("renderResumeScript swaps the marker line, keeps meta first and returns nul
   assert.deepEqual(parsed, { steps, interrupted: LABELS[1] });
   assert.equal(out.split("\n").length, source.split("\n").length);
   assert.equal(renderResumeScript("export const meta = {}\n", { steps, interrupted: null }), null);
+});
+
+test("latestRunRecord returns the newest run of the issue that carries a ship report", () => {
+  const h = makeHistory();
+  const ship = { blocked: false, report: { status: "shipped", tests: ["T"] } };
+  addRun(h, { session: "s1", runId: "wf_old", entries: finished(LABELS), record: { timestamp: "2026-01-01T10:00:00Z", result: { status: "ready", ship } }, age: 60 });
+  addRun(h, { session: "s2", runId: "wf_new", entries: finished(LABELS), record: { timestamp: "2026-01-01T11:00:00Z", result: { status: "ready", ship: { ...ship, blocked: true } } } });
+  const r = latestRunRecord({ issue: 7, history: h });
+  assert.deepEqual([r.runId, r.args.branch, r.result.ship.blocked], ["wf_new", "feat/x", true]);
+});
+
+test("latestRunRecord finds a run that left no journal and returns null when the newest run has no ship report", () => {
+  const h = makeHistory();
+  const put = (session, runId, timestamp, result) => {
+    mkdirSync(path.join(h, session, "workflows"), { recursive: true });
+    writeFileSync(path.join(h, session, "workflows", `${runId}.json`), JSON.stringify({ runId, workflowName: "build-feature", args: ARGS, timestamp, result }));
+  };
+  put("s1", "wf_replayed", "2026-01-01T10:00:00Z", { status: "ready", ship: { blocked: false, report: {} } });
+  assert.equal(latestRunRecord({ issue: 7, history: h }).runId, "wf_replayed");
+  assert.equal(latestRunRecord({ issue: 7, since: Date.parse("2026-01-01T10:30:00Z"), history: h }), null);
+  assert.equal(latestRunRecord({ issue: 8, history: h }), null);
+  assert.equal(latestRunRecord({ issue: 7, history: path.join(h, "missing") }), null);
+  put("s2", "wf_legacy", "2026-01-01T11:00:00Z", { status: "ready", nextCommand: "node scripts/ship.mjs 7 --json '{}'" });
+  assert.equal(latestRunRecord({ issue: 7, history: h }), null);
 });

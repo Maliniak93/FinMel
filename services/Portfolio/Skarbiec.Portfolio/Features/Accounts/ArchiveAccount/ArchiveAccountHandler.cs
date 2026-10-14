@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.Accounts.ArchiveAccount;
 
@@ -25,6 +26,11 @@ public sealed class ArchiveAccountHandler(PortfolioDbContext dbContext, TimeProv
         if (holdsQuantity)
         {
             return AccountErrors.NotEmpty(id);
+        }
+
+        if (await dbContext.IsReturnOfOpenDepositAsync(id, cancellationToken))
+        {
+            return AccountErrors.HasOpenDeposit(id);
         }
 
         account.IsArchived = true;

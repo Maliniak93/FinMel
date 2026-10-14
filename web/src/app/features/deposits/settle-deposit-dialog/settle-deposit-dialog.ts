@@ -8,6 +8,7 @@ import {
   type ValidationErrors,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -29,7 +30,6 @@ import {
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatDate, formatMoney } from '../../../shared/format';
 import { settlementAmounts } from '../deposit-terms';
-import { PayoutDestinationField } from '../payout-destination-field/payout-destination-field';
 
 export interface SettleDepositDialogData {
   deposit: DepositResponse;
@@ -57,12 +57,12 @@ function isAmount(value: number | string | null): value is number | string {
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    PayoutDestinationField,
     TranslocoPipe,
   ],
   templateUrl: './settle-deposit-dialog.html',
@@ -93,7 +93,7 @@ export class SettleDepositDialog {
     ],
     grossInterest: [null as number | null, [Validators.required, Validators.min(0)]],
     tax: [null as number | null, [Validators.required, Validators.min(0), taxWithinGross]],
-    destinationAssetId: [null as string | null],
+    payOut: [false],
   });
 
   private readonly formValue = toSignal(
@@ -110,7 +110,7 @@ export class SettleDepositDialog {
   });
 
   protected readonly movedAmount = computed(() =>
-    this.formValue().destinationAssetId ? (this.amounts()?.finalAmount ?? null) : null,
+    this.formValue().payOut ? (this.amounts()?.finalAmount ?? null) : null,
   );
 
   protected readonly previewResource = resource({
@@ -171,7 +171,7 @@ export class SettleDepositDialog {
         settledOn: toDateOnly(values.settledOn!),
         grossInterest: Number(values.grossInterest),
         tax: Number(values.tax),
-        destinationAssetId: values.destinationAssetId ?? undefined,
+        payOut: values.payOut || undefined,
       },
     });
 

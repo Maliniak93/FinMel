@@ -38,7 +38,6 @@ public sealed record DepositResponse
     public required DateOnly MaturityDate { get; init; }
     public required decimal AnnualInterestRatePercent { get; init; }
     public required DepositCapitalization Capitalization { get; init; }
-    public required bool TaxExempt { get; init; }
     public required decimal EarlyBreakInterestLossPercent { get; init; }
     public required DepositProjectionResponse Projection { get; init; }
     public required DepositStatus Status { get; init; }
@@ -48,15 +47,20 @@ public sealed record DepositResponse
     public decimal? SettledGrossInterest { get; init; }
     public decimal? SettledTax { get; init; }
 
-    /// <summary>The Cash asset the principal came from; null when the money came from outside the app or the transfer was detached.</summary>
-    public Guid? FundingAssetId { get; init; }
+    /// <summary>The Bank account the principal left; fixed once the deposit exists.</summary>
+    public required Guid SourceAccountId { get; init; }
 
-    public string? FundingAssetName { get; init; }
+    public required string SourceAccountName { get; init; }
+
+    /// <summary>The Bank account the capital and net interest go back to; editable until the deposit is paid out.</summary>
+    public required Guid ReturnAccountId { get; init; }
+
+    public required string ReturnAccountName { get; init; }
 
     public DateOnly? PaidOutOn { get; init; }
 
-    /// <summary>Null until the deposit is paid out, and again once the destination asset was removed.</summary>
-    public string? PaidOutToAssetName { get; init; }
+    /// <summary>Null until the deposit is paid out.</summary>
+    public string? PaidOutToAccountName { get; init; }
 
     public required int RolloverCount { get; init; }
 }
@@ -67,8 +71,8 @@ public static class DepositMappingExtensions
         this TermDeposit terms,
         Asset asset,
         DateOnly today,
-        DepositFundingSource? funding,
-        DepositPayoutInfo? payout)
+        IReadOnlyDictionary<Guid, string> accountNames,
+        DateOnly? paidOutOn)
     {
         var projection = DepositInterestMath.Project(new DepositTerms
         {
@@ -77,9 +81,10 @@ public static class DepositMappingExtensions
             TermLength = terms.TermLength,
             TermUnit = terms.TermUnit,
             AnnualInterestRatePercent = terms.AnnualInterestRatePercent,
-            Capitalization = terms.Capitalization,
-            TaxExempt = terms.TaxExempt
+            Capitalization = terms.Capitalization
         });
+
+        var returnAccountName = accountNames.GetValueOrDefault(terms.ReturnAccountId) ?? string.Empty;
 
         return new DepositResponse
         {
@@ -95,7 +100,6 @@ public static class DepositMappingExtensions
             MaturityDate = terms.MaturityDate,
             AnnualInterestRatePercent = terms.AnnualInterestRatePercent,
             Capitalization = terms.Capitalization,
-            TaxExempt = terms.TaxExempt,
             EarlyBreakInterestLossPercent = terms.EarlyBreakInterestLossPercent,
             Projection = new DepositProjectionResponse
             {
@@ -106,15 +110,17 @@ public static class DepositMappingExtensions
                 NetProfitPercent = projection.NetProfitPercent
             },
             Status = terms.SettledOn is not null
-                ? payout is not null ? DepositStatus.PaidOut : DepositStatus.Settled
+                ? paidOutOn is not null ? DepositStatus.PaidOut : DepositStatus.Settled
                 : terms.MaturityDate <= today ? DepositStatus.Due : DepositStatus.Active,
             SettledOn = terms.SettledOn,
             SettledGrossInterest = terms.SettledGrossInterest,
             SettledTax = terms.SettledTax,
-            FundingAssetId = funding?.AssetId,
-            FundingAssetName = funding?.AssetName,
-            PaidOutOn = payout?.PaidOutOn,
-            PaidOutToAssetName = payout?.DestinationAssetName,
+            SourceAccountId = terms.SourceAccountId,
+            SourceAccountName = accountNames.GetValueOrDefault(terms.SourceAccountId) ?? string.Empty,
+            ReturnAccountId = terms.ReturnAccountId,
+            ReturnAccountName = returnAccountName,
+            PaidOutOn = paidOutOn,
+            PaidOutToAccountName = paidOutOn is null ? null : returnAccountName,
             RolloverCount = terms.RolloverCount
         };
     }

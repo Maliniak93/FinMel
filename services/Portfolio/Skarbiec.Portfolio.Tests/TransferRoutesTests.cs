@@ -7,8 +7,7 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class TransferRoutesTests
 {
     private static bool ExpectedAllowed(AssetClass source, AssetClass target) =>
-        (source, target) is (AssetClass.Cash, AssetClass.Deposit) or (AssetClass.Deposit, AssetClass.Cash)
-            or (AssetClass.Deposit, AssetClass.BankAccount)
+        (source, target) is (AssetClass.BankAccount, AssetClass.Deposit) or (AssetClass.Deposit, AssetClass.BankAccount)
             or (AssetClass.Cash, AssetClass.Bond) or (AssetClass.Bond, AssetClass.Cash)
             or (AssetClass.Bond, AssetClass.Bond)
             or (AssetClass.Cash, AssetClass.PreciousMetal) or (AssetClass.PreciousMetal, AssetClass.Cash)
@@ -46,7 +45,8 @@ public sealed class TransferRoutesTests
     [InlineData(AssetClass.Deposit, AssetClass.Deposit)]
     [InlineData(AssetClass.BankAccount, AssetClass.BankAccount)]
     [InlineData(AssetClass.Stock, AssetClass.Deposit)]
-    [InlineData(AssetClass.BankAccount, AssetClass.Deposit)]
+    [InlineData(AssetClass.Cash, AssetClass.Deposit)]
+    [InlineData(AssetClass.Deposit, AssetClass.Cash)]
     [InlineData(AssetClass.Cash, AssetClass.BankAccount)]
     [InlineData(AssetClass.BankAccount, AssetClass.Cash)]
     public void IsAllowed_SameClassSecuritiesOrFreeCashBankPair_IsRejected(AssetClass source, AssetClass target)
@@ -63,11 +63,12 @@ public sealed class TransferRoutesTests
     }
 
     [Fact]
-    public void Route_DepositToBankAccount_IsAllowedButNotDeletable()
+    public void Route_BankAccountAndDeposit_AreAllowedBothWaysButNotDeletable()
     {
         Assert.True(TransferRoutes.IsAllowed(AssetClass.Deposit, AssetClass.BankAccount));
         Assert.False(TransferRoutes.IsDeletable(AssetClass.Deposit, AssetClass.BankAccount));
-        Assert.False(TransferRoutes.IsAllowed(AssetClass.BankAccount, AssetClass.Deposit));
+        Assert.True(TransferRoutes.IsAllowed(AssetClass.BankAccount, AssetClass.Deposit));
+        Assert.False(TransferRoutes.IsDeletable(AssetClass.BankAccount, AssetClass.Deposit));
     }
 
     [Fact]

@@ -47,7 +47,7 @@ public sealed class DepositInterestMathPropertyTests
         Assert.NotEmpty(projection.Periods);
         foreach (var period in projection.Periods)
         {
-            var expectedTax = terms.TaxExempt ? 0m : Math.Ceiling(period.GrossInterest * 0.19m * 100m) / 100m;
+            var expectedTax = Math.Ceiling(period.GrossInterest * 0.19m * 100m) / 100m;
             Assert.Equal(expectedTax, period.Tax);
             Assert.Equal(period.GrossInterest - period.Tax, period.NetInterest);
         }
@@ -103,20 +103,6 @@ public sealed class DepositInterestMathPropertyTests
 
     [Theory]
     [MemberData(nameof(Seeds))]
-    public void Project_TaxExempt_TaxIsZeroAndNetEqualsGross(int seed)
-    {
-        var terms = RandomTerms(seed) with { TaxExempt = true };
-
-        var projection = DepositInterestMath.Project(terms);
-
-        Assert.NotEmpty(projection.Periods);
-        Assert.Equal(0m, projection.Tax);
-        Assert.All(projection.Periods, p => Assert.Equal(0m, p.Tax));
-        Assert.Equal(projection.GrossInterest, projection.NetInterest);
-    }
-
-    [Theory]
-    [MemberData(nameof(Seeds))]
     public void Project_ZeroRate_EarnsNothing(int seed)
     {
         var terms = RandomTerms(seed) with { AnnualInterestRatePercent = 0m };
@@ -160,8 +146,7 @@ public sealed class DepositInterestMathPropertyTests
             TermUnit = termUnit,
             // 0.0000 .. 100.0000 %, numeric(7,4).
             AnnualInterestRatePercent = random.Next(0, 1_000_001) / 10_000m,
-            Capitalization = capitalizations[random.Next(capitalizations.Length)],
-            TaxExempt = random.Next(4) == 0
+            Capitalization = capitalizations[random.Next(capitalizations.Length)]
         };
     }
 }

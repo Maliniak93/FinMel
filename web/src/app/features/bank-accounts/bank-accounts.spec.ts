@@ -232,4 +232,29 @@ describe('BankAccounts', () => {
     );
     expect(listReloadedFrom(callsBefore + 1)).toBe(true);
   });
+
+  it('explains an archive or delete refused because an open deposit returns to the account', async () => {
+    await setup();
+    await switchLanguage(fixture, 'pl');
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const refusal = () =>
+      jsonResponse(
+        {
+          status: 409,
+          detail: 'A deposit will still return to this account.',
+          errorCode: 'Conflict.AccountHasOpenDeposit',
+        },
+        409,
+      );
+
+    fetchSpy.mockResolvedValueOnce(refusal());
+    await component['archive'](nest);
+    fetchSpy.mockResolvedValueOnce(refusal());
+    await component['remove'](nest);
+
+    expect(snackBar.open).toHaveBeenCalledTimes(2);
+    for (const [message] of snackBar.open.mock.calls) {
+      expect(message).toBe('Na to konto wróci otwarta lokata');
+    }
+  });
 });

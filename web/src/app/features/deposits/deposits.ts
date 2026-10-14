@@ -62,6 +62,8 @@ export class Deposits {
   protected readonly displayedColumns = [
     'name',
     'bankName',
+    'sourceAccount',
+    'returnAccount',
     'principal',
     'rate',
     'startDate',

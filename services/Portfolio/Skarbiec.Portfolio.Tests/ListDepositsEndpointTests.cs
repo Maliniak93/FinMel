@@ -5,6 +5,7 @@ using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -177,39 +178,71 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
-    public async Task List_FundedDeposit_ReturnsFundingAsset()
+    public async Task List_ReturnsSourceAndReturnAccounts()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var funded = await client.CreateFundedDepositAsync(cancellationToken);
-        var unfunded = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "New money deposit"));
+        var mBank = await client.CreateBankAccountAsync(cancellationToken, "mBank", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        var toNest = await client.AddDepositAsync(
+            cancellationToken,
+            NewDepositRequest(name: "To Nest", sourceAccountId: mBank.AccountId, returnAccountId: nest.AccountId));
+        var toSource = await client.AddDepositAsync(
+            cancellationToken, NewDepositRequest(name: "To source", sourceAccountId: mBank.AccountId));
 
         var response = await client.GetAsync(AllDepositsUri, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var deposits = await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken);
         Assert.NotNull(deposits);
-        Assert.Equal(2, deposits.Count);
-        var fundedListed = Assert.Single(deposits, d => d.AssetId == funded.Deposit.AssetId);
-        Assert.Equal(funded.CashAssetId, fundedListed.FundingAssetId);
-        Assert.Equal("Cash account", fundedListed.FundingAssetName);
-        var unfundedListed = Assert.Single(deposits, d => d.AssetId == unfunded.AssetId);
-        Assert.Null(unfundedListed.FundingAssetId);
-        Assert.Null(unfundedListed.FundingAssetName);
+        var listedToNest = Assert.Single(deposits, d => d.AssetId == toNest.AssetId);
+        Assert.Equal(mBank.AccountId, listedToNest.SourceAccountId);
+        Assert.Equal("mBank", listedToNest.SourceAccountName);
+        Assert.Equal(nest.AccountId, listedToNest.ReturnAccountId);
+        Assert.Equal("Nest", listedToNest.ReturnAccountName);
+        var listedToSource = Assert.Single(deposits, d => d.AssetId == toSource.AssetId);
+        Assert.Equal(mBank.AccountId, listedToSource.ReturnAccountId);
+        Assert.Equal("mBank", listedToSource.ReturnAccountName);
 
-        // GetDeposit carries the same pair.
-        var single = await client.GetDepositAsync(funded.Deposit.AssetId, cancellationToken);
-        Assert.Equal(funded.CashAssetId, single.FundingAssetId);
-        Assert.Equal("Cash account", single.FundingAssetName);
+        var single = await client.GetDepositAsync(toNest.AssetId, cancellationToken);
+        Assert.Equal(nest.AccountId, single.ReturnAccountId);
+        Assert.Equal("Nest", single.ReturnAccountName);
     }
 
     [Fact]
-    public async Task List_PaidOutDeposit_ReturnsPayoutAndToleratesRemovedDestination()
+    public async Task List_ByAccountId_ReturnsDepositsItFundsOrReceives()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mBank = await client.CreateBankAccountAsync(cancellationToken, "mBank", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var nest = await client.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        var other = await client.CreateBankAccountAsync(cancellationToken, "Other", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var funded = await client.AddDepositAsync(
+            cancellationToken, NewDepositRequest(name: "From mBank", sourceAccountId: mBank.AccountId));
+        var received = await client.AddDepositAsync(
+            cancellationToken,
+            NewDepositRequest(name: "Into mBank", sourceAccountId: other.AccountId, returnAccountId: mBank.AccountId));
+        await client.AddDepositAsync(
+            cancellationToken,
+            NewDepositRequest(name: "Unrelated", sourceAccountId: other.AccountId, returnAccountId: nest.AccountId));
+
+        var response = await client.GetAsync(DepositsOfAccountUri(mBank.AccountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var deposits = await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken);
+        Assert.NotNull(deposits);
+        Assert.Equal(
+            new[] { funded.AssetId, received.AssetId }.Order(),
+            deposits.Select(d => d.AssetId).Order());
+    }
+
+    [Fact]
+    public async Task List_PaidOutDeposit_ReturnsPayoutAccount()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var paidOut = await client.CreatePaidOutDepositAsync(cancellationToken);
+        var paidOut = await client.CreateDepositPaidIntoBankAsync(cancellationToken);
         var settledOnly = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Settled deposit"));
         await client.SettleDepositAsync(settledOnly.AssetId, cancellationToken);
 
@@ -222,33 +255,14 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
         var listed = Assert.Single(deposits, d => d.AssetId == paidOut.Deposit.AssetId);
         Assert.Equal(DepositStatus.PaidOut, listed.Status);
         Assert.Equal(new DateOnly(2026, 4, 15), listed.PaidOutOn);
-        Assert.Equal("Cash account", listed.PaidOutToAssetName);
+        Assert.Equal("Savings account", listed.PaidOutToAccountName);
         var settled = Assert.Single(deposits, d => d.AssetId == settledOnly.AssetId);
         Assert.Equal(DepositStatus.Settled, settled.Status);
         Assert.Null(settled.PaidOutOn);
-        Assert.Null(settled.PaidOutToAssetName);
+        Assert.Null(settled.PaidOutToAccountName);
 
-        // GetDeposit carries the same payout.
         var single = await client.GetDepositAsync(paidOut.Deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.PaidOut, single.Status);
-        Assert.Equal(new DateOnly(2026, 4, 15), single.PaidOutOn);
-        Assert.Equal("Cash account", single.PaidOutToAssetName);
-
-        var removeCash = await client.DeleteAsync(AssetUri(paidOut.CashAssetId), cancellationToken);
-        Assert.Equal(HttpStatusCode.NoContent, removeCash.StatusCode);
-
-        var afterRemoval = await client.GetAsync(AllDepositsUri, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, afterRemoval.StatusCode);
-        var relisted = Assert.Single(
-            (await afterRemoval.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken))!,
-            d => d.AssetId == paidOut.Deposit.AssetId);
-        Assert.Equal(DepositStatus.PaidOut, relisted.Status);
-        Assert.Equal(new DateOnly(2026, 4, 15), relisted.PaidOutOn);
-        Assert.Null(relisted.PaidOutToAssetName);
-        var dangling = await client.GetDepositAsync(paidOut.Deposit.AssetId, cancellationToken);
-        Assert.Equal(DepositStatus.PaidOut, dangling.Status);
-        Assert.Null(dangling.PaidOutToAssetName);
-        Assert.Equal(0m, (await client.GetAssetAsync(paidOut.Deposit.AssetId, cancellationToken)).Quantity);
+        Assert.Equal("Savings account", single.PaidOutToAccountName);
     }
 }

@@ -1,12 +1,51 @@
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 
-import type { DepositResponse } from '../../../api/portfolio';
-import { requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
+import type { AccountResponse, DepositResponse } from '../../../api/portfolio';
+import { bankAccountResponse } from '../../../../testing/bank-account-fixtures';
 
 export const TERM_UNIT = { Days: 0, Months: 1 } as const;
 export const CAPITALIZATION = { AtMaturity: 0, Monthly: 1, Quarterly: 2, Yearly: 3 } as const;
 export const DEPOSIT_STATUS = { Active: 0, Due: 1, Settled: 2, PaidOut: 3 } as const;
+
+export const mBankAccount: AccountResponse = bankAccountResponse({
+  id: 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1',
+  name: 'mBank',
+  cashAssetId: 'a1a1a1a1-0000-0000-0000-000000000001',
+  cashBalance: 20000,
+  bank: { variant: 0, bankName: 'mBank', annualInterestRatePercent: 0 },
+});
+
+export const nestAccount: AccountResponse = bankAccountResponse({
+  id: 'b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2',
+  name: 'Nest Oszczędnościowe',
+  cashAssetId: 'b2b2b2b2-0000-0000-0000-000000000002',
+  cashBalance: 0,
+});
+
+export const mBankUsdAccount: AccountResponse = bankAccountResponse({
+  id: 'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3',
+  name: 'mBank USD',
+  currency: 'USD',
+  cashAssetId: 'c3c3c3c3-0000-0000-0000-000000000003',
+  cashBalance: 1000,
+  bank: { variant: 0, bankName: 'mBank', annualInterestRatePercent: 0 },
+});
+
+export const archivedBankAccount: AccountResponse = bankAccountResponse({
+  id: 'd4d4d4d4-d4d4-d4d4-d4d4-d4d4d4d4d4d4',
+  name: 'Old savings',
+  isArchived: true,
+  cashAssetId: 'd4d4d4d4-0000-0000-0000-000000000004',
+  cashBalance: 0,
+});
+
+export const bankAccountsForDeposits: AccountResponse[] = [
+  mBankAccount,
+  nestAccount,
+  mBankUsdAccount,
+  archivedBankAccount,
+];
 
 export function depositResponse(overrides: Partial<DepositResponse> = {}): DepositResponse {
   return {
@@ -22,7 +61,10 @@ export function depositResponse(overrides: Partial<DepositResponse> = {}): Depos
     maturityDate: '2026-04-15',
     annualInterestRatePercent: 6,
     capitalization: CAPITALIZATION.AtMaturity,
-    taxExempt: false,
+    sourceAccountId: mBankAccount.id,
+    sourceAccountName: mBankAccount.name,
+    returnAccountId: mBankAccount.id,
+    returnAccountName: mBankAccount.name,
     earlyBreakInterestLossPercent: 100,
     projection: {
       grossInterest: 147.95,
@@ -61,6 +103,8 @@ export const dueDeposit: DepositResponse = depositResponse({
   name: 'Matured deposit',
   bankName: 'Bank B',
   status: DEPOSIT_STATUS.Due,
+  returnAccountId: nestAccount.id,
+  returnAccountName: nestAccount.name,
 });
 
 export const archivedDueDeposit: DepositResponse = depositResponse({
@@ -86,6 +130,8 @@ export const settledDeposit: DepositResponse = depositResponse({
   assetId: '88888888-8888-8888-8888-888888888888',
   name: 'Settled deposit',
   bankName: 'Bank D',
+  returnAccountId: nestAccount.id,
+  returnAccountName: nestAccount.name,
   status: DEPOSIT_STATUS.Settled,
   settledOn: '2026-04-17',
   settledGrossInterest: 150,
@@ -105,19 +151,19 @@ export const paidOutDeposit: DepositResponse = depositResponse({
   settledGrossInterest: 150,
   settledTax: 28.5,
   paidOutOn: '2026-04-20',
-  paidOutToAssetName: paidOutDepositDestinationName,
+  paidOutToAccountName: paidOutDepositDestinationName,
 } as Partial<DepositResponse>);
 
-export const paidOutDepositWithRemovedDestination: DepositResponse = depositResponse({
+export const paidOutDepositWithoutAccountName: DepositResponse = depositResponse({
   assetId: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
-  name: 'Orphaned payout',
+  name: 'Payout without a name',
   bankName: 'Bank F',
   status: DEPOSIT_STATUS.PaidOut,
   settledOn: '2026-04-17',
   settledGrossInterest: 150,
   settledTax: 28.5,
   paidOutOn: '2026-04-20',
-  paidOutToAssetName: null,
+  paidOutToAccountName: null,
 } as Partial<DepositResponse>);
 
 export const paidOutIntoBankDeposit: DepositResponse = depositResponse({
@@ -129,7 +175,7 @@ export const paidOutIntoBankDeposit: DepositResponse = depositResponse({
   settledGrossInterest: 150,
   settledTax: 28.5,
   paidOutOn: '2026-04-20',
-  paidOutToAssetName: 'Nest Oszczędnościowe',
+  paidOutToAccountName: 'Nest Oszczędnościowe',
 } as Partial<DepositResponse>);
 
 export const rolledOverDeposit: DepositResponse = depositResponse({
@@ -143,64 +189,6 @@ export const rolledOverDeposit: DepositResponse = depositResponse({
   status: DEPOSIT_STATUS.Active,
   rolloverCount: 1,
 } as Partial<DepositResponse>);
-
-export interface TransferCandidateFixture {
-  assetId: string;
-  name: string;
-  balance: number;
-}
-
-export const plnCashCandidate: TransferCandidateFixture = {
-  assetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  name: 'Cash account',
-  balance: 5000,
-};
-
-export const eurCashCandidate: TransferCandidateFixture = {
-  assetId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-  name: 'EUR account',
-  balance: 2500,
-};
-
-export const transferCandidatesByCurrency: Record<string, TransferCandidateFixture[]> = {
-  PLN: [plnCashCandidate],
-  EUR: [eurCashCandidate],
-};
-
-export const plnBankCandidate: TransferCandidateFixture = {
-  assetId: 'cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd',
-  name: 'Nest Oszczędnościowe',
-  balance: 750,
-};
-
-export const eurBankCandidate: TransferCandidateFixture = {
-  assetId: 'efefefef-efef-efef-efef-efefefefefef',
-  name: 'EUR bank account',
-  balance: 300,
-};
-
-export const bankCandidatesByCurrency: Record<string, TransferCandidateFixture[]> = {
-  PLN: [plnBankCandidate],
-  EUR: [eurBankCandidate],
-};
-
-export function transferCandidatesFor(
-  url: URL,
-  cash: Record<string, TransferCandidateFixture[]> = transferCandidatesByCurrency,
-  bank: Record<string, TransferCandidateFixture[]> = bankCandidatesByCurrency,
-): TransferCandidateFixture[] {
-  const currency = url.searchParams.get('currency') ?? '';
-  const assetClass = url.searchParams.get('assetClass');
-  const byBank = assetClass === 'BankAccount' || assetClass === '9';
-  return (byBank ? bank : cash)[currency] ?? [];
-}
-
-export function requestedCandidateClasses(fetchSpy: { mock: { calls: unknown[][] } }): string[] {
-  return transferCandidateRequests(fetchSpy).map((url) => {
-    const value = url.searchParams.get('assetClass');
-    return value === '0' ? 'Cash' : value === '9' ? 'BankAccount' : (value ?? '');
-  });
-}
 
 export const dueDepositSettlementPreview = {
   settledOn: '2026-04-15',
@@ -218,17 +206,6 @@ export function writeRequests(fetchSpy: { mock: { calls: unknown[][] } }): Reque
   return fetchSpy.mock.calls
     .map((call) => call[0])
     .filter((input) => requestMethod(input) !== 'GET') as Request[];
-}
-
-export function transferCandidateRequests(fetchSpy: { mock: { calls: unknown[][] } }): URL[] {
-  return fetchSpy.mock.calls
-    .map((call) => call[0])
-    .filter(
-      (input) =>
-        requestMethod(input) === 'GET' &&
-        requestUrl(input).includes('/api/portfolio/transfer-candidates'),
-    )
-    .map((input) => new URL(requestUrl(input)));
 }
 
 async function openSelectOptions(
@@ -274,73 +251,6 @@ export async function pickSelectOption(
   option.click();
   fixture.detectChanges();
   await fixture.whenStable();
-}
-
-async function openOnlySelectOptions(fixture: ComponentFixture<unknown>): Promise<HTMLElement[]> {
-  const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-    'mat-select .mat-mdc-select-trigger',
-  );
-  if (!trigger) {
-    throw new Error('No select rendered.');
-  }
-  trigger.click();
-  fixture.detectChanges();
-  await fixture.whenStable();
-  return Array.from(
-    TestBed.inject(OverlayContainer)
-      .getContainerElement()
-      .querySelectorAll<HTMLElement>('mat-option'),
-  );
-}
-
-export async function onlySelectOptionLabels(
-  fixture: ComponentFixture<unknown>,
-): Promise<string[]> {
-  const options = await openOnlySelectOptions(fixture);
-  return options.map((option) => (option.textContent ?? '').trim());
-}
-
-export async function onlySelectOptionGroups(
-  fixture: ComponentFixture<unknown>,
-): Promise<{ label: string; options: string[] }[]> {
-  await openOnlySelectOptions(fixture);
-  return Array.from(
-    TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-optgroup'),
-    (group) => ({
-      label: (
-        group.querySelector('.mat-mdc-optgroup-label')?.textContent ??
-        group.getAttribute('label') ??
-        ''
-      ).trim(),
-      options: Array.from(group.querySelectorAll('mat-option'), (option) =>
-        (option.textContent ?? '').trim(),
-      ),
-    }),
-  );
-}
-
-export async function pickOnlySelectOption(
-  fixture: ComponentFixture<unknown>,
-  labelSubstring: string,
-): Promise<void> {
-  const options = await openOnlySelectOptions(fixture);
-  const option = options.find((candidate) =>
-    (candidate.textContent ?? '').includes(labelSubstring),
-  );
-  if (!option) {
-    throw new Error(`No option matching "${labelSubstring}".`);
-  }
-  option.click();
-  fixture.detectChanges();
-  await fixture.whenStable();
-}
-
-export function onlySelectTriggerText(fixture: ComponentFixture<unknown>): string {
-  return (
-    (fixture.nativeElement as HTMLElement)
-      .querySelector('mat-select .mat-mdc-select-trigger')
-      ?.textContent?.trim() ?? ''
-  );
 }
 
 export function selectTriggerState(

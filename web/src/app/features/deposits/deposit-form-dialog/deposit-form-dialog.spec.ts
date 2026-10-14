@@ -4,7 +4,6 @@ import type { FormGroup } from '@angular/forms';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-import type { DepositResponse } from '../../../api/portfolio';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import {
   findControl,
@@ -15,27 +14,18 @@ import {
 } from '../../assets/asset-form/testing/asset-form-fixtures';
 import {
   CAPITALIZATION,
+  bankAccountsForDeposits,
   depositResponse,
-  eurCashCandidate,
-  pickSelectOption,
-  plnCashCandidate,
+  mBankAccount,
+  mBankUsdAccount,
+  nestAccount,
   rolledOverDeposit,
   selectOptionLabels,
-  selectTriggerState,
   TERM_UNIT,
-  transferCandidatesByCurrency,
 } from '../testing/deposit-fixtures';
 import { DepositFormDialog, type DepositFormDialogData } from './deposit-form-dialog';
 import { provideI18nTesting } from '../../../core/i18n/testing';
-import { formatMoney } from '../../../shared/format';
-import {
-  labelsOf,
-  matchesTranslation,
-  polishProblems,
-  restoreEnglish,
-  switchLanguage,
-  textOf,
-} from '../../../../testing/i18n';
+import { labelsOf, polishProblems, restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 
 describe('DepositFormDialog', () => {
   let fixture: ComponentFixture<DepositFormDialog>;
@@ -62,12 +52,8 @@ describe('DepositFormDialog', () => {
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      if (
-        method(input) === 'GET' &&
-        requestUrl(input).includes('/api/portfolio/transfer-candidates')
-      ) {
-        const currency = new URL(requestUrl(input)).searchParams.get('currency') ?? '';
-        return jsonResponse(transferCandidatesByCurrency[currency] ?? []);
+      if (method(input) === 'GET' && requestUrl(input).includes('/api/portfolio/accounts')) {
+        return jsonResponse(bankAccountsForDeposits);
       }
       return writeResponse();
     });
@@ -110,7 +96,6 @@ describe('DepositFormDialog', () => {
     termUnit: TERM_UNIT.Months,
     annualInterestRatePercent: 6,
     capitalization: CAPITALIZATION.AtMaturity,
-    taxExempt: false,
     earlyBreakInterestLossPercent: 100,
   };
 
@@ -156,7 +141,7 @@ describe('DepositFormDialog', () => {
     ['name', ''],
   ])('an invalid %s (%s) blocks submit', async (field, value) => {
     await setup({});
-    await fill({ ...validTerms, currency: 'PLN' });
+    await fill({ ...validTerms, sourceAccountId: mBankAccount.id });
 
     await fill({ [field]: value });
     await component['onSubmit']();
@@ -168,7 +153,7 @@ describe('DepositFormDialog', () => {
 
   it('a term above 120 months or 3650 days blocks submit', async () => {
     await setup({});
-    await fill({ ...validTerms, currency: 'PLN' });
+    await fill({ ...validTerms, sourceAccountId: mBankAccount.id });
 
     await fill({ termLength: 121, termUnit: TERM_UNIT.Months });
     await component['onSubmit']();
@@ -182,34 +167,9 @@ describe('DepositFormDialog', () => {
     expect(writeRequests()).toHaveLength(1);
   });
 
-  it('create POSTs the terms and closes with true', async () => {
+  it('create POSTs the terms with the source account and closes with true', async () => {
     await setup({});
-    await fill({ ...validTerms, currency: 'EUR' });
-
-    await component['onSubmit']();
-
-    const [request] = writeRequests();
-    expect(request.method).toBe('POST');
-    expect(request.url).toContain(`/api/portfolio/deposits`);
-    expect(await request.json()).toEqual({
-      name: 'Term deposit',
-      bankName: 'Test bank',
-      currency: 'EUR',
-      principal: 10000,
-      startDate: '2026-01-15',
-      termLength: 3,
-      termUnit: TERM_UNIT.Months,
-      annualInterestRatePercent: 6,
-      capitalization: CAPITALIZATION.AtMaturity,
-      taxExempt: false,
-      earlyBreakInterestLossPercent: 100,
-    });
-    expect(dialogRef.close).toHaveBeenCalledWith(true);
-  });
-
-  it('create POSTs the tax exemption', async () => {
-    await setup({});
-    await fill({ ...validTerms, currency: 'PLN', taxExempt: true });
+    await fill({ ...validTerms, sourceAccountId: mBankAccount.id });
 
     await component['onSubmit']();
 
@@ -217,8 +177,21 @@ describe('DepositFormDialog', () => {
     expect(request.method).toBe('POST');
     expect(request.url).toContain(`/api/portfolio/deposits`);
     const body = await request.json();
-    expect(body.taxExempt).toBe(true);
-    expect(body).not.toHaveProperty('accountId');
+    expect(body).toMatchObject({
+      name: 'Term deposit',
+      bankName: 'Test bank',
+      sourceAccountId: mBankAccount.id,
+      principal: 10000,
+      startDate: '2026-01-15',
+      termLength: 3,
+      termUnit: TERM_UNIT.Months,
+      annualInterestRatePercent: 6,
+      capitalization: CAPITALIZATION.AtMaturity,
+      earlyBreakInterestLossPercent: 100,
+    });
+    for (const gone of ['currency', 'taxExempt', 'fundingAssetId']) {
+      expect(body).not.toHaveProperty(gone);
+    }
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
@@ -226,7 +199,6 @@ describe('DepositFormDialog', () => {
     const deposit = depositResponse({
       name: 'Existing deposit',
       capitalization: CAPITALIZATION.Monthly,
-      taxExempt: true,
       earlyBreakInterestLossPercent: 50,
     });
     await setup({ deposit }, () => jsonResponse(deposit));
@@ -236,9 +208,10 @@ describe('DepositFormDialog', () => {
     expect(Number(findControl(form(), 'principal').value)).toBe(10000);
     expect(Number(findControl(form(), 'termLength').value)).toBe(3);
     expect(findControl(form(), 'capitalization').value).toBe(CAPITALIZATION.Monthly);
-    expect(findControl(form(), 'taxExempt').value).toBe(true);
+    expect(findControl(form(), 'returnAccountId').value).toBe(mBankAccount.id);
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector('mat-select[formcontrolname="currency"]')).toBeNull();
+    expect(element.querySelector('mat-select[formcontrolname="sourceAccountId"]')).toBeNull();
     expect(renderedText(fixture)).toContain(mediumDate(2026, 4, 15));
 
     await fill({ principal: 15000, startDate: new Date(2026, 1, 1), termLength: 6 });
@@ -258,7 +231,7 @@ describe('DepositFormDialog', () => {
       termUnit: TERM_UNIT.Months,
       annualInterestRatePercent: 6,
       capitalization: CAPITALIZATION.Monthly,
-      taxExempt: true,
+      returnAccountId: mBankAccount.id,
       earlyBreakInterestLossPercent: 50,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
@@ -276,7 +249,6 @@ describe('DepositFormDialog', () => {
       'termUnit',
       'annualInterestRatePercent',
       'capitalization',
-      'taxExempt',
       'earlyBreakInterestLossPercent',
     ]) {
       expect(findControl(form(), editable).enabled).toBe(true);
@@ -302,7 +274,7 @@ describe('DepositFormDialog', () => {
       termUnit: TERM_UNIT.Months,
       annualInterestRatePercent: 4.5,
       capitalization: CAPITALIZATION.AtMaturity,
-      taxExempt: false,
+      returnAccountId: mBankAccount.id,
       earlyBreakInterestLossPercent: 100,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
@@ -323,7 +295,7 @@ describe('DepositFormDialog', () => {
         400,
       ),
     );
-    await fill({ ...validTerms, currency: 'PLN' });
+    await fill({ ...validTerms, sourceAccountId: mBankAccount.id });
 
     await component['onSubmit']();
 
@@ -344,7 +316,7 @@ describe('DepositFormDialog', () => {
         409,
       ),
     );
-    await fill({ ...validTerms, currency: 'PLN' });
+    await fill({ ...validTerms, sourceAccountId: mBankAccount.id });
 
     await component['onSubmit']();
     fixture.detectChanges();
@@ -363,14 +335,13 @@ describe('DepositFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(false);
   });
 
-  describe('source of funds', () => {
-    function candidateRequests(): URL[] {
+  describe('source account', () => {
+    function accountRequests(): URL[] {
       return fetchSpy.mock.calls
         .map((call: unknown[]) => call[0])
         .filter(
           (input: unknown) =>
-            method(input) === 'GET' &&
-            requestUrl(input).includes('/api/portfolio/transfer-candidates'),
+            method(input) === 'GET' && requestUrl(input).includes('/api/portfolio/accounts'),
         )
         .map((input: unknown) => new URL(requestUrl(input)));
     }
@@ -381,89 +352,96 @@ describe('DepositFormDialog', () => {
       return new RegExp(grouped);
     }
 
-    it('defaults to new money and lists the Cash candidates of the chosen currency with balances', async () => {
+    it('offers the unarchived bank accounts with name, currency and balance, and no funding or tax controls', async () => {
       await setup({});
 
-      expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
-      const requests = candidateRequests();
+      const requests = accountRequests();
       expect(requests.length).toBeGreaterThan(0);
-      const last = requests[requests.length - 1];
-      expect(last.searchParams.get('currency')).toBe('PLN');
-      expect(['Cash', '0']).toContain(last.searchParams.get('assetClass'));
+      expect(['Bank', '2']).toContain(requests.at(-1)!.searchParams.get('type'));
 
-      const labels = await optionLabels('fundingAssetId');
-      expect(labels[0]).toContain('New money');
-      const plnLabel = labels.find((label) => label.includes(plnCashCandidate.name));
-      expect(plnLabel).toBeDefined();
-      expect(plnLabel).toMatch(balancePattern(plnCashCandidate.balance));
-      expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(false);
+      const labels = await optionLabels('sourceAccountId');
+      expect(labels).toHaveLength(3);
+      const mBank = labels.find((label) => label.includes('mBank') && !label.includes('USD'));
+      expect(mBank).toContain('PLN');
+      expect(mBank).toMatch(balancePattern(20000));
+      const usd = labels.find((label) => label.includes('mBank USD'));
+      expect(usd).toContain('USD');
+      expect(usd).toMatch(balancePattern(1000));
+      expect(labels.some((label) => label.includes(nestAccount.name))).toBe(true);
+      expect(labels.some((label) => label.includes('Old savings'))).toBe(false);
+
+      const element = fixture.nativeElement as HTMLElement;
+      expect(hasControl(form(), 'fundingAssetId')).toBe(false);
+      expect(hasControl(form(), 'taxExempt')).toBe(false);
+      expect(element.querySelector('mat-slide-toggle')).toBeNull();
+      expect(element.querySelector('mat-select[formcontrolname="currency"]')).toBeNull();
     });
 
-    it('reloads the candidates when the currency changes and resets a choice no longer listed', async () => {
+    it('a source account is required to submit', async () => {
       await setup({});
-      await fill({ fundingAssetId: plnCashCandidate.assetId });
+      await fill(validTerms);
 
-      await fill({ currency: 'EUR' });
-
-      const last = candidateRequests().at(-1)!;
-      expect(last.searchParams.get('currency')).toBe('EUR');
-      expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
-      const labels = await optionLabels('fundingAssetId');
-      expect(labels.some((label) => label.includes(eurCashCandidate.name))).toBe(true);
-      expect(labels.some((label) => label.includes(plnCashCandidate.name))).toBe(false);
-    });
-
-    it('a principal above the selected balance blocks submit', async () => {
-      await setup({});
-      await fill({ ...validTerms, currency: 'PLN', fundingAssetId: plnCashCandidate.assetId });
-
-      await fill({ principal: plnCashCandidate.balance + 0.01 });
       await component['onSubmit']();
 
-      expect(findControl(form(), 'principal').invalid).toBe(true);
+      expect(findControl(form(), 'sourceAccountId').invalid).toBe(true);
       expect(writeRequests()).toEqual([]);
       expect(dialogRef.close).not.toHaveBeenCalled();
-
-      await fill({ principal: plnCashCandidate.balance });
-      await component['onSubmit']();
-      expect(writeRequests()).toHaveLength(1);
     });
 
-    it('new money puts no cap on the principal', async () => {
+    it('picking a source offers return accounts in its currency only', async () => {
       await setup({});
-      expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
-      await fill({ ...validTerms, currency: 'PLN', principal: 1_000_000 });
+
+      await fill({ sourceAccountId: mBankAccount.id });
+      const plnLabels = await optionLabels('returnAccountId');
+      expect(plnLabels.some((label) => label.includes(nestAccount.name))).toBe(true);
+      expect(plnLabels.some((label) => label.includes('USD'))).toBe(false);
+
+      await fill({ sourceAccountId: mBankUsdAccount.id });
+      const usdLabels = await optionLabels('returnAccountId');
+      expect(usdLabels.some((label) => label.includes(nestAccount.name))).toBe(false);
+      expect(renderedText(fixture)).toContain('USD');
+    });
+
+    it('changing the source drops a return account in another currency', async () => {
+      await setup({});
+      await fill({ sourceAccountId: mBankAccount.id, returnAccountId: nestAccount.id });
+
+      await fill({ sourceAccountId: mBankUsdAccount.id });
+
+      expect(findControl(form(), 'returnAccountId').value).not.toBe(nestAccount.id);
+    });
+
+    it('without a chosen return account the POST names the source or leaves it out', async () => {
+      await setup({});
+      await fill({ ...validTerms, sourceAccountId: mBankAccount.id });
 
       await component['onSubmit']();
 
-      expect(findControl(form(), 'principal').valid).toBe(true);
       const [request] = writeRequests();
-      expect(request.method).toBe('POST');
-      expect((await request.json()).fundingAssetId ?? null).toBeNull();
+      const body = await request.json();
+      expect(body.sourceAccountId).toBe(mBankAccount.id);
+      expect([undefined, null, mBankAccount.id]).toContain(body.returnAccountId);
     });
 
-    it('create POSTs the chosen funding source as fundingAssetId', async () => {
+    it('create POSTs the chosen return account', async () => {
       await setup({});
       await fill({
         ...validTerms,
-        currency: 'PLN',
-        principal: 1000,
-        fundingAssetId: plnCashCandidate.assetId,
+        sourceAccountId: mBankAccount.id,
+        returnAccountId: nestAccount.id,
       });
 
       await component['onSubmit']();
 
       const [request] = writeRequests();
       expect(request.method).toBe('POST');
-      expect(request.url).toContain(`/api/portfolio/deposits`);
       const body = await request.json();
-      expect(body.fundingAssetId).toBe(plnCashCandidate.assetId);
-      expect(body.principal).toBe(1000);
-      expect(body.currency).toBe('PLN');
+      expect(body.sourceAccountId).toBe(mBankAccount.id);
+      expect(body.returnAccountId).toBe(nestAccount.id);
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
-    it('a server 400 InsufficientFunds lands on the principal', async () => {
+    it('a server 400 InsufficientFunds shows "Brak środków na konto" inline', async () => {
       await setup({}, () =>
         jsonResponse(
           {
@@ -475,86 +453,44 @@ describe('DepositFormDialog', () => {
           400,
         ),
       );
-      await fill({
-        ...validTerms,
-        currency: 'PLN',
-        principal: 1000,
-        fundingAssetId: plnCashCandidate.assetId,
-      });
+      await fill({ ...validTerms, sourceAccountId: mBankAccount.id, principal: 30000 });
+      await switchLanguage(fixture, 'pl');
 
       await component['onSubmit']();
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(findControl(form(), 'principal').hasError('server')).toBe(true);
+      const messages = labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
+      expect(messages.some((message) => message.includes('Brak środków na koncie'))).toBe(true);
       expect(dialogRef.close).not.toHaveBeenCalled();
     });
 
-    it('edit shows the funding source read-only and the PUT omits it', async () => {
+    it('edit offers only the return account and the PUT omits the source', async () => {
       const deposit = depositResponse({
-        principal: 1000,
-        fundingAssetId: plnCashCandidate.assetId,
-        fundingAssetName: plnCashCandidate.name,
-      } as Partial<DepositResponse>);
+        returnAccountId: mBankAccount.id,
+        returnAccountName: mBankAccount.name,
+      });
       await setup({ deposit }, () => jsonResponse(deposit));
 
-      const element = fixture.nativeElement as HTMLElement;
-      expect(element.querySelector('mat-select[formcontrolname="fundingAssetId"]')).toBeNull();
-      expect(renderedText(fixture)).toContain(plnCashCandidate.name);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          'mat-select[formcontrolname="sourceAccountId"]',
+        ),
+      ).toBeNull();
+      expect(renderedText(fixture)).toContain(mBankAccount.name);
 
-      await fill({ principal: 1500 });
+      await fill({ returnAccountId: nestAccount.id });
       await component['onSubmit']();
 
       const [request] = writeRequests();
       expect(request.method).toBe('PUT');
-      expect(await request.json()).not.toHaveProperty('fundingAssetId');
-    });
-
-    it('edit of a new-money deposit shows new money as its source', async () => {
-      const deposit = depositResponse({
-        fundingAssetId: null,
-        fundingAssetName: null,
-      } as Partial<DepositResponse>);
-      await setup({ deposit }, () => jsonResponse(deposit));
-
-      const element = fixture.nativeElement as HTMLElement;
-      expect(element.querySelector('mat-select[formcontrolname="fundingAssetId"]')).toBeNull();
-      expect(renderedText(fixture)).toContain('New money');
-    });
-
-    it('sourceOfFunds_NewMoneyChosen_ShowsNewMoneyInTrigger', async () => {
-      await setup({});
-
-      expect(selectTriggerState(fixture, 'fundingAssetId')).toEqual({
-        triggerText: 'New money (from outside)',
-        empty: false,
-      });
-      expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
-
-      await pickSelectOption(fixture, 'fundingAssetId', plnCashCandidate.name);
-      expect(selectTriggerState(fixture, 'fundingAssetId').triggerText).toContain(
-        plnCashCandidate.name,
-      );
-
-      await pickSelectOption(fixture, 'fundingAssetId', 'New money');
-
-      expect(selectTriggerState(fixture, 'fundingAssetId')).toEqual({
-        triggerText: 'New money (from outside)',
-        empty: false,
-      });
-      expect(findControl(form(), 'fundingAssetId').value ?? null).toBeNull();
+      const body = await request.json();
+      expect(body.returnAccountId).toBe(nestAccount.id);
+      expect(body).not.toHaveProperty('sourceAccountId');
     });
   });
 
   describe('in Polish', () => {
-    function textWithout(selector: string, removed: string): string {
-      const clone = (fixture.nativeElement as HTMLElement)
-        .querySelector(selector)!
-        .cloneNode(true) as Element;
-      clone.querySelectorAll(removed).forEach((node) => node.remove());
-      return textOf(clone);
-    }
-
     function errors(): string[] {
       return labelsOf(fixture.nativeElement as HTMLElement, 'mat-error');
     }
@@ -565,46 +501,9 @@ describe('DepositFormDialog', () => {
       await fixture.whenStable();
     }
 
-    it('renders in Polish', async () => {
-      await setup({});
-      const element = fixture.nativeElement as HTMLElement;
-      const texts = () => [
-        ...labelsOf(element, 'h2'),
-        ...labelsOf(element, 'mat-label'),
-        ...labelsOf(element, 'mat-slide-toggle'),
-        textWithout('.deposit-form-dialog__maturity', 'strong'),
-        selectTriggerState(fixture, 'fundingAssetId').triggerText,
-        ...labelsOf(element, 'mat-dialog-actions button'),
-      ];
-
-      const english = texts();
-      expect(english).toEqual([
-        'New deposit',
-        'Name',
-        'Bank',
-        'Currency',
-        'Source of funds',
-        'Principal',
-        'Start date',
-        'Term',
-        'Unit',
-        'Annual interest rate (%)',
-        'Capitalisation',
-        'Interest lost on early break (%)',
-        'IKE/IKZE — no Belka tax',
-        'Matures on',
-        'New money (from outside)',
-        'Cancel',
-        'Create',
-      ]);
-
-      await switchLanguage(fixture, 'pl');
-
-      expect(polishProblems(english, texts(), ['Bank'])).toEqual([]);
-    });
-
     it('shows required-field validation in Polish', async () => {
       await setup({});
+      await fill({ sourceAccountId: mBankAccount.id });
       await touchAll();
 
       const english = errors();
@@ -623,6 +522,7 @@ describe('DepositFormDialog', () => {
     it('shows range and length validation in Polish', async () => {
       await setup({});
       await fill({
+        sourceAccountId: mBankAccount.id,
         name: 'a'.repeat(201),
         bankName: 'a'.repeat(101),
         principal: 0,
@@ -651,52 +551,15 @@ describe('DepositFormDialog', () => {
       expect(polish[4]).toContain('120');
     });
 
-    it('shows the source-balance validation in Polish, with the balance in the active format', async () => {
+    it('renders the source and return account fields in Polish', async () => {
       await setup({});
-      await fill({ fundingAssetId: plnCashCandidate.assetId, principal: 6000 });
-      await touchAll();
-
-      const english = errors().filter((text) => text.startsWith('Principal is above'));
-      expect(english).toHaveLength(1);
 
       await switchLanguage(fixture, 'pl');
 
-      const messages = errors();
-      const polish = messages.find((text) =>
-        text.includes(formatMoney(5000, 'PLN').replace(/\s+/g, ' ')),
-      )!;
-      expect(
-        polish,
-        `no message with the balance in the active format among: ${messages.join(' | ')}`,
-      ).toBeDefined();
-      expect(polish).not.toMatch(/^Principal is above/);
-      expect(matchesTranslation('pl', polish), `"${polish}" is not a pl.json value`).toBe(true);
-    });
-
-    it('renders the edit dialog in Polish', async () => {
-      await setup({
-        deposit: depositResponse({ fundingAssetName: null } as Partial<DepositResponse>),
-      });
-      const element = fixture.nativeElement as HTMLElement;
-      const texts = () => [
-        ...labelsOf(element, 'h2'),
-        textWithout('.deposit-form-dialog__funding', 'strong'),
-        labelsOf(element, '.deposit-form-dialog__funding strong')[0],
-        ...labelsOf(element, 'mat-dialog-actions button'),
-      ];
-
-      const english = texts();
-      expect(english).toEqual([
-        'Edit deposit',
-        'Source of funds',
-        'New money (from outside)',
-        'Cancel',
-        'Save',
-      ]);
-
-      await switchLanguage(fixture, 'pl');
-
-      expect(polishProblems(english, texts())).toEqual([]);
+      const text = renderedText(fixture);
+      expect(text).toContain('Z konta');
+      expect(text).toContain('Zwrot na');
+      expect(text).not.toContain('IKE/IKZE');
     });
   });
 });

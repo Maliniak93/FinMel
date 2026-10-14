@@ -25,9 +25,12 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
    prepare's output (`workflow` is `{ name }` or, on a resume, `{ scriptPath }`). `replay` set → say in one line
    `replay: <steps> → live from <liveFrom>` (`→ ship` when `liveFrom` is null). Then wait. (`prepare` already moved the card to In progress; `resumed: true` means a previous run
    left its branch — say so in one line.)
-5. Run the returned `nextCommand` verbatim as ONE Bash call with `timeout: 3600000` (a ship rebuilds six
-   compose images; the 2-min default cuts it off after the PR exists) — for `ready` and `blocked` alike — and
-   read its last stdout line, `SHIP_RESULT: <json>`.
+5. As soon as the workflow completes, run `node scripts/ship.mjs <issue> --from-run` (the workflow's `nextCommand`;
+   it reads the branch, title and run report from the workflow record, so a truncated result loses nothing) as ONE
+   Bash call with `timeout: 3600000` (a ship rebuilds six compose images; the 2-min default cuts it off after the
+   PR exists) — for `ready` and `blocked` alike — and read its last stdout line, `SHIP_RESULT: <json>`. Run nothing
+   between the workflow and this call: no build, test, grep or file read, and ignore IDE/LSP diagnostics — the
+   workflow's verify and review are the only verdict.
 
 ## Report (at most 11 lines)
 

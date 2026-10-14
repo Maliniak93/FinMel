@@ -40,9 +40,11 @@ import {
   dueDeposit,
   paidOutDeposit,
   paidOutDepositDestinationName,
-  paidOutDepositWithRemovedDestination,
+  paidOutDepositWithoutAccountName,
   paidOutIntoBankDeposit,
-  plnBankCandidate,
+  nestAccount,
+  mBankAccount,
+  depositResponse,
   settledDeposit,
   settledDepositFinalAmount,
 } from './testing/deposit-fixtures';
@@ -167,6 +169,28 @@ describe('Deposits', () => {
       expect(text).toContain(formatDate(`${deposit.startDate}T00:00:00`, 'mediumDate', 'en-US'));
     }
     expect(rowFor('Running deposit').textContent).toMatch(/5[.,]5\s*%/);
+  });
+
+  it('shows the source and the return account of each deposit in their own columns', async () => {
+    const toNest = depositResponse({
+      assetId: '99999999-9999-9999-9999-999999999999',
+      name: 'Returns to Nest',
+      returnAccountId: nestAccount.id,
+      returnAccountName: nestAccount.name,
+    });
+    await setup([activeDeposit, toNest]);
+
+    await switchLanguage(fixture, 'pl');
+    const headers = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('th'),
+      (header) => (header.textContent ?? '').trim(),
+    );
+    expect(headers).toContain('Źródło');
+    expect(headers).toContain('Zwrot na');
+    const row = rowFor('Returns to Nest');
+    expect(row.textContent).toContain(mBankAccount.name);
+    expect(row.textContent).toContain(nestAccount.name);
+    expect(rowFor('Running deposit').textContent).toContain(mBankAccount.name);
   });
 
   it('the Due row carries the "Due" chip and the Active row does not', async () => {
@@ -355,7 +379,7 @@ describe('Deposits', () => {
         'Paid out',
       );
       expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
-      expect(row.textContent).toContain(plnBankCandidate.name);
+      expect(row.textContent).toContain(nestAccount.name);
       expect(transferButton(row)).toBeUndefined();
     });
 
@@ -370,10 +394,10 @@ describe('Deposits', () => {
       expect(settleButton(row)).toBeUndefined();
     });
 
-    it('a PaidOut row whose destination was removed shows "—" for it', async () => {
-      await setup([paidOutDepositWithRemovedDestination]);
+    it('a PaidOut row without an account name shows "—" for it', async () => {
+      await setup([paidOutDepositWithoutAccountName]);
 
-      const row = rowFor('Orphaned payout');
+      const row = rowFor('Payout without a name');
       expect(row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip')?.textContent).toContain(
         'Paid out',
       );
@@ -659,6 +683,8 @@ describe('Deposits', () => {
         'Add deposit',
         'Name',
         'Bank',
+        'Source',
+        'Return to',
         'Principal',
         'Rate',
         'Start',

@@ -13,10 +13,9 @@
       </div>
     </dl>
 
-    <app-payout-destination-field
-      formControlName="destinationAssetId"
-      [currency]="deposit.currency"
-    />
+    <p class="pay-out-deposit-dialog__destination">
+      {{ 'deposits.payOut.goesTo' | transloco: { name: deposit.returnAccountName } }}
+    </p>
 
     <mat-form-field appearance="outline" class="pay-out-deposit-dialog__field">
       <mat-label>{{ 'common.date' | transloco }}</mat-label>

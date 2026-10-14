@@ -38,6 +38,17 @@
   }
 }
 
+.settle-deposit-dialog__pay-out {
+  display: block;
+  margin: 0 0 8px;
+}
+
+.settle-deposit-dialog__moves-out {
+  margin: 0 0 16px;
+  opacity: 0.7;
+  font-size: 0.875em;
+}
+
 .settle-deposit-dialog__error {
   color: var(--mat-sys-error);
   margin: 0 0 8px;

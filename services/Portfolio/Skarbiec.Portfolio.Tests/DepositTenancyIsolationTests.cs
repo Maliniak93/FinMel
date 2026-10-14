@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -155,7 +156,7 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
     }
 
     [Fact]
-    public async Task PayOut_ForeignDepositOrDestination_IsRejected()
+    public async Task PayOut_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AfterDefaultMaturityUtc);
@@ -163,40 +164,69 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         using var owner = Factory.CreateAuthenticatedClient(ownerId);
         var deposit = await owner.AddDepositAsync(cancellationToken);
         await owner.SettleDepositAsync(deposit.AssetId, cancellationToken);
-        var ownerCashId = await owner.AddCashAssetAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var strangerCashId = await stranger.AddCashAssetAsync(cancellationToken);
-        var strangerBank = await stranger.CreateBankAccountAsync(cancellationToken);
 
         var response = await stranger.PostAsJsonAsync(
-            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
-        var intoStrangersCash = await owner.PostAsJsonAsync(
-            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerCashId), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(), cancellationToken);
 
-        var intoStrangersBank = await owner.PostAsJsonAsync(
-            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(strangerBank.MoneyAssetId), cancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        await intoStrangersCash.AssertInvalidTransferCounterpartAsync(cancellationToken);
-        await intoStrangersBank.AssertInvalidTransferCounterpartAsync(cancellationToken);
-
         var unchanged = await owner.GetDepositAsync(deposit.AssetId, cancellationToken);
         Assert.Equal(DepositStatus.Settled, unchanged.Status);
         Assert.Null(unchanged.PaidOutOn);
         Assert.Equal(10_119.83m, (await owner.GetAssetAsync(deposit.AssetId, cancellationToken)).Quantity);
-        var strangerCash = await stranger.GetAssetAsync(strangerCashId, cancellationToken);
-        Assert.Equal(0m, strangerCash.Quantity);
-        Assert.Equal(0, strangerCash.TransactionCount);
-        var strangerBankAfter = await stranger.GetAssetAsync(strangerBank.MoneyAssetId, cancellationToken);
-        Assert.Equal(0m, strangerBankAfter.Quantity);
-        Assert.Equal(0, strangerBankAfter.TransactionCount);
         await using (var dbContext = CreateDbContext(ownerId))
         {
-            Assert.False(await dbContext.Transactions.IgnoreQueryFilters().AnyAsync(t => t.TransferId != null, cancellationToken));
+            Assert.False(await dbContext.Transactions.IgnoreQueryFilters().AnyAsync(
+                t => t.AssetId == deposit.AssetId && t.Type == TransactionType.Withdraw, cancellationToken));
         }
 
-        // Control: the owner can still pay out into their own Cash — the rejections were about the caller and the destination.
         var ownPayOut = await owner.PostAsJsonAsync(
-            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(ownerCashId), cancellationToken);
+            PayOutDepositUri(deposit.AssetId), NewPayOutRequest(), cancellationToken);
         Assert.True(ownPayOut.IsSuccessStatusCode, $"The owner's payout answered {(int)ownPayOut.StatusCode}.");
+    }
+
+    [Fact]
+    public async Task BankAccounts()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var ownersBank = await owner.CreateBankAccountAsync(
+            cancellationToken, "mBank", balance: 20_000m, depositedOn: DefaultTopUpDate);
+        var ownersOtherBank = await owner.CreateBankAccountAsync(cancellationToken, "Nest", SavingsVariant);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangersBank = await stranger.CreateBankAccountAsync(
+            cancellationToken, "Stranger bank", balance: 5_000m, depositedOn: DefaultTopUpDate);
+        var before = await SnapshotUserRowsAsync(ownerId, cancellationToken);
+
+        var fromOwnersAccount = await stranger.PostAsJsonAsync(
+            AllDepositsUri, NewDepositRequest(sourceAccountId: ownersBank.AccountId), cancellationToken);
+        var returningToOwnersAccount = await stranger.PostAsJsonAsync(
+            AllDepositsUri,
+            NewDepositRequest(sourceAccountId: strangersBank.AccountId, returnAccountId: ownersBank.AccountId),
+            cancellationToken);
+        var ownerReturningToStrangersAccount = await owner.PostAsJsonAsync(
+            AllDepositsUri,
+            NewDepositRequest(sourceAccountId: ownersBank.AccountId, returnAccountId: strangersBank.AccountId),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, fromOwnersAccount.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, returningToOwnersAccount.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, ownerReturningToStrangersAccount.StatusCode);
+        Assert.Equal(20_000m, await owner.GetCashBalanceAsync(ownersBank.AccountId, cancellationToken));
+        Assert.Equal(5_000m, await stranger.GetCashBalanceAsync(strangersBank.AccountId, cancellationToken));
+        Assert.Equal(before, await SnapshotUserRowsAsync(ownerId, cancellationToken));
+        Assert.Empty((await stranger.GetFromJsonAsync<List<DepositResponse>>(AllDepositsUri, cancellationToken))!);
+
+        var strangerListsOwnersAccount = await stranger.GetAsync(DepositsOfAccountUri(ownersBank.AccountId), cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, strangerListsOwnersAccount.StatusCode);
+        Assert.Empty((await strangerListsOwnersAccount.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken))!);
+
+        // Control: the owner can still open a deposit from and into their own accounts.
+        var own = await owner.PostAsJsonAsync(
+            AllDepositsUri,
+            NewDepositRequest(sourceAccountId: ownersBank.AccountId, returnAccountId: ownersOtherBank.AccountId),
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.Created, own.StatusCode);
     }
 }

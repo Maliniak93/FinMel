@@ -60,10 +60,10 @@ describe('Shell', () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
 
-  it('offers a "Deposits & savings" nav item linking to /deposits', () => {
+  it('offers a "Deposits" nav item linking to /deposits', () => {
     const link = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
-    ).find((a) => (a.textContent ?? '').includes('Deposits & savings'));
+    ).find((a) => (a.textContent ?? '').includes('Deposits'));
 
     expect(link).toBeDefined();
     expect(link!.getAttribute('href')).toBe('/deposits');
@@ -144,6 +144,25 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/bank-accounts');
   });
 
+  it('offers a "Lokaty" nav item linking to /deposits right after Konta bankowe', async () => {
+    const links = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+          'mat-nav-list a',
+        ),
+      );
+    const english = links().map((a) => a.getAttribute('href'));
+    expect(english.indexOf('/deposits')).toBe(english.indexOf('/bank-accounts') + 1);
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const polish = links();
+    const link = polish.find((a) => a.getAttribute('href') === '/deposits');
+    expect(link?.querySelector('[matListItemTitle]')?.textContent?.trim()).toBe('Lokaty');
+    expect(polish[polish.indexOf(link!) - 1].textContent).toContain('Konta bankowe');
+  });
+
   it('offers an "Obligacje" nav item linking to /bonds', async () => {
     await TestBed.inject(LanguageService).setLanguage('pl');
     await fixture.whenStable();
@@ -185,9 +204,9 @@ describe('Shell', () => {
       'Dashboard',
       'Accounts',
       'Bank accounts',
+      'Deposits',
       'Cash',
       'Stocks & ETFs',
-      'Deposits & savings',
       'Bonds',
       'Precious metals',
       'Settings',

@@ -48,21 +48,6 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
     }
 
     [Fact]
-    public async Task List_AfterFundingTransfer_ReturnsRemainingBalance()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var funded = await client.CreateFundedDepositAsync(cancellationToken);
-
-        var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var candidate = Assert.Single((await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList());
-        Assert.Equal(funded.CashAssetId, candidate.GetProperty("assetId").GetGuid());
-        Assert.Equal(4_000m, candidate.GetProperty("balance").GetDecimal());
-    }
-
-    [Fact]
     public async Task List_OrdersByAssetName()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
