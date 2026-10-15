@@ -15,11 +15,11 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, renderResumeScript } from "./build-replay.mjs";
-import { e2eBlockLines } from "./e2e-repair.mjs";
+import { e2eBlockLines, rebuildInputs } from "./e2e-repair.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OWNER = "Maliniak93";
@@ -501,14 +501,19 @@ function prepare([number, ...rest]) {
   const resumed = issue.status === "In progress";
   if (!resumed && !dryRun) setField(issue.url, "Status", "In progress");
   const ownPlan = issue.e2e && /^\s*\d+\.\s/m.test(section(body, TEST_PLAN));
-  const workflowArgs = { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic, e2e: issue.e2e, ...(ownPlan ? { ownPlan: true } : {}) };
+  const rebuild = prepareRebuild({ n, issue, freshBranch: dirty.length === 0, dryRun });
+  const workflowArgs = {
+    spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic, e2e: issue.e2e,
+    ...(ownPlan ? { ownPlan: true } : {}),
+    ...(rebuild.diagnosis ? { diagnosis: rebuild.diagnosis, patchApplied: rebuild.patchApplied } : {}),
+  };
   const replay = planReplay({ n, body, workflowArgs, attempt: !flags.fresh && action === "resumed" && dirty.length > 0, dryRun });
   const out = {
     ok: true,
     resumed,
     url: issue.url,
     branch: { name: target, action },
-    notes: action === "resumed" ? dirty : [],
+    notes: [...(action === "resumed" ? dirty : []), ...rebuild.notes],
     workflow: replay.workflow,
     replay: replay.summary,
     workflowArgs,
@@ -516,6 +521,29 @@ function prepare([number, ...rest]) {
   if (replay.skipped) out.replaySkipped = replay.skipped;
   if (dryRun) Object.assign(out, { dryRun: true, branchCommands, cardMove: resumed ? null : "Status -> In progress", epicCopies: extraCopies.map((m) => `${ISSUES_DIR}/${m}.md`) });
   console.log(JSON.stringify(out));
+}
+
+// An e2e part whose newest comment is a /fix e2e test-defect diagnosis gets it as a file, and the previous run's tests back from <n>.e2e.patch
+function prepareRebuild({ n, issue, freshBranch, dryRun }) {
+  const none = { diagnosis: null, patchApplied: false, notes: [] };
+  if (!issue.e2e) return none;
+  const { comments } = JSON.parse(gh(["issue", "view", String(n), "--repo", REPO, "--json", "comments"]));
+  const patchRel = `${ISSUES_DIR}/${n}.e2e.patch`;
+  const patchFile = path.resolve(REPO_ROOT, patchRel);
+  const { diagnosis, applyPatch } = rebuildInputs({ e2e: issue.e2e, comments, freshBranch, patchExists: existsSync(patchFile) });
+  if (!diagnosis) return none;
+  const diagnosisRel = `${ISSUES_DIR}/${n}.diagnosis.md`;
+  if (!dryRun) {
+    mkdirSync(path.dirname(path.resolve(REPO_ROOT, diagnosisRel)), { recursive: true });
+    writeFileSync(path.resolve(REPO_ROOT, diagnosisRel), `${diagnosis}\n`);
+  }
+  if (!applyPatch) return { diagnosis: diagnosisRel, patchApplied: false, notes: [`no ${patchRel}: the diagnosed tests are rewritten from master`] };
+  if (dryRun) return { diagnosis: diagnosisRel, patchApplied: false, notes: [`would run: git apply --check ${patchRel}, then git apply ${patchRel}`] };
+  const check = git(["apply", "--check", patchRel]);
+  if (!check.ok) return { diagnosis: diagnosisRel, patchApplied: false, notes: [`${patchRel} does not apply (${check.err}): the diagnosed tests are rewritten from master`] };
+  const applied = git(["apply", patchRel]);
+  if (!applied.ok) return { diagnosis: diagnosisRel, patchApplied: false, notes: [`git apply ${patchRel} failed (${applied.err})`] };
+  return { diagnosis: diagnosisRel, patchApplied: true, notes: [`applied ${patchRel}: the previous run's tests are on disk`] };
 }
 
 // Re-running an interrupted build replays the finished agent steps of its last run from the workflow journal (zero tokens).

@@ -90,6 +90,9 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   gitignored plan file aside); a new `test.skip`, `test.fixme` or `waitForTimeout`; an existing e2e
   test weakened or deleted; a new `toPass` / `expect.poll` on a Reporting projection value whose body does not re-fetch
   (reload, or leave the screen and come back; `expectProjected` does it). Read `.git/e2e-result.json` for the run instead of starting the stack.
+  A **repair rebuild** (the prompt names a diagnosis file) starts from the previous run's tests, saved as
+  `skarbiec-plan/issues/<n>.e2e.patch`: compare the test diff with it. A changed expected value or an assertion
+  taken from the plan is **blocking**; only how a step waits, re-fetches or selects may differ.
 - **Docs and requests**: new endpoint → `requests/<service>.http` updated; convention or hard rule
   changed → `.claude/rules/*` / `skarbiec-plan/decisions.md` updated.
 
