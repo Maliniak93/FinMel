@@ -20,6 +20,9 @@ using Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
 using Skarbiec.Portfolio.Features.Bonds.SwapBond;
 using Skarbiec.Portfolio.Features.Bonds.UndoBondInterestSettlement;
 using Skarbiec.Portfolio.Features.Bonds.UpdateBond;
+using Skarbiec.Portfolio.Features.CashPlaces.CreateCashPlace;
+using Skarbiec.Portfolio.Features.CashPlaces.DeleteCashPlace;
+using Skarbiec.Portfolio.Features.CashPlaces.UpdateCashPlace;
 using Skarbiec.Portfolio.Features.DeleteTransaction;
 using Skarbiec.Portfolio.Features.Deposits.AddDeposit;
 using Skarbiec.Portfolio.Features.Deposits.PayOutDeposit;
@@ -97,6 +100,9 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
             services.AddScoped<ArchiveAssetHandler>();
             services.AddScoped<RestoreAssetHandler>();
             services.AddScoped<DeleteAccountHandler>();
+            services.AddScoped<CreateCashPlaceHandler>();
+            services.AddScoped<UpdateCashPlaceHandler>();
+            services.AddScoped<DeleteCashPlaceHandler>();
             services.AddScoped<CreateTransferHandler>();
             services.AddScoped<DeleteTransferHandler>();
             services.AddScoped<AddWatchlistItemHandler>();
@@ -193,18 +199,22 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
     protected static async Task<Guid> AddCashWithBalanceAsync(
         IServiceProvider services, decimal balance, CancellationToken cancellationToken)
     {
-        var assetResult = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
-            new AddAssetRequest { AssetClass = AssetClass.Cash, Name = "Cash account", Currency = "PLN" },
+        var placeResult = await services.GetRequiredService<CreateCashPlaceHandler>().HandleAsync(
+            new CreateCashPlaceRequest { Name = "Cash account", Currencies = ["PLN"] },
             cancellationToken);
-        Assert.True(assetResult.IsSuccess, assetResult.IsFailure ? assetResult.Error.Code : null);
+        Assert.True(placeResult.IsSuccess, placeResult.IsFailure ? placeResult.Error.Code : null);
+        var balanceId = await services.GetRequiredService<PortfolioDbContext>().Assets
+            .Where(a => a.CashPlaceId == placeResult.Value.Id)
+            .Select(a => a.Id)
+            .SingleAsync(cancellationToken);
 
         var topUp = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
-            assetResult.Value.Id,
+            balanceId,
             new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = balance, UnitPrice = 1m, Date = PortfolioApi.DefaultTopUpDate },
             cancellationToken);
         Assert.True(topUp.IsSuccess, topUp.IsFailure ? topUp.Error.Code : null);
 
-        return assetResult.Value.Id;
+        return balanceId;
     }
 
     protected static async Task<Guid> AddStockAsync(

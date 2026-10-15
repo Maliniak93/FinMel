@@ -104,16 +104,15 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var cashId = await client.AddCashAssetAsync(cancellationToken);
-        var depositId = await client.RecordTransactionAsync(
-            cashId, TransactionType.Deposit, 100m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
-        await client.ArchiveAssetAsync(cashId, cancellationToken);
+        var (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+        var buyId = await client.RecordTransactionAsync(assetId, TransactionType.Buy, 100m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchiveAssetAsync(assetId, cancellationToken);
 
-        var response = await client.DeleteAsync(TransactionUri(cashId, depositId), cancellationToken);
+        var response = await client.DeleteAsync(TransactionUri(assetId, buyId), cancellationToken);
 
         await response.AssertAssetArchivedConflictAsync(cancellationToken);
-        Assert.Equal(100m, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
-        Assert.Contains((await client.ListTransactionsAsync(cashId, cancellationToken)).Items, t => t.Id == depositId);
+        Assert.Equal(100m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
+        Assert.Contains((await client.ListTransactionsAsync(assetId, cancellationToken)).Items, t => t.Id == buyId);
     }
 
     [Fact]

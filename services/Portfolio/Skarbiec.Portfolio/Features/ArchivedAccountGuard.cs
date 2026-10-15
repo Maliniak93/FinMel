@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.CashPlaces;
 
 namespace Skarbiec.Portfolio.Features;
 
@@ -18,7 +19,15 @@ internal static class ArchivedAccountGuard
 
     public static async Task<Error?> ReadOnlyErrorAsync(
         this PortfolioDbContext dbContext, Asset asset, CancellationToken cancellationToken)
-        => asset.ReadOnlyError(await dbContext.IsAccountArchivedAsync(asset.AccountId, cancellationToken));
+    {
+        if (asset.CashPlaceId is { } placeId
+            && await dbContext.CashPlaces.AnyAsync(p => p.Id == placeId && p.IsArchived, cancellationToken))
+        {
+            return CashPlaceErrors.Archived(placeId);
+        }
+
+        return asset.ReadOnlyError(await dbContext.IsAccountArchivedAsync(asset.AccountId, cancellationToken));
+    }
 
     public static Error? ReadOnlyError(this Asset asset, bool accountIsArchived)
         => accountIsArchived ? AccountErrors.Archived(asset.AccountId!.Value)

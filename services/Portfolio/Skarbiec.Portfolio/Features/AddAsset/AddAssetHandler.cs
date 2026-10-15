@@ -3,6 +3,7 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
+using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Metals;
 using Skarbiec.Portfolio.Features.Transfers;
@@ -28,6 +29,12 @@ public sealed class AddAssetHandler(
         if (request.AssetClass == AssetClass.Bond)
         {
             return BondErrors.UseBondEndpoints;
+        }
+
+        // A Cash asset is a cash place's balance or an account's money, created only with them.
+        if (request.AssetClass == AssetClass.Cash)
+        {
+            return CashPlaceErrors.UseCashPlaceEndpoints;
         }
 
         // Likewise only CreateAccount creates a BankAccount-class asset.

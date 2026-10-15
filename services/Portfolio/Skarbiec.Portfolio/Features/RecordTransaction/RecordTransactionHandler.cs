@@ -3,6 +3,7 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
+using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
@@ -178,12 +179,17 @@ public sealed class RecordTransactionHandler(
         var isBuy = metalLeg.Type == TransactionType.Buy;
 
         if (cash is null
-            || cash.AssetClass != AssetClass.Cash
+            || !cash.IsCashPlaceBalance()
             || !(isBuy ? TransferRoutes.IsAllowed(cash.AssetClass, metal.AssetClass) : TransferRoutes.IsAllowed(metal.AssetClass, cash.AssetClass))
             || cash.Currency != metal.Currency
             || cash.IsArchived)
         {
             return TransferErrors.InvalidCounterpart;
+        }
+
+        if (await dbContext.ReadOnlyErrorAsync(cash, cancellationToken) is { } cashReadOnly)
+        {
+            return cashReadOnly;
         }
 
         var transferId = Guid.NewGuid();

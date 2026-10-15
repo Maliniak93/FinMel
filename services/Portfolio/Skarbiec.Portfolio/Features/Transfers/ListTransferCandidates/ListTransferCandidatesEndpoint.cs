@@ -15,8 +15,13 @@ public static class ListTransferCandidatesEndpoint
         return app;
     }
 
-    // No defaults on purpose: currency and assetClass are required, so a missing one is a 400.
+    // No defaults on purpose: the currency is required, and so is the assetClass unless accountCash or cashPlaces picks the list.
     private static async Task<Results<Ok<IReadOnlyList<TransferCandidateResponse>>, ProblemHttpResult>> HandleAsync(
-        string currency, AssetClass assetClass, ListTransferCandidatesHandler handler, CancellationToken cancellationToken, bool accountCash = false)
-        => (await handler.HandleAsync(currency, assetClass, accountCash, cancellationToken)).ToHttpResult();
+        string currency,
+        ListTransferCandidatesHandler handler,
+        CancellationToken cancellationToken,
+        AssetClass? assetClass = null,
+        bool accountCash = false,
+        bool cashPlaces = false)
+        => (await handler.HandleAsync(currency, assetClass, accountCash, cashPlaces, cancellationToken)).ToHttpResult();
 }

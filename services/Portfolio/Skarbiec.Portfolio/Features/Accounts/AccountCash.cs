@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts.BankInterest;
+using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
 
@@ -19,11 +20,13 @@ internal static class AccountCash
     public static bool IsAccountCash(this Asset asset) => asset.AccountId is not null && asset.AssetClass is AssetClass.Cash or AssetClass.BankAccount;
 
     public static Error? ManagedError(this Asset asset)
-        => asset.IsAccountCash() ? AccountErrors.CashManaged(asset.Id) : null;
+        => asset.IsAccountCash() ? AccountErrors.CashManaged(asset.Id)
+            : asset.IsCashPlaceBalance() ? CashPlaceErrors.Managed(asset.Id)
+            : null;
 
-    // One error for every negative account-cash replay, whichever write caused it.
+    // One error for every negative money replay, an account's cash or a cash place balance, whichever write caused it.
     public static Func<TransactionType, Error> OversellError(this Asset asset, Func<TransactionType, Error> ordinary)
-        => asset.IsAccountCash() ? _ => TransferErrors.InsufficientFunds : ordinary;
+        => asset.IsAccountCash() || asset.IsCashPlaceBalance() ? _ => TransferErrors.InsufficientFunds : ordinary;
 
     public static Task<Asset> LoadAccountCashAsync(
         this PortfolioDbContext dbContext, Guid accountId, CancellationToken cancellationToken)

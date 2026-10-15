@@ -395,7 +395,8 @@
     "loadFailed": "Failed to load dashboard.",
     "cash": {
       "title": "Cash",
-      "empty": "No cash accounts yet.",
+      "empty": "No cash places yet.",
+      "total": "Total",
       "loadFailed": "Failed to load cash."
     },
     "upcoming": {
@@ -517,14 +518,66 @@
   },
   "cash": {
     "title": "Cash",
-    "balance": "Balance",
+    "showArchived": "Show archived",
+    "add": "Add place",
+    "empty": "No cash places yet. Add one to track physical cash such as a safe or a wallet.",
+    "loadFailed": "Failed to load cash places.",
     "totals": "Totals",
     "totalLine": "{{ currency }}: {{ amount }}",
-    "empty": "No cash accounts yet. Add a Cash asset to see it here.",
-    "loadFailed": "Failed to load cash accounts.",
-    "add": "Add cash account",
+    "totalValue": "Total value: {{ amount }}",
+    "fxUnavailable": "Exchange rate unavailable",
+    "rename": "Rename",
+    "addCurrency": "Add currency",
     "deposit": "Deposit",
-    "withdraw": "Withdraw"
+    "withdraw": "Withdraw",
+    "atmWithdrawal": "ATM withdrawal",
+    "bankDeposit": "Deposit to bank",
+    "history": "History",
+    "insufficientFunds": "Insufficient funds",
+    "archive": {
+      "title": "Archive this place?",
+      "message": "\"{{ name }}\" will become read-only and hidden from the default list — you can still see it by toggling \"Show archived\".",
+      "failed": "Failed to archive the place."
+    },
+    "restore": {
+      "title": "Restore this place?",
+      "message": "\"{{ name }}\" will return to your default list and accept changes again.",
+      "failed": "Failed to restore the place."
+    },
+    "delete": {
+      "title": "Delete this place?",
+      "message": "\"{{ name }}\" will be permanently deleted. This can't be undone.",
+      "failed": "Failed to delete the place."
+    },
+    "form": {
+      "createTitle": "Add cash place",
+      "renameTitle": "Rename cash place",
+      "addCurrencyTitle": "Add currency",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name is too long.",
+      "currencies": "Currencies",
+      "currencyRequired": "Choose at least one currency.",
+      "noMoreCurrencies": "The place already holds every currency."
+    },
+    "transfer": {
+      "atmTitle": "ATM withdrawal",
+      "bankDepositTitle": "Deposit to bank",
+      "bankAccount": "Bank account",
+      "cashPlace": "Cash place",
+      "noBankAccount": "You have no bank account in this currency.",
+      "noCashPlace": "You have no cash place with a balance in this currency.",
+      "counterpartRequired": "Choose the other side of the transfer.",
+      "currencyMismatch": "Different currencies",
+      "loadFailed": "Failed to load the accounts.",
+      "submit": "Transfer"
+    },
+    "errors": {
+      "notEmpty": "The place is not empty — withdraw its money first.",
+      "hasHistory": "The place has transactions, so it can't be deleted.",
+      "archived": "The place is archived — restore it first.",
+      "duplicateName": "A cash place with this name already exists.",
+      "duplicateCurrency": "The place already holds this currency."
+    }
   },
   "securities": {
     "title": "Stocks & ETFs",

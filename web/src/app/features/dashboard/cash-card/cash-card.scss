@@ -36,3 +36,12 @@
 .cash-card__balance {
   font-weight: 500;
 }
+
+.cash-card__total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}

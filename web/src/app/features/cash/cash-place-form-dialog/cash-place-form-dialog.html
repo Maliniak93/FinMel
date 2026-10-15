@@ -1,0 +1,83 @@
+<h2 mat-dialog-title>
+  {{
+    (mode === 'create'
+      ? 'cash.form.createTitle'
+      : mode === 'rename'
+        ? 'cash.form.renameTitle'
+        : 'cash.form.addCurrencyTitle'
+    ) | transloco
+  }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    @if (mode !== 'addCurrency') {
+      <mat-form-field appearance="outline" class="cash-place-form-dialog__field">
+        <mat-label>{{ 'common.name' | transloco }}</mat-label>
+        <input matInput type="text" formControlName="name" autocomplete="off" />
+        @if (form.controls.name.hasError('required')) {
+          <mat-error>{{ 'cash.form.nameRequired' | transloco }}</mat-error>
+        } @else if (form.controls.name.hasError('maxlength')) {
+          <mat-error>{{ 'cash.form.nameTooLong' | transloco }}</mat-error>
+        } @else if (form.controls.name.hasError('server')) {
+          <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (mode === 'create') {
+      <fieldset class="cash-place-form-dialog__currencies">
+        <legend>{{ 'cash.form.currencies' | transloco }}</legend>
+        @for (currency of currencies; track currency.code) {
+          <mat-checkbox
+            [checked]="selectedCurrencies().includes(currency.code)"
+            (change)="toggleCurrency(currency.code, $event.checked)"
+          >
+            {{ currency.label | transloco }}
+          </mat-checkbox>
+        }
+        @if (noCurrencySelected() && currenciesTouched()) {
+          <p class="cash-place-form-dialog__error" role="alert">
+            {{ 'cash.form.currencyRequired' | transloco }}
+          </p>
+        }
+      </fieldset>
+    }
+
+    @if (mode === 'addCurrency') {
+      <mat-form-field appearance="outline" class="cash-place-form-dialog__field">
+        <mat-label>{{ 'common.currency' | transloco }}</mat-label>
+        <mat-select formControlName="currency">
+          @for (currency of missingCurrencies(); track currency.code) {
+            <mat-option [value]="currency.code">{{ currency.label | transloco }}</mat-option>
+          }
+        </mat-select>
+        @if (missingCurrencies().length === 0) {
+          <mat-hint>{{ 'cash.form.noMoreCurrencies' | transloco }}</mat-hint>
+        }
+        @if (form.controls.currency.hasError('required')) {
+          <mat-error>{{ 'cash.form.currencyRequired' | transloco }}</mat-error>
+        } @else if (form.controls.currency.hasError('server')) {
+          <mat-error>{{ form.controls.currency.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (formError()) {
+      <p class="cash-place-form-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'common.save' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

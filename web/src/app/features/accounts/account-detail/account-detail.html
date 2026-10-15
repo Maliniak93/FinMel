@@ -61,6 +61,24 @@
         >
           {{ 'accounts.transfer.action' | transloco }}
         </button>
+        @if (isBank()) {
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="account.isArchived"
+            (click)="openCashBankTransfer('atm')"
+          >
+            {{ 'cash.atmWithdrawal' | transloco }}
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="account.isArchived"
+            (click)="openCashBankTransfer('bankDeposit')"
+          >
+            {{ 'cash.bankDeposit' | transloco }}
+          </button>
+        }
         @if (account.bank; as bank) {
           @if (bank.interestDue) {
             <button

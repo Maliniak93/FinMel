@@ -90,7 +90,7 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/cash');
   });
 
-  it('offers a "Stocks & ETFs" nav item linking to /securities right after Cash, "Akcje i ETF" in Polish', async () => {
+  it('offers a "Cash" nav item right after Precious metals', async () => {
     const links = () =>
       Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
@@ -98,7 +98,26 @@ describe('Shell', () => {
         ),
       );
     const english = links().map((a) => a.getAttribute('href'));
-    expect(english.indexOf('/securities')).toBe(english.indexOf('/cash') + 1);
+    expect(english.indexOf('/cash')).toBe(english.indexOf('/metals') + 1);
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const polish = links();
+    const link = polish.find((a) => a.getAttribute('href') === '/cash');
+    expect(link?.textContent).toContain('Gotówka');
+    expect(polish[polish.indexOf(link!) - 1].textContent).toContain('Metale szlachetne');
+  });
+
+  it('offers a "Stocks & ETFs" nav item linking to /securities right after Deposits, "Akcje i ETF" in Polish', async () => {
+    const links = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+          'mat-nav-list a',
+        ),
+      );
+    const english = links().map((a) => a.getAttribute('href'));
+    expect(english.indexOf('/securities')).toBe(english.indexOf('/deposits') + 1);
     expect(links().find((a) => a.getAttribute('href') === '/securities')?.textContent).toContain(
       'Stocks & ETFs',
     );
@@ -205,10 +224,10 @@ describe('Shell', () => {
       'Accounts',
       'Bank accounts',
       'Deposits',
-      'Cash',
       'Stocks & ETFs',
       'Bonds',
       'Precious metals',
+      'Cash',
       'Settings',
     ]);
 

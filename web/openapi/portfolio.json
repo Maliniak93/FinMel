@@ -1551,10 +1551,37 @@
         }
       }
     },
-    "/api/portfolio/cash-accounts": {
+    "/api/portfolio/cash-places": {
+      "post": {
+        "tags": [
+          "CreateCashPlaceEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashPlaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPlaceResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
-          "ListCashAccountsEndpoint"
+          "ListCashPlacesEndpoint"
         ],
         "responses": {
           "200": {
@@ -1562,7 +1589,196 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CashAccountsResponse"
+                  "$ref": "#/components/schemas/CashPlacesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/cash-places/{id}/currencies": {
+      "post": {
+        "tags": [
+          "AddCashPlaceCurrencyEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCashPlaceCurrencyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPlaceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/cash-places/{id}": {
+      "get": {
+        "tags": [
+          "GetCashPlaceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPlaceResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "UpdateCashPlaceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCashPlaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPlaceResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeleteCashPlaceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/cash-places/{id}/archive": {
+      "post": {
+        "tags": [
+          "ArchiveCashPlaceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPlaceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/cash-places/{id}/restore": {
+      "post": {
+        "tags": [
+          "RestoreCashPlaceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPlaceResponse"
                 }
               }
             }
@@ -1718,13 +1934,20 @@
           {
             "name": "assetClass",
             "in": "query",
-            "required": true,
             "schema": {
               "$ref": "#/components/schemas/AssetClass"
             }
           },
           {
             "name": "accountCash",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "cashPlaces",
             "in": "query",
             "schema": {
               "type": "boolean",
@@ -2148,6 +2371,17 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "AddCashPlaceCurrencyRequest": {
+        "required": [
+          "currency"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
           }
         }
       },
@@ -3244,24 +3478,20 @@
           }
         }
       },
-      "CashAccountResponse": {
+      "CashBalanceResponse": {
         "required": [
-          "assetId",
-          "name",
           "currency",
+          "cashAssetId",
           "balance"
         ],
         "type": "object",
         "properties": {
-          "assetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
           "currency": {
             "type": "string"
+          },
+          "cashAssetId": {
+            "type": "string",
+            "format": "uuid"
           },
           "balance": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
@@ -3270,20 +3500,66 @@
               "string"
             ],
             "format": "double"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
-      "CashAccountsResponse": {
+      "CashPlaceResponse": {
         "required": [
-          "accounts",
-          "totals"
+          "id",
+          "name",
+          "isArchived",
+          "balances"
         ],
         "type": "object",
         "properties": {
-          "accounts": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "balances": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CashAccountResponse"
+              "$ref": "#/components/schemas/CashBalanceResponse"
+            }
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "CashPlacesResponse": {
+        "required": [
+          "places",
+          "totals",
+          "fxUnavailable"
+        ],
+        "type": "object",
+        "properties": {
+          "places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashPlaceResponse"
             }
           },
           "totals": {
@@ -3291,6 +3567,18 @@
             "items": {
               "$ref": "#/components/schemas/CashTotalResponse"
             }
+          },
+          "totalValuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "fxUnavailable": {
+            "type": "boolean"
           }
         }
       },
@@ -3399,6 +3687,24 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "CreateCashPlaceRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -4730,6 +5036,18 @@
           }
         }
       },
+      "UpdateCashPlaceRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        }
+      },
       "UpdateDepositRequest": {
         "required": [
           "name",
@@ -5254,7 +5572,28 @@
       "name": "GetMetalEndpoint"
     },
     {
-      "name": "ListCashAccountsEndpoint"
+      "name": "CreateCashPlaceEndpoint"
+    },
+    {
+      "name": "ListCashPlacesEndpoint"
+    },
+    {
+      "name": "AddCashPlaceCurrencyEndpoint"
+    },
+    {
+      "name": "GetCashPlaceEndpoint"
+    },
+    {
+      "name": "UpdateCashPlaceEndpoint"
+    },
+    {
+      "name": "DeleteCashPlaceEndpoint"
+    },
+    {
+      "name": "ArchiveCashPlaceEndpoint"
+    },
+    {
+      "name": "RestoreCashPlaceEndpoint"
     },
     {
       "name": "ListSecuritiesEndpoint"

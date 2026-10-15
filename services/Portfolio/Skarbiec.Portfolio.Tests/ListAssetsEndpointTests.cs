@@ -40,7 +40,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var account = await client.CreateAccountAsync(cancellationToken);
         await client.AddStockInAccountAsync(account, cancellationToken, "In account");
-        await client.AddCashAssetAsync(cancellationToken, name: "In none");
+        await client.AddDepositAsync(cancellationToken);
 
         var response = await client.GetAsync(AllAssetsUri, cancellationToken);
 
@@ -104,9 +104,10 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
             seedContext.Assets.Add(new Asset
             {
                 Id = assetId,
-                AssetClass = AssetClass.Cash,
-                ValuationMode = AssetValuationMode.CurrencyValued,
-                Name = "Legacy GBP cash",
+                AssetClass = AssetClass.Stock,
+                ValuationMode = AssetValuationMode.Market,
+                InstrumentId = Guid.NewGuid(),
+                Name = "Legacy GBP shares",
                 Currency = "GBP"
             });
             await seedContext.SaveChangesAsync(cancellationToken);
@@ -127,7 +128,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var deposit = await client.AddDepositAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(cancellationToken);
+        var (_, stockId) = await client.CreateAccountWithAssetAsync(cancellationToken);
 
         var response = await client.GetAsync(AllAssetsUri, cancellationToken);
 
@@ -135,7 +136,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         var assets = await response.Content.ReadFromJsonAsync<List<AssetResponse>>(cancellationToken);
         Assert.NotNull(assets);
         Assert.Equal(new DateOnly(2026, 4, 15), assets.Single(a => a.Id == deposit.AssetId).DepositMaturityDate);
-        Assert.Null(assets.Single(a => a.Id == cashId).DepositMaturityDate);
+        Assert.Null(assets.Single(a => a.Id == stockId).DepositMaturityDate);
     }
 
     [Fact]
@@ -146,7 +147,7 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var settled = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Settled"));
         var due = await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "Due"));
-        var cashId = await client.AddCashAssetAsync(cancellationToken);
+        var (_, stockId) = await client.CreateAccountWithAssetAsync(cancellationToken);
         await client.SettleDepositAsync(settled.AssetId, cancellationToken);
 
         var response = await client.GetAsync(AllAssetsUri, cancellationToken);
@@ -156,6 +157,6 @@ public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers
         Assert.NotNull(assets);
         Assert.True(assets.Single(a => a.Id == settled.AssetId).DepositSettled);
         Assert.False(assets.Single(a => a.Id == due.AssetId).DepositSettled);
-        Assert.Null(assets.Single(a => a.Id == cashId).DepositSettled);
+        Assert.Null(assets.Single(a => a.Id == stockId).DepositSettled);
     }
 }

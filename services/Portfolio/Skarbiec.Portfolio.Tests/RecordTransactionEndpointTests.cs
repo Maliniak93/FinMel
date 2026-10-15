@@ -323,15 +323,16 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 100m);
-        await client.ArchiveAssetAsync(cashId, cancellationToken);
-        var request = new RecordTransactionRequest { Type = TransactionType.Deposit, Quantity = 50m, UnitPrice = 1m, Date = new DateOnly(2026, 2, 1) };
+        var (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 100m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchiveAssetAsync(assetId, cancellationToken);
+        var request = new RecordTransactionRequest { Type = TransactionType.Buy, Quantity = 50m, UnitPrice = 10m, Date = new DateOnly(2026, 2, 1) };
 
-        var response = await client.PostAsJsonAsync(TransactionsUri(cashId), request, cancellationToken);
+        var response = await client.PostAsJsonAsync(TransactionsUri(assetId), request, cancellationToken);
 
         await response.AssertAssetArchivedConflictAsync(cancellationToken);
-        Assert.Equal(100m, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
-        Assert.Equal(1, (await client.ListTransactionsAsync(cashId, cancellationToken)).TotalCount);
+        Assert.Equal(100m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
+        Assert.Equal(1, (await client.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
     }
 
     [Fact]

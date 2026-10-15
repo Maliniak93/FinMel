@@ -89,11 +89,11 @@ Content-Type: application/json
   "date": "2026-08-19"
 }
 
-### List the other accounts' money a transfer can go to, bank accounts included (free Cash is never listed here)
+### List the other accounts' money a transfer can go to, bank accounts included (a cash place balance is listed with cashPlaces=true)
 GET {{baseUrl}}/api/portfolio/transfer-candidates?currency=PLN&assetClass=Cash&accountCash=true
 Authorization: Bearer {{authToken}}
 
-### Transfer between two accounts (400 Validation.InsufficientFunds above the balance, 400 Validation.InvalidTransferCounterpart to a free Cash or the same account, 400 Validation.TransferCurrencyMismatch between currencies)
+### Transfer between two accounts (400 Validation.InsufficientFunds above the balance, 400 Validation.InvalidTransferCounterpart to the same account, 400 Validation.TransferCurrencyMismatch between currencies)
 # @name accountTransfer
 POST {{baseUrl}}/api/portfolio/transfers
 Authorization: Bearer {{authToken}}
@@ -256,8 +256,7 @@ Authorization: Bearer {{authToken}}
 
 ### --- Assets ---
 
-### Add a currency-valued asset
-# @name addAsset
+### Add a Cash asset (400 Validation.UseCashPlaceEndpoints: Cash is a cash place's balance or an account's money)
 POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -265,12 +264,11 @@ Content-Type: application/json
 {
   "assetClass": "Cash",
   "name": "Wallet",
-  "currency": "PLN",
-  "quantity": 1
+  "currency": "PLN"
 }
 
 ### Add a market-valuation asset
-# @name addMarketAsset
+# @name addAsset
 POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -280,7 +278,6 @@ Content-Type: application/json
   "assetClass": "Stock",
   "name": "Example stock",
   "currency": "USD",
-  "quantity": 10,
   "instrumentId": "{{addCustomInstrument.response.body.id}}"
 }
 
@@ -298,10 +295,10 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "assetClass": "Cash",
-  "name": "Wallet (renamed)",
-  "currency": "PLN",
-  "quantity": 1
+  "assetClass": "Stock",
+  "name": "Example stock (renamed)",
+  "currency": "USD",
+  "instrumentId": "{{addCustomInstrument.response.body.id}}"
 }
 
 ### Archive an asset
@@ -315,9 +312,10 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "assetClass": "Cash",
+  "assetClass": "Stock",
   "name": "Renamed while archived",
-  "currency": "PLN"
+  "currency": "USD",
+  "instrumentId": "{{addCustomInstrument.response.body.id}}"
 }
 
 ### Restore an archived asset
@@ -331,26 +329,26 @@ Authorization: Bearer {{authToken}}
 
 ### --- Transactions ---
 
-### Record a transaction
+### Record a transaction (a stock Buy settles in its account's cash)
 # @name recordTransaction
 POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "type": "Deposit",
+  "type": "Buy",
   "quantity": 1,
-  "unitPrice": 5000,
+  "unitPrice": 100,
   "date": "2026-08-18"
 }
 
-### Record a Buy on the Cash asset (400)
+### Record a Deposit on the stock (400 Validation.TransactionTypeNotAllowed)
 POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "type": "Buy",
+  "type": "Deposit",
   "quantity": 1,
   "unitPrice": 100,
   "date": "2026-08-18"
@@ -366,9 +364,9 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "type": "Deposit",
+  "type": "Buy",
   "quantity": 1,
-  "unitPrice": 5200,
+  "unitPrice": 105,
   "date": "2026-08-18"
 }
 
@@ -775,8 +773,102 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
-### List every active cash account, with per-currency totals
-GET {{baseUrl}}/api/portfolio/cash-accounts
+### --- Cash places ---
+
+### Create a cash place with a balance per currency (PLN, EUR, USD; PLN alone when omitted; 409 Conflict.DuplicateName)
+# @name createCashPlace
+POST {{baseUrl}}/api/portfolio/cash-places
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Sejf",
+  "currencies": ["PLN", "USD"]
+}
+
+### Add a currency balance (409 Conflict.DuplicateCurrency, 409 Conflict.CashPlaceArchived)
+POST {{baseUrl}}/api/portfolio/cash-places/{{createCashPlace.response.body.id}}/currencies
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "currency": "EUR"
+}
+
+### Deposit 2000 PLN from outside into the place's PLN balance (its cashAssetId; 400 Validation.InsufficientFunds when a Withdraw would leave it below zero on any day)
+# @name cashPlaceDeposit
+POST {{baseUrl}}/api/portfolio/assets/{{createCashPlace.response.body.$.balances[0].cashAssetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 2000,
+  "unitPrice": 1,
+  "date": "2026-10-01"
+}
+
+### ATM withdrawal: bank money (mBank) into the place's PLN balance (400 Validation.TransferCurrencyMismatch between currencies, 400 Validation.InvalidTransferCounterpart place to place or to a brokerage account's cash)
+# @name atmWithdrawal
+POST {{baseUrl}}/api/portfolio/transfers
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "sourceAssetId": "{{createMbankAccount.response.body.cashAssetId}}",
+  "targetAssetId": "{{createCashPlace.response.body.$.balances[0].cashAssetId}}",
+  "amount": 500,
+  "date": "2026-10-05"
+}
+
+### Bank deposit: the place's PLN balance into the bank money
+# @name bankDeposit
+POST {{baseUrl}}/api/portfolio/transfers
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "sourceAssetId": "{{createCashPlace.response.body.$.balances[0].cashAssetId}}",
+  "targetAssetId": "{{createMbankAccount.response.body.cashAssetId}}",
+  "amount": 200,
+  "date": "2026-10-06"
+}
+
+### Delete the bank deposit
+DELETE {{baseUrl}}/api/portfolio/transfers/{{bankDeposit.response.body.transferId}}
+Authorization: Bearer {{authToken}}
+
+### List the place balances a transfer can go to, in a currency
+GET {{baseUrl}}/api/portfolio/transfer-candidates?currency=PLN&cashPlaces=true
+Authorization: Bearer {{authToken}}
+
+### List every place with balances valued in PLN at the latest rate, and totals per currency (fxUnavailable with null foreign values when MarketData is down)
+GET {{baseUrl}}/api/portfolio/cash-places
+Authorization: Bearer {{authToken}}
+
+### Get a place
+GET {{baseUrl}}/api/portfolio/cash-places/{{createCashPlace.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+### Rename a place and its balances
+PUT {{baseUrl}}/api/portfolio/cash-places/{{createCashPlace.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Sejf domowy"
+}
+
+### Archive a place (409 Conflict.CashPlaceNotEmpty while a balance is not 0; any later write is 409 Conflict.CashPlaceArchived)
+POST {{baseUrl}}/api/portfolio/cash-places/{{createCashPlace.response.body.id}}/archive
+Authorization: Bearer {{authToken}}
+
+### Restore a place
+POST {{baseUrl}}/api/portfolio/cash-places/{{createCashPlace.response.body.id}}/restore
+Authorization: Bearer {{authToken}}
+
+### Delete a place (409 Conflict.CashPlaceHasHistory once a balance has a transaction; publishes AssetRemoved per balance)
+DELETE {{baseUrl}}/api/portfolio/cash-places/{{createCashPlace.response.body.id}}
 Authorization: Bearer {{authToken}}
 
 ### List Stock holdings, with value in PLN and unrealised gain — assetClass=Stock|Etf
@@ -862,22 +954,27 @@ Content-Type: application/json
 
 ### --- Precious metals ---
 
-### Add a Cash account to pay metals from
+### Create a cash place to pay metals from (its PLN balance is the cashAssetId)
 # @name addFundingCash
-POST {{baseUrl}}/api/portfolio/assets
+POST {{baseUrl}}/api/portfolio/cash-places
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "assetClass": "Cash",
-  "name": "Current account",
-  "currency": "PLN",
-  "initialTransaction": {
-    "type": "Deposit",
-    "quantity": 5000,
-    "unitPrice": 1,
-    "date": "2026-01-01"
-  }
+  "name": "Metals cash",
+  "currencies": ["PLN"]
+}
+
+### Fund the metals cash place
+POST {{baseUrl}}/api/portfolio/assets/{{addFundingCash.response.body.$.balances[0].cashAssetId}}/transactions
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Deposit",
+  "quantity": 5000,
+  "unitPrice": 1,
+  "date": "2026-01-01"
 }
 
 ### Add a silver coin with a first purchase (metal 1 = Silver; weightUnit Gram | TroyOunce)
@@ -942,7 +1039,7 @@ Content-Type: application/json
   "date": "2026-10-02"
 }
 
-### Buy one piece paid from the Cash account: a linked Cash Withdraw of quantity × unitPrice
+### Buy one piece paid from the metals cash place: a linked Cash Withdraw of quantity × unitPrice
 # @name metalBuyWithCash
 POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
@@ -953,10 +1050,10 @@ Content-Type: application/json
   "quantity": 1,
   "unitPrice": 275.00,
   "date": "2026-10-03",
-  "cashAssetId": "{{addFundingCash.response.body.id}}"
+  "cashAssetId": "{{addFundingCash.response.body.$.balances[0].cashAssetId}}"
 }
 
-### Sell one piece into the Cash account: a linked Cash Deposit of quantity × unitPrice
+### Sell one piece into the metals cash place: a linked Cash Deposit of quantity × unitPrice
 POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -966,7 +1063,7 @@ Content-Type: application/json
   "quantity": 1,
   "unitPrice": 280.00,
   "date": "2026-10-04",
-  "cashAssetId": "{{addFundingCash.response.body.id}}"
+  "cashAssetId": "{{addFundingCash.response.body.$.balances[0].cashAssetId}}"
 }
 
 ### Add a PLN stock to trade through its account's cash (deposit into the account first)
@@ -1011,7 +1108,7 @@ Content-Type: application/json
 }
 
 ### Buy 2 shares of the USD stock: the cash leg is a PLN Withdraw at the USDPLN rate of the day (400 Validation.FxRateMissing when MarketData has none that early)
-POST {{baseUrl}}/api/portfolio/assets/{{addMarketAsset.response.body.id}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
@@ -1024,7 +1121,7 @@ Content-Type: application/json
 }
 
 ### Buy 2 shares of the USD stock paid in PLN: amountPln is what the broker charged without the fee, it sets the rate (amountPln / (quantity x unitPrice)) and the cash leg (amountPln + fee); no MarketData call (400 Validation.PlnAmountNotAllowed on a PLN asset, a Dividend or a non-positive amount)
-POST {{baseUrl}}/api/portfolio/assets/{{addMarketAsset.response.body.id}}/transactions
+POST {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 

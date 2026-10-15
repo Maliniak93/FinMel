@@ -33,6 +33,10 @@ import {
   formatQuantity,
 } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
+import {
+  CashBankTransferDialog,
+  type CashBankTransferDirection,
+} from '../../cash/cash-bank-transfer-dialog/cash-bank-transfer-dialog';
 import { TransactionFormDialog } from '../../transactions/transaction-form-dialog/transaction-form-dialog';
 import { transactionTypeLabel } from '../../transactions/transaction-type';
 import { transferLabel } from '../../transactions/transfer-direction';
@@ -222,6 +226,29 @@ export class AccountDetail {
     const ref = this.dialog.open(CashOperationDialog, {
       width: '480px',
       data: { cashAssetId: this.accountResource.value().cashAssetId, kind },
+    });
+    ref.afterClosed().subscribe((saved: boolean | undefined) => {
+      if (saved) {
+        this.reload();
+      }
+    });
+  }
+
+  protected openCashBankTransfer(direction: CashBankTransferDirection): void {
+    if (!this.accountResource.hasValue()) {
+      return;
+    }
+    const account = this.accountResource.value();
+    const ref = this.dialog.open(CashBankTransferDialog, {
+      width: '480px',
+      data: {
+        direction,
+        anchor: 'bank',
+        anchorAssetId: account.cashAssetId,
+        anchorName: account.name,
+        currency: account.currency,
+        anchorBalance: account.cashBalance,
+      },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {

@@ -1,0 +1,87 @@
+<h2 mat-dialog-title>
+  {{
+    (data.direction === 'atm' ? 'cash.transfer.atmTitle' : 'cash.transfer.bankDepositTitle')
+      | transloco
+  }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <p class="cash-bank-transfer-dialog__name">
+      {{ data.anchorName }} · {{ formatMoney(data.anchorBalance, data.currency) }}
+    </p>
+
+    <mat-form-field appearance="outline" class="cash-bank-transfer-dialog__field">
+      <mat-label>{{
+        (data.anchor === 'place' ? 'cash.transfer.bankAccount' : 'cash.transfer.cashPlace')
+          | transloco
+      }}</mat-label>
+      <mat-select formControlName="counterpartAssetId">
+        @for (counterpart of counterparts; track counterpart.assetId) {
+          <mat-option [value]="counterpart.assetId">
+            {{ counterpart.name }} ({{ formatMoney(counterpart.balance, data.currency) }})
+          </mat-option>
+        }
+      </mat-select>
+      @if (counterpartsResource.error(); as loadError) {
+        <mat-hint>{{ loadError.message }}</mat-hint>
+      } @else if (counterpartsResource.hasValue() && counterparts.length === 0) {
+        <mat-hint>{{
+          (data.anchor === 'place' ? 'cash.transfer.noBankAccount' : 'cash.transfer.noCashPlace')
+            | transloco
+        }}</mat-hint>
+      }
+      @if (form.controls.counterpartAssetId.hasError('required')) {
+        <mat-error>{{ 'cash.transfer.counterpartRequired' | transloco }}</mat-error>
+      } @else if (form.controls.counterpartAssetId.hasError('server')) {
+        <mat-error>{{ form.controls.counterpartAssetId.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="cash-bank-transfer-dialog__field">
+      <mat-label>{{ 'common.amount' | transloco }}</mat-label>
+      <input matInput type="number" step="0.01" formControlName="amount" />
+      @if (form.controls.amount.hasError('required')) {
+        <mat-error>{{ 'accounts.cash.amountRequired' | transloco }}</mat-error>
+      } @else if (form.controls.amount.hasError('min')) {
+        <mat-error>{{ 'accounts.cash.amountPositive' | transloco }}</mat-error>
+      } @else if (form.controls.amount.hasError('server')) {
+        <mat-error>{{ form.controls.amount.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="cash-bank-transfer-dialog__field">
+      <mat-label>{{ 'common.date' | transloco }}</mat-label>
+      <input matInput [matDatepicker]="datePicker" [max]="maxDate" formControlName="date" />
+      <mat-datepicker-toggle matIconSuffix [for]="datePicker"></mat-datepicker-toggle>
+      <mat-datepicker #datePicker></mat-datepicker>
+      @if (form.controls.date.hasError('required')) {
+        <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+      } @else if (
+        form.controls.date.hasError('dateInFuture') ||
+        form.controls.date.hasError('matDatepickerMax')
+      ) {
+        <mat-error>{{ 'accounts.cash.dateInFuture' | transloco }}</mat-error>
+      } @else if (form.controls.date.hasError('server')) {
+        <mat-error>{{ form.controls.date.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="cash-bank-transfer-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'cash.transfer.submit' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

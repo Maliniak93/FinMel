@@ -110,6 +110,40 @@ public sealed class TransferRoutesTests
         Assert.False(TransferRoutes.IsCreatable(freeCash, money));
     }
 
+    [Fact]
+    public void IsCreatable_BankMoneyAndCashPlaceBalance_IsCreatableAndDeletableBothWays()
+    {
+        var bank = Money(AssetClass.BankAccount, Guid.NewGuid());
+        var placeBalance = PlaceBalance();
+
+        Assert.True(TransferRoutes.IsCreatable(bank, placeBalance));
+        Assert.True(TransferRoutes.IsCreatable(placeBalance, bank));
+        Assert.True(TransferRoutes.IsDeletable(bank, placeBalance));
+        Assert.True(TransferRoutes.IsDeletable(placeBalance, bank));
+    }
+
+    [Fact]
+    public void IsCreatable_CashPlaceBalanceToPlaceOrToBrokerageCash_IsRejected()
+    {
+        var placeBalance = PlaceBalance();
+        var otherPlaceBalance = PlaceBalance();
+        var brokerageCash = Money(AssetClass.Cash, Guid.NewGuid());
+
+        Assert.False(TransferRoutes.IsCreatable(placeBalance, otherPlaceBalance));
+        Assert.False(TransferRoutes.IsCreatable(placeBalance, brokerageCash));
+        Assert.False(TransferRoutes.IsCreatable(brokerageCash, placeBalance));
+    }
+
+    private static Asset PlaceBalance() => new()
+    {
+        Id = Guid.NewGuid(),
+        CashPlaceId = Guid.NewGuid(),
+        AssetClass = AssetClass.Cash,
+        Name = "Sejf",
+        Currency = "PLN",
+        ValuationMode = AssetValuationMode.CurrencyValued
+    };
+
     private static Asset Money(AssetClass assetClass, Guid? accountId) => new()
     {
         Id = Guid.NewGuid(),

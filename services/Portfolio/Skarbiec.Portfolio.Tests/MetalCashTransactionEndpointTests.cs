@@ -78,7 +78,6 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
     [Theory]
     [InlineData("bank-account")]
     [InlineData("eur-cash")]
-    [InlineData("archived-cash")]
     [InlineData("holding-itself")]
     public async Task InvalidCounterpart_ReturnsBadRequest(string scenario)
     {
@@ -96,9 +95,6 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
             case "eur-cash":
                 cashAssetId = await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "Euro cash");
                 break;
-            case "archived-cash":
-                cashAssetId = await client.AddArchivedCashAssetAsync(cancellationToken);
-                break;
             default:
                 cashAssetId = setup.MetalAssetId;
                 break;
@@ -113,6 +109,24 @@ public sealed class MetalCashTransactionEndpointTests(SkarbiecContainersFixture 
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
         await using var dbContext = CreateDbContext(userId);
         Assert.False(await dbContext.Transactions.AnyAsync(t => t.TransferId != null, cancellationToken));
+    }
+
+    [Fact]
+    public async Task AccountCash_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateCashAndMetalAsync(cancellationToken);
+        var brokerage = await client.CreateAccountWithCashAsync(cancellationToken, balance: 5_000m, name: "XTB IKE", depositedOn: DefaultTopUpDate);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            TransactionsUri(setup.MetalAssetId), NewMetalCashRequest(brokerage.CashAssetId, pieces: 1m, pricePerPiece: 100m), cancellationToken);
+
+        await response.AssertInvalidTransferCounterpartAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
     }
 
     [Fact]

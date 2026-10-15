@@ -46,14 +46,14 @@ public sealed class RestoreAssetEndpointTests(SkarbiecContainersFixture containe
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 100m);
-        await client.ArchiveAssetAsync(cashId, cancellationToken);
-        await client.RestoreAssetAsync(cashId, cancellationToken);
+        var (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 100m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchiveAssetAsync(assetId, cancellationToken);
+        await client.RestoreAssetAsync(assetId, cancellationToken);
 
-        await client.RecordTransactionAsync(
-            cashId, TransactionType.Deposit, 50m, new DateOnly(2026, 2, 1), cancellationToken, unitPrice: 1m);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 50m, new DateOnly(2026, 2, 1), cancellationToken);
 
-        Assert.Equal(150m, (await client.GetAssetAsync(cashId, cancellationToken)).Quantity);
+        Assert.Equal(150m, (await client.GetAssetAsync(assetId, cancellationToken)).Quantity);
     }
 
     [Fact]

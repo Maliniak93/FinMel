@@ -12,6 +12,7 @@ import { provideI18nTesting } from '../../../core/i18n/testing';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../../shared/format';
 import { jsonResponse, requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { CashBankTransferDialog } from '../../cash/cash-bank-transfer-dialog/cash-bank-transfer-dialog';
 import { depositResponse } from '../../deposits/testing/deposit-fixtures';
 import { AccountTransferDialog } from '../account-transfer-dialog/account-transfer-dialog';
 import { CashOperationDialog } from '../cash-operation-dialog/cash-operation-dialog';
@@ -303,6 +304,41 @@ describe('AccountDetail', () => {
     ];
     expect(dialogType).toBe(AccountTransferDialog);
     expect(config.data.account).toMatchObject({ id: accountId, cashAssetId });
+  });
+
+  it('a bank account offers the ATM withdrawal and the bank deposit from its side', async () => {
+    await setup({ type: 2, wrapper: 0, currency: 'PLN', bank: bankTerms() });
+    dialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    const accountReadsBefore = getCalls(`/api/portfolio/accounts/${accountId}`);
+
+    action(/^atm withdrawal$/i).click();
+    await fixture.whenStable();
+    action(/^deposit to bank$/i).click();
+    await fixture.whenStable();
+
+    const [[atmDialog, atmConfig], [depositDialog, depositConfig]] = dialog.open.mock.calls as [
+      [unknown, { data: unknown }],
+      [unknown, { data: unknown }],
+    ];
+    expect(atmDialog).toBe(CashBankTransferDialog);
+    expect(atmConfig.data).toMatchObject({
+      direction: 'atm',
+      anchor: 'bank',
+      anchorAssetId: cashAssetId,
+      currency: 'PLN',
+    });
+    expect(depositDialog).toBe(CashBankTransferDialog);
+    expect(depositConfig.data).toMatchObject({ direction: 'bankDeposit', anchor: 'bank' });
+    await vi.waitFor(() =>
+      expect(getCalls(`/api/portfolio/accounts/${accountId}`)).toBeGreaterThan(accountReadsBefore),
+    );
+  });
+
+  it('a brokerage account has no ATM withdrawal or bank deposit', async () => {
+    await setup();
+
+    expect(() => action(/^atm withdrawal$/i)).toThrow();
+    expect(() => action(/^deposit to bank$/i)).toThrow();
   });
 
   it('deleting a transfer asks for confirmation, calls DELETE /transfers/{id} and reloads', async () => {

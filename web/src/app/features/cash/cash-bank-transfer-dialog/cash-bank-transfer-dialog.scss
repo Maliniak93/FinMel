@@ -1,0 +1,14 @@
+.cash-bank-transfer-dialog__name {
+  margin: 0 0 12px;
+  font-weight: 500;
+}
+
+.cash-bank-transfer-dialog__field {
+  display: block;
+  width: 100%;
+}
+
+.cash-bank-transfer-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

@@ -8,20 +8,6 @@
   text-align: center;
 }
 
-.cash-page__table {
-  width: 100%;
-}
-
-.cash-page__totals ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.cash-page__total {
-  padding: 4px 0;
-}
-
 .cash-page__header {
   display: flex;
   align-items: center;
@@ -29,6 +15,80 @@
   gap: 16px;
 }
 
-.cash-page__actions {
+.cash-page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cash-page__totals {
+  margin-bottom: 24px;
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+.cash-page__total {
+  padding: 4px 0;
+}
+
+.cash-page__total-value {
+  margin: 8px 0 0;
+  font-weight: 500;
+}
+
+.cash-page__fx-unavailable {
+  margin: 4px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.cash-place {
+  margin-bottom: 16px;
+}
+
+.cash-place--archived {
+  opacity: 0.7;
+}
+
+.cash-place__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.cash-place__name {
+  flex: 1;
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.cash-place__value {
+  font-weight: 500;
+}
+
+.cash-place__balances {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cash-place__balance {
+  display: grid;
+  grid-template-columns: 4rem 1fr 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.cash-place__amount,
+.cash-place__amount-pln {
   text-align: end;
+}
+
+.cash-place__amount-pln {
+  color: var(--mat-sys-on-surface-variant);
 }

@@ -586,8 +586,6 @@ internal static class PortfolioApi
         EarlyRedemptionFeePerBond = bond.EarlyRedemptionFeePerBond
     };
 
-    public const string AllCashAccountsUri = "/api/portfolio/cash-accounts";
-
     public static readonly DateTimeOffset FixedTodayUtc = new(2026, 2, 1, 10, 0, 0, TimeSpan.Zero);
 
     public static readonly DateOnly FixedToday = new(2026, 2, 1);
@@ -691,14 +689,13 @@ internal static class PortfolioApi
     public static async Task<Guid> AddArchivedCashAssetAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
-        decimal balance = 5_000m,
         string name = "Archived cash",
         string currency = "PLN")
     {
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: balance, name: name, currency: currency);
-        await client.ArchiveAssetAsync(cashId, cancellationToken);
+        var place = await client.CreateCashPlaceAsync(cancellationToken, name, currency);
+        await client.ArchiveCashPlaceAsync(place.Id, cancellationToken);
 
-        return cashId;
+        return place.AssetId(currency);
     }
 
     // CashAssetId is the money asset of the PLN bank account the deposit was opened from.
@@ -747,20 +744,13 @@ internal static class PortfolioApi
         return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
     }
 
+    // A cash place named after the balance, holding it alone; returns the balance's asset id.
     public static async Task<Guid> AddCashAssetAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
-        AssetClass assetClass = AssetClass.Cash,
         string currency = "PLN",
-        string name = "Cash account")
-    {
-        var request = new AddAssetRequest { AssetClass = assetClass, Name = name, Currency = currency };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
-    }
+        string name = "Cash account") =>
+        (await client.CreateCashPlaceAsync(cancellationToken, name, currency)).AssetId(currency);
 
     public const string SecuritiesBaseUri = "/api/portfolio/securities";
 

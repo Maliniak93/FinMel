@@ -118,14 +118,14 @@ public sealed class AccountCashEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task FreeCashCandidates_ExcludeAccountCash()
+    public async Task CashPlaceCandidates_ExcludeAccountCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         await client.CreateAccountWithCashAsync(cancellationToken, balance: 100m);
         var freeCashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Wallet");
 
-        var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
+        var response = await client.GetAsync(CashPlacesApi.CashPlaceCandidatesUri("PLN"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var candidates = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList();

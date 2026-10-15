@@ -51,10 +51,10 @@ export class Shell {
     { path: 'accounts', label: 'shell.nav.accounts', icon: 'account_balance_wallet' },
     { path: 'bank-accounts', label: 'shell.nav.bankAccounts', icon: 'account_balance' },
     { path: 'deposits', label: 'shell.nav.deposits', icon: 'savings' },
-    { path: 'cash', label: 'shell.nav.cash', icon: 'payments' },
     { path: 'securities', label: 'shell.nav.securities', icon: 'show_chart' },
     { path: 'bonds', label: 'shell.nav.bonds', icon: 'receipt_long' },
     { path: 'metals', label: 'shell.nav.metals', icon: 'diamond' },
+    { path: 'cash', label: 'shell.nav.cash', icon: 'payments' },
     { path: 'settings', label: 'shell.nav.settings', icon: 'settings' },
   ];
 

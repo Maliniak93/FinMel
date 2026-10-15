@@ -5,7 +5,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
-import { getApiPortfolioCashAccounts } from '../../../api/portfolio';
+import { getApiPortfolioCashPlaces } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { formatMoney } from '../../../shared/format';
 
@@ -18,7 +18,7 @@ import { formatMoney } from '../../../shared/format';
 export class CashCard {
   protected readonly cashResource = resource({
     loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioCashAccounts({ signal: abortSignal });
+      const result = await getApiPortfolioCashPlaces({ signal: abortSignal });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ?? translate('dashboard.cash.loadFailed'),

@@ -36,17 +36,32 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
 
         var withoutAccount = await client.PostAsJsonAsync(AllAssetsUri, stock, cancellationToken);
         var intoBonds = await client.PostAsJsonAsync(AllAssetsUri, stock with { AccountId = bondsId }, cancellationToken);
-        var cashWithAccount = await client.PostAsJsonAsync(AllAssetsUri, NewAccountlessCashRequest(brokerageId), cancellationToken);
         var intoBrokerage = await client.PostAsJsonAsync(AllAssetsUri, stock with { AccountId = brokerageId }, cancellationToken);
 
         await withoutAccount.AssertProblemAsync(HttpStatusCode.BadRequest, PortfolioAssertions.AccountRequiredErrorCode, cancellationToken);
         await intoBonds.AssertProblemAsync(HttpStatusCode.BadRequest, PortfolioAssertions.AccountTypeMismatchErrorCode, cancellationToken);
-        await cashWithAccount.AssertProblemAsync(HttpStatusCode.BadRequest, PortfolioAssertions.AccountNotAllowedErrorCode, cancellationToken);
         Assert.Equal(HttpStatusCode.Created, intoBrokerage.StatusCode);
         var created = await intoBrokerage.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.Equal(brokerageId, created!.AccountId);
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(1, await dbContext.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
+    }
+
+    [Fact]
+    public async Task CashRejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+
+        var free = await client.PostAsJsonAsync(AllAssetsUri, NewAccountlessCashRequest(), cancellationToken);
+        var inAccount = await client.PostAsJsonAsync(AllAssetsUri, NewAccountlessCashRequest(accountId), cancellationToken);
+
+        await free.AssertProblemAsync(HttpStatusCode.BadRequest, CashPlacesApi.UseCashPlaceEndpointsErrorCode, cancellationToken);
+        await inAccount.AssertProblemAsync(HttpStatusCode.BadRequest, CashPlacesApi.UseCashPlaceEndpointsErrorCode, cancellationToken);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(0, await dbContext.Assets.ExcludingAccountCash().CountAsync(cancellationToken));
     }
 
     [Fact]
@@ -104,57 +119,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
     }
 
-    [Theory]
-    [InlineData(AssetClass.Cash)]
-    [InlineData(AssetClass.Stock)]
-    [InlineData(AssetClass.Etf)]
-    public async Task Add_EveryCreatableAssetClass_ReturnsCreated(AssetClass assetClass)
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var accountId = await client.CreateAccountAsync(cancellationToken);
-        var request = new AddAssetRequest
-        {
-            AccountId = assetClass == AssetClass.Cash ? null : accountId,
-            AssetClass = assetClass,
-            Name = "Test asset",
-            Currency = "USD",
-            InstrumentId = AssetValuationModes.SupportsCurrencyValued(assetClass) ? null : FakeInstrumentLookupClient.IdFor(assetClass, "USD")
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.NotNull(body);
-        Assert.Equal(assetClass, body.AssetClass);
-        Assert.Equal("USD", body.Currency);
-        // No InitialTransaction here, so the quantity stays 0.
-        Assert.Equal(0m, body.Quantity);
-        Assert.Equal(0, body.TransactionCount);
-        Assert.Equal(AssetUri(body.Id), response.Headers.Location?.OriginalString);
-    }
-
-    [Fact]
-    public async Task Add_WithoutInitialTransaction_CreatesAssetWithZeroQuantityAndNoTransactions()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var request = new { AssetClass = AssetClass.Cash, Name = "Wallet" };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.Equal(0m, body!.Quantity);
-        Assert.Equal("PLN", body.Currency);
-        Assert.Equal(0, body.TransactionCount);
-
-        var transactions = await client.ListTransactionsAsync(body.Id, cancellationToken);
-        Assert.Empty(transactions.Items);
-        Assert.Equal(0, transactions.TotalCount);
-    }
-
     [Fact]
     public async Task Add_WithInitialTransaction_QuantityMatchesRecomputeAndTransactionIsListed()
     {
@@ -203,65 +167,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
-    public async Task Add_WithInitialTransactionWhenFxUnavailable_ReturnsServiceUnavailableAndCreatesNoAsset()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.FxRateLookupClient.WithUnavailable("EUR");
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var request = new AddAssetRequest
-        {
-            AssetClass = AssetClass.Cash,
-            Name = "Euro account",
-            Currency = "EUR",
-            InitialTransaction = new RecordTransactionRequest
-            {
-                Type = TransactionType.Deposit,
-                Quantity = 500m,
-                UnitPrice = 1m,
-                Date = new DateOnly(2026, 3, 4)
-            }
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Single(Factory.FxRateLookupClient.Calls);
-        await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
-    }
-
-    [Fact]
-    public async Task Add_PlnAssetWithInitialTransaction_ValuePlnEqualsAmountWithoutFxLookup()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var request = new AddAssetRequest
-        {
-            AssetClass = AssetClass.Cash,
-            Name = "Checking account",
-            Currency = "PLN",
-            InitialTransaction = new RecordTransactionRequest
-            {
-                Type = TransactionType.Deposit,
-                Quantity = 1_000m,
-                UnitPrice = 1m,
-                Date = new DateOnly(2026, 3, 4)
-            }
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        var listed = Assert.Single((await client.ListTransactionsAsync(body!.Id, cancellationToken)).Items);
-        Assert.Equal("PLN", listed.Currency);
-        Assert.Equal(1000.00m, listed.ValuePln);
-        Assert.Empty(Factory.FxRateLookupClient.Calls);
-    }
-
-    [Fact]
     public async Task Add_WithInvalidInitialTransaction_ReturnsBadRequestAndCreatesNoAsset()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -291,51 +196,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         await using var dbContext = CreateDbContext(userId);
         Assert.Equal(0, await dbContext.Assets.ExcludingAccountCash().CountAsync(a => a.AccountId == accountId, cancellationToken));
         Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
-    }
-
-    [Theory]
-    [InlineData("PLN")]
-    [InlineData("EUR")]
-    [InlineData("USD")]
-    public async Task Add_WithSupportedCurrency_ReturnsCreated(string currency)
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var request = new AddAssetRequest
-        {
-            AssetClass = AssetClass.Cash,
-            Name = $"Cash in {currency}",
-            Currency = currency
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.Equal(currency, body!.Currency);
-    }
-
-    [Fact]
-    public async Task Add_WithUnsupportedCurrency_ReturnsBadRequestNamingAcceptedSet()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var request = new AddAssetRequest
-        {
-            AssetClass = AssetClass.Cash,
-            Name = "Swiss cash",
-            Currency = "CHF"
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
-        Assert.NotNull(problem);
-        Assert.Contains(problem.Errors, e => e.Key.Equals(nameof(AddAssetRequest.Currency), StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(
-            problem.Errors.Values.SelectMany(messages => messages),
-            message => message.Contains(SupportedCurrencies.Accepted, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -375,7 +235,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         using var client = Factory.CreateClient();
         var request = new AddAssetRequest
         {
-            AssetClass = AssetClass.Cash,
+            AssetClass = AssetClass.Stock,
             Name = "Unauthorized",
             Currency = "PLN"
         };
@@ -484,70 +344,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Theory]
-    [InlineData(AssetClass.Cash)]
-    public async Task Add_CurrencyValuedClassWithInitialDeposit_ReturnsCreatedAsCurrencyValuedWithQuantityFromTransaction(AssetClass assetClass)
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var request = new AddAssetRequest
-        {
-            AssetClass = assetClass,
-            Name = "Plain cash",
-            Currency = "EUR",
-            InitialTransaction = new RecordTransactionRequest
-            {
-                Type = TransactionType.Deposit,
-                Quantity = 1_000m,
-                UnitPrice = 1m,
-                Date = new DateOnly(2026, 1, 1)
-            }
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.NotNull(body);
-        Assert.Equal(AssetValuationMode.CurrencyValued, body.ValuationMode);
-        Assert.Equal(1_000m, body.Quantity);
-        Assert.Equal(1, body.TransactionCount);
-        Assert.Null(body.InstrumentId);
-    }
-
-    [Theory]
-    [InlineData(AssetClass.Cash, TransactionType.Buy)]
-    [InlineData(AssetClass.Cash, TransactionType.Interest)]
-    public async Task Add_CashLikeClassWithDisallowedInitialType_ReturnsBadRequestAndCreatesNoAsset(
-        AssetClass assetClass, TransactionType initialType)
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.FxRateLookupClient.WithRate("EUR", 4.30m);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var request = new AddAssetRequest
-        {
-            AssetClass = assetClass,
-            Name = "Euro savings",
-            Currency = "EUR",
-            InitialTransaction = new RecordTransactionRequest
-            {
-                Type = initialType,
-                Quantity = 500m,
-                UnitPrice = 1m,
-                Date = new DateOnly(2026, 3, 4)
-            }
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        await response.AssertTransactionTypeNotAllowedAsync(cancellationToken);
-        Assert.Empty(Factory.FxRateLookupClient.Calls);
-        await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(0, await dbContext.Assets.CountAsync(cancellationToken));
-        Assert.Equal(0, await dbContext.Transactions.CountAsync(cancellationToken));
     }
 
     [Fact]

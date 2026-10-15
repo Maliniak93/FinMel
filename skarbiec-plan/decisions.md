@@ -244,3 +244,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Decision:** `WatchlistItem` lives in Portfolio. Adding one validates the instrument through `GET /internal/instruments/{id}` (REST use 1). The list and get read quotes through `POST /internal/instruments/batch`, now with the previous close, plus `/internal/fx/latest-batch`, failing soft (REST use 5, ADR-031). Add and remove publish `WatchlistItemAdded` and `WatchlistItemRemoved` through the outbox. MarketData counts watchers from them and syncs watched instruments. The loser was a watchlist in MarketData: no event, but MarketData's first user-owned entity, and the "held" marker joined in the SPA. Amends ADR-021 and ADR-031.
 
 **Consequences:** a list load costs two internal calls. A watched instrument is synced daily even when nobody holds it.
+
+## ADR-036 🕐 Cash places read the latest FX rate on the read path
+
+**Context:** a physical cash place holds balances in several currencies, and the "Gotówka" page shows each one's PLN value. Reporting values the same balances, but per user and account, not per place.
+**Decision:** `ListCashPlaces` and `GetCashPlace` call MarketData's existing `POST /internal/fx/latest-batch` once for the distinct held non-PLN currencies, fail soft like ADR-031 (`fxUnavailable`, foreign values null, still 200). Nothing is stored or published. Extends ADR-031 to a second handler.
+**Consequences:** one extra internal call per cash-page load; the page and net worth can differ by one sync, as on the securities page.

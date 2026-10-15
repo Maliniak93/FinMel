@@ -18,8 +18,8 @@ public sealed class ListAssetsHandler(PortfolioDbContext dbContext)
         var rows = await dbContext.Assets
             .AsNoTracking()
             .Where(a => accountId == null || a.AccountId == accountId)
-            // An account's money is read through the account, never listed as a holding.
-            .Where(a => a.AssetClass != AssetClass.BankAccount && (a.AssetClass != AssetClass.Cash || a.AccountId == null))
+            // An account's money is read through the account and a place's balances through the place, never listed as holdings.
+            .Where(a => a.AssetClass != AssetClass.BankAccount && a.AssetClass != AssetClass.Cash)
             .OrderBy(a => a.Name)
             .Select(a => new
             {
