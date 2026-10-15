@@ -395,7 +395,8 @@
     "loadFailed": "Nie udało się wczytać pulpitu.",
     "cash": {
       "title": "Gotówka",
-      "empty": "Brak kont gotówkowych.",
+      "empty": "Brak miejsc z gotówką.",
+      "total": "Razem",
       "loadFailed": "Nie udało się wczytać gotówki."
     },
     "upcoming": {
@@ -517,14 +518,66 @@
   },
   "cash": {
     "title": "Gotówka",
-    "balance": "Saldo",
+    "showArchived": "Pokaż zarchiwizowane",
+    "add": "Dodaj miejsce",
+    "empty": "Nie masz jeszcze miejsc z gotówką. Dodaj miejsce, np. sejf lub portfel, aby śledzić fizyczną gotówkę.",
+    "loadFailed": "Nie udało się wczytać miejsc z gotówką.",
     "totals": "Suma",
     "totalLine": "{{ currency }}: {{ amount }}",
-    "empty": "Nie masz jeszcze kont gotówkowych. Dodaj aktywo typu Gotówka, aby je tu zobaczyć.",
-    "loadFailed": "Nie udało się wczytać kont gotówkowych.",
-    "add": "Dodaj konto gotówkowe",
+    "totalValue": "Łączna wartość: {{ amount }}",
+    "fxUnavailable": "Kurs niedostępny",
+    "rename": "Zmień nazwę",
+    "addCurrency": "Dodaj walutę",
     "deposit": "Wpłata",
-    "withdraw": "Wypłata"
+    "withdraw": "Wypłata",
+    "atmWithdrawal": "Wypłata z bankomatu",
+    "bankDeposit": "Wpłata do banku",
+    "history": "Historia",
+    "insufficientFunds": "Brak środków",
+    "archive": {
+      "title": "Zarchiwizować to miejsce?",
+      "message": "\"{{ name }}\" będzie tylko do odczytu i zniknie z domyślnej listy — nadal zobaczysz je po włączeniu \"Pokaż zarchiwizowane\".",
+      "failed": "Nie udało się zarchiwizować miejsca."
+    },
+    "restore": {
+      "title": "Przywrócić to miejsce?",
+      "message": "\"{{ name }}\" wróci na domyślną listę i znów przyjmie zmiany.",
+      "failed": "Nie udało się przywrócić miejsca."
+    },
+    "delete": {
+      "title": "Usunąć to miejsce?",
+      "message": "\"{{ name }}\" zostanie trwale usunięte. Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć miejsca."
+    },
+    "form": {
+      "createTitle": "Dodaj miejsce z gotówką",
+      "renameTitle": "Zmień nazwę miejsca",
+      "addCurrencyTitle": "Dodaj walutę",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameTooLong": "Nazwa jest za długa.",
+      "currencies": "Waluty",
+      "currencyRequired": "Wybierz co najmniej jedną walutę.",
+      "noMoreCurrencies": "Miejsce ma już każdą walutę."
+    },
+    "transfer": {
+      "atmTitle": "Wypłata z bankomatu",
+      "bankDepositTitle": "Wpłata do banku",
+      "bankAccount": "Konto bankowe",
+      "cashPlace": "Miejsce z gotówką",
+      "noBankAccount": "Nie masz konta bankowego w tej walucie.",
+      "noCashPlace": "Nie masz miejsca z gotówką w tej walucie.",
+      "counterpartRequired": "Wybierz drugą stronę przelewu.",
+      "currencyMismatch": "Różne waluty",
+      "loadFailed": "Nie udało się wczytać kont.",
+      "submit": "Przelej"
+    },
+    "errors": {
+      "notEmpty": "Miejsce nie jest puste — najpierw wypłać z niego pieniądze.",
+      "hasHistory": "Miejsce ma transakcje, więc nie można go usunąć.",
+      "archived": "Miejsce jest zarchiwizowane — najpierw je przywróć.",
+      "duplicateName": "Miejsce o tej nazwie już istnieje.",
+      "duplicateCurrency": "Miejsce ma już tę walutę."
+    }
   },
   "securities": {
     "title": "Akcje i ETF",

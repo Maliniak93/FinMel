@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
-import type { AccountResponse, CashAccountsResponse } from '../../../api/portfolio';
+import type { AccountResponse, CashPlacesResponse } from '../../../api/portfolio';
 import { client as reportingClient } from '../../../api/reporting/client.gen';
 import type { DashboardResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -66,8 +66,11 @@ export function accountResponse(overrides: Partial<AccountResponse> = {}): Accou
   };
 }
 
-export function cashAccountsResponse(totals: CashAccountsResponse['totals']): CashAccountsResponse {
-  return { accounts: [], totals };
+export function cashPlacesResponse(
+  totals: CashPlacesResponse['totals'],
+  totalValuePln?: number,
+): CashPlacesResponse {
+  return { places: [], totals, totalValuePln, fxUnavailable: false };
 }
 
 export function dateOnlyFromToday(days: number): string {
@@ -80,7 +83,7 @@ export const API_PATHS = {
   dashboard: '/api/reporting/dashboard',
   history: '/net-worth-history',
   accounts: '/api/portfolio/accounts',
-  cash: '/api/portfolio/cash-accounts',
+  cash: '/api/portfolio/cash-places',
   deposits: '/api/portfolio/deposits',
   bonds: '/api/portfolio/bonds',
 } as const;
@@ -94,7 +97,7 @@ const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   dashboard: jsonResponse(dashboard),
   history: jsonResponse({ range: '1Y', points: [] }),
   accounts: jsonResponse([]),
-  cash: jsonResponse(cashAccountsResponse([])),
+  cash: jsonResponse(cashPlacesResponse([])),
   deposits: jsonResponse([]),
   bonds: jsonResponse([]),
 };

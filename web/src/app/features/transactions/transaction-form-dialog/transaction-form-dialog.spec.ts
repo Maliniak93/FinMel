@@ -398,7 +398,9 @@ describe('TransactionFormDialog', () => {
       const candidatesRequest = fetchSpy.mock.calls
         .map((call: unknown[]) => call[0] as Request)
         .find((request: Request) => request.url.includes('/transfer-candidates'));
-      expect(candidatesRequest?.url).toContain('assetClass=');
+      expect(candidatesRequest?.url).toContain('cashPlaces=true');
+      expect(candidatesRequest?.url).not.toContain('assetClass=');
+      expect(component['cashCandidatesResource'].value()?.[0].name).toBe('Wallet · PLN');
 
       component['form'].controls.quantity.setValue(2);
       component['form'].controls.unitPrice.setValue(1200);

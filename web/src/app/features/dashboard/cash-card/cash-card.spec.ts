@@ -1,6 +1,6 @@
 import { polishProblems, restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { formatMoney } from '../../../shared/format';
-import { cashAccountsResponse, jsonResponse, renderCard } from '../testing/dashboard-fixtures';
+import { cashPlacesResponse, jsonResponse, renderCard } from '../testing/dashboard-fixtures';
 import { CashCard } from './cash-card';
 
 describe('CashCard', () => {
@@ -12,10 +12,13 @@ describe('CashCard', () => {
   it('shows totals per currency', async () => {
     const { fixture } = await renderCard(CashCard, {
       cash: jsonResponse(
-        cashAccountsResponse([
-          { currency: 'PLN', balance: 1234.5 },
-          { currency: 'EUR', balance: 200 },
-        ]),
+        cashPlacesResponse(
+          [
+            { currency: 'PLN', balance: 1234.5 },
+            { currency: 'EUR', balance: 200 },
+          ],
+          1634.5,
+        ),
       ),
     });
     const element = fixture.nativeElement as HTMLElement;
@@ -23,12 +26,13 @@ describe('CashCard', () => {
 
     expect(text).toContain(formatMoney(1234.5, 'PLN'));
     expect(text).toContain(formatMoney(200, 'EUR'));
+    expect(element.querySelector('.cash-card__total')?.textContent).toContain(formatMoney(1634.5));
     expect(element.querySelector('a[href="/cash"]')).not.toBeNull();
   });
 
   it('empty', async () => {
     const { fixture } = await renderCard(CashCard, {
-      cash: jsonResponse(cashAccountsResponse([])),
+      cash: jsonResponse(cashPlacesResponse([])),
     });
     const element = fixture.nativeElement as HTMLElement;
 
@@ -38,7 +42,7 @@ describe('CashCard', () => {
 
   it('renders in Polish', async () => {
     const { fixture } = await renderCard(CashCard, {
-      cash: jsonResponse(cashAccountsResponse([])),
+      cash: jsonResponse(cashPlacesResponse([])),
     });
     const element = fixture.nativeElement as HTMLElement;
     const texts = () => [

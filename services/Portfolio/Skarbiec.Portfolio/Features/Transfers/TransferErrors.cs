@@ -16,6 +16,9 @@ internal static class TransferErrors
     public static readonly Error InsufficientFunds =
         new("Validation.InsufficientFunds", "The source of funds can't cover this amount on this date.");
 
+    public static readonly Error AssetClassRequired =
+        new("Validation.AssetClassRequired", "An assetClass is required unless accountCash or cashPlaces is set.");
+
     public static readonly Error DateInFuture =
         new("Validation.TransferDateInFuture", "The transfer date can't be in the future.");
 

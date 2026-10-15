@@ -94,7 +94,7 @@ public sealed class TransferTenancyIsolationTests(SkarbiecContainersFixture cont
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var strangerCashId = await stranger.AddCashAssetWithBalanceAsync(cancellationToken, name: "Stranger's cash");
 
-        var response = await stranger.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
+        var response = await stranger.GetAsync(CashPlacesApi.CashPlaceCandidatesUri("PLN"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var candidates = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList();

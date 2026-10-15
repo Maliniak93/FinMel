@@ -65,16 +65,18 @@ public sealed class RemoveAssetEndpointTests(SkarbiecContainersFixture container
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 100m);
-        await client.ArchiveAssetAsync(cashId, cancellationToken);
+        var (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 100m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchiveAssetAsync(assetId, cancellationToken);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
-        var response = await client.DeleteAsync(AssetUri(cashId), cancellationToken);
+        var response = await client.DeleteAsync(AssetUri(assetId), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(cashId), cancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(AssetUri(assetId), cancellationToken)).StatusCode);
         var rows = await SnapshotUserRowsAsync(userId, cancellationToken);
-        Assert.Equal(0, rows.Assets);
-        Assert.Equal(0, rows.Transactions);
+        Assert.Equal(before.Assets - 1, rows.Assets);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(TransactionsUri(assetId), cancellationToken)).StatusCode);
     }
 
     [Fact]

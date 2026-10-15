@@ -36,32 +36,11 @@ public sealed class MarketDataInstrumentQuoteLookupClient(HttpClient httpClient)
                 .Distinct()
                 .ToList();
 
-            var rates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-            if (currencies.Count > 0)
-            {
-                using var ratesResponse = await httpClient.PostAsJsonAsync(
-                    "/internal/fx/latest-batch",
-                    new FxBatchRequest([.. currencies.Select(c => c + BaseCurrency)], asOfDate),
-                    cancellationToken);
+            var rates = await FetchRatesAsync(currencies, asOfDate, cancellationToken);
 
-                if (ratesResponse.StatusCode != HttpStatusCode.OK)
-                {
-                    return InstrumentQuoteLookupResult.Unavailable;
-                }
-
-                var ratesBody = await ratesResponse.Content.ReadFromJsonAsync<FxBatchResponse>(cancellationToken);
-                if (ratesBody is null)
-                {
-                    return InstrumentQuoteLookupResult.Unavailable;
-                }
-
-                foreach (var rate in ratesBody.Rates)
-                {
-                    rates[rate.Pair[..^BaseCurrency.Length]] = rate.Rate;
-                }
-            }
-
-            return InstrumentQuoteLookupResult.Found(instruments, rates);
+            return rates is null
+                ? InstrumentQuoteLookupResult.Unavailable
+                : InstrumentQuoteLookupResult.Found(instruments, rates);
         }
         catch (OperationCanceledException)
         {
@@ -78,6 +57,65 @@ public sealed class MarketDataInstrumentQuoteLookupClient(HttpClient httpClient)
             // Any other failure talking to MarketData fails soft: the caller lists the holdings without prices.
             return InstrumentQuoteLookupResult.Unavailable;
         }
+    }
+
+    public async Task<InstrumentQuoteLookupResult> GetRatesAsync(
+        IReadOnlyCollection<string> currencies, DateOnly asOfDate, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var rates = await FetchRatesAsync(currencies, asOfDate, cancellationToken);
+
+            return rates is null
+                ? InstrumentQuoteLookupResult.Unavailable
+                : InstrumentQuoteLookupResult.Found(new Dictionary<Guid, InstrumentQuote>(), rates);
+        }
+        catch (OperationCanceledException)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            return InstrumentQuoteLookupResult.Unavailable;
+        }
+        catch (Exception)
+        {
+            return InstrumentQuoteLookupResult.Unavailable;
+        }
+    }
+
+    private async Task<Dictionary<string, decimal>?> FetchRatesAsync(
+        IReadOnlyCollection<string> currencies, DateOnly asOfDate, CancellationToken cancellationToken)
+    {
+        var rates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        if (currencies.Count == 0)
+        {
+            return rates;
+        }
+
+        using var ratesResponse = await httpClient.PostAsJsonAsync(
+            "/internal/fx/latest-batch",
+            new FxBatchRequest([.. currencies.Select(c => c + BaseCurrency)], asOfDate),
+            cancellationToken);
+
+        if (ratesResponse.StatusCode != HttpStatusCode.OK)
+        {
+            return null;
+        }
+
+        var ratesBody = await ratesResponse.Content.ReadFromJsonAsync<FxBatchResponse>(cancellationToken);
+        if (ratesBody is null)
+        {
+            return null;
+        }
+
+        foreach (var rate in ratesBody.Rates)
+        {
+            rates[rate.Pair[..^BaseCurrency.Length]] = rate.Rate;
+        }
+
+        return rates;
     }
 
     private sealed record InstrumentsBatchRequest(IReadOnlyCollection<Guid> InstrumentIds);

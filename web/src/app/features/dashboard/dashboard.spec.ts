@@ -23,7 +23,7 @@ import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import {
   type ApiRoute,
   type Responder,
-  cashAccountsResponse,
+  cashPlacesResponse,
   dashboard,
   dashboardWithClasses,
   jsonResponse,
@@ -532,7 +532,7 @@ describe('Dashboard', () => {
     await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
       bonds: jsonResponse({ detail: 'Bonds unavailable.' }, 503),
       accounts: jsonResponse([accountResponse({ name: 'Retirement' })]),
-      cash: jsonResponse(cashAccountsResponse([{ currency: 'PLN', balance: 1000 }])),
+      cash: jsonResponse(cashPlacesResponse([{ currency: 'PLN', balance: 1000 }])),
     });
     const element = fixture.nativeElement as HTMLElement;
     const upcoming = element.querySelector('app-upcoming-card') as HTMLElement;

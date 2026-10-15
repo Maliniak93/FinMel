@@ -269,6 +269,9 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<int>("AssetClass")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("CashPlaceId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -309,6 +312,9 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasIndex("AccountId");
 
                     b.HasIndex("InstrumentId");
+
+                    b.HasIndex("CashPlaceId", "Currency")
+                        .IsUnique();
 
                     b.ToTable("Assets");
                 });
@@ -495,6 +501,31 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasIndex("AssetId");
 
                     b.ToTable("BondRedemptions");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.CashPlace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("CashPlaces");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.MetalHolding", b =>

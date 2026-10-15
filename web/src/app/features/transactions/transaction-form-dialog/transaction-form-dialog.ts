@@ -182,7 +182,7 @@ export class TransactionFormDialog {
     params: () => (this.offersCash ? { currency: this.cashCurrency } : undefined),
     loader: async ({ params, abortSignal }): Promise<CashOption[]> => {
       const result = await getApiPortfolioTransferCandidates({
-        query: { currency: params.currency, assetClass: ASSET_CLASS.Cash },
+        query: { currency: params.currency, cashPlaces: true },
         signal: abortSignal,
       });
       if (result.error) {
@@ -191,7 +191,10 @@ export class TransactionFormDialog {
             translate('transactions.form.cashAccountsLoadFailed'),
         );
       }
-      return result.data ?? [];
+      return (result.data ?? []).map((candidate) => ({
+        ...candidate,
+        name: `${candidate.name} · ${params.currency}`,
+      }));
     },
   });
 

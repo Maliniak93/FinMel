@@ -5,7 +5,6 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
-using Skarbiec.Portfolio.Features.CashAccounts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -65,8 +64,7 @@ public sealed class CreateAccountEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal("XTB IKE", asset.Name);
         Assert.Equal(0m, asset.Quantity);
 
-        var freeCash = await client.GetFromJsonAsync<CashAccountsResponse>(PortfolioApi.AllCashAccountsUri, cancellationToken);
-        Assert.Empty(freeCash!.Accounts);
+        Assert.Empty((await client.ListCashPlacesAsync(cancellationToken)).Places);
     }
 
     [Fact]

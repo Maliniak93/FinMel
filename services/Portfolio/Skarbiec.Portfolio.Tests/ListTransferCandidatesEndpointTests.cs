@@ -3,6 +3,7 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.CashPlacesApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -10,53 +11,35 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task List_ReturnsSameCurrencyClassActiveAssets()
+    public async Task List_CashPlaces_ReturnsUnarchivedBalancesInTheCurrency()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var brokerageId = await client.CreateAccountAsync(cancellationToken, name: "Brokerage");
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
-        await client.AddCashAssetWithBalanceAsync(cancellationToken, currency: "EUR", name: "EUR cash");
-        await client.AddAssetAsync(brokerageId, cancellationToken, name: "PLN shares", assetClass: AssetClass.Stock);
-        await client.AddDepositAsync(cancellationToken, NewDepositRequest(name: "PLN deposit"));
-        await client.AddArchivedCashAssetAsync(cancellationToken);
+        var brokerage = await client.CreateAccountWithCashAsync(cancellationToken, balance: 1_000m, name: "XTB", depositedOn: DefaultTopUpDate);
+        var sejf = await client.CreateCashPlaceAsync(cancellationToken, "Sejf", "PLN", "USD");
+        await client.RecordTransactionAsync(sejf.AssetId("PLN"), TransactionType.Deposit, 5_000m, DefaultTopUpDate, cancellationToken, unitPrice: 1m);
+        await client.AddArchivedCashAssetAsync(cancellationToken, name: "Skarbonka");
 
-        var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var candidates = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList();
-        var candidate = Assert.Single(candidates);
-        Assert.Equal(cashId, candidate.GetProperty("assetId").GetGuid());
-        Assert.Equal("Cash account", candidate.GetProperty("name").GetString());
-        Assert.Equal(5_000m, candidate.GetProperty("balance").GetDecimal());
-    }
-
-    [Fact]
-    public async Task List_ExcludesArchivedAssets()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var liveId = await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Live cash");
-        var archivedId = await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Archived cash");
-        await client.ArchiveAssetAsync(archivedId, cancellationToken);
-
-        var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
+        var response = await client.GetAsync(CashPlaceCandidatesUri("PLN"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var candidate = Assert.Single((await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList());
-        Assert.Equal(liveId, candidate.GetProperty("assetId").GetGuid());
+        Assert.Equal(sejf.AssetId("PLN"), candidate.GetProperty("assetId").GetGuid());
+        Assert.Equal("Sejf", candidate.GetProperty("name").GetString());
+        Assert.Equal(5_000m, candidate.GetProperty("balance").GetDecimal());
+        Assert.NotEqual(brokerage.CashAssetId, candidate.GetProperty("assetId").GetGuid());
     }
 
     [Fact]
-    public async Task List_OrdersByAssetName()
+    public async Task List_CashPlaces_OrdersByName()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.AddCashAssetAsync(cancellationToken, name: "A cash");
-        await client.AddCashAssetAsync(cancellationToken, name: "Z cash");
-        await client.AddCashAssetAsync(cancellationToken, name: "B cash");
+        await client.CreateCashPlaceAsync(cancellationToken, "A cash");
+        await client.CreateCashPlaceAsync(cancellationToken, "Z cash");
+        await client.CreateCashPlaceAsync(cancellationToken, "B cash");
 
-        var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash"), cancellationToken);
+        var response = await client.GetAsync(CashPlaceCandidatesUri("PLN"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var listed = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray()

@@ -163,31 +163,20 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal(3m, unchanged.Quantity);
     }
 
-    [Theory]
-    [InlineData("stock-to-cash", PortfolioAssertions.AccountNotAllowedErrorCode)]
-    [InlineData("cash-to-stock", PortfolioAssertions.AccountRequiredErrorCode)]
-    public async Task Update_ClassChangeAcrossTheAccountBoundary_ReturnsBadRequestAndLeavesAsset(string change, string errorCode)
+    [Fact]
+    public async Task Update_StockToCash_ReturnsAccountNotAllowedAndLeavesAsset()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var (accountId, stockId) = await client.CreateAccountWithAssetAsync(cancellationToken);
-        var cashId = await client.AddCashAssetAsync(cancellationToken, name: "Wallet");
-        var (assetId, request) = change == "stock-to-cash"
-            ? (stockId, new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Now cash", Currency = "PLN" })
-            : (cashId, new UpdateAssetRequest
-            {
-                AssetClass = AssetClass.Stock,
-                Name = "Now a stock",
-                Currency = "PLN",
-                InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN")
-            });
+        var request = new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "Now cash", Currency = "PLN" };
 
-        var response = await client.PutAsJsonAsync(AssetUri(assetId), request, cancellationToken);
+        var response = await client.PutAsJsonAsync(AssetUri(stockId), request, cancellationToken);
 
-        await response.AssertProblemAsync(HttpStatusCode.BadRequest, errorCode, cancellationToken);
-        var unchanged = await client.GetAssetAsync(assetId, cancellationToken);
-        Assert.Equal(change == "stock-to-cash" ? AssetClass.Stock : AssetClass.Cash, unchanged.AssetClass);
-        Assert.Equal(change == "stock-to-cash" ? accountId : null, unchanged.AccountId);
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, PortfolioAssertions.AccountNotAllowedErrorCode, cancellationToken);
+        var unchanged = await client.GetAssetAsync(stockId, cancellationToken);
+        Assert.Equal(AssetClass.Stock, unchanged.AssetClass);
+        Assert.Equal(accountId, unchanged.AccountId);
     }
 
     [Fact]
@@ -330,16 +319,25 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 100m, name: "Before archive");
-        await client.ArchiveAssetAsync(cashId, cancellationToken);
-        var request = new UpdateAssetRequest { AssetClass = AssetClass.Cash, Name = "After archive", Currency = "PLN" };
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        await client.FundAccountAsync(accountId, cancellationToken);
+        var assetId = await client.AddAssetAsync(accountId, cancellationToken, name: "Before archive");
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 10m, new DateOnly(2026, 1, 1), cancellationToken);
+        await client.ArchiveAssetAsync(assetId, cancellationToken);
+        var request = new UpdateAssetRequest
+        {
+            AssetClass = AssetClass.Stock,
+            Name = "After archive",
+            Currency = "PLN",
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN")
+        };
 
-        var response = await client.PutAsJsonAsync(AssetUri(cashId), request, cancellationToken);
+        var response = await client.PutAsJsonAsync(AssetUri(assetId), request, cancellationToken);
 
         await response.AssertAssetArchivedConflictAsync(cancellationToken);
-        var unchanged = await client.GetAssetAsync(cashId, cancellationToken);
+        var unchanged = await client.GetAssetAsync(assetId, cancellationToken);
         Assert.Equal("Before archive", unchanged.Name);
-        Assert.Equal(100m, unchanged.Quantity);
+        Assert.Equal(10m, unchanged.Quantity);
         Assert.True(unchanged.IsArchived);
     }
 
@@ -382,7 +380,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Theory]
-    [InlineData("cash-to-deposit")]
+    [InlineData("stock-to-deposit")]
     [InlineData("deposit-to-cash")]
     [InlineData("deposit-stays-deposit")]
     public async Task Update_ToOrFromDepositClass_ReturnsBadRequest(string change)
@@ -394,11 +392,11 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         string originalName;
         decimal originalQuantity;
         AssetClass requestedClass;
-        if (change == "cash-to-deposit")
+        if (change == "stock-to-deposit")
         {
-            assetId = await client.AddCashAssetAsync(cancellationToken, name: "Wallet");
-            await client.RecordTransactionAsync(assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
-            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Cash, "Wallet", 300m, AssetClass.Deposit);
+            (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+            await client.RecordTransactionAsync(assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Stock, (await client.GetAssetAsync(assetId, cancellationToken)).Name, 3m, AssetClass.Deposit);
         }
         else
         {
@@ -419,24 +417,24 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Theory]
-    [InlineData("cash-to-bond")]
+    [InlineData("stock-to-bond")]
     [InlineData("bond-to-cash")]
     [InlineData("bond-stays-bond")]
     public async Task Update_ToOrFromBondClass_ReturnsBadRequest(string change)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var accountId = await client.CreateAccountAsync(cancellationToken, type: AccountType.Bonds);
+        var accountId = await client.CreateAccountAsync(cancellationToken, "Bonds", type: AccountType.Bonds);
         Guid assetId;
         AssetClass originalClass;
         string originalName;
         decimal originalQuantity;
         AssetClass requestedClass;
-        if (change == "cash-to-bond")
+        if (change == "stock-to-bond")
         {
-            assetId = await client.AddCashAssetAsync(cancellationToken, name: "Wallet");
-            await client.RecordTransactionAsync(assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
-            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Cash, "Wallet", 300m, AssetClass.Bond);
+            (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+            await client.RecordTransactionAsync(assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+            (originalClass, originalName, originalQuantity, requestedClass) = (AssetClass.Stock, (await client.GetAssetAsync(assetId, cancellationToken)).Name, 3m, AssetClass.Bond);
         }
         else
         {
@@ -457,22 +455,23 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Fact]
-    public async Task Update_CashToBankAccount_ReturnsUseAccountEndpoints()
+    public async Task Update_StockToBankAccount_ReturnsUseAccountEndpoints()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(FixedTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var assetId = await client.AddCashAssetAsync(cancellationToken, name: "Wallet");
-        await client.RecordTransactionAsync(assetId, TransactionType.Deposit, 300m, new DateOnly(2026, 1, 1), cancellationToken, unitPrice: 1m);
+        var (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 3m, new DateOnly(2026, 1, 1), cancellationToken);
+        var original = await client.GetAssetAsync(assetId, cancellationToken);
         var request = new UpdateAssetRequest { AssetClass = AssetClass.BankAccount, Name = "Edited through assets", Currency = "PLN" };
 
         var response = await client.PutAsJsonAsync(AssetUri(assetId), request, cancellationToken);
 
         await response.AssertUseAccountEndpointsAsync(cancellationToken);
         var unchanged = await client.GetAssetAsync(assetId, cancellationToken);
-        Assert.Equal(AssetClass.Cash, unchanged.AssetClass);
-        Assert.Equal("Wallet", unchanged.Name);
-        Assert.Equal(300m, unchanged.Quantity);
+        Assert.Equal(AssetClass.Stock, unchanged.AssetClass);
+        Assert.Equal(original.Name, unchanged.Name);
+        Assert.Equal(3m, unchanged.Quantity);
     }
 
     [Fact]
@@ -494,7 +493,7 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
     }
 
     [Theory]
-    [InlineData("cash-to-metal")]
+    [InlineData("stock-to-metal")]
     [InlineData("metal-to-cash")]
     [InlineData("metal-to-metal")]
     public async Task Update_ToOrFromPreciousMetal_ReturnsUseMetalEndpoints(string change)
@@ -506,10 +505,10 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         AssetClass originalClass;
         string originalName;
         AssetClass requestedClass;
-        if (change == "cash-to-metal")
+        if (change == "stock-to-metal")
         {
-            assetId = await client.AddCashAssetAsync(cancellationToken, name: "Wallet");
-            (originalClass, originalName, requestedClass) = (AssetClass.Cash, "Wallet", AssetClass.PreciousMetal);
+            (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+            (originalClass, originalName, requestedClass) = (AssetClass.Stock, (await client.GetAssetAsync(assetId, cancellationToken)).Name, AssetClass.PreciousMetal);
         }
         else
         {

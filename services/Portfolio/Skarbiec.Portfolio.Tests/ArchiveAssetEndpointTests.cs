@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -43,19 +44,20 @@ public sealed class ArchiveAssetEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
-    public async Task Archive_CashWithBalance_KeepsQuantityAndTransactions()
+    public async Task Archive_AssetWithPosition_KeepsQuantityAndTransactions()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: 5_000m);
+        var (_, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
+        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 50m, new DateOnly(2026, 1, 1), cancellationToken);
 
-        var response = await client.PostAsync(ArchiveAssetUri(cashId), content: null, cancellationToken);
+        var response = await client.PostAsync(ArchiveAssetUri(assetId), content: null, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var asset = await client.GetAssetAsync(cashId, cancellationToken);
+        var asset = await client.GetAssetAsync(assetId, cancellationToken);
         Assert.True(asset.IsArchived);
-        Assert.Equal(5_000m, asset.Quantity);
-        Assert.Equal(1, (await client.ListTransactionsAsync(cashId, cancellationToken)).TotalCount);
+        Assert.Equal(50m, asset.Quantity);
+        Assert.Equal(1, (await client.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
     }
 
     [Fact]

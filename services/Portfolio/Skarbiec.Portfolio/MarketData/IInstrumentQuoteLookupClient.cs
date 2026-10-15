@@ -35,4 +35,8 @@ public interface IInstrumentQuoteLookupClient
 {
     Task<InstrumentQuoteLookupResult> GetQuotesAsync(
         IReadOnlyCollection<Guid> instrumentIds, DateOnly asOfDate, CancellationToken cancellationToken);
+
+    /// <summary>The latest {currency}PLN rate of each non-PLN currency, without any instrument; Instruments is empty.</summary>
+    Task<InstrumentQuoteLookupResult> GetRatesAsync(
+        IReadOnlyCollection<string> currencies, DateOnly asOfDate, CancellationToken cancellationToken);
 }

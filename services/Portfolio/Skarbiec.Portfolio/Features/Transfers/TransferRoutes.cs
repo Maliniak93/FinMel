@@ -1,6 +1,7 @@
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.CashPlaces;
 
 namespace Skarbiec.Portfolio.Features.Transfers;
 
@@ -41,12 +42,18 @@ public static class TransferRoutes
         [(AssetClass.Etf, AssetClass.Cash)] = Access.None,
     };
 
-    // An account's money only moves to another account's money, never to a free Cash or any other class.
+    // An account's money moves to another account's money, and a bank account's money to or from a cash place balance (an ATM withdrawal, a bank deposit).
     public static bool IsCreatable(Asset source, Asset target) =>
-        source.IsAccountCash() && target.IsAccountCash() && source.AccountId != target.AccountId;
+        (source.IsAccountCash() && target.IsAccountCash() && source.AccountId != target.AccountId)
+        || IsBankAndPlace(source, target);
 
     public static bool IsDeletable(Asset source, Asset target) =>
-        (source.IsAccountCash() && target.IsAccountCash()) || IsDeletable(source.AssetClass, target.AssetClass);
+        (source.IsAccountCash() && target.IsAccountCash()) || IsBankAndPlace(source, target) || IsDeletable(source.AssetClass, target.AssetClass);
+
+    private static bool IsBankAndPlace(Asset source, Asset target) =>
+        (IsBankMoney(source) && target.IsCashPlaceBalance()) || (source.IsCashPlaceBalance() && IsBankMoney(target));
+
+    private static bool IsBankMoney(Asset asset) => asset.IsAccountCash() && asset.AssetClass == AssetClass.BankAccount;
 
     public static bool IsAllowed(AssetClass source, AssetClass target) => Routes.ContainsKey((source, target));
 

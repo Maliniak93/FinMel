@@ -41,6 +41,10 @@ export type AddBondRequest = {
     earlyRedemptionFeePerBond: number | string;
 };
 
+export type AddCashPlaceCurrencyRequest = {
+    currency: string;
+};
+
 export type AddDepositRequest = {
     name: string;
     bankName?: null | string;
@@ -238,16 +242,26 @@ export type BondSwapSourceResponse = {
     name: string;
 };
 
-export type CashAccountResponse = {
-    assetId: string;
-    name: string;
+export type CashBalanceResponse = {
     currency: string;
+    cashAssetId: string;
     balance: number | string;
+    valuePln?: null | number | string;
 };
 
-export type CashAccountsResponse = {
-    accounts: Array<CashAccountResponse>;
+export type CashPlaceResponse = {
+    id: string;
+    name: string;
+    isArchived: boolean;
+    balances: Array<CashBalanceResponse>;
+    valuePln?: null | number | string;
+};
+
+export type CashPlacesResponse = {
+    places: Array<CashPlaceResponse>;
     totals: Array<CashTotalResponse>;
+    totalValuePln?: null | number | string;
+    fxUnavailable: boolean;
 };
 
 export type CashTotalResponse = {
@@ -269,6 +283,11 @@ export type CreateAccountRequest = {
     variant?: null | BankVariant;
     bankName?: null | string;
     annualInterestRatePercent?: null | number | string;
+};
+
+export type CreateCashPlaceRequest = {
+    name: string;
+    currencies?: Array<string>;
 };
 
 export type CreateTransferRequest = {
@@ -526,6 +545,10 @@ export type UpdateBondRequest = {
     firstPeriodRatePercent: number | string;
     marginPercent?: null | number | string;
     earlyRedemptionFeePerBond: number | string;
+};
+
+export type UpdateCashPlaceRequest = {
+    name: string;
 };
 
 export type UpdateDepositRequest = {
@@ -1404,21 +1427,145 @@ export type PutApiPortfolioMetalsByAssetIdResponses = {
 
 export type PutApiPortfolioMetalsByAssetIdResponse = PutApiPortfolioMetalsByAssetIdResponses[keyof PutApiPortfolioMetalsByAssetIdResponses];
 
-export type GetApiPortfolioCashAccountsData = {
+export type GetApiPortfolioCashPlacesData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/portfolio/cash-accounts';
+    url: '/api/portfolio/cash-places';
 };
 
-export type GetApiPortfolioCashAccountsResponses = {
+export type GetApiPortfolioCashPlacesResponses = {
     /**
      * OK
      */
-    200: CashAccountsResponse;
+    200: CashPlacesResponse;
 };
 
-export type GetApiPortfolioCashAccountsResponse = GetApiPortfolioCashAccountsResponses[keyof GetApiPortfolioCashAccountsResponses];
+export type GetApiPortfolioCashPlacesResponse = GetApiPortfolioCashPlacesResponses[keyof GetApiPortfolioCashPlacesResponses];
+
+export type PostApiPortfolioCashPlacesData = {
+    body: CreateCashPlaceRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/cash-places';
+};
+
+export type PostApiPortfolioCashPlacesResponses = {
+    /**
+     * Created
+     */
+    201: CashPlaceResponse;
+};
+
+export type PostApiPortfolioCashPlacesResponse = PostApiPortfolioCashPlacesResponses[keyof PostApiPortfolioCashPlacesResponses];
+
+export type PostApiPortfolioCashPlacesByIdCurrenciesData = {
+    body: AddCashPlaceCurrencyRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/cash-places/{id}/currencies';
+};
+
+export type PostApiPortfolioCashPlacesByIdCurrenciesResponses = {
+    /**
+     * OK
+     */
+    200: CashPlaceResponse;
+};
+
+export type PostApiPortfolioCashPlacesByIdCurrenciesResponse = PostApiPortfolioCashPlacesByIdCurrenciesResponses[keyof PostApiPortfolioCashPlacesByIdCurrenciesResponses];
+
+export type DeleteApiPortfolioCashPlacesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/cash-places/{id}';
+};
+
+export type DeleteApiPortfolioCashPlacesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioCashPlacesByIdResponse = DeleteApiPortfolioCashPlacesByIdResponses[keyof DeleteApiPortfolioCashPlacesByIdResponses];
+
+export type GetApiPortfolioCashPlacesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/cash-places/{id}';
+};
+
+export type GetApiPortfolioCashPlacesByIdResponses = {
+    /**
+     * OK
+     */
+    200: CashPlaceResponse;
+};
+
+export type GetApiPortfolioCashPlacesByIdResponse = GetApiPortfolioCashPlacesByIdResponses[keyof GetApiPortfolioCashPlacesByIdResponses];
+
+export type PutApiPortfolioCashPlacesByIdData = {
+    body: UpdateCashPlaceRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/cash-places/{id}';
+};
+
+export type PutApiPortfolioCashPlacesByIdResponses = {
+    /**
+     * OK
+     */
+    200: CashPlaceResponse;
+};
+
+export type PutApiPortfolioCashPlacesByIdResponse = PutApiPortfolioCashPlacesByIdResponses[keyof PutApiPortfolioCashPlacesByIdResponses];
+
+export type PostApiPortfolioCashPlacesByIdArchiveData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/cash-places/{id}/archive';
+};
+
+export type PostApiPortfolioCashPlacesByIdArchiveResponses = {
+    /**
+     * OK
+     */
+    200: CashPlaceResponse;
+};
+
+export type PostApiPortfolioCashPlacesByIdArchiveResponse = PostApiPortfolioCashPlacesByIdArchiveResponses[keyof PostApiPortfolioCashPlacesByIdArchiveResponses];
+
+export type PostApiPortfolioCashPlacesByIdRestoreData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/cash-places/{id}/restore';
+};
+
+export type PostApiPortfolioCashPlacesByIdRestoreResponses = {
+    /**
+     * OK
+     */
+    200: CashPlaceResponse;
+};
+
+export type PostApiPortfolioCashPlacesByIdRestoreResponse = PostApiPortfolioCashPlacesByIdRestoreResponses[keyof PostApiPortfolioCashPlacesByIdRestoreResponses];
 
 export type GetApiPortfolioSecuritiesData = {
     body?: never;
@@ -1498,8 +1645,9 @@ export type GetApiPortfolioTransferCandidatesData = {
     path?: never;
     query: {
         currency: string;
-        assetClass: AssetClass;
+        assetClass?: AssetClass;
         accountCash?: boolean;
+        cashPlaces?: boolean;
     };
     url: '/api/portfolio/transfer-candidates';
 };

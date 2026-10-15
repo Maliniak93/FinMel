@@ -96,7 +96,6 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
     [Theory]
     [InlineData("cash-to-deposit", true)]
     [InlineData("cash-to-stock", true)]
-    [InlineData("free-cash-to-bank", true)]
     [InlineData("eur-bank-to-pln-bank", false)]
     [InlineData("same-asset", true)]
     [InlineData("unknown-asset", true)]
@@ -121,8 +120,6 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
                 (await client.CreateBankAccountAsync(cancellationToken, "EUR account", currency: "EUR", balance: 200m, depositedOn: DefaultTopUpDate)).MoneyAssetId,
                 setup.Savings.MoneyAssetId,
                 amount: 100m),
-            "free-cash-to-bank" => NewTransferRequest(
-                await client.AddCashAssetWithBalanceAsync(cancellationToken, name: "Wallet"), setup.Savings.MoneyAssetId, amount: 100m),
             "same-asset" => NewTransferRequest(setup.Current.MoneyAssetId, setup.Current.MoneyAssetId),
             "unknown-asset" => NewTransferRequest(setup.Current.MoneyAssetId, Guid.NewGuid()),
             "zero-amount" => NewTransferRequest(setup.Current.MoneyAssetId, setup.Savings.MoneyAssetId, amount: 0m),

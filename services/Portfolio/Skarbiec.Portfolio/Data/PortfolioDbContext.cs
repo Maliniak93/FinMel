@@ -12,6 +12,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<AccountContributionLimit> AccountContributionLimits => Set<AccountContributionLimit>();
+    public DbSet<CashPlace> CashPlaces => Set<CashPlace>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
@@ -47,6 +48,13 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             limit.Property(l => l.Amount).HasPrecision(18, 2);
         });
 
+        modelBuilder.Entity<CashPlace>(place =>
+        {
+            place.Property(p => p.Name).HasMaxLength(200);
+
+            place.HasIndex(p => new { p.UserId, p.Name }).IsUnique();
+        });
+
         modelBuilder.Entity<Asset>(asset =>
         {
             asset.Property(a => a.Name).HasMaxLength(200);
@@ -55,6 +63,9 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             // No FK, but every account-filtered asset query reads AccountId.
             asset.HasIndex(a => a.AccountId);
+
+            // One balance per currency in a place; assets outside a place have a null CashPlaceId, which a unique index never collides.
+            asset.HasIndex(a => new { a.CashPlaceId, a.Currency }).IsUnique();
 
             // No FK to MarketData either; indexed for the same reason.
             asset.HasIndex(a => a.InstrumentId);

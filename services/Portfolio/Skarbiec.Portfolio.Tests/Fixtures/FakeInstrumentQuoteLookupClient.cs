@@ -49,6 +49,21 @@ public sealed class FakeInstrumentQuoteLookupClient : IInstrumentQuoteLookupClie
         return this;
     }
 
+    public Task<InstrumentQuoteLookupResult> GetRatesAsync(
+        IReadOnlyCollection<string> currencies, DateOnly asOfDate, CancellationToken cancellationToken)
+    {
+        if (_unavailable)
+        {
+            return Task.FromResult(InstrumentQuoteLookupResult.Unavailable);
+        }
+
+        IReadOnlyDictionary<string, decimal> rates = currencies
+            .Where(_rates.ContainsKey)
+            .ToDictionary(c => c, c => _rates[c], StringComparer.OrdinalIgnoreCase);
+
+        return Task.FromResult(InstrumentQuoteLookupResult.Found(new Dictionary<Guid, InstrumentQuote>(), rates));
+    }
+
     public Task<InstrumentQuoteLookupResult> GetQuotesAsync(
         IReadOnlyCollection<Guid> instrumentIds, DateOnly asOfDate, CancellationToken cancellationToken)
     {
