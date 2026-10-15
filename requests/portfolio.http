@@ -977,7 +977,7 @@ Content-Type: application/json
   "date": "2026-01-01"
 }
 
-### Add a silver coin with a first purchase (metal 1 = Silver; weightUnit Gram | TroyOunce)
+### Add a silver coin with no holding (metal 1 = Silver; weightUnit Gram | TroyOunce); every purchase goes through a trade
 # @name addMetal
 POST {{baseUrl}}/api/portfolio/metals
 Authorization: Bearer {{authToken}}
@@ -987,15 +987,10 @@ Content-Type: application/json
   "name": "Maple Leaf 1 oz",
   "metal": 1,
   "fineWeight": 1,
-  "weightUnit": "TroyOunce",
-  "firstPurchase": {
-    "pieces": 10,
-    "pricePerPiece": 260.00,
-    "date": "2026-10-01"
-  }
+  "weightUnit": "TroyOunce"
 }
 
-### Add a gold bar with no purchase yet (metal 0 = Gold)
+### Add a gold bar (metal 0 = Gold)
 POST {{baseUrl}}/api/portfolio/metals
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -1027,44 +1022,51 @@ Content-Type: application/json
   "weightUnit": "Gram"
 }
 
-### Buy one more piece (a PreciousMetal asset takes Buy and Sell only)
+### Buy 10 pieces paid from the metals cash place: totalAmount is the invoice total and the linked Cash Withdraw (400 Validation.SettlementSourceRequired without cashAssetId, 400 Validation.MetalTotalRequired with a unitPrice or no totalAmount, 400 Validation.TransferCurrencyMismatch for another currency, 400 Validation.InsufficientFunds when the source would go negative on any day)
+# @name metalBuyFromCashPlace
 POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "type": 0,
-  "quantity": 1,
-  "unitPrice": 270.00,
-  "date": "2026-10-02"
-}
-
-### Buy one piece paid from the metals cash place: a linked Cash Withdraw of quantity × unitPrice
-# @name metalBuyWithCash
-POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "type": 0,
-  "quantity": 1,
-  "unitPrice": 275.00,
+  "type": "Buy",
+  "quantity": 10,
+  "totalAmount": 2750.00,
   "date": "2026-10-03",
   "cashAssetId": "{{addFundingCash.response.body.$.balances[0].cashAssetId}}"
 }
 
-### Sell one piece into the metals cash place: a linked Cash Deposit of quantity × unitPrice
+### Sell one piece into the mBank account: a linked bank Deposit of exactly totalAmount
+# @name metalSellToBank
 POST {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "type": 1,
+  "type": "Sell",
   "quantity": 1,
-  "unitPrice": 280.00,
+  "totalAmount": 280.00,
   "date": "2026-10-04",
-  "cashAssetId": "{{addFundingCash.response.body.$.balances[0].cashAssetId}}"
+  "cashAssetId": "{{createMbankAccount.response.body.cashAssetId}}"
 }
+
+### Edit that sell's total (the source stays the same)
+PUT {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions/{{metalSellToBank.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "type": "Sell",
+  "quantity": 1,
+  "totalAmount": 290.00,
+  "date": "2026-10-04",
+  "cashAssetId": "{{createMbankAccount.response.body.cashAssetId}}"
+}
+
+### Delete that sell together with its bank Deposit
+DELETE {{baseUrl}}/api/portfolio/assets/{{addMetal.response.body.assetId}}/transactions/{{metalSellToBank.response.body.id}}
+Authorization: Bearer {{authToken}}
+
 
 ### Add a PLN stock to trade through its account's cash (deposit into the account first)
 # @name addPlnStock

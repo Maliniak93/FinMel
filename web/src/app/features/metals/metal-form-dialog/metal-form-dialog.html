@@ -51,41 +51,6 @@
       </mat-form-field>
     </div>
 
-    @if (!isEdit) {
-      <h3 class="metal-form-dialog__section">{{ 'metals.form.firstPurchase' | transloco }}</h3>
-      <div class="metal-form-dialog__row">
-        <mat-form-field appearance="outline" class="metal-form-dialog__field">
-          <mat-label>{{ 'metals.pieces' | transloco }}</mat-label>
-          <input matInput type="number" step="1" formControlName="pieces" />
-          @if (hasError('pieces', 'positive')) {
-            <mat-error>{{ 'metals.form.piecesPositive' | transloco }}</mat-error>
-          }
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="metal-form-dialog__field">
-          <mat-label>{{ 'metals.form.pricePerPiece' | transloco }}</mat-label>
-          <input matInput type="number" step="0.01" formControlName="pricePerPiece" />
-          @if (hasError('pricePerPiece', 'required')) {
-            <mat-error>{{ 'metals.form.pricePerPieceRequired' | transloco }}</mat-error>
-          } @else if (hasError('pricePerPiece', 'min')) {
-            <mat-error>{{ 'metals.form.pricePerPieceNegative' | transloco }}</mat-error>
-          }
-        </mat-form-field>
-      </div>
-
-      <mat-form-field appearance="outline" class="metal-form-dialog__field">
-        <mat-label>{{ 'metals.form.purchaseDate' | transloco }}</mat-label>
-        <input matInput [matDatepicker]="purchaseDatePicker" formControlName="purchaseDate" />
-        <mat-datepicker-toggle matIconSuffix [for]="purchaseDatePicker"></mat-datepicker-toggle>
-        <mat-datepicker #purchaseDatePicker></mat-datepicker>
-        @if (hasError('purchaseDate', 'required')) {
-          <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
-        } @else if (hasError('purchaseDate', 'future')) {
-          <mat-error>{{ 'metals.form.purchaseDateInFuture' | transloco }}</mat-error>
-        }
-      </mat-form-field>
-    }
-
     @if (formError()) {
       <p class="metal-form-dialog__error" role="alert">{{ formError() }}</p>
     }

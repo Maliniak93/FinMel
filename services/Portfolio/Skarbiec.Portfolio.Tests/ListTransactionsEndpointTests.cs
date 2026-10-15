@@ -224,7 +224,7 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalAssetId, setup.CashAssetId, cancellationToken);
         var sell = await client.RecordMetalTransactionWithCashAsync(
             setup.MetalAssetId, setup.CashAssetId, cancellationToken,
-            type: TransactionType.Sell, pieces: 1m, pricePerPiece: 1_300m, date: MetalCashDate.AddDays(1));
+            type: TransactionType.Sell, pieces: 1m, totalAmount: 1_300m, date: MetalCashDate.AddDays(1));
 
         var cashLegs = (await client.ListTransactionsAsync(setup.CashAssetId, cancellationToken)).Items;
         var withdraw = Assert.Single(cashLegs, t => t.Type == TransactionType.Withdraw);

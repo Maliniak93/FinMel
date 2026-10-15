@@ -9,7 +9,4 @@ internal static class MetalErrors
 
     public static readonly Error UseMetalEndpoints =
         new("Validation.UseMetalEndpoints", "A PreciousMetal asset is a metal holding — create and edit it through the metal endpoints.");
-
-    public static readonly Error PurchaseDateInFuture =
-        new("Validation.PurchaseDateInFuture", "The purchase date can't be in the future.");
 }

@@ -31,9 +31,11 @@ public static class TransferRoutes
         // Buying a new series with a matured bond's proceeds, through SwapBond.
         [(AssetClass.Bond, AssetClass.Bond)] = Access.None,
 
-        // A metal Buy paid from cash and a Sell paid into it, through RecordTransaction's cashAssetId; removed through DeleteTransfer.
+        // A metal Buy paid from a cash place or a bank account and a Sell paid into it, through RecordTransaction's cashAssetId; removed through DeleteTransfer.
         [(AssetClass.Cash, AssetClass.PreciousMetal)] = Access.Delete,
         [(AssetClass.PreciousMetal, AssetClass.Cash)] = Access.Delete,
+        [(AssetClass.BankAccount, AssetClass.PreciousMetal)] = Access.Delete,
+        [(AssetClass.PreciousMetal, AssetClass.BankAccount)] = Access.Delete,
 
         // A stock or ETF trade, dividend or interest settles only in its own account's cash, written by RecordTransaction and AddAsset; changed through the security's own transaction.
         [(AssetClass.Cash, AssetClass.Stock)] = Access.None,

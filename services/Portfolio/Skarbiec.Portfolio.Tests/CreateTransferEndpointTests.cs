@@ -81,7 +81,7 @@ public sealed class CreateTransferEndpointTests(SkarbiecContainersFixture contai
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateCashAndMetalAsync(cancellationToken, pieces: 3m);
+        var setup = await client.CreateCashAndMetalAsync(cancellationToken);
         var request = route == "cash-to-metal"
             ? NewTransferRequest(setup.CashAssetId, setup.MetalAssetId, date: MetalCashDate)
             : NewTransferRequest(setup.MetalAssetId, setup.CashAssetId, date: MetalCashDate);

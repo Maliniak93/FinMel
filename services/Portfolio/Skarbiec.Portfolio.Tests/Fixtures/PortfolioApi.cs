@@ -602,19 +602,12 @@ internal static class PortfolioApi
         string name = "Maple Leaf 1 oz",
         Metal metal = Metal.Silver,
         decimal fineWeight = 1m,
-        WeightUnit weightUnit = WeightUnit.TroyOunce,
-        bool withFirstPurchase = true,
-        decimal pieces = 10m,
-        decimal pricePerPiece = 260.00m,
-        DateOnly? purchaseDate = null) => new()
+        WeightUnit weightUnit = WeightUnit.TroyOunce) => new()
         {
             Name = name,
             Metal = metal,
             FineWeight = fineWeight,
-            WeightUnit = weightUnit,
-            FirstPurchase = withFirstPurchase
-                ? new FirstPurchaseRequest { Pieces = pieces, PricePerPiece = pricePerPiece, Date = purchaseDate ?? MetalPurchaseDate }
-                : null
+            WeightUnit = weightUnit
         };
 
     public static UpdateMetalRequest NewUpdateMetalRequest(
@@ -873,30 +866,31 @@ internal static class PortfolioApi
 
     public sealed record CashAndMetal(Guid CashAssetId, Guid MetalAssetId);
 
+    // A metal starts with no pieces; every holding is bought through a trade that debits its settlement source.
     public static async Task<CashAndMetal> CreateCashAndMetalAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
-        decimal cashBalance = 5_000m,
-        decimal pieces = 0m)
+        decimal cashBalance = 5_000m)
     {
         var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken, balance: cashBalance);
         var metal = await client.AddMetalAsync(
             cancellationToken,
-            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, withFirstPurchase: pieces > 0m, pieces: pieces));
+            NewMetalRequest(name: "Gold bar", metal: Metal.Gold));
 
         return new CashAndMetal(cashId, metal.AssetId);
     }
 
+    // The invoice total is the amount of record; the stored unit price is totalAmount / pieces.
     public static RecordTransactionRequest NewMetalCashRequest(
         Guid? cashAssetId,
         TransactionType type = TransactionType.Buy,
         decimal pieces = 2m,
-        decimal pricePerPiece = 1_200.00m,
+        decimal totalAmount = 2_400.00m,
         DateOnly? date = null) => new()
         {
             Type = type,
             Quantity = pieces,
-            UnitPrice = pricePerPiece,
+            TotalAmount = totalAmount,
             Date = date ?? MetalCashDate,
             CashAssetId = cashAssetId
         };
@@ -908,11 +902,11 @@ internal static class PortfolioApi
         CancellationToken cancellationToken,
         TransactionType type = TransactionType.Buy,
         decimal pieces = 2m,
-        decimal pricePerPiece = 1_200.00m,
+        decimal totalAmount = 2_400.00m,
         DateOnly? date = null)
     {
         var response = await client.PostAsJsonAsync(
-            TransactionsUri(assetId), NewMetalCashRequest(cashAssetId, type, pieces, pricePerPiece, date), cancellationToken);
+            TransactionsUri(assetId), NewMetalCashRequest(cashAssetId, type, pieces, totalAmount, date), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return Assert.Single(

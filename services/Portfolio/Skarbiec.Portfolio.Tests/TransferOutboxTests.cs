@@ -206,7 +206,7 @@ public sealed class TransferOutboxTests(SkarbiecContainersFixture containers) : 
         await using var arrange = Provider.CreateAsyncScope();
         var cashId = await AddCashWithBalanceAsync(arrange.ServiceProvider, 5_000m, cancellationToken);
         var metal = await arrange.ServiceProvider.GetRequiredService<AddMetalHandler>()
-            .HandleAsync(PortfolioApi.NewMetalRequest(metal: Metal.Gold, withFirstPurchase: false), cancellationToken);
+            .HandleAsync(PortfolioApi.NewMetalRequest(metal: Metal.Gold), cancellationToken);
         Assert.True(metal.IsSuccess, metal.IsFailure ? metal.Error.Code : null);
 
         return (cashId, metal.Value.AssetId);

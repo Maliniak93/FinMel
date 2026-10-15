@@ -66,8 +66,9 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
         var setup = await client.CreateCashAndMetalAsync(cancellationToken);
         var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalAssetId, setup.CashAssetId, cancellationToken);
         Assert.NotNull(buy.Transfer);
-        await client.RecordTransactionAsync(
-            setup.MetalAssetId, TransactionType.Sell, 1m, MetalCashDate.AddDays(1), cancellationToken, unitPrice: 1_300m);
+        await client.RecordMetalTransactionWithCashAsync(
+            setup.MetalAssetId, setup.CashAssetId, cancellationToken,
+            type: TransactionType.Sell, pieces: 1m, totalAmount: 1_300m, date: MetalCashDate.AddDays(1));
         var before = await SnapshotUserRowsAsync(userId, cancellationToken);
 
         var response = await client.DeleteAsync(TransferUri(buy.Transfer.TransferId), cancellationToken);
@@ -75,7 +76,7 @@ public sealed class DeleteTransferEndpointTests(SkarbiecContainersFixture contai
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.OversellsPositionErrorCode, cancellationToken);
         Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
         Assert.Equal(1m, (await client.GetAssetAsync(setup.MetalAssetId, cancellationToken)).Quantity);
-        Assert.Equal(2_600m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
+        Assert.Equal(3_900m, (await client.GetAssetAsync(setup.CashAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]

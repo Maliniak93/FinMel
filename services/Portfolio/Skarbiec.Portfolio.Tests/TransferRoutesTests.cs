@@ -11,11 +11,13 @@ public sealed class TransferRoutesTests
             or (AssetClass.Cash, AssetClass.Bond) or (AssetClass.Bond, AssetClass.Cash)
             or (AssetClass.Bond, AssetClass.Bond)
             or (AssetClass.Cash, AssetClass.PreciousMetal) or (AssetClass.PreciousMetal, AssetClass.Cash)
+            or (AssetClass.BankAccount, AssetClass.PreciousMetal) or (AssetClass.PreciousMetal, AssetClass.BankAccount)
             or (AssetClass.Cash, AssetClass.Stock) or (AssetClass.Stock, AssetClass.Cash)
             or (AssetClass.Cash, AssetClass.Etf) or (AssetClass.Etf, AssetClass.Cash);
 
     private static bool ExpectedDeletable(AssetClass source, AssetClass target) =>
-        (source, target) is (AssetClass.Cash, AssetClass.PreciousMetal) or (AssetClass.PreciousMetal, AssetClass.Cash);
+        (source, target) is (AssetClass.Cash, AssetClass.PreciousMetal) or (AssetClass.PreciousMetal, AssetClass.Cash)
+            or (AssetClass.BankAccount, AssetClass.PreciousMetal) or (AssetClass.PreciousMetal, AssetClass.BankAccount);
 
     public static TheoryData<AssetClass, AssetClass, bool, bool> EveryClassPair()
     {
@@ -33,7 +35,7 @@ public sealed class TransferRoutesTests
 
     [Theory]
     [MemberData(nameof(EveryClassPair))]
-    public void Route_EveryClassPair_OnlyTheListedRoutesAreAllowedAndOnlyCashMetalIsDeletable(
+    public void Route_EveryClassPair_OnlyTheListedRoutesAreAllowedAndOnlyMetalSettlementIsDeletable(
         AssetClass source, AssetClass target, bool allowed, bool deletable)
     {
         Assert.Equal(allowed, TransferRoutes.IsAllowed(source, target));
@@ -76,6 +78,15 @@ public sealed class TransferRoutesTests
     {
         Assert.True(TransferRoutes.IsDeletable(AssetClass.Cash, AssetClass.PreciousMetal));
         Assert.True(TransferRoutes.IsDeletable(AssetClass.PreciousMetal, AssetClass.Cash));
+    }
+
+    [Fact]
+    public void Route_BankAccountMetal_IsDeleteOnly()
+    {
+        Assert.True(TransferRoutes.IsAllowed(AssetClass.BankAccount, AssetClass.PreciousMetal));
+        Assert.True(TransferRoutes.IsDeletable(AssetClass.BankAccount, AssetClass.PreciousMetal));
+        Assert.True(TransferRoutes.IsAllowed(AssetClass.PreciousMetal, AssetClass.BankAccount));
+        Assert.True(TransferRoutes.IsDeletable(AssetClass.PreciousMetal, AssetClass.BankAccount));
     }
 
     public static TheoryData<AssetClass, AssetClass> AccountMoneyPairs() => new()

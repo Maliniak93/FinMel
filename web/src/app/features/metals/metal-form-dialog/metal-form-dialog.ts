@@ -1,5 +1,4 @@
 import { Component, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormControl,
   FormGroup,
@@ -9,7 +8,6 @@ import {
   type ValidationErrors,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -30,7 +28,6 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
-import { toDateOnly } from '../../../shared/date-only';
 import { METAL, METALS } from '../metal';
 
 export interface MetalFormDialogData {
@@ -42,9 +39,6 @@ interface MetalForm {
   name: FormControl<string>;
   fineWeight: FormControl<number | null>;
   weightUnit: FormControl<WeightUnit>;
-  pieces?: FormControl<number | null>;
-  pricePerPiece?: FormControl<number | null>;
-  purchaseDate?: FormControl<Date | null>;
 }
 
 const WEIGHT_UNITS: readonly { value: WeightUnit; label: string }[] = [
@@ -60,31 +54,11 @@ function positive(control: AbstractControl): ValidationErrors | null {
   return !isBlank(control.value) && Number(control.value) <= 0 ? { positive: true } : null;
 }
 
-function piecesEntered(control: AbstractControl): boolean {
-  return !isBlank(control.parent?.get('pieces')?.value);
-}
-
-function pricePerPieceValid(control: AbstractControl): ValidationErrors | null {
-  if (isBlank(control.value)) {
-    return piecesEntered(control) ? { required: true } : null;
-  }
-  return Number(control.value) < 0 ? { min: true } : null;
-}
-
-function purchaseDateValid(control: AbstractControl): ValidationErrors | null {
-  const date = control.value as Date | null;
-  if (!date) {
-    return piecesEntered(control) ? { required: true } : null;
-  }
-  return toDateOnly(date) > toDateOnly(new Date()) ? { future: true } : null;
-}
-
 @Component({
   selector: 'app-metal-form-dialog',
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
-    MatDatepickerModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -125,21 +99,7 @@ export class MetalFormDialog {
       nonNullable: true,
       validators: [Validators.required],
     }),
-    ...(this.holding
-      ? {}
-      : {
-          pieces: new FormControl<number | null>(null, [positive]),
-          pricePerPiece: new FormControl<number | null>(null, [pricePerPieceValid]),
-          purchaseDate: new FormControl<Date | null>(new Date(), [purchaseDateValid]),
-        }),
   });
-
-  constructor() {
-    this.form.controls.pieces?.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
-      this.form.controls.pricePerPiece?.updateValueAndValidity();
-      this.form.controls.purchaseDate?.updateValueAndValidity();
-    });
-  }
 
   protected hasError(controlName: keyof MetalForm, errorCode: string): boolean {
     return this.form.get(controlName)?.hasError(errorCode) ?? false;
@@ -175,20 +135,7 @@ export class MetalFormDialog {
           path: { assetId: this.holding.assetId },
           body: product,
         })
-      : await postApiPortfolioMetals({
-          body: {
-            ...product,
-            ...(isBlank(values.pieces)
-              ? {}
-              : {
-                  firstPurchase: {
-                    pieces: Number(values.pieces),
-                    pricePerPiece: Number(values.pricePerPiece),
-                    date: toDateOnly(values.purchaseDate!),
-                  },
-                }),
-          },
-        });
+      : await postApiPortfolioMetals({ body: product });
 
     this.submitting.set(false);
 

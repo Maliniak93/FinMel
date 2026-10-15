@@ -49,8 +49,8 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
-            // A stock or ETF trade's pair is deleted from the security side.
-            return asset.AssetClass is AssetClass.Stock or AssetClass.Etf
+            // A stock, ETF or precious metal trade's pair is deleted from the security side.
+            return asset.AssetClass is AssetClass.Stock or AssetClass.Etf or AssetClass.PreciousMetal
                 ? await DeleteTradeAsync(asset, transaction, cancellationToken)
                 : TransferErrors.LegManaged;
         }

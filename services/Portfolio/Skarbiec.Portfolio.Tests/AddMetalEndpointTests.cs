@@ -14,69 +14,36 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task Add_WithFirstPurchase_CreatesHoldingAndBuy()
+    public async Task AddMetal_NoHolding()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
 
-        var response = await client.PostAsJsonAsync(AllMetalsUri, NewMetalRequest(), cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken);
-        Assert.NotNull(body);
-        Assert.Equal(MetalUri(body.AssetId), response.Headers.Location?.OriginalString);
-        Assert.Equal("Maple Leaf 1 oz", body.Name);
-        Assert.Equal(Metal.Silver, body.Metal);
-        Assert.Equal(31.10347680m, body.FineWeightGramsPerPiece);
-        Assert.Equal(10m, body.Pieces);
-        Assert.Equal(311.0347680m, body.TotalFineGrams);
-        Assert.False(body.IsArchived);
-
-        var asset = await client.GetAssetAsync(body.AssetId, cancellationToken);
-        Assert.Equal(AssetClass.PreciousMetal, asset.AssetClass);
-        Assert.Equal(AssetValuationMode.Market, asset.ValuationMode);
-        Assert.Equal("PLN", asset.Currency);
-        Assert.Equal(10m, asset.Quantity);
-        Assert.Equal(31.10347680m, asset.FineWeightGramsPerPiece);
-        Assert.Equal(1, asset.TransactionCount);
-
-        var buy = Assert.Single((await client.ListTransactionsAsync(body.AssetId, cancellationToken)).Items);
-        Assert.Equal(TransactionType.Buy, buy.Type);
-        Assert.Equal(10m, buy.Quantity);
-        Assert.Equal(260.00m, buy.UnitPrice);
-        Assert.Equal(MetalPurchaseDate, buy.Date);
-        Assert.Equal(2_600.00m, buy.ValuePln);
-        await client.AssertQuantityMatchesRecomputeFromScratchAsync(body.AssetId, cancellationToken);
-
-        await using var dbContext = CreateDbContext(userId);
-        var storedAsset = await dbContext.Assets.SingleAsync(a => a.Id == body.AssetId, cancellationToken);
-        Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Silver), storedAsset.InstrumentId);
-        var holding = await dbContext.Set<MetalHolding>().SingleAsync(h => h.AssetId == body.AssetId, cancellationToken);
-        Assert.Equal(userId, holding.UserId);
-        Assert.Equal(Metal.Silver, holding.Metal);
-        Assert.Equal(31.10347680m, holding.FineWeightGramsPerPiece);
-    }
-
-    [Fact]
-    public async Task Add_WithoutFirstPurchase_StartsEmptyWithGramWeight()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(MetalTodayUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-
         var response = await client.PostAsJsonAsync(
             AllMetalsUri,
-            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram, withFirstPurchase: false),
+            NewMetalRequest(name: "Gold bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken);
         Assert.NotNull(body);
+        Assert.Equal(MetalUri(body.AssetId), response.Headers.Location?.OriginalString);
         Assert.Equal(50m, body.FineWeightGramsPerPiece);
         Assert.Equal(0m, body.Pieces);
+        Assert.False(body.IsArchived);
+
+        var asset = await client.GetAssetAsync(body.AssetId, cancellationToken);
+        Assert.Equal(0m, asset.Quantity);
+        Assert.Equal(0, asset.TransactionCount);
         Assert.Empty((await client.ListTransactionsAsync(body.AssetId, cancellationToken)).Items);
+
+        await using var dbContext = CreateDbContext(userId);
+        var holding = await dbContext.Set<MetalHolding>().SingleAsync(h => h.AssetId == body.AssetId, cancellationToken);
+        Assert.Equal(userId, holding.UserId);
+        Assert.Equal(Metal.Gold, holding.Metal);
+        Assert.Equal(50m, holding.FineWeightGramsPerPiece);
     }
 
     [Theory]
@@ -84,9 +51,6 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
     [InlineData("weight-negative")]
     [InlineData("unknown-metal")]
     [InlineData("name-empty")]
-    [InlineData("pieces-zero")]
-    [InlineData("date-tomorrow")]
-    [InlineData("price-negative")]
     public async Task Add_Invalid_ReturnsBadRequest(string invalidCase)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -99,9 +63,6 @@ public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) 
             "weight-negative" => NewMetalRequest(fineWeight: -1m),
             "unknown-metal" => NewMetalRequest(metal: (Metal)99),
             "name-empty" => NewMetalRequest(name: ""),
-            "pieces-zero" => NewMetalRequest(pieces: 0m),
-            "date-tomorrow" => NewMetalRequest(purchaseDate: DateOnly.FromDateTime(MetalTodayUtc.UtcDateTime).AddDays(1)),
-            "price-negative" => NewMetalRequest(pricePerPiece: -1m),
             _ => throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null)
         };
 

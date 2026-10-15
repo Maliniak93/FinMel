@@ -3,7 +3,6 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
-using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
@@ -51,18 +50,35 @@ public sealed class RecordTransactionHandler(
             return TransferErrors.CashLinkNotAllowed;
         }
 
+        var isMetal = MetalSettlement.Applies(asset.AssetClass);
+        if (isMetal && request.CashAssetId is null)
+        {
+            return TransactionErrors.SettlementSourceRequired;
+        }
+
+        if (isMetal && MetalSettlement.TotalError(request.Quantity, request.UnitPrice, request.TotalAmount) is { } totalError)
+        {
+            return totalError;
+        }
+
+        if (!isMetal && request.UnitPrice is null)
+        {
+            return TransactionErrors.UnitPriceRequired;
+        }
+
         if (BrokerageTrade.FeeError(asset.AssetClass, request.Type, request.FeeAmount) is { } feeError)
         {
             return feeError;
         }
 
         if (BrokerageTrade.AmountPlnError(
-            asset.AssetClass, asset.Currency, request.Type, request.Quantity, request.UnitPrice, request.AmountPln) is { } amountPlnError)
+            asset.AssetClass, asset.Currency, request.Type, request.Quantity, request.UnitPrice ?? 0m, request.AmountPln) is { } amountPlnError)
         {
             return amountPlnError;
         }
 
-        var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
+        var unitPrice = Money.Create(
+            isMetal ? MetalSettlement.UnitPrice(request.TotalAmount!.Value, request.Quantity) : request.UnitPrice!.Value, asset.Currency);
         if (unitPrice.IsFailure)
         {
             return unitPrice.Error;
@@ -111,7 +127,7 @@ public sealed class RecordTransactionHandler(
         {
             if (request.CashAssetId is { } cashAssetId)
             {
-                var planned = await PlanCashLegAsync(cashAssetId, asset, transaction, cancellationToken);
+                var planned = await PlanCashLegAsync(cashAssetId, asset, transaction, request.TotalAmount!.Value, cancellationToken);
                 if (planned.IsFailure)
                 {
                     return planned.Error;
@@ -167,24 +183,29 @@ public sealed class RecordTransactionHandler(
             return TransactionErrors.ConcurrentModification();
         }
 
-        return transaction.ToResponse(
+        var response = transaction.ToResponse(
             asset.Currency, brokerage?.ToTransferResponse(transaction) ?? cashLeg?.ToTransferResponse(asset, transaction));
+
+        return cashLeg is null ? response : response.WithTotal(cashLeg.Leg.Quantity);
     }
 
     private async Task<Result<CashLeg>> PlanCashLegAsync(
-        Guid cashAssetId, Asset metal, Transaction metalLeg, CancellationToken cancellationToken)
+        Guid cashAssetId, Asset metal, Transaction metalLeg, decimal totalAmount, CancellationToken cancellationToken)
     {
-        // Through the tenancy filter: a stranger's Cash gets the same 400 as any unsuitable counterpart.
+        // Through the tenancy filter: a stranger's money gets the same 400 as any unsuitable counterpart.
         var cash = await dbContext.Assets.FirstOrDefaultAsync(a => a.Id == cashAssetId, cancellationToken);
         var isBuy = metalLeg.Type == TransactionType.Buy;
 
         if (cash is null
-            || !cash.IsCashPlaceBalance()
-            || !(isBuy ? TransferRoutes.IsAllowed(cash.AssetClass, metal.AssetClass) : TransferRoutes.IsAllowed(metal.AssetClass, cash.AssetClass))
-            || cash.Currency != metal.Currency
-            || cash.IsArchived)
+            || !MetalSettlement.IsSource(cash)
+            || !(isBuy ? TransferRoutes.IsAllowed(cash.AssetClass, metal.AssetClass) : TransferRoutes.IsAllowed(metal.AssetClass, cash.AssetClass)))
         {
             return TransferErrors.InvalidCounterpart;
+        }
+
+        if (cash.Currency != metal.Currency)
+        {
+            return TransferErrors.CurrencyMismatch;
         }
 
         if (await dbContext.ReadOnlyErrorAsync(cash, cancellationToken) is { } cashReadOnly)
@@ -200,7 +221,7 @@ public sealed class RecordTransactionHandler(
             Id = Guid.NewGuid(),
             AssetId = cash.Id,
             Type = isBuy ? TransactionType.Withdraw : TransactionType.Deposit,
-            Quantity = metalLeg.Quantity * metalLeg.UnitPriceAmount,
+            Quantity = totalAmount,
             UnitPriceAmount = 1m,
             Date = metalLeg.Date,
             TransferId = transferId
