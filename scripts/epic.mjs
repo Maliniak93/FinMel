@@ -5,7 +5,7 @@
 //   --no-shutdown  do not schedule `shutdown /s /t 600` when the run ends
 //   node scripts/epic.mjs <epic> --stop   creates the stop file; the running driver stops before the next build
 //   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
-//   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it or corrects the epic's plan, the loop builds and merges them, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
+//   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
+import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
@@ -132,14 +133,11 @@ function commentedSince(number, since) {
 }
 
 const SHIP_BLOCKED = "**Blocked** at `ship`";
-const E2E_BLOCKED = "**Blocked** at `e2e`";
-const E2E_APP_BLOCKED = `${E2E_BLOCKED} (app)`;
 
 function e2eAppBlocks(number) {
-  const jq = `[.comments[].body | select(startswith(${JSON.stringify(E2E_APP_BLOCKED)}))] | length`;
-  const res = retryTransient(`issue view ${number}`, () => gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", jq]));
+  const res = retryTransient(`issue view ${number}`, () => gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", "[.comments[] | {body}]"]));
   if (!res.ok) throw new Stop("github", `gh issue view ${number}: ${res.firstErr}`);
-  return Number(res.out);
+  return appBlocks(JSON.parse(res.out));
 }
 
 // "ship" retries a failed ship step, "resume" continues an interrupted build on the tree on disk, "build" starts fresh
@@ -515,20 +513,15 @@ async function repairE2e(part, block, ctx) {
   const fixed = await runClaude(ctx.claude, part.number, `${part.title} — e2e repair`, `/fix e2e:#${part.number}`, FIX_MODEL);
   if (fixed.timedOut) throw new Stop("timeout", `#${part.number}: the e2e repair exceeded 4 h and was killed`);
   if (fixed.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached during the e2e repair, resets ${resetClock(fixed.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
-  const line = fixed.text.split(/\r?\n/).reverse().find((l) => l.trim().startsWith("FIX_RESULT: "));
-  let result = null;
-  try {
-    result = JSON.parse(line.trim().slice("FIX_RESULT: ".length));
-  } catch {
-  }
+  const result = parseFixResult(fixed.text);
   if (!result?.ok) throw giveUp(result ? `the repair stopped: ${result.summary}` : `the repair gave no FIX_RESULT (exit ${fixed.code})`);
   const dirty = dirtyFiles();
   if (dirty.length || currentBranch() !== "master") throw new Stop("dirty-tree", `the e2e repair left ${currentBranch()} with ${dirty.length} uncommitted file(s): ${dirty.slice(0, 5).join(", ")}`);
-  if (result.kind === "app") {
-    const next = getIssue(ctx.epic).subIssues.find((s) => s.state !== "CLOSED");
-    if (!result.issues?.length || !next || !result.issues.includes(next.number)) throw new Stop("blocked", `#${part.number}: the repair reported fix part(s) ${(result.issues ?? []).join(", ") || "none"}, but the next open part is #${next?.number}`);
-    say(`repair: fix part(s) ${result.issues.map((n) => `#${n}`).join(", ")} ahead of #${part.number} - ${short(result.summary, 120)}`);
-  } else say(`repair: the epic's plan corrected - ${short(result.summary, 120)}`);
+  const nextOpen = getIssue(ctx.epic).subIssues.find((s) => s.state !== "CLOSED")?.number;
+  const outcome = repairOutcome(result, { part: part.number, nextOpen });
+  if (outcome.action === "stop") throw new Stop("blocked", `#${part.number}: ${outcome.reason}`);
+  if (result.kind === "test") say(`repair ${blocks}/${MAX_E2E_REPAIRS}: test defect in #${part.number} - ${short(result.summary, 120)}`);
+  else say(`repair: ${short(outcome.reason, 160)}`);
 }
 
 function runnerOnline() {

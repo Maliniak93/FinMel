@@ -75,6 +75,10 @@ The delegation message carries paths and JSON, never file contents:
      or an old one): return `blocked` with `blocked.class: "app"`, the test title, the `Krok <n>` step from `failed[].step`, the
      `trace` path, the `reportPath` and `blocked.selfCheck` (what was rewritten, the wait, the result). Read `e2e/test-results/stack.log` for the backend side and put the cause in one `notes` line.
      Do not patch production code, and do not weaken a test to get past it: a stable app failure is a `/fix`.
+   **Repair rebuild.** When the prompt names a diagnosis file (`skarbiec-plan/issues/<n>.diagnosis.md`), a repair found a
+   defect in the test: read it first. When the prompt says the patch was applied, the previous run's tests are on disk; fix only
+   the diagnosed step(s) by changing how they wait, re-fetch or select, never an expected value or an assertion taken from the
+   plan, then run the whole suite as usual.
 7. After the last green verify and the green e2e run, **edit no file**. `scripts/ship.mjs` re-checks `verify --projects e2e` and
    `node scripts/e2e.mjs check` against the tree before committing; any edit afterwards blocks the ship.
 

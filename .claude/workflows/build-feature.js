@@ -142,7 +142,7 @@ const REVIEW = {
 
 // ---------------------------------------------------------------- setup
 
-const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false } = args || {}
+const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false } = args || {}
 
 if (!(spec && issue && branch && title)) {
   return {
@@ -270,7 +270,7 @@ const E2E_RUN_LINE =
   'Run `node scripts/verify.mjs --projects e2e --fix --cache`, then the whole suite with `node scripts/e2e.mjs run --detach` / `--await`. A stable app failure or an environment problem is a `blocked` result with `blocked.class` (`app` or `environment`), the test, the `Krok <n>` step, the trace path and the report path - never a patch to production code. An `app` block also carries `blocked.selfCheck`: the 30 s `expectProjected` rewrite, the wait and the `--grep` rerun result.'
 const E2E_OWN_LINE =
   'You own the test code: a wrong test is yours to fix - list each change in `deviations` with why. `verified: true` only on a green verify and a green whole-suite e2e run of the same tree, and edit nothing after it.'
-const E2E_LINES = ownPlan
+const E2E_BASE_LINES = ownPlan
   ? [
       `This e2e part has its own plan: automate this spec's \`## Test manualny\` 1:1 as Playwright tests (one \`Krok <n>\` step per plan step, \`(tylko manualnie)\` for a step that cannot be automated) into the \`e2e/tests/*.spec.ts\` file its Goal names, and run the whole suite.`,
       `${epic ? `Read the epic body \`skarbiec-plan/issues/${epic.number}.md\` for context only; it is not your plan. ` : ''}Edit only files under \`e2e/\` and the plan file; production code is never yours.`,
@@ -285,6 +285,17 @@ const E2E_LINES = ownPlan
       'Refresh the epic\'s whole-feature plan in `skarbiec-plan/issues/' + (epic ? epic.number : '<epic>') + '.manual.md` and return it in `manualTest` as `{ issue, file }`.',
       E2E_OWN_LINE,
     ]
+// A /fix e2e repair diagnosed a defect in the test itself: the rebuild changes only how the diagnosed steps wait, re-fetch or select.
+const DIAGNOSIS_RULE = 'only how a step waits, re-fetches or selects; never an expected value or an assertion taken from the plan'
+const E2E_LINES = diagnosis
+  ? [
+      `A repair diagnosed a defect in the test: read \`${diagnosis}\` first. ${patchApplied ? `The previous run's tests are on disk (\`skarbiec-plan/issues/${issue}.e2e.patch\` was applied): fix the diagnosed step(s) by changing ${DIAGNOSIS_RULE}, then run the whole suite as usual.` : `The previous run's patch could not be applied, so write the tests as usual, but change ${DIAGNOSIS_RULE} in the diagnosed step(s).`}`,
+      ...E2E_BASE_LINES,
+    ]
+  : E2E_BASE_LINES
+const DIAGNOSIS_REVIEW_LINE = diagnosis
+  ? `This is a repair rebuild: a diagnosis of a defect in the test is in \`${diagnosis}\`. Compare the test diff with \`skarbiec-plan/issues/${issue}.e2e.patch\`; a changed expected value or an assertion taken from the plan is blocking - only ${DIAGNOSIS_RULE} may change.`
+  : null
 async function e2eRun(label, lines) {
   const result = await step(
     'e2e',
@@ -421,6 +432,7 @@ if (skipped.has('review')) {
             `blocking findings of the previous round: ${JSON.stringify(previous.blocking)}`,
             `implementer response: ${JSON.stringify({ notes: previous.impl.notes || [], deviations: previous.impl.deviations || [], filesTouched: previous.impl.filesTouched })}`,
             'Check only that each finding is resolved (or rebutted with a sound reason in notes) and that the diff of the files touched in that round broke nothing. A full re-review is not your job.',
+            e2e ? DIAGNOSIS_REVIEW_LINE : null,
             'blocking only for an unresolved finding or a regression in those files. Everything else is minor.',
           ]
         : [
@@ -429,6 +441,7 @@ if (skipped.has('review')) {
             e2e ? null : `tests claimed: ${JSON.stringify(tests.tests)}`,
             `${e2e ? 'e2e agent' : 'implementer'} report: ${JSON.stringify(impl)}`,
             e2e ? 'This is an epic\'s e2e part (the `e2e` label): there is no test-writer and no implementer. Apply the "An e2e part" rules of your agent prompt; the epic body and the sibling parts are in `skarbiec-plan/issues/`, and `.git/e2e-result.json` holds the run.' : null,
+            e2e ? DIAGNOSIS_REVIEW_LINE : null,
             deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
             e2e || tests.tests.length ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
             'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',

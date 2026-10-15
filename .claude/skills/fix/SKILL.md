@@ -111,8 +111,9 @@ previous one has merged. Build it exactly as `/build` steps 1–5 do and report 
 ## Unattended e2e repair (`e2e:#<n>`)
 
 1. **The failure.** `node scripts/gh-project.mjs get <n>` gives the epic (`parent`). The newest comment on `#<n>`
-   (`gh issue view <n> --comments`) is the block: test, `Krok <k>`, trace, patch, the e2e agent's one-line cause and its
-   deviations. Read the epic's `## Test manualny`, the sibling parts' Goal / ACs / Design decisions
+   (`gh issue view <n> --comments`) is the block: test, `Krok <k>`, trace, patch, the e2e agent's one-line cause, its
+   deviations and its `self-check:` line (what it rewrote with `expectProjected`, the wait, the result). The plan is the
+   epic's `## Test manualny`, or the part's own when its body has a numbered `## Test manualny` (an own-plan part). Read it, the sibling parts' Goal / ACs / Design decisions
    (`node scripts/gh-project.mjs get <m>`), the test code in `skarbiec-plan/issues/<n>.e2e.patch` and
    `e2e/test-results/stack.log`. The closed `Fix:` parts of the same epic are earlier repairs: the same symptom again
    means the earlier fix missed the cause — go deeper, never repeat it.
@@ -129,11 +130,20 @@ previous one has merged. Build it exactly as `/build` steps 1–5 do and report 
      scratchpad, then `node scripts/gh-project.mjs section <epic> --heading "Test manualny" --file <path>` and
      `node scripts/gh-project.mjs comment <epic> --body-file <path>` naming the steps changed and the quoted spec line.
      Never loosen a step to dodge a defect: when in doubt, it is **app**.
+   - **test** — through the API and after a reload the app reaches the plan's value within 30 s, and the test waits
+     wrongly, does not re-fetch, or has a wrong selector: the fix lies entirely in `e2e/`. Write the diagnosis to the
+     scratchpad and post it with `node scripts/gh-project.mjs comment <n> --body-file <path>`: first line
+     `**E2E test defect** — <test title>, Krok <k>`, then what is wrong in the test, the evidence (trace, API calls,
+     timings) and the fix hint (e.g. "assert through `expectProjected` with a reload"). Never a changed expected value.
+     The next build of the part reads it as its newest comment: post nothing after it.
    - **stop** — no reproduction, a missing design (`/design`), or the cause is outside the app (the e2e harness, the stub,
-     the data set).
+     the environment, no project).
+   - The boundary: a value that never arrives, arrives after more than 30 s (measured) or differs from the plan is
+     **app**; no reproduction, a stub, harness or environment failure, or no project is **stop**.
 4. The last line of your final message is exactly one line
    `FIX_RESULT: {"ok":true,"kind":"app","issues":[<numbers>],"summary":"…"}`, or `{"ok":true,"kind":"plan","summary":"…"}`,
-   or `{"ok":false,"kind":"stop","summary":"<what stops it and what the user must decide>"}`.
+   or `{"ok":true,"kind":"test","summary":"…"}`,
+   or `{"ok":false,"kind":"stop","summary":"<what stops it and what the user must decide>"}`. `/fix e2e` changes no file.
 
 ## Hard constraints
 
