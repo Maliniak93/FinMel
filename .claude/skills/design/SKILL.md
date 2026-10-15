@@ -134,6 +134,11 @@ no `## Test manualny` of its own. Add no e2e part to an epic with no app-visible
 cleanup), nor to the e2e epic itself, whose smoke is its e2e. The approval summary lists the e2e part like any other
 part (title, tier 1, kind new, 4 ACs, `brak planu`).
 
+An e2e coverage epic (e2e tests for features that already exist) is different: it is a sequence of **own-plan** e2e parts,
+one per area, each drafted from the own-plan variant in `e2e-part-template.md`, created with `--e2e --parent <umbrella>`.
+Each carries its own numbered `## Test manualny`, names its `e2e/tests/*.spec.ts` file in the Goal, and its build
+automates that plan and refreshes it on its own issue. The umbrella holds no plan and gets no trailing e2e part.
+
 Converting an already published spec (the user asks, or `/build` blocked on it): the existing issue
 stays a part — narrow its body to that part with `edit --body-file`, never delete and re-create it —
 and the new epic is created around it. Attach in build order: create the epic, then for each part
