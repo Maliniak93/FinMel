@@ -2,9 +2,10 @@
 // Usage: node scripts/gh-usage.mjs [-- <command...>]
 //   alone          print the current GraphQL and REST limit
 //   with command   run it and print the GraphQL points and REST requests it consumed (or that the window reset meanwhile)
+//   exit 4 when the GitHub limit is exhausted (reset time and a GITHUB_LIMIT line on stderr)
 
 import { spawnSync } from "node:child_process";
-import { REPO_ROOT, rateLimit, usageDelta, usageLine } from "./gh.mjs";
+import { GhLimitError, REPO_ROOT, exitOnGhLimit, rateLimit, usageDelta, usageLine } from "./gh.mjs";
 
 const argv = process.argv.slice(2);
 const split = argv.indexOf("--");
@@ -14,14 +15,23 @@ if (split === -1 && argv.length) {
   process.exit(1);
 }
 
-const before = rateLimit();
+function readLimit() {
+  try {
+    return rateLimit();
+  } catch (err) {
+    if (err instanceof GhLimitError) exitOnGhLimit(err);
+    throw err;
+  }
+}
+
+const before = readLimit();
 if (!command.length) {
   console.log(usageLine(before));
   process.exit(0);
 }
 
 const res = spawnSync(command[0], command.slice(1), { cwd: REPO_ROOT, stdio: "inherit", windowsHide: true, shell: false });
-const after = rateLimit();
+const after = readLimit();
 const delta = usageDelta(before, after);
 if (res.error) console.error(`${command.join(" ")}: ${res.error.message}`);
 console.log(

@@ -12,6 +12,7 @@
 //   list                                                   every issue on the project as JSON
 //   comment <n> --body-file <path>                         post a comment
 //   tick <n>                                               tick every acceptance-criterion checkbox
+//   exit 1 on an error, 4 when the GitHub limit is exhausted (stderr: reset time and a GITHUB_LIMIT line; never waits)
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -27,15 +28,20 @@ import { fileURLToPath } from "node:url";
 import { findReplay, renderResumeScript } from "./build-replay.mjs";
 import { e2eBlockLines, rebuildInputs } from "./e2e-repair.mjs";
 import {
+  GhLimitError,
   OWNER,
   PROJECT_NUMBER,
   REPO,
   cardFromIssueNode,
+  exitOnGhLimit,
   gh,
   graphql,
+  hasRunMarker,
+  limitFromGhFailure,
   listPages,
   rateLimit,
   reportUsage,
+  runMarker,
   spawnGh,
 } from "./gh.mjs";
 
@@ -598,6 +604,10 @@ function create(flags) {
     if (flags.before)
       placeBefore(flags.parent, issueNumber, Number(flags.before));
   } catch (err) {
+    if (err instanceof GhLimitError) {
+      err.message = `${err.message}\nissue already created: ${url}`;
+      throw err;
+    }
     throw new Error(`${err.message}\nissue already created: ${url}`);
   }
   console.log(
@@ -918,6 +928,8 @@ function prepare([number, ...rest]) {
               shell: false,
             });
       if (res.error || res.status !== 0) {
+        const limit = cmd === "gh" && !res.error ? limitFromGhFailure(res.stderr) : null;
+        if (limit) throw limit;
         return refuseBranch(
           `${cmd} ${argv.join(" ")}: ${res.error?.message ?? res.stderr.trim().split(/\r?\n/)[0]}`,
         );
@@ -1169,6 +1181,20 @@ function report([number, ...rest]) {
   const run = JSON.parse(flags.json ?? readStdin());
   const where = (f) => [f.file, f.line].filter(Boolean).join(":") || "—";
   const lines = [];
+  const afterPost = () => {
+    if (run.status === "shipped" && (run.reviewRan || run.resumedShip))
+      tick([number]);
+  };
+
+  const marker = reportMarker(number, run);
+  const { comments } = JSON.parse(
+    gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments"]),
+  );
+  if (hasRunMarker(comments, marker)) {
+    console.log(`#${number}: report already posted`);
+    afterPost();
+    return;
+  }
 
   if (run.status === "shipped") {
     const [pr] = JSON.parse(
@@ -1266,6 +1292,7 @@ function report([number, ...rest]) {
         );
         lines.push(`Test manualny zaktualizowany w #${m.issue}`);
       } catch (err) {
+        if (err instanceof GhLimitError) throw err;
         lines.push(
           `Test manualny NIE zaktualizowany w #${m.issue}: ${err.message.split("\n")[0]}`,
         );
@@ -1275,13 +1302,34 @@ function report([number, ...rest]) {
 
   const usage = usageReportLine();
   if (usage) lines.push("", usage);
+  lines.push("", marker);
 
   gh(["issue", "comment", String(number), "--repo", REPO, "--body-file", "-"], {
     input: lines.join("\n"),
   });
   console.log(`#${number}: report posted`);
-  if (run.status === "shipped" && (run.reviewRan || run.resumedShip))
-    tick([number]);
+  afterPost();
+}
+
+function reportMarker(number, run) {
+  const git = (...argv) =>
+    (
+      spawnSync("git", argv, {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        windowsHide: true,
+        shell: false,
+      }).stdout ?? ""
+    ).trim();
+  const digest = createHash("sha256")
+    .update(JSON.stringify(run))
+    .digest("hex")
+    .slice(0, 8);
+  return runMarker({
+    issue: number,
+    branch: run.branch ?? git("rev-parse", "--abbrev-ref", "HEAD"),
+    sha: `${git("rev-parse", "HEAD").slice(0, 12)}-${digest}`,
+  });
 }
 
 async function list() {
@@ -1368,6 +1416,7 @@ try {
     throw new Error(`usage: gh-project.mjs ${Object.keys(VERBS).join(" | ")}`);
   await verb(rest);
 } catch (err) {
+  if (err instanceof GhLimitError) exitOnGhLimit(err);
   console.error(err.message);
   process.exit(1);
 }

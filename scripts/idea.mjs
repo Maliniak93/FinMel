@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { GH_LIMIT_EXIT, clockTime, limitFromText } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GH_PROJECT = path.join(REPO_ROOT, "scripts", "gh-project.mjs");
@@ -119,6 +120,10 @@ function appMap() {
 function board() {
   const res = run("node", [GH_PROJECT, "list"], { timeout: 25000 });
   if (res.error) return { error: res.error.code === "ETIMEDOUT" ? "timeout" : res.error.message };
+  if (res.status === GH_LIMIT_EXIT) {
+    const limit = limitFromText(`${res.stdout}\n${res.stderr}`);
+    if (limit) return { limit };
+  }
   if (res.status !== 0) return { error: (res.stderr || "gh-project failed").trim().split("\n")[0].slice(0, 100) };
   try {
     return { issues: JSON.parse(res.stdout) };
@@ -210,8 +215,9 @@ function context(argv) {
   const map = appMap();
   const out = [`Prompts dir: ${promptsDir()}`, `Today: ${today()}`, "", "## App map", ...map.lines, `Web routes: ${map.routes.join(", ")}`, "", "## Board"];
   const b = board();
-  const issues = b.error ? [] : b.issues;
-  out.push(...(b.error ? [`board unavailable (${b.error})`] : boardLines(issues)));
+  const issues = b.error || b.limit ? [] : b.issues;
+  if (b.limit) out.push(`limit GitHuba do ${b.limit.resetAt ? clockTime(b.limit.resetAt) : "?"}`);
+  else out.push(...(b.error ? [`board unavailable (${b.error})`] : boardLines(issues)));
   const ideaList = ideas();
   const adrList = adrs();
   const saved = listRows(false);
