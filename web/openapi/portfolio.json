@@ -1786,6 +1786,120 @@
         }
       }
     },
+    "/api/portfolio/recurring-incomes": {
+      "post": {
+        "tags": [
+          "CreateRecurringIncomeEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecurringIncomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateRecurringIncomeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-incomes/{id}/end": {
+      "post": {
+        "tags": [
+          "EndRecurringIncomeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndRecurringIncomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-incomes/{id}": {
+      "delete": {
+        "tags": [
+          "DeleteRecurringIncomeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/planning/months/{month}": {
+      "get": {
+        "tags": [
+          "GetPlanningMonthEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningMonthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/securities": {
       "get": {
         "tags": [
@@ -3468,6 +3582,9 @@
           }
         }
       },
+      "BusinessDayShift": {
+        "type": "integer"
+      },
       "CashBalanceResponse": {
         "required": [
           "currency",
@@ -3695,6 +3812,86 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "CreateRecurringIncomeRequest": {
+        "required": [
+          "name",
+          "amount",
+          "accountId",
+          "startDate",
+          "intervalMonths",
+          "dayKind",
+          "shift"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "intervalMonths": {
+            "maximum": 12,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
+          }
+        }
+      },
+      "CreateRecurringIncomeResponse": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -4009,6 +4206,169 @@
       "DepositTermUnit": {
         "type": "integer"
       },
+      "EndRecurringIncomeRequest": {
+        "required": [
+          "endDate"
+        ],
+        "type": "object",
+        "properties": {
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "IncomeDefinitionResponse": {
+        "required": [
+          "id",
+          "name",
+          "startDate",
+          "endDate",
+          "status",
+          "amount",
+          "currency",
+          "accountId",
+          "accountName",
+          "accountArchived",
+          "intervalMonths",
+          "dayKind",
+          "dayOfMonth",
+          "shift"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RecurringIncomeStatus"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "accountArchived": {
+            "type": "boolean"
+          },
+          "intervalMonths": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
+          }
+        }
+      },
+      "IncomeOccurrenceResponse": {
+        "required": [
+          "recurringIncomeId",
+          "nominalMonth",
+          "date",
+          "name",
+          "accountId",
+          "accountName",
+          "accountArchived",
+          "amount",
+          "currency",
+          "amountPln",
+          "estimated"
+        ],
+        "type": "object",
+        "properties": {
+          "recurringIncomeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nominalMonth": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "name": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "accountArchived": {
+            "type": "boolean"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "estimated": {
+            "type": "boolean"
+          }
+        }
+      },
       "Metal": {
         "type": "integer"
       },
@@ -4116,6 +4476,51 @@
           }
         }
       },
+      "PlanningIncomesResponse": {
+        "required": [
+          "occurrences",
+          "totalPln",
+          "fxUnavailable",
+          "definitions"
+        ],
+        "type": "object",
+        "properties": {
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncomeOccurrenceResponse"
+            }
+          },
+          "totalPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "fxUnavailable": {
+            "type": "boolean"
+          },
+          "definitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncomeDefinitionResponse"
+            }
+          }
+        }
+      },
+      "PlanningMonthResponse": {
+        "required": [
+          "incomes"
+        ],
+        "type": "object",
+        "properties": {
+          "incomes": {
+            "$ref": "#/components/schemas/PlanningIncomesResponse"
+          }
+        }
+      },
       "RecordTransactionRequest": {
         "required": [
           "type",
@@ -4184,6 +4589,16 @@
             "format": "double"
           }
         }
+      },
+      "RecurrenceDayKind": {
+        "type": "integer"
+      },
+      "RecurringIncomeStatus": {
+        "enum": [
+          "Upcoming",
+          "Active",
+          "Ended"
+        ]
       },
       "RedeemBondEarlyRequest": {
         "required": [
@@ -5584,6 +5999,18 @@
     },
     {
       "name": "RestoreCashPlaceEndpoint"
+    },
+    {
+      "name": "CreateRecurringIncomeEndpoint"
+    },
+    {
+      "name": "EndRecurringIncomeEndpoint"
+    },
+    {
+      "name": "DeleteRecurringIncomeEndpoint"
+    },
+    {
+      "name": "GetPlanningMonthEndpoint"
     },
     {
       "name": "ListSecuritiesEndpoint"

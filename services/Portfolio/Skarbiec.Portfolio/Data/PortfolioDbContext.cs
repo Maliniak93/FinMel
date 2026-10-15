@@ -23,6 +23,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<BondInterestSettlement> BondInterestSettlements => Set<BondInterestSettlement>();
     public DbSet<BondRedemption> BondRedemptions => Set<BondRedemption>();
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
+    public DbSet<RecurringIncome> RecurringIncomes => Set<RecurringIncome>();
+    public DbSet<RecurringIncomeVersion> RecurringIncomeVersions => Set<RecurringIncomeVersion>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -209,6 +211,31 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             item.Property(i => i.QuoteCurrency).HasMaxLength(3);
             item.Property(i => i.Note).HasMaxLength(500);
             item.Property(i => i.TargetPrice).HasPrecision(18, 8);
+        });
+
+        modelBuilder.Entity<RecurringIncome>(income =>
+        {
+            income.Property(i => i.Name).HasMaxLength(200);
+
+            income.HasIndex(i => new { i.UserId, i.Name }).IsUnique();
+
+            income.HasMany(i => i.Versions)
+                .WithOne()
+                .HasForeignKey(v => v.RecurringIncomeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecurringIncomeVersion>(version =>
+        {
+            version.Property(v => v.Amount).HasPrecision(18, 2);
+            version.Property(v => v.DayKind).HasConversion<string>().HasMaxLength(20);
+            version.Property(v => v.Shift).HasConversion<string>().HasMaxLength(20);
+
+            // Restrict: an account that an income targets is never deleted under it.
+            version.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(v => v.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

@@ -548,6 +548,81 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("MetalHoldings");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncome", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("RecurringIncomes");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncomeVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("DayKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("DayOfMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<int>("IntervalMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RecurringIncomeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Shift")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("RecurringIncomeId");
+
+                    b.ToTable("RecurringIncomeVersions");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
                 {
                     b.Property<Guid>("AssetId")
@@ -800,6 +875,21 @@ namespace Skarbiec.Portfolio.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncomeVersion", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Skarbiec.Portfolio.Data.RecurringIncome", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("RecurringIncomeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
                 {
                     b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
@@ -816,6 +906,11 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasForeignKey("Skarbiec.Portfolio.Data.TreasuryBond", "AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncome", b =>
+                {
+                    b.Navigation("Versions");
                 });
 #pragma warning restore 612, 618
         }

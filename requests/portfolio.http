@@ -1176,3 +1176,55 @@ Content-Type: application/json
   "currency": "PLN",
   "instrumentId": "{{addCustomInstrument.response.body.id}}"
 }
+
+### --- Recurring incomes ---
+
+### Create a recurring income on a non-archived account: monthly, last business day (dayKind 1 = LastBusinessDay, no day, shift 0 = None; 404 for another user's account, 409 Conflict.AccountArchived, 409 Conflict.DuplicateName)
+# @name createRecurringIncome
+POST {{baseUrl}}/api/portfolio/recurring-incomes
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Wypłata Dominik",
+  "amount": 9200,
+  "accountId": "{{createMbankAccount.response.body.id}}",
+  "startDate": "2026-01-01",
+  "intervalMonths": 1,
+  "dayKind": 1,
+  "shift": 0
+}
+
+### Create a recurring income on a day of the month, shifted to the previous business day (dayKind 0 = DayOfMonth, shift 1 = PreviousBusinessDay, 2 = NextBusinessDay)
+POST {{baseUrl}}/api/portfolio/recurring-incomes
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Wypłata żona",
+  "amount": 6500,
+  "accountId": "{{createMbankAccount.response.body.id}}",
+  "startDate": "2026-01-01",
+  "endDate": null,
+  "intervalMonths": 1,
+  "dayKind": 0,
+  "dayOfMonth": 10,
+  "shift": 1
+}
+
+### End the income on a date (past or future; 400 when before the start)
+POST {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/end
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "endDate": "2026-12-31"
+}
+
+### Read a month (yyyy-MM, 2011-01 to 2099-12, else 400): occurrences by date then name, the PLN total (fxUnavailable when a foreign rate is missing) and every definition with its status
+GET {{baseUrl}}/api/portfolio/planning/months/2026-10
+Authorization: Bearer {{authToken}}
+
+### Delete the income with its versions
+DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}
+Authorization: Bearer {{authToken}}

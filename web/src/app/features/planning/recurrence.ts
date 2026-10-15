@@ -1,0 +1,51 @@
+import type { BusinessDayShift, RecurrenceDayKind } from '../../api/portfolio';
+
+// Mirrors Skarbiec.Portfolio.Features.Planning.Recurrence: the enums travel as their ints.
+export const DAY_KIND = { DayOfMonth: 0, LastBusinessDay: 1 } as const satisfies Record<
+  string,
+  RecurrenceDayKind
+>;
+
+export const SHIFT = {
+  None: 0,
+  PreviousBusinessDay: 1,
+  NextBusinessDay: 2,
+} as const satisfies Record<string, BusinessDayShift>;
+
+export const SHIFT_OPTIONS = [
+  { value: SHIFT.None, label: 'planning.shift.none' },
+  { value: SHIFT.PreviousBusinessDay, label: 'planning.shift.previous' },
+  { value: SHIFT.NextBusinessDay, label: 'planning.shift.next' },
+] as const;
+
+export interface RulePart {
+  key: string;
+  params?: Record<string, number>;
+}
+
+export function ruleParts(rule: {
+  intervalMonths: number | string;
+  dayKind: number;
+  dayOfMonth?: number | string | null;
+  shift: number;
+}): RulePart[] {
+  const interval = Number(rule.intervalMonths);
+  const parts: RulePart[] = [
+    interval === 1
+      ? { key: 'planning.rule.monthly' }
+      : { key: 'planning.rule.everyMonths', params: { count: interval } },
+  ];
+
+  if (rule.dayKind === DAY_KIND.LastBusinessDay) {
+    parts.push({ key: 'planning.rule.lastBusinessDay' });
+    return parts;
+  }
+
+  parts.push({ key: 'planning.rule.dayOfMonth', params: { day: Number(rule.dayOfMonth) } });
+  if (rule.shift === SHIFT.PreviousBusinessDay) {
+    parts.push({ key: 'planning.rule.previousBusinessDay' });
+  } else if (rule.shift === SHIFT.NextBusinessDay) {
+    parts.push({ key: 'planning.rule.nextBusinessDay' });
+  }
+  return parts;
+}

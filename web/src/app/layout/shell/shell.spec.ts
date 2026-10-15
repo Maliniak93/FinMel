@@ -228,6 +228,7 @@ describe('Shell', () => {
       'Bonds',
       'Precious metals',
       'Cash',
+      'Planning',
       'Settings',
     ]);
 
