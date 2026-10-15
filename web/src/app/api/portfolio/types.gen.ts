@@ -241,6 +241,8 @@ export type BondSwapSourceResponse = {
     name: string;
 };
 
+export type BusinessDayShift = number;
+
 export type CashBalanceResponse = {
     currency: string;
     cashAssetId: string;
@@ -287,6 +289,22 @@ export type CreateAccountRequest = {
 export type CreateCashPlaceRequest = {
     name: string;
     currencies?: Array<string>;
+};
+
+export type CreateRecurringIncomeRequest = {
+    name: string;
+    amount: number | string;
+    accountId: string;
+    startDate: string;
+    endDate?: null | string;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth?: null | number | string;
+    shift: BusinessDayShift;
+};
+
+export type CreateRecurringIncomeResponse = {
+    id: string;
 };
 
 export type CreateTransferRequest = {
@@ -350,6 +368,41 @@ export type DepositStatus = number;
 
 export type DepositTermUnit = number;
 
+export type EndRecurringIncomeRequest = {
+    endDate: string;
+};
+
+export type IncomeDefinitionResponse = {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: null | string;
+    status: RecurringIncomeStatus;
+    amount: number | string;
+    currency: string;
+    accountId: string;
+    accountName: string;
+    accountArchived: boolean;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth: null | number | string;
+    shift: BusinessDayShift;
+};
+
+export type IncomeOccurrenceResponse = {
+    recurringIncomeId: string;
+    nominalMonth: string;
+    date: string;
+    name: string;
+    accountId: string;
+    accountName: string;
+    accountArchived: boolean;
+    amount: number | string;
+    currency: string;
+    amountPln: null | number | string;
+    estimated: boolean;
+};
+
 export type Metal = number;
 
 export type MetalResponse = {
@@ -373,6 +426,17 @@ export type PayOutDepositRequest = {
     date: string;
 };
 
+export type PlanningIncomesResponse = {
+    occurrences: Array<IncomeOccurrenceResponse>;
+    totalPln: number | string;
+    fxUnavailable: boolean;
+    definitions: Array<IncomeDefinitionResponse>;
+};
+
+export type PlanningMonthResponse = {
+    incomes: PlanningIncomesResponse;
+};
+
 export type RecordTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
@@ -383,6 +447,10 @@ export type RecordTransactionRequest = {
     feeAmount?: null | number | string;
     amountPln?: null | number | string;
 };
+
+export type RecurrenceDayKind = number;
+
+export type RecurringIncomeStatus = 'Upcoming' | 'Active' | 'Ended';
 
 export type RedeemBondEarlyRequest = {
     date: string;
@@ -1563,6 +1631,76 @@ export type PostApiPortfolioCashPlacesByIdRestoreResponses = {
 };
 
 export type PostApiPortfolioCashPlacesByIdRestoreResponse = PostApiPortfolioCashPlacesByIdRestoreResponses[keyof PostApiPortfolioCashPlacesByIdRestoreResponses];
+
+export type PostApiPortfolioRecurringIncomesData = {
+    body: CreateRecurringIncomeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/recurring-incomes';
+};
+
+export type PostApiPortfolioRecurringIncomesResponses = {
+    /**
+     * Created
+     */
+    201: CreateRecurringIncomeResponse;
+};
+
+export type PostApiPortfolioRecurringIncomesResponse = PostApiPortfolioRecurringIncomesResponses[keyof PostApiPortfolioRecurringIncomesResponses];
+
+export type PostApiPortfolioRecurringIncomesByIdEndData = {
+    body: EndRecurringIncomeRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-incomes/{id}/end';
+};
+
+export type PostApiPortfolioRecurringIncomesByIdEndResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiPortfolioRecurringIncomesByIdEndResponse = PostApiPortfolioRecurringIncomesByIdEndResponses[keyof PostApiPortfolioRecurringIncomesByIdEndResponses];
+
+export type DeleteApiPortfolioRecurringIncomesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-incomes/{id}';
+};
+
+export type DeleteApiPortfolioRecurringIncomesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioRecurringIncomesByIdResponse = DeleteApiPortfolioRecurringIncomesByIdResponses[keyof DeleteApiPortfolioRecurringIncomesByIdResponses];
+
+export type GetApiPortfolioPlanningMonthsByMonthData = {
+    body?: never;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/planning/months/{month}';
+};
+
+export type GetApiPortfolioPlanningMonthsByMonthResponses = {
+    /**
+     * OK
+     */
+    200: PlanningMonthResponse;
+};
+
+export type GetApiPortfolioPlanningMonthsByMonthResponse = GetApiPortfolioPlanningMonthsByMonthResponses[keyof GetApiPortfolioPlanningMonthsByMonthResponses];
 
 export type GetApiPortfolioSecuritiesData = {
     body?: never;

@@ -1,0 +1,121 @@
+.planning-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.planning-page__months {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planning-page__month {
+  min-width: 10rem;
+  text-align: center;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.planning-page__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.planning-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.planning-section__empty {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.planning-section__total {
+  margin: 16px 0 24px;
+  font-weight: 500;
+}
+
+.planning-section__incomplete {
+  margin-inline-start: 8px;
+  font-weight: 400;
+  color: var(--mat-sys-error);
+}
+
+.planning-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 8px;
+    text-align: start;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+}
+
+.planning-table__amount {
+  text-align: end;
+}
+
+.planning-table__estimate {
+  display: block;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.planning-table__warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: 8px;
+  color: var(--mat-sys-error);
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+}
+
+.planning-definitions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planning-definition {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.planning-definition__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planning-definition__name {
+  font-weight: 500;
+}
+
+.planning-definition__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.planning-definition__rule-part:not(:last-child)::after {
+  content: ', ';
+}

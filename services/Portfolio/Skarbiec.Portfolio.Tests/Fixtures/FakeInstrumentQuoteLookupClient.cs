@@ -8,9 +8,12 @@ public sealed class FakeInstrumentQuoteLookupClient : IInstrumentQuoteLookupClie
     private readonly ConcurrentDictionary<Guid, InstrumentQuote> _instruments = new();
     private readonly ConcurrentDictionary<string, decimal> _rates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentQueue<IReadOnlyList<Guid>> _calls = new();
+    private readonly ConcurrentQueue<IReadOnlyList<string>> _rateCalls = new();
     private volatile bool _unavailable;
 
     public IReadOnlyList<IReadOnlyList<Guid>> Calls => [.. _calls];
+
+    public IReadOnlyList<IReadOnlyList<string>> RateCalls => [.. _rateCalls];
 
     public FakeInstrumentQuoteLookupClient WithInstrument(
         Guid instrumentId,
@@ -52,6 +55,8 @@ public sealed class FakeInstrumentQuoteLookupClient : IInstrumentQuoteLookupClie
     public Task<InstrumentQuoteLookupResult> GetRatesAsync(
         IReadOnlyCollection<string> currencies, DateOnly asOfDate, CancellationToken cancellationToken)
     {
+        _rateCalls.Enqueue([.. currencies]);
+
         if (_unavailable)
         {
             return Task.FromResult(InstrumentQuoteLookupResult.Unavailable);

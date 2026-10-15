@@ -23,6 +23,9 @@ internal static class AccountErrors
     public static Error HasOpenDeposit(Guid id) =>
         new("Conflict.AccountHasOpenDeposit", $"Account '{id}' is the return account of a deposit that is not paid out yet.");
 
+    public static Error HasRecurringIncome(Guid id) =>
+        new("Conflict.AccountHasRecurringIncome", $"Account '{id}' is the target of a recurring income — move or delete the income first.");
+
     public static Error BankAccountRequired(Guid id) =>
         new("Validation.BankAccountRequired", $"Account '{id}' is not an unarchived Bank account.");
 

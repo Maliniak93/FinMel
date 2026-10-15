@@ -250,3 +250,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** a physical cash place holds balances in several currencies, and the "Gotówka" page shows each one's PLN value. Reporting values the same balances, but per user and account, not per place.
 **Decision:** `ListCashPlaces` and `GetCashPlace` call MarketData's existing `POST /internal/fx/latest-batch` once for the distinct held non-PLN currencies, fail soft like ADR-031 (`fxUnavailable`, foreign values null, still 200). Nothing is stored or published. Extends ADR-031 to a second handler.
 **Consequences:** one extra internal call per cash-page load; the page and net worth can differ by one sync, as on the securities page.
+
+## ADR-037 🕐 The planning month view reads the latest FX rate on the read path
+
+**Context:** a planned income on a non-PLN account needs a PLN equivalent and the month total is in PLN; nothing about plans is stored in MarketData or Reporting.
+**Decision:** `GetPlanningMonth` calls MarketData's existing `POST /internal/fx/latest-batch` once for the distinct non-PLN currencies of the month's occurrences, as of today, and uses that one rate for every month (an estimate); a missing rate gives `fxUnavailable`, a null `amountPln` and an incomplete total, still 200. Nothing is stored or published. Extends ADR-036 to a third handler.
+**Consequences:** one extra internal call per planning-page load with a foreign income; past and future months show today's rate.

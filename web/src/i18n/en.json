@@ -34,6 +34,7 @@
     "nav": {
       "dashboard": "Dashboard",
       "cash": "Cash",
+      "planning": "Planning",
       "securities": "Stocks & ETFs",
       "deposits": "Deposits",
       "bonds": "Bonds",
@@ -581,6 +582,81 @@
       "archived": "The place is archived — restore it first.",
       "duplicateName": "A cash place with this name already exists.",
       "duplicateCurrency": "The place already holds this currency."
+    }
+  },
+  "planning": {
+    "title": "Planning",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "add": "Add income",
+    "account": "Account",
+    "archivedAccount": "account archived — change the account",
+    "estimate": "≈ {{ amount }}",
+    "estimateUnavailable": "estimate unavailable",
+    "total": "Month total: {{ amount }}",
+    "totalIncomplete": "incomplete — an exchange rate is missing",
+    "loadFailed": "Failed to load the plan.",
+    "incomes": {
+      "title": "Income",
+      "empty": "No income expected this month."
+    },
+    "definitions": {
+      "title": "Recurring incomes",
+      "empty": "No recurring incomes yet.",
+      "periodOpen": "from {{ start }}",
+      "periodClosed": "{{ start }} – {{ end }}"
+    },
+    "status": {
+      "upcoming": "Upcoming",
+      "active": "Active",
+      "ended": "Ended"
+    },
+    "rule": {
+      "monthly": "every month",
+      "everyMonths": "every {{ count }} months",
+      "lastBusinessDay": "last business day",
+      "dayOfMonth": "on day {{ day }}",
+      "previousBusinessDay": "previous business day",
+      "nextBusinessDay": "next business day"
+    },
+    "shift": {
+      "none": "No shift",
+      "previous": "Previous business day",
+      "next": "Next business day"
+    },
+    "delete": {
+      "title": "Delete recurring income",
+      "message": "Delete “{{ name }}” with its whole plan? This can't be undone.",
+      "failed": "Failed to delete the income."
+    },
+    "end": {
+      "action": "End",
+      "title": "End “{{ name }}”",
+      "dateOutOfRange": "The end date must be on or after the start date and not after 2099-12-31."
+    },
+    "errors": {
+      "duplicateName": "An income with this name already exists.",
+      "accountArchived": "This account is archived."
+    },
+    "form": {
+      "title": "Add recurring income",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name can have at most 200 characters.",
+      "accountRequired": "Choose an account.",
+      "accountsLoadFailed": "Failed to load the accounts.",
+      "currencyHint": "Currency: {{ currency }}",
+      "startDate": "Start date",
+      "endDate": "End date (optional)",
+      "dateOutOfRange": "Date must be between 2011-01-01 and 2099-12-31.",
+      "endBeforeStart": "The end date can't be before the start date.",
+      "intervalMonths": "Repeat every (months)",
+      "intervalInvalid": "Enter a number of months from 1 to 12.",
+      "dayKind": "Day",
+      "dayOfMonthKind": "Day of the month",
+      "lastBusinessDayKind": "Last business day",
+      "dayOfMonth": "Day of the month",
+      "dayInvalid": "Enter a day from 1 to 31.",
+      "shift": "Business-day shift"
     }
   },
   "securities": {

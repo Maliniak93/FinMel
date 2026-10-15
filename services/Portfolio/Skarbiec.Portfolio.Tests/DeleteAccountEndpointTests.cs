@@ -86,4 +86,23 @@ public sealed class DeleteAccountEndpointTests(SkarbiecContainersFixture contain
         await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.AccountHasOpenDepositErrorCode, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(AccountUri(nest.AccountId), cancellationToken)).StatusCode);
     }
+
+    [Fact]
+    public async Task Returns409_WhenRecurringIncomeTargetsAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var income = await client.CreateRecurringIncomeAsync(accountId, cancellationToken);
+
+        var blocked = await client.DeleteAsync(AccountUri(accountId), cancellationToken);
+
+        await blocked.AssertProblemAsync(HttpStatusCode.Conflict, PlanningApi.AccountHasRecurringIncomeErrorCode, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(AccountUri(accountId), cancellationToken)).StatusCode);
+
+        await client.DeleteRecurringIncomeAsync(income, cancellationToken);
+        var deleted = await client.DeleteAsync(AccountUri(accountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
 }

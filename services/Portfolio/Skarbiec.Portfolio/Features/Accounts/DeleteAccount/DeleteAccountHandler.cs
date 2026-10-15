@@ -23,6 +23,11 @@ public sealed class DeleteAccountHandler(
             return AccountErrors.HasOpenDeposit(id);
         }
 
+        if (await dbContext.RecurringIncomeVersions.AnyAsync(v => v.AccountId == id, cancellationToken))
+        {
+            return AccountErrors.HasRecurringIncome(id);
+        }
+
         var cash = await dbContext.LoadAccountCashAsync(id, cancellationToken);
 
         var holdsOtherAssets = await dbContext.Assets.AnyAsync(a => a.AccountId == id && a.Id != cash.Id, cancellationToken);

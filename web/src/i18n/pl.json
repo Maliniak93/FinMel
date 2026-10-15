@@ -34,6 +34,7 @@
     "nav": {
       "dashboard": "Pulpit",
       "cash": "Gotówka",
+      "planning": "Planowanie",
       "securities": "Akcje i ETF",
       "deposits": "Lokaty",
       "bonds": "Obligacje",
@@ -581,6 +582,81 @@
       "archived": "Miejsce jest zarchiwizowane — najpierw je przywróć.",
       "duplicateName": "Miejsce o tej nazwie już istnieje.",
       "duplicateCurrency": "Miejsce ma już tę walutę."
+    }
+  },
+  "planning": {
+    "title": "Planowanie",
+    "previousMonth": "Poprzedni miesiąc",
+    "nextMonth": "Następny miesiąc",
+    "add": "Dodaj wpływ",
+    "account": "Konto",
+    "archivedAccount": "konto zarchiwizowane — zmień konto",
+    "estimate": "≈ {{ amount }}",
+    "estimateUnavailable": "brak szacunku",
+    "total": "Suma miesiąca: {{ amount }}",
+    "totalIncomplete": "niekompletna — brakuje kursu waluty",
+    "loadFailed": "Nie udało się wczytać planu.",
+    "incomes": {
+      "title": "Wpływy",
+      "empty": "W tym miesiącu nie oczekujesz żadnych wpływów."
+    },
+    "definitions": {
+      "title": "Wpływy cykliczne",
+      "empty": "Brak wpływów cyklicznych.",
+      "periodOpen": "od {{ start }}",
+      "periodClosed": "{{ start }} – {{ end }}"
+    },
+    "status": {
+      "upcoming": "Nadchodzący",
+      "active": "Aktywny",
+      "ended": "Zakończony"
+    },
+    "rule": {
+      "monthly": "co miesiąc",
+      "everyMonths": "co {{ count }} mies.",
+      "lastBusinessDay": "ostatni dzień roboczy",
+      "dayOfMonth": "{{ day }}. dnia",
+      "previousBusinessDay": "poprzedni dzień roboczy",
+      "nextBusinessDay": "następny dzień roboczy"
+    },
+    "shift": {
+      "none": "Bez przesunięcia",
+      "previous": "Poprzedni dzień roboczy",
+      "next": "Następny dzień roboczy"
+    },
+    "delete": {
+      "title": "Usuń wpływ cykliczny",
+      "message": "Usunąć „{{ name }}” wraz z całym planem? Tej operacji nie można cofnąć.",
+      "failed": "Nie udało się usunąć wpływu."
+    },
+    "end": {
+      "action": "Zakończ",
+      "title": "Zakończ „{{ name }}”",
+      "dateOutOfRange": "Data zakończenia nie może być wcześniejsza niż start ani późniejsza niż 2099-12-31."
+    },
+    "errors": {
+      "duplicateName": "Wpływ o tej nazwie już istnieje.",
+      "accountArchived": "To konto jest zarchiwizowane."
+    },
+    "form": {
+      "title": "Dodaj wpływ cykliczny",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameTooLong": "Nazwa może mieć najwyżej 200 znaków.",
+      "accountRequired": "Wybierz konto.",
+      "accountsLoadFailed": "Nie udało się wczytać kont.",
+      "currencyHint": "Waluta: {{ currency }}",
+      "startDate": "Data początku",
+      "endDate": "Data końca (opcjonalnie)",
+      "dateOutOfRange": "Data musi mieścić się między 2011-01-01 a 2099-12-31.",
+      "endBeforeStart": "Data końca nie może być wcześniejsza niż początek.",
+      "intervalMonths": "Powtarzaj co (miesięcy)",
+      "intervalInvalid": "Podaj liczbę miesięcy od 1 do 12.",
+      "dayKind": "Dzień",
+      "dayOfMonthKind": "Dzień miesiąca",
+      "lastBusinessDayKind": "Ostatni dzień roboczy",
+      "dayOfMonth": "Dzień miesiąca",
+      "dayInvalid": "Podaj dzień od 1 do 31.",
+      "shift": "Przesunięcie na dzień roboczy"
     }
   },
   "securities": {
