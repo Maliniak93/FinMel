@@ -12,6 +12,11 @@ Known failure modes, what causes them, and the fix. If you hit something not lis
 **Cause:** GraphQL has a 5000-point hourly window; a wide query (a whole project with bodies) spends hundreds of points per call. `gh api rate_limit` is free and shows what is left.
 **Fix:** measure the command: `node scripts/gh-usage.mjs -- node scripts/gh-project.mjs get <n>` prints the GraphQL points and REST requests it consumed (or says the window reset meanwhile); `node scripts/gh-usage.mjs` alone prints the current state. Budgets: `get` ≤ 2, `list` ≤ 5, `set` ≤ 3, session start 0, one epic part ≤ 100. `SKARBIEC_GH_BIN` points every script at another `gh` binary (a fake, in tests).
 
+## A script exits 4 with `Limit GitHuba (...) wyczerpany`
+
+**Cause:** the GitHub limit (primary GraphQL or REST, or a secondary one) is exhausted; `gh-project.mjs`, `ship.mjs` and `gh-usage.mjs` never wait. The second line, `GITHUB_LIMIT {"kind":…,"resetAt":<epoch seconds>}`, carries the reset (`resetAt` is null for a secondary limit: wait a few minutes).
+**Fix:** re-run the same command after the reset time (`node scripts/gh-usage.mjs` shows the state; it is free). `/build` stops at once on an exit 4 from `prepare` or `ship.mjs`; the work stays on its branch and a re-run ships it. `epic.mjs` waits by itself and resumes; `plan-status.mjs` and `idea.mjs context` print `limit GitHuba do HH:MM` instead of the board.
+
 ## Gateway 429s during a seed script or smoke test
 
 **Cause:** the Gateway rate-limits at 100 requests / 10 seconds. A seed or smoke script that fires requests in a tight loop (e.g. creating many assets) can hit it well before a human would.

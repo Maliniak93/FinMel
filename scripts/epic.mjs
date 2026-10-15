@@ -9,6 +9,7 @@
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
+//   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
 import { spawn, spawnSync } from "node:child_process";
@@ -18,7 +19,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
-import { REPO, checkBuckets, rateLimit, spawnGh, usageLine } from "./gh.mjs";
+import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./epic-gh.mjs";
+import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WIN = process.platform === "win32";
@@ -46,6 +48,7 @@ const clock = (date = new Date()) => date.toTimeString().slice(0, 5);
 const pad = (n) => String(n).padStart(2, "0");
 
 let logPath = null;
+let runStamp = String(Date.now());
 let lastSayAt = Date.now();
 
 function say(text) {
@@ -69,29 +72,71 @@ function openLog(epic) {
   mkdirSync(dir, { recursive: true });
   const d = new Date();
   const stamped = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  runStamp = stamped;
   logPath = path.join(dir, `${stamped}.log`);
   say(`epic #${epic} · log ${path.relative(REPO_ROOT, logPath).replaceAll("\\", "/")}`);
 }
 
 function outcome(res) {
   const err = res.error?.message ?? (res.stderr ?? "").trim();
-  return { ok: !res.error && res.status === 0, out: (res.stdout ?? "").trim(), err, firstErr: err.split(/\r?\n/).find(Boolean) ?? "" };
+  return { ok: !res.error && res.status === 0, out: (res.stdout ?? "").trim(), err, firstErr: err.split(/\r?\n/).find(Boolean) ?? "", all: `${res.stdout ?? ""}\n${res.stderr ?? ""}` };
 }
 
 function run(cmd, argv, options = {}) {
   return outcome(spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, maxBuffer: 64 * 1024 * 1024, ...options }));
 }
 
-const TRANSIENT_RE = /(?:HTTP|status code:?) 5\d\d|Bad Gateway|Internal Server Error|Service Unavailable|Gateway Time-?out|timed? ?out|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|connection reset|TLS handshake/i;
 const RETRY_DELAYS_S = [15, 30, 60, 120, 240];
+const waitBudgets = new Set();
 
-function retryTransient(label, fn) {
+// A child node process does the sleeping so that Ctrl+C (delivered to the whole console group) ends it and the wait with it
+function blockingSleep(ms) {
+  const res = spawnSync(NODE, ["-e", `setTimeout(() => {}, ${Math.ceil(ms)})`], { windowsHide: true, stdio: "ignore" });
+  if (res.error) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  else if (res.status !== 0) interrupt();
+}
+
+function limitSleep(ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    blockingSleep(Math.min(HEARTBEAT_MS, until - Date.now()));
+    if (Date.now() < until) say(`still waiting for the GitHub limit, ${Math.round((until - Date.now()) / 60e3)} min left`);
+  }
+}
+
+const excludeFromBudgets = (ms) => waitBudgets.forEach((budget) => budget.exclude(ms));
+const stepWait = { log: say, sleep: limitSleep, now: Date.now, onWait: excludeFromBudgets };
+
+function limitOf(res) {
+  const marker = limitFromText(res.all);
+  if (marker) return new GhLimitError(marker.kind, marker.resetAt);
+  return res.err ? limitFromGhFailure(res.err) : null;
+}
+
+function waitOutLimit(limit, attempt) {
+  const { ms, until } = limitWait(limit, attempt, Date.now());
+  say(`limit GitHuba (${limit.kind}), czekam do ${until}`);
+  excludeFromBudgets(ms);
+  limitSleep(ms);
+  say("limit GitHuba: wznawiam");
+}
+
+function retryTransient(label, fn, { alreadyDone } = {}) {
   let res = fn();
-  for (let i = 0; i < RETRY_DELAYS_S.length && !res.ok && TRANSIENT_RE.test(res.err); i++) {
-    const s = RETRY_DELAYS_S[i];
-    say(`github: ${label} failed (${short(res.firstErr, 100)}), retry ${i + 1}/${RETRY_DELAYS_S.length} in ${s}s`);
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, s * 1000);
-    res = fn();
+  let transient = 0;
+  let limits = 0;
+  while (!res.ok) {
+    const limit = limitOf(res);
+    if (limit) {
+      waitOutLimit(limit, ++limits);
+      if (alreadyDone?.()) return { ok: true, out: "", err: "", firstErr: "", all: "" };
+      res = fn();
+    } else if (transient < RETRY_DELAYS_S.length && TRANSIENT_RE.test(res.err)) {
+      const s = RETRY_DELAYS_S[transient++];
+      say(`github: ${label} failed (${short(res.firstErr, 100)}), retry ${transient}/${RETRY_DELAYS_S.length} in ${s}s`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, s * 1000);
+      res = fn();
+    } else break;
   }
   return res;
 }
@@ -186,27 +231,30 @@ function claudeSpawn(claude, argv) {
   return { cmd: claude.cmd, argv: claude.shell ? argv.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : argv, shell: claude.shell };
 }
 
-function retryShip(part) {
+async function retryShip(part) {
   say(`retrying the ship step of #${part.number} on ${part.branch}`);
   if (currentBranch() !== part.branch) {
     const switched = git(["switch", part.branch]);
     if (!switched.ok) throw new Stop("ship-failed", `git switch ${part.branch}: ${switched.firstErr}`);
   }
   const json = JSON.stringify({ deviations: [], resumedShip: true });
-  ship(part.number, ["--branch", part.branch, "--title", part.title, "--json", json]);
+  await ship(part.number, ["--branch", part.branch, "--title", part.title, "--json", json]);
 }
 
 // The build session can end without running nextCommand (a confused relay); a ready run is then shipped from its record.
-function shipUnshippedRun(part, since) {
+async function shipUnshippedRun(part, since) {
   const record = latestRunRecord({ issue: part.number, since });
   if (record?.result?.status !== "ready" || commentedSince(part.number, since)) return false;
   say(`#${part.number}: the build session did not ship its ready run - shipping it from workflow ${record.runId}`);
-  ship(part.number, ["--from-run"]);
+  await ship(part.number, ["--from-run"]);
   return true;
 }
 
-function ship(number, flags) {
-  const res = spawnSync(NODE, ["scripts/ship.mjs", String(number), ...flags], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, timeout: 3600e3, maxBuffer: 64 * 1024 * 1024 });
+async function ship(number, flags) {
+  const { res } = await runStepWithLimit(async () => {
+    const spawned = spawnSync(NODE, ["scripts/ship.mjs", String(number), ...flags], { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, timeout: 3600e3, maxBuffer: 64 * 1024 * 1024 });
+    return { code: spawned.status, output: `${spawned.stdout ?? ""}\n${spawned.stderr ?? ""}`, res: spawned };
+  }, stepWait);
   const line = (res.stdout ?? "").split(/\r?\n/).reverse().find((l) => l.startsWith("SHIP_RESULT: "));
   let parsed = null;
   try {
@@ -262,7 +310,7 @@ const span = (ms) => {
 const resetClock = (t) => (t ? clock(new Date(t > 1e12 ? t : t * 1000)) : "unknown");
 
 function createReporter(number) {
-  const rep = { limitHit: false, resetsAt: null, sessionId: null, result: null };
+  const rep = { limitHit: false, resetsAt: null, sessionId: null, result: null, ghLimit: null };
   const toolNames = new Map();
   const agents = new Map();
   const phases = new Set();
@@ -338,6 +386,7 @@ function createReporter(number) {
     else if (obj.type === "system") onSystem(obj);
     else if (obj.type === "rate_limit_event" && obj.rate_limit_info?.status === "rejected") markLimit(obj.rate_limit_info.resetsAt);
     else if (obj.type === "result") onResult(obj);
+    else if (obj.type === "user") rep.ghLimit = limitFromStreamEvent(obj) ?? rep.ghLimit;
   };
 
   rep.heartbeat = () => {
@@ -412,7 +461,7 @@ function runClaude(claude, number, heading, prompt, model) {
       buildChild = null;
       reportBuildEnd(number, code, reporter.result, Date.now() - startedAt);
       if (code !== 0 && errTail.trim()) say(`exit ${code}: ${errTail.trim().split(/\r?\n/).slice(-3).join(" | ")}`);
-      resolve({ code, timedOut, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, sessionId: reporter.sessionId, text: String(reporter.result?.result ?? ""), ms: Date.now() - startedAt });
+      resolve({ code, timedOut, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, ghLimit: reporter.ghLimit, sessionId: reporter.sessionId, text: String(reporter.result?.result ?? ""), ms: Date.now() - startedAt });
     });
   });
 }
@@ -436,41 +485,71 @@ function readChecks(pr) {
 
 async function waitForCi(pr) {
   const startedAt = Date.now();
-  let emptySince = Date.now();
+  const budgets = [];
+  const track = (ms) => {
+    const budget = createTimeoutBudget(ms);
+    waitBudgets.add(budget);
+    budgets.push(budget);
+    return budget;
+  };
+  const total = track(CI_TIMEOUT_MS);
+  let missing = track(CI_MISSING_MS);
   let lastStatus = "";
   let greenPolls = 0;
-  while (true) {
-    const checks = readChecks(pr.number);
-    if (!checks) {
-      greenPolls = 0;
-      if (Date.now() - startedAt > CI_TIMEOUT_MS) throw new Stop("ci-timeout", `PR ${pr.url}: checks not readable or not green after 90 min`);
-      await sleep(CI_POLL_MS);
-      continue;
-    }
-    if (checks.length) emptySince = null;
-    else emptySince ??= Date.now();
-    const count = (...buckets) => checks.filter((c) => buckets.includes(c.bucket)).length;
-    const failed = checks.filter((c) => ["fail", "cancel"].includes(c.bucket));
-    const status = `pass ${count("pass")} · skipping ${count("skipping")} · pending ${count("pending")} · fail ${failed.length}`;
-    if (checks.length && status !== lastStatus) say(`CI PR #${pr.number}: ${status}`);
-    lastStatus = status;
+  try {
+    while (true) {
+      const checks = readChecks(pr.number);
+      if (!checks) {
+        greenPolls = 0;
+        if (total.expired()) throw new Stop("ci-timeout", `PR ${pr.url}: checks not readable or not green after 90 min`);
+        await sleep(CI_POLL_MS);
+        continue;
+      }
+      if (checks.length) missing = null;
+      else missing ??= track(CI_MISSING_MS);
+      const count = (...buckets) => checks.filter((c) => buckets.includes(c.bucket)).length;
+      const failed = checks.filter((c) => ["fail", "cancel"].includes(c.bucket));
+      const status = `pass ${count("pass")} · skipping ${count("skipping")} · pending ${count("pending")} · fail ${failed.length}`;
+      if (checks.length && status !== lastStatus) say(`CI PR #${pr.number}: ${status}`);
+      lastStatus = status;
 
-    if (failed.length) throw new Stop("ci-failed", `PR ${pr.url}: ${failed.map((c) => `${c.name} (${c.link})`).join(", ")}`);
-    if (emptySince && Date.now() - emptySince > CI_MISSING_MS) throw new Stop("ci-missing", `PR ${pr.url}: no checks after 10 min - the runner did not pick up the job`);
-    greenPolls = checks.length && checks.every((c) => ["pass", "skipping"].includes(c.bucket)) ? greenPolls + 1 : 0;
-    // two green polls in a row: a late-registered check must not slip past the merge
-    if (greenPolls >= 2) return Date.now() - startedAt;
-    if (Date.now() - startedAt > CI_TIMEOUT_MS) throw new Stop("ci-timeout", `PR ${pr.url}: checks not green after 90 min`);
-    await sleep(CI_POLL_MS);
+      if (failed.length) throw new Stop("ci-failed", `PR ${pr.url}: ${failed.map((c) => `${c.name} (${c.link})`).join(", ")}`);
+      if (missing?.expired()) throw new Stop("ci-missing", `PR ${pr.url}: no checks after 10 min - the runner did not pick up the job`);
+      greenPolls = checks.length && checks.every((c) => ["pass", "skipping"].includes(c.bucket)) ? greenPolls + 1 : 0;
+      // two green polls in a row: a late-registered check must not slip past the merge
+      if (greenPolls >= 2) return Date.now() - startedAt;
+      if (total.expired()) throw new Stop("ci-timeout", `PR ${pr.url}: checks not green after 90 min`);
+      await sleep(CI_POLL_MS);
+    }
+  } finally {
+    budgets.forEach((budget) => waitBudgets.delete(budget));
   }
 }
 
+function prState(pr) {
+  const view = retryTransient(`pr view ${pr.number}`, () => gh(["pr", "view", String(pr.number), "--repo", REPO, "--json", "state"]));
+  if (!view.ok) throw new Stop("github", `gh pr view ${pr.number}: ${view.firstErr}`);
+  return JSON.parse(view.out).state;
+}
+
+function closeIssue(number) {
+  return closeUnlessClosed({
+    state: () => getIssue(number).state,
+    close: () => {
+      const closed = () => getIssue(number).state === "CLOSED";
+      retryTransient(`issue close ${number}`, () => gh(["issue", "close", String(number), "--repo", REPO, "--reason", "completed"]), { alreadyDone: closed });
+    },
+  });
+}
+
 async function mergeAndSync(pr, branch, number) {
-  const merged = gh(["pr", "merge", String(pr.number), "--repo", REPO, "--squash", "--delete-branch"]);
-  if (!merged.ok) {
-    const view = retryTransient("pr view", () => gh(["pr", "view", String(pr.number), "--repo", REPO, "--json", "state"]));
-    if (!view.ok || JSON.parse(view.out).state !== "MERGED") throw new Stop("merge-failed", `PR ${pr.url}: ${merged.firstErr}`);
-  }
+  await mergeUnlessMerged({
+    state: () => prState(pr),
+    merge: () => {
+      const merged = retryTransient(`pr merge ${pr.number}`, () => gh(["pr", "merge", String(pr.number), "--repo", REPO, "--squash", "--delete-branch"]), { alreadyDone: () => prState(pr) === "MERGED" });
+      if (!merged.ok && prState(pr) !== "MERGED") throw new Stop("merge-failed", `PR ${pr.url}: ${merged.firstErr}`);
+    },
+  });
   say(`merged PR #${pr.number}`);
   for (const argv of [["switch", "master"], ["pull", "--ff-only", "origin", "master"]]) {
     const step = git(argv);
@@ -481,7 +560,7 @@ async function mergeAndSync(pr, branch, number) {
     if (getIssue(number).state === "CLOSED") return;
     await sleep(10e3);
   }
-  gh(["issue", "close", String(number), "--repo", REPO, "--reason", "completed"]);
+  await closeIssue(number);
 }
 
 async function handlePart(sub, ctx) {
@@ -495,20 +574,26 @@ async function handlePart(sub, ctx) {
     if (ctx.builds >= ctx.maxTasks) throw new Stop("max-tasks", `${ctx.maxTasks} build(s) done in this run`);
     if (partPlan(part, dirtyFiles().length) === "ship") {
       entry.shipOnly = true;
-      retryShip(part);
+      await retryShip(part);
       pr = openPr(part.branch);
       if (!pr) throw new Stop("ship-failed", `#${part.number}: ship.mjs succeeded but no open PR exists for ${part.branch}`);
     } else {
       ctx.builds++;
       const buildStart = Date.now();
-      const built = await build(ctx.claude, part.number, part.title);
+      // a build that ends on the GitHub limit without a PR is rerun after the reset; the workflow journal replays what it finished
+      const { built, pr: builtPr } = await runStepWithLimit(async () => {
+        const result = await build(ctx.claude, part.number, part.title);
+        const stopped = result.timedOut || result.limitHit;
+        const found = stopped ? null : openPr(part.branch);
+        return { code: result.code, output: result.ghLimit && !found && !stopped ? `GITHUB_LIMIT ${JSON.stringify(result.ghLimit)}` : "", built: result, pr: found };
+      }, stepWait);
       entry.buildMin = minutes(built.ms);
       if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
       if (built.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached, resets ${resetClock(built.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
-      pr = openPr(part.branch);
+      pr = builtPr;
       const blockedAtE2e = pr ? null : e2eBlock(part.number);
       if (blockedAtE2e) return repairE2e(part, blockedAtE2e, ctx);
-      if (!pr && shipUnshippedRun(part, buildStart)) pr = openPr(part.branch);
+      if (!pr && (await shipUnshippedRun(part, buildStart))) pr = openPr(part.branch);
       if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
     }
   }
@@ -634,24 +719,44 @@ function costLine(parts) {
   return known.length ? `Cost at list prices: ${known.join(" · ")}` : null;
 }
 
-function postComment(epic, body) {
+function epicComments(epic) {
+  const res = retryTransient(`issue view ${epic}`, () => gh(["issue", "view", String(epic), "--repo", REPO, "--json", "comments", "--jq", "[.comments[] | {body}]"]));
+  try {
+    return res.ok ? JSON.parse(res.out) : [];
+  } catch {
+    return [];
+  }
+}
+
+// A summary hit by the limit mid-post is not repeated: the run's marker in a comment means it was posted
+async function postSummary(epic, body) {
+  const marker = `<!-- skarbiec-epic-summary:${epic}:${runStamp} -->`;
   const file = path.join(os.tmpdir(), `skarbiec-epic-${epic}-comment.md`);
-  writeFileSync(file, body, "utf8");
-  const res = project(["comment", String(epic), "--body-file", file]);
-  rmSync(file, { force: true });
-  return res.ok ? null : res.firstErr;
+  let failure = null;
+  await postOnce({
+    comments: () => epicComments(epic),
+    marker,
+    body,
+    post: (text) => {
+      writeFileSync(file, text, "utf8");
+      const res = retryTransient(`comment ${epic}`, () => project(["comment", String(epic), "--body-file", file]), { alreadyDone: () => hasRunMarker(epicComments(epic), marker) });
+      rmSync(file, { force: true });
+      failure = res.ok ? null : res.firstErr;
+    },
+  });
+  return failure;
 }
 
 const prNumber = (url) => url?.split("/").pop();
 const partLine = (p) => `#${p.number} PR #${prNumber(p.prUrl)} (${p.shipOnly ? "ship retried" : `build ${Math.round(p.buildMin ?? 0)} min`}, CI ${Math.round(p.ciMin ?? 0)} min)`;
 
-function finishRun(reason, detail, ctx) {
+async function finishRun(reason, detail, ctx) {
   const ok = reason === "done" || reason === "dry-run";
   say(`epic #${ctx.epic ?? "?"}: ${reason}${detail ? ` — ${detail}` : ""}`);
   if (ctx.parts.length) say(`done in this run: ${ctx.parts.map(partLine).join("; ")}`);
   if (!ok && ctx.epic && reason !== "usage") say(`resume: node scripts/epic.mjs ${ctx.epic}`);
   if (!ctx.dryRun && ctx.started) {
-    const failure = postComment(ctx.epic, summary(reason, detail, ctx.parts, ctx.epic, ok ? costLine(ctx.parts) : null));
+    const failure = await postSummary(ctx.epic, summary(reason, detail, ctx.parts, ctx.epic, ok ? costLine(ctx.parts) : null));
     if (failure) say(`could not post the epic comment: ${failure}`);
     if (!ctx.flags["no-shutdown"] && IS_WIN) {
       run("shutdown", ["/s", "/t", "600", "/c", `Skarbiec epic #${ctx.epic}: ${reason}`]);
@@ -675,18 +780,20 @@ async function runLoop(ctx) {
       sayUsage(`#${next.number} end`);
     }
   }
-  gh(["issue", "close", String(ctx.epic), "--repo", REPO, "--reason", "completed"]);
-  const moved = project(["set", String(ctx.epic), "Status", "Done"]);
+  await closeIssue(ctx.epic);
+  const moved = retryTransient(`set ${ctx.epic} Done`, () => project(["set", String(ctx.epic), "Status", "Done"]));
   if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
 }
 
 const ctx = { epic: /^[0-9]+$/.test(epicArg ?? "") ? Number(epicArg) : null, parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, claude: null };
 
-process.on("SIGINT", () => {
+function interrupt() {
   killTree(buildChild);
   say("interrupted (Ctrl+C) - no comment, no shutdown");
   process.exit(130);
-});
+}
+
+process.on("SIGINT", interrupt);
 
 try {
   if (!/^\d+$/.test(epicArg ?? "")) throw new Stop("usage", USAGE);
@@ -705,21 +812,21 @@ try {
   if (!ctx.dryRun) openLog(ctx.epic);
   ctx.claude = resolveClaude();
   const { issue, runners } = preChecks(ctx.epic, flags);
-  if (issue.state === "CLOSED") finishRun("done", "the epic is already closed - nothing to do", { ...ctx, started: false });
+  if (issue.state === "CLOSED") await finishRun("done", "the epic is already closed - nothing to do", { ...ctx, started: false });
 
   if (ctx.dryRun) {
     say(`runner online: ${runners}`);
     sayUsage("now");
     dryRunTable(issue);
-    finishRun("dry-run", null, ctx);
+    await finishRun("dry-run", null, ctx);
   }
 
   rmSync(stopFile(ctx.epic), { force: true });
   startSleepGuard();
   ctx.started = true;
   await runLoop(ctx);
-  finishRun("done", null, ctx);
+  await finishRun("done", null, ctx);
 } catch (err) {
   const stop = err instanceof Stop ? err : new Stop("error", err.stack ?? err.message);
-  finishRun(stop.reason, stop.message, ctx);
+  await finishRun(stop.reason, stop.message, ctx);
 }

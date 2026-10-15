@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnGh } from "./gh.mjs";
+import { GH_LIMIT_EXIT, clockTime, limitFromGhFailure, limitFromText, spawnGh } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GH_PROJECT = path.join(REPO_ROOT, "scripts", "gh-project.mjs");
@@ -17,6 +17,14 @@ const END = "<!-- status:end -->";
 const GH_TIMEOUT_MS = 8000;
 const PROJECT_TIMEOUT_MS = 20000;
 const TRUNK = "master";
+
+let ghLimit = null;
+
+function noteLimit(bin, res) {
+  if (ghLimit || res.error) return;
+  if (bin === "gh") ghLimit = limitFromGhFailure(res.stderr);
+  else if (res.status === GH_LIMIT_EXIT) ghLimit = limitFromText(`${res.stdout}\n${res.stderr}`);
+}
 
 function run(bin, argv, timeout = 15000) {
   const res =
@@ -29,9 +37,14 @@ function run(bin, argv, timeout = 15000) {
           windowsHide: true,
           shell: false,
         });
-  if (res.error || res.status !== 0) return null;
+  if (res.error || res.status !== 0) {
+    if (bin === "gh" || argv[0] === GH_PROJECT) noteLimit(bin, res);
+    return null;
+  }
   return res.stdout.trim();
 }
+
+const limitNote = () => `limit GitHuba do ${ghLimit.resetAt ? clockTime(ghLimit.resetAt) : "?"}`;
 
 const git = (...argv) => run("git", argv);
 const lines = (text) => (text ? text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : []);
@@ -149,7 +162,7 @@ function render(specs, facts, allPrs) {
 
   const open = (specs || []).filter((s) => s.status !== "Done");
   if (specs === null) {
-    out.push("**Spec issues:** not checked (`gh` unavailable or skipped).");
+    out.push(`**Spec issues:** ${ghLimit ? `${limitNote()}.` : "not checked (`gh` unavailable or skipped)."}`);
   } else if (open.length) {
     out.push("| Issue | Title | Status | Tier · Kind | Where it stands |");
     out.push("|---|---|---|---|---|");
@@ -181,7 +194,7 @@ function render(specs, facts, allPrs) {
   out.push(`**Checkout:** \`${head}\`, ${dirt}${behind}.`);
 
   if (prs === null) {
-    out.push("**Open PRs:** not checked (`gh` unavailable or skipped).");
+    out.push(`**Open PRs:** ${ghLimit ? `${limitNote()}.` : "not checked (`gh` unavailable or skipped)."}`);
   } else if (!prs.length) {
     out.push("**Open PRs:** none.");
   } else {

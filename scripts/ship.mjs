@@ -6,14 +6,14 @@
 //   an e2e part ("e2e": true in --json) instead needs node scripts/verify.mjs --projects e2e --cache-check and a green node scripts/e2e.mjs check
 //   --blocked at stage e2e also saves the uncommitted diff to skarbiec-plan/issues/<issue>.e2e.patch, restores the tree and switches to master
 //   after a successful ship it rebuilds the local compose images from the shipped commit (result.images; never fails the ship)
-//   last stdout line: SHIP_RESULT: {...}; exit 0 ok, 2 failed
+//   last stdout line: SHIP_RESULT: {...}; exit 0 ok, 2 failed, 4 GitHub limit exhausted (stderr: reset time and a GITHUB_LIMIT line; rerun after the reset)
 
 import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { latestRunRecord } from "./build-replay.mjs";
-import { spawnGh } from "./gh.mjs";
+import { GH_LIMIT_EXIT, GhLimitError, limitFromGhFailure, limitFromText, limitText, spawnGh } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
@@ -27,12 +27,24 @@ const NOT_E2E_GREEN = "the e2e gate failed: no green whole-suite e2e run of this
 function run(cmd, argv) {
   const res = cmd === "gh" ? spawnGh(argv) : spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
   const err = res.error?.message ?? (res.stderr ?? "").trim();
-  return {
+  const out = {
     ok: !res.error && res.status === 0,
     out: (res.stdout ?? "").trim(),
     firstErr: err.split(/\r?\n/).find(Boolean) ?? "",
     all: `${res.stdout ?? ""}\n${res.stderr ?? ""}`,
   };
+  if (!out.ok && !res.error) throwOnLimit(cmd, argv, res, out.all);
+  return out;
+}
+
+function throwOnLimit(cmd, argv, res, all) {
+  if (cmd === "gh") {
+    const limit = limitFromGhFailure(res.stderr);
+    if (limit) throw limit;
+  } else if (argv[0]?.endsWith("gh-project.mjs") && res.status === GH_LIMIT_EXIT) {
+    const limit = limitFromText(all);
+    if (limit) throw new GhLimitError(limit.kind, limit.resetAt);
+  }
 }
 
 function parseFlags(argv) {
@@ -199,6 +211,9 @@ try {
   else if (!/^(feat|fix|chore)\//.test(branch) || ["master", "main"].includes(branch)) failed = { command: "guard", error: `refusing to ship branch ${branch}` };
 
   if (flags["dry-run"]) {
+    const existing = run("gh", ["pr", "list", "--repo", REPO, "--head", branch, "--state", "open", "--json", "url", "--limit", "1"]);
+    const existingUrl = existing.ok ? JSON.parse(existing.out || "[]")[0]?.url : null;
+    if (existingUrl) console.log(`an open PR exists and will be reused: ${existingUrl}`);
     if (failed) console.log(`guard failed: ${failed.error}`);
     console.log(`would run: ${gateCommand(e2e)}`);
     if (!failed) {
@@ -271,7 +286,13 @@ try {
     result.images = fullSha.ok ? buildImages(fullSha.out) : { ok: false, error: "git rev-parse HEAD failed" };
   }
 } catch (err) {
-  result = { ...result, ok: false, error: err.message };
-  exitCode = 2;
+  if (err instanceof GhLimitError) {
+    console.error(limitText(err).trimEnd());
+    result = { ...result, ok: false, error: `GitHub limit (${err.kind})`, limit: { kind: err.kind, resetAt: err.resetAt } };
+    exitCode = GH_LIMIT_EXIT;
+  } else {
+    result = { ...result, ok: false, error: err.message };
+    exitCode = 2;
+  }
 }
 finish();

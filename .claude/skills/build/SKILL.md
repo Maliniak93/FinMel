@@ -32,6 +32,10 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
    between the workflow and this call: no build, test, grep or file read, and ignore IDE/LSP diagnostics — the
    workflow's verify and review are the only verdict.
 
+## GitHub limit
+
+`prepare` or `ship.mjs` that exits 4 hit the GitHub API limit (stderr: `Limit GitHuba (<kind>) wyczerpany, reset o HH:MM` and a `GITHUB_LIMIT` line). Stop at once, no retry, no workaround: the final message is that reset time and "re-run `/build #<n>` after the reset" (after a `ship.mjs` exit 4 the work is verified and reviewed and stays on its branch; the re-run ships it).
+
 ## Report (at most 11 lines)
 
 - `replay: <steps> → live from <liveFrom>` first, when prepare returned `replay`.
