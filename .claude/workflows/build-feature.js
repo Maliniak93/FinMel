@@ -109,6 +109,7 @@ const E2E_RESULT = {
           },
         },
         reportPath: { type: 'string' },
+        selfCheck: { type: 'string' },
       },
       required: ['class'],
     },
@@ -223,6 +224,7 @@ function stop(stage, extra) {
       class: result.e2eBlock.class,
       failed: (result.e2eBlock.failed || []).map((f) => ({ test: clip(f.test, 200), step: clip(f.step, 200), trace: f.trace })),
       reportPath: result.e2eBlock.reportPath,
+      selfCheck: clip(result.e2eBlock.selfCheck, 300),
     })
   }
   result.ship = { report: run, blocked: true }
@@ -265,7 +267,7 @@ async function implement(label, lines) {
 
 // The e2e part: the e2e agent replaces the test-writer and the implementer. It owns e2e/ and the epic's plan file only.
 const E2E_RUN_LINE =
-  'Run `node scripts/verify.mjs --projects e2e --fix --cache`, then the whole suite with `node scripts/e2e.mjs run --detach` / `--await`. A stable app failure or an environment problem is a `blocked` result with `blocked.class` (`app` or `environment`), the test, the `Krok <n>` step, the trace path and the report path - never a patch to production code.'
+  'Run `node scripts/verify.mjs --projects e2e --fix --cache`, then the whole suite with `node scripts/e2e.mjs run --detach` / `--await`. A stable app failure or an environment problem is a `blocked` result with `blocked.class` (`app` or `environment`), the test, the `Krok <n>` step, the trace path and the report path - never a patch to production code. An `app` block also carries `blocked.selfCheck`: the 30 s `expectProjected` rewrite, the wait and the `--grep` rerun result.'
 const E2E_OWN_LINE =
   'You own the test code: a wrong test is yours to fix - list each change in `deviations` with why. `verified: true` only on a green verify and a green whole-suite e2e run of the same tree, and edit nothing after it.'
 const E2E_LINES = ownPlan
