@@ -133,7 +133,7 @@
         <dt>
           {{ (account.bank ? 'bankAccounts.balance' : 'accounts.balances.cash') | transloco }}
         </dt>
-        <dd>{{ formatMoney(account.cashBalance, account.currency) }}</dd>
+        <dd data-testid="account-cash">{{ formatMoney(account.cashBalance, account.currency) }}</dd>
       </div>
       @if (account.bank; as bank) {
         <div>

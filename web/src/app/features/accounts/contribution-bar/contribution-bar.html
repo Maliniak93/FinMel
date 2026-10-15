@@ -1,5 +1,9 @@
 @let data = contribution();
-<div class="contribution-bar" [class.contribution-bar--exceeded]="exceeded()">
+<div
+  class="contribution-bar"
+  data-testid="contribution-bar"
+  [class.contribution-bar--exceeded]="exceeded()"
+>
   @if (limit() !== null) {
     <span>{{
       'accounts.contribution.withLimit'

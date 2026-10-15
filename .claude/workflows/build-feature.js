@@ -141,7 +141,7 @@ const REVIEW = {
 
 // ---------------------------------------------------------------- setup
 
-const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false } = args || {}
+const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false } = args || {}
 
 if (!(spec && issue && branch && title)) {
   return {
@@ -264,13 +264,25 @@ async function implement(label, lines) {
 }
 
 // The e2e part: the e2e agent replaces the test-writer and the implementer. It owns e2e/ and the epic's plan file only.
-const E2E_LINES = [
-  'This is the e2e part of the epic: automate the epic\'s `## Test manualny` 1:1 as Playwright tests (one `Krok <n>` step per plan step, `(tylko manualnie)` for a step that cannot be automated) and run the whole suite.',
-  `Read the epic body \`skarbiec-plan/issues/${epic ? epic.number : '<epic>'}.md\` and the sibling parts' bodies \`skarbiec-plan/issues/<m>.md\` first. Edit only files under \`e2e/\` and the plan files; production code is never yours.`,
-  'Run `node scripts/verify.mjs --projects e2e --fix --cache`, then the whole suite with `node scripts/e2e.mjs run --detach` / `--await`. A stable app failure or an environment problem is a `blocked` result with `blocked.class` (`app` or `environment`), the test, the `Krok <n>` step, the trace path and the report path - never a patch to production code.',
-  'Refresh the epic\'s whole-feature plan in `skarbiec-plan/issues/' + (epic ? epic.number : '<epic>') + '.manual.md` and return it in `manualTest` as `{ issue, file }`.',
-  'You own the test code: a wrong test is yours to fix - list each change in `deviations` with why. `verified: true` only on a green verify and a green whole-suite e2e run of the same tree, and edit nothing after it.',
-]
+const E2E_RUN_LINE =
+  'Run `node scripts/verify.mjs --projects e2e --fix --cache`, then the whole suite with `node scripts/e2e.mjs run --detach` / `--await`. A stable app failure or an environment problem is a `blocked` result with `blocked.class` (`app` or `environment`), the test, the `Krok <n>` step, the trace path and the report path - never a patch to production code.'
+const E2E_OWN_LINE =
+  'You own the test code: a wrong test is yours to fix - list each change in `deviations` with why. `verified: true` only on a green verify and a green whole-suite e2e run of the same tree, and edit nothing after it.'
+const E2E_LINES = ownPlan
+  ? [
+      `This e2e part has its own plan: automate this spec's \`## Test manualny\` 1:1 as Playwright tests (one \`Krok <n>\` step per plan step, \`(tylko manualnie)\` for a step that cannot be automated) into the \`e2e/tests/*.spec.ts\` file its Goal names, and run the whole suite.`,
+      `${epic ? `Read the epic body \`skarbiec-plan/issues/${epic.number}.md\` for context only; it is not your plan. ` : ''}Edit only files under \`e2e/\` and the plan file; production code is never yours.`,
+      E2E_RUN_LINE,
+      `Refresh this spec's plan in \`skarbiec-plan/issues/${issue}.manual.md\` and return it in \`manualTest\` as \`{ issue: ${issue}, file }\`.`,
+      E2E_OWN_LINE,
+    ]
+  : [
+      'This is the e2e part of the epic: automate the epic\'s `## Test manualny` 1:1 as Playwright tests (one `Krok <n>` step per plan step, `(tylko manualnie)` for a step that cannot be automated) and run the whole suite.',
+      `Read the epic body \`skarbiec-plan/issues/${epic ? epic.number : '<epic>'}.md\` and the sibling parts' bodies \`skarbiec-plan/issues/<m>.md\` first. Edit only files under \`e2e/\` and the plan files; production code is never yours.`,
+      E2E_RUN_LINE,
+      'Refresh the epic\'s whole-feature plan in `skarbiec-plan/issues/' + (epic ? epic.number : '<epic>') + '.manual.md` and return it in `manualTest` as `{ issue, file }`.',
+      E2E_OWN_LINE,
+    ]
 async function e2eRun(label, lines) {
   const result = await step(
     'e2e',

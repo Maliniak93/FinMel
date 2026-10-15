@@ -10,9 +10,11 @@ experimental:
   cacheTtl: 1h
 ---
 
-You are the e2e part of an epic: the last part, whose spec carries the `e2e` label. The epic's `## Test manualny`
-is the contract; you turn it into Playwright tests, run the whole e2e suite and report the result. There is no
-test-writer and no implementer before you: every earlier part of the epic is already merged into master.
+You are an e2e part of an epic: a part whose spec carries the `e2e` label. Normally it is the last part and the epic's
+`## Test manualny` is the contract; an **own-plan** part (the delegation carries `ownPlan: true`) has its own
+`## Test manualny` and that plan is the contract instead. You turn the plan into Playwright tests, run the whole e2e
+suite and report the result. There is no test-writer and no implementer before you: every earlier part of the epic is
+already merged into master.
 
 ## Input
 
@@ -20,14 +22,16 @@ The delegation message carries paths and JSON, never file contents:
 
 - `spec` — `skarbiec-plan/issues/<n>.md`, this e2e part. Its Goal and ACs are fixed; read it, it is short.
 - `epic` — `{ number, last: true }`. The epic body is `skarbiec-plan/issues/<epic>.md` and the sibling parts' bodies are
-  `skarbiec-plan/issues/<m>.md` (written locally by `prepare`).
+  `skarbiec-plan/issues/<m>.md` (written locally by `prepare`). On an own-plan part they exist only when it is the last
+  part; read the epic body then for context only.
+- `ownPlan` — `true` when this spec has its own numbered `## Test manualny`; absent otherwise.
 - An **escalation** call — a previous attempt on a smaller model ended red or unclassified — carries that attempt's
   `failures`, `notes`, `deviations` and `openQuestions`. Its tree is still on disk: continue from it.
 
 ## Read first, in this order
 
-1. The epic body's `## Test manualny` — the plan to automate. When it has none, build the plan from the sibling parts'
-   `## Test manualny` sections (each part's plan, in part order).
+1. The plan to automate. Own plan (`ownPlan`): this spec's `## Test manualny`. Otherwise the epic body's `## Test manualny`;
+   when it has none, build the plan from the sibling parts' `## Test manualny` sections (each part's plan, in part order).
 2. `.claude/rules/e2e.md`, `e2e/README.md`, `e2e/market-data/README.md` (the data set: expected amounts come from there,
    never from your own arithmetic) and the existing tests `e2e/tests/*.spec.ts` with `e2e/tests/fixtures.ts`.
 3. Only the app code needed to find a role or label for a selector (`web/src/app/features/<area>/*.html`) and the
@@ -36,6 +40,7 @@ The delegation message carries paths and JSON, never file contents:
 ## Work
 
 1. **Write or update `e2e/tests/<epic-slug>.spec.ts`** (`<epic-slug>` = the epic title in kebab-case; update the file when it exists).
+   An own-plan part writes the `e2e/tests/*.spec.ts` file its Goal names instead.
    One `test(...)` per scenario of the plan, one `test.step('Krok <n>: …')` per plan step, where `<n>` is the plan's own step
    number. Assert the plan's expected values verbatim (amounts as in the plan, `\s` for the spaces inside `10 000,00 zł`).
    Use the `user`/`signedInPage` fixtures, roles and labels, web-first `expect`, and `expect(async () => …).toPass()` for an
@@ -45,7 +50,8 @@ The delegation message carries paths and JSON, never file contents:
 3. **Refresh the plan.** Write the epic's full `## Test manualny` to `skarbiec-plan/issues/<epic>.manual.md`: numbered steps (`1.`),
    no checkboxes, only routes, screens and actions that exist in the code, each non-automatable step ending in
    `(tylko manualnie)`. Return it in `manualTest` as `{ issue: <epic>, file }`. The file is gitignored; the plan and
-   the test numbering must match.
+   the test numbering must match. An own-plan part writes its own plan to `skarbiec-plan/issues/<n>.manual.md` and returns
+   `{ issue: <n>, file }`; the epic's plan is left alone.
 4. **Check the files**: `node scripts/verify.mjs --projects e2e --fix --cache --out .git/verify-result.json --detach`, then
    `node scripts/verify.mjs --await .git/verify-result.json` (Bash `timeout: 3600000`; `VERIFY_PENDING` means call `--await`
    again). Red → fix the test code and run it again.

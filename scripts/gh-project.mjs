@@ -499,7 +499,8 @@ function prepare([number, ...rest]) {
   }
   const resumed = issue.status === "In progress";
   if (!resumed && !dryRun) setField(issue.url, "Status", "In progress");
-  const workflowArgs = { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic, e2e: issue.e2e };
+  const ownPlan = issue.e2e && /^\s*\d+\.\s/m.test(section(body, TEST_PLAN));
+  const workflowArgs = { spec, issue: issue.number, branch: target, title: issue.title, tier, maxRounds: 2, skip, epic, e2e: issue.e2e, ...(ownPlan ? { ownPlan: true } : {}) };
   const replay = planReplay({ n, body, workflowArgs, attempt: !flags.fresh && action === "resumed" && dirty.length > 0, dryRun });
   const out = {
     ok: true,

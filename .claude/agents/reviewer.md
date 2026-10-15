@@ -82,7 +82,9 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   that names something absent is **blocking**; wording problems are minor.
 - **An e2e part** (the spec carries the `e2e` label; no test-writer or implementer ran, the e2e agent
   wrote `e2e/tests/<epic-slug>.spec.ts` from the epic's `## Test manualny`). Read the epic body
-  (`skarbiec-plan/issues/<epic>.md`) and the plan the agent returned in `manualTest`. **Blocking**:
+  (`skarbiec-plan/issues/<epic>.md`) and the plan the agent returned in `manualTest`. An own-plan part
+  (`ownPlan`) is checked against its own spec's `## Test manualny`, in the `e2e/tests/*.spec.ts` file its Goal names,
+  and its refreshed plan is `skarbiec-plan/issues/<n>.manual.md` for the part's own issue, not the epic's. **Blocking**:
   a plan step that is neither automated as a `test.step('Krok <n>: …')` nor marked `(tylko manualnie)`;
   an assertion whose expected value differs from the plan; any changed file outside `e2e/` (the
   gitignored plan file aside); a new `test.skip`, `test.fixme` or `waitForTimeout`; an existing e2e
