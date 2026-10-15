@@ -26,14 +26,26 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, renderResumeScript } from "./build-replay.mjs";
 import { e2eBlockLines, rebuildInputs } from "./e2e-repair.mjs";
+import {
+  OWNER,
+  PROJECT_NUMBER,
+  REPO,
+  cardFromIssueNode,
+  gh,
+  graphql,
+  listPages,
+  rateLimit,
+  reportUsage,
+  spawnGh,
+} from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
-const OWNER = "Maliniak93";
-const REPO = `${OWNER}/FinMel`;
-const PROJECT = "1";
+const PROJECT = String(PROJECT_NUMBER);
+const REPO_NAME = REPO.split("/")[1];
+const USAGE_START_FILE = path.join(REPO_ROOT, ".git", "gh-usage-start.json");
 const ISSUES_DIR = "skarbiec-plan/issues";
 
 const FIELDS = [
@@ -81,22 +93,6 @@ const BOOLEAN_FLAGS = new Set([
 ]);
 const SKIPPABLE = new Set(["tests", "review"]);
 
-function gh(argv, input) {
-  const res = spawnSync("gh", argv, {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-    windowsHide: true,
-    shell: false,
-    input,
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (res.error)
-    throw new Error(`gh ${argv[0]} ${argv[1] ?? ""}: ${res.error.message}`);
-  if (res.status !== 0)
-    throw new Error(`gh ${argv.slice(0, 2).join(" ")}: ${res.stderr.trim()}`);
-  return res.stdout.trim();
-}
-
 function git(argv) {
   const res = spawnSync("git", argv, {
     cwd: REPO_ROOT,
@@ -111,24 +107,99 @@ function git(argv) {
   };
 }
 
-function issueUrl(number) {
-  return `https://github.com/${REPO}/issues/${number}`;
+let projectMeta = null;
+const itemIds = new Map();
+
+// One query per process: the project id and every field with its options.
+function projectFields() {
+  if (projectMeta) return projectMeta;
+  const { user } = graphql(
+    `query ($owner: String!, $number: Int!) {
+      user(login: $owner) {
+        projectV2(number: $number) {
+          id
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2FieldCommon { id name }
+              ... on ProjectV2SingleSelectField { options { id name } }
+            }
+          }
+        }
+      }
+    }`,
+    { owner: OWNER, number: PROJECT_NUMBER },
+  );
+  const { id, fields } = user.projectV2;
+  projectMeta = { id, fields: new Map(fields.nodes.map((f) => [f.name, f])) };
+  return projectMeta;
 }
 
-function setField(url, field, value) {
-  gh([
-    "project",
-    "item-edit",
-    PROJECT,
-    "--owner",
-    OWNER,
-    "--url",
-    url,
-    "--field",
-    field,
-    "--value",
-    value,
-  ]);
+function itemIdOf(number) {
+  const known = itemIds.get(Number(number));
+  if (known) return known;
+  const { repository } = graphql(
+    `query ($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        issue(number: $number) {
+          projectItems(first: 10) { nodes { id project { number } } }
+        }
+      }
+    }`,
+    { owner: OWNER, name: REPO_NAME, number: Number(number) },
+  );
+  const item = repository.issue?.projectItems.nodes.find(
+    (i) => i.project.number === PROJECT_NUMBER,
+  );
+  if (!item) throw new Error(`#${number} is not a card on project ${PROJECT}`);
+  itemIds.set(Number(number), item.id);
+  return item.id;
+}
+
+function setField(number, field, value) {
+  const meta = projectFields();
+  const def = meta.fields.get(field);
+  if (!def?.id) throw new Error(`project field ${field} does not exist`);
+  let fieldValue = { text: value };
+  if (def.options) {
+    const option = def.options.find((o) => o.name === value);
+    if (!option)
+      throw new Error(
+        `${field} has no option ${value}: ${def.options.map((o) => o.name).join(", ")}`,
+      );
+    fieldValue = { singleSelectOptionId: option.id };
+  }
+  graphql(
+    `mutation ($project: ID!, $item: ID!, $field: ID!, $value: ProjectV2FieldValue!) {
+      updateProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item, fieldId: $field, value: $value }) {
+        projectV2Item { id }
+      }
+    }`,
+    {
+      project: meta.id,
+      item: itemIdOf(number),
+      field: def.id,
+      value: fieldValue,
+    },
+  );
+}
+
+function addToProject(number) {
+  const meta = projectFields();
+  const { repository } = graphql(
+    `query ($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) { issue(number: $number) { id } }
+    }`,
+    { owner: OWNER, name: REPO_NAME, number: Number(number) },
+  );
+  const { addProjectV2ItemById } = graphql(
+    `mutation ($project: ID!, $content: ID!) {
+      addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
+        item { id }
+      }
+    }`,
+    { project: meta.id, content: repository.issue.id },
+  );
+  itemIds.set(Number(number), addProjectV2ItemById.item.id);
 }
 
 function parseFlags(argv) {
@@ -315,21 +386,53 @@ function preparedBody(file, epic, e2e = false) {
   return body;
 }
 
-function projectItems() {
-  const { items } = JSON.parse(
-    gh([
-      "project",
-      "item-list",
-      PROJECT,
-      "--owner",
-      OWNER,
-      "--format",
-      "json",
-      "--limit",
-      "500",
-    ]),
+const SINGLE_SELECT = "... on ProjectV2ItemFieldSingleSelectValue { name }";
+const ITEM_FIELDS = `
+  status: fieldValueByName(name: "Status") { ${SINGLE_SELECT} }
+  tier: fieldValueByName(name: "Tier") { ${SINGLE_SELECT} }
+  kind: fieldValueByName(name: "Kind") { ${SINGLE_SELECT} }
+  branch: fieldValueByName(name: "Branch") { ... on ProjectV2ItemFieldTextValue { text } }
+`;
+
+const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      number title body state url
+      labels(first: 30) { nodes { name } }
+      parent { number subIssues(first: 100) { nodes { number state } } }
+      subIssues(first: 100) { nodes { number title state } }
+      projectItems(first: 10) { nodes { id project { number } ${ITEM_FIELDS} } }
+    }
+  }
+}`;
+
+const ITEMS_QUERY = `query ($owner: String!, $number: Int!, $cursor: String) {
+  user(login: $owner) {
+    projectV2(number: $number) {
+      items(first: 100, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          ${ITEM_FIELDS}
+          content {
+            __typename
+            ... on Issue { number title labels(first: 10) { nodes { name } } }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+async function projectItems() {
+  const nodes = await listPages(
+    async (cursor) =>
+      graphql(ITEMS_QUERY, {
+        owner: OWNER,
+        number: PROJECT_NUMBER,
+        cursor: cursor ?? null,
+      }).user.projectV2.items,
   );
-  return items.filter((item) => item.content?.type === "Issue");
+  return nodes.filter((item) => item.content?.__typename === "Issue");
 }
 
 function subIssues(number) {
@@ -345,10 +448,10 @@ function subIssues(number) {
 
 function fieldsOf(item, labels) {
   return {
-    status: item?.status ?? null,
-    tier: item?.tier ?? null,
-    kind: item?.kind ?? null,
-    branch: item?.branch ?? null,
+    status: item.status?.name ?? null,
+    tier: item.tier?.name ?? null,
+    kind: item.kind?.name ?? null,
+    branch: item.branch?.text ?? null,
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),
     e2e: labels.includes("e2e"),
@@ -356,33 +459,21 @@ function fieldsOf(item, labels) {
 }
 
 function fetchIssue(number) {
-  const issue = JSON.parse(
-    gh([
-      "issue",
-      "view",
-      String(number),
-      "--repo",
-      REPO,
-      "--json",
-      "number,title,body,state,labels,url,parent",
-    ]),
+  const { repository } = graphql(ISSUE_QUERY, {
+    owner: OWNER,
+    name: REPO_NAME,
+    number: Number(number),
+  });
+  const issue = repository.issue;
+  if (!issue) throw new Error(`issue #${number} not found in ${REPO}`);
+  const result = cardFromIssueNode(issue);
+  const item = issue.projectItems.nodes.find(
+    (i) => i.project.number === PROJECT_NUMBER,
   );
-  const labels = issue.labels.map((l) => l.name);
-  const item = projectItems().find((i) => i.content.number === issue.number);
-  const result = {
-    number: issue.number,
-    title: issue.title,
-    url: issue.url,
-    state: issue.state,
-    labels,
-    inProject: Boolean(item),
-    ...fieldsOf(item, labels),
-    parent: issue.parent?.number ?? null,
-  };
-  result.subIssues = result.epic ? subIssues(issue.number) : [];
+  if (item) itemIds.set(issue.number, item.id);
   result.lastPart =
     result.parent !== null &&
-    subIssues(result.parent).every(
+    issue.parent.subIssues.nodes.every(
       (s) => s.number === issue.number || s.state === "CLOSED",
     );
   return { result, body: issue.body.replace(/\r\n/g, "\n").trim() };
@@ -495,25 +586,22 @@ function create(flags) {
   if (flags["skip-tests"]) argv.push("--label", "skip-tests");
   if (flags.e2e) argv.push("--label", "e2e");
   if (flags.parent) argv.push("--parent", flags.parent);
-  const url = gh(argv, body).split(/\r?\n/).pop();
+  const url = gh(argv, { input: body }).split(/\r?\n/).pop();
+  const issueNumber = Number(url.split("/").pop());
 
   try {
-    gh(["project", "item-add", PROJECT, "--owner", OWNER, "--url", url]);
-    setField(url, "Status", "Todo");
-    setField(url, "Tier", flags.tier);
-    setField(url, "Kind", kind);
-    if (branch) setField(url, "Branch", branch);
+    addToProject(issueNumber);
+    setField(issueNumber, "Status", "Todo");
+    setField(issueNumber, "Tier", flags.tier);
+    setField(issueNumber, "Kind", kind);
+    if (branch) setField(issueNumber, "Branch", branch);
     if (flags.before)
-      placeBefore(
-        flags.parent,
-        Number(url.split("/").pop()),
-        Number(flags.before),
-      );
+      placeBefore(flags.parent, issueNumber, Number(flags.before));
   } catch (err) {
     throw new Error(`${err.message}\nissue already created: ${url}`);
   }
   console.log(
-    JSON.stringify({ number: Number(url.split("/").pop()), url, branch }),
+    JSON.stringify({ number: issueNumber, url, branch }),
   );
 }
 
@@ -557,11 +645,13 @@ function edit([number, ...rest]) {
       labels.includes("epic"),
       labels.includes("e2e"),
     );
-    gh(["issue", "edit", number, "--repo", REPO, "--body-file", "-"], body);
+    gh(["issue", "edit", number, "--repo", REPO, "--body-file", "-"], {
+      input: body,
+    });
     done.push("body replaced");
   }
   if (flags.tier) {
-    setField(issueUrl(number), "Tier", flags.tier);
+    setField(number, "Tier", flags.tier);
     done.push(`Tier = ${flags.tier}`);
   }
   if (flags.parent) {
@@ -605,17 +695,16 @@ function sectionVerb([number, ...rest]) {
     console.log(next);
     return;
   }
-  gh(
-    ["issue", "edit", String(number), "--repo", REPO, "--body-file", "-"],
-    next,
-  );
+  gh(["issue", "edit", String(number), "--repo", REPO, "--body-file", "-"], {
+    input: next,
+  });
   console.log(`#${number}: replaced \`## ${flags.heading}\``);
 }
 
 function set([number, field, value]) {
   if (!number || !field || value === undefined)
     throw new Error("usage: set <issue number> <field> <value>");
-  setField(issueUrl(number), field, value);
+  setField(number, field, value);
   console.log(`#${number} ${field} = ${value}`);
 }
 
@@ -819,12 +908,15 @@ function prepare([number, ...rest]) {
           ];
     branchCommands.push([cmd, ...argv].join(" "));
     if (!dryRun) {
-      const res = spawnSync(cmd, argv, {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        windowsHide: true,
-        shell: false,
-      });
+      const res =
+        cmd === "gh"
+          ? spawnGh(argv)
+          : spawnSync(cmd, argv, {
+              cwd: REPO_ROOT,
+              encoding: "utf8",
+              windowsHide: true,
+              shell: false,
+            });
       if (res.error || res.status !== 0) {
         return refuseBranch(
           `${cmd} ${argv.join(" ")}: ${res.error?.message ?? res.stderr.trim().split(/\r?\n/)[0]}`,
@@ -858,7 +950,8 @@ function prepare([number, ...rest]) {
     }
   }
   const resumed = issue.status === "In progress";
-  if (!resumed && !dryRun) setField(issue.url, "Status", "In progress");
+  if (!resumed && !dryRun) setField(issue.number, "Status", "In progress");
+  if (!dryRun) saveUsageStart();
   const ownPlan = issue.e2e && /^\s*\d+\.\s/m.test(section(body, TEST_PLAN));
   const rebuild = prepareRebuild({
     n,
@@ -1044,6 +1137,29 @@ function planReplay({ n, body, workflowArgs, attempt, dryRun }) {
   };
 }
 
+// The usage line is informative: a failing rate_limit read must never fail a build or a report.
+function saveUsageStart() {
+  try {
+    writeFileSync(USAGE_START_FILE, JSON.stringify(rateLimit()));
+  } catch {
+    rmSync(USAGE_START_FILE, { force: true });
+  }
+}
+
+function usageReportLine() {
+  try {
+    let start = null;
+    try {
+      start = JSON.parse(readFileSync(USAGE_START_FILE, "utf8"));
+    } catch {
+      start = null;
+    }
+    return reportUsage(start, rateLimit());
+  } catch {
+    return null;
+  }
+}
+
 function report([number, ...rest]) {
   if (!number)
     throw new Error(
@@ -1146,7 +1262,7 @@ function report([number, ...rest]) {
             "--body-file",
             "-",
           ],
-          sectionEdit(m.issue, TEST_PLAN, m.file),
+          { input: sectionEdit(m.issue, TEST_PLAN, m.file) },
         );
         lines.push(`Test manualny zaktualizowany w #${m.issue}`);
       } catch (err) {
@@ -1157,21 +1273,26 @@ function report([number, ...rest]) {
     }
   }
 
-  gh(
-    ["issue", "comment", String(number), "--repo", REPO, "--body-file", "-"],
-    lines.join("\n"),
-  );
+  const usage = usageReportLine();
+  if (usage) lines.push("", usage);
+
+  gh(["issue", "comment", String(number), "--repo", REPO, "--body-file", "-"], {
+    input: lines.join("\n"),
+  });
   console.log(`#${number}: report posted`);
   if (run.status === "shipped" && (run.reviewRan || run.resumedShip))
     tick([number]);
 }
 
-function list() {
-  const result = projectItems().map((item) => {
+async function list() {
+  const result = (await projectItems()).map((item) => {
     const entry = {
       number: item.content.number,
       title: item.content.title,
-      ...fieldsOf(item, item.labels ?? []),
+      ...fieldsOf(
+        item,
+        item.content.labels.nodes.map((l) => l.name),
+      ),
     };
     if (entry.epic)
       entry.subIssues = subIssues(entry.number).map((s) => s.number);
@@ -1211,10 +1332,9 @@ function tick([number]) {
     },
   );
   if (count)
-    gh(
-      ["issue", "edit", String(number), "--repo", REPO, "--body-file", "-"],
-      ticked,
-    );
+    gh(["issue", "edit", String(number), "--repo", REPO, "--body-file", "-"], {
+      input: ticked,
+    });
   console.log(`#${number}: ticked ${count} acceptance criteria`);
 }
 
@@ -1246,7 +1366,7 @@ try {
   const verb = VERBS[command];
   if (!verb)
     throw new Error(`usage: gh-project.mjs ${Object.keys(VERBS).join(" | ")}`);
-  verb(rest);
+  await verb(rest);
 } catch (err) {
   console.error(err.message);
   process.exit(1);

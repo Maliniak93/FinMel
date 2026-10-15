@@ -65,6 +65,7 @@
       "Bash(node scripts/gh-project.mjs set:*)",
       "Bash(node scripts/gh-project.mjs comment:*)",
       "Bash(node scripts/gh-project.mjs tick:*)",
+      "Bash(node scripts/gh-usage.mjs:*)",
       "Bash(gh run view:*)",
       "Bash(docker ps:*)",
       "Bash(docker logs:*)",
@@ -96,7 +97,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/plan-status.mjs\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/plan-status.mjs\" --no-gh",
             "timeout": 30
           }
         ]

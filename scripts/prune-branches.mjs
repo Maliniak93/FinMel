@@ -5,12 +5,13 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnGh } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const KEEP = new Set(["master", "main"]);
 
 function run(bin, argv) {
-  const res = spawnSync(bin, argv, { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000, windowsHide: true });
+  const res = bin === "gh" ? spawnGh(argv, { timeout: 60_000 }) : spawnSync(bin, argv, { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000, windowsHide: true });
   if (res.error || res.status !== 0) {
     throw new Error(`${bin} ${argv.join(" ")} failed: ${(res.stderr || res.error?.message || "").trim()}`);
   }
