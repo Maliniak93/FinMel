@@ -30,10 +30,10 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
         var verifyDb = verify.ServiceProvider.GetRequiredService<PortfolioDbContext>();
         var asset = await verifyDb.Assets.SingleAsync(a => a.Id == assetId, cancellationToken);
         Assert.Equal(AssetClass.PreciousMetal, asset.AssetClass);
-        Assert.Equal(10m, asset.Quantity);
+        Assert.Equal(0m, asset.Quantity);
         Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Silver), asset.InstrumentId);
         Assert.True(await verifyDb.Set<MetalHolding>().AnyAsync(h => h.AssetId == assetId, cancellationToken));
-        Assert.Single(await verifyDb.Transactions.Where(t => t.AssetId == assetId).ToListAsync(cancellationToken));
+        Assert.Empty(await verifyDb.Transactions.Where(t => t.AssetId == assetId).ToListAsync(cancellationToken));
 
         var evt = Assert.Single(await verifyDb.ReadPublishedAsync<AssetPositionChanged>(cancellationToken));
         Assert.Equal(assetId, evt.AssetId);
@@ -42,7 +42,7 @@ public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : Por
         Assert.Equal(AssetClass.PreciousMetal, evt.AssetClass);
         Assert.Equal(AssetValuationMode.Market, evt.ValuationMode);
         Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Silver), evt.InstrumentId);
-        Assert.Equal(10m, evt.Quantity);
+        Assert.Equal(0m, evt.Quantity);
         Assert.Equal(31.10347680m, evt.QuoteUnitsPerQuantity);
     }
 

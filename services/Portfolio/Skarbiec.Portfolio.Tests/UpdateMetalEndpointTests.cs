@@ -18,8 +18,9 @@ public sealed class UpdateMetalEndpointTests(SkarbiecContainersFixture container
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var metal = await client.AddMetalAsync(
-            cancellationToken, NewMetalRequest(name: "Krugerrand", metal: Metal.Gold, pieces: 2m));
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken);
+        var metal = await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Krugerrand", metal: Metal.Gold));
+        await client.RecordMetalTransactionWithCashAsync(metal.AssetId, cashId, cancellationToken, pieces: 2m, totalAmount: 2_000m);
 
         var response = await client.PutAsJsonAsync(
             MetalUri(metal.AssetId), NewUpdateMetalRequest(name: "Silver bar"), cancellationToken);

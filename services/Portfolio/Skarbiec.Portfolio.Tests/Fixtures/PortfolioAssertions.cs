@@ -193,6 +193,18 @@ internal static class PortfolioAssertions
 
     public const string PlnAmountNotAllowedErrorCode = "Validation.PlnAmountNotAllowed";
 
+    public const string SettlementSourceRequiredErrorCode = "Validation.SettlementSourceRequired";
+
+    public const string MetalTotalRequiredErrorCode = "Validation.MetalTotalRequired";
+
+    public static async Task AssertSettlementSourceRequiredAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, SettlementSourceRequiredErrorCode, cancellationToken);
+
+    public static async Task AssertMetalTotalRequiredAsync(
+        this HttpResponseMessage response, CancellationToken cancellationToken) =>
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, MetalTotalRequiredErrorCode, cancellationToken);
+
     public static async Task AssertInsufficientFundsAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.BadRequest, InsufficientFundsErrorCode, cancellationToken);

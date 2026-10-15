@@ -78,17 +78,12 @@ describe('MetalFormDialog', () => {
   }
 
   describe('add', () => {
-    it('POSTs gold, a 1 oz weight and the first purchase, and closes with true', async () => {
+    it('POSTs gold and a 1 oz weight with no first purchase section, and closes with true', async () => {
       await setup({});
-      await fill({
-        metal: METAL.Gold,
-        name: 'Krugerrand',
-        fineWeight: 1,
-        weightUnit: 'TroyOunce',
-        pieces: 2,
-        pricePerPiece: 11000,
-        purchaseDate: new Date(2026, 9, 1),
-      });
+      for (const absent of ['pieces', 'pricePerPiece', 'purchaseDate']) {
+        expect(hasControl(form(), absent)).toBe(false);
+      }
+      await fill({ metal: METAL.Gold, name: 'Krugerrand', fineWeight: 1, weightUnit: 'TroyOunce' });
 
       await component['onSubmit']();
 
@@ -100,22 +95,8 @@ describe('MetalFormDialog', () => {
         metal: METAL.Gold,
         fineWeight: 1,
         weightUnit: 'TroyOunce',
-        firstPurchase: { pieces: 2, pricePerPiece: 11000, date: '2026-10-01' },
       });
       expect(dialogRef.close).toHaveBeenCalledWith(true);
-    });
-
-    it('omits the first purchase when no pieces are entered', async () => {
-      await setup({});
-      await fill({ metal: METAL.Silver, name: 'Silver bar', fineWeight: 100, weightUnit: 'Gram' });
-
-      await component['onSubmit']();
-
-      const [request] = writeRequests();
-      expect(request.url).toContain(`/api/portfolio/metals`);
-      const body = await request.json();
-      expect(body).not.toHaveProperty('firstPurchase');
-      expect(body).toMatchObject({ metal: METAL.Silver, fineWeight: 100, weightUnit: 'Gram' });
     });
 
     it.each([

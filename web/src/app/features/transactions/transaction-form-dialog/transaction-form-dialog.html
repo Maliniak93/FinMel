@@ -24,7 +24,17 @@
       }
     </mat-form-field>
 
-    @if (isPriced()) {
+    @if (showsTotal) {
+      <mat-form-field appearance="outline" class="transaction-form-dialog__field">
+        <mat-label>{{ 'transactions.form.invoiceTotal' | transloco }}</mat-label>
+        <input matInput type="number" step="0.01" formControlName="totalAmount" />
+        @if (form.controls.totalAmount.invalid && form.controls.totalAmount.touched) {
+          <mat-error>{{ 'transactions.form.invoiceTotalRequired' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (showsUnitPrice()) {
       <mat-form-field appearance="outline" class="transaction-form-dialog__field">
         <mat-label>{{ unitPriceLabel | transloco }}</mat-label>
         <input matInput type="number" step="0.01" formControlName="unitPrice" />
@@ -110,28 +120,35 @@
 
     @if (showsCash()) {
       <mat-form-field appearance="outline" class="transaction-form-dialog__field">
-        <mat-label>{{ 'transactions.form.cashAccount' | transloco }}</mat-label>
-        <mat-select formControlName="cashAssetId" canSelectNullableOptions>
-          <mat-option [value]="null">{{
-            'transactions.form.noCashAccount' | transloco
-          }}</mat-option>
+        <mat-label>{{ 'transactions.form.settleFrom' | transloco }}</mat-label>
+        <mat-select formControlName="cashAssetId" required>
           @if (cashCandidatesResource.hasValue()) {
-            @for (candidate of cashCandidatesResource.value(); track candidate.assetId) {
-              <mat-option [value]="candidate.assetId">
-                {{ candidate.name }} ({{ formatMoney(candidate.balance, cashCurrency) }})
-              </mat-option>
+            @if (cashCandidatesResource.value().places.length > 0) {
+              <mat-optgroup [label]="'transactions.form.settleGroupCash' | transloco">
+                @for (candidate of cashCandidatesResource.value().places; track candidate.assetId) {
+                  <mat-option [value]="candidate.assetId">
+                    {{ candidate.name }} ({{ formatMoney(candidate.balance, cashCurrency) }})
+                  </mat-option>
+                }
+              </mat-optgroup>
+            }
+            @if (cashCandidatesResource.value().banks.length > 0) {
+              <mat-optgroup [label]="'transactions.form.settleGroupBank' | transloco">
+                @for (candidate of cashCandidatesResource.value().banks; track candidate.assetId) {
+                  <mat-option [value]="candidate.assetId">
+                    {{ candidate.name }} ({{ formatMoney(candidate.balance, cashCurrency) }})
+                  </mat-option>
+                }
+              </mat-optgroup>
             }
           }
         </mat-select>
         @if (cashCandidatesResource.error(); as loadError) {
           <mat-hint>{{ loadError.message }}</mat-hint>
-        } @else if (cashAmount(); as amount) {
-          <mat-hint>{{
-            'transactions.form.cashAmountHint'
-              | transloco: { amount: formatMoney(amount, cashCurrency) }
-          }}</mat-hint>
         }
-        @if (form.controls.cashAssetId.hasError('server')) {
+        @if (form.controls.cashAssetId.hasError('required')) {
+          <mat-error>{{ 'transactions.form.settleFromRequired' | transloco }}</mat-error>
+        } @else if (form.controls.cashAssetId.hasError('server')) {
           <mat-error>{{ form.controls.cashAssetId.getError('server') }}</mat-error>
         }
       </mat-form-field>

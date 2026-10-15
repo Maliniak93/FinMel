@@ -44,6 +44,7 @@ const CASH_CURRENCY = 'PLN';
 
 const CASH_ERROR_KEYS: Record<string, string> = {
   'Validation.InsufficientFunds': 'transactions.form.insufficientFunds',
+  'Validation.TransferCurrencyMismatch': 'transactions.form.currencyMismatch',
   'Validation.FxRateMissing': 'transactions.form.fxRateMissing',
   'Validation.InvalidTransferCounterpart': 'transactions.form.invalidCashAccount',
   'Conflict.TransferLegManaged': 'transactions.form.legManaged',
@@ -55,6 +56,11 @@ interface CashOption {
   assetId: string;
   name: string;
   balance: number | string;
+}
+
+interface SettlementSources {
+  places: CashOption[];
+  banks: CashOption[];
 }
 
 export interface TransactionFormDialogData {
@@ -88,6 +94,7 @@ export class TransactionFormDialog {
   protected readonly data = inject<TransactionFormDialogData>(MAT_DIALOG_DATA);
 
   protected readonly isEdit = !!this.data.transaction;
+  private readonly isMetal = Number(this.data.assetClass) === ASSET_CLASS.PreciousMetal;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
   protected readonly transactionTypes = allowedTransactionTypes(this.data.assetClass);
@@ -102,6 +109,12 @@ export class TransactionFormDialog {
     ],
     quantity: [Number(this.data.transaction?.quantity ?? 0), [Validators.min(0)]],
     unitPrice: [Number(this.data.transaction?.unitPrice ?? 0), [Validators.min(0)]],
+    totalAmount: [
+      this.data.transaction?.totalAmount != null
+        ? Number(this.data.transaction.totalAmount)
+        : (null as number | null),
+      this.isMetal ? [Validators.required, Validators.min(0.01)] : [],
+    ],
     date: [
       this.data.transaction ? fromDateOnly(this.data.transaction.date) : new Date(),
       [Validators.required],
@@ -112,7 +125,11 @@ export class TransactionFormDialog {
         : (null as number | null),
       [Validators.min(0)],
     ],
-    cashAssetId: [null as string | null],
+    cashAssetId: [
+      (this.isMetal ? (this.data.transaction?.transfer?.counterpartAssetId ?? null) : null) as
+        string | null,
+      this.isMetal ? [Validators.required] : [],
+    ],
     paymentCurrency: [
       (this.data.transaction?.amountPln != null ? 'PLN' : 'asset') as PaymentCurrency,
     ],
@@ -138,12 +155,13 @@ export class TransactionFormDialog {
 
   private readonly isSecurity = isSecurityAssetClass(this.data.assetClass);
 
-  // A new precious-metal trade can move money through a free Cash account.
-  private readonly offersCash = !this.isEdit && this.data.assetClass === ASSET_CLASS.PreciousMetal;
+  // A precious-metal trade always settles with a cash place or a bank account; an edit keeps its source.
   protected readonly showsCash = computed(() => {
     const type = this.selectedType();
-    return this.offersCash && (type === TRANSACTION_TYPE_BUY || type === TRANSACTION_TYPE_SELL);
+    return this.isMetal && (type === TRANSACTION_TYPE_BUY || type === TRANSACTION_TYPE_SELL);
   });
+  protected readonly showsUnitPrice = computed(() => this.isPriced() && !this.isMetal);
+  protected readonly showsTotal = this.isMetal;
   protected readonly showsFee = computed(() => this.isSecurity && this.isPriced());
   protected readonly cashCurrency = CASH_CURRENCY;
   protected readonly formatMoney = formatMoney;
@@ -167,34 +185,33 @@ export class TransactionFormDialog {
     { initialValue: this.form.getRawValue() },
   );
 
-  // Display only, in whole grosze; the server computes the stored amount.
-  protected readonly cashAmount = computed(() => {
-    const values = this.formValue();
-    const quantity = Number(values.quantity);
-    const unitPrice = Number(values.unitPrice);
-    if (!values.cashAssetId || !Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
-      return null;
-    }
-    return Math.round(quantity * Math.round(unitPrice * 100)) / 100;
-  });
-
   protected readonly cashCandidatesResource = resource({
-    params: () => (this.offersCash ? { currency: this.cashCurrency } : undefined),
-    loader: async ({ params, abortSignal }): Promise<CashOption[]> => {
-      const result = await getApiPortfolioTransferCandidates({
-        query: { currency: params.currency, cashPlaces: true },
-        signal: abortSignal,
-      });
-      if (result.error) {
+    params: () => (this.isMetal ? { currency: this.cashCurrency } : undefined),
+    loader: async ({ params, abortSignal }): Promise<SettlementSources> => {
+      const [places, banks] = await Promise.all([
+        getApiPortfolioTransferCandidates({
+          query: { currency: params.currency, cashPlaces: true },
+          signal: abortSignal,
+        }),
+        getApiPortfolioTransferCandidates({
+          query: { currency: params.currency, assetClass: ASSET_CLASS.BankAccount },
+          signal: abortSignal,
+        }),
+      ]);
+      const failed = places.error ?? banks.error;
+      if (failed) {
         throw new Error(
-          readProblemDetails(result.error).detail ??
+          readProblemDetails(failed).detail ??
             translate('transactions.form.cashAccountsLoadFailed'),
         );
       }
-      return (result.data ?? []).map((candidate) => ({
-        ...candidate,
-        name: `${candidate.name} · ${params.currency}`,
-      }));
+      return {
+        places: (places.data ?? []).map((candidate) => ({
+          ...candidate,
+          name: `${candidate.name} · ${params.currency}`,
+        })),
+        banks: banks.data ?? [],
+      };
     },
   });
 
@@ -265,8 +282,12 @@ export class TransactionFormDialog {
   });
 
   constructor() {
-    if (this.isEdit && this.isSecurity) {
+    if (this.isEdit && (this.isSecurity || this.isMetal)) {
       this.form.controls.type.disable();
+    }
+
+    if (this.isEdit && this.isMetal) {
+      this.form.controls.cashAssetId.disable();
     }
 
     effect(() => {
@@ -299,12 +320,13 @@ export class TransactionFormDialog {
     const body = {
       type: values.type,
       quantity: values.quantity,
-      unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1,
       date: toDateOnly(values.date),
+      ...(this.isMetal
+        ? { totalAmount: values.totalAmount, cashAssetId: values.cashAssetId }
+        : { unitPrice: isPricedTransactionType(values.type) ? values.unitPrice : 1 }),
       ...(feeAmount !== null ? { feeAmount } : {}),
       ...(amountPln !== null ? { amountPln } : {}),
     };
-    const cashAssetId = this.showsCash() ? values.cashAssetId : null;
 
     const result = this.data.transaction
       ? await putApiPortfolioAssetsByAssetIdTransactionsById({
@@ -316,7 +338,7 @@ export class TransactionFormDialog {
         })
       : await postApiPortfolioAssetsByAssetIdTransactions({
           path: { assetId: this.data.assetId },
-          body: cashAssetId ? { ...body, cashAssetId } : body,
+          body,
         });
 
     this.submitting.set(false);

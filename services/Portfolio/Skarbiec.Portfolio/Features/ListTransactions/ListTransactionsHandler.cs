@@ -53,6 +53,7 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                 {
                     TransferId = leg.TransferId!.Value,
                     Asset = counterpartAsset,
+                    Amount = leg.Quantity,
                     AccountName = counterpartAccount.Name
                 })
             .ToDictionaryAsync(c => c.TransferId, cancellationToken);
@@ -72,23 +73,29 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
         {
             Items =
             [
-                .. transactions.Select(t => t.ToResponse(
-                    currency,
-                    t.TransferId is { } transferId && counterparts.TryGetValue(transferId, out var counterpart)
-                        ? new TransactionTransferResponse
-                        {
-                            TransferId = transferId,
-                            Manual = TransferLegs.DirectionOf(t) == TransferDirection.Out
-                                ? TransferRoutes.IsDeletable(asset, counterpart.Asset)
-                                : TransferRoutes.IsDeletable(counterpart.Asset, asset),
-                            CounterpartAssetId = counterpart.Asset.Id,
-                            CounterpartAssetName = counterpart.Asset.Name,
-                            CounterpartAccountName = counterpart.AccountName,
-                            Direction = TransferLegs.DirectionOf(t)
-                        }
-                        : null,
-                    creditPeriodEnds.TryGetValue(t.Id, out var periodEnd) ? periodEnd : null,
-                    creditPeriodIndexes.TryGetValue(t.Id, out var periodIndex) ? periodIndex : null))
+                .. transactions.Select(t =>
+                {
+                    var counterpart = t.TransferId is { } transferId && counterparts.TryGetValue(transferId, out var found) ? found : null;
+                    var response = t.ToResponse(
+                        currency,
+                        counterpart is null
+                            ? null
+                            : new TransactionTransferResponse
+                            {
+                                TransferId = t.TransferId!.Value,
+                                Manual = TransferLegs.DirectionOf(t) == TransferDirection.Out
+                                    ? TransferRoutes.IsDeletable(asset, counterpart.Asset)
+                                    : TransferRoutes.IsDeletable(counterpart.Asset, asset),
+                                CounterpartAssetId = counterpart.Asset.Id,
+                                CounterpartAssetName = counterpart.Asset.Name,
+                                CounterpartAccountName = counterpart.AccountName,
+                                Direction = TransferLegs.DirectionOf(t)
+                            },
+                        creditPeriodEnds.TryGetValue(t.Id, out var periodEnd) ? periodEnd : null,
+                        creditPeriodIndexes.TryGetValue(t.Id, out var periodIndex) ? periodIndex : null);
+
+                    return counterpart is not null && MetalSettlement.Applies(asset.AssetClass) ? response.WithTotal(counterpart.Amount) : response;
+                })
             ],
             Page = page,
             PageSize = pageSize,

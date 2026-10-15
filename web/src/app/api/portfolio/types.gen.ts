@@ -64,7 +64,6 @@ export type AddMetalRequest = {
     metal: Metal;
     fineWeight: number | string;
     weightUnit: WeightUnit;
-    firstPurchase?: null | FirstPurchaseRequest;
 };
 
 export type AddWatchlistItemRequest = {
@@ -351,12 +350,6 @@ export type DepositStatus = number;
 
 export type DepositTermUnit = number;
 
-export type FirstPurchaseRequest = {
-    pieces: number | string;
-    pricePerPiece: number | string;
-    date: string;
-};
-
 export type Metal = number;
 
 export type MetalResponse = {
@@ -383,7 +376,8 @@ export type PayOutDepositRequest = {
 export type RecordTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
-    unitPrice: number | string;
+    unitPrice?: null | number | string;
+    totalAmount?: null | number | string;
     date: string;
     cashAssetId?: null | string;
     feeAmount?: null | number | string;
@@ -493,6 +487,7 @@ export type TransactionResponse = {
     currency: string;
     amountPln?: null | number | string;
     valuePln?: null | number | string;
+    totalAmount?: null | number | string;
     feeAmount?: null | number | string;
     date: string;
     transfer?: null | TransactionTransferResponse;
@@ -574,8 +569,10 @@ export type UpdateMetalRequest = {
 export type UpdateTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
-    unitPrice: number | string;
+    unitPrice?: null | number | string;
+    totalAmount?: null | number | string;
     date: string;
+    cashAssetId?: null | string;
     feeAmount?: null | number | string;
     amountPln?: null | number | string;
 };

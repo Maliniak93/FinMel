@@ -35,6 +35,24 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
+    public async Task Update_MetalTradeWithUnitPrice_ReturnsMetalTotalRequired()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var setup = await client.CreateCashAndMetalAsync(cancellationToken);
+        var buy = await client.RecordMetalTransactionWithCashAsync(setup.MetalAssetId, setup.CashAssetId, cancellationToken);
+        var before = await SnapshotUserRowsAsync(userId, cancellationToken);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Buy, Quantity = 2m, UnitPrice = 1_300m, Date = buy.Date };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(setup.MetalAssetId, buy.Id), update, cancellationToken);
+
+        await response.AssertMetalTotalRequiredAsync(cancellationToken);
+        Assert.Equal(before, await SnapshotUserRowsAsync(userId, cancellationToken));
+    }
+
+    [Fact]
     public async Task Update_OldBuyDownwardThatBreaksLaterSell_ReturnsConflictAndNothingChanged()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

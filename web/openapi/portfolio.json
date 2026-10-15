@@ -2500,16 +2500,6 @@
           },
           "weightUnit": {
             "$ref": "#/components/schemas/WeightUnit"
-          },
-          "firstPurchase": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/FirstPurchaseRequest"
-              }
-            ]
           }
         }
       },
@@ -4019,40 +4009,6 @@
       "DepositTermUnit": {
         "type": "integer"
       },
-      "FirstPurchaseRequest": {
-        "required": [
-          "pieces",
-          "pricePerPiece",
-          "date"
-        ],
-        "type": "object",
-        "properties": {
-          "pieces": {
-            "maximum": 79228162514264337593543950335,
-            "exclusiveMinimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "pricePerPiece": {
-            "maximum": 79228162514264337593543950335,
-            "minimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
       "Metal": {
         "type": "integer"
       },
@@ -4163,7 +4119,6 @@
       "RecordTransactionRequest": {
         "required": [
           "type",
-          "unitPrice",
           "date"
         ],
         "type": "object",
@@ -4184,6 +4139,16 @@
           "unitPrice": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
               "number",
               "string"
             ],
@@ -4778,6 +4743,15 @@
             ],
             "format": "double"
           },
+          "totalAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
           "feeAmount": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -5164,7 +5138,6 @@
       "UpdateTransactionRequest": {
         "required": [
           "type",
-          "unitPrice",
           "date"
         ],
         "type": "object",
@@ -5185,6 +5158,16 @@
           "unitPrice": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
               "number",
               "string"
             ],
@@ -5193,6 +5176,13 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "cashAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "feeAmount": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",

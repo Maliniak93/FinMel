@@ -1,22 +1,12 @@
-using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Deposits;
 
 namespace Skarbiec.Portfolio.Features.Metals.AddMetal;
 
-public sealed class AddMetalHandler(
-    PortfolioDbContext dbContext,
-    PositionEventPublisher positionEventPublisher,
-    TimeProvider timeProvider)
+public sealed class AddMetalHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
 {
     public async Task<Result<MetalResponse>> HandleAsync(AddMetalRequest request, CancellationToken cancellationToken)
     {
-        if (request.FirstPurchase is { } purchase && purchase.Date > WarsawCalendar.Today(timeProvider))
-        {
-            return MetalErrors.PurchaseDateInFuture;
-        }
-
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
@@ -34,42 +24,8 @@ public sealed class AddMetalHandler(
             FineWeightGramsPerPiece = MetalWeight.ToGrams(request.FineWeight, request.WeightUnit)
         };
 
-        // The first purchase is an ordinary Buy, editable and deletable later like any other.
-        Transaction? buy = null;
-        if (request.FirstPurchase is { } firstPurchase)
-        {
-            var unitPrice = Money.Create(firstPurchase.PricePerPiece, asset.Currency);
-            if (unitPrice.IsFailure)
-            {
-                return unitPrice.Error;
-            }
-
-            buy = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                AssetId = asset.Id,
-                Type = TransactionType.Buy,
-                Quantity = firstPurchase.Pieces,
-                UnitPriceAmount = unitPrice.Value.Amount,
-                FxRateToPln = 1m,
-                Date = firstPurchase.Date
-            };
-
-            var recomputed = TransactionQuantityCalculator.Recompute([buy]);
-            if (recomputed.IsFailure)
-            {
-                return recomputed.Error;
-            }
-
-            asset.Quantity = recomputed.Value;
-        }
-
         dbContext.Assets.Add(asset);
         dbContext.MetalHoldings.Add(holding);
-        if (buy is not null)
-        {
-            dbContext.Transactions.Add(buy);
-        }
 
         await positionEventPublisher.PublishCreatedAsync(asset, cancellationToken);
 

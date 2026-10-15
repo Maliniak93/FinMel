@@ -125,12 +125,20 @@ export class Transactions {
       this.assetResource.hasValue() && isSecurityAssetClass(this.assetResource.value().assetClass),
   );
 
+  private readonly isMetal = computed(
+    () =>
+      this.assetResource.hasValue() &&
+      Number(this.assetResource.value().assetClass) === ASSET_CLASS.PreciousMetal,
+  );
+
   protected hasEditMenu(transaction: TransactionResponse): boolean {
     if (transaction.bankInterestPeriodEnd) {
       return false;
     }
     return (
-      !transaction.transfer || (this.isSecurity() && isSecurityTransactionType(transaction.type))
+      !transaction.transfer ||
+      (this.isSecurity() && isSecurityTransactionType(transaction.type)) ||
+      this.isMetal()
     );
   }
 

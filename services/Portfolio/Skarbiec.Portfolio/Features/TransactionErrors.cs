@@ -24,6 +24,15 @@ internal static class TransactionErrors
     public static readonly Error PlnAmountNotAllowed =
         new("Validation.PlnAmountNotAllowed", "A positive PLN amount is accepted only on a stock or ETF Buy or Sell with a positive quantity and unit price, in a currency other than PLN.");
 
+    public static readonly Error UnitPriceRequired =
+        new("Validation.UnitPriceRequired", "A unitPrice is required for this transaction.");
+
+    public static readonly Error SettlementSourceRequired =
+        new("Validation.SettlementSourceRequired", "A precious metal Buy or Sell needs a cash place or bank account to settle with (cashAssetId).");
+
+    public static readonly Error MetalTotalRequired =
+        new("Validation.MetalTotalRequired", "A precious metal Buy or Sell takes a positive quantity and an invoice total (totalAmount, more than zero, 2 decimal places) and no unitPrice.");
+
     public static readonly Error FeeExceedsProceeds =
         new("Validation.FeeExceedsProceeds", "The fee can't be higher than the proceeds of the sale.");
 

@@ -1,5 +1,6 @@
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import type { AbstractControl } from '@angular/forms';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslocoService } from '@jsverse/transloco';
@@ -173,7 +174,7 @@ describe('TransactionFormDialog', () => {
     expect(await typeOptionLabels()).toEqual(['Deposit', 'Withdraw']);
   });
 
-  it('offers only Buy/Sell for a precious metal and labels the quantity in pieces and the price per piece', async () => {
+  it('offers only Buy/Sell for a precious metal and labels the quantity in pieces, with no price per piece', async () => {
     await setup({ assetId, assetClass: ASSET_CLASS.PreciousMetal, type: 0 });
 
     const fieldLabels = Array.from(
@@ -181,7 +182,7 @@ describe('TransactionFormDialog', () => {
       (label) => (label.textContent ?? '').trim(),
     );
     expect(fieldLabels).toContain('Pieces');
-    expect(fieldLabels).toContain('Price per piece');
+    expect(fieldLabels).not.toContain('Price per piece');
     expect(fieldLabels).not.toContain('Quantity');
     expect(await typeOptionLabels()).toEqual(['Buy', 'Sell']);
   });
@@ -363,24 +364,40 @@ describe('TransactionFormDialog', () => {
 
     expect(polishProblems(english, texts())).toEqual([]);
   });
-  describe('Cash account for a precious metal', () => {
+  describe('Settlement source for a precious metal', () => {
     const metalAssetId = '44444444-4444-4444-4444-444444444444';
-    const cashAssetId = '55555555-5555-5555-5555-555555555555';
+    const safeAssetId = '55555555-5555-5555-5555-555555555555';
+    const mBankAssetId = '77777777-7777-7777-7777-777777777777';
     const metalData = {
       assetId: metalAssetId,
       assetClass: ASSET_CLASS.PreciousMetal,
     };
 
     function respond(request: Request): Response {
-      return request.url.includes('/transfer-candidates')
-        ? jsonResponse([
-            {
-              assetId: cashAssetId,
-              name: 'Wallet',
-              balance: 5000,
-            },
-          ])
-        : jsonResponse({ ...existingTransaction, assetId: metalAssetId }, 201);
+      if (request.url.includes('/transfer-candidates')) {
+        return request.url.includes('cashPlaces=true')
+          ? jsonResponse([{ assetId: safeAssetId, name: 'Sejf', balance: 2000 }])
+          : jsonResponse([{ assetId: mBankAssetId, name: 'mBank', balance: 5000 }]);
+      }
+
+      return jsonResponse({ ...existingTransaction, assetId: metalAssetId }, 201);
+    }
+
+    function respondWithError(errorCode: string): (request: Request) => Response {
+      return (request) =>
+        request.method === 'POST'
+          ? jsonResponse({ detail: errorCode, errorCode }, 400)
+          : jsonResponse([{ assetId: safeAssetId, name: 'Sejf', balance: 2000 }]);
+    }
+
+    function totalAmount(): AbstractControl {
+      return component['form'].get('totalAmount') as AbstractControl;
+    }
+
+    function postedRequests(): Request[] {
+      return fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'POST');
     }
 
     function cashSelect(): HTMLElement | null {
@@ -389,56 +406,90 @@ describe('TransactionFormDialog', () => {
       );
     }
 
-    it('sends the chosen cashAssetId and shows quantity times price as a hint', async () => {
+    it('for a Buy shows quantity, the invoice total and a required "Rozlicz z" grouped into Gotówka and Konta bankowe', async () => {
+      await setup(metalData, respond);
+      await switchLanguage(fixture, 'pl');
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(labelsOf(fixture.nativeElement, 'mat-label')).toEqual(
+        expect.arrayContaining(['Kwota z faktury (PLN)', 'Rozlicz z']),
+      );
+      expect(component['form'].controls.cashAssetId.valid).toBe(false);
+
+      const trigger = cashSelect()?.querySelector<HTMLElement>('.mat-mdc-select-trigger');
+      trigger?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const groups = Array.from(
+        TestBed.inject(OverlayContainer).getContainerElement().querySelectorAll('mat-optgroup'),
+        (group) => (group.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+      expect(groups).toHaveLength(2);
+      expect(groups[0]).toContain('Gotówka');
+      expect(groups[0]).toContain('Sejf');
+      expect(groups[0]).toContain('2000,00');
+      expect(groups[1]).toContain('Konta bankowe');
+      expect(groups[1]).toContain('mBank');
+      expect(groups[1]).toContain('5000,00');
+    });
+
+    it('sends the chosen cashAssetId and the invoice total, not a unit price', async () => {
       await setup(metalData, respond);
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(cashSelect()).not.toBeNull();
-      const candidatesRequest = fetchSpy.mock.calls
-        .map((call: unknown[]) => call[0] as Request)
-        .find((request: Request) => request.url.includes('/transfer-candidates'));
-      expect(candidatesRequest?.url).toContain('cashPlaces=true');
-      expect(candidatesRequest?.url).not.toContain('assetClass=');
-      expect(component['cashCandidatesResource'].value()?.[0].name).toBe('Wallet · PLN');
-
       component['form'].controls.quantity.setValue(2);
-      component['form'].controls.unitPrice.setValue(1200);
-      component['form'].controls.cashAssetId.setValue(cashAssetId);
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect((fixture.nativeElement as HTMLElement).textContent).toContain('2,400');
+      totalAmount().setValue(2400);
+      component['form'].controls.cashAssetId.setValue(safeAssetId);
 
       await component['onSubmit']();
 
-      const post = fetchSpy.mock.calls
-        .map((call: unknown[]) => call[0] as Request)
-        .find(
-          (request: Request) => request.method === 'POST' && request.url.includes('/transactions'),
-        );
-      expect(post).toBeDefined();
-      const body = await post!.json();
-      expect(body.cashAssetId).toBe(cashAssetId);
+      const [post] = postedRequests();
+      expect(post.url).toContain('/transactions');
+      const body = await post.json();
+      expect(body).toMatchObject({ quantity: 2, cashAssetId: safeAssetId, totalAmount: 2400 });
+      expect(body).not.toHaveProperty('unitPrice');
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
-    it('omits cashAssetId while no account is chosen', async () => {
+    it('does not submit while no "Rozlicz z" account is chosen', async () => {
       await setup(metalData, respond);
       fixture.detectChanges();
       await fixture.whenStable();
       component['form'].controls.quantity.setValue(1);
-      component['form'].controls.unitPrice.setValue(1200);
+      totalAmount().setValue(1200);
 
       await component['onSubmit']();
 
-      const post = fetchSpy.mock.calls
-        .map((call: unknown[]) => call[0] as Request)
-        .find(
-          (request: Request) => request.method === 'POST' && request.url.includes('/transactions'),
-        );
-      const body = await post!.json();
-      expect(body.cashAssetId ?? null).toBeNull();
+      expect(postedRequests()).toEqual([]);
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('shows "Brak środków" when the settlement source cannot cover the total', async () => {
+      await setup(metalData, respondWithError('Validation.InsufficientFunds'));
+      await switchLanguage(fixture, 'pl');
+      component['form'].controls.quantity.setValue(1);
+      totalAmount().setValue(1200);
+      component['form'].controls.cashAssetId.setValue(safeAssetId);
+
+      await component['onSubmit']();
+
+      expect(component['formError']()).toContain('Brak środków');
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('shows "Różne waluty" when the settlement source is in another currency', async () => {
+      await setup(metalData, respondWithError('Validation.TransferCurrencyMismatch'));
+      await switchLanguage(fixture, 'pl');
+      component['form'].controls.quantity.setValue(1);
+      totalAmount().setValue(1200);
+      component['form'].controls.cashAssetId.setValue(safeAssetId);
+
+      await component['onSubmit']();
+
+      expect(component['formError']()).toContain('Różne waluty');
+      expect(dialogRef.close).not.toHaveBeenCalled();
     });
 
     it('has no Cash select for a Cash asset', async () => {

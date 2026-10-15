@@ -57,6 +57,11 @@ public sealed class AddAssetHandler(
 
         if (request.InitialTransaction is { } opening)
         {
+            if (opening.UnitPrice is null)
+            {
+                return TransactionErrors.UnitPriceRequired;
+            }
+
             if (opening.CashAssetId is not null && BrokerageTrade.Applies(request.AssetClass))
             {
                 return TransferErrors.CashLinkNotAllowed;
@@ -68,7 +73,7 @@ public sealed class AddAssetHandler(
             }
 
             if (BrokerageTrade.AmountPlnError(
-                request.AssetClass, request.Currency, opening.Type, opening.Quantity, opening.UnitPrice, opening.AmountPln) is { } amountPlnError)
+                request.AssetClass, request.Currency, opening.Type, opening.Quantity, opening.UnitPrice.Value, opening.AmountPln) is { } amountPlnError)
             {
                 return amountPlnError;
             }
@@ -124,7 +129,7 @@ public sealed class AddAssetHandler(
         BrokerageLegs? brokerage = null;
         if (request.InitialTransaction is { } transactionRequest)
         {
-            var unitPrice = Money.Create(transactionRequest.UnitPrice, asset.Currency);
+            var unitPrice = Money.Create(transactionRequest.UnitPrice!.Value, asset.Currency);
             if (unitPrice.IsFailure)
             {
                 return unitPrice.Error;

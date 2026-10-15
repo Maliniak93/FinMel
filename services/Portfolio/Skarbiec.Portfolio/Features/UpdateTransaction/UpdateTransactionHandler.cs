@@ -55,7 +55,7 @@ public sealed class UpdateTransactionHandler(
         }
 
         if (BrokerageTrade.AmountPlnError(
-            asset.AssetClass, asset.Currency, request.Type, request.Quantity, request.UnitPrice, request.AmountPln) is { } amountPlnError)
+            asset.AssetClass, asset.Currency, request.Type, request.Quantity, request.UnitPrice ?? 0m, request.AmountPln) is { } amountPlnError)
         {
             return amountPlnError;
         }
@@ -63,10 +63,20 @@ public sealed class UpdateTransactionHandler(
         // A transfer leg changes only through its transfer's entry point, so the two legs never drift apart.
         if (transaction.TransferId is not null)
         {
-            // A stock or ETF trade's pair is edited from the security side.
+            // A stock, ETF or precious metal trade's pair is edited from the security side.
+            if (MetalSettlement.Applies(asset.AssetClass))
+            {
+                return await UpdateMetalTradeAsync(asset, transaction, request, cancellationToken);
+            }
+
             return asset.AssetClass is AssetClass.Stock or AssetClass.Etf
                 ? await UpdateTradeAsync(asset, transaction, request, cancellationToken)
                 : TransferErrors.LegManaged;
+        }
+
+        if (request.UnitPrice is not { } requestedUnitPrice)
+        {
+            return TransactionErrors.UnitPriceRequired;
         }
 
         // A bank interest credit goes only by undoing its settlement, so a settlement never loses its credit.
@@ -81,7 +91,7 @@ public sealed class UpdateTransactionHandler(
             return TransactionErrors.TypeNotAllowedForClass(request.Type, asset.AssetClass);
         }
 
-        var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
+        var unitPrice = Money.Create(requestedUnitPrice, asset.Currency);
         if (unitPrice.IsFailure)
         {
             return unitPrice.Error;
@@ -159,7 +169,12 @@ public sealed class UpdateTransactionHandler(
             return cashReadOnly;
         }
 
-        var unitPrice = Money.Create(request.UnitPrice, asset.Currency);
+        if (request.UnitPrice is not { } requestedUnitPrice)
+        {
+            return TransactionErrors.UnitPriceRequired;
+        }
+
+        var unitPrice = Money.Create(requestedUnitPrice, asset.Currency);
         if (unitPrice.IsFailure)
         {
             return unitPrice.Error;
@@ -239,6 +254,102 @@ public sealed class UpdateTransactionHandler(
         }
 
         return transaction.ToResponse(asset.Currency);
+    }
+
+    private async Task<Result<TransactionResponse>> UpdateMetalTradeAsync(
+        Asset asset, Transaction transaction, UpdateTransactionRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Type != transaction.Type)
+        {
+            return TransferErrors.LegManaged;
+        }
+
+        if (MetalSettlement.TotalError(request.Quantity, request.UnitPrice, request.TotalAmount) is { } totalError)
+        {
+            return totalError;
+        }
+
+        if (request.CashAssetId is null)
+        {
+            return TransactionErrors.SettlementSourceRequired;
+        }
+
+        var cashLeg = await dbContext.Transactions
+            .FirstOrDefaultAsync(t => t.TransferId == transaction.TransferId && t.Id != transaction.Id, cancellationToken);
+        if (cashLeg is null || cashLeg.AssetId != request.CashAssetId)
+        {
+            return TransferErrors.LegManaged;
+        }
+
+        var cash = await dbContext.Assets.FirstAsync(a => a.Id == cashLeg.AssetId, cancellationToken);
+        if (await dbContext.ReadOnlyErrorAsync(cash, cancellationToken) is { } cashReadOnly)
+        {
+            return cashReadOnly;
+        }
+
+        var totalAmount = request.TotalAmount!.Value;
+        var candidate = new Transaction
+        {
+            Id = transaction.Id,
+            AssetId = asset.Id,
+            Type = request.Type,
+            Quantity = request.Quantity,
+            UnitPriceAmount = MetalSettlement.UnitPrice(totalAmount, request.Quantity),
+            Date = request.Date
+        };
+
+        var metalQuantity = await RecomputeWithAsync(asset.Id, candidate, TransactionErrors.MutationBreaksHistory, cancellationToken);
+        if (metalQuantity.IsFailure)
+        {
+            return metalQuantity.Error;
+        }
+
+        // Re-resolved on every update so the stored rate always matches the current date.
+        var fxRateToPln = await fxRateLookupClient.ResolveFxRateToPlnAsync(asset.Currency, request.Date, cancellationToken);
+        if (fxRateToPln.IsFailure)
+        {
+            return fxRateToPln.Error;
+        }
+
+        var cashCandidate = new Transaction
+        {
+            Id = cashLeg.Id,
+            AssetId = cash.Id,
+            Type = cashLeg.Type,
+            Quantity = totalAmount,
+            UnitPriceAmount = 1m,
+            Date = request.Date
+        };
+
+        var cashQuantity = await dbContext.ReplayCashAsync(cash.Id, cashCandidate, cancellationToken);
+        if (cashQuantity.IsFailure)
+        {
+            return cashQuantity.Error;
+        }
+
+        transaction.Quantity = candidate.Quantity;
+        transaction.UnitPriceAmount = candidate.UnitPriceAmount;
+        transaction.FxRateToPln = fxRateToPln.Value;
+        transaction.Date = candidate.Date;
+        cashLeg.Quantity = totalAmount;
+        cashLeg.FxRateToPln = fxRateToPln.Value;
+        cashLeg.Date = request.Date;
+        asset.Quantity = metalQuantity.Value;
+        cash.Quantity = cashQuantity.Value;
+
+        await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
+        await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return TransactionErrors.ConcurrentModification();
+        }
+
+        return transaction.ToResponse(asset.Currency).WithTotal(totalAmount);
     }
 
     private async Task<Result<decimal>> RecomputeWithAsync(

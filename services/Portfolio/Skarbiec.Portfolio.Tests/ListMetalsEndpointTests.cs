@@ -17,9 +17,12 @@ public sealed class ListMetalsEndpointTests(SkarbiecContainersFixture containers
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(MetalTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Zebra bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram, pieces: 2m));
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken);
+        var zebraMetal = await client.AddMetalAsync(
+            cancellationToken, NewMetalRequest(name: "Zebra bar", metal: Metal.Gold, fineWeight: 50m, weightUnit: WeightUnit.Gram));
+        await client.RecordMetalTransactionWithCashAsync(zebraMetal.AssetId, cashId, cancellationToken, pieces: 2m, totalAmount: 2_000m);
         await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Alpha coin"));
-        await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Mid coin", withFirstPurchase: false));
+        await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Mid coin"));
 
         var response = await client.GetAsync(AllMetalsUri, cancellationToken);
 
