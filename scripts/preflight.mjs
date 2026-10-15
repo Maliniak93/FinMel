@@ -8,6 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnGh } from "./gh.mjs";
 import { stopStack } from "./stop-stack.mjs";
 
 const IS_WIN = process.platform === "win32";
@@ -26,7 +27,7 @@ const fixed = (name, detail) => ({ name, status: "fixed", detail });
 const fail = (name, detail, fix) => ({ name, status: "fail", detail, ...(fix ? { fix } : {}) });
 
 function run(cmd, args, { cwd = REPO_ROOT, timeout = 30_000 } = {}) {
-  const res = spawnSync(cmd, args, { cwd, encoding: "utf8", timeout, windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
+  const res = cmd === "gh" ? spawnGh(args, { cwd, timeout }) : spawnSync(cmd, args, { cwd, encoding: "utf8", timeout, windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
   return {
     status: res.status,
     out: `${res.stdout ?? ""}${res.stderr ?? ""}`,

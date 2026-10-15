@@ -7,6 +7,11 @@ Known failure modes, what causes them, and the fix. If you hit something not lis
 **Cause:** Postgres and RabbitMQ bake their admin credentials into the data volume the *first* time they initialize and never change them again. The AppHost uses **fixed** literal passwords (not Aspire's generated-and-persisted-to-user-secrets default) specifically so this can't drift — but if a fixed password is ever edited in code without also resetting local state, the volume still expects the old value and every connection fails authentication, with no self-healing.
 **Fix:** remove the named Postgres/RabbitMQ volumes so they reinitialize cleanly (`docker volume ls` to find the names, then `docker volume rm ...`) — see `runbooks/local-dev.md` → "Resetting local databases". Always safe: no real data exists in local-only development.
 
+## A script or an epic run eats the GitHub rate limit
+
+**Cause:** GraphQL has a 5000-point hourly window; a wide query (a whole project with bodies) spends hundreds of points per call. `gh api rate_limit` is free and shows what is left.
+**Fix:** measure the command: `node scripts/gh-usage.mjs -- node scripts/gh-project.mjs get <n>` prints the GraphQL points and REST requests it consumed (or says the window reset meanwhile); `node scripts/gh-usage.mjs` alone prints the current state. Budgets: `get` ≤ 2, `list` ≤ 5, `set` ≤ 3, session start 0, one epic part ≤ 100. `SKARBIEC_GH_BIN` points every script at another `gh` binary (a fake, in tests).
+
 ## Gateway 429s during a seed script or smoke test
 
 **Cause:** the Gateway rate-limits at 100 requests / 10 seconds. A seed or smoke script that fires requests in a tight loop (e.g. creating many assets) can hit it well before a human would.

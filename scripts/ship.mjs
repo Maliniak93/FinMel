@@ -13,6 +13,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { latestRunRecord } from "./build-replay.mjs";
+import { spawnGh } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
@@ -24,7 +25,7 @@ const NOT_GREEN = "the tree was not proven green by verify.mjs (cache miss)";
 const NOT_E2E_GREEN = "the e2e gate failed: no green whole-suite e2e run of this tree";
 
 function run(cmd, argv) {
-  const res = spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
+  const res = cmd === "gh" ? spawnGh(argv) : spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false });
   const err = res.error?.message ?? (res.stderr ?? "").trim();
   return {
     ok: !res.error && res.status === 0,

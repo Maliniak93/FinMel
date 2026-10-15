@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnGh } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GH_PROJECT = path.join(REPO_ROOT, "scripts", "gh-project.mjs");
@@ -18,13 +19,16 @@ const PROJECT_TIMEOUT_MS = 20000;
 const TRUNK = "master";
 
 function run(bin, argv, timeout = 15000) {
-  const res = spawnSync(bin, argv, {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-    timeout,
-    windowsHide: true,
-    shell: false,
-  });
+  const res =
+    bin === "gh"
+      ? spawnGh(argv, { timeout })
+      : spawnSync(bin, argv, {
+          cwd: REPO_ROOT,
+          encoding: "utf8",
+          timeout,
+          windowsHide: true,
+          shell: false,
+        });
   if (res.error || res.status !== 0) return null;
   return res.stdout.trim();
 }
@@ -61,7 +65,7 @@ function repoFacts() {
 function pullRequests(enabled) {
   if (!enabled) return null;
   const raw = run(
-    process.platform === "win32" ? "gh.exe" : "gh",
+    "gh",
     ["pr", "list", "--state", "all", "--limit", "60", "--json", "number,title,headRefName,state"],
     GH_TIMEOUT_MS,
   );

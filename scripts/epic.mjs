@@ -18,9 +18,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
+import { REPO, checkBuckets, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const REPO = "Maliniak93/FinMel";
 const IS_WIN = process.platform === "win32";
 const BOOLEAN_FLAGS = new Set(["dry-run", "no-shutdown", "stop"]);
 const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks"]);
@@ -56,6 +56,14 @@ function say(text) {
   lastSayAt = Date.now();
 }
 
+function sayUsage(label) {
+  try {
+    say(`${usageLine(rateLimit())} · ${label}`);
+  } catch (err) {
+    say(`GitHub: limit unreadable (${String(err.message).split(/\r?\n/)[0].slice(0, 100)}) · ${label}`);
+  }
+}
+
 function openLog(epic) {
   const dir = path.join(REPO_ROOT, "skarbiec-plan", "epic-runs", String(epic));
   mkdirSync(dir, { recursive: true });
@@ -65,10 +73,13 @@ function openLog(epic) {
   say(`epic #${epic} · log ${path.relative(REPO_ROOT, logPath).replaceAll("\\", "/")}`);
 }
 
-function run(cmd, argv, options = {}) {
-  const res = spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, maxBuffer: 64 * 1024 * 1024, ...options });
+function outcome(res) {
   const err = res.error?.message ?? (res.stderr ?? "").trim();
   return { ok: !res.error && res.status === 0, out: (res.stdout ?? "").trim(), err, firstErr: err.split(/\r?\n/).find(Boolean) ?? "" };
+}
+
+function run(cmd, argv, options = {}) {
+  return outcome(spawnSync(cmd, argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true, shell: false, maxBuffer: 64 * 1024 * 1024, ...options }));
 }
 
 const TRANSIENT_RE = /(?:HTTP|status code:?) 5\d\d|Bad Gateway|Internal Server Error|Service Unavailable|Gateway Time-?out|timed? ?out|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|connection reset|TLS handshake/i;
@@ -85,7 +96,7 @@ function retryTransient(label, fn) {
   return res;
 }
 
-const gh = (argv) => run("gh", argv);
+const gh = (argv) => outcome(spawnGh(argv));
 const git = (argv) => run("git", argv);
 const project = (argv) => run(NODE, ["scripts/gh-project.mjs", ...argv]);
 
@@ -406,12 +417,20 @@ function runClaude(claude, number, heading, prompt, model) {
   });
 }
 
+// REST on purpose: the core quota is separate from the GraphQL one the project reads spend. Returns null when the read failed.
 function readChecks(pr) {
-  const res = retryTransient("pr checks", () => gh(["pr", "checks", String(pr), "--repo", REPO, "--json", "name,state,bucket,link"]));
+  const head = retryTransient("pr head", () => gh(["api", `repos/${REPO}/pulls/${pr}`, "--jq", ".head.sha"]));
+  if (!head.ok || !head.out) {
+    say(`CI PR #${pr}: could not read the head commit (${short(head.firstErr, 120)})`);
+    return null;
+  }
+  const res = retryTransient("check runs", () => gh(["api", `repos/${REPO}/commits/${head.out}/check-runs?per_page=100`, "--jq", ".check_runs"]));
   try {
-    return JSON.parse(res.out);
-  } catch {
-    return [];
+    if (!res.ok) throw new Error(res.firstErr);
+    return checkBuckets(JSON.parse(res.out));
+  } catch (err) {
+    say(`CI PR #${pr}: could not read the check runs (${short(err.message, 120)})`);
+    return null;
   }
 }
 
@@ -422,6 +441,12 @@ async function waitForCi(pr) {
   let greenPolls = 0;
   while (true) {
     const checks = readChecks(pr.number);
+    if (!checks) {
+      greenPolls = 0;
+      if (Date.now() - startedAt > CI_TIMEOUT_MS) throw new Stop("ci-timeout", `PR ${pr.url}: checks not readable or not green after 90 min`);
+      await sleep(CI_POLL_MS);
+      continue;
+    }
     if (checks.length) emptySince = null;
     else emptySince ??= Date.now();
     const count = (...buckets) => checks.filter((c) => buckets.includes(c.bucket)).length;
@@ -643,7 +668,12 @@ async function runLoop(ctx) {
     if (!issue.subIssues.length) throw new Stop("no-parts", `#${ctx.epic} has no sub-issues`);
     const next = issue.subIssues.find((s) => s.state !== "CLOSED");
     if (!next) break;
-    await handlePart(next, ctx);
+    sayUsage(`#${next.number} start`);
+    try {
+      await handlePart(next, ctx);
+    } finally {
+      sayUsage(`#${next.number} end`);
+    }
   }
   gh(["issue", "close", String(ctx.epic), "--repo", REPO, "--reason", "completed"]);
   const moved = project(["set", String(ctx.epic), "Status", "Done"]);
@@ -679,6 +709,7 @@ try {
 
   if (ctx.dryRun) {
     say(`runner online: ${runners}`);
+    sayUsage("now");
     dryRunTable(issue);
     finishRun("dry-run", null, ctx);
   }
