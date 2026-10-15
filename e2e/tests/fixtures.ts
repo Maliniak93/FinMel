@@ -43,6 +43,47 @@ export async function logInThroughApi(
   return ((await login.json()) as { accessToken: string }).accessToken;
 }
 
+export function warsawDate(daysAgo = 0): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Warsaw',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function bearer(token: string): { Authorization: string } {
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function createAccountThroughApi(
+  request: APIRequestContext,
+  token: string,
+  account: { name: string; type: number; wrapper: number },
+): Promise<{ id: string; cashAssetId: string }> {
+  const response = await request.post('/api/portfolio/accounts', {
+    headers: bearer(token),
+    data: account,
+  });
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()) as { id: string; cashAssetId: string };
+}
+
+export async function depositCashThroughApi(
+  request: APIRequestContext,
+  token: string,
+  cashAssetId: string,
+  deposit: { quantity: number; date: string },
+): Promise<void> {
+  const response = await request.post(`/api/portfolio/assets/${cashAssetId}/transactions`, {
+    headers: bearer(token),
+    data: { type: 2, quantity: deposit.quantity, unitPrice: 1, date: deposit.date },
+  });
+  expect(response.ok()).toBeTruthy();
+}
+
 export const test = base.extend<Fixtures>({
   // The UI is asserted in Polish; the language key must be set before the first page load.
   context: async ({ context }, use) => {
