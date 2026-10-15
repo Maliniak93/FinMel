@@ -27,45 +27,6 @@ public sealed record CreateRecurringIncomeRequest : IValidatableObject
 
     public required BusinessDayShift Shift { get; init; }
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (!Enum.IsDefined(DayKind))
-        {
-            yield return new ValidationResult("Unknown day kind.", [nameof(DayKind)]);
-        }
-
-        if (!Enum.IsDefined(Shift))
-        {
-            yield return new ValidationResult("Unknown shift.", [nameof(Shift)]);
-        }
-
-        if (DayKind == RecurrenceDayKind.DayOfMonth && DayOfMonth is not (>= 1 and <= 31))
-        {
-            yield return new ValidationResult("A day of month from 1 to 31 is required.", [nameof(DayOfMonth)]);
-        }
-
-        if (DayKind == RecurrenceDayKind.LastBusinessDay && DayOfMonth is not null)
-        {
-            yield return new ValidationResult("The last business day has no day of month.", [nameof(DayOfMonth)]);
-        }
-
-        if (DayKind == RecurrenceDayKind.LastBusinessDay && Shift != BusinessDayShift.None)
-        {
-            yield return new ValidationResult("The last business day takes no shift.", [nameof(Shift)]);
-        }
-
-        if (StartDate < RecurringIncomeLimits.FirstDay || StartDate > RecurringIncomeLimits.LastDay)
-        {
-            yield return new ValidationResult(
-                $"The start date must be between {RecurringIncomeLimits.FirstDay:yyyy-MM-dd} and {RecurringIncomeLimits.LastDay:yyyy-MM-dd}.",
-                [nameof(StartDate)]);
-        }
-
-        if (EndDate is { } end && (end < StartDate || end > RecurringIncomeLimits.LastDay))
-        {
-            yield return new ValidationResult(
-                $"The end date must be on or after the start date and not after {RecurringIncomeLimits.LastDay:yyyy-MM-dd}.",
-                [nameof(EndDate)]);
-        }
-    }
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
+        RecurringIncomeValidation.Validate(DayKind, Shift, DayOfMonth, StartDate, EndDate);
 }

@@ -1869,6 +1869,68 @@
             "description": "No Content"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "UpdateRecurringIncomeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRecurringIncomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-incomes/{id}/changes/{month}": {
+      "delete": {
+        "tags": [
+          "DeleteRecurringIncomeChangeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
       }
     },
     "/api/portfolio/planning/months/{month}": {
@@ -4233,7 +4295,9 @@
           "intervalMonths",
           "dayKind",
           "dayOfMonth",
-          "shift"
+          "shift",
+          "effectiveFrom",
+          "nextChange"
         ],
         "type": "object",
         "properties": {
@@ -4278,6 +4342,74 @@
           },
           "accountArchived": {
             "type": "boolean"
+          },
+          "intervalMonths": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
+          },
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "nextChange": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/IncomeNextChangeResponse"
+              }
+            ]
+          }
+        }
+      },
+      "IncomeNextChangeResponse": {
+        "required": [
+          "effectiveFrom",
+          "amount",
+          "currency",
+          "accountName",
+          "intervalMonths",
+          "dayKind",
+          "dayOfMonth",
+          "shift"
+        ],
+        "type": "object",
+        "properties": {
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
           },
           "intervalMonths": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -5550,6 +5682,78 @@
           }
         }
       },
+      "UpdateRecurringIncomeRequest": {
+        "required": [
+          "name",
+          "startDate",
+          "effectiveFrom",
+          "amount",
+          "accountId",
+          "intervalMonths",
+          "dayKind",
+          "shift"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "intervalMonths": {
+            "maximum": 12,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
+          }
+        }
+      },
       "UpdateTransactionRequest": {
         "required": [
           "type",
@@ -6008,6 +6212,12 @@
     },
     {
       "name": "DeleteRecurringIncomeEndpoint"
+    },
+    {
+      "name": "UpdateRecurringIncomeEndpoint"
+    },
+    {
+      "name": "DeleteRecurringIncomeChangeEndpoint"
     },
     {
       "name": "GetPlanningMonthEndpoint"

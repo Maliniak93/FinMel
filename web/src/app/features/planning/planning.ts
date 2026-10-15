@@ -12,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 
 import {
   deleteApiPortfolioRecurringIncomesById,
+  deleteApiPortfolioRecurringIncomesByIdChangesByMonth,
   getApiPortfolioPlanningMonthsByMonth,
   type IncomeDefinitionResponse,
   type RecurringIncomeStatus,
@@ -24,8 +25,11 @@ import {
   EndRecurringIncomeDialog,
   type EndRecurringIncomeDialogData,
 } from './end-recurring-income-dialog/end-recurring-income-dialog';
-import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
-import { ruleParts } from './recurrence';
+import {
+  RecurringIncomeFormDialog,
+  type RecurringIncomeFormDialogData,
+} from './recurring-income-form-dialog/recurring-income-form-dialog';
+import { currentWarsawMonth, ruleParts } from './recurrence';
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -34,17 +38,6 @@ const STATUS_KEYS: Record<RecurringIncomeStatus, string> = {
   Active: 'planning.status.active',
   Ended: 'planning.status.ended',
 };
-
-function currentWarsawMonth(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Warsaw',
-    year: 'numeric',
-    month: '2-digit',
-  }).formatToParts(new Date());
-  const year = parts.find((part) => part.type === 'year')!.value;
-  const month = parts.find((part) => part.type === 'month')!.value;
-  return `${year}-${month}`;
-}
 
 function shiftMonth(month: string, delta: number): string {
   const [year, number] = month.split('-').map(Number);
@@ -135,6 +128,56 @@ export class Planning {
   protected openAddDialog(): void {
     const ref = this.dialog.open(RecurringIncomeFormDialog, { width: '520px' });
     this.reloadWhenSaved(ref.afterClosed());
+  }
+
+  protected openEditDialog(definition: IncomeDefinitionResponse): void {
+    const data: RecurringIncomeFormDialogData = { definition };
+    const ref = this.dialog.open(RecurringIncomeFormDialog, { width: '520px', data });
+    this.reloadWhenSaved(ref.afterClosed());
+  }
+
+  protected changeMonthLabel(effectiveFrom: string): string {
+    const [year, month] = effectiveFrom.split('-');
+    return `${month}.${year}`;
+  }
+
+  protected async removeChange(definition: IncomeDefinitionResponse): Promise<void> {
+    const change = definition.nextChange;
+    if (!change) {
+      return;
+    }
+
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.change.deleteTitle'),
+            message: translate('planning.change.deleteMessage', {
+              name: definition.name,
+              month: this.changeMonthLabel(change.effectiveFrom),
+            }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioRecurringIncomesByIdChangesByMonth({
+      path: { id: definition.id, month: change.effectiveFrom },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.change.deleteFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.monthResource.reload();
   }
 
   protected openEndDialog(definition: IncomeDefinitionResponse): void {

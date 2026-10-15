@@ -58,6 +58,26 @@ public sealed record IncomeDefinitionResponse
     public required RecurrenceDayKind DayKind { get; init; }
     public required int? DayOfMonth { get; init; }
     public required BusinessDayShift Shift { get; init; }
+
+    /// <summary>The month (yyyy-MM) the values above took effect from.</summary>
+    public required string EffectiveFrom { get; init; }
+
+    /// <summary>The earliest scheduled change after the viewed month, null when there is none.</summary>
+    public required IncomeNextChangeResponse? NextChange { get; init; }
+}
+
+public sealed record IncomeNextChangeResponse
+{
+    /// <summary>The month (yyyy-MM) the change takes effect from.</summary>
+    public required string EffectiveFrom { get; init; }
+
+    public required decimal Amount { get; init; }
+    public required string Currency { get; init; }
+    public required string AccountName { get; init; }
+    public required int IntervalMonths { get; init; }
+    public required RecurrenceDayKind DayKind { get; init; }
+    public required int? DayOfMonth { get; init; }
+    public required BusinessDayShift Shift { get; init; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<RecurringIncomeStatus>))]

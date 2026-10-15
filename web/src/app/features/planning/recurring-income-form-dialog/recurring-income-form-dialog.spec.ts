@@ -1,3 +1,4 @@
+import type { IncomeDefinitionResponse } from '../../../api/portfolio';
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
@@ -36,13 +37,19 @@ describe('RecurringIncomeFormDialog', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     fetchSpy.mockRestore();
   });
 
-  async function setup(): Promise<void> {
+  async function setup(
+    data: { definition: IncomeDefinitionResponse } | null = null,
+  ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const request = input as Request;
+      if (request.method === 'PUT') {
+        return new Response(null, { status: 204 });
+      }
       if (request.method !== 'GET') {
         return jsonResponse({ id: 'new-income' }, 201);
       }
@@ -58,7 +65,7 @@ describe('RecurringIncomeFormDialog', () => {
       providers: [
         provideI18nTesting(),
         provideNativeDateAdapter(),
-        { provide: MAT_DIALOG_DATA, useValue: null },
+        { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
@@ -123,6 +130,90 @@ describe('RecurringIncomeFormDialog', () => {
     expect(body.dayOfMonth ?? null).toBeNull();
     expect(body.endDate ?? null).toBeNull();
     expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  function definition(extra: Partial<IncomeDefinitionResponse> = {}): IncomeDefinitionResponse {
+    return {
+      id: 'income-1',
+      name: 'Wypłata Dominik',
+      startDate: '2026-01-01',
+      endDate: null,
+      status: 'Active',
+      amount: 9200,
+      currency: 'PLN',
+      accountId: plnAccountId,
+      accountName: 'mBank ROR',
+      accountArchived: false,
+      intervalMonths: 1,
+      dayKind: 1,
+      dayOfMonth: null,
+      shift: 0,
+      effectiveFrom: '2026-01',
+      nextChange: null,
+      ...extra,
+    };
+  }
+
+  function puts(): Request[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter((request: Request) => request.method === 'PUT');
+  }
+
+  it('prefills the viewed month values in edit mode and puts them with the current month as effectiveFrom', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 20, 12));
+    await setup({ definition: definition() });
+
+    expect(component['form'].getRawValue()).toMatchObject({
+      name: 'Wypłata Dominik',
+      amount: 9200,
+      accountId: plnAccountId,
+      effectiveFrom: '2026-10',
+      intervalMonths: 1,
+      dayKind: 1,
+    });
+    expect(field('effectiveFrom')).not.toBeNull();
+    expect(field('dayOfMonth')).toBeNull();
+
+    component['form'].controls.amount.setValue(9800);
+    component['form'].controls.effectiveFrom.setValue('2027-01');
+    await component['onSubmit']();
+
+    expect(posts()).toHaveLength(0);
+    const [request] = puts();
+    expect(request.url).toContain('/api/portfolio/recurring-incomes/income-1');
+    expect(await request.json()).toMatchObject({
+      name: 'Wypłata Dominik',
+      startDate: '2026-01-01',
+      effectiveFrom: '2027-01',
+      amount: 9800,
+      accountId: plnAccountId,
+      intervalMonths: 1,
+      dayKind: 1,
+      shift: 0,
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('rejects an effective month outside 2011-01 to 2099-12 and keeps an archived current account selectable', async () => {
+    await setup({
+      definition: definition({ accountId: archivedAccountId, accountName: 'Stare konto' }),
+    });
+
+    expect(component['accounts']().map((account) => account.id)).toContain(archivedAccountId);
+
+    component['form'].controls.effectiveFrom.setValue('2010-12');
+    await component['onSubmit']();
+
+    expect(puts()).toHaveLength(0);
+    expect(component['form'].controls.effectiveFrom.hasError('monthOutOfRange')).toBe(true);
+  });
+
+  it('has no effective month field when adding', async () => {
+    await setup();
+
+    expect(field('effectiveFrom')).toBeNull();
   });
 
   it('lists only the non-archived accounts with their currency', async () => {
