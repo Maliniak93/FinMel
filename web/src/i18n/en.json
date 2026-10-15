@@ -629,6 +629,17 @@
       "message": "Delete “{{ name }}” with its whole plan? This can't be undone.",
       "failed": "Failed to delete the income."
     },
+    "edit": {
+      "action": "Edit"
+    },
+    "change": {
+      "next": "scheduled change from {{ month }}: {{ amount }}",
+      "account": "on account {{ account }}",
+      "delete": "Delete scheduled change",
+      "deleteTitle": "Delete scheduled change",
+      "deleteMessage": "Delete the change of “{{ name }}” scheduled from {{ month }}? Earlier months stay as they are.",
+      "deleteFailed": "Failed to delete the change."
+    },
     "end": {
       "action": "End",
       "title": "End “{{ name }}”",
@@ -640,6 +651,10 @@
     },
     "form": {
       "title": "Add recurring income",
+      "editTitle": "Edit recurring income",
+      "effectiveFrom": "Applies from",
+      "effectiveFromHint": "Amount, account and schedule change from this month on; name and dates apply to every month.",
+      "effectiveFromInvalid": "Choose a month between 2011-01 and 2099-12.",
       "nameRequired": "Name is required.",
       "nameTooLong": "Name can have at most 200 characters.",
       "accountRequired": "Choose an account.",

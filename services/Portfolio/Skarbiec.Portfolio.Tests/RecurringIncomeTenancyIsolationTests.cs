@@ -33,6 +33,36 @@ public sealed class RecurringIncomeTenancyIsolationTests(SkarbiecContainersFixtu
     }
 
     [Fact]
+    public async Task UpdateAndDeleteChange_ByStranger_ReturnNotFoundAndLeaveIncomeUnchanged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await owner.CreateBankAccountAsync(cancellationToken);
+        var income = await owner.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", 500m);
+        await owner.UpdateRecurringIncomeAsync(income, account.AccountId, "2027-01", cancellationToken, "Pensja", 600m);
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangersAccount = await stranger.CreateBankAccountAsync(cancellationToken, "Moje konto");
+        var strangersIncome = await stranger.CreateRecurringIncomeAsync(strangersAccount.AccountId, cancellationToken, "Własny wpływ", 100m);
+        var update = await stranger.PutAsJsonAsync(
+            RecurringIncomeUri(income), UpdateRecurringIncomeBody(strangersAccount.AccountId, "2026-11", "Pensja", 1m), cancellationToken);
+        var deleteChange = await stranger.DeleteAsync(RecurringIncomeChangeUri(income, "2027-01"), cancellationToken);
+        var pointAtOwnersAccount = await stranger.PutAsJsonAsync(
+            RecurringIncomeUri(strangersIncome), UpdateRecurringIncomeBody(account.AccountId, "2026-11", "Własny wpływ", 100m), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleteChange.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, pointAtOwnersAccount.StatusCode);
+        var definition = Assert.Single((await owner.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes.Definitions);
+        Assert.Equal(500m, definition.Amount);
+        Assert.Equal(600m, definition.NextChange!.Amount);
+        var own = Assert.Single(
+            (await stranger.GetPlanningMonthAsync("2026-11", cancellationToken)).Incomes.Occurrences);
+        Assert.Equal(strangersAccount.AccountId, own.AccountId);
+    }
+
+    [Fact]
     public async Task Create_OnStrangersAccount_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

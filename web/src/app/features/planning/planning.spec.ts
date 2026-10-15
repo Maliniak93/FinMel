@@ -10,6 +10,7 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatMoney } from '../../shared/format';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { Planning } from './planning';
+import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
 
 const accountId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const archivedAccountId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -48,6 +49,22 @@ function definition(name: string, extra: Record<string, unknown> = {}): Record<s
     accountId,
     accountName: 'mBank ROR',
     accountArchived: false,
+    intervalMonths: 1,
+    dayKind: 1,
+    dayOfMonth: null,
+    shift: 0,
+    effectiveFrom: '2026-01',
+    nextChange: null,
+    ...extra,
+  };
+}
+
+function nextChange(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    effectiveFrom: '2027-01',
+    amount: 9800,
+    currency: 'PLN',
+    accountName: 'mBank ROR',
     intervalMonths: 1,
     dayKind: 1,
     dayOfMonth: null,
@@ -92,6 +109,9 @@ describe('Planning', () => {
   async function setup(url = '/planning'): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const requested = /\/planning\/months\/(\d{4}-\d{2})/.exec(requestUrl(input));
+      if ((input as Request).method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
       if (!requested) {
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -207,6 +227,59 @@ describe('Planning', () => {
     expect(element().textContent).toContain(formatMoney(11050, 'PLN'));
     expect(rows('total-incomplete')).toHaveLength(1);
     expect(rows('definition-row')).toHaveLength(2);
+  });
+
+  it('shows the next scheduled change with its month and amount, and the account only when it changes', async () => {
+    responses['2026-10'] = month({
+      definitions: [
+        definition('Wypłata Dominik', { nextChange: nextChange() }),
+        definition('Premia', { nextChange: nextChange({ accountName: 'Konto firmowe' }) }),
+        definition('Najem'),
+      ],
+    });
+    await setup();
+
+    const changes = rows('next-change');
+    expect(changes).toHaveLength(2);
+    expect(changes[0].textContent).toContain('01.2027');
+    expect(changes[0].textContent).toContain(formatMoney(9800, 'PLN'));
+    expect(changes[0].textContent).not.toContain('Konto firmowe');
+    expect(changes[1].textContent).toContain('Konto firmowe');
+  });
+
+  it('opens the edit dialog with the definition of the viewed month', async () => {
+    responses['2026-10'] = month({ definitions: [definition('Wypłata Dominik')] });
+    await setup();
+
+    click('edit-income');
+
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      RecurringIncomeFormDialog,
+      expect.objectContaining({
+        data: { definition: expect.objectContaining({ id: 'id-Wypłata Dominik' }) },
+      }),
+    );
+  });
+
+  it('deletes the scheduled change after confirmation and reloads the month', async () => {
+    responses['2026-10'] = month({
+      definitions: [definition('Najem', { nextChange: nextChange() })],
+    });
+    await setup();
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+
+    click('delete-change');
+
+    await vi.waitFor(() => {
+      const deletes = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'DELETE');
+      expect(deletes).toHaveLength(1);
+      expect(deletes[0].url).toContain('/recurring-incomes/id-Najem/changes/2027-01');
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
   });
 
   it('marks nothing incomplete when every rate is known', async () => {

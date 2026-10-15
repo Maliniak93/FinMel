@@ -40,6 +40,18 @@ internal static class PlanningApi
         int IntervalMonths,
         JsonElement DayKind,
         int? DayOfMonth,
+        JsonElement Shift,
+        string EffectiveFrom,
+        NextChangeView? NextChange);
+
+    public sealed record NextChangeView(
+        string EffectiveFrom,
+        decimal Amount,
+        string Currency,
+        string AccountName,
+        int IntervalMonths,
+        JsonElement DayKind,
+        int? DayOfMonth,
         JsonElement Shift);
 
     public sealed record IncomesView(
@@ -50,6 +62,63 @@ internal static class PlanningApi
     public static string RecurringIncomeUri(Guid id) => $"{RecurringIncomesUri}/{id}";
 
     public static string EndRecurringIncomeUri(Guid id) => $"{RecurringIncomeUri(id)}/end";
+
+    public const string FirstVersionErrorCode = "Conflict.FirstVersion";
+
+    public static string RecurringIncomeChangeUri(Guid id, string month) => $"{RecurringIncomeUri(id)}/changes/{month}";
+
+    public static object UpdateRecurringIncomeBody(
+        Guid accountId,
+        string effectiveFrom,
+        string name = "Wypłata",
+        decimal amount = 1_000m,
+        DateOnly? startDate = null,
+        DateOnly? endDate = null,
+        int intervalMonths = 1,
+        RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
+        int? dayOfMonth = 10,
+        BusinessDayShift shift = BusinessDayShift.None) => new
+        {
+            name,
+            startDate = startDate ?? new DateOnly(2026, 1, 1),
+            endDate,
+            effectiveFrom,
+            amount,
+            accountId,
+            intervalMonths,
+            dayKind = (int)dayKind,
+            dayOfMonth = dayKind == RecurrenceDayKind.LastBusinessDay ? null : dayOfMonth,
+            shift = (int)shift
+        };
+
+    public static async Task UpdateRecurringIncomeAsync(
+        this HttpClient client,
+        Guid id,
+        Guid accountId,
+        string effectiveFrom,
+        CancellationToken cancellationToken,
+        string name = "Wypłata",
+        decimal amount = 1_000m,
+        DateOnly? startDate = null,
+        DateOnly? endDate = null,
+        int intervalMonths = 1,
+        RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
+        int? dayOfMonth = 10,
+        BusinessDayShift shift = BusinessDayShift.None)
+    {
+        var response = await client.PutAsJsonAsync(
+            RecurringIncomeUri(id),
+            UpdateRecurringIncomeBody(accountId, effectiveFrom, name, amount, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task DeleteRecurringIncomeChangeAsync(
+        this HttpClient client, Guid id, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(RecurringIncomeChangeUri(id, month), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 
     public static string PlanningMonthUri(string month) => $"/api/portfolio/planning/months/{month}";
 

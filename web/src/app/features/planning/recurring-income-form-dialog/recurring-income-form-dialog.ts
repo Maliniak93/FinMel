@@ -9,24 +9,42 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
-import { getApiPortfolioAccounts, postApiPortfolioRecurringIncomes } from '../../../api/portfolio';
+import {
+  getApiPortfolioAccounts,
+  postApiPortfolioRecurringIncomes,
+  putApiPortfolioRecurringIncomesById,
+  type IncomeDefinitionResponse,
+} from '../../../api/portfolio';
 import {
   applyFieldErrors,
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
-import { toDateOnly } from '../../../shared/date-only';
-import { DAY_KIND, SHIFT, SHIFT_OPTIONS } from '../recurrence';
+import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
+import { DAY_KIND, SHIFT, SHIFT_OPTIONS, currentWarsawMonth } from '../recurrence';
 
 const MIN_DATE = new Date(2011, 0, 1);
 const MAX_DATE = new Date(2099, 11, 31);
+const MIN_MONTH = '2011-01';
+const MAX_MONTH = '2099-12';
+
+export interface RecurringIncomeFormDialogData {
+  definition: IncomeDefinitionResponse;
+}
+
+function monthInRange(control: AbstractControl): ValidationErrors | null {
+  const value = control.value as string;
+  return /^\d{4}-\d{2}$/.test(value) && (value < MIN_MONTH || value > MAX_MONTH)
+    ? { monthOutOfRange: true }
+    : null;
+}
 
 @Component({
   selector: 'app-recurring-income-form-dialog',
@@ -48,8 +66,15 @@ export class RecurringIncomeFormDialog {
   private readonly formBuilder = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<RecurringIncomeFormDialog>);
 
+  private readonly editing =
+    inject<RecurringIncomeFormDialogData | null>(MAT_DIALOG_DATA, { optional: true })?.definition ??
+    null;
+
+  protected readonly isEdit = this.editing !== null;
   protected readonly minDate = MIN_DATE;
   protected readonly maxDate = MAX_DATE;
+  protected readonly minMonth = MIN_MONTH;
+  protected readonly maxMonth = MAX_MONTH;
   protected readonly dayKinds = DAY_KIND;
   protected readonly shiftOptions = SHIFT_OPTIONS;
 
@@ -57,24 +82,37 @@ export class RecurringIncomeFormDialog {
   protected readonly formError = signal<string | null>(null);
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(200)]],
-    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
-    accountId: [null as string | null, [Validators.required]],
+    name: [this.editing?.name ?? '', [Validators.required, Validators.maxLength(200)]],
+    amount: [
+      this.editing ? Number(this.editing.amount) : (null as number | null),
+      [Validators.required, Validators.min(0.01)],
+    ],
+    accountId: [this.editing?.accountId ?? (null as string | null), [Validators.required]],
+    effectiveFrom: [
+      currentWarsawMonth(),
+      [Validators.required, Validators.pattern(/^\d{4}-\d{2}$/), monthInRange],
+    ],
     startDate: [
-      null as Date | null,
+      this.editing ? fromDateOnly(this.editing.startDate) : (null as Date | null),
       [Validators.required, (control: AbstractControl) => this.withinRange(control)],
     ],
     endDate: [
-      null as Date | null,
+      this.editing?.endDate ? fromDateOnly(this.editing.endDate) : (null as Date | null),
       [
         (control: AbstractControl) => this.withinRange(control),
         (c: AbstractControl) => this.endBeforeStart(c),
       ],
     ],
-    intervalMonths: [1, [Validators.required, Validators.min(1), Validators.max(12)]],
-    dayKind: [DAY_KIND.DayOfMonth as number],
-    dayOfMonth: [1 as number | null, [Validators.required, Validators.min(1), Validators.max(31)]],
-    shift: [SHIFT.None as number],
+    intervalMonths: [
+      this.editing ? Number(this.editing.intervalMonths) : 1,
+      [Validators.required, Validators.min(1), Validators.max(12)],
+    ],
+    dayKind: [this.editing?.dayKind ?? (DAY_KIND.DayOfMonth as number)],
+    dayOfMonth: [
+      this.editing?.dayOfMonth != null ? Number(this.editing.dayOfMonth) : (1 as number | null),
+      [Validators.required, Validators.min(1), Validators.max(31)],
+    ],
+    shift: [this.editing?.shift ?? (SHIFT.None as number)],
   });
 
   protected readonly dayKind = toSignal(this.form.controls.dayKind.valueChanges, {
@@ -92,7 +130,9 @@ export class RecurringIncomeFormDialog {
           readProblemDetails(result.error).detail ?? translate('planning.form.accountsLoadFailed'),
         );
       }
-      return (result.data ?? []).filter((account) => !account.isArchived);
+      return (result.data ?? []).filter(
+        (account) => !account.isArchived || account.id === this.editing?.accountId,
+      );
     },
   });
 
@@ -109,17 +149,25 @@ export class RecurringIncomeFormDialog {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.endDate.updateValueAndValidity());
 
-    this.form.controls.dayKind.valueChanges.pipe(takeUntilDestroyed()).subscribe((kind) => {
-      const usesDay = kind === DAY_KIND.DayOfMonth;
-      const { dayOfMonth, shift } = this.form.controls;
-      if (usesDay) {
-        dayOfMonth.enable();
-        shift.enable();
-      } else {
-        dayOfMonth.disable();
-        shift.disable();
-      }
-    });
+    this.form.controls.dayKind.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe((kind) => this.toggleDayControls(kind));
+    this.toggleDayControls(this.form.controls.dayKind.value);
+
+    if (!this.isEdit) {
+      this.form.controls.effectiveFrom.disable();
+    }
+  }
+
+  private toggleDayControls(kind: number): void {
+    const { dayOfMonth, shift } = this.form.controls;
+    if (kind === DAY_KIND.DayOfMonth) {
+      dayOfMonth.enable();
+      shift.enable();
+    } else {
+      dayOfMonth.disable();
+      shift.disable();
+    }
   }
 
   protected async onSubmit(): Promise<void> {
@@ -137,19 +185,23 @@ export class RecurringIncomeFormDialog {
 
     const values = this.form.getRawValue();
     const usesDay = values.dayKind === DAY_KIND.DayOfMonth;
-    const result = await postApiPortfolioRecurringIncomes({
-      body: {
-        name: values.name.trim(),
-        amount: Number(values.amount),
-        accountId: values.accountId!,
-        startDate: toDateOnly(values.startDate!),
-        endDate: values.endDate ? toDateOnly(values.endDate) : null,
-        intervalMonths: Number(values.intervalMonths),
-        dayKind: values.dayKind,
-        dayOfMonth: usesDay ? Number(values.dayOfMonth) : null,
-        shift: usesDay ? values.shift : SHIFT.None,
-      },
-    });
+    const body = {
+      name: values.name.trim(),
+      amount: Number(values.amount),
+      accountId: values.accountId!,
+      startDate: toDateOnly(values.startDate!),
+      endDate: values.endDate ? toDateOnly(values.endDate) : null,
+      intervalMonths: Number(values.intervalMonths),
+      dayKind: values.dayKind,
+      dayOfMonth: usesDay ? Number(values.dayOfMonth) : null,
+      shift: usesDay ? values.shift : SHIFT.None,
+    };
+    const result = this.editing
+      ? await putApiPortfolioRecurringIncomesById({
+          path: { id: this.editing.id },
+          body: { ...body, effectiveFrom: values.effectiveFrom },
+        })
+      : await postApiPortfolioRecurringIncomes({ body });
 
     this.submitting.set(false);
 

@@ -1221,7 +1221,28 @@ Content-Type: application/json
   "endDate": "2026-12-31"
 }
 
-### Read a month (yyyy-MM, 2011-01 to 2099-12, else 400): occurrences by date then name, the PLN total (fxUnavailable when a foreign rate is missing) and every definition with its status
+### Edit the income from a month (effectiveFrom yyyy-MM 2011-01 to 2099-12; amount, account and rule from that month on, later changes kept; name, start and end global; 204; 409 Conflict.AccountArchived, 409 Conflict.DuplicateName)
+PUT {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Wypłata Dominik",
+  "startDate": "2026-01-01",
+  "endDate": null,
+  "effectiveFrom": "2027-01",
+  "amount": 9800,
+  "accountId": "{{createMbankAccount.response.body.id}}",
+  "intervalMonths": 1,
+  "dayKind": 1,
+  "shift": 0
+}
+
+### Delete the scheduled change starting in a month (204; 404 when no version starts there; 409 Conflict.FirstVersion for the first one)
+DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/changes/2027-01
+Authorization: Bearer {{authToken}}
+
+### Read a month (yyyy-MM, 2011-01 to 2099-12, else 400): occurrences by date then name, the PLN total (fxUnavailable when a foreign rate is missing) and every definition with its status, effectiveFrom and nextChange
 GET {{baseUrl}}/api/portfolio/planning/months/2026-10
 Authorization: Bearer {{authToken}}
 

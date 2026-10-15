@@ -629,6 +629,17 @@
       "message": "Usunąć „{{ name }}” wraz z całym planem? Tej operacji nie można cofnąć.",
       "failed": "Nie udało się usunąć wpływu."
     },
+    "edit": {
+      "action": "Edytuj"
+    },
+    "change": {
+      "next": "zaplanowana zmiana od {{ month }}: {{ amount }}",
+      "account": "na koncie {{ account }}",
+      "delete": "Usuń zaplanowaną zmianę",
+      "deleteTitle": "Usuń zaplanowaną zmianę",
+      "deleteMessage": "Usunąć zmianę „{{ name }}” zaplanowaną od {{ month }}? Wcześniejsze miesiące zostają bez zmian.",
+      "deleteFailed": "Nie udało się usunąć zmiany."
+    },
     "end": {
       "action": "Zakończ",
       "title": "Zakończ „{{ name }}”",
@@ -640,6 +651,10 @@
     },
     "form": {
       "title": "Dodaj wpływ cykliczny",
+      "editTitle": "Edytuj wpływ cykliczny",
+      "effectiveFrom": "Obowiązuje od",
+      "effectiveFromHint": "Kwota, konto i harmonogram zmieniają się od tego miesiąca; nazwa i daty dotyczą każdego miesiąca.",
+      "effectiveFromInvalid": "Wybierz miesiąc od 2011-01 do 2099-12.",
       "nameRequired": "Nazwa jest wymagana.",
       "nameTooLong": "Nazwa może mieć najwyżej 200 znaków.",
       "accountRequired": "Wybierz konto.",

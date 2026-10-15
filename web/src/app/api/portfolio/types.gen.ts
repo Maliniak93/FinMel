@@ -387,6 +387,19 @@ export type IncomeDefinitionResponse = {
     dayKind: RecurrenceDayKind;
     dayOfMonth: null | number | string;
     shift: BusinessDayShift;
+    effectiveFrom: string;
+    nextChange: null | IncomeNextChangeResponse;
+};
+
+export type IncomeNextChangeResponse = {
+    effectiveFrom: string;
+    amount: number | string;
+    currency: string;
+    accountName: string;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth: null | number | string;
+    shift: BusinessDayShift;
 };
 
 export type IncomeOccurrenceResponse = {
@@ -632,6 +645,19 @@ export type UpdateMetalRequest = {
     metal: Metal;
     fineWeight: number | string;
     weightUnit: WeightUnit;
+};
+
+export type UpdateRecurringIncomeRequest = {
+    name: string;
+    startDate: string;
+    endDate?: null | string;
+    effectiveFrom: string;
+    amount: number | string;
+    accountId: string;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth?: null | number | string;
+    shift: BusinessDayShift;
 };
 
 export type UpdateTransactionRequest = {
@@ -1683,6 +1709,43 @@ export type DeleteApiPortfolioRecurringIncomesByIdResponses = {
 };
 
 export type DeleteApiPortfolioRecurringIncomesByIdResponse = DeleteApiPortfolioRecurringIncomesByIdResponses[keyof DeleteApiPortfolioRecurringIncomesByIdResponses];
+
+export type PutApiPortfolioRecurringIncomesByIdData = {
+    body: UpdateRecurringIncomeRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-incomes/{id}';
+};
+
+export type PutApiPortfolioRecurringIncomesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioRecurringIncomesByIdResponse = PutApiPortfolioRecurringIncomesByIdResponses[keyof PutApiPortfolioRecurringIncomesByIdResponses];
+
+export type DeleteApiPortfolioRecurringIncomesByIdChangesByMonthData = {
+    body?: never;
+    path: {
+        id: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-incomes/{id}/changes/{month}';
+};
+
+export type DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponse = DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses[keyof DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses];
 
 export type GetApiPortfolioPlanningMonthsByMonthData = {
     body?: never;

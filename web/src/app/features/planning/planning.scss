@@ -116,6 +116,14 @@
   gap: 4px 16px;
 }
 
+.planning-definition__change {
+  flex-basis: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .planning-definition__rule-part:not(:last-child)::after {
   content: ', ';
 }

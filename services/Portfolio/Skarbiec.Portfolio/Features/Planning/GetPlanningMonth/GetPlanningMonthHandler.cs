@@ -96,6 +96,11 @@ public sealed class GetPlanningMonthHandler(
             {
                 var version = income.InForce(viewed);
                 var account = accounts[version.AccountId];
+                var next = income.Versions
+                    .Where(v => v.EffectiveFrom > viewed.FirstDay)
+                    .OrderBy(v => v.EffectiveFrom)
+                    .FirstOrDefault();
+                var nextAccount = next is null ? null : accounts[next.AccountId];
 
                 return new IncomeDefinitionResponse
                 {
@@ -114,7 +119,21 @@ public sealed class GetPlanningMonthHandler(
                     IntervalMonths = version.IntervalMonths,
                     DayKind = version.DayKind,
                     DayOfMonth = version.DayOfMonth,
-                    Shift = version.Shift
+                    Shift = version.Shift,
+                    EffectiveFrom = YearMonth.From(version.EffectiveFrom).ToString(),
+                    NextChange = next is null || nextAccount is null
+                        ? null
+                        : new IncomeNextChangeResponse
+                        {
+                            EffectiveFrom = YearMonth.From(next.EffectiveFrom).ToString(),
+                            Amount = next.Amount,
+                            Currency = nextAccount.Currency,
+                            AccountName = nextAccount.Name,
+                            IntervalMonths = next.IntervalMonths,
+                            DayKind = next.DayKind,
+                            DayOfMonth = next.DayOfMonth,
+                            Shift = next.Shift
+                        }
                 };
             })
             .ToList();

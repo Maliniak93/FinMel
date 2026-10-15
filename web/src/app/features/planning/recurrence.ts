@@ -18,6 +18,17 @@ export const SHIFT_OPTIONS = [
   { value: SHIFT.NextBusinessDay, label: 'planning.shift.next' },
 ] as const;
 
+export function currentWarsawMonth(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Warsaw',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')!.value;
+  const month = parts.find((part) => part.type === 'month')!.value;
+  return `${year}-${month}`;
+}
+
 export interface RulePart {
   key: string;
   params?: Record<string, number>;
