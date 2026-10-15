@@ -88,7 +88,8 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   a plan step that is neither automated as a `test.step('Krok <n>: …')` nor marked `(tylko manualnie)`;
   an assertion whose expected value differs from the plan; any changed file outside `e2e/` (the
   gitignored plan file aside); a new `test.skip`, `test.fixme` or `waitForTimeout`; an existing e2e
-  test weakened or deleted. Read `.git/e2e-result.json` for the run instead of starting the stack.
+  test weakened or deleted; a new `toPass` / `expect.poll` on a Reporting projection value whose body does not re-fetch
+  (reload, or leave the screen and come back; `expectProjected` does it). Read `.git/e2e-result.json` for the run instead of starting the stack.
 - **Docs and requests**: new endpoint → `requests/<service>.http` updated; convention or hard rule
   changed → `.claude/rules/*` / `skarbiec-plan/decisions.md` updated.
 

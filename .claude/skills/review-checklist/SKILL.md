@@ -26,7 +26,7 @@ agent's report at face value.
 - The API surface changed but the generated TS client or `requests/<service>.http` wasn't updated.
 - A convention or hard rule changed without a matching update to `.claude/rules/*` or `skarbiec-plan/decisions.md`.
 - A `## Test manualny` plan — kept from the spec or rewritten in `skarbiec-plan/issues/<n>.manual.md` — that names a route, screen or action absent from the code. Wording problems in it are minor.
-- An e2e part (the spec carries the `e2e` label; the e2e agent wrote `e2e/tests/<epic-slug>.spec.ts` from the epic's `## Test manualny`): a plan step that is neither a `test.step('Krok <n>: …')` nor marked `(tylko manualnie)`; an assertion whose value differs from the plan; a changed file outside `e2e/`; a new `test.skip`, `test.fixme` or `waitForTimeout`; an existing e2e test weakened or deleted. Read `.git/e2e-result.json` for the run — never start the stack.
+- An e2e part (the spec carries the `e2e` label; the e2e agent wrote `e2e/tests/<epic-slug>.spec.ts` from the epic's `## Test manualny`): a plan step that is neither a `test.step('Krok <n>: …')` nor marked `(tylko manualnie)`; an assertion whose value differs from the plan; a changed file outside `e2e/`; a new `test.skip`, `test.fixme` or `waitForTimeout`; an existing e2e test weakened or deleted; a new `toPass` / `expect.poll` on a projection value with no re-fetch in its body (blocking). Read `.git/e2e-result.json` for the run — never start the stack.
 
 Everything else — naming, style, duplication, a "nicer" alternative structure — is `minor`, or not worth reporting at all.
 

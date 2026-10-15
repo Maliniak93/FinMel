@@ -43,8 +43,9 @@ The delegation message carries paths and JSON, never file contents:
    An own-plan part writes the `e2e/tests/*.spec.ts` file its Goal names instead.
    One `test(...)` per scenario of the plan, one `test.step('Krok <n>: …')` per plan step, where `<n>` is the plan's own step
    number. Assert the plan's expected values verbatim (amounts as in the plan, `\s` for the spaces inside `10 000,00 zł`).
-   Use the `user`/`signedInPage` fixtures, roles and labels, web-first `expect`, and `expect(async () => …).toPass()` for an
-   eventually consistent value. **Never** `waitForTimeout`, `test.skip`, `test.fixme` or a hardcoded sleep.
+   Use the `user`/`signedInPage` fixtures, roles and labels, web-first `expect`, and `expectProjected(refetch, assertion)`
+   (`e2e/tests/projection.ts`) for a Reporting projection value (it re-fetches before every attempt; a `toPass` without a re-fetch
+   is forbidden) and `toPass` only for other eventually consistent values. **Never** `waitForTimeout`, `test.skip`, `test.fixme` or a hardcoded sleep.
 2. **A step you cannot automate** (a physical device, an external site, a visual judgement, a data set the stub does not
    serve) is marked `(tylko manualnie)` in the plan and gets no step. Do not invent a stub or change the harness.
 3. **Refresh the plan.** Write the epic's full `## Test manualny` to `skarbiec-plan/issues/<epic>.manual.md`: numbered steps (`1.`),
@@ -66,9 +67,13 @@ The delegation message carries paths and JSON, never file contents:
    - **Environment** (`class: "environment"`: Docker down, a port taken, the stack not healthy by its deadline, no Playwright output,
      the 45-minute deadline): return `blocked` with `blocked.class: "environment"`. Never edit tests for it. A port in use →
      `node scripts/stop-stack.mjs` and one rerun first.
-   - **Stable app failure** (it fails after the retries and the test matches the plan, in a new scenario or an old one): return
-     `blocked` with `blocked.class: "app"`, the test title, the `Krok <n>` step from `failed[].step`, the `trace` path and the
-     `reportPath`. Read `e2e/test-results/stack.log` for the backend side and put the cause in one `notes` line.
+   - **Self-check before any `app` block**, once per failing test: rewrite the failing step's assertion with `expectProjected`
+     (30 s) and rerun only that test with `node scripts/e2e.mjs run --grep "<test title>"`. Green → it was a test defect: keep
+     the rewrite, count it as a test-code round and continue with the whole-suite run (step 4, 5); the `--grep` run is never the
+     ship gate. Red → block as `app`.
+   - **Stable app failure** (it fails after the retries, the self-check stayed red and the test matches the plan, in a new scenario
+     or an old one): return `blocked` with `blocked.class: "app"`, the test title, the `Krok <n>` step from `failed[].step`, the
+     `trace` path, the `reportPath` and `blocked.selfCheck` (what was rewritten, the wait, the result). Read `e2e/test-results/stack.log` for the backend side and put the cause in one `notes` line.
      Do not patch production code, and do not weaken a test to get past it: a stable app failure is a `/fix`.
 7. After the last green verify and the green e2e run, **edit no file**. `scripts/ship.mjs` re-checks `verify --projects e2e` and
    `node scripts/e2e.mjs check` against the tree before committing; any edit afterwards blocks the ship.

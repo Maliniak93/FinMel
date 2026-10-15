@@ -21,6 +21,7 @@ Browser tests live in `e2e/` and run only through `node scripts/e2e.mjs run`. Mo
 - Every test gets a fresh user (`user` fixture, unique e-mail), so tests never depend on each other or on leftovers. Language is `pl` (`skarbiec-lang`, set before the first page load); assert Polish text and `pl-PL` money (`10 000,00 zł`, match the spaces with `\s`).
 - Locate by role or label. A `data-testid` goes into the app only when no stable role or label exists.
 - Assertions wait: web-first `expect`, or `expect(async () => …).toPass()` for an eventually consistent value. **`waitForTimeout` is never used** (`grep -rn waitForTimeout e2e/` must stay empty).
+- A value that comes from a Reporting projection (dashboard, portfolio totals, valuations) is asserted with `expectProjected(refetch, assertion)` from `e2e/tests/projection.ts` (30 s, re-fetches before every attempt). A `toPass` / `expect.poll` on such a value whose body does not re-fetch (reload, or leave the screen and come back) is forbidden: it polls a stale screen.
 - One `test.step` per user action, so a failure names the step.
 - Expected amounts come from `e2e/market-data/` and are never recomputed in a test.
 - A change to a provider payload shape updates the stub and the data set README in the same change.
@@ -30,7 +31,7 @@ Browser tests live in `e2e/` and run only through `node scripts/e2e.mjs run`. Mo
 | class | exit | meaning | action |
 | --- | --- | --- | --- |
 | `pass` | 0 | all tests green (a flaky test is listed, not failed) | none |
-| `fail` | 1 | a test failed after its retries; `failed[]` names the test, the failing step and the trace | fix the app or the test; read `e2e/test-results/stack.log` for the backend |
+| `fail` | 1 | a test failed after its retries; `failed[]` names the test, the failing step and the trace | fix the app or the test; read `e2e/test-results/stack.log` for the backend; before blocking as `app`, the e2e agent runs the 30 s `expectProjected` self-check |
 | `environment` | 3 | Docker unreachable, a port taken, stack not healthy in 10 minutes, no Playwright output, or the 45-minute deadline | not a code defect: fix the machine and rerun; never edit tests for it |
 
 ## Hygiene

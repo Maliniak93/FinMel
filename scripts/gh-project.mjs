@@ -19,6 +19,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, renderResumeScript } from "./build-replay.mjs";
+import { e2eBlockLines } from "./e2e-repair.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OWNER = "Maliniak93";
@@ -594,11 +595,7 @@ function report([number, ...rest]) {
     lines.push(`**Blocked** at \`${run.stage ?? "?"}\`${e2eBlock && run.class ? ` (${run.class})` : ""}${run.reason ? ` — ${run.reason}` : ""}`, "");
     for (const f of run.failures ?? []) lines.push(`- ${f.step}: ${f.summary}${f.file ? ` (\`${f.file}\`)` : ""}`);
     for (const f of run.blocking ?? []) lines.push(`- \`${where(f)}\` — ${f.claim}`);
-    if (e2eBlock) {
-      for (const f of run.failed ?? []) lines.push(`- test \`${f.test}\`${f.step ? ` — ${f.step}` : ""}${f.trace ? ` — trace: \`${f.trace}\`` : ""}`);
-      if (run.reportPath) lines.push(`- report: \`${run.reportPath}\``);
-      if (run.patch) lines.push(`- patch: \`${run.patch}\``);
-    }
+    if (e2eBlock) lines.push(...e2eBlockLines(run));
     lines.push(
       "",
       run.stage === "ship"
