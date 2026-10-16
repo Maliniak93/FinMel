@@ -86,7 +86,7 @@
           } @else {
             <mat-form-field appearance="outline">
               <mat-label>{{ 'planning.allocation.dialog.kind' | transloco }}</mat-label>
-              <mat-select [formControl]="row.controls.kind">
+              <mat-select [formControl]="row.controls.kind" (selectionChange)="onKindChanged(row)">
                 @for (option of bucketKinds; track option.value) {
                   <mat-option [value]="option.value">{{ option.label | transloco }}</mat-option>
                 }
@@ -125,6 +125,26 @@
                 <mat-error>{{ 'planning.allocation.dialog.shareInvalid' | transloco }}</mat-error>
               }
             </mat-form-field>
+
+            @if (asksContributed(row)) {
+              <mat-form-field appearance="outline">
+                <mat-label>{{
+                  'planning.allocation.dialog.contributed' | transloco: contributedPeriod()
+                }}</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  step="0.01"
+                  [formControl]="row.controls.startingBalance"
+                  data-testid="row-contributed"
+                />
+                @if (row.controls.startingBalance.invalid) {
+                  <mat-error>{{
+                    'planning.allocation.dialog.startingBalanceInvalid' | transloco
+                  }}</mat-error>
+                }
+              </mat-form-field>
+            }
           }
 
           <mat-form-field appearance="outline">
@@ -139,7 +159,7 @@
             </mat-select>
           </mat-form-field>
 
-          @if (!isCushion(row)) {
+          @if (!isCushion(row) && !isLimited(row)) {
             <mat-checkbox
               data-testid="row-remainder"
               [checked]="row.controls.isRemainder.value"

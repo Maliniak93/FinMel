@@ -729,10 +729,16 @@
       "kind": {
         "investments": "Inwestycje",
         "savings": "Oszczędności",
-        "cushion": "Poduszka"
+        "cushion": "Poduszka",
+        "ike": "IKE",
+        "ikze": "IKZE",
+        "ikzeJdg": "IKZE JDG"
       },
       "cushionBalance": "Saldo {{ start }} → {{ end }} / cel {{ target }} ({{ months }} mies.)",
       "cushionReached": "cel osiągnięty",
+      "limitContributed": "Wpłacono w {{ year }}: {{ contributed }} / {{ limit }}",
+      "limitReached": "limit osiągnięty",
+      "limitEstimated": "Limit na {{ year }} jest szacowany na podstawie ostatniego znanego roku.",
       "shareType": {
         "fixed": "Kwota stała",
         "percent": "Procent"
@@ -765,6 +771,7 @@
         "targetMonthsInvalid": "Podaj liczbę całkowitą miesięcy od 1 do 24.",
         "startingBalance": "Saldo na początek miesiąca (PLN)",
         "startingBalanceInvalid": "Podaj kwotę 0 lub większą.",
+        "contributed": "Wpłacono w {{ year }} przed {{ month }} (PLN)",
         "empty": "Brak koszyków — od tego miesiąca nic nie będzie dzielone.",
         "percentSum": "Suma procentów: {{ sum }}",
         "percentOver": "Suma procentów przekracza 100.",

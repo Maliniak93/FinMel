@@ -68,7 +68,7 @@ public sealed class GetPlanningMonthHandler(
         var forecast = new PlanningForecast(incomes, accounts, stored, expenseRows);
 
         var foreign = new List<string>();
-        for (var walked = AllocationLedger.WalkStart(viewed, versions); walked <= viewed; walked = walked.AddMonths(1))
+        for (var walked = AllocationLedger.WalkStart(viewed, versions, kinds); walked <= viewed; walked = walked.AddMonths(1))
         {
             foreign.AddRange(forecast.ForeignIn(walked));
         }
@@ -181,10 +181,10 @@ public sealed class GetPlanningMonthHandler(
         Dictionary<Guid, Account> accounts,
         List<AllocationPlanVersion> versions,
         List<AllocationBalanceOverride> overrides,
-        Dictionary<Guid, BucketKind> kinds,
+        IReadOnlyDictionary<Guid, BucketKind> kinds,
         Func<YearMonth, MonthFigures> figuresFor)
     {
-        var ledger = AllocationLedger.Compute(viewed, versions, overrides, figuresFor);
+        var ledger = AllocationLedger.Compute(viewed, versions, overrides, kinds, figuresFor);
         var next = versions
             .Where(v => v.EffectiveFrom > viewed.FirstDay)
             .OrderBy(v => v.EffectiveFrom)
@@ -204,6 +204,18 @@ public sealed class GetPlanningMonthHandler(
                 AccountName = b.Entry.AccountId is { } accountId && accounts.TryGetValue(accountId, out var account) ? account.Name : null,
                 AllocatedPln = b.Allocation.Allocated,
                 Underfunded = b.Allocation.Underfunded,
+                LimitReached = b.Allocation.LimitReached,
+                Limit = b.Limit is null
+                    ? null
+                    : new LimitResponse
+                    {
+                        Year = b.Limit.Year,
+                        LimitPln = b.Limit.Limit,
+                        ContributedStartPln = b.Limit.ContributedStart,
+                        ContributedEndPln = b.Limit.ContributedEnd,
+                        Reached = b.Limit.Reached,
+                        Estimated = b.Limit.Estimated
+                    },
                 Cushion = b.Cushion is null
                     ? null
                     : new CushionResponse
@@ -225,7 +237,7 @@ public sealed class GetPlanningMonthHandler(
             Incomplete = incomplete,
             DeficitPln = ledger.Deficit,
             Buckets = buckets,
-            ToInvestPln = buckets.Where(b => b.Kind == BucketKind.Investments).Sum(b => b.AllocatedPln)
+            ToInvestPln = buckets.Where(b => b.Kind == BucketKind.Investments || b.Kind.IsLimited()).Sum(b => b.AllocatedPln)
         };
     }
 

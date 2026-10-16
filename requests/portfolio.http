@@ -1329,7 +1329,7 @@ Authorization: Bearer {{authToken}}
 
 ### --- Allocation plan ---
 
-### Save the whole plan from a month (204; month yyyy-MM, 2011-01 to 2099-12; kind 0 = Investments, 1 = Savings, 2 = Cushion (at most one; no shareType, share or remainder; targetMonths 1-24 required; startingBalance >= 0 only on a new cushion, default 0); shareType 0 = Fixed (PLN), 1 = Percent; exactly one remainder in a non-empty plan, an empty buckets list means no split from that month; omit bucketId to create a bucket, send it to keep one; later versions are kept; 400 Validation.PercentSumOver100, 400 Validation.BucketKindMismatch; 404 NotFound.AllocationBucket / NotFound.Account; 409 Conflict.AccountArchived when the account changes to an archived one)
+### Save the whole plan from a month (204; month yyyy-MM, 2011-01 to 2099-12; kind 0 = Investments, 1 = Savings, 2 = Cushion (at most one; no shareType, share or remainder; targetMonths 1-24 required; startingBalance >= 0 only on a new cushion, default 0), 3 = Ike, 4 = Ikze, 5 = IkzeJdg (yearly-limited, never the remainder; startingBalance >= 0 = contributed in the month's year before it, only on a new bucket, default 0; an account must have wrapper Ike for Ike, Ikze for Ikze and IkzeJdg, else 400 Validation.BucketAccountWrapper); shareType 0 = Fixed (PLN), 1 = Percent; exactly one remainder in a non-empty plan, an empty buckets list means no split from that month; omit bucketId to create a bucket, send it to keep one; later versions are kept; 400 Validation.PercentSumOver100, 400 Validation.BucketKindMismatch; 404 NotFound.AllocationBucket / NotFound.Account; 409 Conflict.AccountArchived when the account changes to an archived one)
 PUT {{baseUrl}}/api/portfolio/allocation-plan/versions/2026-10
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -1338,7 +1338,8 @@ Content-Type: application/json
   "buckets": [
     { "name": "Poduszka", "kind": 2, "targetMonths": 6, "startingBalance": 20000, "isRemainder": false },
     { "name": "Wakacje", "kind": 1, "shareType": 0, "share": 500, "isRemainder": false },
-    { "name": "Akcje", "kind": 0, "shareType": 1, "share": 50, "isRemainder": false },
+    { "name": "IKE", "kind": 3, "shareType": 1, "share": 30, "isRemainder": false, "startingBalance": 26000 },
+    { "name": "Akcje", "kind": 0, "shareType": 1, "share": 20, "isRemainder": false },
     { "name": "Lokata", "kind": 1, "shareType": 1, "share": 20, "isRemainder": false },
     { "name": "ETF", "kind": 0, "shareType": 1, "share": 30, "isRemainder": true }
   ]

@@ -128,7 +128,12 @@ internal static class PlanningApi
         string? AccountName,
         decimal AllocatedPln,
         bool Underfunded,
-        CushionView? Cushion = null);
+        CushionView? Cushion = null,
+        bool LimitReached = false,
+        LimitView? Limit = null);
+
+    public sealed record LimitView(
+        int Year, decimal LimitPln, decimal ContributedStartPln, decimal ContributedEndPln, bool Reached, bool Estimated);
 
     public sealed record CushionView(
         decimal BalanceStartPln, decimal TargetPln, int TargetMonths, decimal BalanceEndPln, bool Reached);
@@ -150,6 +155,14 @@ internal static class PlanningApi
     public const int SavingsKind = (int)BucketKind.Savings;
 
     public const int CushionKind = (int)BucketKind.Cushion;
+
+    public const int IkeKind = (int)BucketKind.Ike;
+
+    public const int IkzeKind = (int)BucketKind.Ikze;
+
+    public const int IkzeJdgKind = (int)BucketKind.IkzeJdg;
+
+    public const string BucketAccountWrapperErrorCode = "Validation.BucketAccountWrapper";
 
     public const int FixedShare = (int)BucketShareType.Fixed;
 
@@ -199,6 +212,26 @@ internal static class PlanningApi
         await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", 16_443.27m, dayOfMonth: 10);
 
         return await client.CreateRecurringExpenseAsync(cancellationToken, "Życie", 4_200m, dayOfMonth: 1);
+    }
+
+    // IKE 50% (contributed 26 000), IKZE 20% (contributed 9 000), Inwestycje 30% remainder; Wakacje fixed 500 and a 6-month cushion from 20 000.
+    public static object[] TaxLimitPlan(Guid? ikeAccountId = null, Guid? ikzeAccountId = null) =>
+    [
+        CushionRow(6, 20_000m),
+        AllocationRow("Wakacje", SavingsKind, FixedShare, 500m),
+        AllocationRow("IKE", IkeKind, PercentShare, 50m, accountId: ikeAccountId, startingBalance: 26_000m),
+        AllocationRow("IKZE", IkzeKind, PercentShare, 20m, accountId: ikzeAccountId, startingBalance: 9_000m),
+        AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 30m, isRemainder: true)
+    ];
+
+    public static async Task<(Guid IkeAccountId, Guid IkzeAccountId)> CreateTaxLimitSetupAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        await client.CreateCushionSetupAsync(cancellationToken);
+        var ike = await client.CreateAccountAsync(cancellationToken, "IKE Dominik", AccountType.Brokerage, TaxWrapper.Ike);
+        var ikze = await client.CreateAccountAsync(cancellationToken, "IKZE Dominik", AccountType.Brokerage, TaxWrapper.Ikze);
+
+        return (ike, ikze);
     }
 
     public static object NewAllocationPlanBody(params object[] buckets) => new { buckets };

@@ -74,6 +74,12 @@ export function formatMonth(value: string | Date | null | undefined): string {
       );
 }
 
+export function formatMonthName(value: string | Date | null | undefined): string {
+  return value === null || value === undefined || value === ''
+    ? ''
+    : new Intl.DateTimeFormat(activeLocale(), { month: 'long' }).format(toDate(value));
+}
+
 export function formatDateTime(value: string | Date | null | undefined): string {
   return value === null || value === undefined || value === ''
     ? ''

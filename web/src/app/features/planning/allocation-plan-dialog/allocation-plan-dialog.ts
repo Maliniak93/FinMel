@@ -35,7 +35,10 @@ import {
   MIN_TARGET_MONTHS,
   SHARE_TYPE,
   SHARE_TYPES,
+  isLimitedKind,
+  wrapperForKind,
 } from '../allocation';
+import { formatMonthName } from '../../../shared/format';
 import { MAX_MONTH, MIN_MONTH, monthInRange } from '../recurrence';
 
 export interface AllocationPlanDialogData {
@@ -201,6 +204,13 @@ export class AllocationPlanDialog {
       .reduce((sum, row) => sum + Math.round(Number(row.share ?? 0) * 100), 0),
   );
 
+  protected readonly contributedPeriod = computed(() => {
+    const month = this.formValue().effectiveFrom;
+    return /^\d{4}-\d{2}$/.test(month)
+      ? { year: month.slice(0, 4), month: formatMonthName(`${month}-01`) }
+      : { year: '', month: '' };
+  });
+
   protected readonly percentSum = computed(() => this.percentSumHundredths() / 100);
 
   protected readonly percentOver = computed(() => this.percentSumHundredths() > 10_000);
@@ -250,9 +260,34 @@ export class AllocationPlanDialog {
     }
 
     const current = row.controls.accountId.value;
+    const wrapper = wrapperForKind(row.controls.kind.value);
     return this.accountsResource
       .value()
-      .filter((account) => !account.isArchived || account.id === current);
+      .filter(
+        (account) =>
+          (!account.isArchived || account.id === current) &&
+          (wrapper === null || Number(account.wrapper) === wrapper),
+      );
+  }
+
+  protected isLimited(row: PlanRow): boolean {
+    return isLimitedKind(row.controls.kind.value);
+  }
+
+  protected asksContributed(row: PlanRow): boolean {
+    return this.isLimited(row) && row.controls.bucketId.value === null;
+  }
+
+  protected onKindChanged(row: PlanRow): void {
+    if (this.isLimited(row)) {
+      row.controls.isRemainder.setValue(false, { emitEvent: false });
+      const accountId = row.controls.accountId.value;
+      if (!accountId || !this.accountOptions(row).some((account) => account.id === accountId)) {
+        row.controls.accountId.setValue(null, { emitEvent: false });
+      }
+    }
+
+    this.revalidateShares();
   }
 
   protected addRow(): void {
@@ -352,6 +387,10 @@ export class AllocationPlanDialog {
                 share: Number(row.share),
                 isRemainder: row.isRemainder,
                 accountId: row.accountId,
+                startingBalance:
+                  isLimitedKind(row.kind) && row.bucketId === null && row.startingBalance !== null
+                    ? Number(row.startingBalance)
+                    : null,
               },
         ),
       },

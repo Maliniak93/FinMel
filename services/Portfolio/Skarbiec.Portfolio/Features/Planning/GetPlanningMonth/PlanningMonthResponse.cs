@@ -36,7 +36,7 @@ public sealed record AllocationResponse
     /// <summary>The fixed group first, then the percent group, each by position; empty when no version is in force.</summary>
     public required IReadOnlyList<AllocationBucketResponse> Buckets { get; init; }
 
-    /// <summary>PLN sum of the Investments buckets.</summary>
+    /// <summary>PLN sum of the Investments, IKE, IKZE and IKZE JDG buckets.</summary>
     public required decimal ToInvestPln { get; init; }
 }
 
@@ -63,6 +63,30 @@ public sealed record AllocationBucketResponse
 
     /// <summary>The cushion's balance against its target, null for any other bucket.</summary>
     public required CushionResponse? Cushion { get; init; }
+
+    /// <summary>True when the yearly limit cut the bucket's allocation short.</summary>
+    public required bool LimitReached { get; init; }
+
+    /// <summary>The year's contributions against the statutory limit, null for a bucket without one.</summary>
+    public required LimitResponse? Limit { get; init; }
+}
+
+public sealed record LimitResponse
+{
+    public required int Year { get; init; }
+    public required decimal LimitPln { get; init; }
+
+    /// <summary>Contributed in the year before the month.</summary>
+    public required decimal ContributedStartPln { get; init; }
+
+    /// <summary>Contributed in the year after the month's allocation.</summary>
+    public required decimal ContributedEndPln { get; init; }
+
+    /// <summary>True when the counter is within 1 zł of the limit or above it.</summary>
+    public required bool Reached { get; init; }
+
+    /// <summary>True when the year's limit is taken from the last known year.</summary>
+    public required bool Estimated { get; init; }
 }
 
 public sealed record CushionResponse

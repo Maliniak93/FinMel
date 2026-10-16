@@ -9,6 +9,7 @@ import {
   allocation,
   cushionBucket,
   firstPlanBuckets,
+  limitedBucket,
 } from '../../../../testing/allocation-fixtures';
 import {
   findControl,
@@ -31,14 +32,17 @@ describe('AllocationPlanDialog', () => {
     fetchSpy.mockRestore();
   });
 
-  async function setup(buckets: Record<string, unknown>[] = firstPlanBuckets()): Promise<void> {
+  async function setup(
+    buckets: Record<string, unknown>[] = firstPlanBuckets(),
+    accounts: Record<string, unknown>[] = [],
+  ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if ((input as Request).method === 'PUT') {
         return new Response(null, { status: 204 });
       }
       if (requestUrl(input).includes('/accounts')) {
-        return jsonResponse([]);
+        return jsonResponse(accounts);
       }
       return jsonResponse({ detail: 'Not found.' }, 404);
     });
@@ -294,5 +298,115 @@ describe('AllocationPlanDialog', () => {
     });
     expect(body.buckets[3]).toMatchObject({ bucketId: 'bucket-ETF', isRemainder: true });
     await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));
+  });
+
+  describe('limited buckets', () => {
+    const accounts = [
+      { id: 'acc-ike', name: 'IKE Dominik', wrapper: 1, isArchived: false },
+      { id: 'acc-ikze', name: 'IKZE Dominik', wrapper: 2, isArchived: false },
+      { id: 'acc-xtb', name: 'XTB', wrapper: 0, isArchived: false },
+    ];
+
+    async function addLimitedRow(kind: number): Promise<FormGroup> {
+      root().querySelector<HTMLElement>('[data-testid="add-row"]')!.click();
+      await settle();
+      const group = rowGroups()[4];
+      findControl(group, 'kind').setValue(kind);
+      component['onKindChanged'](group as never);
+      await settle();
+      return group;
+    }
+
+    function accountNames(group: FormGroup): string[] {
+      return (component['accountOptions'](group as never) as { name: string }[]).map(
+        (account) => account.name,
+      );
+    }
+
+    it('offers only the accounts with the matching wrapper for IKE, IKZE and IKZE JDG', async () => {
+      await setup(firstPlanBuckets(), accounts);
+
+      const group = await addLimitedRow(3);
+      expect(accountNames(group)).toEqual(['IKE Dominik']);
+
+      findControl(group, 'kind').setValue(4);
+      expect(accountNames(group)).toEqual(['IKZE Dominik']);
+
+      findControl(group, 'kind').setValue(5);
+      expect(accountNames(group)).toEqual(['IKZE Dominik']);
+
+      findControl(group, 'kind').setValue(0);
+      expect(accountNames(group)).toEqual(['IKE Dominik', 'IKZE Dominik', 'XTB']);
+    });
+
+    it('drops a chosen account that does not fit the new kind', async () => {
+      await setup(firstPlanBuckets(), accounts);
+      root().querySelector<HTMLElement>('[data-testid="add-row"]')!.click();
+      await settle();
+      const group = rowGroups()[4];
+      findControl(group, 'accountId').setValue('acc-xtb');
+
+      findControl(group, 'kind').setValue(3);
+      component['onKindChanged'](group as never);
+
+      expect(findControl(group, 'accountId').value).toBeNull();
+    });
+
+    it('asks for the contributed value on a new limited row only and never offers it as the remainder', async () => {
+      await setup([limitedBucket('IKE', { bucketId: 'bucket-IKE' }), ...firstPlanBuckets()]);
+
+      expect(rowOf('IKE').querySelector('[data-testid="row-contributed"]')).toBeNull();
+      expect(rowOf('IKE').querySelector('[data-testid="row-remainder"]')).toBeNull();
+      expect(rowOf('Wakacje').querySelector('[data-testid="row-contributed"]')).toBeNull();
+
+      root().querySelector<HTMLElement>('[data-testid="add-row"]')!.click();
+      await settle();
+      expect(rowElements()[5].querySelector('[data-testid="row-contributed"]')).toBeNull();
+      expect(rowElements()[5].querySelector('[data-testid="row-remainder"]')).not.toBeNull();
+
+      const group = rowGroups()[5];
+      findControl(group, 'isRemainder').setValue(true);
+      findControl(group, 'kind').setValue(3);
+      component['onKindChanged'](group as never);
+      await settle();
+
+      expect(findControl(group, 'isRemainder').value).toBe(false);
+      expect(rowElements()[5].querySelector('[data-testid="row-contributed"]')).not.toBeNull();
+      expect(rowElements()[5].querySelector('[data-testid="row-remainder"]')).toBeNull();
+      expect(rowElements()[5].textContent).toContain('2026');
+    });
+
+    it('puts the contributed value of a new limited row as startingBalance', async () => {
+      await setup(firstPlanBuckets(), accounts);
+      const group = await addLimitedRow(3);
+      findControl(group, 'name').setValue('IKE');
+      findControl(group, 'share').setValue(10);
+      findControl(group, 'accountId').setValue('acc-ike');
+      findControl(group, 'startingBalance').setValue(26000);
+      await setShare('Akcje', 40);
+
+      saveButton().click();
+
+      await vi.waitFor(() => {
+        const puts = fetchSpy.mock.calls
+          .map((call: unknown[]) => call[0] as Request)
+          .filter((request: Request) => request.method === 'PUT');
+        expect(puts).toHaveLength(1);
+      });
+      const request = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .find((candidate: Request) => candidate.method === 'PUT')!;
+      const body = JSON.parse(await request.clone().text()) as {
+        buckets: Record<string, unknown>[];
+      };
+      expect(body.buckets[4]).toMatchObject({
+        name: 'IKE',
+        kind: 3,
+        accountId: 'acc-ike',
+        startingBalance: 26000,
+        isRemainder: false,
+      });
+      expect(body.buckets[0]['startingBalance'] ?? null).toBeNull();
+    });
   });
 });

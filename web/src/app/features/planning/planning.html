@@ -607,7 +607,25 @@
                         {{ 'planning.allocation.remainder' | transloco }}
                       </mat-chip>
                     }
+                    @if (bucket.limit?.reached) {
+                      <mat-chip data-testid="allocation-limit-reached">
+                        {{ 'planning.allocation.limitReached' | transloco }}
+                      </mat-chip>
+                    }
                   </span>
+                  @if (bucket.limit; as limit) {
+                    <span class="planning-allocation__limit" data-testid="allocation-limit">
+                      {{
+                        'planning.allocation.limitContributed'
+                          | transloco
+                            : {
+                                year: limit.year,
+                                contributed: formatMoney(limit.contributedEndPln, 'PLN'),
+                                limit: formatMoney(limit.limitPln, 'PLN'),
+                              }
+                      }}
+                    </span>
+                  }
                 </li>
               }
             </ul>
@@ -636,10 +654,34 @@
                         {{ 'planning.allocation.remainder' | transloco }}
                       </mat-chip>
                     }
+                    @if (bucket.limit?.reached) {
+                      <mat-chip data-testid="allocation-limit-reached">
+                        {{ 'planning.allocation.limitReached' | transloco }}
+                      </mat-chip>
+                    }
                   </span>
+                  @if (bucket.limit; as limit) {
+                    <span class="planning-allocation__limit" data-testid="allocation-limit">
+                      {{
+                        'planning.allocation.limitContributed'
+                          | transloco
+                            : {
+                                year: limit.year,
+                                contributed: formatMoney(limit.contributedEndPln, 'PLN'),
+                                limit: formatMoney(limit.limitPln, 'PLN'),
+                              }
+                      }}
+                    </span>
+                  }
                 </li>
               }
             </ul>
+          }
+
+          @if (estimatedLimitYear(); as year) {
+            <p class="planning-section__incomplete" data-testid="allocation-limit-estimated">
+              {{ 'planning.allocation.limitEstimated' | transloco: { year: year } }}
+            </p>
           }
 
           <dl class="planning-balance__values">

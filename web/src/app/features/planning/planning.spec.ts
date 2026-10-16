@@ -15,6 +15,7 @@ import {
   allocationBucket,
   cushionBucket,
   firstPlanBuckets,
+  limitedBucket,
 } from '../../../testing/allocation-fixtures';
 import { AllocationPlanDialog } from './allocation-plan-dialog/allocation-plan-dialog';
 import { Planning } from './planning';
@@ -847,6 +848,57 @@ describe('Planning', () => {
     await settle();
 
     expect(rows('allocation-cushion-reached')).toHaveLength(1);
+  });
+
+  it('shows a limited bucket with its contributed against the limit, the reached marker and the estimated warning', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {
+        effectiveFrom: '2026-10',
+        buckets: [limitedBucket('IKE', { position: 0, share: 50 }), ...firstPlanBuckets()],
+      },
+    );
+    await setup();
+
+    const limit = rows('allocation-limit');
+    expect(limit).toHaveLength(1);
+    expect(limit[0].textContent).toContain(formatMoney(28260, 'PLN'));
+    expect(limit[0].textContent).toContain('2026');
+    expect(rows('allocation-limit-reached')).toHaveLength(1);
+    expect(rows('allocation-limit-estimated')).toHaveLength(0);
+
+    responses['2026-11'] = month(
+      {},
+      {},
+      {},
+      {
+        effectiveFrom: '2026-10',
+        buckets: [
+          limitedBucket('IKE', {
+            allocatedPln: 5871,
+            limitReached: false,
+            limit: {
+              year: 2027,
+              limitPln: 28260,
+              contributedStartPln: 0,
+              contributedEndPln: 5871,
+              reached: false,
+              estimated: true,
+            },
+          }),
+          ...firstPlanBuckets(),
+        ],
+      },
+    );
+    click('next-month');
+    await settle();
+
+    expect(rows('allocation-limit')[0].textContent).toContain(formatMoney(5871, 'PLN'));
+    expect(rows('allocation-limit-reached')).toHaveLength(0);
+    expect(rows('allocation-limit-estimated')).toHaveLength(1);
+    expect(rows('allocation-limit-estimated')[0].textContent).toContain('2027');
   });
 
   it('shows no buckets and an edit action when no plan is in force, and opens the plan dialog for the viewed month', async () => {
