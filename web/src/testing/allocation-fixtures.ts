@@ -1,4 +1,4 @@
-export const BUCKET_KIND = { Investments: 0, Savings: 1 } as const;
+export const BUCKET_KIND = { Investments: 0, Savings: 1, Cushion: 2 } as const;
 export const SHARE_TYPE = { Fixed: 0, Percent: 1 } as const;
 
 export function allocationBucket(
@@ -19,6 +19,24 @@ export function allocationBucket(
     underfunded: false,
     ...extra,
   };
+}
+
+export function cushionBucket(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return allocationBucket('Poduszka', {
+    kind: BUCKET_KIND.Cushion,
+    shareType: null,
+    share: null,
+    position: 0,
+    allocatedPln: 5200,
+    cushion: {
+      balanceStartPln: 20000,
+      targetPln: 25200,
+      targetMonths: 6,
+      balanceEndPln: 25200,
+      reached: false,
+    },
+    ...extra,
+  });
 }
 
 export function allocation(extra: Record<string, unknown> = {}): Record<string, unknown> {

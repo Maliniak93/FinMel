@@ -120,14 +120,18 @@ internal static class PlanningApi
         Guid BucketId,
         string Name,
         int Kind,
-        int ShareType,
-        decimal Share,
+        int? ShareType,
+        decimal? Share,
         int Position,
         bool IsRemainder,
         Guid? AccountId,
         string? AccountName,
         decimal AllocatedPln,
-        bool Underfunded);
+        bool Underfunded,
+        CushionView? Cushion = null);
+
+    public sealed record CushionView(
+        decimal BalanceStartPln, decimal TargetPln, int TargetMonths, decimal BalanceEndPln, bool Reached);
 
     public sealed record AllocationView(
         string? EffectiveFrom,
@@ -144,6 +148,8 @@ internal static class PlanningApi
     public const int InvestmentsKind = (int)BucketKind.Investments;
 
     public const int SavingsKind = (int)BucketKind.Savings;
+
+    public const int CushionKind = (int)BucketKind.Cushion;
 
     public const int FixedShare = (int)BucketShareType.Fixed;
 
@@ -164,7 +170,36 @@ internal static class PlanningApi
         decimal share,
         bool isRemainder = false,
         Guid? bucketId = null,
-        Guid? accountId = null) => new { bucketId, name, kind, shareType, share, isRemainder, accountId };
+        Guid? accountId = null,
+        int? targetMonths = null,
+        decimal? startingBalance = null) =>
+        new { bucketId, name, kind, shareType, share, isRemainder, accountId, targetMonths, startingBalance };
+
+    public static object CushionRow(
+        int? targetMonths = 6,
+        decimal? startingBalance = null,
+        Guid? bucketId = null,
+        string name = "Poduszka",
+        int? shareType = null,
+        decimal? share = null,
+        bool isRemainder = false) =>
+        new { bucketId, name, kind = CushionKind, shareType, share, isRemainder, targetMonths, startingBalance };
+
+    public static object[] CushionPlan(decimal startingBalance = 20_000m, int targetMonths = 6) =>
+    [
+        CushionRow(targetMonths, startingBalance),
+        AllocationRow("Wakacje", SavingsKind, FixedShare, 500m),
+        AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true)
+    ];
+
+    // Forecast 12 243.27 and cost 4 200 every month; returns the "Życie" expense id.
+    public static async Task<Guid> CreateCushionSetupAsync(this HttpClient client, CancellationToken cancellationToken)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", 16_443.27m, dayOfMonth: 10);
+
+        return await client.CreateRecurringExpenseAsync(cancellationToken, "Życie", 4_200m, dayOfMonth: 1);
+    }
 
     public static object NewAllocationPlanBody(params object[] buckets) => new { buckets };
 

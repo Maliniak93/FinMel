@@ -31,6 +31,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<AllocationBucket> AllocationBuckets => Set<AllocationBucket>();
     public DbSet<AllocationPlanVersion> AllocationPlanVersions => Set<AllocationPlanVersion>();
     public DbSet<AllocationPlanEntry> AllocationPlanEntries => Set<AllocationPlanEntry>();
+    public DbSet<AllocationBalanceOverride> AllocationBalanceOverrides => Set<AllocationBalanceOverride>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -321,6 +322,17 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
                 .WithMany()
                 .HasForeignKey(e => e.BucketId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AllocationBalanceOverride>(balance =>
+        {
+            balance.Property(o => o.Amount).HasPrecision(18, 2);
+            balance.HasIndex(o => new { o.BucketId, o.Month }).IsUnique();
+
+            balance.HasOne<AllocationBucket>()
+                .WithMany()
+                .HasForeignKey(o => o.BucketId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

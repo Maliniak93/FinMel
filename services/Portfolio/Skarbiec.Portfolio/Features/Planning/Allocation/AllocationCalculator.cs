@@ -1,6 +1,16 @@
 namespace Skarbiec.Portfolio.Features.Planning.Allocation;
 
-public sealed record BucketInput(BucketShareType ShareType, decimal Share, bool IsRemainder);
+public sealed record BucketInput(BucketShareType ShareType, decimal Share, bool IsRemainder)
+{
+    public bool IsCushion { get; private init; }
+
+    public decimal CushionBalance { get; private init; }
+
+    public decimal CushionTarget { get; private init; }
+
+    public static BucketInput Cushion(decimal balanceStart, decimal target) =>
+        new(BucketShareType.Fixed, 0m, false) { IsCushion = true, CushionBalance = balanceStart, CushionTarget = target };
+}
 
 public sealed record BucketAllocation(decimal Allocated, bool Underfunded);
 
@@ -8,6 +18,9 @@ public sealed record AllocationResult(IReadOnlyList<BucketAllocation> Buckets, d
 
 public static class AllocationCalculator
 {
+    // A gap under this counts as reached.
+    public const decimal CushionTolerance = 1m;
+
     public static AllocationResult Allocate(decimal forecast, IReadOnlyList<BucketInput> buckets)
     {
         if (forecast <= 0m)
@@ -19,7 +32,19 @@ public static class AllocationCalculator
         var available = forecast;
         for (var i = 0; i < buckets.Count; i++)
         {
-            if (buckets[i].ShareType != BucketShareType.Fixed)
+            if (!buckets[i].IsCushion)
+            {
+                continue;
+            }
+
+            var gap = buckets[i].CushionTarget - buckets[i].CushionBalance;
+            exact[i] = gap < CushionTolerance ? 0m : Math.Floor(Math.Min(available, gap));
+            available -= exact[i];
+        }
+
+        for (var i = 0; i < buckets.Count; i++)
+        {
+            if (buckets[i].IsCushion || buckets[i].ShareType != BucketShareType.Fixed)
             {
                 continue;
             }
@@ -30,7 +55,7 @@ public static class AllocationCalculator
 
         for (var i = 0; i < buckets.Count; i++)
         {
-            if (buckets[i].ShareType == BucketShareType.Percent)
+            if (!buckets[i].IsCushion && buckets[i].ShareType == BucketShareType.Percent)
             {
                 exact[i] = available * buckets[i].Share / 100m;
             }
@@ -60,7 +85,7 @@ public static class AllocationCalculator
         for (var i = 0; i < buckets.Count; i++)
         {
             var funded = buckets[i].IsRemainder ? allocated[i] : exact[i];
-            var underfunded = buckets[i].ShareType == BucketShareType.Fixed && funded < buckets[i].Share;
+            var underfunded = !buckets[i].IsCushion && buckets[i].ShareType == BucketShareType.Fixed && funded < buckets[i].Share;
             result[i] = new BucketAllocation(allocated[i], underfunded);
         }
 

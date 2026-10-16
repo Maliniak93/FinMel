@@ -44,6 +44,39 @@ public sealed class AllocationCalculatorPropertyTests
 
     [Theory]
     [MemberData(nameof(Seeds))]
+    public void Allocate_RandomPlanWithCushion_NeverExceedsTheGapOrTheForecast(int seed)
+    {
+        var random = new Random(seed);
+        var forecast = random.Next(-200_000, 3_000_000) / 100m;
+        var cost = random.Next(0, 800_000) / 100m;
+        var target = random.Next(1, 25) * cost;
+        var balance = random.Next(0, 3_000_000) / 100m;
+        var plan = new List<BucketInput> { BucketInput.Cushion(balance, target) };
+        plan.AddRange(RandomPlan(random));
+
+        var result = AllocationCalculator.Allocate(forecast, plan);
+
+        var cushion = result.Buckets[0].Allocated;
+        var gap = Math.Max(target - balance, 0m);
+        Assert.True(cushion >= 0m);
+        Assert.Equal(Math.Floor(cushion), cushion);
+        Assert.True(cushion <= Math.Max(forecast, 0m));
+        Assert.True(cushion <= gap);
+        if (forecast > 0m && gap >= 1m)
+        {
+            Assert.Equal(Math.Floor(Math.Min(forecast, gap)), cushion);
+        }
+
+        if (gap < 1m)
+        {
+            Assert.Equal(0m, cushion);
+        }
+
+        Assert.Equal(Math.Max(forecast, 0m), result.Buckets.Sum(b => b.Allocated));
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
     public void Allocate_RandomPlan_KeepsTheAllocationInvariants(int seed)
     {
         var random = new Random(seed);

@@ -4,6 +4,7 @@ public enum BucketKind
 {
     Investments = 0,
     Savings = 1,
+    Cushion = 2,
 }
 
 public enum BucketShareType

@@ -76,24 +76,27 @@ export type AllocationBucketResponse = {
     bucketId: string;
     name: string;
     kind: BucketKind;
-    shareType: BucketShareType;
-    share: number | string;
+    shareType: null | BucketShareType;
+    share: null | number | string;
     position: number | string;
     isRemainder: boolean;
     accountId: null | string;
     accountName: null | string;
     allocatedPln: number | string;
     underfunded: boolean;
+    cushion: null | CushionResponse;
 };
 
 export type AllocationPlanRowRequest = {
     bucketId?: null | string;
     name: string;
     kind: BucketKind;
-    shareType: BucketShareType;
-    share: number | string;
+    shareType?: null | BucketShareType;
+    share?: null | number | string;
     isRemainder: boolean;
     accountId?: null | string;
+    targetMonths?: null | number | string;
+    startingBalance?: null | number | string;
 };
 
 export type AllocationResponse = {
@@ -369,6 +372,14 @@ export type CreateTransferRequest = {
 
 export type CreateTransferResponse = {
     transferId: string;
+};
+
+export type CushionResponse = {
+    balanceStartPln: number | string;
+    targetPln: number | string;
+    targetMonths: number | string;
+    balanceEndPln: number | string;
+    reached: boolean;
 };
 
 export type DepositCapitalization = number;

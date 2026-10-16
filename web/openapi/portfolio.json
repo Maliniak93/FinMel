@@ -3042,7 +3042,8 @@
           "accountId",
           "accountName",
           "allocatedPln",
-          "underfunded"
+          "underfunded",
+          "cushion"
         ],
         "type": "object",
         "properties": {
@@ -3057,11 +3058,19 @@
             "$ref": "#/components/schemas/BucketKind"
           },
           "shareType": {
-            "$ref": "#/components/schemas/BucketShareType"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BucketShareType"
+              }
+            ]
           },
           "share": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "null",
               "number",
               "string"
             ],
@@ -3101,6 +3110,16 @@
           },
           "underfunded": {
             "type": "boolean"
+          },
+          "cushion": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CushionResponse"
+              }
+            ]
           }
         }
       },
@@ -3108,8 +3127,6 @@
         "required": [
           "name",
           "kind",
-          "shareType",
-          "share",
           "isRemainder"
         ],
         "type": "object",
@@ -3128,11 +3145,19 @@
             "$ref": "#/components/schemas/BucketKind"
           },
           "shareType": {
-            "$ref": "#/components/schemas/BucketShareType"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BucketShareType"
+              }
+            ]
           },
           "share": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "null",
               "number",
               "string"
             ],
@@ -3147,6 +3172,24 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "targetMonths": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "startingBalance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4580,6 +4623,53 @@
           "transferId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "CushionResponse": {
+        "required": [
+          "balanceStartPln",
+          "targetPln",
+          "targetMonths",
+          "balanceEndPln",
+          "reached"
+        ],
+        "type": "object",
+        "properties": {
+          "balanceStartPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "targetPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "targetMonths": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "balanceEndPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "reached": {
+            "type": "boolean"
           }
         }
       },

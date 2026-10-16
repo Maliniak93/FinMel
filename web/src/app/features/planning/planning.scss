@@ -56,6 +56,11 @@
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
+.planning-allocation__cushion {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
+}
+
 .planning-allocation__amount {
   font-weight: 500;
   text-align: end;

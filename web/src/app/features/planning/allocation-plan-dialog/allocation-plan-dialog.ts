@@ -28,7 +28,14 @@ import {
   type AllocationResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
-import { BUCKET_KIND, BUCKET_KINDS, SHARE_TYPE, SHARE_TYPES } from '../allocation';
+import {
+  BUCKET_KIND,
+  BUCKET_KINDS,
+  MAX_TARGET_MONTHS,
+  MIN_TARGET_MONTHS,
+  SHARE_TYPE,
+  SHARE_TYPES,
+} from '../allocation';
 import { MAX_MONTH, MIN_MONTH, monthInRange } from '../recurrence';
 
 export interface AllocationPlanDialogData {
@@ -40,9 +47,37 @@ const MAX_NAME_LENGTH = 100;
 const MAX_FIXED_SHARE = 1_000_000;
 const MIN_SHARE = 0.01;
 
+function isCushionRow(row: AbstractControl | null): boolean {
+  return row?.get('kind')?.value === BUCKET_KIND.Cushion;
+}
+
+function targetMonthsInRange(control: AbstractControl): ValidationErrors | null {
+  if (!isCushionRow(control.parent)) {
+    return null;
+  }
+
+  const months = Number(control.value);
+  return control.value !== null &&
+    control.value !== '' &&
+    Number.isInteger(months) &&
+    months >= MIN_TARGET_MONTHS &&
+    months <= MAX_TARGET_MONTHS
+    ? null
+    : { targetMonthsRange: true };
+}
+
+function startingBalanceNotNegative(control: AbstractControl): ValidationErrors | null {
+  if (control.value === null || control.value === '') {
+    return null;
+  }
+
+  const balance = Number(control.value);
+  return Number.isFinite(balance) && balance >= 0 ? null : { startingBalanceRange: true };
+}
+
 function shareInRange(control: AbstractControl): ValidationErrors | null {
   const row = control.parent;
-  if (!row) {
+  if (!row || isCushionRow(row)) {
     return null;
   }
 
@@ -63,7 +98,7 @@ function shareInRange(control: AbstractControl): ValidationErrors | null {
   return share >= min && share <= 100 ? null : { shareRange: true };
 }
 
-function createRow(bucket?: AllocationBucketResponse) {
+function createRow(bucket?: AllocationBucketResponse, cushion = false) {
   const row = new FormGroup({
     bucketId: new FormControl<string | null>(bucket?.bucketId ?? null),
     name: new FormControl(bucket?.name ?? '', {
@@ -73,21 +108,34 @@ function createRow(bucket?: AllocationBucketResponse) {
     // A bucket's kind is fixed once it exists.
     kind: new FormControl(
       {
-        value: bucket ? Number(bucket.kind) : (BUCKET_KIND.Investments as number),
-        disabled: !!bucket,
+        value: bucket
+          ? Number(bucket.kind)
+          : cushion
+            ? (BUCKET_KIND.Cushion as number)
+            : (BUCKET_KIND.Investments as number),
+        disabled: !!bucket || cushion,
       },
       { nonNullable: true },
     ),
-    shareType: new FormControl(bucket ? Number(bucket.shareType) : (SHARE_TYPE.Percent as number), {
-      nonNullable: true,
-    }),
-    share: new FormControl<number | null>(bucket ? Number(bucket.share) : null, {
+    shareType: new FormControl(
+      bucket?.shareType != null ? Number(bucket.shareType) : (SHARE_TYPE.Percent as number),
+      { nonNullable: true },
+    ),
+    share: new FormControl<number | null>(bucket?.share != null ? Number(bucket.share) : null, {
       validators: [shareInRange],
     }),
     isRemainder: new FormControl(bucket?.isRemainder ?? false, { nonNullable: true }),
     accountId: new FormControl<string | null>(bucket?.accountId ?? null),
+    targetMonths: new FormControl<number | null>(
+      bucket?.cushion ? Number(bucket.cushion.targetMonths) : null,
+      { validators: [targetMonthsInRange] },
+    ),
+    startingBalance: new FormControl<number | null>(null, {
+      validators: [startingBalanceNotNegative],
+    }),
   });
   row.controls.share.updateValueAndValidity({ emitEvent: false });
+  row.controls.targetMonths.updateValueAndValidity({ emitEvent: false });
 
   return row;
 }
@@ -147,13 +195,19 @@ export class AllocationPlanDialog {
 
   protected readonly percentSumHundredths = computed(() =>
     this.formValue()
-      .rows.filter((row) => row.shareType === SHARE_TYPE.Percent)
+      .rows.filter(
+        (row) => row.kind !== BUCKET_KIND.Cushion && row.shareType === SHARE_TYPE.Percent,
+      )
       .reduce((sum, row) => sum + Math.round(Number(row.share ?? 0) * 100), 0),
   );
 
   protected readonly percentSum = computed(() => this.percentSumHundredths() / 100);
 
   protected readonly percentOver = computed(() => this.percentSumHundredths() > 10_000);
+
+  protected readonly hasCushion = computed(() =>
+    this.formValue().rows.some((row) => row.kind === BUCKET_KIND.Cushion),
+  );
 
   protected readonly remainderMissing = computed(() => {
     const rows = this.formValue().rows;
@@ -205,13 +259,28 @@ export class AllocationPlanDialog {
     this.rows.push(createRow());
   }
 
+  protected addCushion(): void {
+    if (!this.hasCushion()) {
+      this.rows.insert(0, createRow(undefined, true));
+    }
+  }
+
+  protected isCushion(row: PlanRow): boolean {
+    return row.controls.kind.value === BUCKET_KIND.Cushion;
+  }
+
   protected removeRow(row: PlanRow): void {
     this.rows.removeAt(this.rows.controls.indexOf(row));
   }
 
   protected canMove(row: PlanRow, delta: -1 | 1): boolean {
     const neighbour = this.rows.at(this.rows.controls.indexOf(row) + delta) as PlanRow | undefined;
-    return !!neighbour && neighbour.controls.shareType.value === row.controls.shareType.value;
+    return (
+      !!neighbour &&
+      !this.isCushion(row) &&
+      !this.isCushion(neighbour) &&
+      neighbour.controls.shareType.value === row.controls.shareType.value
+    );
   }
 
   protected move(row: PlanRow, delta: -1 | 1): void {
@@ -226,11 +295,12 @@ export class AllocationPlanDialog {
 
   protected onShareTypeChanged(row: PlanRow): void {
     this.rows.removeAt(this.rows.controls.indexOf(row), { emitEvent: false });
-    const fixedCount = this.rows.controls.filter(
-      (candidate) => candidate.controls.shareType.value === SHARE_TYPE.Fixed,
+    const leading = this.rows.controls.filter(
+      (candidate) =>
+        this.isCushion(candidate) || candidate.controls.shareType.value === SHARE_TYPE.Fixed,
     ).length;
     this.rows.insert(
-      row.controls.shareType.value === SHARE_TYPE.Fixed ? fixedCount : this.rows.length,
+      row.controls.shareType.value === SHARE_TYPE.Fixed ? leading : this.rows.length,
       row,
       {
         emitEvent: false,
@@ -260,15 +330,30 @@ export class AllocationPlanDialog {
     const result = await putApiPortfolioAllocationPlanVersionsByMonth({
       path: { month: values.effectiveFrom },
       body: {
-        buckets: values.rows.map((row) => ({
-          bucketId: row.bucketId,
-          name: row.name.trim(),
-          kind: row.kind,
-          shareType: row.shareType,
-          share: Number(row.share),
-          isRemainder: row.isRemainder,
-          accountId: row.accountId,
-        })),
+        buckets: values.rows.map((row) =>
+          row.kind === BUCKET_KIND.Cushion
+            ? {
+                bucketId: row.bucketId,
+                name: row.name.trim(),
+                kind: row.kind,
+                isRemainder: false,
+                accountId: row.accountId,
+                targetMonths: Number(row.targetMonths),
+                startingBalance:
+                  row.bucketId === null && row.startingBalance !== null
+                    ? Number(row.startingBalance)
+                    : null,
+              }
+            : {
+                bucketId: row.bucketId,
+                name: row.name.trim(),
+                kind: row.kind,
+                shareType: row.shareType,
+                share: Number(row.share),
+                isRemainder: row.isRemainder,
+                accountId: row.accountId,
+              },
+        ),
       },
     });
 

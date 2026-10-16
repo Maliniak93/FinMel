@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.MarketData;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Containers;
@@ -20,6 +22,8 @@ public sealed class PortfolioApiFactory(SkarbiecContainersFixture containers)
 
     public AdjustableTimeProvider Clock { get; } = new();
 
+    internal DbCommandCounter Commands { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -31,6 +35,7 @@ public sealed class PortfolioApiFactory(SkarbiecContainersFixture containers)
             services.AddSingleton<IBondRateLookupClient>(BondRateLookupClient);
             services.AddSingleton<IInstrumentQuoteLookupClient>(InstrumentQuoteLookupClient);
             services.AddSingleton<TimeProvider>(Clock);
+            services.ConfigureDbContext<PortfolioDbContext>(options => options.AddInterceptors(Commands));
         });
     }
 }

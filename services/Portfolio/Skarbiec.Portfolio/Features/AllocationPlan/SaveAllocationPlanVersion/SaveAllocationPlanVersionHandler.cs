@@ -24,7 +24,7 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
         var effective = YearMonth.From(parsed);
         var rows = request.Buckets;
 
-        if (rows.Where(r => r.ShareType == BucketShareType.Percent).Sum(r => r.Share) > 100m)
+        if (rows.Where(r => r.ShareType == BucketShareType.Percent).Sum(r => r.Share ?? 0m) > 100m)
         {
             return AllocationPlanErrors.PercentSumOver100;
         }
@@ -96,11 +96,25 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
             if (row.BucketId is null)
             {
                 dbContext.AllocationBuckets.Add(new AllocationBucket { Id = bucketId, Kind = row.Kind });
+                if (row.Kind == BucketKind.Cushion)
+                {
+                    dbContext.AllocationBalanceOverrides.Add(new AllocationBalanceOverride
+                    {
+                        Id = Guid.NewGuid(),
+                        BucketId = bucketId,
+                        Month = effective.FirstDay,
+                        Amount = row.StartingBalance ?? 0m
+                    });
+                }
             }
 
             keptBucketIds.Add(bucketId);
-            var position = positions.GetValueOrDefault(row.ShareType);
-            positions[row.ShareType] = position + 1;
+            var position = 0;
+            if (row.ShareType is { } shareType)
+            {
+                position = positions.GetValueOrDefault(shareType);
+                positions[shareType] = position + 1;
+            }
 
             dbContext.AllocationPlanEntries.Add(new AllocationPlanEntry
             {
@@ -112,7 +126,8 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
                 Share = row.Share,
                 Position = position,
                 IsRemainder = row.IsRemainder,
-                AccountId = row.AccountId
+                AccountId = row.AccountId,
+                TargetMonths = row.TargetMonths
             });
         }
 

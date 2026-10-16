@@ -2,15 +2,12 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.AllocationPlan;
-using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Features.Planning.Reserves;
 using Skarbiec.Portfolio.Features.RecurringExpenses;
 using Skarbiec.Portfolio.Features.RecurringIncomes;
-using Skarbiec.Portfolio.Features.RecurringIncomes.Occurrences;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
@@ -46,41 +43,37 @@ public sealed class GetPlanningMonthHandler(
             .AsNoTracking()
             .ToDictionaryAsync(a => a.Id, cancellationToken);
 
-        // A shift moves a date by less than a month, so a stored occurrence planned in the viewed month has a nominal month within one of it.
         var stored = await dbContext.RecurringIncomeOccurrences
             .AsNoTracking()
-            .Where(o => o.NominalMonth >= viewed.AddMonths(-1).FirstDay && o.NominalMonth <= viewed.AddMonths(1).FirstDay)
             .ToListAsync(cancellationToken);
-        var storedKeys = stored.Select(o => (o.RecurringIncomeId, o.NominalMonth)).ToHashSet();
-        var incomesById = incomes.ToDictionary(i => i.Id);
 
-        var computed = incomes
-            .SelectMany(income => RecurrenceSchedule
-                .OccurrencesIn(viewed, income.StartDate, income.EndDate, nominal => income.InForce(nominal).ToRule())
-                .Where(occurrence => !storedKeys.Contains((income.Id, occurrence.NominalMonth.FirstDay)))
-                .Select(occurrence =>
-                {
-                    var version = income.InForce(occurrence.NominalMonth);
-                    return new PlannedRow(income, occurrence.NominalMonth, occurrence.Date, version.Amount, version.AccountId, null);
-                }));
+        var expenseRows = await dbContext.RecurringExpenses
+            .AsNoTracking()
+            .Include(e => e.Versions)
+            .ToListAsync(cancellationToken);
 
-        var storedRows = stored
-            .Where(o => YearMonth.From(o.PlannedDate) == viewed)
-            .Select(o => new PlannedRow(
-                incomesById[o.RecurringIncomeId], YearMonth.From(o.NominalMonth), o.PlannedDate, o.PlannedAmount, o.PlannedAccountId, o));
+        var versions = await dbContext.AllocationPlanVersions
+            .AsNoTracking()
+            .Include(v => v.Entries)
+            .ToListAsync(cancellationToken);
 
-        var planned = computed
-            .Concat(storedRows)
-            .OrderBy(p => p.Date)
-            .ThenBy(p => p.Income.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var overrides = await dbContext.AllocationBalanceOverrides
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
 
-        var foreign = planned
-            .Where(p => p.Stored?.Status != OccurrenceStatus.Settled)
-            .Select(p => accounts[p.PlannedAccountId].Currency)
-            .Where(c => c != CashPlaceBalances.BaseCurrency)
-            .Distinct()
-            .ToList();
+        var kinds = await dbContext.AllocationBuckets
+            .AsNoTracking()
+            .ToDictionaryAsync(b => b.Id, b => b.Kind, cancellationToken);
+
+        var forecast = new PlanningForecast(incomes, accounts, stored, expenseRows);
+
+        var foreign = new List<string>();
+        for (var walked = AllocationLedger.WalkStart(viewed, versions); walked <= viewed; walked = walked.AddMonths(1))
+        {
+            foreign.AddRange(forecast.ForeignIn(walked));
+        }
+
+        foreign = foreign.Distinct().ToList();
 
         var today = WarsawCalendar.Today(timeProvider);
         var rates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
@@ -96,54 +89,7 @@ public sealed class GetPlanningMonthHandler(
             }
         }
 
-        var occurrences = planned
-            .Select(p =>
-            {
-                var currency = accounts[p.PlannedAccountId].Currency;
-                var settlement = p.Stored is { Status: OccurrenceStatus.Settled } settled ? settled : null;
-                var account = accounts[settlement?.AccountId ?? p.PlannedAccountId];
-                var estimated = settlement is null && currency != CashPlaceBalances.BaseCurrency;
-
-                decimal? amountPln;
-                if (settlement is not null)
-                {
-                    amountPln = Round(p.Amount * settlement.FxRateToPln!.Value);
-                }
-                else if (!estimated)
-                {
-                    amountPln = p.Amount;
-                }
-                else
-                {
-                    amountPln = rates.TryGetValue(currency, out var rate) ? Round(p.Amount * rate) : null;
-                }
-
-                return new IncomeOccurrenceResponse
-                {
-                    RecurringIncomeId = p.Income.Id,
-                    NominalMonth = p.Nominal.ToString(),
-                    Date = p.Date,
-                    Name = p.Income.Name,
-                    AccountId = account.Id,
-                    AccountName = account.Name,
-                    AccountArchived = account.IsArchived,
-                    Amount = p.Amount,
-                    Currency = currency,
-                    AmountPln = amountPln,
-                    Estimated = estimated,
-                    Status = p.Stored?.Status ?? OccurrenceStatus.Pending,
-                    OutOfRule = p.Stored is not null && p.Income.ComputedAt(p.Nominal)?.Date != p.Date,
-                    PlannedAccountId = p.PlannedAccountId,
-                    ActualAmount = settlement?.ActualAmount,
-                    ActualDate = settlement?.ActualDate,
-                    Difference = p.Stored is null ? null : (settlement?.ActualAmount ?? 0m) - p.Amount,
-                    ActualAmountPln = settlement is null ? null : Round(settlement.ActualAmount!.Value * settlement.FxRateToPln!.Value),
-                    DepositCreated = settlement?.TransactionId is not null,
-                    Overdue = (p.Stored?.Status ?? OccurrenceStatus.Pending) == OccurrenceStatus.Pending
-                        && p.Date < today && p.Date >= p.Income.CreatedOn
-                };
-            })
-            .ToList();
+        var occurrences = forecast.OccurrencesIn(viewed, rates, today);
 
         var definitions = incomes
             .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
@@ -193,20 +139,20 @@ public sealed class GetPlanningMonthHandler(
             })
             .ToList();
 
-        var balance = new IncomeBalanceResponse
-        {
-            PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m),
-            ActualPln = occurrences.Sum(o => o.ActualAmountPln ?? 0m),
-            PendingPln = occurrences.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m),
-            DifferencePln = occurrences
-                .Where(o => o.Status != OccurrenceStatus.Pending)
-                .Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
-        };
-        var fxUnavailable = foreign.Any(c => !rates.ContainsKey(c));
+        var balance = PlanningForecast.BalanceOf(occurrences);
+        var fxUnavailable = forecast.ForeignIn(viewed).Any(c => !rates.ContainsKey(c));
 
-        var expenses = await BuildExpensesAsync(viewed, cancellationToken);
-        var forecast = balance.ActualPln + balance.PendingPln - expenses.CostPln;
-        var allocation = await BuildAllocationAsync(viewed, forecast, fxUnavailable, accounts, cancellationToken);
+        var expenses = BuildExpenses(viewed, forecast.Plans);
+        var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - expenses.CostPln, expenses.CostPln);
+        var allocation = BuildAllocation(
+            viewed,
+            viewedFigures,
+            fxUnavailable,
+            accounts,
+            versions,
+            overrides,
+            kinds,
+            walked => walked == viewed ? viewedFigures : forecast.FiguresIn(walked, rates, today));
 
         return new PlanningMonthResponse
         {
@@ -221,74 +167,71 @@ public sealed class GetPlanningMonthHandler(
             FreeFunds = new FreeFundsResponse
             {
                 PlanPln = balance.PlanPln - expenses.CostPln,
-                ForecastPln = forecast,
+                ForecastPln = viewedFigures.Forecast,
                 Incomplete = fxUnavailable
             },
             Allocation = allocation
         };
     }
 
-    private async Task<AllocationResponse> BuildAllocationAsync(
-        YearMonth viewed, decimal forecast, bool incomplete, Dictionary<Guid, Account> accounts, CancellationToken cancellationToken)
+    private static AllocationResponse BuildAllocation(
+        YearMonth viewed,
+        MonthFigures figures,
+        bool incomplete,
+        Dictionary<Guid, Account> accounts,
+        List<AllocationPlanVersion> versions,
+        List<AllocationBalanceOverride> overrides,
+        Dictionary<Guid, BucketKind> kinds,
+        Func<YearMonth, MonthFigures> figuresFor)
     {
-        var versions = await dbContext.AllocationPlanVersions
-            .AsNoTracking()
-            .Include(v => v.Entries)
-            .ToListAsync(cancellationToken);
-        var inForce = versions.InForce(viewed);
+        var ledger = AllocationLedger.Compute(viewed, versions, overrides, figuresFor);
         var next = versions
             .Where(v => v.EffectiveFrom > viewed.FirstDay)
             .OrderBy(v => v.EffectiveFrom)
             .FirstOrDefault();
 
-        var entries = (inForce?.Entries ?? [])
-            .OrderBy(e => e.ShareType)
-            .ThenBy(e => e.Position)
-            .ToList();
-        var result = AllocationCalculator.Allocate(
-            forecast, entries.Select(e => new BucketInput(e.ShareType, e.Share, e.IsRemainder)).ToList());
-        var kinds = await dbContext.AllocationBuckets
-            .AsNoTracking()
-            .ToDictionaryAsync(b => b.Id, b => b.Kind, cancellationToken);
-
-        var buckets = entries
-            .Select((e, i) => new AllocationBucketResponse
+        var buckets = ledger.Buckets
+            .Select(b => new AllocationBucketResponse
             {
-                BucketId = e.BucketId,
-                Name = e.Name,
-                Kind = kinds[e.BucketId],
-                ShareType = e.ShareType,
-                Share = e.Share,
-                Position = e.Position,
-                IsRemainder = e.IsRemainder,
-                AccountId = e.AccountId,
-                AccountName = e.AccountId is { } accountId && accounts.TryGetValue(accountId, out var account) ? account.Name : null,
-                AllocatedPln = result.Buckets[i].Allocated,
-                Underfunded = result.Buckets[i].Underfunded
+                BucketId = b.Entry.BucketId,
+                Name = b.Entry.Name,
+                Kind = kinds[b.Entry.BucketId],
+                ShareType = b.Entry.ShareType,
+                Share = b.Entry.Share,
+                Position = b.Entry.Position,
+                IsRemainder = b.Entry.IsRemainder,
+                AccountId = b.Entry.AccountId,
+                AccountName = b.Entry.AccountId is { } accountId && accounts.TryGetValue(accountId, out var account) ? account.Name : null,
+                AllocatedPln = b.Allocation.Allocated,
+                Underfunded = b.Allocation.Underfunded,
+                Cushion = b.Cushion is null
+                    ? null
+                    : new CushionResponse
+                    {
+                        BalanceStartPln = b.Cushion.BalanceStart,
+                        TargetPln = b.Cushion.Target,
+                        TargetMonths = b.Cushion.TargetMonths,
+                        BalanceEndPln = b.Cushion.BalanceEnd,
+                        Reached = b.Cushion.Reached
+                    }
             })
             .ToList();
 
         return new AllocationResponse
         {
-            EffectiveFrom = inForce is null ? null : YearMonth.From(inForce.EffectiveFrom).ToString(),
+            EffectiveFrom = ledger.InForce is null ? null : YearMonth.From(ledger.InForce.EffectiveFrom).ToString(),
             NextChange = next is null ? null : YearMonth.From(next.EffectiveFrom).ToString(),
-            ForecastPln = forecast,
+            ForecastPln = figures.Forecast,
             Incomplete = incomplete,
-            DeficitPln = result.Deficit,
+            DeficitPln = ledger.Deficit,
             Buckets = buckets,
             ToInvestPln = buckets.Where(b => b.Kind == BucketKind.Investments).Sum(b => b.AllocatedPln)
         };
     }
 
-    private async Task<PlanningExpensesResponse> BuildExpensesAsync(YearMonth viewed, CancellationToken cancellationToken)
+    private static PlanningExpensesResponse BuildExpenses(
+        YearMonth viewed, IReadOnlyList<(RecurringExpense Expense, ReservePlan Plan)> plans)
     {
-        var expenses = await dbContext.RecurringExpenses
-            .AsNoTracking()
-            .Include(e => e.Versions)
-            .ToListAsync(cancellationToken);
-
-        var plans = expenses.Select(e => (Expense: e, Plan: e.ToReservePlan())).ToList();
-
         var payments = plans
             .SelectMany(p => ReserveSchedule.PaymentsIn(viewed, p.Plan).Select(payment => new ExpensePaymentResponse
             {
@@ -367,14 +310,4 @@ public sealed class GetPlanningMonthHandler(
 
         return null;
     }
-
-    private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
-
-    private sealed record PlannedRow(
-        RecurringIncome Income,
-        YearMonth Nominal,
-        DateOnly Date,
-        decimal Amount,
-        Guid PlannedAccountId,
-        RecurringIncomeOccurrence? Stored);
 }

@@ -45,10 +45,12 @@ public sealed record AllocationBucketResponse
     public required Guid BucketId { get; init; }
     public required string Name { get; init; }
     public required BucketKind Kind { get; init; }
-    public required BucketShareType ShareType { get; init; }
 
-    /// <summary>PLN for a Fixed bucket, percent for a Percent bucket.</summary>
-    public required decimal Share { get; init; }
+    /// <summary>Null for a cushion.</summary>
+    public required BucketShareType? ShareType { get; init; }
+
+    /// <summary>PLN for a Fixed bucket, percent for a Percent bucket; null for a cushion.</summary>
+    public required decimal? Share { get; init; }
 
     public required int Position { get; init; }
     public required bool IsRemainder { get; init; }
@@ -58,6 +60,25 @@ public sealed record AllocationBucketResponse
 
     /// <summary>True when a fixed bucket got less than its share.</summary>
     public required bool Underfunded { get; init; }
+
+    /// <summary>The cushion's balance against its target, null for any other bucket.</summary>
+    public required CushionResponse? Cushion { get; init; }
+}
+
+public sealed record CushionResponse
+{
+    public required decimal BalanceStartPln { get; init; }
+
+    /// <summary>Target months times the month's expense cost.</summary>
+    public required decimal TargetPln { get; init; }
+
+    public required int TargetMonths { get; init; }
+
+    /// <summary>The balance after the month's allocation.</summary>
+    public required decimal BalanceEndPln { get; init; }
+
+    /// <summary>True when the balance is within 1 zł of the target or above it.</summary>
+    public required bool Reached { get; init; }
 }
 
 public sealed record PlanningExpensesResponse
