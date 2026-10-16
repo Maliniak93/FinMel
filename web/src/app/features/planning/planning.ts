@@ -13,8 +13,12 @@ import { firstValueFrom } from 'rxjs';
 import {
   deleteApiPortfolioRecurringIncomesById,
   deleteApiPortfolioRecurringIncomesByIdChangesByMonth,
+  deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
   getApiPortfolioPlanningMonthsByMonth,
+  putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
   type IncomeDefinitionResponse,
+  type IncomeOccurrenceResponse,
+  type OccurrenceStatus,
   type RecurringIncomeStatus,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
@@ -30,8 +34,18 @@ import {
   type RecurringIncomeFormDialogData,
 } from './recurring-income-form-dialog/recurring-income-form-dialog';
 import { currentWarsawMonth, ruleParts } from './recurrence';
+import {
+  SettleOccurrenceDialog,
+  type SettleOccurrenceDialogData,
+} from './settle-occurrence-dialog/settle-occurrence-dialog';
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+const OCCURRENCE_STATUS_KEYS: Record<OccurrenceStatus, string> = {
+  Pending: 'planning.occurrence.status.pending',
+  Settled: 'planning.occurrence.status.settled',
+  Skipped: 'planning.occurrence.status.skipped',
+};
 
 const STATUS_KEYS: Record<RecurringIncomeStatus, string> = {
   Upcoming: 'planning.status.upcoming',
@@ -103,6 +117,10 @@ export class Planning {
     return STATUS_KEYS[status];
   }
 
+  protected occurrenceStatusKey(status: OccurrenceStatus): string {
+    return OCCURRENCE_STATUS_KEYS[status];
+  }
+
   protected periodLabel(definition: IncomeDefinitionResponse): {
     key: string;
     params: Record<string, string>;
@@ -134,6 +152,61 @@ export class Planning {
     const data: RecurringIncomeFormDialogData = { definition };
     const ref = this.dialog.open(RecurringIncomeFormDialog, { width: '520px', data });
     this.reloadWhenSaved(ref.afterClosed());
+  }
+
+  protected openSettleDialog(occurrence: IncomeOccurrenceResponse): void {
+    const data: SettleOccurrenceDialogData = { occurrence };
+    const ref = this.dialog.open(SettleOccurrenceDialog, { width: '420px', data });
+    this.reloadWhenSaved(ref.afterClosed());
+  }
+
+  protected async skipOccurrence(occurrence: IncomeOccurrenceResponse): Promise<void> {
+    const result = await putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip({
+      path: { id: occurrence.recurringIncomeId, month: occurrence.nominalMonth },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.occurrence.skipFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.monthResource.reload();
+  }
+
+  protected async undoOccurrence(occurrence: IncomeOccurrenceResponse): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.occurrence.undoTitle'),
+            message: translate('planning.occurrence.undoMessage', {
+              name: occurrence.name,
+              date: formatDate(occurrence.date),
+            }),
+            confirmLabel: translate('planning.occurrence.undo'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth({
+      path: { id: occurrence.recurringIncomeId, month: occurrence.nominalMonth },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.occurrence.undoFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.monthResource.reload();
   }
 
   protected changeMonthLabel(effectiveFrom: string): string {

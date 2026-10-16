@@ -414,6 +414,13 @@ export type IncomeOccurrenceResponse = {
     currency: string;
     amountPln: null | number | string;
     estimated: boolean;
+    status: OccurrenceStatus;
+    outOfRule: boolean;
+    plannedAccountId: string;
+    actualAmount: null | number | string;
+    actualDate: null | string;
+    difference: null | number | string;
+    actualAmountPln: null | number | string;
 };
 
 export type Metal = number;
@@ -427,6 +434,8 @@ export type MetalResponse = {
     pieces: number | string;
     totalFineGrams: number | string;
 };
+
+export type OccurrenceStatus = 'Pending' | 'Settled' | 'Skipped';
 
 export type PagedResponseOfTransactionResponse = {
     items: Array<TransactionResponse>;
@@ -540,6 +549,12 @@ export type SettleDepositRequest = {
     grossInterest: number | string;
     tax: number | string;
     payOut?: boolean;
+};
+
+export type SettleOccurrenceRequest = {
+    actualAmount: number | string;
+    actualDate: string;
+    accountId: string;
 };
 
 export type SwapBondRequest = {
@@ -1746,6 +1761,63 @@ export type DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses = {
 };
 
 export type DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponse = DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses[keyof DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses];
+
+export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementData = {
+    body: SettleOccurrenceRequest;
+    path: {
+        id: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-incomes/{id}/occurrences/{month}/settlement';
+};
+
+export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementResponse = PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementResponses[keyof PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementResponses];
+
+export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkipData = {
+    body?: never;
+    path: {
+        id: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-incomes/{id}/occurrences/{month}/skip';
+};
+
+export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkipResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkipResponse = PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkipResponses[keyof PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkipResponses];
+
+export type DeleteApiPortfolioRecurringIncomesByIdOccurrencesByMonthData = {
+    body?: never;
+    path: {
+        id: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-incomes/{id}/occurrences/{month}';
+};
+
+export type DeleteApiPortfolioRecurringIncomesByIdOccurrencesByMonthResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioRecurringIncomesByIdOccurrencesByMonthResponse = DeleteApiPortfolioRecurringIncomesByIdOccurrencesByMonthResponses[keyof DeleteApiPortfolioRecurringIncomesByIdOccurrencesByMonthResponses];
 
 export type GetApiPortfolioPlanningMonthsByMonthData = {
     body?: never;

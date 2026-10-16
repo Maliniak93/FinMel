@@ -632,6 +632,32 @@
     "edit": {
       "action": "Edytuj"
     },
+    "occurrence": {
+      "status": {
+        "pending": "oczekuje",
+        "settled": "rozliczone",
+        "skipped": "pominięte"
+      },
+      "actual": "Faktycznie",
+      "difference": "Różnica",
+      "outOfRule": "poza regułą",
+      "settle": "Rozlicz",
+      "skip": "Pomiń",
+      "edit": "Edytuj",
+      "undo": "Cofnij",
+      "undoTitle": "Cofnij",
+      "undoMessage": "Cofnąć rozliczenie lub pominięcie „{{ name }}” zaplanowanego na {{ date }}? Wystąpienie wróci do stanu „oczekuje”.",
+      "skipFailed": "Nie udało się pominąć wpływu.",
+      "undoFailed": "Nie udało się cofnąć."
+    },
+    "settle": {
+      "title": "Rozlicz „{{ name }}”",
+      "editTitle": "Edytuj rozliczenie „{{ name }}”",
+      "actualAmount": "Faktyczna kwota",
+      "actualDate": "Faktyczna data",
+      "dateInFuture": "Data nie może być późniejsza niż dzisiaj.",
+      "dateOutOfRange": "Data musi mieścić się między 2011-01-01 a dniem dzisiejszym."
+    },
     "change": {
       "next": "zaplanowana zmiana od {{ month }}: {{ amount }}",
       "account": "na koncie {{ account }}",

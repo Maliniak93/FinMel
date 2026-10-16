@@ -632,6 +632,32 @@
     "edit": {
       "action": "Edit"
     },
+    "occurrence": {
+      "status": {
+        "pending": "Pending",
+        "settled": "Settled",
+        "skipped": "Skipped"
+      },
+      "actual": "Actual",
+      "difference": "Difference",
+      "outOfRule": "out of rule",
+      "settle": "Settle",
+      "skip": "Skip",
+      "edit": "Edit",
+      "undo": "Undo",
+      "undoTitle": "Undo",
+      "undoMessage": "Undo the settlement or skip of “{{ name }}” planned for {{ date }}? The occurrence goes back to pending.",
+      "skipFailed": "Failed to skip the income.",
+      "undoFailed": "Failed to undo."
+    },
+    "settle": {
+      "title": "Settle “{{ name }}”",
+      "editTitle": "Edit the settlement of “{{ name }}”",
+      "actualAmount": "Actual amount",
+      "actualDate": "Actual date",
+      "dateInFuture": "The date can't be later than today.",
+      "dateOutOfRange": "Date must be between 2011-01-01 and today."
+    },
     "change": {
       "next": "scheduled change from {{ month }}: {{ amount }}",
       "account": "on account {{ account }}",

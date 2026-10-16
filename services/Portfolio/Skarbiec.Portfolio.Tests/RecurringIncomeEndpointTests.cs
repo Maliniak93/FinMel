@@ -161,4 +161,30 @@ public sealed class RecurringIncomeEndpointTests(SkarbiecContainersFixture conta
         var version = await dbContext.Set<RecurringIncomeVersion>().SingleAsync(cancellationToken);
         Assert.NotEqual(income, version.RecurringIncomeId);
     }
+
+    [Fact]
+    public async Task Delete_BlockedBySettlement_AllowedWithSkipsOnly()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var settledAccount = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var skippedAccount = await client.CreateBankAccountAsync(cancellationToken, "Konto firmowe");
+        var settled = await client.CreateRecurringIncomeAsync(settledAccount.AccountId, cancellationToken, "Pensja", 500m);
+        var skipped = await client.CreateRecurringIncomeAsync(skippedAccount.AccountId, cancellationToken, "800+", 800m);
+        await client.SettleOccurrenceAsync(settled, "2026-10", settledAccount.AccountId, 500m, new DateOnly(2026, 10, 10), cancellationToken);
+        await client.SkipOccurrenceAsync(settled, "2026-09", cancellationToken);
+        await client.SkipOccurrenceAsync(skipped, "2026-10", cancellationToken);
+
+        var blocked = await client.DeleteAsync(RecurringIncomeUri(settled), cancellationToken);
+        var allowed = await client.DeleteAsync(RecurringIncomeUri(skipped), cancellationToken);
+
+        await blocked.AssertProblemAsync(HttpStatusCode.Conflict, RecurringIncomeHasSettlementsErrorCode, cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, allowed.StatusCode);
+        var october = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes;
+        Assert.Equal("Settled", october.Occurrence("2026-10").Status);
+        Assert.DoesNotContain(october.Occurrences, o => o.Name == "800+");
+        var accountDeleted = await client.DeleteAsync(AccountUri(skippedAccount.AccountId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, accountDeleted.StatusCode);
+    }
 }

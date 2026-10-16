@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
@@ -30,16 +31,35 @@ public sealed record IncomeOccurrenceResponse
 
     public required DateOnly Date { get; init; }
     public required string Name { get; init; }
+
+    /// <summary>The settlement account once settled, the planned one otherwise.</summary>
     public required Guid AccountId { get; init; }
+
     public required string AccountName { get; init; }
     public required bool AccountArchived { get; init; }
+
+    /// <summary>The planned amount, frozen once the occurrence is settled or skipped.</summary>
     public required decimal Amount { get; init; }
+
     public required string Currency { get; init; }
 
-    /// <summary>Equal to the amount for PLN; the latest-rate estimate otherwise, null when the rate is missing.</summary>
+    /// <summary>The planned amount in PLN: at the rate frozen on settlement, else the latest-rate estimate (null when the rate is missing).</summary>
     public required decimal? AmountPln { get; init; }
 
     public required bool Estimated { get; init; }
+    public required OccurrenceStatus Status { get; init; }
+
+    /// <summary>True when the income's current rule no longer generates this stored occurrence at its planned date.</summary>
+    public required bool OutOfRule { get; init; }
+
+    public required Guid PlannedAccountId { get; init; }
+    public required decimal? ActualAmount { get; init; }
+    public required DateOnly? ActualDate { get; init; }
+
+    /// <summary>Actual minus planned in the currency; minus the plan when skipped, null while pending.</summary>
+    public required decimal? Difference { get; init; }
+
+    public required decimal? ActualAmountPln { get; init; }
 }
 
 public sealed record IncomeDefinitionResponse

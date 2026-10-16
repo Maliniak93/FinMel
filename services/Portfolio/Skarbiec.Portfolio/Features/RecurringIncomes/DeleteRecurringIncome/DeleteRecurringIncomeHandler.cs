@@ -14,7 +14,14 @@ public sealed class DeleteRecurringIncomeHandler(PortfolioDbContext dbContext)
             return RecurringIncomeErrors.NotFound(id);
         }
 
-        // The versions go with it through the database cascade.
+        var settled = await dbContext.RecurringIncomeOccurrences
+            .AnyAsync(o => o.RecurringIncomeId == id && o.Status == OccurrenceStatus.Settled, cancellationToken);
+        if (settled)
+        {
+            return RecurringIncomeErrors.HasSettlements(id);
+        }
+
+        // The versions and the skipped occurrences go with it through the database cascade.
         dbContext.RecurringIncomes.Remove(income);
         await dbContext.SaveChangesAsync(cancellationToken);
 

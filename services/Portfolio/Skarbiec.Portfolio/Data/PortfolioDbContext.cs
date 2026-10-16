@@ -25,6 +25,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
     public DbSet<RecurringIncome> RecurringIncomes => Set<RecurringIncome>();
     public DbSet<RecurringIncomeVersion> RecurringIncomeVersions => Set<RecurringIncomeVersion>();
+    public DbSet<RecurringIncomeOccurrence> RecurringIncomeOccurrences => Set<RecurringIncomeOccurrence>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -235,6 +236,32 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             version.HasOne<Account>()
                 .WithMany()
                 .HasForeignKey(v => v.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RecurringIncomeOccurrence>(occurrence =>
+        {
+            occurrence.Property(o => o.Status).HasConversion<string>().HasMaxLength(20);
+            occurrence.Property(o => o.PlannedAmount).HasPrecision(18, 2);
+            occurrence.Property(o => o.ActualAmount).HasPrecision(18, 2);
+            occurrence.Property(o => o.FxRateToPln).HasPrecision(18, 6);
+
+            occurrence.HasIndex(o => new { o.RecurringIncomeId, o.NominalMonth }).IsUnique();
+
+            occurrence.HasOne<RecurringIncome>()
+                .WithMany()
+                .HasForeignKey(o => o.RecurringIncomeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict: an account that an occurrence plans or settles to is never deleted under it.
+            occurrence.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(o => o.PlannedAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            occurrence.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(o => o.AccountId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

@@ -1246,6 +1246,25 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/planning/months/2026-10
 Authorization: Bearer {{authToken}}
 
-### Delete the income with its versions
+### Settle an occurrence by its nominal month (yyyy-MM, 2011-01 to 2099-12); creates or edits the settlement, freezes the plan and the FX rate of actualDate (204; 400 Validation.CurrencyMismatch / Validation.FxRateMissing / Validation.ActualDateInFuture; 404 when the rule does not generate the month; 409 Conflict.AccountArchived)
+PUT {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/occurrences/2026-10/settlement
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "actualAmount": 9143.27,
+  "actualDate": "2026-10-30",
+  "accountId": "{{createMbankAccount.response.body.id}}"
+}
+
+### Skip an occurrence (204; no-op when already skipped; 409 Conflict.OccurrenceSettled for a settled one)
+PUT {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/occurrences/2026-09/skip
+Authorization: Bearer {{authToken}}
+
+### Undo a settlement or a skip: the occurrence is pending again (204; 404 when nothing is stored)
+DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/occurrences/2026-10
+Authorization: Bearer {{authToken}}
+
+### Delete the income with its versions (409 Conflict.RecurringIncomeHasSettlements while a settled occurrence exists; skipped ones go with it)
 DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}
 Authorization: Bearer {{authToken}}
