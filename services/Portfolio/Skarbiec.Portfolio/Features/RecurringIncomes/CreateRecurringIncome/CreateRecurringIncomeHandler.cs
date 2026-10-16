@@ -2,11 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 
 namespace Skarbiec.Portfolio.Features.RecurringIncomes.CreateRecurringIncome;
 
-public sealed class CreateRecurringIncomeHandler(PortfolioDbContext dbContext)
+public sealed class CreateRecurringIncomeHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result<CreateRecurringIncomeResponse>> HandleAsync(
         CreateRecurringIncomeRequest request, CancellationToken cancellationToken)
@@ -35,7 +36,8 @@ public sealed class CreateRecurringIncomeHandler(PortfolioDbContext dbContext)
             Id = Guid.NewGuid(),
             Name = request.Name,
             StartDate = request.StartDate,
-            EndDate = request.EndDate
+            EndDate = request.EndDate,
+            CreatedOn = WarsawCalendar.Today(timeProvider)
         };
         income.Versions.Add(new RecurringIncomeVersion
         {

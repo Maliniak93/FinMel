@@ -92,6 +92,6 @@ public sealed class RecurringIncomeTenancyIsolationTests(SkarbiecContainersFixtu
 
         Assert.Empty(incomes.Occurrences);
         Assert.Empty(incomes.Definitions);
-        Assert.Equal(0m, incomes.TotalPln);
+        Assert.Equal(0m, incomes.Balance.PlanPln);
     }
 }

@@ -11,6 +11,8 @@ namespace Skarbiec.Portfolio.Tests;
 // Incomes are arranged through PlanningApi; the month read goes through its helper, which only asserts success, and the PLN-only fact calls it raw.
 public sealed class PlanningMonthEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    private static readonly DateTimeOffset MidNovemberUtc = new(2026, 11, 15, 10, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public async Task ReturnsOccurrencesAndTotal()
     {
@@ -44,7 +46,7 @@ public sealed class PlanningMonthEndpointTests(SkarbiecContainersFixture contain
             Assert.Equal(o.Amount, o.AmountPln);
             Assert.False(o.Estimated);
         });
-        Assert.Equal(16_500m, october.TotalPln);
+        Assert.Equal(16_500m, october.Balance.PlanPln);
         Assert.False(october.FxUnavailable);
         Assert.Equal(
             [new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 30)],
@@ -88,7 +90,7 @@ public sealed class PlanningMonthEndpointTests(SkarbiecContainersFixture contain
 
         var rent = Assert.Single(known.Occurrences, o => o.Name == "Najem EUR");
         Assert.Equal((1_000m, "EUR", 4_250m, true), (rent.Amount, rent.Currency, rent.AmountPln, rent.Estimated));
-        Assert.Equal(4_750m, known.TotalPln);
+        Assert.Equal(4_750m, known.Balance.PlanPln);
         Assert.False(known.FxUnavailable);
 
         Factory.InstrumentQuoteLookupClient.WithUnavailable();
@@ -98,8 +100,85 @@ public sealed class PlanningMonthEndpointTests(SkarbiecContainersFixture contain
         Assert.Null(unknownRent.AmountPln);
         Assert.True(unknownRent.Estimated);
         Assert.Equal(1_000m, unknownRent.Amount);
-        Assert.Equal(500m, unavailable.TotalPln);
+        Assert.Equal(500m, unavailable.Balance.PlanPln);
         Assert.True(unavailable.FxUnavailable);
+    }
+
+    [Fact]
+    public async Task Occurrences_FlagOverdue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "800+", 800m, new DateOnly(2024, 6, 10), dayOfMonth: 10);
+        await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata żona", 6_500m, new DateOnly(2026, 1, 1),
+            dayOfMonth: 10, shift: BusinessDayShift.PreviousBusinessDay);
+        Factory.Clock.SetUtcNow(AfterDueDayUtc);
+
+        var october = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes;
+        var november = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).Incomes;
+        var december = (await client.GetPlanningMonthAsync("2026-12", cancellationToken)).Incomes;
+
+        Assert.Equal(2, november.Occurrences.Count);
+        Assert.All(november.Occurrences, o => Assert.True(o.Overdue));
+        Assert.NotEmpty(october.Occurrences);
+        Assert.All(october.Occurrences, o => Assert.False(o.Overdue));
+        Assert.All(december.Occurrences, o => Assert.False(o.Overdue));
+    }
+
+    [Fact]
+    public async Task Balance_PlanActualPendingDifference()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var dominik = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata Dominik", 9_200m, new DateOnly(2026, 1, 1),
+            dayKind: RecurrenceDayKind.LastBusinessDay, dayOfMonth: null);
+        var wife = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata żona", 6_500m, new DateOnly(2026, 1, 1),
+            dayOfMonth: 10, shift: BusinessDayShift.PreviousBusinessDay);
+        var benefit = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "800+", 800m, new DateOnly(2024, 6, 10), dayOfMonth: 10);
+        await client.SettleOccurrenceAsync(dominik, "2026-10", account.AccountId, 9_143.27m, new DateOnly(2026, 10, 19), cancellationToken);
+        await client.SettleOccurrenceAsync(wife, "2026-10", account.AccountId, 6_500m, new DateOnly(2026, 10, 9), cancellationToken);
+
+        var pending = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes.Balance;
+        await client.SkipOccurrenceAsync(benefit, "2026-10", cancellationToken);
+        var skipped = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes.Balance;
+
+        Assert.Equal(new BalanceView(16_500m, 15_643.27m, 800m, -56.73m), pending);
+        Assert.Equal(new BalanceView(16_500m, 15_643.27m, 0m, -856.73m), skipped);
+    }
+
+    [Fact]
+    public async Task Balance_ForeignOccurrences()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MidNovemberUtc);
+        Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.25m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var eur = await client.CreateBankAccountAsync(cancellationToken, "Revolut EUR", currency: "EUR");
+        var income = await client.CreateRecurringIncomeAsync(eur.AccountId, cancellationToken, "Najem EUR", 1_000m, dayOfMonth: 10);
+        var settleDate = new DateOnly(2026, 11, 10);
+        Factory.FxRateLookupClient.WithRate("EUR", settleDate, 4.30m);
+        await client.SettleOccurrenceAsync(income, "2026-11", eur.AccountId, 980m, settleDate, cancellationToken);
+
+        var november = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).Incomes;
+        Factory.InstrumentQuoteLookupClient.WithUnavailable();
+        var december = (await client.GetPlanningMonthAsync("2026-12", cancellationToken)).Incomes;
+
+        Assert.Equal(4_300m, november.Balance.PlanPln);
+        Assert.Equal(4_214m, november.Balance.ActualPln);
+        Assert.Equal(0m, november.Balance.PendingPln);
+        Assert.False(november.FxUnavailable);
+        Assert.True(december.FxUnavailable);
+        Assert.Equal(0m, december.Balance.PlanPln);
+        Assert.Equal(0m, december.Balance.PendingPln);
     }
 
     [Fact]

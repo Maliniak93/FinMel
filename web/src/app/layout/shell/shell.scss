@@ -15,6 +15,17 @@
   background: var(--mat-sys-secondary-container);
 }
 
+.shell__badge {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
 .shell__spacer {
   flex: 1 1 auto;
 }

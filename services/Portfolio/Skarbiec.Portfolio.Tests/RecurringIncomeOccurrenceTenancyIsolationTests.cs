@@ -74,7 +74,24 @@ public sealed class RecurringIncomeOccurrenceTenancyIsolationTests(SkarbiecConta
 
         Assert.Empty(october.Occurrences);
         Assert.Empty(september.Occurrences);
-        Assert.Equal(0m, october.TotalPln);
+        Assert.Equal(0m, october.Balance.PlanPln);
+    }
+
+    [Fact]
+    public async Task Overdue_ForStranger_DoesNotListOwnersOccurrences()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await owner.CreateBankAccountAsync(cancellationToken);
+        await owner.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", 500m, dayOfMonth: 10);
+        Factory.Clock.SetUtcNow(AfterDueDayUtc);
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangers = await stranger.GetOverdueOccurrencesAsync(cancellationToken);
+
+        Assert.Single((await owner.GetOverdueOccurrencesAsync(cancellationToken)).Items);
+        Assert.Empty(strangers.Items);
     }
 
     [Fact]

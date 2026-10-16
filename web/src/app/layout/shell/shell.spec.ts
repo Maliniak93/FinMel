@@ -1,6 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import { client as portfolioClient } from '../../api/portfolio/client.gen';
+import {
+  jsonResponse,
+  requestUrl,
+} from '../../features/assets/asset-form/testing/asset-form-fixtures';
 import {
   isTranslationIn,
   looksLikeTranslationKey,
@@ -13,12 +18,115 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { THEME_STORAGE_KEY, ThemeService } from '../../core/theme/theme';
 import { Shell } from './shell';
 
+function overdueItem(name: string): Record<string, unknown> {
+  return {
+    recurringIncomeId: `id-${name}`,
+    nominalMonth: '2026-11',
+    date: '2026-11-10',
+    name,
+    accountId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    accountName: 'mBank ROR',
+    accountArchived: false,
+    amount: 800,
+    currency: 'PLN',
+  };
+}
+
+describe('Shell planning badge', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeAll(() => {
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  async function createShell(items: Record<string, unknown>[]): Promise<HTMLElement> {
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) =>
+        requestUrl(input).includes('/planning/overdue')
+          ? jsonResponse({ items })
+          : jsonResponse({ detail: 'Not found.' }, 404),
+      );
+    await TestBed.configureTestingModule({
+      imports: [Shell],
+      providers: [provideRouter([]), provideI18nTesting()],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(Shell);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  function planningLink(element: HTMLElement): HTMLAnchorElement {
+    return Array.from(element.querySelectorAll<HTMLAnchorElement>('mat-nav-list a')).find(
+      (a) => a.getAttribute('href') === '/planning',
+    )!;
+  }
+
+  it('shows the overdue count as a badge at Planning when it is above zero', async () => {
+    const element = await createShell([overdueItem('800+'), overdueItem('Wypłata żona')]);
+
+    const badge = planningLink(element).querySelector('[data-testid="overdue-badge"]');
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent!.trim()).toBe('2');
+  });
+
+  it('shows no badge at Planning when nothing is overdue', async () => {
+    const element = await createShell([]);
+
+    expect(planningLink(element).querySelector('[data-testid="overdue-badge"]')).toBeNull();
+  });
+
+  it('follows the second shell when a new session starts in the same tab', async () => {
+    let items = [overdueItem('800+'), overdueItem('Wypłata żona')];
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => jsonResponse({ items }));
+    await TestBed.configureTestingModule({
+      imports: [Shell],
+      providers: [provideRouter([]), provideI18nTesting()],
+    }).compileComponents();
+
+    const first = TestBed.createComponent(Shell);
+    await first.whenStable();
+    first.detectChanges();
+    await first.whenStable();
+    first.detectChanges();
+    const firstBadge = planningLink(first.nativeElement).querySelector(
+      '[data-testid="overdue-badge"]',
+    );
+    expect(firstBadge!.textContent!.trim()).toBe('2');
+    first.destroy();
+
+    items = [overdueItem('Premia')];
+    const second = TestBed.createComponent(Shell);
+    await second.whenStable();
+    second.detectChanges();
+    await second.whenStable();
+    second.detectChanges();
+
+    const secondBadge = planningLink(second.nativeElement).querySelector(
+      '[data-testid="overdue-badge"]',
+    );
+    expect(secondBadge!.textContent!.trim()).toBe('1');
+  });
+});
+
 describe('Shell', () => {
   let component: Shell;
   let fixture: ComponentFixture<Shell>;
   let themeService: ThemeService;
 
   beforeEach(async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ items: [] }));
+
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.style.removeProperty('color-scheme');
@@ -35,6 +143,7 @@ describe('Shell', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.clear();
     document.documentElement.lang = 'en';

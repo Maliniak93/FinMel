@@ -2065,6 +2065,25 @@
         }
       }
     },
+    "/api/portfolio/planning/overdue": {
+      "get": {
+        "tags": [
+          "GetOverdueOccurrencesEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverdueOccurrencesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/securities": {
       "get": {
         "tags": [
@@ -4383,6 +4402,49 @@
           }
         }
       },
+      "IncomeBalanceResponse": {
+        "required": [
+          "planPln",
+          "actualPln",
+          "pendingPln",
+          "differencePln"
+        ],
+        "type": "object",
+        "properties": {
+          "planPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "pendingPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "differencePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "IncomeDefinitionResponse": {
         "required": [
           "id",
@@ -4559,7 +4621,8 @@
           "actualDate",
           "difference",
           "actualAmountPln",
-          "depositCreated"
+          "depositCreated",
+          "overdue"
         ],
         "type": "object",
         "properties": {
@@ -4656,6 +4719,9 @@
           },
           "depositCreated": {
             "type": "boolean"
+          },
+          "overdue": {
+            "type": "boolean"
           }
         }
       },
@@ -4720,6 +4786,71 @@
           "Skipped"
         ]
       },
+      "OverdueOccurrenceResponse": {
+        "required": [
+          "recurringIncomeId",
+          "nominalMonth",
+          "date",
+          "name",
+          "accountId",
+          "accountName",
+          "accountArchived",
+          "amount",
+          "currency"
+        ],
+        "type": "object",
+        "properties": {
+          "recurringIncomeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nominalMonth": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "name": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "accountArchived": {
+            "type": "boolean"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
+      "OverdueOccurrencesResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverdueOccurrenceResponse"
+            }
+          }
+        }
+      },
       "PagedResponseOfTransactionResponse": {
         "required": [
           "items",
@@ -4776,7 +4907,7 @@
       "PlanningIncomesResponse": {
         "required": [
           "occurrences",
-          "totalPln",
+          "balance",
           "fxUnavailable",
           "definitions"
         ],
@@ -4788,13 +4919,8 @@
               "$ref": "#/components/schemas/IncomeOccurrenceResponse"
             }
           },
-          "totalPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
+          "balance": {
+            "$ref": "#/components/schemas/IncomeBalanceResponse"
           },
           "fxUnavailable": {
             "type": "boolean"
@@ -6432,6 +6558,9 @@
     },
     {
       "name": "GetPlanningMonthEndpoint"
+    },
+    {
+      "name": "GetOverdueOccurrencesEndpoint"
     },
     {
       "name": "ListSecuritiesEndpoint"

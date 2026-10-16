@@ -554,6 +554,9 @@ namespace Skarbiec.Portfolio.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateOnly>("CreatedOn")
+                        .HasColumnType("date");
+
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 

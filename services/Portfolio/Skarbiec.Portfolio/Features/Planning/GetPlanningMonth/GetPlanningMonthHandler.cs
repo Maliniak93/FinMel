@@ -75,10 +75,11 @@ public sealed class GetPlanningMonthHandler(
             .Distinct()
             .ToList();
 
+        var today = WarsawCalendar.Today(timeProvider);
         var rates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         if (foreign.Count > 0)
         {
-            var lookup = await quoteLookup.GetRatesAsync(foreign, WarsawCalendar.Today(timeProvider), cancellationToken);
+            var lookup = await quoteLookup.GetRatesAsync(foreign, today, cancellationToken);
             if (lookup.Status == InstrumentQuoteLookupStatus.Found)
             {
                 foreach (var (currency, rate) in lookup.Rates!)
@@ -130,7 +131,9 @@ public sealed class GetPlanningMonthHandler(
                     ActualDate = settlement?.ActualDate,
                     Difference = p.Stored is null ? null : (settlement?.ActualAmount ?? 0m) - p.Amount,
                     ActualAmountPln = settlement is null ? null : Round(settlement.ActualAmount!.Value * settlement.FxRateToPln!.Value),
-                    DepositCreated = settlement?.TransactionId is not null
+                    DepositCreated = settlement?.TransactionId is not null,
+                    Overdue = (p.Stored?.Status ?? OccurrenceStatus.Pending) == OccurrenceStatus.Pending
+                        && p.Date < today && p.Date >= p.Income.CreatedOn
                 };
             })
             .ToList();
@@ -188,7 +191,15 @@ public sealed class GetPlanningMonthHandler(
             Incomes = new PlanningIncomesResponse
             {
                 Occurrences = occurrences,
-                TotalPln = occurrences.Sum(o => o.AmountPln ?? 0m),
+                Balance = new IncomeBalanceResponse
+                {
+                    PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m),
+                    ActualPln = occurrences.Sum(o => o.ActualAmountPln ?? 0m),
+                    PendingPln = occurrences.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m),
+                    DifferencePln = occurrences
+                        .Where(o => o.Status != OccurrenceStatus.Pending)
+                        .Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
+                },
                 FxUnavailable = foreign.Any(c => !rates.ContainsKey(c)),
                 Definitions = definitions
             }
