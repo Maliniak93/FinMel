@@ -19,9 +19,11 @@ import {
   type IncomeDefinitionResponse,
   type IncomeOccurrenceResponse,
   type OccurrenceStatus,
+  type OverdueOccurrenceResponse,
   type RecurringIncomeStatus,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { PlanningState } from '../../core/planning/planning-state';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatMonth } from '../../shared/format';
@@ -77,6 +79,9 @@ export class Planning {
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly planningState = inject(PlanningState);
+
+  protected readonly overdue = this.planningState.overdue;
 
   readonly month = input<string>();
 
@@ -160,7 +165,9 @@ export class Planning {
     this.reloadWhenSaved(ref.afterClosed());
   }
 
-  protected async skipOccurrence(occurrence: IncomeOccurrenceResponse): Promise<void> {
+  protected async skipOccurrence(
+    occurrence: Pick<IncomeOccurrenceResponse, 'recurringIncomeId' | 'nominalMonth'>,
+  ): Promise<void> {
     const result = await putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip({
       path: { id: occurrence.recurringIncomeId, month: occurrence.nominalMonth },
     });
@@ -172,7 +179,24 @@ export class Planning {
       return;
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
+  }
+
+  protected openSettleOverdueDialog(item: OverdueOccurrenceResponse): void {
+    this.openSettleDialog({
+      ...item,
+      amountPln: null,
+      estimated: false,
+      status: 'Pending',
+      outOfRule: false,
+      plannedAccountId: item.accountId,
+      actualAmount: null,
+      actualDate: null,
+      difference: null,
+      actualAmountPln: null,
+      depositCreated: false,
+      overdue: true,
+    });
   }
 
   protected async undoOccurrence(occurrence: IncomeOccurrenceResponse): Promise<void> {
@@ -206,7 +230,7 @@ export class Planning {
       return;
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
   }
 
   protected changeMonthLabel(effectiveFrom: string): string {
@@ -250,7 +274,7 @@ export class Planning {
       return;
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
   }
 
   protected openEndDialog(definition: IncomeDefinitionResponse): void {
@@ -289,7 +313,12 @@ export class Planning {
       return;
     }
 
+    this.reloadAll();
+  }
+
+  private reloadAll(): void {
     this.monthResource.reload();
+    this.planningState.reloadOverdue();
   }
 
   private reloadWhenSaved(closed: {
@@ -297,7 +326,7 @@ export class Planning {
   }): void {
     closed.subscribe((saved) => {
       if (saved) {
-        this.monthResource.reload();
+        this.reloadAll();
       }
     });
   }

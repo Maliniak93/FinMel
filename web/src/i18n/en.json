@@ -594,8 +594,18 @@
     "archivedAccount": "account archived — change the account",
     "estimate": "≈ {{ amount }}",
     "estimateUnavailable": "estimate unavailable",
-    "total": "Month total: {{ amount }}",
-    "totalIncomplete": "incomplete — an exchange rate is missing",
+    "balance": {
+      "title": "Month balance",
+      "plan": "Plan",
+      "actual": "Actual",
+      "pending": "Pending",
+      "difference": "Difference",
+      "incomplete": "incomplete — an exchange rate is missing"
+    },
+    "overdue": {
+      "title": "To settle",
+      "badge": "Overdue occurrences"
+    },
     "loadFailed": "Failed to load the plan.",
     "incomes": {
       "title": "Income",

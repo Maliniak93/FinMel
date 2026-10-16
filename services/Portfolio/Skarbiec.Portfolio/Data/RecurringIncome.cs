@@ -9,6 +9,7 @@ public sealed class RecurringIncome : IUserOwned
     public required string Name { get; set; }
     public required DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
+    public required DateOnly CreatedOn { get; init; }
 
     public List<RecurringIncomeVersion> Versions { get; init; } = [];
 }

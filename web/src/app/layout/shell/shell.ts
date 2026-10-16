@@ -9,6 +9,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AuthService } from '../../core/auth/auth';
+import { PlanningState } from '../../core/planning/planning-state';
 import { ThemeService, type ThemePreference } from '../../core/theme/theme';
 import { LanguageSwitch } from '../../shared/language-switch/language-switch';
 
@@ -45,6 +46,11 @@ const THEME_NEXT_LABELS: Record<ThemePreference, string> = {
 export class Shell {
   private readonly authService = inject(AuthService);
   protected readonly themeService = inject(ThemeService);
+  protected readonly planningState = inject(PlanningState);
+
+  constructor() {
+    this.planningState.startSession();
+  }
 
   protected readonly navLinks = [
     { path: 'dashboard', label: 'shell.nav.dashboard', icon: 'dashboard' },

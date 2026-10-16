@@ -594,8 +594,18 @@
     "archivedAccount": "konto zarchiwizowane — zmień konto",
     "estimate": "≈ {{ amount }}",
     "estimateUnavailable": "brak szacunku",
-    "total": "Suma miesiąca: {{ amount }}",
-    "totalIncomplete": "niekompletna — brakuje kursu waluty",
+    "balance": {
+      "title": "Bilans miesiąca",
+      "plan": "Plan",
+      "actual": "Faktycznie",
+      "pending": "Oczekuje",
+      "difference": "Różnica",
+      "incomplete": "niekompletny — brakuje kursu waluty"
+    },
+    "overdue": {
+      "title": "Do rozliczenia",
+      "badge": "Zaległe wystąpienia"
+    },
     "loadFailed": "Nie udało się wczytać planu.",
     "incomes": {
       "title": "Wpływy",

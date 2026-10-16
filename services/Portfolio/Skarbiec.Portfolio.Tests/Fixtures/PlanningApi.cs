@@ -21,6 +21,10 @@ internal static class PlanningApi
 
     public static readonly DateTimeOffset PlanningTodayUtc = new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero);
 
+    public static readonly DateTimeOffset CreationDayUtc = new(2026, 10, 15, 10, 0, 0, TimeSpan.Zero);
+
+    public static readonly DateTimeOffset AfterDueDayUtc = new(2026, 11, 12, 10, 0, 0, TimeSpan.Zero);
+
     public sealed record OccurrenceView(
         Guid RecurringIncomeId,
         string NominalMonth,
@@ -40,7 +44,8 @@ internal static class PlanningApi
         DateOnly? ActualDate,
         decimal? Difference,
         decimal? ActualAmountPln,
-        bool DepositCreated);
+        bool DepositCreated,
+        bool Overdue);
 
     public sealed record DefinitionView(
         Guid Id,
@@ -70,10 +75,36 @@ internal static class PlanningApi
         int? DayOfMonth,
         JsonElement Shift);
 
+    public sealed record BalanceView(decimal PlanPln, decimal ActualPln, decimal PendingPln, decimal DifferencePln);
+
     public sealed record IncomesView(
-        List<OccurrenceView> Occurrences, decimal TotalPln, bool FxUnavailable, List<DefinitionView> Definitions);
+        List<OccurrenceView> Occurrences, BalanceView Balance, bool FxUnavailable, List<DefinitionView> Definitions);
 
     public sealed record PlanningMonthView(IncomesView Incomes);
+
+    public sealed record OverdueItemView(
+        Guid RecurringIncomeId,
+        string NominalMonth,
+        DateOnly Date,
+        string Name,
+        Guid AccountId,
+        string AccountName,
+        bool AccountArchived,
+        decimal Amount,
+        string Currency);
+
+    public sealed record OverdueView(List<OverdueItemView> Items);
+
+    public const string OverdueUri = "/api/portfolio/planning/overdue";
+
+    public static async Task<OverdueView> GetOverdueOccurrencesAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(OverdueUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<OverdueView>(cancellationToken))!;
+    }
 
     public static string RecurringIncomeUri(Guid id) => $"{RecurringIncomesUri}/{id}";
 

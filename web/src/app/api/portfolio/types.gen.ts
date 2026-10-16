@@ -372,6 +372,13 @@ export type EndRecurringIncomeRequest = {
     endDate: string;
 };
 
+export type IncomeBalanceResponse = {
+    planPln: number | string;
+    actualPln: number | string;
+    pendingPln: number | string;
+    differencePln: number | string;
+};
+
 export type IncomeDefinitionResponse = {
     id: string;
     name: string;
@@ -422,6 +429,7 @@ export type IncomeOccurrenceResponse = {
     difference: null | number | string;
     actualAmountPln: null | number | string;
     depositCreated: boolean;
+    overdue: boolean;
 };
 
 export type Metal = number;
@@ -438,6 +446,22 @@ export type MetalResponse = {
 
 export type OccurrenceStatus = 'Pending' | 'Settled' | 'Skipped';
 
+export type OverdueOccurrenceResponse = {
+    recurringIncomeId: string;
+    nominalMonth: string;
+    date: string;
+    name: string;
+    accountId: string;
+    accountName: string;
+    accountArchived: boolean;
+    amount: number | string;
+    currency: string;
+};
+
+export type OverdueOccurrencesResponse = {
+    items: Array<OverdueOccurrenceResponse>;
+};
+
 export type PagedResponseOfTransactionResponse = {
     items: Array<TransactionResponse>;
     page: number | string;
@@ -451,7 +475,7 @@ export type PayOutDepositRequest = {
 
 export type PlanningIncomesResponse = {
     occurrences: Array<IncomeOccurrenceResponse>;
-    totalPln: number | string;
+    balance: IncomeBalanceResponse;
     fxUnavailable: boolean;
     definitions: Array<IncomeDefinitionResponse>;
 };
@@ -1839,6 +1863,22 @@ export type GetApiPortfolioPlanningMonthsByMonthResponses = {
 };
 
 export type GetApiPortfolioPlanningMonthsByMonthResponse = GetApiPortfolioPlanningMonthsByMonthResponses[keyof GetApiPortfolioPlanningMonthsByMonthResponses];
+
+export type GetApiPortfolioPlanningOverdueData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/planning/overdue';
+};
+
+export type GetApiPortfolioPlanningOverdueResponses = {
+    /**
+     * OK
+     */
+    200: OverdueOccurrencesResponse;
+};
+
+export type GetApiPortfolioPlanningOverdueResponse = GetApiPortfolioPlanningOverdueResponses[keyof GetApiPortfolioPlanningOverdueResponses];
 
 export type GetApiPortfolioSecuritiesData = {
     body?: never;

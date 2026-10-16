@@ -1242,8 +1242,12 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/changes/2027-01
 Authorization: Bearer {{authToken}}
 
-### Read a month (yyyy-MM, 2011-01 to 2099-12, else 400): occurrences by date then name, the PLN total (fxUnavailable when a foreign rate is missing) and every definition with its status, effectiveFrom and nextChange
+### Read a month (yyyy-MM, 2011-01 to 2099-12, else 400): occurrences by date then name (overdue flagged), the PLN balance (plan, actual, pending, difference; fxUnavailable when a foreign rate is missing) and every definition with its status, effectiveFrom and nextChange
 GET {{baseUrl}}/api/portfolio/planning/months/2026-10
+Authorization: Bearer {{authToken}}
+
+### List the overdue occurrences: pending, planned before today and not before the income was created, by date then name
+GET {{baseUrl}}/api/portfolio/planning/overdue
 Authorization: Bearer {{authToken}}
 
 ### Settle an occurrence by its nominal month (yyyy-MM, 2011-01 to 2099-12); creates or edits the settlement, freezes the plan and the FX rate of actualDate (204; 400 Validation.CurrencyMismatch / Validation.FxRateMissing / Validation.ActualDateInFuture; 404 when the rule does not generate the month; 409 Conflict.AccountArchived); createDeposit (default false) also writes, moves or removes a locked Deposit on the account's cash (400 Validation.InsufficientFunds when a replay goes negative; 409 Conflict.AccountArchived on an archived account)

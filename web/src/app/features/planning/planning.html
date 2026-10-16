@@ -24,6 +24,44 @@
     </div>
   </div>
 
+  @if (overdue().length > 0) {
+    <section class="planning-section" data-testid="overdue-section">
+      <h2>{{ 'planning.overdue.title' | transloco }}</h2>
+      <table class="planning-table">
+        <tbody>
+          @for (item of overdue(); track item.recurringIncomeId + item.nominalMonth) {
+            <tr data-testid="overdue-row">
+              <td>{{ formatDate(item.date) }}</td>
+              <td>{{ item.name }}</td>
+              <td>{{ item.accountName }}</td>
+              <td class="planning-table__amount">
+                {{ formatMoney(item.amount, item.currency) }}
+              </td>
+              <td class="planning-table__actions">
+                <button
+                  mat-button
+                  type="button"
+                  data-testid="settle-overdue"
+                  (click)="openSettleOverdueDialog(item)"
+                >
+                  {{ 'planning.occurrence.settle' | transloco }}
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  data-testid="skip-overdue"
+                  (click)="skipOccurrence(item)"
+                >
+                  {{ 'planning.occurrence.skip' | transloco }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+
   @if (monthResource.error(); as loadError) {
     <div class="planning-page__state" role="alert">
       <p>{{ loadError.message }}</p>
@@ -70,7 +108,10 @@
               occurrence of plan.occurrences;
               track occurrence.recurringIncomeId + occurrence.nominalMonth
             ) {
-              <tr data-testid="occurrence-row">
+              <tr
+                data-testid="occurrence-row"
+                [class.planning-table__row--overdue]="occurrence.overdue"
+              >
                 <td>{{ formatDate(occurrence.date) }}</td>
                 <td>{{ occurrence.name }}</td>
                 <td>
@@ -177,14 +218,32 @@
         </table>
       }
 
-      <p class="planning-section__total">
-        {{ 'planning.total' | transloco: { amount: formatMoney(plan.totalPln, 'PLN') } }}
+      <div class="planning-balance">
+        <h3>{{ 'planning.balance.title' | transloco }}</h3>
+        <dl class="planning-balance__values">
+          <div data-testid="balance-plan">
+            <dt>{{ 'planning.balance.plan' | transloco }}</dt>
+            <dd>{{ formatMoney(plan.balance.planPln, 'PLN') }}</dd>
+          </div>
+          <div data-testid="balance-actual">
+            <dt>{{ 'planning.balance.actual' | transloco }}</dt>
+            <dd>{{ formatMoney(plan.balance.actualPln, 'PLN') }}</dd>
+          </div>
+          <div data-testid="balance-pending">
+            <dt>{{ 'planning.balance.pending' | transloco }}</dt>
+            <dd>{{ formatMoney(plan.balance.pendingPln, 'PLN') }}</dd>
+          </div>
+          <div data-testid="balance-difference">
+            <dt>{{ 'planning.balance.difference' | transloco }}</dt>
+            <dd>{{ formatMoney(plan.balance.differencePln, 'PLN') }}</dd>
+          </div>
+        </dl>
         @if (plan.fxUnavailable) {
-          <span class="planning-section__incomplete" data-testid="total-incomplete">
-            {{ 'planning.totalIncomplete' | transloco }}
+          <span class="planning-section__incomplete" data-testid="balance-incomplete">
+            {{ 'planning.balance.incomplete' | transloco }}
           </span>
         }
-      </p>
+      </div>
 
       <h3>{{ 'planning.definitions.title' | transloco }}</h3>
       @if (plan.definitions.length === 0) {

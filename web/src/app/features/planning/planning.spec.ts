@@ -43,6 +43,7 @@ function occurrence(
     difference: null,
     actualAmountPln: null,
     depositCreated: false,
+    overdue: false,
     ...extra,
   };
 }
@@ -83,11 +84,29 @@ function nextChange(extra: Record<string, unknown> = {}): Record<string, unknown
   };
 }
 
+function balance(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { planPln: 0, actualPln: 0, pendingPln: 0, differencePln: 0, ...extra };
+}
+
+function overdueItem(name: string, date: string, amount: number): Record<string, unknown> {
+  return {
+    recurringIncomeId: `id-${name}`,
+    nominalMonth: date.slice(0, 7),
+    date,
+    name,
+    accountId,
+    accountName: 'mBank ROR',
+    accountArchived: false,
+    amount,
+    currency: 'PLN',
+  };
+}
+
 function month(incomes: Record<string, unknown>): Record<string, unknown> {
   return {
     incomes: {
       occurrences: [],
-      totalPln: 0,
+      balance: balance(),
       fxUnavailable: false,
       definitions: [],
       ...incomes,
@@ -100,6 +119,7 @@ describe('Planning', () => {
   let component: Planning;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let responses: Record<string, Record<string, unknown>>;
+  let overdueItems: Record<string, unknown>[];
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
@@ -109,6 +129,7 @@ describe('Planning', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 9, 20, 12));
     responses = {};
+    overdueItems = [];
   });
 
   afterEach(() => {
@@ -119,8 +140,11 @@ describe('Planning', () => {
   async function setup(url = '/planning'): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const requested = /\/planning\/months\/(\d{4}-\d{2})/.exec(requestUrl(input));
-      if ((input as Request).method === 'DELETE') {
+      if ((input as Request).method === 'DELETE' || (input as Request).method === 'PUT') {
         return new Response(null, { status: 204 });
+      }
+      if (requestUrl(input).includes('/planning/overdue')) {
+        return jsonResponse({ items: overdueItems });
       }
       if (!requested) {
         return jsonResponse({ detail: 'Not found.' }, 404);
@@ -214,7 +238,7 @@ describe('Planning', () => {
           estimated: true,
         }),
       ],
-      totalPln: 11050,
+      balance: balance({ planPln: 11050 }),
       fxUnavailable: true,
       definitions: [definition('Wypłata żona'), definition('Najem EUR')],
     });
@@ -235,7 +259,7 @@ describe('Planning', () => {
     expect(rows('archived-warning')).toHaveLength(1);
     expect(occurrenceRows[2].querySelector('[data-testid="archived-warning"]')).not.toBeNull();
     expect(element().textContent).toContain(formatMoney(11050, 'PLN'));
-    expect(rows('total-incomplete')).toHaveLength(1);
+    expect(rows('balance-incomplete')).toHaveLength(1);
     expect(rows('definition-row')).toHaveLength(2);
   });
 
@@ -315,7 +339,7 @@ describe('Planning', () => {
           actualAmountPln: 300,
         }),
       ],
-      totalPln: 10800,
+      balance: balance({ planPln: 10800 }),
     });
     await setup();
 
@@ -399,14 +423,92 @@ describe('Planning', () => {
     });
   });
 
-  it('marks nothing incomplete when every rate is known', async () => {
+  function overdueRequests(): number {
+    return fetchSpy.mock.calls.filter((call: unknown[]) =>
+      requestUrl(call[0]).includes('/planning/overdue'),
+    ).length;
+  }
+
+  it('lists overdue occurrences in a section with settle and skip, highlights them in the month and shows the balance', async () => {
+    overdueItems = [
+      overdueItem('800+', '2026-09-10', 800),
+      overdueItem('Pensja', '2026-09-12', 500),
+    ];
     responses['2026-10'] = month({
-      occurrences: [occurrence('Wypłata żona', '2026-10-09', 6500)],
-      totalPln: 6500,
+      occurrences: [
+        occurrence('Pensja', '2026-10-05', 500, { overdue: true }),
+        occurrence('Wypłata', '2026-10-30', 9200),
+      ],
+      balance: balance({ planPln: 9700, actualPln: 0, pendingPln: 9700, differencePln: -56.73 }),
     });
     await setup();
 
-    expect(rows('total-incomplete')).toHaveLength(0);
+    const section = rows('overdue-section');
+    expect(section).toHaveLength(1);
+    const overdueRows = rows('overdue-row');
+    expect(overdueRows).toHaveLength(2);
+    expect(overdueRows[0].textContent).toContain('800+');
+    expect(overdueRows[0].textContent).toContain('mBank ROR');
+    expect(overdueRows[0].textContent).toContain(formatMoney(800, 'PLN'));
+    expect(overdueRows[0].querySelector('[data-testid="settle-overdue"]')).not.toBeNull();
+    expect(overdueRows[0].querySelector('[data-testid="skip-overdue"]')).not.toBeNull();
+
+    overdueRows[0].querySelector<HTMLElement>('[data-testid="settle-overdue"]')!.click();
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      SettleOccurrenceDialog,
+      expect.objectContaining({
+        data: {
+          occurrence: expect.objectContaining({
+            recurringIncomeId: 'id-800+',
+            nominalMonth: '2026-09',
+          }),
+        },
+      }),
+    );
+
+    const [overdueRow, regularRow] = rows('occurrence-row');
+    expect(overdueRow.classList.contains('planning-table__row--overdue')).toBe(true);
+    expect(regularRow.classList.contains('planning-table__row--overdue')).toBe(false);
+
+    const text = (testId: string): string => rows(testId)[0].textContent!;
+    expect(text('balance-plan')).toContain(formatMoney(9700, 'PLN'));
+    expect(text('balance-actual')).toContain(formatMoney(0, 'PLN'));
+    expect(text('balance-pending')).toContain(formatMoney(9700, 'PLN'));
+    expect(text('balance-difference')).toContain(formatMoney(-56.73, 'PLN'));
+  });
+
+  it('hides the overdue section when nothing is overdue', async () => {
+    await setup();
+
+    expect(rows('overdue-section')).toHaveLength(0);
+    expect(rows('overdue-row')).toHaveLength(0);
+  });
+
+  it('reloads the overdue list after a settle and after a skip', async () => {
+    overdueItems = [overdueItem('800+', '2026-09-10', 800)];
+    await setup();
+    const loaded = overdueRequests();
+    expect(loaded).toBeGreaterThan(0);
+
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+    click('settle-overdue');
+    await vi.waitFor(() => expect(overdueRequests()).toBeGreaterThan(loaded));
+    const afterSettle = overdueRequests();
+
+    click('skip-overdue');
+    await vi.waitFor(() => expect(overdueRequests()).toBeGreaterThan(afterSettle));
+  });
+
+  it('marks nothing incomplete when every rate is known', async () => {
+    responses['2026-10'] = month({
+      occurrences: [occurrence('Wypłata żona', '2026-10-09', 6500)],
+      balance: balance({ planPln: 6500 }),
+    });
+    await setup();
+
+    expect(rows('balance-incomplete')).toHaveLength(0);
     expect(rows('archived-warning')).toHaveLength(0);
     expect(element().textContent).toContain(formatMoney(6500, 'PLN'));
   });

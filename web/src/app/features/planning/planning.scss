@@ -39,9 +39,29 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
-.planning-section__total {
+.planning-balance {
   margin: 16px 0 24px;
-  font-weight: 500;
+}
+
+.planning-balance__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0;
+
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 500;
+  }
+}
+
+.planning-table__row--overdue {
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
 }
 
 .planning-section__incomplete {

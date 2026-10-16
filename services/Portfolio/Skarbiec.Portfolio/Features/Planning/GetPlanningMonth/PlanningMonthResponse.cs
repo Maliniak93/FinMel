@@ -13,13 +13,27 @@ public sealed record PlanningIncomesResponse
 {
     public required IReadOnlyList<IncomeOccurrenceResponse> Occurrences { get; init; }
 
-    /// <summary>PLN sum of the occurrences whose PLN amount is known.</summary>
-    public required decimal TotalPln { get; init; }
+    public required IncomeBalanceResponse Balance { get; init; }
 
-    /// <summary>True when a needed FX rate is missing, so the total is incomplete.</summary>
+    /// <summary>True when a needed FX rate is missing, so the balance is incomplete.</summary>
     public required bool FxUnavailable { get; init; }
 
     public required IReadOnlyList<IncomeDefinitionResponse> Definitions { get; init; }
+}
+
+public sealed record IncomeBalanceResponse
+{
+    /// <summary>PLN sum of every occurrence's plan whose PLN amount is known.</summary>
+    public required decimal PlanPln { get; init; }
+
+    /// <summary>PLN sum of the settled actual amounts at the frozen rate.</summary>
+    public required decimal ActualPln { get; init; }
+
+    /// <summary>PLN sum of the pending plans.</summary>
+    public required decimal PendingPln { get; init; }
+
+    /// <summary>Actual minus plan of the settled and skipped occurrences.</summary>
+    public required decimal DifferencePln { get; init; }
 }
 
 public sealed record IncomeOccurrenceResponse
@@ -63,6 +77,9 @@ public sealed record IncomeOccurrenceResponse
 
     /// <summary>True when the settlement created a cash deposit on its account.</summary>
     public required bool DepositCreated { get; init; }
+
+    /// <summary>True when the occurrence is pending, planned before today and not before the income was created.</summary>
+    public required bool Overdue { get; init; }
 }
 
 public sealed record IncomeDefinitionResponse

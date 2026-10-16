@@ -101,7 +101,7 @@ public sealed class RecurringIncomeEndpointTests(SkarbiecContainersFixture conta
 
         var occurrence = Assert.Single(october.Occurrences);
         Assert.True(occurrence.AccountArchived);
-        Assert.Equal(1_000m, october.TotalPln);
+        Assert.Equal(1_000m, october.Balance.PlanPln);
         Assert.True(Assert.Single(october.Definitions).AccountArchived);
     }
 

@@ -170,7 +170,7 @@ public sealed class RecurringIncomeOccurrenceEndpointTests(SkarbiecContainersFix
         var skipped = skippedMonth.Occurrence("2026-10");
         Assert.Equal("Skipped", skipped.Status);
         Assert.Equal(-800m, skipped.Difference);
-        Assert.Equal(800m, skippedMonth.TotalPln);
+        Assert.Equal(800m, skippedMonth.Balance.PlanPln);
 
         var skipAgain = await client.PutAsync(SkipOccurrenceUri(income, "2026-10"), content: null, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, skipAgain.StatusCode);
