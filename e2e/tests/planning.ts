@@ -121,7 +121,11 @@ export interface IncomeInput {
   shift?: 'Bez przesunięcia' | 'Poprzedni dzień roboczy' | 'Następny dzień roboczy';
 }
 
-async function fillRule(page: Page, dialog: Locator, income: IncomeInput): Promise<void> {
+export async function fillRule(
+  page: Page,
+  dialog: Locator,
+  income: Pick<IncomeInput, 'interval' | 'day' | 'shift'>,
+): Promise<void> {
   await dialog.getByRole('spinbutton', { name: 'Powtarzaj co (miesięcy)' }).fill(income.interval);
   const dayKind = dialog.getByRole('combobox', { name: 'Dzień', exact: true });
   if (income.day === 'last') {
