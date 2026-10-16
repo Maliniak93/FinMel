@@ -53,6 +53,24 @@ public sealed record ExpenseDefinitionResponse
 
     /// <summary>The first payment on or after the viewed month, null when none falls within the next 24 months.</summary>
     public required ExpenseNextPaymentResponse? NextPayment { get; init; }
+
+    /// <summary>The month (yyyy-MM) the amount and rule above took effect from.</summary>
+    public required string EffectiveFrom { get; init; }
+
+    /// <summary>The earliest scheduled change after the viewed month, null when there is none.</summary>
+    public required ExpenseNextChangeResponse? NextChange { get; init; }
+}
+
+public sealed record ExpenseNextChangeResponse
+{
+    /// <summary>The month (yyyy-MM) the change takes effect from.</summary>
+    public required string EffectiveFrom { get; init; }
+
+    public required decimal Amount { get; init; }
+    public required int IntervalMonths { get; init; }
+    public required RecurrenceDayKind DayKind { get; init; }
+    public required int? DayOfMonth { get; init; }
+    public required BusinessDayShift Shift { get; init; }
 }
 
 public sealed record ExpenseNextPaymentResponse

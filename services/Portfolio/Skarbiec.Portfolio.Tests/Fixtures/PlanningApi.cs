@@ -97,7 +97,17 @@ internal static class PlanningApi
         int? DayOfMonth,
         JsonElement Shift,
         decimal ReservePln,
-        NextPaymentView? NextPayment);
+        NextPaymentView? NextPayment,
+        string EffectiveFrom,
+        ExpenseNextChangeView? NextChange);
+
+    public sealed record ExpenseNextChangeView(
+        string EffectiveFrom,
+        decimal Amount,
+        int IntervalMonths,
+        JsonElement DayKind,
+        int? DayOfMonth,
+        JsonElement Shift);
 
     public sealed record ExpensesView(
         List<ExpensePaymentView> Payments, decimal CostPln, List<ExpenseDefinitionView> Definitions);
@@ -168,6 +178,58 @@ internal static class PlanningApi
         response.EnsureSuccessStatusCode();
     }
 
+    public static string RecurringExpenseChangeUri(Guid id, string month) => $"{RecurringExpenseUri(id)}/changes/{month}";
+
+    public static object UpdateRecurringExpenseBody(
+        string effectiveFrom,
+        string name = "Rachunki",
+        decimal amount = 1_000m,
+        DateOnly? startDate = null,
+        DateOnly? endDate = null,
+        int intervalMonths = 1,
+        RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
+        int? dayOfMonth = 10,
+        BusinessDayShift shift = BusinessDayShift.None) => new
+        {
+            name,
+            startDate = startDate ?? new DateOnly(2026, 1, 1),
+            endDate,
+            effectiveFrom,
+            amount,
+            intervalMonths,
+            dayKind = (int)dayKind,
+            dayOfMonth = dayKind == RecurrenceDayKind.LastBusinessDay ? null : dayOfMonth,
+            shift = (int)shift
+        };
+
+    public static async Task UpdateRecurringExpenseAsync(
+        this HttpClient client,
+        Guid id,
+        string effectiveFrom,
+        CancellationToken cancellationToken,
+        string name = "Rachunki",
+        decimal amount = 1_000m,
+        DateOnly? startDate = null,
+        DateOnly? endDate = null,
+        int intervalMonths = 1,
+        RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
+        int? dayOfMonth = 10,
+        BusinessDayShift shift = BusinessDayShift.None)
+    {
+        var response = await client.PutAsJsonAsync(
+            RecurringExpenseUri(id),
+            UpdateRecurringExpenseBody(effectiveFrom, name, amount, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task DeleteRecurringExpenseChangeAsync(
+        this HttpClient client, Guid id, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(RecurringExpenseChangeUri(id, month), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
     // "Życie" 3 000 on day 1 and "Rachunki" 1 000 on day 10, monthly from 2026-01-01.
     public static async Task CreateLivingExpensesAsync(this HttpClient client, CancellationToken cancellationToken)
     {
@@ -175,10 +237,12 @@ internal static class PlanningApi
         await client.CreateRecurringExpenseAsync(cancellationToken, "Rachunki", 1_000m, dayOfMonth: 10);
     }
 
+    public static readonly DateOnly OcToyotaStart = new(2027, 3, 15);
+
     // "OC Toyota" 1 200 every 12 months on day 15, starting 2027-03-15.
     public static Task<Guid> CreateOcToyotaAsync(this HttpClient client, CancellationToken cancellationToken) =>
         client.CreateRecurringExpenseAsync(
-            cancellationToken, "OC Toyota", 1_200m, new DateOnly(2027, 3, 15), intervalMonths: 12, dayOfMonth: 15);
+            cancellationToken, "OC Toyota", 1_200m, OcToyotaStart, intervalMonths: 12, dayOfMonth: 15);
 
     public sealed record HouseholdIncomes(
         BankAccountsApi.BankAccount Account, Guid Dominik, Guid Zona, Guid Plus800);
@@ -417,6 +481,12 @@ internal static class PlanningApi
 
         return (await response.Content.ReadFromJsonAsync<PlanningMonthView>(cancellationToken))!;
     }
+
+    public static async Task<ExpenseDefinitionView> ExpenseDefinitionAsync(
+        this HttpClient client, Guid id, string month, CancellationToken cancellationToken) =>
+        Assert.Single(
+            (await client.GetPlanningMonthAsync(month, cancellationToken)).Expenses.Definitions,
+            definition => definition.Id == id);
 
     public static bool Is<TEnum>(this JsonElement element, TEnum expected) where TEnum : struct, Enum =>
         element.ValueKind == JsonValueKind.String

@@ -404,6 +404,17 @@ export type ExpenseDefinitionResponse = {
     shift: BusinessDayShift;
     reservePln: number | string;
     nextPayment: null | ExpenseNextPaymentResponse;
+    effectiveFrom: string;
+    nextChange: null | ExpenseNextChangeResponse;
+};
+
+export type ExpenseNextChangeResponse = {
+    effectiveFrom: string;
+    amount: number | string;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth: null | number | string;
+    shift: BusinessDayShift;
 };
 
 export type ExpenseNextPaymentResponse = {
@@ -748,6 +759,18 @@ export type UpdateMetalRequest = {
     metal: Metal;
     fineWeight: number | string;
     weightUnit: WeightUnit;
+};
+
+export type UpdateRecurringExpenseRequest = {
+    name: string;
+    startDate: string;
+    endDate?: null | string;
+    effectiveFrom: string;
+    amount: number | string;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth?: null | number | string;
+    shift: BusinessDayShift;
 };
 
 export type UpdateRecurringIncomeRequest = {
@@ -1901,6 +1924,43 @@ export type DeleteApiPortfolioRecurringExpensesByIdResponses = {
 };
 
 export type DeleteApiPortfolioRecurringExpensesByIdResponse = DeleteApiPortfolioRecurringExpensesByIdResponses[keyof DeleteApiPortfolioRecurringExpensesByIdResponses];
+
+export type PutApiPortfolioRecurringExpensesByIdData = {
+    body: UpdateRecurringExpenseRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-expenses/{id}';
+};
+
+export type PutApiPortfolioRecurringExpensesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioRecurringExpensesByIdResponse = PutApiPortfolioRecurringExpensesByIdResponses[keyof PutApiPortfolioRecurringExpensesByIdResponses];
+
+export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthData = {
+    body?: never;
+    path: {
+        id: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-expenses/{id}/changes/{month}';
+};
+
+export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponse = DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses[keyof DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses];
 
 export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementData = {
     body: SettleOccurrenceRequest;

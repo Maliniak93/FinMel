@@ -120,6 +120,20 @@ function expenseDefinition(
     shift: 0,
     reservePln: 1000,
     nextPayment: null,
+    effectiveFrom: '2026-01',
+    nextChange: null,
+    ...extra,
+  };
+}
+
+function expenseNextChange(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    effectiveFrom: '2027-01',
+    amount: 1320,
+    intervalMonths: 12,
+    dayKind: 0,
+    dayOfMonth: 15,
+    shift: 0,
     ...extra,
   };
 }
@@ -603,6 +617,70 @@ describe('Planning', () => {
       definitions[0].querySelector('[data-testid="expense-next-payment"]')!.textContent,
     ).toContain('15');
     expect(definitions[1].querySelector('[data-testid="expense-next-payment"]')).toBeNull();
+  });
+
+  it('shows the next scheduled expense change with its month and amount and a delete action', async () => {
+    responses['2026-10'] = month(
+      {},
+      {
+        definitions: [
+          expenseDefinition('OC Toyota', {
+            startDate: '2027-03-15',
+            intervalMonths: 12,
+            dayOfMonth: 15,
+            reservePln: 200,
+            nextChange: expenseNextChange(),
+          }),
+          expenseDefinition('Rachunki'),
+        ],
+      },
+    );
+    await setup();
+
+    const changes = rows('expense-next-change');
+    expect(changes).toHaveLength(1);
+    expect(changes[0].textContent).toContain('01.2027');
+    expect(changes[0].textContent).toContain(formatMoney(1320, 'PLN'));
+    expect(changes[0].querySelector('[data-testid="delete-expense-change"]')).not.toBeNull();
+  });
+
+  it('opens the expense edit dialog with the definition of the viewed month', async () => {
+    responses['2026-10'] = month(
+      {},
+      { definitions: [expenseDefinition('OC Toyota', { effectiveFrom: '2026-01', amount: 1200 })] },
+    );
+    await setup();
+
+    click('edit-expense');
+
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      RecurringExpenseFormDialog,
+      expect.objectContaining({
+        data: { definition: expect.objectContaining({ id: 'expense-OC Toyota' }) },
+      }),
+    );
+  });
+
+  it('deletes the scheduled expense change after confirmation and reloads the month', async () => {
+    responses['2026-10'] = month(
+      {},
+      { definitions: [expenseDefinition('Najem', { nextChange: expenseNextChange() })] },
+    );
+    await setup();
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+
+    click('delete-expense-change');
+
+    await vi.waitFor(() => {
+      const deletes = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'DELETE');
+      expect(deletes).toHaveLength(1);
+      expect(deletes[0].url).toContain('/recurring-expenses/expense-Najem/changes/2027-01');
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
   });
 
   it('opens the add expense dialog from the Wydatki section', async () => {

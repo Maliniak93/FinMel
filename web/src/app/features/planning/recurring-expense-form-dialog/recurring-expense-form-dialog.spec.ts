@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -18,20 +18,25 @@ describe('RecurringExpenseFormDialog', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     fetchSpy.mockRestore();
   });
 
-  async function setup(): Promise<void> {
+  async function setup(data: { definition: Record<string, unknown> } | null = null): Promise<void> {
     dialogRef = { close: vi.fn() };
-    fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(async () => jsonResponse({ id: 'new-expense' }, 201));
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if ((input as Request).method === 'PUT') {
+        return new Response(null, { status: 204 });
+      }
+      return jsonResponse({ id: 'new-expense' }, 201);
+    });
 
     await TestBed.configureTestingModule({
       imports: [RecurringExpenseFormDialog],
       providers: [
         provideI18nTesting(),
         provideNativeDateAdapter(),
+        { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
@@ -62,6 +67,32 @@ describe('RecurringExpenseFormDialog', () => {
     return fetchSpy.mock.calls
       .map((call: unknown[]) => call[0] as Request)
       .filter((request: Request) => request.method === 'POST');
+  }
+
+  function puts(): Request[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter((request: Request) => request.method === 'PUT');
+  }
+
+  function definition(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: 'expense-1',
+      name: 'OC Toyota',
+      startDate: '2027-03-15',
+      endDate: null,
+      status: 'Upcoming',
+      amount: 1200,
+      intervalMonths: 12,
+      dayKind: 0,
+      dayOfMonth: 15,
+      shift: 0,
+      reservePln: 200,
+      nextPayment: null,
+      effectiveFrom: '2026-01',
+      nextChange: null,
+      ...extra,
+    };
   }
 
   it('has no account or currency field', async () => {
@@ -106,6 +137,38 @@ describe('RecurringExpenseFormDialog', () => {
     expect(body.dayOfMonth ?? null).toBeNull();
     expect(body.endDate ?? null).toBeNull();
     expect(body.accountId).toBeUndefined();
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('prefills the viewed month values in edit mode and puts them with the current month as effectiveFrom', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 20, 12));
+    await setup({ definition: definition() });
+
+    expect(component['form'].getRawValue()).toMatchObject({
+      name: 'OC Toyota',
+      amount: 1200,
+      intervalMonths: 12,
+      dayKind: 0,
+      effectiveFrom: '2026-10',
+    });
+    expect(field('effectiveFrom')).not.toBeNull();
+
+    await component['onSubmit']();
+
+    expect(posts()).toHaveLength(0);
+    const [request] = puts();
+    expect(request.url).toContain('/api/portfolio/recurring-expenses/expense-1');
+    expect(await request.json()).toMatchObject({
+      name: 'OC Toyota',
+      startDate: '2027-03-15',
+      effectiveFrom: '2026-10',
+      amount: 1200,
+      intervalMonths: 12,
+      dayKind: 0,
+      dayOfMonth: 15,
+      shift: 0,
+    });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 });

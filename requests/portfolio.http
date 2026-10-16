@@ -1293,6 +1293,27 @@ Content-Type: application/json
   "shift": 0
 }
 
+### Update the expense from a month (204): name, start and end apply to every month; amount and rule from effectiveFrom (yyyy-MM, 2011-01 to 2099-12) on, later changes are kept (409 Conflict.DuplicateName)
+PUT {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "OC Toyota",
+  "startDate": "2027-03-15",
+  "endDate": null,
+  "effectiveFrom": "2027-01",
+  "amount": 1320,
+  "intervalMonths": 12,
+  "dayKind": 0,
+  "dayOfMonth": 15,
+  "shift": 0
+}
+
+### Delete the scheduled change starting in a month (204; 404 when no version starts there; 409 Conflict.FirstVersion for the first one)
+DELETE {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}/changes/2027-01
+Authorization: Bearer {{authToken}}
+
 ### End the expense (204; sets or replaces the end date, past and future allowed)
 POST {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}/end
 Authorization: Bearer {{authToken}}

@@ -413,8 +413,37 @@
                         </span>
                       }
                     }
+                    @if (definition.nextChange; as change) {
+                      <span class="planning-definition__change" data-testid="expense-next-change">
+                        {{
+                          'planning.change.next'
+                            | transloco
+                              : {
+                                  month: changeMonthLabel(change.effectiveFrom),
+                                  amount: formatMoney(change.amount, 'PLN'),
+                                }
+                        }}
+                        <button
+                          mat-icon-button
+                          type="button"
+                          data-testid="delete-expense-change"
+                          [attr.aria-label]="'planning.change.delete' | transloco"
+                          (click)="removeExpenseChange(definition)"
+                        >
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      </span>
+                    }
                   </div>
                   <div class="planning-definition__actions">
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="edit-expense"
+                      (click)="openEditExpenseDialog(definition)"
+                    >
+                      {{ 'planning.edit.action' | transloco }}
+                    </button>
                     <button mat-button type="button" (click)="openEndExpenseDialog(definition)">
                       {{ 'planning.end.action' | transloco }}
                     </button>
