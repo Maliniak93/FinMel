@@ -1,176 +1,27 @@
-import { type Locator, type Page } from '@playwright/test';
 import { expect, logInThroughApi, logInThroughUi, test } from './fixtures';
+import {
+  COMPANY,
+  MBANK,
+  REVOLUT,
+  addIncome,
+  choose,
+  confirmDelete,
+  definition,
+  eur,
+  expectPlan,
+  fillIncome,
+  occurrence,
+  occurrences,
+  openAddDialog,
+  openEditDialog,
+  openMonth,
+  pln,
+  saveEdit,
+} from './planning';
 
 const ACCOUNT_TYPE_BANK = 2;
 const WRAPPER_REGULAR = 0;
 const VARIANT_CURRENT = 0;
-
-const MONTH_NAMES = [
-  'styczeń',
-  'luty',
-  'marzec',
-  'kwiecień',
-  'maj',
-  'czerwiec',
-  'lipiec',
-  'sierpień',
-  'wrzesień',
-  'październik',
-  'listopad',
-  'grudzień',
-];
-
-const MONTH_ABBREVIATIONS = [
-  'sty',
-  'lut',
-  'mar',
-  'kwi',
-  'maj',
-  'cze',
-  'lip',
-  'sie',
-  'wrz',
-  'paź',
-  'lis',
-  'gru',
-];
-
-const MBANK = 'mBank ROR';
-const COMPANY = 'Konto firmowe';
-const REVOLUT = 'Revolut EUR';
-
-// pl-PL leaves out the grouping space in four-digit numbers on some ICU builds, so the space is optional.
-function pln(amount: string): RegExp {
-  return new RegExp(`${amount.replace(/ /g, '\\s?')}\\szł`);
-}
-
-function eur(amount: string): RegExp {
-  return new RegExp(`${amount.replace(/ /g, '\\s?')}\\s(?:EUR|€)`);
-}
-
-function monthTotal(amount: string): RegExp {
-  return new RegExp(`Suma miesiąca:\\s${amount.replace(/ /g, '\\s?')}\\szł`);
-}
-
-function shortDate(iso: string): RegExp {
-  const [year, month, day] = iso.split('-').map(Number) as [number, number, number];
-  return new RegExp(`^${day}\\s${MONTH_ABBREVIATIONS[month - 1]}\\.?\\s${year}`);
-}
-
-function monthLabel(month: string): string {
-  const [year, number] = month.split('-').map(Number) as [number, number];
-  return `${MONTH_NAMES[number - 1]} ${year}`;
-}
-
-function exactly(text: string): RegExp {
-  return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-}
-
-async function openMonth(page: Page, month: string): Promise<void> {
-  await page.goto(`/planning?month=${month}`);
-  await expect(page.getByTestId('month-label')).toHaveText(monthLabel(month));
-  await expect(page.locator('.planning-section__total')).toBeVisible();
-}
-
-function occurrences(page: Page, name: string): Locator {
-  return page
-    .getByTestId('occurrence-row')
-    .filter({ has: page.getByRole('cell', { name: exactly(name) }) });
-}
-
-function occurrence(page: Page, name: string, iso: string): Locator {
-  return occurrences(page, name).filter({ has: page.getByRole('cell', { name: shortDate(iso) }) });
-}
-
-function definition(page: Page, name: string): Locator {
-  return page.getByTestId('definition-row').filter({
-    has: page.locator('.planning-definition__name', { hasText: exactly(name) }),
-  });
-}
-
-async function choose(page: Page, select: Locator, option: string | RegExp): Promise<void> {
-  await select.click();
-  await page
-    .getByRole(
-      'option',
-      typeof option === 'string' ? { name: option, exact: true } : { name: option },
-    )
-    .click();
-}
-
-interface IncomeInput {
-  name: string;
-  amount: string;
-  account: string;
-  start: string;
-  end?: string;
-  interval: string;
-  day: number | 'last';
-  shift?: 'Bez przesunięcia' | 'Poprzedni dzień roboczy' | 'Następny dzień roboczy';
-}
-
-async function fillRule(page: Page, dialog: Locator, income: IncomeInput): Promise<void> {
-  await dialog.getByRole('spinbutton', { name: 'Powtarzaj co (miesięcy)' }).fill(income.interval);
-  const dayKind = dialog.getByRole('combobox', { name: 'Dzień', exact: true });
-  if (income.day === 'last') {
-    await choose(page, dayKind, 'Ostatni dzień roboczy');
-    return;
-  }
-  await choose(page, dayKind, 'Dzień miesiąca');
-  await dialog.getByRole('spinbutton', { name: 'Dzień miesiąca' }).fill(String(income.day));
-  await choose(
-    page,
-    dialog.getByRole('combobox', { name: 'Przesunięcie na dzień roboczy' }),
-    income.shift ?? 'Bez przesunięcia',
-  );
-}
-
-async function openAddDialog(page: Page): Promise<Locator> {
-  await page.getByRole('button', { name: 'Dodaj wpływ' }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Dodaj wpływ cykliczny' })).toBeVisible();
-  return dialog;
-}
-
-async function fillIncome(page: Page, dialog: Locator, income: IncomeInput): Promise<void> {
-  await dialog.getByLabel('Nazwa').fill(income.name);
-  await dialog.getByRole('spinbutton', { name: 'Kwota' }).fill(income.amount);
-  await choose(
-    page,
-    dialog.getByRole('combobox', { name: 'Konto', exact: true }),
-    new RegExp(`^${income.account}`),
-  );
-  await dialog.getByLabel('Data początku').fill(income.start);
-  if (income.end) {
-    await dialog.getByLabel('Data końca').fill(income.end);
-  }
-  await fillRule(page, dialog, income);
-}
-
-async function addIncome(page: Page, income: IncomeInput): Promise<void> {
-  const dialog = await openAddDialog(page);
-  await fillIncome(page, dialog, income);
-  await dialog.getByRole('button', { name: 'Zapisz' }).click();
-  await expect(dialog).toBeHidden();
-}
-
-async function openEditDialog(page: Page, name: string): Promise<Locator> {
-  await definition(page, name).getByTestId('edit-income').click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Edytuj wpływ cykliczny' })).toBeVisible();
-  return dialog;
-}
-
-async function saveEdit(dialog: Locator): Promise<void> {
-  await dialog.getByRole('button', { name: 'Zapisz' }).click();
-  await expect(dialog).toBeHidden();
-}
-
-async function confirmDelete(page: Page): Promise<void> {
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Usuń', exact: true }).click();
-  await expect(dialog).toBeHidden();
-}
 
 test('recurring incomes: define incomes, read any month of /planning, change them from a month', async ({
   page,
@@ -211,7 +62,7 @@ test('recurring incomes: define incomes, read any month of /planning, change the
     await expect(page.getByRole('heading', { name: 'Planowanie', exact: true })).toBeVisible();
     await expect(page.getByTestId('month-label')).toHaveText(/\S+ \d{4}/);
     await expect(page.getByText('W tym miesiącu nie oczekujesz żadnych wpływów.')).toBeVisible();
-    await expect(page.locator('.planning-section__total')).toContainText(monthTotal('0,00'));
+    await expectPlan(page, '0,00');
   });
 
   await test.step('Krok 2: /planning?month=2026-10 shows październik 2026, the arrows go to listopad 2026 and back', async () => {
@@ -270,7 +121,7 @@ test('recurring incomes: define incomes, read any month of /planning, change the
     const row = occurrence(page, '800+', '2026-10-10');
     await expect(row).toBeVisible();
     await expect(row).toContainText(pln('800,00'));
-    await expect(page.locator('.planning-section__total')).toContainText(monthTotal('16 500,00'));
+    await expectPlan(page, '16 500,00');
   });
 
   await test.step('Krok 6: a second 800+ is rejected with the taken-name message', async () => {
@@ -296,7 +147,7 @@ test('recurring incomes: define incomes, read any month of /planning, change the
     await expect(occurrence(page, 'Wypłata żona', '2026-11-10')).toContainText(pln('6 500,00'));
     await expect(occurrence(page, '800+', '2026-11-10')).toContainText(pln('800,00'));
     await expect(occurrence(page, 'Wypłata Dominik', '2026-11-30')).toContainText(pln('9 200,00'));
-    await expect(page.locator('.planning-section__total')).toContainText(monthTotal('16 500,00'));
+    await expectPlan(page, '16 500,00');
   });
 
   await test.step('Krok 8: marzec 2032 has 800+ on 10.03.2032, kwiecień 2032 has none and the definition is Zakończony', async () => {
@@ -344,10 +195,9 @@ test('recurring incomes: define incomes, read any month of /planning, change the
     await expect(async () => {
       await openMonth(page, '2026-10');
       await expect(row).toContainText(/≈\s4\s?250,00\szł/, { timeout: 3_000 });
-      await expect(page.locator('.planning-section__total')).toContainText(
-        monthTotal('20 750,00'),
-        { timeout: 3_000 },
-      );
+      await expect(page.getByTestId('balance-plan').locator('dd')).toContainText(pln('20 750,00'), {
+        timeout: 3_000,
+      });
     }).toPass({ timeout: 60_000, intervals: [1_000, 2_000, 3_000] });
   });
 
@@ -475,7 +325,7 @@ test('recurring incomes: define incomes, read any month of /planning, change the
     await openMonth(page, '2026-11');
     const row = occurrence(page, 'Wypłata', '2026-11-30');
     await expect(row.getByTestId('archived-warning')).toContainText('konto zarchiwizowane');
-    await expect(page.locator('.planning-section__total')).toContainText(monthTotal('21 250,00'));
+    await expectPlan(page, '21 250,00');
   });
 
   await test.step('Krok 19: deleting Bon świąteczny removes 12.11.2026 and the definition', async () => {
@@ -485,7 +335,7 @@ test('recurring incomes: define incomes, read any month of /planning, change the
     await confirmDelete(page);
     await expect(occurrences(page, 'Bon świąteczny')).toHaveCount(0);
     await expect(definition(page, 'Bon świąteczny')).toHaveCount(0);
-    await expect(page.locator('.planning-section__total')).toContainText(monthTotal('20 750,00'));
+    await expectPlan(page, '20 750,00');
   });
 
   await test.step('Krok 20: styczeń 2026 lists żona 09.01, 800+ 10.01 and Wypłata 30.01 for 9 200 zł on mBank ROR', async () => {
