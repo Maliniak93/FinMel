@@ -60,6 +60,9 @@ public sealed record IncomeOccurrenceResponse
     public required decimal? Difference { get; init; }
 
     public required decimal? ActualAmountPln { get; init; }
+
+    /// <summary>True when the settlement created a cash deposit on its account.</summary>
+    public required bool DepositCreated { get; init; }
 }
 
 public sealed record IncomeDefinitionResponse

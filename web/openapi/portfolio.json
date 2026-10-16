@@ -4558,7 +4558,8 @@
           "actualAmount",
           "actualDate",
           "difference",
-          "actualAmountPln"
+          "actualAmountPln",
+          "depositCreated"
         ],
         "type": "object",
         "properties": {
@@ -4652,6 +4653,9 @@
               "string"
             ],
             "format": "double"
+          },
+          "depositCreated": {
+            "type": "boolean"
           }
         }
       },
@@ -5328,6 +5332,9 @@
           "accountId": {
             "type": "string",
             "format": "uuid"
+          },
+          "createDeposit": {
+            "type": "boolean"
           }
         }
       },
@@ -5526,6 +5533,12 @@
               "string"
             ],
             "format": "int32"
+          },
+          "recurringIncomeName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

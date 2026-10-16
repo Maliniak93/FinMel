@@ -23,6 +23,9 @@ public sealed class RecurringIncomeOccurrence : IUserOwned
 
     /// <summary>The PLN rate of the actual date, 1 for PLN; null while skipped.</summary>
     public decimal? FxRateToPln { get; set; }
+
+    /// <summary>The system-managed Deposit on the settlement account's money asset; null when none was created.</summary>
+    public Guid? TransactionId { get; set; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<OccurrenceStatus>))]

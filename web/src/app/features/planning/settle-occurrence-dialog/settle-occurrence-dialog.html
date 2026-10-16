@@ -55,6 +55,10 @@
       }
     </mat-form-field>
 
+    <mat-checkbox formControlName="createDeposit" class="settle-occurrence-dialog__field">
+      {{ 'planning.settle.createDeposit' | transloco }}
+    </mat-checkbox>
+
     @if (formError()) {
       <p class="settle-occurrence-dialog__error" role="alert">{{ formError() }}</p>
     }

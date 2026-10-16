@@ -37,6 +37,9 @@ public sealed record TransactionResponse
 
     /// <summary>The settled period's 1-based index when this is a treasury bond's interest credit; null otherwise.</summary>
     public int? BondInterestPeriodIndex { get; init; }
+
+    /// <summary>The current name of the recurring income when this is the deposit of its settlement; null otherwise.</summary>
+    public string? RecurringIncomeName { get; init; }
 }
 
 public static class TransactionMappingExtensions
@@ -46,7 +49,8 @@ public static class TransactionMappingExtensions
         string currency,
         TransactionTransferResponse? transfer = null,
         DateOnly? bankInterestPeriodEnd = null,
-        int? bondInterestPeriodIndex = null) => new()
+        int? bondInterestPeriodIndex = null,
+        string? recurringIncomeName = null) => new()
         {
             Id = transaction.Id,
             AssetId = transaction.AssetId,
@@ -63,6 +67,7 @@ public static class TransactionMappingExtensions
             Date = transaction.Date,
             Transfer = transfer,
             BankInterestPeriodEnd = bankInterestPeriodEnd,
-            BondInterestPeriodIndex = bondInterestPeriodIndex
+            BondInterestPeriodIndex = bondInterestPeriodIndex,
+            RecurringIncomeName = recurringIncomeName
         };
 }

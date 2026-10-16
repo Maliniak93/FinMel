@@ -13,6 +13,9 @@ internal static class OccurrenceErrors
     public static Error CurrencyMismatch(string planned, string actual) =>
         new("Validation.CurrencyMismatch", $"The occurrence is planned in {planned}, so it can't be settled on a {actual} account.");
 
+    public static readonly Error IncomeDepositManaged =
+        new("Conflict.IncomeDepositManaged", "This transaction is a recurring income deposit — change the settlement instead.");
+
     public static Error FutureDate(DateOnly today) =>
         new("Validation.ActualDateInFuture", $"The actual date can't be after today ({today:yyyy-MM-dd}).");
 }

@@ -69,6 +69,13 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
             .Where(s => transactionIds.Contains(s.CreditTransactionId))
             .ToDictionaryAsync(s => s.CreditTransactionId!.Value, s => s.PeriodIndex, cancellationToken);
 
+        var incomeNames = await (
+                from occurrence in dbContext.RecurringIncomeOccurrences.AsNoTracking()
+                where transactionIds.Contains(occurrence.TransactionId)
+                join income in dbContext.RecurringIncomes.AsNoTracking() on occurrence.RecurringIncomeId equals income.Id
+                select new { TransactionId = occurrence.TransactionId!.Value, income.Name })
+            .ToDictionaryAsync(i => i.TransactionId, i => i.Name, cancellationToken);
+
         return new PagedResponse<TransactionResponse>
         {
             Items =
@@ -92,7 +99,8 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
                                 Direction = TransferLegs.DirectionOf(t)
                             },
                         creditPeriodEnds.TryGetValue(t.Id, out var periodEnd) ? periodEnd : null,
-                        creditPeriodIndexes.TryGetValue(t.Id, out var periodIndex) ? periodIndex : null);
+                        creditPeriodIndexes.TryGetValue(t.Id, out var periodIndex) ? periodIndex : null,
+                        incomeNames.GetValueOrDefault(t.Id));
 
                     return counterpart is not null && MetalSettlement.Applies(asset.AssetClass) ? response.WithTotal(counterpart.Amount) : response;
                 })

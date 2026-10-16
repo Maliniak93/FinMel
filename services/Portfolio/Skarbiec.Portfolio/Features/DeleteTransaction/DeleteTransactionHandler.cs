@@ -5,6 +5,7 @@ using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Accounts.BankInterest;
+using Skarbiec.Portfolio.Features.RecurringIncomes.Occurrences;
 using Skarbiec.Portfolio.Features.Transfers;
 
 namespace Skarbiec.Portfolio.Features.DeleteTransaction;
@@ -60,6 +61,12 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
             && await dbContext.BankInterestSettlements.AnyAsync(s => s.TransactionId == id, cancellationToken))
         {
             return BankInterestErrors.InterestManaged;
+        }
+
+        // A settlement's deposit goes only by undoing or editing its settlement.
+        if (await dbContext.RecurringIncomeOccurrences.AnyAsync(o => o.TransactionId == id, cancellationToken))
+        {
+            return OccurrenceErrors.IncomeDepositManaged;
         }
 
         // Recompute without the deleted transaction before removing it, so a rejected delete leaves the database untouched.

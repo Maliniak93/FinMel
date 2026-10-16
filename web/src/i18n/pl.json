@@ -469,6 +469,7 @@
   },
   "transactions": {
     "bankInterest": "Odsetki · {{ month }}",
+    "incomeDeposit": "Wpływ · {{ name }}",
     "title": "Transakcje",
     "titleWithName": "Transakcje — {{ name }}",
     "newTransaction": "Nowa transakcja",
@@ -641,6 +642,7 @@
       "actual": "Faktycznie",
       "difference": "Różnica",
       "outOfRule": "poza regułą",
+      "depositCreated": "wpłata utworzona",
       "settle": "Rozlicz",
       "skip": "Pomiń",
       "edit": "Edytuj",
@@ -655,6 +657,7 @@
       "editTitle": "Edytuj rozliczenie „{{ name }}”",
       "actualAmount": "Faktyczna kwota",
       "actualDate": "Faktyczna data",
+      "createDeposit": "Utwórz wpłatę na konto",
       "dateInFuture": "Data nie może być późniejsza niż dzisiaj.",
       "dateOutOfRange": "Data musi mieścić się między 2011-01-01 a dniem dzisiejszym."
     },

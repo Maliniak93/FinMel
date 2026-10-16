@@ -9,6 +9,7 @@ using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.PlanningApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -305,6 +306,23 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
         var openingResponse = await client.PutAsJsonAsync(TransactionUri(account.MoneyAssetId, opening.Id), openingUpdate, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, openingResponse.StatusCode);
         Assert.Equal(12_033.29m, (await client.GetAssetAsync(account.MoneyAssetId, cancellationToken)).Quantity);
+    }
+
+    [Fact]
+    public async Task Update_IncomeDeposit_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var deposit = await client.CreateIncomeDepositAsync(cancellationToken);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 99m, UnitPrice = 1m, Date = SeptemberLastDay };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(deposit.Account.MoneyAssetId, deposit.TransactionId), update, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.IncomeDepositManagedErrorCode, cancellationToken);
+        var unchanged = Assert.Single((await client.ListTransactionsAsync(deposit.Account.MoneyAssetId, cancellationToken)).Items);
+        Assert.Equal(9_143.27m, unchanged.Quantity);
+        Assert.Equal(9_143.27m, (await client.GetAssetAsync(deposit.Account.MoneyAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]

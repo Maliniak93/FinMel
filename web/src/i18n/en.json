@@ -469,6 +469,7 @@
   },
   "transactions": {
     "bankInterest": "Interest · {{ month }}",
+    "incomeDeposit": "Income · {{ name }}",
     "title": "Transactions",
     "titleWithName": "Transactions — {{ name }}",
     "newTransaction": "New transaction",
@@ -641,6 +642,7 @@
       "actual": "Actual",
       "difference": "Difference",
       "outOfRule": "out of rule",
+      "depositCreated": "deposit created",
       "settle": "Settle",
       "skip": "Skip",
       "edit": "Edit",
@@ -655,6 +657,7 @@
       "editTitle": "Edit the settlement of “{{ name }}”",
       "actualAmount": "Actual amount",
       "actualDate": "Actual date",
+      "createDeposit": "Create a deposit on the account",
       "dateInFuture": "The date can't be later than today.",
       "dateOutOfRange": "Date must be between 2011-01-01 and today."
     },

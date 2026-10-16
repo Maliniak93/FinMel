@@ -7,6 +7,7 @@ import {
   type ValidationErrors,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -35,6 +36,7 @@ export interface SettleOccurrenceDialogData {
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -70,6 +72,7 @@ export class SettleOccurrenceDialog {
       [Validators.required, (control: AbstractControl) => this.withinRange(control)],
     ],
     accountId: [this.occurrence.accountId as string | null, [Validators.required]],
+    createDeposit: [this.isEdit ? this.occurrence.depositCreated : true],
   });
 
   protected readonly accountsResource = resource({
@@ -112,6 +115,7 @@ export class SettleOccurrenceDialog {
         actualAmount: Number(values.actualAmount),
         actualDate: toDateOnly(values.actualDate!),
         accountId: values.accountId!,
+        createDeposit: values.createDeposit,
       },
     });
 

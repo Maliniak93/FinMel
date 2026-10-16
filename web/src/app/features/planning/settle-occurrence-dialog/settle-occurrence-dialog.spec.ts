@@ -45,6 +45,7 @@ const occurrence = {
   actualDate: null,
   difference: null,
   actualAmountPln: null,
+  depositCreated: false,
 };
 
 describe('SettleOccurrenceDialog', () => {
@@ -67,12 +68,15 @@ describe('SettleOccurrenceDialog', () => {
     fetchSpy.mockRestore();
   });
 
-  async function setup(): Promise<void> {
+  async function setup(
+    data: Record<string, unknown> = occurrence,
+    putResponse: () => Response = () => new Response(null, { status: 204 }),
+  ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const request = input as Request;
       if (request.method === 'PUT') {
-        return new Response(null, { status: 204 });
+        return putResponse();
       }
       return jsonResponse([
         account(plnAccountId, 'mBank ROR', 'PLN'),
@@ -87,7 +91,7 @@ describe('SettleOccurrenceDialog', () => {
       providers: [
         provideI18nTesting(),
         provideNativeDateAdapter(),
-        { provide: MAT_DIALOG_DATA, useValue: { occurrence } },
+        { provide: MAT_DIALOG_DATA, useValue: { occurrence: data } },
         { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
@@ -158,7 +162,87 @@ describe('SettleOccurrenceDialog', () => {
       actualAmount: 9143.27,
       actualDate: '2026-10-19',
       accountId: otherPlnAccountId,
+      createDeposit: true,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('checks the deposit box for a new settlement and sends the unticked choice', async () => {
+    await setup();
+
+    const checkbox = element().querySelector<HTMLInputElement>('mat-checkbox input')!;
+    expect(checkbox.checked).toBe(true);
+    expect(element().textContent).toContain('Create a deposit on the account');
+
+    checkbox.click();
+    await settle();
+    await component['onSubmit']();
+
+    const [request] = puts();
+    expect(await request.json()).toMatchObject({ createDeposit: false });
+  });
+
+  const settledOccurrence = {
+    ...occurrence,
+    status: 'Settled',
+    actualAmount: 9143.27,
+    actualDate: '2026-10-19',
+  };
+
+  it('editing a settlement without a deposit leaves the box unchecked and sends false', async () => {
+    await setup({ ...settledOccurrence, depositCreated: false });
+
+    expect(element().querySelector<HTMLInputElement>('mat-checkbox input')!.checked).toBe(false);
+    await component['onSubmit']();
+    expect(await puts()[0].json()).toMatchObject({ createDeposit: false });
+  });
+
+  it('editing a settlement with a deposit leaves the box checked and sends true', async () => {
+    await setup({ ...settledOccurrence, depositCreated: true });
+
+    expect(element().querySelector<HTMLInputElement>('mat-checkbox input')!.checked).toBe(true);
+    await component['onSubmit']();
+    expect(await puts()[0].json()).toMatchObject({ createDeposit: true });
+  });
+
+  it('shows the insufficient-funds message in the dialog and keeps it open', async () => {
+    await setup(
+      occurrence,
+      () =>
+        new Response(
+          JSON.stringify({
+            detail: 'Cash would go below zero.',
+            errorCode: 'Validation.InsufficientFunds',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+    );
+
+    await component['onSubmit']();
+    await settle();
+
+    expect(element().querySelector('[role="alert"]')?.textContent).toContain(
+      'Cash would go below zero.',
+    );
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('shows the archived-account error on the account field', async () => {
+    await setup(
+      occurrence,
+      () =>
+        new Response(
+          JSON.stringify({ detail: 'Archived.', errorCode: 'Conflict.AccountArchived' }),
+          { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+    );
+
+    await component['onSubmit']();
+    await settle();
+
+    expect(component['form'].controls.accountId.getError('server')).toBe(
+      'This account is archived.',
+    );
+    expect(dialogRef.close).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,9 @@ public sealed record SettleOccurrenceRequest : IValidatableObject
     /// <summary>The account the money arrived on; same currency as the plan.</summary>
     public required Guid AccountId { get; init; }
 
+    /// <summary>Whether the settlement also credits the account's cash with a Deposit of the actual amount.</summary>
+    public bool CreateDeposit { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (ActualDate < RecurringIncomeLimits.FirstDay)
