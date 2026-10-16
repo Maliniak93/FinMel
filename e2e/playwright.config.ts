@@ -16,7 +16,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:18080',
     locale: 'pl-PL',
-    timezoneId: 'UTC',
+    timezoneId: 'Europe/Warsaw',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
