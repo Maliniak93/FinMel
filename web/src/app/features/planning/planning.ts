@@ -12,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 
 import {
   deleteApiPortfolioRecurringExpensesById,
+  deleteApiPortfolioRecurringExpensesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesById,
   deleteApiPortfolioRecurringIncomesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
@@ -37,7 +38,10 @@ import {
   EndRecurringIncomeDialog,
   type EndRecurringIncomeDialogData,
 } from './end-recurring-income-dialog/end-recurring-income-dialog';
-import { RecurringExpenseFormDialog } from './recurring-expense-form-dialog/recurring-expense-form-dialog';
+import {
+  RecurringExpenseFormDialog,
+  type RecurringExpenseFormDialogData,
+} from './recurring-expense-form-dialog/recurring-expense-form-dialog';
 import {
   RecurringIncomeFormDialog,
   type RecurringIncomeFormDialogData,
@@ -342,6 +346,51 @@ export class Planning {
   protected openAddExpenseDialog(): void {
     const ref = this.dialog.open(RecurringExpenseFormDialog, { width: '520px' });
     this.reloadMonthWhenSaved(ref.afterClosed());
+  }
+
+  protected openEditExpenseDialog(definition: ExpenseDefinitionResponse): void {
+    const data: RecurringExpenseFormDialogData = { definition };
+    const ref = this.dialog.open(RecurringExpenseFormDialog, { width: '520px', data });
+    this.reloadMonthWhenSaved(ref.afterClosed());
+  }
+
+  protected async removeExpenseChange(definition: ExpenseDefinitionResponse): Promise<void> {
+    const change = definition.nextChange;
+    if (!change) {
+      return;
+    }
+
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.change.deleteTitle'),
+            message: translate('planning.change.deleteMessage', {
+              name: definition.name,
+              month: this.changeMonthLabel(change.effectiveFrom),
+            }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioRecurringExpensesByIdChangesByMonth({
+      path: { id: definition.id, month: change.effectiveFrom },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.change.deleteFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.monthResource.reload();
   }
 
   protected openEndExpenseDialog(definition: ExpenseDefinitionResponse): void {

@@ -2016,6 +2016,68 @@
             "description": "No Content"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "UpdateRecurringExpenseEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRecurringExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-expenses/{id}/changes/{month}": {
+      "delete": {
+        "tags": [
+          "DeleteRecurringExpenseChangeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
       }
     },
     "/api/portfolio/recurring-incomes/{id}/occurrences/{month}/settlement": {
@@ -4587,7 +4649,9 @@
           "dayOfMonth",
           "shift",
           "reservePln",
-          "nextPayment"
+          "nextPayment",
+          "effectiveFrom",
+          "nextChange"
         ],
         "type": "object",
         "properties": {
@@ -4660,6 +4724,66 @@
                 "$ref": "#/components/schemas/ExpenseNextPaymentResponse"
               }
             ]
+          },
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "nextChange": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExpenseNextChangeResponse"
+              }
+            ]
+          }
+        }
+      },
+      "ExpenseNextChangeResponse": {
+        "required": [
+          "effectiveFrom",
+          "amount",
+          "intervalMonths",
+          "dayKind",
+          "dayOfMonth",
+          "shift"
+        ],
+        "type": "object",
+        "properties": {
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "intervalMonths": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
           }
         }
       },
@@ -6393,6 +6517,73 @@
           }
         }
       },
+      "UpdateRecurringExpenseRequest": {
+        "required": [
+          "name",
+          "startDate",
+          "effectiveFrom",
+          "amount",
+          "intervalMonths",
+          "dayKind",
+          "shift"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "intervalMonths": {
+            "maximum": 12,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
+          }
+        }
+      },
       "UpdateRecurringIncomeRequest": {
         "required": [
           "name",
@@ -6938,6 +7129,12 @@
     },
     {
       "name": "DeleteRecurringExpenseEndpoint"
+    },
+    {
+      "name": "UpdateRecurringExpenseEndpoint"
+    },
+    {
+      "name": "DeleteRecurringExpenseChangeEndpoint"
     },
     {
       "name": "SettleOccurrenceEndpoint"

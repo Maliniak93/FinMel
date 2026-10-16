@@ -709,6 +709,8 @@
       },
       "form": {
         "title": "Add recurring expense",
+        "editTitle": "Edit recurring expense",
+        "effectiveFromHint": "Amount and schedule change from this month on; name and dates apply to every month.",
         "amount": "Amount (PLN)"
       }
     },

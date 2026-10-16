@@ -709,6 +709,8 @@
       },
       "form": {
         "title": "Dodaj wydatek cykliczny",
+        "editTitle": "Edytuj wydatek cykliczny",
+        "effectiveFromHint": "Kwota i harmonogram zmieniają się od tego miesiąca; nazwa i daty dotyczą każdego miesiąca.",
         "amount": "Kwota (PLN)"
       }
     },

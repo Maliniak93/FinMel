@@ -1,4 +1,6 @@
-<h2 mat-dialog-title>{{ 'planning.expenses.form.title' | transloco }}</h2>
+<h2 mat-dialog-title>
+  {{ (isEdit ? 'planning.expenses.form.editTitle' : 'planning.expenses.form.title') | transloco }}
+</h2>
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
@@ -13,6 +15,23 @@
         <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
       }
     </mat-form-field>
+
+    @if (isEdit) {
+      <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
+        <mat-label>{{ 'planning.form.effectiveFrom' | transloco }}</mat-label>
+        <input
+          matInput
+          type="month"
+          [min]="minMonth"
+          [max]="maxMonth"
+          formControlName="effectiveFrom"
+        />
+        <mat-hint>{{ 'planning.expenses.form.effectiveFromHint' | transloco }}</mat-hint>
+        @if (form.controls.effectiveFrom.invalid) {
+          <mat-error>{{ 'planning.form.effectiveFromInvalid' | transloco }}</mat-error>
+        }
+      </mat-form-field>
+    }
 
     <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
       <mat-label>{{ 'planning.expenses.form.amount' | transloco }}</mat-label>

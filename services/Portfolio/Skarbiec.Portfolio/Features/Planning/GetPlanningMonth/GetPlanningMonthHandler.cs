@@ -250,6 +250,10 @@ public sealed class GetPlanningMonthHandler(
             .Select(p =>
             {
                 var version = p.Expense.InForce(viewed);
+                var next = p.Expense.Versions
+                    .Where(v => v.EffectiveFrom > viewed.FirstDay)
+                    .OrderBy(v => v.EffectiveFrom)
+                    .FirstOrDefault();
 
                 return new ExpenseDefinitionResponse
                 {
@@ -266,7 +270,19 @@ public sealed class GetPlanningMonthHandler(
                     DayOfMonth = version.DayOfMonth,
                     Shift = version.Shift,
                     ReservePln = ReserveSchedule.CostIn(viewed, p.Plan),
-                    NextPayment = NextPayment(viewed, p.Plan)
+                    NextPayment = NextPayment(viewed, p.Plan),
+                    EffectiveFrom = YearMonth.From(version.EffectiveFrom).ToString(),
+                    NextChange = next is null
+                        ? null
+                        : new ExpenseNextChangeResponse
+                        {
+                            EffectiveFrom = YearMonth.From(next.EffectiveFrom).ToString(),
+                            Amount = next.Amount,
+                            IntervalMonths = next.IntervalMonths,
+                            DayKind = next.DayKind,
+                            DayOfMonth = next.DayOfMonth,
+                            Shift = next.Shift
+                        }
                 };
             })
             .ToList();
