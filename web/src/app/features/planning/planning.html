@@ -55,12 +55,20 @@
               <th>{{ 'common.name' | transloco }}</th>
               <th>{{ 'planning.account' | transloco }}</th>
               <th class="planning-table__amount">{{ 'common.amount' | transloco }}</th>
+              <th>{{ 'common.status' | transloco }}</th>
+              <th class="planning-table__amount">
+                {{ 'planning.occurrence.actual' | transloco }}
+              </th>
+              <th class="planning-table__amount">
+                {{ 'planning.occurrence.difference' | transloco }}
+              </th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             @for (
               occurrence of plan.occurrences;
-              track occurrence.recurringIncomeId + occurrence.date
+              track occurrence.recurringIncomeId + occurrence.nominalMonth
             ) {
               <tr data-testid="occurrence-row">
                 <td>{{ formatDate(occurrence.date) }}</td>
@@ -87,6 +95,75 @@
                         {{ 'planning.estimateUnavailable' | transloco }}
                       }
                     </span>
+                  }
+                </td>
+                <td>
+                  <span data-testid="occurrence-status">{{
+                    occurrenceStatusKey(occurrence.status) | transloco
+                  }}</span>
+                  @if (occurrence.outOfRule) {
+                    <span class="planning-table__warning" data-testid="out-of-rule">
+                      {{ 'planning.occurrence.outOfRule' | transloco }}
+                    </span>
+                  }
+                </td>
+                <td class="planning-table__amount">
+                  @if (occurrence.actualAmount !== null && occurrence.actualAmount !== undefined) {
+                    <span data-testid="occurrence-actual">
+                      {{ formatMoney(occurrence.actualAmount, occurrence.currency) }}
+                      @if (occurrence.actualDate) {
+                        ({{ formatDate(occurrence.actualDate) }})
+                      }
+                    </span>
+                  }
+                </td>
+                <td class="planning-table__amount">
+                  @if (occurrence.difference !== null && occurrence.difference !== undefined) {
+                    <span data-testid="occurrence-difference">
+                      {{ formatMoney(occurrence.difference, occurrence.currency) }}
+                    </span>
+                  }
+                </td>
+                <td class="planning-table__actions">
+                  @if (occurrence.status === 'Pending' || occurrence.status === 'Skipped') {
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="settle-occurrence"
+                      (click)="openSettleDialog(occurrence)"
+                    >
+                      {{ 'planning.occurrence.settle' | transloco }}
+                    </button>
+                  }
+                  @if (occurrence.status === 'Pending') {
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="skip-occurrence"
+                      (click)="skipOccurrence(occurrence)"
+                    >
+                      {{ 'planning.occurrence.skip' | transloco }}
+                    </button>
+                  }
+                  @if (occurrence.status === 'Settled') {
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="edit-settlement"
+                      (click)="openSettleDialog(occurrence)"
+                    >
+                      {{ 'planning.occurrence.edit' | transloco }}
+                    </button>
+                  }
+                  @if (occurrence.status !== 'Pending') {
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="undo-occurrence"
+                      (click)="undoOccurrence(occurrence)"
+                    >
+                      {{ 'planning.occurrence.undo' | transloco }}
+                    </button>
                   }
                 </td>
               </tr>

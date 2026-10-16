@@ -11,6 +11,14 @@ internal static class PlanningApi
 
     public const string AccountHasRecurringIncomeErrorCode = "Conflict.AccountHasRecurringIncome";
 
+    public const string AccountHasIncomeOccurrencesErrorCode = "Conflict.AccountHasIncomeOccurrences";
+
+    public const string RecurringIncomeHasSettlementsErrorCode = "Conflict.RecurringIncomeHasSettlements";
+
+    public const string OccurrenceSettledErrorCode = "Conflict.OccurrenceSettled";
+
+    public const string CurrencyMismatchErrorCode = "Validation.CurrencyMismatch";
+
     public static readonly DateTimeOffset PlanningTodayUtc = new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero);
 
     public sealed record OccurrenceView(
@@ -24,7 +32,14 @@ internal static class PlanningApi
         decimal Amount,
         string Currency,
         decimal? AmountPln,
-        bool Estimated);
+        bool Estimated,
+        string Status,
+        bool OutOfRule,
+        Guid PlannedAccountId,
+        decimal? ActualAmount,
+        DateOnly? ActualDate,
+        decimal? Difference,
+        decimal? ActualAmountPln);
 
     public sealed record DefinitionView(
         Guid Id,
@@ -117,6 +132,46 @@ internal static class PlanningApi
         this HttpClient client, Guid id, string month, CancellationToken cancellationToken)
     {
         var response = await client.DeleteAsync(RecurringIncomeChangeUri(id, month), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static OccurrenceView Occurrence(this IncomesView incomes, string nominalMonth) =>
+        incomes.Occurrences.Single(o => o.NominalMonth == nominalMonth);
+
+    public static string OccurrenceUri(Guid id, string month) => $"{RecurringIncomeUri(id)}/occurrences/{month}";
+
+    public static string SettleOccurrenceUri(Guid id, string month) => $"{OccurrenceUri(id, month)}/settlement";
+
+    public static string SkipOccurrenceUri(Guid id, string month) => $"{OccurrenceUri(id, month)}/skip";
+
+    public static object SettleOccurrenceBody(Guid accountId, decimal actualAmount, DateOnly actualDate) =>
+        new { actualAmount, actualDate, accountId };
+
+    public static async Task SettleOccurrenceAsync(
+        this HttpClient client,
+        Guid id,
+        string month,
+        Guid accountId,
+        decimal actualAmount,
+        DateOnly actualDate,
+        CancellationToken cancellationToken)
+    {
+        var response = await client.PutAsJsonAsync(
+            SettleOccurrenceUri(id, month), SettleOccurrenceBody(accountId, actualAmount, actualDate), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task SkipOccurrenceAsync(
+        this HttpClient client, Guid id, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.PutAsync(SkipOccurrenceUri(id, month), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task UndoOccurrenceAsync(
+        this HttpClient client, Guid id, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(OccurrenceUri(id, month), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

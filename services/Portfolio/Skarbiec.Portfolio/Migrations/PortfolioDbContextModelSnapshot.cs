@@ -576,6 +576,62 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("RecurringIncomes");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncomeOccurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ActualAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly?>("ActualDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("FxRateToPln")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<DateOnly>("NominalMonth")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("PlannedAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PlannedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("PlannedDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("RecurringIncomeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("PlannedAccountId");
+
+                    b.HasIndex("RecurringIncomeId", "NominalMonth")
+                        .IsUnique();
+
+                    b.ToTable("RecurringIncomeOccurrences");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncomeVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -871,6 +927,26 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
                         .WithOne()
                         .HasForeignKey("Skarbiec.Portfolio.Data.MetalHolding", "AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncomeOccurrence", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithMany()
+                        .HasForeignKey("PlannedAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Skarbiec.Portfolio.Data.RecurringIncome", null)
+                        .WithMany()
+                        .HasForeignKey("RecurringIncomeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

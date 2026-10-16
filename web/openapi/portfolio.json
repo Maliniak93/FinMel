@@ -1933,6 +1933,109 @@
         }
       }
     },
+    "/api/portfolio/recurring-incomes/{id}/occurrences/{month}/settlement": {
+      "put": {
+        "tags": [
+          "SettleOccurrenceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleOccurrenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-incomes/{id}/occurrences/{month}/skip": {
+      "put": {
+        "tags": [
+          "SkipOccurrenceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-incomes/{id}/occurrences/{month}": {
+      "delete": {
+        "tags": [
+          "UndoOccurrenceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/planning/months/{month}": {
       "get": {
         "tags": [
@@ -4448,7 +4551,14 @@
           "amount",
           "currency",
           "amountPln",
-          "estimated"
+          "estimated",
+          "status",
+          "outOfRule",
+          "plannedAccountId",
+          "actualAmount",
+          "actualDate",
+          "difference",
+          "actualAmountPln"
         ],
         "type": "object",
         "properties": {
@@ -4498,6 +4608,50 @@
           },
           "estimated": {
             "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OccurrenceStatus"
+          },
+          "outOfRule": {
+            "type": "boolean"
+          },
+          "plannedAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actualAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "difference": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualAmountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -4554,6 +4708,13 @@
             "format": "double"
           }
         }
+      },
+      "OccurrenceStatus": {
+        "enum": [
+          "Pending",
+          "Settled",
+          "Skipped"
+        ]
       },
       "PagedResponseOfTransactionResponse": {
         "required": [
@@ -5139,6 +5300,34 @@
           },
           "payOut": {
             "type": "boolean"
+          }
+        }
+      },
+      "SettleOccurrenceRequest": {
+        "required": [
+          "actualAmount",
+          "actualDate",
+          "accountId"
+        ],
+        "type": "object",
+        "properties": {
+          "actualAmount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -6218,6 +6407,15 @@
     },
     {
       "name": "DeleteRecurringIncomeChangeEndpoint"
+    },
+    {
+      "name": "SettleOccurrenceEndpoint"
+    },
+    {
+      "name": "SkipOccurrenceEndpoint"
+    },
+    {
+      "name": "UndoOccurrenceEndpoint"
     },
     {
       "name": "GetPlanningMonthEndpoint"

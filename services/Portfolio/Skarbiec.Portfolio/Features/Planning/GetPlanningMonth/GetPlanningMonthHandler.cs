@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Features.RecurringIncomes;
+using Skarbiec.Portfolio.Features.RecurringIncomes.Occurrences;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
@@ -38,16 +39,38 @@ public sealed class GetPlanningMonthHandler(
             .AsNoTracking()
             .ToDictionaryAsync(a => a.Id, cancellationToken);
 
-        var planned = incomes
+        // A shift moves a date by less than a month, so a stored occurrence planned in the viewed month has a nominal month within one of it.
+        var stored = await dbContext.RecurringIncomeOccurrences
+            .AsNoTracking()
+            .Where(o => o.NominalMonth >= viewed.AddMonths(-1).FirstDay && o.NominalMonth <= viewed.AddMonths(1).FirstDay)
+            .ToListAsync(cancellationToken);
+        var storedKeys = stored.Select(o => (o.RecurringIncomeId, o.NominalMonth)).ToHashSet();
+        var incomesById = incomes.ToDictionary(i => i.Id);
+
+        var computed = incomes
             .SelectMany(income => RecurrenceSchedule
                 .OccurrencesIn(viewed, income.StartDate, income.EndDate, nominal => income.InForce(nominal).ToRule())
-                .Select(occurrence => (Income: income, Occurrence: occurrence, Version: income.InForce(occurrence.NominalMonth))))
-            .OrderBy(p => p.Occurrence.Date)
+                .Where(occurrence => !storedKeys.Contains((income.Id, occurrence.NominalMonth.FirstDay)))
+                .Select(occurrence =>
+                {
+                    var version = income.InForce(occurrence.NominalMonth);
+                    return new PlannedRow(income, occurrence.NominalMonth, occurrence.Date, version.Amount, version.AccountId, null);
+                }));
+
+        var storedRows = stored
+            .Where(o => YearMonth.From(o.PlannedDate) == viewed)
+            .Select(o => new PlannedRow(
+                incomesById[o.RecurringIncomeId], YearMonth.From(o.NominalMonth), o.PlannedDate, o.PlannedAmount, o.PlannedAccountId, o));
+
+        var planned = computed
+            .Concat(storedRows)
+            .OrderBy(p => p.Date)
             .ThenBy(p => p.Income.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var foreign = planned
-            .Select(p => accounts[p.Version.AccountId].Currency)
+            .Where(p => p.Stored?.Status != OccurrenceStatus.Settled)
+            .Select(p => accounts[p.PlannedAccountId].Currency)
             .Where(c => c != CashPlaceBalances.BaseCurrency)
             .Distinct()
             .ToList();
@@ -68,24 +91,45 @@ public sealed class GetPlanningMonthHandler(
         var occurrences = planned
             .Select(p =>
             {
-                var account = accounts[p.Version.AccountId];
-                var estimated = account.Currency != CashPlaceBalances.BaseCurrency;
+                var currency = accounts[p.PlannedAccountId].Currency;
+                var settlement = p.Stored is { Status: OccurrenceStatus.Settled } settled ? settled : null;
+                var account = accounts[settlement?.AccountId ?? p.PlannedAccountId];
+                var estimated = settlement is null && currency != CashPlaceBalances.BaseCurrency;
+
+                decimal? amountPln;
+                if (settlement is not null)
+                {
+                    amountPln = Round(p.Amount * settlement.FxRateToPln!.Value);
+                }
+                else if (!estimated)
+                {
+                    amountPln = p.Amount;
+                }
+                else
+                {
+                    amountPln = rates.TryGetValue(currency, out var rate) ? Round(p.Amount * rate) : null;
+                }
 
                 return new IncomeOccurrenceResponse
                 {
                     RecurringIncomeId = p.Income.Id,
-                    NominalMonth = p.Occurrence.NominalMonth.ToString(),
-                    Date = p.Occurrence.Date,
+                    NominalMonth = p.Nominal.ToString(),
+                    Date = p.Date,
                     Name = p.Income.Name,
                     AccountId = account.Id,
                     AccountName = account.Name,
                     AccountArchived = account.IsArchived,
-                    Amount = p.Version.Amount,
-                    Currency = account.Currency,
-                    AmountPln = !estimated ? p.Version.Amount
-                        : rates.TryGetValue(account.Currency, out var rate) ? Round(p.Version.Amount * rate)
-                        : null,
-                    Estimated = estimated
+                    Amount = p.Amount,
+                    Currency = currency,
+                    AmountPln = amountPln,
+                    Estimated = estimated,
+                    Status = p.Stored?.Status ?? OccurrenceStatus.Pending,
+                    OutOfRule = p.Stored is not null && p.Income.ComputedAt(p.Nominal)?.Date != p.Date,
+                    PlannedAccountId = p.PlannedAccountId,
+                    ActualAmount = settlement?.ActualAmount,
+                    ActualDate = settlement?.ActualDate,
+                    Difference = p.Stored is null ? null : (settlement?.ActualAmount ?? 0m) - p.Amount,
+                    ActualAmountPln = settlement is null ? null : Round(settlement.ActualAmount!.Value * settlement.FxRateToPln!.Value)
                 };
             })
             .ToList();
@@ -151,4 +195,12 @@ public sealed class GetPlanningMonthHandler(
     }
 
     private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    private sealed record PlannedRow(
+        RecurringIncome Income,
+        YearMonth Nominal,
+        DateOnly Date,
+        decimal Amount,
+        Guid PlannedAccountId,
+        RecurringIncomeOccurrence? Stored);
 }

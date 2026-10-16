@@ -8,9 +8,11 @@ import { of } from 'rxjs';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatMoney } from '../../shared/format';
+import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { Planning } from './planning';
 import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
+import { SettleOccurrenceDialog } from './settle-occurrence-dialog/settle-occurrence-dialog';
 
 const accountId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const archivedAccountId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -33,6 +35,13 @@ function occurrence(
     currency: 'PLN',
     amountPln: amount,
     estimated: false,
+    status: 'Pending',
+    outOfRule: false,
+    plannedAccountId: accountId,
+    actualAmount: null,
+    actualDate: null,
+    difference: null,
+    actualAmountPln: null,
     ...extra,
   };
 }
@@ -280,6 +289,108 @@ describe('Planning', () => {
       expect(deletes[0].url).toContain('/recurring-incomes/id-Najem/changes/2027-01');
     });
     await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+  });
+
+  it('shows status, actual and difference, the out-of-rule mark and the actions of each status, and confirms before undo', async () => {
+    responses['2026-10'] = month({
+      occurrences: [
+        occurrence('Pensja', '2026-10-05', 500),
+        occurrence('Wypłata', '2026-10-30', 9200, {
+          status: 'Settled',
+          accountName: 'Konto firmowe',
+          actualAmount: 9143.27,
+          actualDate: '2026-10-29',
+          difference: -56.73,
+          actualAmountPln: 9143.27,
+        }),
+        occurrence('800+', '2026-10-10', 800, { status: 'Skipped', difference: -800 }),
+        occurrence('Stara premia', '2026-10-12', 300, {
+          status: 'Settled',
+          outOfRule: true,
+          actualAmount: 300,
+          actualDate: '2026-10-12',
+          difference: 0,
+          actualAmountPln: 300,
+        }),
+      ],
+      totalPln: 10800,
+    });
+    await setup();
+
+    const [pending, settled, skipped, outOfRule] = rows('occurrence-row');
+    const has = (row: HTMLElement, testId: string): boolean =>
+      row.querySelector(`[data-testid="${testId}"]`) !== null;
+    const statusOf = (row: HTMLElement): string =>
+      row.querySelector('[data-testid="occurrence-status"]')!.textContent!;
+
+    expect(statusOf(pending)).toMatch(/pending/i);
+    expect(statusOf(settled)).toMatch(/settled/i);
+    expect(statusOf(skipped)).toMatch(/skipped/i);
+
+    expect(has(pending, 'settle-occurrence')).toBe(true);
+    expect(has(pending, 'skip-occurrence')).toBe(true);
+    expect(has(pending, 'edit-settlement')).toBe(false);
+    expect(has(pending, 'undo-occurrence')).toBe(false);
+
+    expect(has(settled, 'edit-settlement')).toBe(true);
+    expect(has(settled, 'undo-occurrence')).toBe(true);
+    expect(has(settled, 'settle-occurrence')).toBe(false);
+    expect(has(settled, 'skip-occurrence')).toBe(false);
+
+    expect(has(skipped, 'settle-occurrence')).toBe(true);
+    expect(has(skipped, 'undo-occurrence')).toBe(true);
+    expect(has(skipped, 'skip-occurrence')).toBe(false);
+    expect(has(skipped, 'edit-settlement')).toBe(false);
+
+    expect(settled.textContent).toContain(formatMoney(9200, 'PLN'));
+    expect(settled.querySelector('[data-testid="occurrence-actual"]')!.textContent).toContain(
+      formatMoney(9143.27, 'PLN'),
+    );
+    expect(settled.querySelector('[data-testid="occurrence-difference"]')!.textContent).toContain(
+      formatMoney(-56.73, 'PLN'),
+    );
+    expect(skipped.querySelector('[data-testid="occurrence-difference"]')!.textContent).toContain(
+      formatMoney(-800, 'PLN'),
+    );
+
+    expect(rows('out-of-rule')).toHaveLength(1);
+    expect(has(outOfRule, 'out-of-rule')).toBe(true);
+
+    pending.querySelector<HTMLElement>('[data-testid="settle-occurrence"]')!.click();
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      SettleOccurrenceDialog,
+      expect.objectContaining({
+        data: {
+          occurrence: expect.objectContaining({
+            recurringIncomeId: 'id-Pensja',
+            nominalMonth: '2026-10',
+          }),
+        },
+      }),
+    );
+
+    const deletes = (): Request[] =>
+      fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'DELETE');
+
+    settled.querySelector<HTMLElement>('[data-testid="undo-occurrence"]')!.click();
+    await settle();
+
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+    expect(deletes()).toHaveLength(0);
+
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+    settled.querySelector<HTMLElement>('[data-testid="undo-occurrence"]')!.click();
+
+    await vi.waitFor(() => {
+      expect(deletes()).toHaveLength(1);
+      expect(decodeURIComponent(deletes()[0].url)).toContain(
+        '/recurring-incomes/id-Wypłata/occurrences/2026-10',
+      );
+    });
   });
 
   it('marks nothing incomplete when every rate is known', async () => {

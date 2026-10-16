@@ -29,6 +29,17 @@ export function currentWarsawMonth(): string {
   return `${year}-${month}`;
 }
 
+export function currentWarsawDate(): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Warsaw',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const value = (type: string): number => Number(parts.find((part) => part.type === type)!.value);
+  return new Date(value('year'), value('month') - 1, value('day'));
+}
+
 export interface RulePart {
   key: string;
   params?: Record<string, number>;

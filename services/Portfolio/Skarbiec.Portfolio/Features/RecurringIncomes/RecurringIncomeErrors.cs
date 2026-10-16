@@ -16,6 +16,9 @@ internal static class RecurringIncomeErrors
     public static Error FirstVersion(string month) =>
         new("Conflict.FirstVersion", $"The change in {month} is the income's first version — end or delete the income instead.");
 
+    public static Error HasSettlements(Guid id) =>
+        new("Conflict.RecurringIncomeHasSettlements", $"Recurring income '{id}' has settled occurrences — undo them first.");
+
     public static Error EndBeforeStart(DateOnly start) =>
         new("Validation.EndBeforeStart", $"The end date can't be before the start date {start:yyyy-MM-dd}.");
 }

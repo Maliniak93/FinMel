@@ -127,3 +127,8 @@
 .planning-definition__rule-part:not(:last-child)::after {
   content: ', ';
 }
+
+.planning-table__actions {
+  text-align: end;
+  white-space: nowrap;
+}

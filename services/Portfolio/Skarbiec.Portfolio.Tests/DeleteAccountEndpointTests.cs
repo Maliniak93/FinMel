@@ -105,4 +105,39 @@ public sealed class DeleteAccountEndpointTests(SkarbiecContainersFixture contain
 
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
     }
+
+    [Fact]
+    public async Task Returns409_WhenIncomeOccurrenceReferencesAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningApi.PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var planned = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var settlement = await client.CreateBankAccountAsync(cancellationToken, "Konto firmowe");
+        var income = await client.CreateRecurringIncomeAsync(planned.AccountId, cancellationToken);
+        await client.SettleOccurrenceAsync(income, "2026-10", settlement.AccountId, 1_000m, new DateOnly(2026, 10, 10), cancellationToken);
+
+        var blocked = await client.DeleteAsync(AccountUri(settlement.AccountId), cancellationToken);
+
+        await blocked.AssertProblemAsync(HttpStatusCode.Conflict, PlanningApi.AccountHasIncomeOccurrencesErrorCode, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(AccountUri(settlement.AccountId), cancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Returns409_WhenIncomeOccurrenceWasPlannedOnAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningApi.PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var planned = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var current = await client.CreateBankAccountAsync(cancellationToken, "Konto firmowe");
+        var income = await client.CreateRecurringIncomeAsync(planned.AccountId, cancellationToken);
+        await client.SkipOccurrenceAsync(income, "2026-10", cancellationToken);
+        await client.UpdateRecurringIncomeAsync(income, current.AccountId, "2026-01", cancellationToken);
+
+        var blocked = await client.DeleteAsync(AccountUri(planned.AccountId), cancellationToken);
+
+        await blocked.AssertProblemAsync(HttpStatusCode.Conflict, PlanningApi.AccountHasIncomeOccurrencesErrorCode, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(AccountUri(planned.AccountId), cancellationToken)).StatusCode);
+    }
 }

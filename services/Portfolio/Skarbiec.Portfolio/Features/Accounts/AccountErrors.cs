@@ -26,6 +26,9 @@ internal static class AccountErrors
     public static Error HasRecurringIncome(Guid id) =>
         new("Conflict.AccountHasRecurringIncome", $"Account '{id}' is the target of a recurring income — move or delete the income first.");
 
+    public static Error HasIncomeOccurrences(Guid id) =>
+        new("Conflict.AccountHasIncomeOccurrences", $"Account '{id}' is planned or settled by a recurring income occurrence — undo it first.");
+
     public static Error BankAccountRequired(Guid id) =>
         new("Validation.BankAccountRequired", $"Account '{id}' is not an unarchived Bank account.");
 
