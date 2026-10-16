@@ -688,6 +688,36 @@
       "duplicateName": "Wpływ o tej nazwie już istnieje.",
       "accountArchived": "To konto jest zarchiwizowane."
     },
+    "expenses": {
+      "title": "Wydatki",
+      "add": "Dodaj wydatek",
+      "empty": "W tym miesiącu nie planujesz żadnych wydatków.",
+      "cost": "Koszt miesiąca (z rezerwami)",
+      "reserve": "{{ amount }}/mies.",
+      "nextPayment": "najbliższa płatność {{ date }}",
+      "definitions": {
+        "title": "Wydatki cykliczne",
+        "empty": "Brak wydatków cyklicznych."
+      },
+      "delete": {
+        "title": "Usuń wydatek cykliczny",
+        "message": "Usunąć „{{ name }}” wraz z całym planem? Tej operacji nie można cofnąć.",
+        "failed": "Nie udało się usunąć wydatku."
+      },
+      "errors": {
+        "duplicateName": "Wydatek o tej nazwie już istnieje."
+      },
+      "form": {
+        "title": "Dodaj wydatek cykliczny",
+        "amount": "Kwota (PLN)"
+      }
+    },
+    "freeFunds": {
+      "title": "Wolne środki",
+      "plan": "Plan",
+      "forecast": "Prognoza",
+      "deficit": "deficyt"
+    },
     "form": {
       "title": "Dodaj wpływ cykliczny",
       "editTitle": "Edytuj wpływ cykliczny",

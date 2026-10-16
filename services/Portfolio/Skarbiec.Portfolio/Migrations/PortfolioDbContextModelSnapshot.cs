@@ -548,6 +548,79 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("MetalHoldings");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("CreatedOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("RecurringExpenses");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpenseVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("DayKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("DayOfMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<int>("IntervalMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RecurringExpenseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Shift")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecurringExpenseId");
+
+                    b.ToTable("RecurringExpenseVersions");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncome", b =>
                 {
                     b.Property<Guid>("Id")
@@ -939,6 +1012,15 @@ namespace Skarbiec.Portfolio.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpenseVersion", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.RecurringExpense", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("RecurringExpenseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncomeOccurrence", b =>
                 {
                     b.HasOne("Skarbiec.Portfolio.Data.Account", null)
@@ -995,6 +1077,11 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasForeignKey("Skarbiec.Portfolio.Data.TreasuryBond", "AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpense", b =>
+                {
+                    b.Navigation("Versions");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncome", b =>

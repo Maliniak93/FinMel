@@ -1,0 +1,34 @@
+<mat-form-field appearance="outline" class="recurrence-rule-fields__field">
+  <mat-label>{{ 'planning.form.intervalMonths' | transloco }}</mat-label>
+  <input matInput type="number" step="1" min="1" max="12" formControlName="intervalMonths" />
+  <mat-error>{{ 'planning.form.intervalInvalid' | transloco }}</mat-error>
+</mat-form-field>
+
+<mat-form-field appearance="outline" class="recurrence-rule-fields__field">
+  <mat-label>{{ 'planning.form.dayKind' | transloco }}</mat-label>
+  <mat-select formControlName="dayKind">
+    <mat-option [value]="dayKinds.DayOfMonth">{{
+      'planning.form.dayOfMonthKind' | transloco
+    }}</mat-option>
+    <mat-option [value]="dayKinds.LastBusinessDay">{{
+      'planning.form.lastBusinessDayKind' | transloco
+    }}</mat-option>
+  </mat-select>
+</mat-form-field>
+
+@if (dayKind() === dayKinds.DayOfMonth) {
+  <mat-form-field appearance="outline" class="recurrence-rule-fields__field">
+    <mat-label>{{ 'planning.form.dayOfMonth' | transloco }}</mat-label>
+    <input matInput type="number" step="1" min="1" max="31" formControlName="dayOfMonth" />
+    <mat-error>{{ 'planning.form.dayInvalid' | transloco }}</mat-error>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="recurrence-rule-fields__field">
+    <mat-label>{{ 'planning.form.shift' | transloco }}</mat-label>
+    <mat-select formControlName="shift">
+      @for (option of shiftOptions; track option.value) {
+        <mat-option [value]="option.value">{{ option.label | transloco }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+}

@@ -5,6 +5,8 @@ using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
+using Skarbiec.Portfolio.Features.Planning.Reserves;
+using Skarbiec.Portfolio.Features.RecurringExpenses;
 using Skarbiec.Portfolio.Features.RecurringIncomes;
 using Skarbiec.Portfolio.Features.RecurringIncomes.Occurrences;
 using Skarbiec.Portfolio.MarketData;
@@ -14,6 +16,9 @@ namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
 public sealed class GetPlanningMonthHandler(
     PortfolioDbContext dbContext, IInstrumentQuoteLookupClient quoteLookup, TimeProvider timeProvider)
 {
+    // Twice the longest interval.
+    private const int NextPaymentLookAheadMonths = 24;
+
     private static readonly YearMonth FirstMonth = YearMonth.From(RecurringIncomeLimits.FirstDay);
     private static readonly YearMonth LastMonth = YearMonth.From(RecurringIncomeLimits.LastDay);
 
@@ -186,24 +191,108 @@ public sealed class GetPlanningMonthHandler(
             })
             .ToList();
 
+        var balance = new IncomeBalanceResponse
+        {
+            PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m),
+            ActualPln = occurrences.Sum(o => o.ActualAmountPln ?? 0m),
+            PendingPln = occurrences.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m),
+            DifferencePln = occurrences
+                .Where(o => o.Status != OccurrenceStatus.Pending)
+                .Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
+        };
+        var fxUnavailable = foreign.Any(c => !rates.ContainsKey(c));
+
+        var expenses = await BuildExpensesAsync(viewed, cancellationToken);
+
         return new PlanningMonthResponse
         {
             Incomes = new PlanningIncomesResponse
             {
                 Occurrences = occurrences,
-                Balance = new IncomeBalanceResponse
-                {
-                    PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m),
-                    ActualPln = occurrences.Sum(o => o.ActualAmountPln ?? 0m),
-                    PendingPln = occurrences.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m),
-                    DifferencePln = occurrences
-                        .Where(o => o.Status != OccurrenceStatus.Pending)
-                        .Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
-                },
-                FxUnavailable = foreign.Any(c => !rates.ContainsKey(c)),
+                Balance = balance,
+                FxUnavailable = fxUnavailable,
                 Definitions = definitions
+            },
+            Expenses = expenses,
+            FreeFunds = new FreeFundsResponse
+            {
+                PlanPln = balance.PlanPln - expenses.CostPln,
+                ForecastPln = balance.ActualPln + balance.PendingPln - expenses.CostPln,
+                Incomplete = fxUnavailable
             }
         };
+    }
+
+    private async Task<PlanningExpensesResponse> BuildExpensesAsync(YearMonth viewed, CancellationToken cancellationToken)
+    {
+        var expenses = await dbContext.RecurringExpenses
+            .AsNoTracking()
+            .Include(e => e.Versions)
+            .ToListAsync(cancellationToken);
+
+        var plans = expenses.Select(e => (Expense: e, Plan: e.ToReservePlan())).ToList();
+
+        var payments = plans
+            .SelectMany(p => ReserveSchedule.PaymentsIn(viewed, p.Plan).Select(payment => new ExpensePaymentResponse
+            {
+                RecurringExpenseId = p.Expense.Id,
+                NominalMonth = payment.NominalMonth.ToString(),
+                Date = payment.Date,
+                Name = p.Expense.Name,
+                Amount = payment.Amount
+            }))
+            .OrderBy(p => p.Date)
+            .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var definitions = plans
+            .OrderBy(p => p.Expense.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(p =>
+            {
+                var version = p.Expense.InForce(viewed);
+
+                return new ExpenseDefinitionResponse
+                {
+                    Id = p.Expense.Id,
+                    Name = p.Expense.Name,
+                    StartDate = p.Expense.StartDate,
+                    EndDate = p.Expense.EndDate,
+                    Status = p.Expense.StartDate > viewed.LastDay ? RecurringIncomeStatus.Upcoming
+                        : p.Expense.EndDate < viewed.FirstDay ? RecurringIncomeStatus.Ended
+                        : RecurringIncomeStatus.Active,
+                    Amount = version.Amount,
+                    IntervalMonths = version.IntervalMonths,
+                    DayKind = version.DayKind,
+                    DayOfMonth = version.DayOfMonth,
+                    Shift = version.Shift,
+                    ReservePln = ReserveSchedule.CostIn(viewed, p.Plan),
+                    NextPayment = NextPayment(viewed, p.Plan)
+                };
+            })
+            .ToList();
+
+        return new PlanningExpensesResponse
+        {
+            Payments = payments,
+            CostPln = plans.Sum(p => ReserveSchedule.CostIn(viewed, p.Plan)),
+            Definitions = definitions
+        };
+    }
+
+    private static ExpenseNextPaymentResponse? NextPayment(YearMonth viewed, ReservePlan plan)
+    {
+        for (var offset = 0; offset < NextPaymentLookAheadMonths; offset++)
+        {
+            var next = ReserveSchedule.PaymentsIn(viewed.AddMonths(offset), plan)
+                .OrderBy(p => p.Date)
+                .FirstOrDefault();
+            if (next is not null)
+            {
+                return new ExpenseNextPaymentResponse { Date = next.Date, Amount = next.Amount };
+            }
+        }
+
+        return null;
     }
 
     private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);

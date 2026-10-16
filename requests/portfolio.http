@@ -1273,3 +1273,35 @@ Authorization: Bearer {{authToken}}
 ### Delete the income with its versions (409 Conflict.RecurringIncomeHasSettlements while a settled occurrence exists; skipped ones go with it)
 DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}
 Authorization: Bearer {{authToken}}
+
+### --- Recurring expenses ---
+
+### Create a recurring expense: 1 200 PLN every 12 months on day 15 (no account or currency; 409 Conflict.DuplicateName among expenses)
+# @name createRecurringExpense
+POST {{baseUrl}}/api/portfolio/recurring-expenses
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "OC Toyota",
+  "amount": 1200,
+  "startDate": "2027-03-15",
+  "endDate": null,
+  "intervalMonths": 12,
+  "dayKind": 0,
+  "dayOfMonth": 15,
+  "shift": 0
+}
+
+### End the expense (204; sets or replaces the end date, past and future allowed)
+POST {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}/end
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "endDate": "2028-03-31"
+}
+
+### Delete the expense with its versions (204; always allowed)
+DELETE {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}
+Authorization: Bearer {{authToken}}

@@ -1,0 +1,45 @@
+<h2 mat-dialog-title>{{ 'planning.end.title' | transloco: { name: data.name } }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" class="end-recurring-expense-dialog__field">
+      <mat-label>{{ 'planning.form.endDate' | transloco }}</mat-label>
+      <input
+        matInput
+        [matDatepicker]="endPicker"
+        [min]="minDate"
+        [max]="maxDate"
+        formControlName="endDate"
+      />
+      <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+      <mat-datepicker #endPicker></mat-datepicker>
+      @if (form.controls.endDate.hasError('required')) {
+        <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+      } @else if (
+        form.controls.endDate.hasError('matDatepickerMin') ||
+        form.controls.endDate.hasError('matDatepickerMax')
+      ) {
+        <mat-error>{{ 'planning.form.dateOutOfRange' | transloco }}</mat-error>
+      } @else if (form.controls.endDate.hasError('server')) {
+        <mat-error>{{ form.controls.endDate.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="end-recurring-expense-dialog__error" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'common.save' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

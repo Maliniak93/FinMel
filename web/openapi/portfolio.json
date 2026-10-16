@@ -1933,6 +1933,91 @@
         }
       }
     },
+    "/api/portfolio/recurring-expenses": {
+      "post": {
+        "tags": [
+          "CreateRecurringExpenseEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecurringExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateRecurringExpenseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-expenses/{id}/end": {
+      "post": {
+        "tags": [
+          "EndRecurringExpenseEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndRecurringExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/recurring-expenses/{id}": {
+      "delete": {
+        "tags": [
+          "DeleteRecurringExpenseEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/recurring-incomes/{id}/occurrences/{month}/settlement": {
       "put": {
         "tags": [
@@ -3999,6 +4084,81 @@
           }
         }
       },
+      "CreateRecurringExpenseRequest": {
+        "required": [
+          "name",
+          "amount",
+          "startDate",
+          "intervalMonths",
+          "dayKind",
+          "shift"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "intervalMonths": {
+            "maximum": 12,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
+          }
+        }
+      },
+      "CreateRecurringExpenseResponse": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateRecurringIncomeRequest": {
         "required": [
           "name",
@@ -4390,6 +4550,18 @@
       "DepositTermUnit": {
         "type": "integer"
       },
+      "EndRecurringExpenseRequest": {
+        "required": [
+          "endDate"
+        ],
+        "type": "object",
+        "properties": {
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
       "EndRecurringIncomeRequest": {
         "required": [
           "endDate"
@@ -4399,6 +4571,179 @@
           "endDate": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "ExpenseDefinitionResponse": {
+        "required": [
+          "id",
+          "name",
+          "startDate",
+          "endDate",
+          "status",
+          "amount",
+          "intervalMonths",
+          "dayKind",
+          "dayOfMonth",
+          "shift",
+          "reservePln",
+          "nextPayment"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RecurringIncomeStatus"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "intervalMonths": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dayKind": {
+            "$ref": "#/components/schemas/RecurrenceDayKind"
+          },
+          "dayOfMonth": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/BusinessDayShift"
+          },
+          "reservePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "nextPayment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExpenseNextPaymentResponse"
+              }
+            ]
+          }
+        }
+      },
+      "ExpenseNextPaymentResponse": {
+        "required": [
+          "date",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "ExpensePaymentResponse": {
+        "required": [
+          "recurringExpenseId",
+          "nominalMonth",
+          "date",
+          "name",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "recurringExpenseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nominalMonth": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "FreeFundsResponse": {
+        "required": [
+          "planPln",
+          "forecastPln",
+          "incomplete"
+        ],
+        "type": "object",
+        "properties": {
+          "planPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "forecastPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "incomplete": {
+            "type": "boolean"
           }
         }
       },
@@ -4904,6 +5249,36 @@
           }
         }
       },
+      "PlanningExpensesResponse": {
+        "required": [
+          "payments",
+          "costPln",
+          "definitions"
+        ],
+        "type": "object",
+        "properties": {
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePaymentResponse"
+            }
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "definitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDefinitionResponse"
+            }
+          }
+        }
+      },
       "PlanningIncomesResponse": {
         "required": [
           "occurrences",
@@ -4935,12 +5310,20 @@
       },
       "PlanningMonthResponse": {
         "required": [
-          "incomes"
+          "incomes",
+          "expenses",
+          "freeFunds"
         ],
         "type": "object",
         "properties": {
           "incomes": {
             "$ref": "#/components/schemas/PlanningIncomesResponse"
+          },
+          "expenses": {
+            "$ref": "#/components/schemas/PlanningExpensesResponse"
+          },
+          "freeFunds": {
+            "$ref": "#/components/schemas/FreeFundsResponse"
           }
         }
       },
@@ -6546,6 +6929,15 @@
     },
     {
       "name": "DeleteRecurringIncomeChangeEndpoint"
+    },
+    {
+      "name": "CreateRecurringExpenseEndpoint"
+    },
+    {
+      "name": "EndRecurringExpenseEndpoint"
+    },
+    {
+      "name": "DeleteRecurringExpenseEndpoint"
     },
     {
       "name": "SettleOccurrenceEndpoint"

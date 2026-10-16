@@ -112,44 +112,7 @@
       }
     </mat-form-field>
 
-    <mat-form-field appearance="outline" class="recurring-income-form-dialog__field">
-      <mat-label>{{ 'planning.form.intervalMonths' | transloco }}</mat-label>
-      <input matInput type="number" step="1" min="1" max="12" formControlName="intervalMonths" />
-      @if (form.controls.intervalMonths.invalid) {
-        <mat-error>{{ 'planning.form.intervalInvalid' | transloco }}</mat-error>
-      }
-    </mat-form-field>
-
-    <mat-form-field appearance="outline" class="recurring-income-form-dialog__field">
-      <mat-label>{{ 'planning.form.dayKind' | transloco }}</mat-label>
-      <mat-select formControlName="dayKind">
-        <mat-option [value]="dayKinds.DayOfMonth">{{
-          'planning.form.dayOfMonthKind' | transloco
-        }}</mat-option>
-        <mat-option [value]="dayKinds.LastBusinessDay">{{
-          'planning.form.lastBusinessDayKind' | transloco
-        }}</mat-option>
-      </mat-select>
-    </mat-form-field>
-
-    @if (dayKind() === dayKinds.DayOfMonth) {
-      <mat-form-field appearance="outline" class="recurring-income-form-dialog__field">
-        <mat-label>{{ 'planning.form.dayOfMonth' | transloco }}</mat-label>
-        <input matInput type="number" step="1" min="1" max="31" formControlName="dayOfMonth" />
-        @if (form.controls.dayOfMonth.invalid) {
-          <mat-error>{{ 'planning.form.dayInvalid' | transloco }}</mat-error>
-        }
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="recurring-income-form-dialog__field">
-        <mat-label>{{ 'planning.form.shift' | transloco }}</mat-label>
-        <mat-select formControlName="shift">
-          @for (option of shiftOptions; track option.value) {
-            <mat-option [value]="option.value">{{ option.label | transloco }}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
-    }
+    <app-recurrence-rule-fields [dayKind]="dayKind()" />
 
     @if (formError()) {
       <p class="recurring-income-form-dialog__error" role="alert">{{ formError() }}</p>

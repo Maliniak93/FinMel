@@ -26,6 +26,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<RecurringIncome> RecurringIncomes => Set<RecurringIncome>();
     public DbSet<RecurringIncomeVersion> RecurringIncomeVersions => Set<RecurringIncomeVersion>();
     public DbSet<RecurringIncomeOccurrence> RecurringIncomeOccurrences => Set<RecurringIncomeOccurrence>();
+    public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
+    public DbSet<RecurringExpenseVersion> RecurringExpenseVersions => Set<RecurringExpenseVersion>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -269,6 +271,25 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
                 .WithMany()
                 .HasForeignKey(o => o.TransactionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RecurringExpense>(expense =>
+        {
+            expense.Property(e => e.Name).HasMaxLength(200);
+
+            expense.HasIndex(e => new { e.UserId, e.Name }).IsUnique();
+
+            expense.HasMany(e => e.Versions)
+                .WithOne()
+                .HasForeignKey(v => v.RecurringExpenseId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecurringExpenseVersion>(version =>
+        {
+            version.Property(v => v.Amount).HasPrecision(18, 2);
+            version.Property(v => v.DayKind).HasConversion<string>().HasMaxLength(20);
+            version.Property(v => v.Shift).HasConversion<string>().HasMaxLength(20);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

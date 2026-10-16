@@ -688,6 +688,36 @@
       "duplicateName": "An income with this name already exists.",
       "accountArchived": "This account is archived."
     },
+    "expenses": {
+      "title": "Expenses",
+      "add": "Add expense",
+      "empty": "No expenses planned this month.",
+      "cost": "Monthly cost (with reserves)",
+      "reserve": "{{ amount }}/mo.",
+      "nextPayment": "next payment {{ date }}",
+      "definitions": {
+        "title": "Recurring expenses",
+        "empty": "No recurring expenses yet."
+      },
+      "delete": {
+        "title": "Delete recurring expense",
+        "message": "Delete “{{ name }}” with its whole plan? This can't be undone.",
+        "failed": "Failed to delete the expense."
+      },
+      "errors": {
+        "duplicateName": "An expense with this name already exists."
+      },
+      "form": {
+        "title": "Add recurring expense",
+        "amount": "Amount (PLN)"
+      }
+    },
+    "freeFunds": {
+      "title": "Free funds",
+      "plan": "Plan",
+      "forecast": "Forecast",
+      "deficit": "deficit"
+    },
     "form": {
       "title": "Add recurring income",
       "editTitle": "Edit recurring income",

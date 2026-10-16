@@ -291,6 +291,21 @@ export type CreateCashPlaceRequest = {
     currencies?: Array<string>;
 };
 
+export type CreateRecurringExpenseRequest = {
+    name: string;
+    amount: number | string;
+    startDate: string;
+    endDate?: null | string;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth?: null | number | string;
+    shift: BusinessDayShift;
+};
+
+export type CreateRecurringExpenseResponse = {
+    id: string;
+};
+
 export type CreateRecurringIncomeRequest = {
     name: string;
     amount: number | string;
@@ -368,8 +383,46 @@ export type DepositStatus = number;
 
 export type DepositTermUnit = number;
 
+export type EndRecurringExpenseRequest = {
+    endDate: string;
+};
+
 export type EndRecurringIncomeRequest = {
     endDate: string;
+};
+
+export type ExpenseDefinitionResponse = {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: null | string;
+    status: RecurringIncomeStatus;
+    amount: number | string;
+    intervalMonths: number | string;
+    dayKind: RecurrenceDayKind;
+    dayOfMonth: null | number | string;
+    shift: BusinessDayShift;
+    reservePln: number | string;
+    nextPayment: null | ExpenseNextPaymentResponse;
+};
+
+export type ExpenseNextPaymentResponse = {
+    date: string;
+    amount: number | string;
+};
+
+export type ExpensePaymentResponse = {
+    recurringExpenseId: string;
+    nominalMonth: string;
+    date: string;
+    name: string;
+    amount: number | string;
+};
+
+export type FreeFundsResponse = {
+    planPln: number | string;
+    forecastPln: number | string;
+    incomplete: boolean;
 };
 
 export type IncomeBalanceResponse = {
@@ -473,6 +526,12 @@ export type PayOutDepositRequest = {
     date: string;
 };
 
+export type PlanningExpensesResponse = {
+    payments: Array<ExpensePaymentResponse>;
+    costPln: number | string;
+    definitions: Array<ExpenseDefinitionResponse>;
+};
+
 export type PlanningIncomesResponse = {
     occurrences: Array<IncomeOccurrenceResponse>;
     balance: IncomeBalanceResponse;
@@ -482,6 +541,8 @@ export type PlanningIncomesResponse = {
 
 export type PlanningMonthResponse = {
     incomes: PlanningIncomesResponse;
+    expenses: PlanningExpensesResponse;
+    freeFunds: FreeFundsResponse;
 };
 
 export type RecordTransactionRequest = {
@@ -1788,6 +1849,58 @@ export type DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses = {
 };
 
 export type DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponse = DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses[keyof DeleteApiPortfolioRecurringIncomesByIdChangesByMonthResponses];
+
+export type PostApiPortfolioRecurringExpensesData = {
+    body: CreateRecurringExpenseRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/recurring-expenses';
+};
+
+export type PostApiPortfolioRecurringExpensesResponses = {
+    /**
+     * Created
+     */
+    201: CreateRecurringExpenseResponse;
+};
+
+export type PostApiPortfolioRecurringExpensesResponse = PostApiPortfolioRecurringExpensesResponses[keyof PostApiPortfolioRecurringExpensesResponses];
+
+export type PostApiPortfolioRecurringExpensesByIdEndData = {
+    body: EndRecurringExpenseRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-expenses/{id}/end';
+};
+
+export type PostApiPortfolioRecurringExpensesByIdEndResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiPortfolioRecurringExpensesByIdEndResponse = PostApiPortfolioRecurringExpensesByIdEndResponses[keyof PostApiPortfolioRecurringExpensesByIdEndResponses];
+
+export type DeleteApiPortfolioRecurringExpensesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-expenses/{id}';
+};
+
+export type DeleteApiPortfolioRecurringExpensesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioRecurringExpensesByIdResponse = DeleteApiPortfolioRecurringExpensesByIdResponses[keyof DeleteApiPortfolioRecurringExpensesByIdResponses];
 
 export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementData = {
     body: SettleOccurrenceRequest;
