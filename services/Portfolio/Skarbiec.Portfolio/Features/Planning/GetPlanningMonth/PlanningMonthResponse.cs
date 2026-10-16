@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
@@ -11,6 +12,52 @@ public sealed record PlanningMonthResponse
     public required PlanningExpensesResponse Expenses { get; init; }
 
     public required FreeFundsResponse FreeFunds { get; init; }
+
+    public required AllocationResponse Allocation { get; init; }
+}
+
+public sealed record AllocationResponse
+{
+    /// <summary>The month (yyyy-MM) of the plan version in force, null when none is.</summary>
+    public required string? EffectiveFrom { get; init; }
+
+    /// <summary>The earliest scheduled plan version after the viewed month (yyyy-MM), null when there is none.</summary>
+    public required string? NextChange { get; init; }
+
+    /// <summary>The free-funds forecast the buckets split.</summary>
+    public required decimal ForecastPln { get; init; }
+
+    /// <summary>True when a needed FX rate is missing, so the forecast is incomplete.</summary>
+    public required bool Incomplete { get; init; }
+
+    /// <summary>The shortfall when the forecast is negative; 0 otherwise.</summary>
+    public required decimal DeficitPln { get; init; }
+
+    /// <summary>The fixed group first, then the percent group, each by position; empty when no version is in force.</summary>
+    public required IReadOnlyList<AllocationBucketResponse> Buckets { get; init; }
+
+    /// <summary>PLN sum of the Investments buckets.</summary>
+    public required decimal ToInvestPln { get; init; }
+}
+
+public sealed record AllocationBucketResponse
+{
+    public required Guid BucketId { get; init; }
+    public required string Name { get; init; }
+    public required BucketKind Kind { get; init; }
+    public required BucketShareType ShareType { get; init; }
+
+    /// <summary>PLN for a Fixed bucket, percent for a Percent bucket.</summary>
+    public required decimal Share { get; init; }
+
+    public required int Position { get; init; }
+    public required bool IsRemainder { get; init; }
+    public required Guid? AccountId { get; init; }
+    public required string? AccountName { get; init; }
+    public required decimal AllocatedPln { get; init; }
+
+    /// <summary>True when a fixed bucket got less than its share.</summary>
+    public required bool Underfunded { get; init; }
 }
 
 public sealed record PlanningExpensesResponse

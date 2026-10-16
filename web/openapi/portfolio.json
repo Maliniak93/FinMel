@@ -2080,6 +2080,58 @@
         }
       }
     },
+    "/api/portfolio/allocation-plan/versions/{month}": {
+      "put": {
+        "tags": [
+          "SaveAllocationPlanVersionEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAllocationPlanVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeleteAllocationPlanVersionEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/recurring-incomes/{id}/occurrences/{month}/settlement": {
       "put": {
         "tags": [
@@ -2971,6 +3023,185 @@
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "AllocationBucketResponse": {
+        "required": [
+          "bucketId",
+          "name",
+          "kind",
+          "shareType",
+          "share",
+          "position",
+          "isRemainder",
+          "accountId",
+          "accountName",
+          "allocatedPln",
+          "underfunded"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/BucketKind"
+          },
+          "shareType": {
+            "$ref": "#/components/schemas/BucketShareType"
+          },
+          "share": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "position": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isRemainder": {
+            "type": "boolean"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "allocatedPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "underfunded": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AllocationPlanRowRequest": {
+        "required": [
+          "name",
+          "kind",
+          "shareType",
+          "share",
+          "isRemainder"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/BucketKind"
+          },
+          "shareType": {
+            "$ref": "#/components/schemas/BucketShareType"
+          },
+          "share": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "isRemainder": {
+            "type": "boolean"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "AllocationResponse": {
+        "required": [
+          "effectiveFrom",
+          "nextChange",
+          "forecastPln",
+          "incomplete",
+          "deficitPln",
+          "buckets",
+          "toInvestPln"
+        ],
+        "type": "object",
+        "properties": {
+          "effectiveFrom": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "nextChange": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "forecastPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "incomplete": {
+            "type": "boolean"
+          },
+          "deficitPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationBucketResponse"
+            }
+          },
+          "toInvestPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
               "number",
               "string"
             ],
@@ -3912,6 +4143,12 @@
             "type": "string"
           }
         }
+      },
+      "BucketKind": {
+        "type": "integer"
+      },
+      "BucketShareType": {
+        "type": "integer"
       },
       "BusinessDayShift": {
         "type": "integer"
@@ -5436,7 +5673,8 @@
         "required": [
           "incomes",
           "expenses",
-          "freeFunds"
+          "freeFunds",
+          "allocation"
         ],
         "type": "object",
         "properties": {
@@ -5448,6 +5686,9 @@
           },
           "freeFunds": {
             "$ref": "#/components/schemas/FreeFundsResponse"
+          },
+          "allocation": {
+            "$ref": "#/components/schemas/AllocationResponse"
           }
         }
       },
@@ -5600,6 +5841,20 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "SaveAllocationPlanVersionRequest": {
+        "required": [
+          "buckets"
+        ],
+        "type": "object",
+        "properties": {
+          "buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationPlanRowRequest"
+            }
           }
         }
       },
@@ -7135,6 +7390,12 @@
     },
     {
       "name": "DeleteRecurringExpenseChangeEndpoint"
+    },
+    {
+      "name": "SaveAllocationPlanVersionEndpoint"
+    },
+    {
+      "name": "DeleteAllocationPlanVersionEndpoint"
     },
     {
       "name": "SettleOccurrenceEndpoint"

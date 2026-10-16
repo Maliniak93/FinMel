@@ -10,6 +10,12 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
+import {
+  allocation,
+  allocationBucket,
+  firstPlanBuckets,
+} from '../../../testing/allocation-fixtures';
+import { AllocationPlanDialog } from './allocation-plan-dialog/allocation-plan-dialog';
 import { Planning } from './planning';
 import { RecurringExpenseFormDialog } from './recurring-expense-form-dialog/recurring-expense-form-dialog';
 import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
@@ -150,6 +156,7 @@ function month(
   incomes: Record<string, unknown>,
   expensesPart: Record<string, unknown> = {},
   freeFundsPart: Record<string, unknown> = {},
+  allocationPart: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     incomes: {
@@ -161,6 +168,7 @@ function month(
     },
     expenses: expenses(expensesPart),
     freeFunds: freeFunds(freeFundsPart),
+    allocation: allocation(allocationPart),
   };
 }
 
@@ -712,5 +720,120 @@ describe('Planning', () => {
     expect(deficits).toHaveLength(1);
     expect(deficits[0].textContent).toContain(formatMoney(-700, 'PLN'));
     expect(rows('free-funds-incomplete')).toHaveLength(1);
+  });
+
+  it('renders the allocation groups with the underfunded and remainder markers, the deficit message, the amount to invest and the next change', async () => {
+    const buckets = [
+      ...firstPlanBuckets(),
+      allocationBucket('Remont', {
+        kind: 1,
+        shareType: 0,
+        share: 15000,
+        position: 1,
+        allocatedPln: 11743,
+        underfunded: true,
+      }),
+    ];
+    responses['2026-10'] = month(
+      {},
+      {},
+      { planPln: 12243.27, forecastPln: 12243.27 },
+      {
+        effectiveFrom: '2026-10',
+        nextChange: '2027-01',
+        forecastPln: 12243.27,
+        incomplete: true,
+        toInvestPln: 9395.27,
+        buckets,
+      },
+    );
+    await setup();
+
+    expect(rows('allocation-section')).toHaveLength(1);
+    const fixedRows = rows('allocation-group-fixed')[0].querySelectorAll(
+      '[data-testid="allocation-bucket-row"]',
+    );
+    const percentRows = rows('allocation-group-percent')[0].querySelectorAll(
+      '[data-testid="allocation-bucket-row"]',
+    );
+    expect(Array.from(fixedRows).map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Wakacje'),
+      expect.stringContaining('Remont'),
+    ]);
+    expect(Array.from(percentRows).map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Akcje'),
+      expect.stringContaining('Lokata'),
+      expect.stringContaining('ETF'),
+    ]);
+    expect(fixedRows[0].textContent).toContain(formatMoney(500, 'PLN'));
+    expect(percentRows[2].textContent).toContain(formatMoney(3524.27, 'PLN'));
+    expect(rows('allocation-underfunded')).toHaveLength(1);
+    expect(fixedRows[1].querySelector('[data-testid="allocation-underfunded"]')).not.toBeNull();
+    expect(rows('allocation-remainder')).toHaveLength(1);
+    expect(percentRows[2].querySelector('[data-testid="allocation-remainder"]')).not.toBeNull();
+    expect(rows('allocation-to-invest')[0].textContent).toContain(formatMoney(9395.27, 'PLN'));
+    expect(rows('allocation-incomplete')).toHaveLength(1);
+    expect(rows('allocation-deficit')).toHaveLength(0);
+    expect(rows('allocation-next-change')[0].textContent).toContain('01.2027');
+    expect(rows('delete-allocation-change')).toHaveLength(1);
+
+    responses['2026-11'] = month(
+      {},
+      {},
+      {},
+      {
+        effectiveFrom: '2026-10',
+        forecastPln: -756.73,
+        deficitPln: 756.73,
+        buckets: firstPlanBuckets().map((bucket) => ({ ...bucket, allocatedPln: 0 })),
+      },
+    );
+    click('next-month');
+    await settle();
+
+    expect(rows('allocation-deficit')[0].textContent).toContain(formatMoney(756.73, 'PLN'));
+    expect(rows('allocation-incomplete')).toHaveLength(0);
+    expect(rows('allocation-next-change')).toHaveLength(0);
+  });
+
+  it('shows no buckets and an edit action when no plan is in force, and opens the plan dialog for the viewed month', async () => {
+    responses['2026-10'] = month({}, {}, {}, allocation());
+    await setup();
+
+    expect(rows('allocation-section')).toHaveLength(1);
+    expect(rows('allocation-bucket-row')).toHaveLength(0);
+
+    click('edit-allocation');
+
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      AllocationPlanDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({ month: '2026-10' }),
+      }),
+    );
+  });
+
+  it('deletes the scheduled allocation change after confirmation and reloads the month', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      { effectiveFrom: '2026-10', nextChange: '2027-01', buckets: firstPlanBuckets() },
+    );
+    await setup();
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+
+    click('delete-allocation-change');
+
+    await vi.waitFor(() => {
+      const deletes = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'DELETE');
+      expect(deletes).toHaveLength(1);
+      expect(deletes[0].url).toContain('/allocation-plan/versions/2027-01');
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
   });
 });

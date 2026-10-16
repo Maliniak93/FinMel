@@ -257,6 +257,92 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("AccountContributionLimits");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationBucket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AllocationBuckets");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BucketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsRemainder")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Share")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ShareType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BucketId");
+
+                    b.HasIndex("VersionId");
+
+                    b.ToTable("AllocationPlanEntries");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("AllocationPlanVersions");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Asset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -994,6 +1080,21 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasPrincipalKey("MessageId", "ConsumerId");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanEntry", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.AllocationBucket", null)
+                        .WithMany()
+                        .HasForeignKey("BucketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Skarbiec.Portfolio.Data.AllocationPlanVersion", null)
+                        .WithMany("Entries")
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.BankAccountTerms", b =>
                 {
                     b.HasOne("Skarbiec.Portfolio.Data.Account", null)
@@ -1077,6 +1178,11 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasForeignKey("Skarbiec.Portfolio.Data.TreasuryBond", "AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanVersion", b =>
+                {
+                    b.Navigation("Entries");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpense", b =>

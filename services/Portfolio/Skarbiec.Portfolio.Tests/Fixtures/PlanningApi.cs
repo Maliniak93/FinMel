@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
@@ -114,7 +116,93 @@ internal static class PlanningApi
 
     public sealed record FreeFundsView(decimal PlanPln, decimal ForecastPln, bool Incomplete);
 
-    public sealed record PlanningMonthView(IncomesView Incomes, ExpensesView Expenses, FreeFundsView FreeFunds);
+    public sealed record AllocationBucketView(
+        Guid BucketId,
+        string Name,
+        int Kind,
+        int ShareType,
+        decimal Share,
+        int Position,
+        bool IsRemainder,
+        Guid? AccountId,
+        string? AccountName,
+        decimal AllocatedPln,
+        bool Underfunded);
+
+    public sealed record AllocationView(
+        string? EffectiveFrom,
+        string? NextChange,
+        decimal ForecastPln,
+        bool Incomplete,
+        decimal DeficitPln,
+        List<AllocationBucketView> Buckets,
+        decimal ToInvestPln);
+
+    public sealed record PlanningMonthView(
+        IncomesView Incomes, ExpensesView Expenses, FreeFundsView FreeFunds, AllocationView Allocation);
+
+    public const int InvestmentsKind = (int)BucketKind.Investments;
+
+    public const int SavingsKind = (int)BucketKind.Savings;
+
+    public const int FixedShare = (int)BucketShareType.Fixed;
+
+    public const int PercentShare = (int)BucketShareType.Percent;
+
+    public const string AllocationBucketNotFoundErrorCode = "NotFound.AllocationBucket";
+
+    public const string AllocationPlanVersionNotFoundErrorCode = "NotFound.AllocationPlanVersion";
+
+    public const string PercentSumOver100ErrorCode = "Validation.PercentSumOver100";
+
+    public static string AllocationPlanVersionUri(string month) => $"/api/portfolio/allocation-plan/versions/{month}";
+
+    public static object AllocationRow(
+        string name,
+        int kind,
+        int shareType,
+        decimal share,
+        bool isRemainder = false,
+        Guid? bucketId = null,
+        Guid? accountId = null) => new { bucketId, name, kind, shareType, share, isRemainder, accountId };
+
+    public static object NewAllocationPlanBody(params object[] buckets) => new { buckets };
+
+    public static object[] FirstAllocationPlan(Guid? accountId = null) =>
+    [
+        AllocationRow("Wakacje", SavingsKind, FixedShare, 500m, accountId: accountId),
+        AllocationRow("Akcje", InvestmentsKind, PercentShare, 50m),
+        AllocationRow("Lokata", SavingsKind, PercentShare, 20m),
+        AllocationRow("ETF", InvestmentsKind, PercentShare, 30m, isRemainder: true)
+    ];
+
+    // A PLN account with the "Pensja" income: the forecast is 12 243.27 every month.
+    public static async Task<BankAccountsApi.BankAccount> CreateAllocationSetupAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", 12_243.27m, dayOfMonth: 10);
+
+        return account;
+    }
+
+    public static async Task SaveAllocationPlanAsync(
+        this HttpClient client, string month, CancellationToken cancellationToken, params object[] buckets)
+    {
+        var response = await client.PutAsJsonAsync(AllocationPlanVersionUri(month), NewAllocationPlanBody(buckets), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task DeleteAllocationPlanVersionAsync(
+        this HttpClient client, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(AllocationPlanVersionUri(month), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<AllocationView> GetAllocationAsync(
+        this HttpClient client, string month, CancellationToken cancellationToken) =>
+        (await client.GetPlanningMonthAsync(month, cancellationToken)).Allocation;
 
     public const string RecurringExpensesUri = "/api/portfolio/recurring-expenses";
 

@@ -714,6 +714,57 @@
         "amount": "Kwota (PLN)"
       }
     },
+    "allocation": {
+      "title": "Podział",
+      "edit": "Edytuj podział",
+      "forecast": "Prognoza do podziału",
+      "effectiveFrom": "Obowiązuje od",
+      "empty": "Brak podziału obowiązującego w tym miesiącu.",
+      "deficit": "Deficyt {{ amount }} — nie ma czego dzielić.",
+      "groups": {
+        "fixed": "Kwoty stałe",
+        "percent": "Procentowe"
+      },
+      "kind": {
+        "investments": "Inwestycje",
+        "savings": "Oszczędności"
+      },
+      "shareType": {
+        "fixed": "Kwota stała",
+        "percent": "Procent"
+      },
+      "underfunded": "niedofinansowany",
+      "remainder": "reszta",
+      "toInvest": "Do zainwestowania",
+      "nextChange": "zaplanowana zmiana od {{ month }}",
+      "deleteTitle": "Usuń zaplanowaną zmianę",
+      "deleteMessage": "Usunąć zmianę podziału zaplanowaną od {{ month }}? Wcześniejsze miesiące zostają bez zmian.",
+      "deleteFailed": "Nie udało się usunąć zmiany.",
+      "dialog": {
+        "title": "Edytuj podział",
+        "effectiveFrom": "Obowiązuje od",
+        "effectiveFromHint": "Cały podział obowiązuje od tego miesiąca; późniejsze zaplanowane zmiany zostają.",
+        "name": "Nazwa koszyka",
+        "kind": "Rodzaj",
+        "shareType": "Typ udziału",
+        "fixedShare": "Kwota (PLN)",
+        "percentShare": "Procent",
+        "account": "Konto",
+        "noAccount": "Bez konta",
+        "remainder": "Reszta",
+        "moveUp": "Przesuń w górę",
+        "moveDown": "Przesuń w dół",
+        "removeRow": "Usuń koszyk",
+        "addRow": "Dodaj koszyk",
+        "empty": "Brak koszyków — od tego miesiąca nic nie będzie dzielone.",
+        "percentSum": "Suma procentów: {{ sum }}",
+        "percentOver": "Suma procentów przekracza 100.",
+        "remainderRequired": "Wybierz koszyk, który przejmuje resztę.",
+        "nameRequired": "Nazwa jest wymagana.",
+        "nameDuplicate": "Nazwy koszyków muszą być unikalne.",
+        "shareInvalid": "Podaj poprawny udział."
+      }
+    },
     "freeFunds": {
       "title": "Wolne środki",
       "plan": "Plan",

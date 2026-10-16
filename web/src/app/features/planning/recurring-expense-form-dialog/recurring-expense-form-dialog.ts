@@ -27,22 +27,20 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { RecurrenceRuleFields } from '../recurrence-rule-fields/recurrence-rule-fields';
-import { DAY_KIND, SHIFT, bindDayControls, currentWarsawMonth } from '../recurrence';
+import {
+  DAY_KIND,
+  MAX_MONTH,
+  MIN_MONTH,
+  SHIFT,
+  bindDayControls,
+  currentWarsawMonth,
+  monthInRange,
+} from '../recurrence';
 
 const MIN_DATE = new Date(2011, 0, 1);
 const MAX_DATE = new Date(2099, 11, 31);
-const MIN_MONTH = '2011-01';
-const MAX_MONTH = '2099-12';
-
 export interface RecurringExpenseFormDialogData {
   definition: ExpenseDefinitionResponse;
-}
-
-function monthInRange(control: AbstractControl): ValidationErrors | null {
-  const value = control.value as string;
-  return /^\d{4}-\d{2}$/.test(value) && (value < MIN_MONTH || value > MAX_MONTH)
-    ? { monthOutOfRange: true }
-    : null;
 }
 
 @Component({

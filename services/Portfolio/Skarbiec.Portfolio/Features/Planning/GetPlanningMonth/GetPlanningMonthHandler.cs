@@ -2,8 +2,10 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.AllocationPlan;
 using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Features.Planning.Reserves;
 using Skarbiec.Portfolio.Features.RecurringExpenses;
@@ -203,6 +205,8 @@ public sealed class GetPlanningMonthHandler(
         var fxUnavailable = foreign.Any(c => !rates.ContainsKey(c));
 
         var expenses = await BuildExpensesAsync(viewed, cancellationToken);
+        var forecast = balance.ActualPln + balance.PendingPln - expenses.CostPln;
+        var allocation = await BuildAllocationAsync(viewed, forecast, fxUnavailable, accounts, cancellationToken);
 
         return new PlanningMonthResponse
         {
@@ -217,9 +221,62 @@ public sealed class GetPlanningMonthHandler(
             FreeFunds = new FreeFundsResponse
             {
                 PlanPln = balance.PlanPln - expenses.CostPln,
-                ForecastPln = balance.ActualPln + balance.PendingPln - expenses.CostPln,
+                ForecastPln = forecast,
                 Incomplete = fxUnavailable
-            }
+            },
+            Allocation = allocation
+        };
+    }
+
+    private async Task<AllocationResponse> BuildAllocationAsync(
+        YearMonth viewed, decimal forecast, bool incomplete, Dictionary<Guid, Account> accounts, CancellationToken cancellationToken)
+    {
+        var versions = await dbContext.AllocationPlanVersions
+            .AsNoTracking()
+            .Include(v => v.Entries)
+            .ToListAsync(cancellationToken);
+        var inForce = versions.InForce(viewed);
+        var next = versions
+            .Where(v => v.EffectiveFrom > viewed.FirstDay)
+            .OrderBy(v => v.EffectiveFrom)
+            .FirstOrDefault();
+
+        var entries = (inForce?.Entries ?? [])
+            .OrderBy(e => e.ShareType)
+            .ThenBy(e => e.Position)
+            .ToList();
+        var result = AllocationCalculator.Allocate(
+            forecast, entries.Select(e => new BucketInput(e.ShareType, e.Share, e.IsRemainder)).ToList());
+        var kinds = await dbContext.AllocationBuckets
+            .AsNoTracking()
+            .ToDictionaryAsync(b => b.Id, b => b.Kind, cancellationToken);
+
+        var buckets = entries
+            .Select((e, i) => new AllocationBucketResponse
+            {
+                BucketId = e.BucketId,
+                Name = e.Name,
+                Kind = kinds[e.BucketId],
+                ShareType = e.ShareType,
+                Share = e.Share,
+                Position = e.Position,
+                IsRemainder = e.IsRemainder,
+                AccountId = e.AccountId,
+                AccountName = e.AccountId is { } accountId && accounts.TryGetValue(accountId, out var account) ? account.Name : null,
+                AllocatedPln = result.Buckets[i].Allocated,
+                Underfunded = result.Buckets[i].Underfunded
+            })
+            .ToList();
+
+        return new AllocationResponse
+        {
+            EffectiveFrom = inForce is null ? null : YearMonth.From(inForce.EffectiveFrom).ToString(),
+            NextChange = next is null ? null : YearMonth.From(next.EffectiveFrom).ToString(),
+            ForecastPln = forecast,
+            Incomplete = incomplete,
+            DeficitPln = result.Deficit,
+            Buckets = buckets,
+            ToInvestPln = buckets.Where(b => b.Kind == BucketKind.Investments).Sum(b => b.AllocatedPln)
         };
     }
 

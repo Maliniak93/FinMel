@@ -1,7 +1,17 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import type { FormControl } from '@angular/forms';
+import type { AbstractControl, FormControl, ValidationErrors } from '@angular/forms';
 
 import type { BusinessDayShift, RecurrenceDayKind } from '../../api/portfolio';
+
+export const MIN_MONTH = '2011-01';
+export const MAX_MONTH = '2099-12';
+
+export function monthInRange(control: AbstractControl): ValidationErrors | null {
+  const value = control.value as string;
+  return /^\d{4}-\d{2}$/.test(value) && (value < MIN_MONTH || value > MAX_MONTH)
+    ? { monthOutOfRange: true }
+    : null;
+}
 
 // Mirrors Skarbiec.Portfolio.Features.Planning.Recurrence: the enums travel as their ints.
 export const DAY_KIND = { DayOfMonth: 0, LastBusinessDay: 1 } as const satisfies Record<

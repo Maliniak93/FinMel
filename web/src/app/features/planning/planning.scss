@@ -47,6 +47,26 @@
   color: var(--mat-sys-on-error-container);
 }
 
+.planning-allocation__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1.5fr;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.planning-allocation__amount {
+  font-weight: 500;
+  text-align: end;
+}
+
+.planning-allocation__markers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .planning-section__header {
   display: flex;
   align-items: center;

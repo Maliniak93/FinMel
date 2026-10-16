@@ -714,6 +714,57 @@
         "amount": "Amount (PLN)"
       }
     },
+    "allocation": {
+      "title": "Allocation",
+      "edit": "Edit allocation",
+      "forecast": "Forecast to split",
+      "effectiveFrom": "Plan from",
+      "empty": "No allocation plan in force this month.",
+      "deficit": "Deficit {{ amount }} — nothing to allocate.",
+      "groups": {
+        "fixed": "Fixed amounts",
+        "percent": "Percent"
+      },
+      "kind": {
+        "investments": "Investments",
+        "savings": "Savings"
+      },
+      "shareType": {
+        "fixed": "Fixed amount",
+        "percent": "Percent"
+      },
+      "underfunded": "underfunded",
+      "remainder": "remainder",
+      "toInvest": "To invest",
+      "nextChange": "scheduled change from {{ month }}",
+      "deleteTitle": "Delete scheduled change",
+      "deleteMessage": "Delete the allocation change scheduled from {{ month }}? Earlier months stay as they are.",
+      "deleteFailed": "Failed to delete the change.",
+      "dialog": {
+        "title": "Edit allocation",
+        "effectiveFrom": "Applies from",
+        "effectiveFromHint": "The whole plan applies from this month on; later scheduled changes are kept.",
+        "name": "Bucket name",
+        "kind": "Kind",
+        "shareType": "Share type",
+        "fixedShare": "Amount (PLN)",
+        "percentShare": "Percent",
+        "account": "Account",
+        "noAccount": "No account",
+        "remainder": "Remainder",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "removeRow": "Remove bucket",
+        "addRow": "Add bucket",
+        "empty": "No buckets — nothing will be split from this month.",
+        "percentSum": "Percent total: {{ sum }}",
+        "percentOver": "The percent shares add up to more than 100.",
+        "remainderRequired": "Choose the bucket that takes the remainder.",
+        "nameRequired": "A name is required.",
+        "nameDuplicate": "Bucket names must be unique.",
+        "shareInvalid": "Enter a valid share."
+      }
+    },
     "freeFunds": {
       "title": "Free funds",
       "plan": "Plan",

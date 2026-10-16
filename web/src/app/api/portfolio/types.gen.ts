@@ -72,6 +72,40 @@ export type AddWatchlistItemRequest = {
     targetPrice?: null | number | string;
 };
 
+export type AllocationBucketResponse = {
+    bucketId: string;
+    name: string;
+    kind: BucketKind;
+    shareType: BucketShareType;
+    share: number | string;
+    position: number | string;
+    isRemainder: boolean;
+    accountId: null | string;
+    accountName: null | string;
+    allocatedPln: number | string;
+    underfunded: boolean;
+};
+
+export type AllocationPlanRowRequest = {
+    bucketId?: null | string;
+    name: string;
+    kind: BucketKind;
+    shareType: BucketShareType;
+    share: number | string;
+    isRemainder: boolean;
+    accountId?: null | string;
+};
+
+export type AllocationResponse = {
+    effectiveFrom: null | string;
+    nextChange: null | string;
+    forecastPln: number | string;
+    incomplete: boolean;
+    deficitPln: number | string;
+    buckets: Array<AllocationBucketResponse>;
+    toInvestPln: number | string;
+};
+
 export type AssetClass = number;
 
 export type AssetResponse = {
@@ -240,6 +274,10 @@ export type BondSwapSourceResponse = {
     assetId: string;
     name: string;
 };
+
+export type BucketKind = number;
+
+export type BucketShareType = number;
 
 export type BusinessDayShift = number;
 
@@ -554,6 +592,7 @@ export type PlanningMonthResponse = {
     incomes: PlanningIncomesResponse;
     expenses: PlanningExpensesResponse;
     freeFunds: FreeFundsResponse;
+    allocation: AllocationResponse;
 };
 
 export type RecordTransactionRequest = {
@@ -585,6 +624,10 @@ export type RollOverDepositRequest = {
     annualInterestRatePercent: number | string;
     grossInterest?: null | number | string;
     tax?: null | number | string;
+};
+
+export type SaveAllocationPlanVersionRequest = {
+    buckets: Array<AllocationPlanRowRequest>;
 };
 
 export type SecuritiesResponse = {
@@ -1961,6 +2004,42 @@ export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses = {
 };
 
 export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponse = DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses[keyof DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses];
+
+export type DeleteApiPortfolioAllocationPlanVersionsByMonthData = {
+    body?: never;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/allocation-plan/versions/{month}';
+};
+
+export type DeleteApiPortfolioAllocationPlanVersionsByMonthResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioAllocationPlanVersionsByMonthResponse = DeleteApiPortfolioAllocationPlanVersionsByMonthResponses[keyof DeleteApiPortfolioAllocationPlanVersionsByMonthResponses];
+
+export type PutApiPortfolioAllocationPlanVersionsByMonthData = {
+    body: SaveAllocationPlanVersionRequest;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/allocation-plan/versions/{month}';
+};
+
+export type PutApiPortfolioAllocationPlanVersionsByMonthResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioAllocationPlanVersionsByMonthResponse = PutApiPortfolioAllocationPlanVersionsByMonthResponses[keyof PutApiPortfolioAllocationPlanVersionsByMonthResponses];
 
 export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementData = {
     body: SettleOccurrenceRequest;

@@ -497,5 +497,136 @@
         }
       </section>
     }
+
+    @if (allocation(); as plan) {
+      <section class="planning-section planning-allocation" data-testid="allocation-section">
+        <div class="planning-section__header">
+          <h2>{{ 'planning.allocation.title' | transloco }}</h2>
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            data-testid="edit-allocation"
+            (click)="openAllocationDialog(plan)"
+          >
+            <mat-icon>edit</mat-icon>
+            {{ 'planning.allocation.edit' | transloco }}
+          </button>
+        </div>
+
+        <dl class="planning-balance__values">
+          <div data-testid="allocation-forecast">
+            <dt>{{ 'planning.allocation.forecast' | transloco }}</dt>
+            <dd>{{ formatMoney(plan.forecastPln, 'PLN') }}</dd>
+          </div>
+          @if (plan.effectiveFrom; as effectiveFrom) {
+            <div data-testid="allocation-effective-from">
+              <dt>{{ 'planning.allocation.effectiveFrom' | transloco }}</dt>
+              <dd>{{ changeMonthLabel(effectiveFrom) }}</dd>
+            </div>
+          }
+        </dl>
+        @if (plan.incomplete) {
+          <span class="planning-section__incomplete" data-testid="allocation-incomplete">
+            {{ 'planning.balance.incomplete' | transloco }}
+          </span>
+        }
+
+        @if (isPositive(plan.deficitPln)) {
+          <p class="planning-free-funds__deficit" data-testid="allocation-deficit">
+            {{
+              'planning.allocation.deficit'
+                | transloco: { amount: formatMoney(plan.deficitPln, 'PLN') }
+            }}
+          </p>
+        }
+
+        @if (plan.buckets.length === 0) {
+          <p class="planning-section__empty">{{ 'planning.allocation.empty' | transloco }}</p>
+        } @else {
+          @if (fixedBuckets().length > 0) {
+            <h3>{{ 'planning.allocation.groups.fixed' | transloco }}</h3>
+            <ul class="planning-definitions" data-testid="allocation-group-fixed">
+              @for (bucket of fixedBuckets(); track bucket.bucketId) {
+                <li class="planning-allocation__row" data-testid="allocation-bucket-row">
+                  <span class="planning-definition__name">{{ bucket.name }}</span>
+                  <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
+                  <span>{{ formatMoney(bucket.share, 'PLN') }}</span>
+                  <span>{{ bucket.accountName ?? '' }}</span>
+                  <span class="planning-allocation__amount">
+                    {{ formatMoney(bucket.allocatedPln, 'PLN') }}
+                  </span>
+                  <span class="planning-allocation__markers">
+                    @if (bucket.underfunded) {
+                      <mat-chip data-testid="allocation-underfunded">
+                        {{ 'planning.allocation.underfunded' | transloco }}
+                      </mat-chip>
+                    }
+                    @if (bucket.isRemainder) {
+                      <mat-chip data-testid="allocation-remainder">
+                        {{ 'planning.allocation.remainder' | transloco }}
+                      </mat-chip>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+
+          @if (percentBuckets().length > 0) {
+            <h3>{{ 'planning.allocation.groups.percent' | transloco }}</h3>
+            <ul class="planning-definitions" data-testid="allocation-group-percent">
+              @for (bucket of percentBuckets(); track bucket.bucketId) {
+                <li class="planning-allocation__row" data-testid="allocation-bucket-row">
+                  <span class="planning-definition__name">{{ bucket.name }}</span>
+                  <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
+                  <span>{{ formatPercent(bucket.share) }}</span>
+                  <span>{{ bucket.accountName ?? '' }}</span>
+                  <span class="planning-allocation__amount">
+                    {{ formatMoney(bucket.allocatedPln, 'PLN') }}
+                  </span>
+                  <span class="planning-allocation__markers">
+                    @if (bucket.underfunded) {
+                      <mat-chip data-testid="allocation-underfunded">
+                        {{ 'planning.allocation.underfunded' | transloco }}
+                      </mat-chip>
+                    }
+                    @if (bucket.isRemainder) {
+                      <mat-chip data-testid="allocation-remainder">
+                        {{ 'planning.allocation.remainder' | transloco }}
+                      </mat-chip>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+
+          <dl class="planning-balance__values">
+            <div data-testid="allocation-to-invest">
+              <dt>{{ 'planning.allocation.toInvest' | transloco }}</dt>
+              <dd>{{ formatMoney(plan.toInvestPln, 'PLN') }}</dd>
+            </div>
+          </dl>
+        }
+
+        @if (plan.nextChange; as nextChange) {
+          <span class="planning-definition__change" data-testid="allocation-next-change">
+            {{
+              'planning.allocation.nextChange' | transloco: { month: changeMonthLabel(nextChange) }
+            }}
+            <button
+              mat-icon-button
+              type="button"
+              data-testid="delete-allocation-change"
+              [attr.aria-label]="'planning.change.delete' | transloco"
+              (click)="removeAllocationChange(nextChange)"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          </span>
+        }
+      </section>
+    }
   }
 </div>
