@@ -5,6 +5,7 @@ using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.PlanningApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -185,6 +186,21 @@ public sealed class DeleteTransactionEndpointTests(SkarbiecContainersFixture con
         Assert.Equal(10_033.29m, (await client.GetAssetAsync(account.MoneyAssetId, cancellationToken)).Quantity);
         Assert.Contains((await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items, t => t.Id == credit.Id);
         Assert.Equal(1, await CountBankSettlementsAsync(userId, cancellationToken, account.MoneyAssetId));
+    }
+
+    [Fact]
+    public async Task Delete_IncomeDeposit_ReturnsConflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var deposit = await client.CreateIncomeDepositAsync(cancellationToken);
+
+        var response = await client.DeleteAsync(TransactionUri(deposit.Account.MoneyAssetId, deposit.TransactionId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.IncomeDepositManagedErrorCode, cancellationToken);
+        Assert.Contains((await client.ListTransactionsAsync(deposit.Account.MoneyAssetId, cancellationToken)).Items, t => t.Id == deposit.TransactionId);
+        Assert.Equal(9_143.27m, (await client.GetAssetAsync(deposit.Account.MoneyAssetId, cancellationToken)).Quantity);
     }
 
     [Fact]

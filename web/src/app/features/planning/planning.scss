@@ -71,6 +71,11 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
+.planning-table__deposit {
+  margin-inline-start: 8px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .planning-table__warning {
   display: inline-flex;
   align-items: center;

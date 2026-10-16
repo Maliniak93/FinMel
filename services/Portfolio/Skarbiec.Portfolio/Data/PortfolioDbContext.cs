@@ -263,6 +263,12 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
                 .WithMany()
                 .HasForeignKey(o => o.AccountId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Restrict: a transaction an occurrence references is never deleted under it; the index also serves the transaction-lock lookups.
+            occurrence.HasOne<Transaction>()
+                .WithMany()
+                .HasForeignKey(o => o.TransactionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

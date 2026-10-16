@@ -269,6 +269,8 @@
             <td mat-cell *matCellDef="let transaction">
               @if (transaction.bankInterestPeriodEnd; as periodEnd) {
                 {{ 'transactions.bankInterest' | transloco: { month: formatMonth(periodEnd) } }}
+              } @else if (transaction.recurringIncomeName; as incomeName) {
+                {{ 'transactions.incomeDeposit' | transloco: { name: incomeName } }}
               } @else {
                 {{ transactionTypeLabel(transaction.type) | transloco }}
               }
@@ -291,7 +293,11 @@
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let transaction">
-              @if (!transaction.transfer && !transaction.bankInterestPeriodEnd) {
+              @if (
+                !transaction.transfer &&
+                !transaction.bankInterestPeriodEnd &&
+                !transaction.recurringIncomeName
+              ) {
                 <button
                   mat-icon-button
                   type="button"
@@ -308,7 +314,7 @@
                 >
                   <mat-icon>delete</mat-icon>
                 </button>
-              } @else if (transaction.transfer.manual) {
+              } @else if (transaction.transfer?.manual) {
                 <button
                   mat-icon-button
                   type="button"

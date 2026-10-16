@@ -5,6 +5,7 @@ using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Accounts.BankInterest;
+using Skarbiec.Portfolio.Features.RecurringIncomes.Occurrences;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
@@ -84,6 +85,12 @@ public sealed class UpdateTransactionHandler(
             && await dbContext.BankInterestSettlements.AnyAsync(s => s.TransactionId == id, cancellationToken))
         {
             return BankInterestErrors.InterestManaged;
+        }
+
+        // A settlement's deposit changes only through its settlement.
+        if (await dbContext.RecurringIncomeOccurrences.AnyAsync(o => o.TransactionId == id, cancellationToken))
+        {
+            return OccurrenceErrors.IncomeDepositManaged;
         }
 
         if (!AssetTransactionTypes.IsAllowed(asset.AssetClass, request.Type))

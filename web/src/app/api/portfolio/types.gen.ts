@@ -421,6 +421,7 @@ export type IncomeOccurrenceResponse = {
     actualDate: null | string;
     difference: null | number | string;
     actualAmountPln: null | number | string;
+    depositCreated: boolean;
 };
 
 export type Metal = number;
@@ -555,6 +556,7 @@ export type SettleOccurrenceRequest = {
     actualAmount: number | string;
     actualDate: string;
     accountId: string;
+    createDeposit?: boolean;
 };
 
 export type SwapBondRequest = {
@@ -589,6 +591,7 @@ export type TransactionResponse = {
     transfer?: null | TransactionTransferResponse;
     bankInterestPeriodEnd?: null | string;
     bondInterestPeriodIndex?: null | number | string;
+    recurringIncomeName?: null | string;
 };
 
 export type TransactionTransferResponse = {

@@ -139,6 +139,8 @@ internal static class PortfolioAssertions
 
     public const string BankInterestManagedErrorCode = "Conflict.BankInterestManaged";
 
+    public const string IncomeDepositManagedErrorCode = "Conflict.IncomeDepositManaged";
+
     public const string OversellsPositionErrorCode = "Conflict.OversellsPosition";
 
     public const string UseAccountEndpointsErrorCode = "Validation.UseAccountEndpoints";

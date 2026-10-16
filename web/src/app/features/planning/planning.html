@@ -101,6 +101,11 @@
                   <span data-testid="occurrence-status">{{
                     occurrenceStatusKey(occurrence.status) | transloco
                   }}</span>
+                  @if (occurrence.depositCreated) {
+                    <span class="planning-table__deposit" data-testid="deposit-created">
+                      {{ 'planning.occurrence.depositCreated' | transloco }}
+                    </span>
+                  }
                   @if (occurrence.outOfRule) {
                     <span class="planning-table__warning" data-testid="out-of-rule">
                       {{ 'planning.occurrence.outOfRule' | transloco }}

@@ -1246,7 +1246,7 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/planning/months/2026-10
 Authorization: Bearer {{authToken}}
 
-### Settle an occurrence by its nominal month (yyyy-MM, 2011-01 to 2099-12); creates or edits the settlement, freezes the plan and the FX rate of actualDate (204; 400 Validation.CurrencyMismatch / Validation.FxRateMissing / Validation.ActualDateInFuture; 404 when the rule does not generate the month; 409 Conflict.AccountArchived)
+### Settle an occurrence by its nominal month (yyyy-MM, 2011-01 to 2099-12); creates or edits the settlement, freezes the plan and the FX rate of actualDate (204; 400 Validation.CurrencyMismatch / Validation.FxRateMissing / Validation.ActualDateInFuture; 404 when the rule does not generate the month; 409 Conflict.AccountArchived); createDeposit (default false) also writes, moves or removes a locked Deposit on the account's cash (400 Validation.InsufficientFunds when a replay goes negative; 409 Conflict.AccountArchived on an archived account)
 PUT {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/occurrences/2026-10/settlement
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -1254,14 +1254,15 @@ Content-Type: application/json
 {
   "actualAmount": 9143.27,
   "actualDate": "2026-10-30",
-  "accountId": "{{createMbankAccount.response.body.id}}"
+  "accountId": "{{createMbankAccount.response.body.id}}",
+  "createDeposit": true
 }
 
 ### Skip an occurrence (204; no-op when already skipped; 409 Conflict.OccurrenceSettled for a settled one)
 PUT {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/occurrences/2026-09/skip
 Authorization: Bearer {{authToken}}
 
-### Undo a settlement or a skip: the occurrence is pending again (204; 404 when nothing is stored)
+### Undo a settlement or a skip: the occurrence is pending again and its deposit is removed (204; 404 when nothing is stored; 400 Validation.InsufficientFunds when a later withdrawal spent the deposit)
 DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/occurrences/2026-10
 Authorization: Bearer {{authToken}}
 

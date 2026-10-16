@@ -39,7 +39,8 @@ internal static class PlanningApi
         decimal? ActualAmount,
         DateOnly? ActualDate,
         decimal? Difference,
-        decimal? ActualAmountPln);
+        decimal? ActualAmountPln,
+        bool DepositCreated);
 
     public sealed record DefinitionView(
         Guid Id,
@@ -144,8 +145,9 @@ internal static class PlanningApi
 
     public static string SkipOccurrenceUri(Guid id, string month) => $"{OccurrenceUri(id, month)}/skip";
 
-    public static object SettleOccurrenceBody(Guid accountId, decimal actualAmount, DateOnly actualDate) =>
-        new { actualAmount, actualDate, accountId };
+    public static object SettleOccurrenceBody(
+        Guid accountId, decimal actualAmount, DateOnly actualDate, bool createDeposit = false) =>
+        new { actualAmount, actualDate, accountId, createDeposit };
 
     public static async Task SettleOccurrenceAsync(
         this HttpClient client,
@@ -154,11 +156,33 @@ internal static class PlanningApi
         Guid accountId,
         decimal actualAmount,
         DateOnly actualDate,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool createDeposit = false)
     {
         var response = await client.PutAsJsonAsync(
-            SettleOccurrenceUri(id, month), SettleOccurrenceBody(accountId, actualAmount, actualDate), cancellationToken);
+            SettleOccurrenceUri(id, month),
+            SettleOccurrenceBody(accountId, actualAmount, actualDate, createDeposit),
+            cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    public static readonly DateOnly SeptemberLastDay = new(2026, 9, 30);
+
+    public sealed record IncomeDeposit(BankAccountsApi.BankAccount Account, Guid IncomeId, Guid TransactionId);
+
+    // Settles 2026-09 of "Wypłata Dominik" onto a fresh PLN "mBank ROR" with a deposit; the caller's clock must be past 2026-09-30.
+    public static async Task<IncomeDeposit> CreateIncomeDepositAsync(
+        this HttpClient client, CancellationToken cancellationToken, decimal actualAmount = 9_143.27m)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var incomeId = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata Dominik", 9_200m, new DateOnly(2026, 1, 1),
+            dayKind: RecurrenceDayKind.LastBusinessDay, dayOfMonth: null);
+        await client.SettleOccurrenceAsync(
+            incomeId, "2026-09", account.AccountId, actualAmount, SeptemberLastDay, cancellationToken, createDeposit: true);
+        var deposit = Assert.Single((await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items);
+
+        return new IncomeDeposit(account, incomeId, deposit.Id);
     }
 
     public static async Task SkipOccurrenceAsync(

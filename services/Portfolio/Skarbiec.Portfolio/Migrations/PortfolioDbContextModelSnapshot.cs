@@ -617,6 +617,9 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -625,6 +628,8 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasIndex("AccountId");
 
                     b.HasIndex("PlannedAccountId");
+
+                    b.HasIndex("TransactionId");
 
                     b.HasIndex("RecurringIncomeId", "NominalMonth")
                         .IsUnique();
@@ -949,6 +954,11 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasForeignKey("RecurringIncomeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Skarbiec.Portfolio.Data.Transaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncomeVersion", b =>

@@ -26,6 +26,7 @@ const depositId = '11111111-1111-1111-1111-111111111111';
 const withdrawId = '22222222-2222-2222-2222-222222222222';
 const transferLegId = '33333333-3333-3333-3333-333333333333';
 const transferId = '44444444-4444-4444-4444-444444444444';
+const incomeDepositId = '55555555-5555-5555-5555-555555555555';
 
 const account = {
   id: accountId,
@@ -88,10 +89,20 @@ const transactions = {
         direction: 1,
       },
     },
+    {
+      id: incomeDepositId,
+      assetId: cashAssetId,
+      type: 2,
+      quantity: 9143.27,
+      unitPrice: 1,
+      currency: 'PLN',
+      date: '2026-10-16',
+      recurringIncomeName: 'Wypłata Dominik',
+    },
   ],
   page: 1,
   pageSize: 100,
-  totalCount: 3,
+  totalCount: 4,
 };
 
 const fundedDeposit = depositResponse({
@@ -267,6 +278,15 @@ describe('AccountDetail', () => {
     expect(transferRow.textContent).toContain('Obligacje IKE');
     expect(rowButton(transferRow, /edit/i)).toBeUndefined();
     expect(rowButton(transferRow, /delete/i)).toBeDefined();
+  });
+
+  it('labels a settlement deposit with the income name and offers no edit or delete', async () => {
+    await setup();
+
+    const incomeRow = historyRow(incomeDepositId);
+    expect(incomeRow.textContent).toContain('Income · Wypłata Dominik');
+    expect(rowButton(incomeRow, /edit/i)).toBeUndefined();
+    expect(rowButton(incomeRow, /delete/i)).toBeUndefined();
   });
 
   it('Deposit and Withdraw open the cash operation dialog and reload after it saves', async () => {

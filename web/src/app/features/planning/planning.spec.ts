@@ -42,6 +42,7 @@ function occurrence(
     actualDate: null,
     difference: null,
     actualAmountPln: null,
+    depositCreated: false,
     ...extra,
   };
 }
@@ -302,6 +303,7 @@ describe('Planning', () => {
           actualDate: '2026-10-29',
           difference: -56.73,
           actualAmountPln: 9143.27,
+          depositCreated: true,
         }),
         occurrence('800+', '2026-10-10', 800, { status: 'Skipped', difference: -800 }),
         occurrence('Stara premia', '2026-10-12', 300, {
@@ -352,6 +354,10 @@ describe('Planning', () => {
     expect(skipped.querySelector('[data-testid="occurrence-difference"]')!.textContent).toContain(
       formatMoney(-800, 'PLN'),
     );
+
+    expect(rows('deposit-created')).toHaveLength(1);
+    expect(has(settled, 'deposit-created')).toBe(true);
+    expect(has(outOfRule, 'deposit-created')).toBe(false);
 
     expect(rows('out-of-rule')).toHaveLength(1);
     expect(has(outOfRule, 'out-of-rule')).toBe(true);

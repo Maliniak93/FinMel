@@ -129,7 +129,8 @@ public sealed class GetPlanningMonthHandler(
                     ActualAmount = settlement?.ActualAmount,
                     ActualDate = settlement?.ActualDate,
                     Difference = p.Stored is null ? null : (settlement?.ActualAmount ?? 0m) - p.Amount,
-                    ActualAmountPln = settlement is null ? null : Round(settlement.ActualAmount!.Value * settlement.FxRateToPln!.Value)
+                    ActualAmountPln = settlement is null ? null : Round(settlement.ActualAmount!.Value * settlement.FxRateToPln!.Value),
+                    DepositCreated = settlement?.TransactionId is not null
                 };
             })
             .ToList();
