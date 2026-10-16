@@ -7,6 +7,70 @@ namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
 public sealed record PlanningMonthResponse
 {
     public required PlanningIncomesResponse Incomes { get; init; }
+
+    public required PlanningExpensesResponse Expenses { get; init; }
+
+    public required FreeFundsResponse FreeFunds { get; init; }
+}
+
+public sealed record PlanningExpensesResponse
+{
+    public required IReadOnlyList<ExpensePaymentResponse> Payments { get; init; }
+
+    /// <summary>PLN sum of every expense's cost for the month: payments plus the reserve set aside for later ones.</summary>
+    public required decimal CostPln { get; init; }
+
+    public required IReadOnlyList<ExpenseDefinitionResponse> Definitions { get; init; }
+}
+
+public sealed record ExpensePaymentResponse
+{
+    public required Guid RecurringExpenseId { get; init; }
+
+    /// <summary>The month the rule produced the date for (yyyy-MM); a business-day shift can move the date into a neighbouring month.</summary>
+    public required string NominalMonth { get; init; }
+
+    public required DateOnly Date { get; init; }
+    public required string Name { get; init; }
+    public required decimal Amount { get; init; }
+}
+
+public sealed record ExpenseDefinitionResponse
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required DateOnly StartDate { get; init; }
+    public required DateOnly? EndDate { get; init; }
+    public required RecurringIncomeStatus Status { get; init; }
+    public required decimal Amount { get; init; }
+    public required int IntervalMonths { get; init; }
+    public required RecurrenceDayKind DayKind { get; init; }
+    public required int? DayOfMonth { get; init; }
+    public required BusinessDayShift Shift { get; init; }
+
+    /// <summary>The PLN set aside in the viewed month for this expense's payments.</summary>
+    public required decimal ReservePln { get; init; }
+
+    /// <summary>The first payment on or after the viewed month, null when none falls within the next 24 months.</summary>
+    public required ExpenseNextPaymentResponse? NextPayment { get; init; }
+}
+
+public sealed record ExpenseNextPaymentResponse
+{
+    public required DateOnly Date { get; init; }
+    public required decimal Amount { get; init; }
+}
+
+public sealed record FreeFundsResponse
+{
+    /// <summary>Planned income minus the month's expense cost; negative is a deficit.</summary>
+    public required decimal PlanPln { get; init; }
+
+    /// <summary>Settled income plus pending income minus the month's expense cost; negative is a deficit.</summary>
+    public required decimal ForecastPln { get; init; }
+
+    /// <summary>True when a needed FX rate is missing, so the figures are incomplete.</summary>
+    public required bool Incomplete { get; init; }
 }
 
 public sealed record PlanningIncomesResponse

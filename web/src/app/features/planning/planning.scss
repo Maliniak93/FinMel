@@ -28,6 +28,25 @@
   text-align: center;
 }
 
+.planning-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.planning-columns > .planning-section {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.planning-free-funds__deficit {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
 .planning-section__header {
   display: flex;
   align-items: center;

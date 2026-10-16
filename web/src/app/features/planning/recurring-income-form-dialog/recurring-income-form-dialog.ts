@@ -28,7 +28,8 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
-import { DAY_KIND, SHIFT, SHIFT_OPTIONS, currentWarsawMonth } from '../recurrence';
+import { RecurrenceRuleFields } from '../recurrence-rule-fields/recurrence-rule-fields';
+import { DAY_KIND, SHIFT, bindDayControls, currentWarsawMonth } from '../recurrence';
 
 const MIN_DATE = new Date(2011, 0, 1);
 const MAX_DATE = new Date(2099, 11, 31);
@@ -57,6 +58,7 @@ function monthInRange(control: AbstractControl): ValidationErrors | null {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    RecurrenceRuleFields,
     TranslocoPipe,
   ],
   templateUrl: './recurring-income-form-dialog.html',
@@ -75,8 +77,6 @@ export class RecurringIncomeFormDialog {
   protected readonly maxDate = MAX_DATE;
   protected readonly minMonth = MIN_MONTH;
   protected readonly maxMonth = MAX_MONTH;
-  protected readonly dayKinds = DAY_KIND;
-  protected readonly shiftOptions = SHIFT_OPTIONS;
 
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
@@ -149,24 +149,10 @@ export class RecurringIncomeFormDialog {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.endDate.updateValueAndValidity());
 
-    this.form.controls.dayKind.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe((kind) => this.toggleDayControls(kind));
-    this.toggleDayControls(this.form.controls.dayKind.value);
+    bindDayControls(this.form.controls);
 
     if (!this.isEdit) {
       this.form.controls.effectiveFrom.disable();
-    }
-  }
-
-  private toggleDayControls(kind: number): void {
-    const { dayOfMonth, shift } = this.form.controls;
-    if (kind === DAY_KIND.DayOfMonth) {
-      dayOfMonth.enable();
-      shift.enable();
-    } else {
-      dayOfMonth.disable();
-      shift.disable();
     }
   }
 

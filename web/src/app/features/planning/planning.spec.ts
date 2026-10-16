@@ -11,6 +11,7 @@ import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { Planning } from './planning';
+import { RecurringExpenseFormDialog } from './recurring-expense-form-dialog/recurring-expense-form-dialog';
 import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
 import { SettleOccurrenceDialog } from './settle-occurrence-dialog/settle-occurrence-dialog';
 
@@ -102,7 +103,40 @@ function overdueItem(name: string, date: string, amount: number): Record<string,
   };
 }
 
-function month(incomes: Record<string, unknown>): Record<string, unknown> {
+function expenseDefinition(
+  name: string,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: `expense-${name}`,
+    name,
+    startDate: '2026-01-01',
+    endDate: null,
+    status: 'Active',
+    amount: 1000,
+    intervalMonths: 1,
+    dayKind: 0,
+    dayOfMonth: 10,
+    shift: 0,
+    reservePln: 1000,
+    nextPayment: null,
+    ...extra,
+  };
+}
+
+function expenses(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { payments: [], costPln: 0, definitions: [], ...extra };
+}
+
+function freeFunds(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return { planPln: 0, forecastPln: 0, incomplete: false, ...extra };
+}
+
+function month(
+  incomes: Record<string, unknown>,
+  expensesPart: Record<string, unknown> = {},
+  freeFundsPart: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     incomes: {
       occurrences: [],
@@ -111,6 +145,8 @@ function month(incomes: Record<string, unknown>): Record<string, unknown> {
       definitions: [],
       ...incomes,
     },
+    expenses: expenses(expensesPart),
+    freeFunds: freeFunds(freeFundsPart),
   };
 }
 
@@ -511,5 +547,92 @@ describe('Planning', () => {
     expect(rows('balance-incomplete')).toHaveLength(0);
     expect(rows('archived-warning')).toHaveLength(0);
     expect(element().textContent).toContain(formatMoney(6500, 'PLN'));
+  });
+
+  it('renders the expenses payments, the monthly cost and the definitions with the reserve and the next payment of a multi-month interval', async () => {
+    responses['2026-10'] = month(
+      {},
+      {
+        payments: [
+          {
+            recurringExpenseId: 'expense-Życie',
+            nominalMonth: '2026-10',
+            date: '2026-10-01',
+            name: 'Życie',
+            amount: 3000,
+          },
+          {
+            recurringExpenseId: 'expense-Rachunki',
+            nominalMonth: '2026-10',
+            date: '2026-10-10',
+            name: 'Rachunki',
+            amount: 1000,
+          },
+        ],
+        costPln: 4200,
+        definitions: [
+          expenseDefinition('OC Toyota', {
+            startDate: '2027-03-15',
+            status: 'Upcoming',
+            amount: 1200,
+            intervalMonths: 12,
+            dayOfMonth: 15,
+            reservePln: 200,
+            nextPayment: { date: '2027-03-15', amount: 1200 },
+          }),
+          expenseDefinition('Rachunki'),
+        ],
+      },
+    );
+    await setup();
+
+    const payments = rows('expense-payment-row');
+    expect(payments).toHaveLength(2);
+    expect(payments[0].textContent).toContain('Życie');
+    expect(payments[0].textContent).toContain(formatMoney(3000, 'PLN'));
+    expect(payments[1].textContent).toContain('Rachunki');
+    expect(rows('expense-cost')[0].textContent).toContain(formatMoney(4200, 'PLN'));
+
+    const definitions = rows('expense-definition-row');
+    expect(definitions).toHaveLength(2);
+    expect(definitions[0].textContent).toContain('OC Toyota');
+    expect(definitions[0].querySelector('[data-testid="expense-reserve"]')!.textContent).toContain(
+      formatMoney(200, 'PLN'),
+    );
+    expect(
+      definitions[0].querySelector('[data-testid="expense-next-payment"]')!.textContent,
+    ).toContain('15');
+    expect(definitions[1].querySelector('[data-testid="expense-next-payment"]')).toBeNull();
+  });
+
+  it('opens the add expense dialog from the Wydatki section', async () => {
+    await setup();
+
+    click('add-expense');
+
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      RecurringExpenseFormDialog,
+      expect.anything(),
+    );
+  });
+
+  it('shows the free funds plan and forecast, a negative value as a deficit and the incomplete marker', async () => {
+    responses['2026-10'] = month({}, {}, { planPln: 12300, forecastPln: 11443.27 });
+    await setup();
+
+    expect(rows('free-funds-plan')[0].textContent).toContain(formatMoney(12300, 'PLN'));
+    expect(rows('free-funds-forecast')[0].textContent).toContain(formatMoney(11443.27, 'PLN'));
+    expect(rows('free-funds-deficit')).toHaveLength(0);
+    expect(rows('free-funds-incomplete')).toHaveLength(0);
+
+    responses['2026-11'] = month({}, {}, { planPln: -700, forecastPln: 50, incomplete: true });
+    click('next-month');
+    await settle();
+
+    expect(rows('free-funds-plan')[0].textContent).toContain(formatMoney(-700, 'PLN'));
+    const deficits = rows('free-funds-deficit');
+    expect(deficits).toHaveLength(1);
+    expect(deficits[0].textContent).toContain(formatMoney(-700, 'PLN'));
+    expect(rows('free-funds-incomplete')).toHaveLength(1);
   });
 });

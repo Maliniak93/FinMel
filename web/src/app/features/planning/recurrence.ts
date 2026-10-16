@@ -1,3 +1,6 @@
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { FormControl } from '@angular/forms';
+
 import type { BusinessDayShift, RecurrenceDayKind } from '../../api/portfolio';
 
 // Mirrors Skarbiec.Portfolio.Features.Planning.Recurrence: the enums travel as their ints.
@@ -17,6 +20,25 @@ export const SHIFT_OPTIONS = [
   { value: SHIFT.PreviousBusinessDay, label: 'planning.shift.previous' },
   { value: SHIFT.NextBusinessDay, label: 'planning.shift.next' },
 ] as const;
+
+export function bindDayControls(controls: {
+  dayKind: FormControl<number>;
+  dayOfMonth: FormControl<number | null>;
+  shift: FormControl<number>;
+}): void {
+  const toggle = (kind: number): void => {
+    if (kind === DAY_KIND.DayOfMonth) {
+      controls.dayOfMonth.enable();
+      controls.shift.enable();
+    } else {
+      controls.dayOfMonth.disable();
+      controls.shift.disable();
+    }
+  };
+
+  controls.dayKind.valueChanges.pipe(takeUntilDestroyed()).subscribe(toggle);
+  toggle(controls.dayKind.value);
+}
 
 export function currentWarsawMonth(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {

@@ -80,7 +80,125 @@ internal static class PlanningApi
     public sealed record IncomesView(
         List<OccurrenceView> Occurrences, BalanceView Balance, bool FxUnavailable, List<DefinitionView> Definitions);
 
-    public sealed record PlanningMonthView(IncomesView Incomes);
+    public sealed record ExpensePaymentView(
+        Guid RecurringExpenseId, string NominalMonth, DateOnly Date, string Name, decimal Amount);
+
+    public sealed record NextPaymentView(DateOnly Date, decimal Amount);
+
+    public sealed record ExpenseDefinitionView(
+        Guid Id,
+        string Name,
+        DateOnly StartDate,
+        DateOnly? EndDate,
+        string Status,
+        decimal Amount,
+        int IntervalMonths,
+        JsonElement DayKind,
+        int? DayOfMonth,
+        JsonElement Shift,
+        decimal ReservePln,
+        NextPaymentView? NextPayment);
+
+    public sealed record ExpensesView(
+        List<ExpensePaymentView> Payments, decimal CostPln, List<ExpenseDefinitionView> Definitions);
+
+    public sealed record FreeFundsView(decimal PlanPln, decimal ForecastPln, bool Incomplete);
+
+    public sealed record PlanningMonthView(IncomesView Incomes, ExpensesView Expenses, FreeFundsView FreeFunds);
+
+    public const string RecurringExpensesUri = "/api/portfolio/recurring-expenses";
+
+    public static string RecurringExpenseUri(Guid id) => $"{RecurringExpensesUri}/{id}";
+
+    public static string EndRecurringExpenseUri(Guid id) => $"{RecurringExpenseUri(id)}/end";
+
+    public static object NewRecurringExpenseBody(
+        string name = "Rachunki",
+        decimal amount = 1_000m,
+        DateOnly? startDate = null,
+        DateOnly? endDate = null,
+        int intervalMonths = 1,
+        RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
+        int? dayOfMonth = 10,
+        BusinessDayShift shift = BusinessDayShift.None) => new
+        {
+            name,
+            amount,
+            startDate = startDate ?? new DateOnly(2026, 1, 1),
+            endDate,
+            intervalMonths,
+            dayKind = (int)dayKind,
+            dayOfMonth = dayKind == RecurrenceDayKind.LastBusinessDay ? null : dayOfMonth,
+            shift = (int)shift
+        };
+
+    public static async Task<Guid> CreateRecurringExpenseAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        string name = "Rachunki",
+        decimal amount = 1_000m,
+        DateOnly? startDate = null,
+        DateOnly? endDate = null,
+        int intervalMonths = 1,
+        RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
+        int? dayOfMonth = 10,
+        BusinessDayShift shift = BusinessDayShift.None)
+    {
+        var response = await client.PostAsJsonAsync(
+            RecurringExpensesUri,
+            NewRecurringExpenseBody(name, amount, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        return created.GetProperty("id").GetGuid();
+    }
+
+    public static async Task EndRecurringExpenseAsync(
+        this HttpClient client, Guid id, DateOnly endDate, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsJsonAsync(EndRecurringExpenseUri(id), new { endDate }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task DeleteRecurringExpenseAsync(
+        this HttpClient client, Guid id, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(RecurringExpenseUri(id), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    // "Życie" 3 000 on day 1 and "Rachunki" 1 000 on day 10, monthly from 2026-01-01.
+    public static async Task CreateLivingExpensesAsync(this HttpClient client, CancellationToken cancellationToken)
+    {
+        await client.CreateRecurringExpenseAsync(cancellationToken, "Życie", 3_000m, dayOfMonth: 1);
+        await client.CreateRecurringExpenseAsync(cancellationToken, "Rachunki", 1_000m, dayOfMonth: 10);
+    }
+
+    // "OC Toyota" 1 200 every 12 months on day 15, starting 2027-03-15.
+    public static Task<Guid> CreateOcToyotaAsync(this HttpClient client, CancellationToken cancellationToken) =>
+        client.CreateRecurringExpenseAsync(
+            cancellationToken, "OC Toyota", 1_200m, new DateOnly(2027, 3, 15), intervalMonths: 12, dayOfMonth: 15);
+
+    public sealed record HouseholdIncomes(
+        BankAccountsApi.BankAccount Account, Guid Dominik, Guid Zona, Guid Plus800);
+
+    // "Wypłata Dominik" 9 200 (last business day), "Wypłata żona" 6 500 (day 10, previous business day), "800+" 800 (day 10), all from 2026-01-01.
+    public static async Task<HouseholdIncomes> CreateHouseholdIncomesAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var dominik = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata Dominik", 9_200m, new DateOnly(2026, 1, 1),
+            dayKind: RecurrenceDayKind.LastBusinessDay, dayOfMonth: null);
+        var zona = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata żona", 6_500m, new DateOnly(2026, 1, 1),
+            dayOfMonth: 10, shift: BusinessDayShift.PreviousBusinessDay);
+        var plus800 = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "800+", 800m, new DateOnly(2026, 1, 1), dayOfMonth: 10);
+
+        return new HouseholdIncomes(account, dominik, zona, plus800);
+    }
 
     public sealed record OverdueItemView(
         Guid RecurringIncomeId,

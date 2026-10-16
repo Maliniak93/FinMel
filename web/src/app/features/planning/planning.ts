@@ -11,11 +11,13 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
+  deleteApiPortfolioRecurringExpensesById,
   deleteApiPortfolioRecurringIncomesById,
   deleteApiPortfolioRecurringIncomesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
   getApiPortfolioPlanningMonthsByMonth,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
+  type ExpenseDefinitionResponse,
   type IncomeDefinitionResponse,
   type IncomeOccurrenceResponse,
   type OccurrenceStatus,
@@ -28,9 +30,14 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatMonth } from '../../shared/format';
 import {
+  EndRecurringExpenseDialog,
+  type EndRecurringExpenseDialogData,
+} from './end-recurring-expense-dialog/end-recurring-expense-dialog';
+import {
   EndRecurringIncomeDialog,
   type EndRecurringIncomeDialogData,
 } from './end-recurring-income-dialog/end-recurring-income-dialog';
+import { RecurringExpenseFormDialog } from './recurring-expense-form-dialog/recurring-expense-form-dialog';
 import {
   RecurringIncomeFormDialog,
   type RecurringIncomeFormDialogData,
@@ -114,6 +121,14 @@ export class Planning {
     this.monthResource.hasValue() ? this.monthResource.value().incomes : null,
   );
 
+  protected readonly expenses = computed(() =>
+    this.monthResource.hasValue() ? this.monthResource.value().expenses : null,
+  );
+
+  protected readonly freeFunds = computed(() =>
+    this.monthResource.hasValue() ? this.monthResource.value().freeFunds : null,
+  );
+
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
   protected readonly ruleParts = ruleParts;
@@ -126,7 +141,15 @@ export class Planning {
     return OCCURRENCE_STATUS_KEYS[status];
   }
 
-  protected periodLabel(definition: IncomeDefinitionResponse): {
+  protected isMultiMonth(definition: Pick<ExpenseDefinitionResponse, 'intervalMonths'>): boolean {
+    return Number(definition.intervalMonths) > 1;
+  }
+
+  protected isNegative(amount: number | string): boolean {
+    return Number(amount) < 0;
+  }
+
+  protected periodLabel(definition: Pick<IncomeDefinitionResponse, 'startDate' | 'endDate'>): {
     key: string;
     params: Record<string, string>;
   } {
@@ -314,6 +337,56 @@ export class Planning {
     }
 
     this.reloadAll();
+  }
+
+  protected openAddExpenseDialog(): void {
+    const ref = this.dialog.open(RecurringExpenseFormDialog, { width: '520px' });
+    this.reloadMonthWhenSaved(ref.afterClosed());
+  }
+
+  protected openEndExpenseDialog(definition: ExpenseDefinitionResponse): void {
+    const data: EndRecurringExpenseDialogData = { id: definition.id, name: definition.name };
+    const ref = this.dialog.open(EndRecurringExpenseDialog, { width: '420px', data });
+    this.reloadMonthWhenSaved(ref.afterClosed());
+  }
+
+  protected async removeExpense(definition: ExpenseDefinitionResponse): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.expenses.delete.title'),
+            message: translate('planning.expenses.delete.message', { name: definition.name }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioRecurringExpensesById({ path: { id: definition.id } });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.expenses.delete.failed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.monthResource.reload();
+  }
+
+  private reloadMonthWhenSaved(closed: {
+    subscribe(next: (saved: boolean | undefined) => void): unknown;
+  }): void {
+    closed.subscribe((saved) => {
+      if (saved) {
+        this.monthResource.reload();
+      }
+    });
   }
 
   private reloadAll(): void {
