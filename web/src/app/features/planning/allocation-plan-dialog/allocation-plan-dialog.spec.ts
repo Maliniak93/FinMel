@@ -5,7 +5,11 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
-import { allocation, firstPlanBuckets } from '../../../../testing/allocation-fixtures';
+import {
+  allocation,
+  cushionBucket,
+  firstPlanBuckets,
+} from '../../../../testing/allocation-fixtures';
 import {
   findControl,
   jsonResponse,
@@ -192,6 +196,66 @@ describe('AllocationPlanDialog', () => {
 
     expect(rowElements()).toHaveLength(0);
     expect(saveButton().disabled).toBe(false);
+  });
+
+  it('keeps an existing cushion first and unmovable, without a share or a remainder choice, and offers no second one', async () => {
+    await setup([cushionBucket(), ...firstPlanBuckets()]);
+
+    expect(screenNames()).toEqual(['Poduszka', 'Wakacje', 'Akcje', 'Lokata', 'ETF']);
+    const cushionRow = rowOf('Poduszka');
+    const button = (testId: string): HTMLButtonElement =>
+      cushionRow.querySelector<HTMLElement>(`[data-testid="${testId}"]`) as HTMLButtonElement;
+    expect(button('move-up').disabled).toBe(true);
+    expect(button('move-down').disabled).toBe(true);
+    expect(cushionRow.querySelector('[data-testid="row-remainder"]')).toBeNull();
+    expect(cushionRow.querySelector('[data-testid="row-share"]')).toBeNull();
+    expect(cushionRow.querySelector('[data-testid="row-target-months"]')).not.toBeNull();
+    expect(cushionRow.querySelector('[data-testid="row-starting-balance"]')).toBeNull();
+    expect(root().querySelector('[data-testid="add-cushion"]')).toBeNull();
+
+    await clickIn('Wakacje', 'move-up');
+
+    expect(screenNames()).toEqual(['Poduszka', 'Wakacje', 'Akcje', 'Lokata', 'ETF']);
+  });
+
+  it('adds a new cushion first and puts its target months and starting balance without a share', async () => {
+    await setup();
+
+    root().querySelector<HTMLElement>('[data-testid="add-cushion"]')!.click();
+    await settle();
+
+    expect(screenNames()).toEqual(['', 'Wakacje', 'Akcje', 'Lokata', 'ETF']);
+    expect(root().querySelector('[data-testid="add-cushion"]')).toBeNull();
+    expect(rowElements()[0].querySelector('[data-testid="row-starting-balance"]')).not.toBeNull();
+    const cushion = rowGroups()[0];
+    findControl(cushion, 'name').setValue('Poduszka');
+    findControl(cushion, 'targetMonths').setValue(6);
+    findControl(cushion, 'startingBalance').setValue(20000);
+    await settle();
+
+    saveButton().click();
+
+    await vi.waitFor(() => {
+      const puts = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'PUT');
+      expect(puts).toHaveLength(1);
+    });
+    const request = fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .find((candidate: Request) => candidate.method === 'PUT')!;
+    const body = JSON.parse(await request.clone().text()) as {
+      buckets: Record<string, unknown>[];
+    };
+    expect(body.buckets[0]).toMatchObject({
+      name: 'Poduszka',
+      kind: 2,
+      targetMonths: 6,
+      startingBalance: 20000,
+      isRemainder: false,
+    });
+    expect(body.buckets[0]['share'] ?? null).toBeNull();
+    expect(body.buckets[0]['shareType'] ?? null).toBeNull();
   });
 
   it('puts the plan to the chosen month with the rows in on-screen order', async () => {

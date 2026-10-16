@@ -722,13 +722,17 @@
       "empty": "Brak podziału obowiązującego w tym miesiącu.",
       "deficit": "Deficyt {{ amount }} — nie ma czego dzielić.",
       "groups": {
+        "cushion": "Poduszka bezpieczeństwa",
         "fixed": "Kwoty stałe",
         "percent": "Procentowe"
       },
       "kind": {
         "investments": "Inwestycje",
-        "savings": "Oszczędności"
+        "savings": "Oszczędności",
+        "cushion": "Poduszka"
       },
+      "cushionBalance": "Saldo {{ start }} → {{ end }} / cel {{ target }} ({{ months }} mies.)",
+      "cushionReached": "cel osiągnięty",
       "shareType": {
         "fixed": "Kwota stała",
         "percent": "Procent"
@@ -756,6 +760,11 @@
         "moveDown": "Przesuń w dół",
         "removeRow": "Usuń koszyk",
         "addRow": "Dodaj koszyk",
+        "addCushion": "Dodaj poduszkę bezpieczeństwa",
+        "targetMonths": "Cel (miesiące kosztów)",
+        "targetMonthsInvalid": "Podaj liczbę całkowitą miesięcy od 1 do 24.",
+        "startingBalance": "Saldo na początek miesiąca (PLN)",
+        "startingBalanceInvalid": "Podaj kwotę 0 lub większą.",
         "empty": "Brak koszyków — od tego miesiąca nic nie będzie dzielone.",
         "percentSum": "Suma procentów: {{ sum }}",
         "percentOver": "Suma procentów przekracza 100.",

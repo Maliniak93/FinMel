@@ -17,7 +17,7 @@ namespace Skarbiec.Portfolio.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -257,6 +257,33 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("AccountContributionLimits");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationBalanceOverride", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BucketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BucketId", "Month")
+                        .IsUnique();
+
+                    b.ToTable("AllocationBalanceOverrides");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationBucket", b =>
                 {
                     b.Property<Guid>("Id")
@@ -299,14 +326,16 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
-                    b.Property<decimal>("Share")
+                    b.Property<decimal?>("Share")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("ShareType")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("TargetMonths")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -1078,6 +1107,15 @@ namespace Skarbiec.Portfolio.Migrations
                         .WithMany()
                         .HasForeignKey("InboxMessageId", "InboxConsumerId")
                         .HasPrincipalKey("MessageId", "ConsumerId");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationBalanceOverride", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.AllocationBucket", null)
+                        .WithMany()
+                        .HasForeignKey("BucketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanEntry", b =>

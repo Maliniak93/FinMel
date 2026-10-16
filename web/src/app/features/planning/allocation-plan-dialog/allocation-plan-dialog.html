@@ -26,7 +26,11 @@
 
     <ul class="allocation-plan-dialog__rows">
       @for (row of rowControls(); track row) {
-        <li class="allocation-plan-dialog__row" data-testid="plan-row">
+        <li
+          class="allocation-plan-dialog__row"
+          [class.allocation-plan-dialog__row--cushion]="isCushion(row)"
+          data-testid="plan-row"
+        >
           <mat-form-field appearance="outline" class="allocation-plan-dialog__name">
             <mat-label>{{ 'planning.allocation.dialog.name' | transloco }}</mat-label>
             <input
@@ -41,41 +45,87 @@
             }
           </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>{{ 'planning.allocation.dialog.kind' | transloco }}</mat-label>
-            <mat-select [formControl]="row.controls.kind">
-              @for (option of bucketKinds; track option.value) {
-                <mat-option [value]="option.value">{{ option.label | transloco }}</mat-option>
+          @if (isCushion(row)) {
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'planning.allocation.dialog.targetMonths' | transloco }}</mat-label>
+              <input
+                matInput
+                type="number"
+                step="1"
+                [formControl]="row.controls.targetMonths"
+                data-testid="row-target-months"
+              />
+              @if (row.controls.targetMonths.invalid) {
+                <mat-error>{{
+                  'planning.allocation.dialog.targetMonthsInvalid' | transloco
+                }}</mat-error>
               }
-            </mat-select>
-          </mat-form-field>
+            </mat-form-field>
 
-          <mat-form-field appearance="outline">
-            <mat-label>{{ 'planning.allocation.dialog.shareType' | transloco }}</mat-label>
-            <mat-select
-              [formControl]="row.controls.shareType"
-              (selectionChange)="onShareTypeChanged(row)"
-            >
-              @for (option of shareTypes; track option.value) {
-                <mat-option [value]="option.value">{{ option.label | transloco }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>
-              {{
-                (row.controls.shareType.value === fixedShareType
-                  ? 'planning.allocation.dialog.fixedShare'
-                  : 'planning.allocation.dialog.percentShare'
-                ) | transloco
-              }}
-            </mat-label>
-            <input matInput type="number" step="0.01" [formControl]="row.controls.share" />
-            @if (row.controls.share.invalid) {
-              <mat-error>{{ 'planning.allocation.dialog.shareInvalid' | transloco }}</mat-error>
+            @if (row.controls.bucketId.value === null) {
+              <mat-form-field appearance="outline">
+                <mat-label>{{
+                  'planning.allocation.dialog.startingBalance' | transloco
+                }}</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  step="0.01"
+                  [formControl]="row.controls.startingBalance"
+                  data-testid="row-starting-balance"
+                />
+                @if (row.controls.startingBalance.invalid) {
+                  <mat-error>{{
+                    'planning.allocation.dialog.startingBalanceInvalid' | transloco
+                  }}</mat-error>
+                }
+              </mat-form-field>
+            } @else {
+              <span></span>
             }
-          </mat-form-field>
+          } @else {
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'planning.allocation.dialog.kind' | transloco }}</mat-label>
+              <mat-select [formControl]="row.controls.kind">
+                @for (option of bucketKinds; track option.value) {
+                  <mat-option [value]="option.value">{{ option.label | transloco }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'planning.allocation.dialog.shareType' | transloco }}</mat-label>
+              <mat-select
+                [formControl]="row.controls.shareType"
+                (selectionChange)="onShareTypeChanged(row)"
+              >
+                @for (option of shareTypes; track option.value) {
+                  <mat-option [value]="option.value">{{ option.label | transloco }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>
+                {{
+                  (row.controls.shareType.value === fixedShareType
+                    ? 'planning.allocation.dialog.fixedShare'
+                    : 'planning.allocation.dialog.percentShare'
+                  ) | transloco
+                }}
+              </mat-label>
+              <input
+                matInput
+                type="number"
+                step="0.01"
+                [formControl]="row.controls.share"
+                data-testid="row-share"
+              />
+              @if (row.controls.share.invalid) {
+                <mat-error>{{ 'planning.allocation.dialog.shareInvalid' | transloco }}</mat-error>
+              }
+            </mat-form-field>
+          }
 
           <mat-form-field appearance="outline">
             <mat-label>{{ 'planning.allocation.dialog.account' | transloco }}</mat-label>
@@ -89,13 +139,15 @@
             </mat-select>
           </mat-form-field>
 
-          <mat-checkbox
-            data-testid="row-remainder"
-            [checked]="row.controls.isRemainder.value"
-            (change)="setRemainder(row, $event.checked)"
-          >
-            {{ 'planning.allocation.dialog.remainder' | transloco }}
-          </mat-checkbox>
+          @if (!isCushion(row)) {
+            <mat-checkbox
+              data-testid="row-remainder"
+              [checked]="row.controls.isRemainder.value"
+              (change)="setRemainder(row, $event.checked)"
+            >
+              {{ 'planning.allocation.dialog.remainder' | transloco }}
+            </mat-checkbox>
+          }
 
           <span class="allocation-plan-dialog__actions">
             <button
@@ -136,6 +188,12 @@
       <mat-icon>add</mat-icon>
       {{ 'planning.allocation.dialog.addRow' | transloco }}
     </button>
+    @if (!hasCushion()) {
+      <button mat-button type="button" data-testid="add-cushion" (click)="addCushion()">
+        <mat-icon>add</mat-icon>
+        {{ 'planning.allocation.dialog.addCushion' | transloco }}
+      </button>
+    }
 
     @if (rowControls().length > 0) {
       <p class="allocation-plan-dialog__summary" data-testid="percent-sum">

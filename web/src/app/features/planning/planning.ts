@@ -144,15 +144,19 @@ export class Planning {
     this.monthResource.hasValue() ? this.monthResource.value().allocation : null,
   );
 
+  protected readonly cushionBuckets = computed(() =>
+    (this.allocation()?.buckets ?? []).filter((bucket) => !!bucket.cushion),
+  );
+
   protected readonly fixedBuckets = computed(() =>
     (this.allocation()?.buckets ?? []).filter(
-      (bucket) => Number(bucket.shareType) === SHARE_TYPE.Fixed,
+      (bucket) => bucket.shareType !== null && Number(bucket.shareType) === SHARE_TYPE.Fixed,
     ),
   );
 
   protected readonly percentBuckets = computed(() =>
     (this.allocation()?.buckets ?? []).filter(
-      (bucket) => Number(bucket.shareType) === SHARE_TYPE.Percent,
+      (bucket) => bucket.shareType !== null && Number(bucket.shareType) === SHARE_TYPE.Percent,
     ),
   );
 

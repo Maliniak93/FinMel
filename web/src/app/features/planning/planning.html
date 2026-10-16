@@ -544,6 +544,46 @@
         @if (plan.buckets.length === 0) {
           <p class="planning-section__empty">{{ 'planning.allocation.empty' | transloco }}</p>
         } @else {
+          @if (cushionBuckets().length > 0) {
+            <h3>{{ 'planning.allocation.groups.cushion' | transloco }}</h3>
+            <ul class="planning-definitions" data-testid="allocation-group-cushion">
+              @for (bucket of cushionBuckets(); track bucket.bucketId) {
+                <li class="planning-allocation__row" data-testid="allocation-bucket-row">
+                  <span class="planning-definition__name">{{ bucket.name }}</span>
+                  <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
+                  @if (bucket.cushion; as cushion) {
+                    <span
+                      class="planning-allocation__cushion"
+                      data-testid="allocation-cushion-balance"
+                    >
+                      {{
+                        'planning.allocation.cushionBalance'
+                          | transloco
+                            : {
+                                start: formatMoney(cushion.balanceStartPln, 'PLN'),
+                                end: formatMoney(cushion.balanceEndPln, 'PLN'),
+                                target: formatMoney(cushion.targetPln, 'PLN'),
+                                months: cushion.targetMonths,
+                              }
+                      }}
+                    </span>
+                  }
+                  <span>{{ bucket.accountName ?? '' }}</span>
+                  <span class="planning-allocation__amount">
+                    {{ formatMoney(bucket.allocatedPln, 'PLN') }}
+                  </span>
+                  <span class="planning-allocation__markers">
+                    @if (bucket.cushion?.reached) {
+                      <mat-chip data-testid="allocation-cushion-reached">
+                        {{ 'planning.allocation.cushionReached' | transloco }}
+                      </mat-chip>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+
           @if (fixedBuckets().length > 0) {
             <h3>{{ 'planning.allocation.groups.fixed' | transloco }}</h3>
             <ul class="planning-definitions" data-testid="allocation-group-fixed">
@@ -551,7 +591,7 @@
                 <li class="planning-allocation__row" data-testid="allocation-bucket-row">
                   <span class="planning-definition__name">{{ bucket.name }}</span>
                   <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
-                  <span>{{ formatMoney(bucket.share, 'PLN') }}</span>
+                  <span>{{ formatMoney(bucket.share ?? 0, 'PLN') }}</span>
                   <span>{{ bucket.accountName ?? '' }}</span>
                   <span class="planning-allocation__amount">
                     {{ formatMoney(bucket.allocatedPln, 'PLN') }}
@@ -580,7 +620,7 @@
                 <li class="planning-allocation__row" data-testid="allocation-bucket-row">
                   <span class="planning-definition__name">{{ bucket.name }}</span>
                   <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
-                  <span>{{ formatPercent(bucket.share) }}</span>
+                  <span>{{ formatPercent(bucket.share ?? 0) }}</span>
                   <span>{{ bucket.accountName ?? '' }}</span>
                   <span class="planning-allocation__amount">
                     {{ formatMoney(bucket.allocatedPln, 'PLN') }}

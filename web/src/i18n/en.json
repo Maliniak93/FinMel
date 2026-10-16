@@ -722,13 +722,17 @@
       "empty": "No allocation plan in force this month.",
       "deficit": "Deficit {{ amount }} — nothing to allocate.",
       "groups": {
+        "cushion": "Emergency cushion",
         "fixed": "Fixed amounts",
         "percent": "Percent"
       },
       "kind": {
         "investments": "Investments",
-        "savings": "Savings"
+        "savings": "Savings",
+        "cushion": "Cushion"
       },
+      "cushionBalance": "Balance {{ start }} → {{ end }} / target {{ target }} ({{ months }} mo.)",
+      "cushionReached": "target reached",
       "shareType": {
         "fixed": "Fixed amount",
         "percent": "Percent"
@@ -756,6 +760,11 @@
         "moveDown": "Move down",
         "removeRow": "Remove bucket",
         "addRow": "Add bucket",
+        "addCushion": "Add emergency cushion",
+        "targetMonths": "Target (months of costs)",
+        "targetMonthsInvalid": "Enter a whole number of months from 1 to 24.",
+        "startingBalance": "Balance at the start of the month (PLN)",
+        "startingBalanceInvalid": "Enter an amount of 0 or more.",
         "empty": "No buckets — nothing will be split from this month.",
         "percentSum": "Percent total: {{ sum }}",
         "percentOver": "The percent shares add up to more than 100.",

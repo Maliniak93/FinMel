@@ -163,6 +163,43 @@ public sealed class AllocationPlanEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task InvalidCushion_Return400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.CreateCushionSetupAsync(cancellationToken);
+        await client.SaveAllocationPlanAsync("2026-10", cancellationToken, CushionPlan());
+        var cushionId = (await client.GetAllocationAsync("2026-10", cancellationToken)).Buckets[0].BucketId;
+        var remainder = AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true);
+
+        var invalid = new (string Case, object[] Buckets)[]
+        {
+            ("two cushions", [CushionRow(6), CushionRow(3, name: "Druga"), remainder]),
+            ("cushion with a share", [CushionRow(6, shareType: PercentShare, share: 10m), remainder]),
+            ("cushion as remainder", [CushionRow(6, isRemainder: true)]),
+            ("targetMonths 0", [CushionRow(0), remainder]),
+            ("targetMonths 25", [CushionRow(25), remainder]),
+            ("targetMonths missing", [CushionRow(null), remainder]),
+            ("targetMonths on another kind", [AllocationRow("Wakacje", SavingsKind, FixedShare, 500m, targetMonths: 6), remainder]),
+            ("negative starting balance", [CushionRow(6, -1m), remainder]),
+            ("starting balance on another kind", [AllocationRow("Wakacje", SavingsKind, FixedShare, 500m, startingBalance: 100m), remainder]),
+            ("starting balance on an existing cushion", [CushionRow(6, 100m, cushionId), remainder])
+        };
+        foreach (var (name, buckets) in invalid)
+        {
+            var response = await client.PutAsJsonAsync(AllocationPlanVersionUri("2026-10"), NewAllocationPlanBody(buckets), cancellationToken);
+
+            Assert.True(response.StatusCode == HttpStatusCode.BadRequest, $"{name}: {response.StatusCode}");
+        }
+
+        var unchanged = await client.GetAllocationAsync("2026-10", cancellationToken);
+        Assert.Equal(["Poduszka", "Wakacje", "Inwestycje"], unchanged.Buckets.Select(b => b.Name));
+        Assert.Equal(1, await CountAllocationVersionsAsync(userId, cancellationToken));
+    }
+
+    [Fact]
     public async Task ArchivedAccount_OnlyWhenChanged()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -13,6 +13,7 @@ import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-for
 import {
   allocation,
   allocationBucket,
+  cushionBucket,
   firstPlanBuckets,
 } from '../../../testing/allocation-fixtures';
 import { AllocationPlanDialog } from './allocation-plan-dialog/allocation-plan-dialog';
@@ -794,6 +795,58 @@ describe('Planning', () => {
     expect(rows('allocation-deficit')[0].textContent).toContain(formatMoney(756.73, 'PLN'));
     expect(rows('allocation-incomplete')).toHaveLength(0);
     expect(rows('allocation-next-change')).toHaveLength(0);
+  });
+
+  it('renders the cushion first without a share, with its balance against the target and the reached marker', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {
+        effectiveFrom: '2026-10',
+        buckets: [cushionBucket(), ...firstPlanBuckets()],
+      },
+    );
+    await setup();
+
+    const cushionRows = rows('allocation-group-cushion');
+    expect(cushionRows).toHaveLength(1);
+    const allRows = rows('allocation-bucket-row');
+    expect(allRows[0].textContent).toContain('Poduszka');
+    expect(cushionRows[0].contains(allRows[0])).toBe(true);
+    expect(allRows[0].textContent).toContain(formatMoney(5200, 'PLN'));
+    const balance = rows('allocation-cushion-balance');
+    expect(balance).toHaveLength(1);
+    expect(balance[0].textContent).toContain(formatMoney(20000, 'PLN'));
+    expect(balance[0].textContent).toContain(formatMoney(25200, 'PLN'));
+    expect(rows('allocation-cushion-reached')).toHaveLength(0);
+    expect(rows('allocation-remainder')).toHaveLength(1);
+
+    responses['2026-11'] = month(
+      {},
+      {},
+      {},
+      {
+        effectiveFrom: '2026-10',
+        buckets: [
+          cushionBucket({
+            allocatedPln: 0,
+            cushion: {
+              balanceStartPln: 25200,
+              targetPln: 25200,
+              targetMonths: 6,
+              balanceEndPln: 25200,
+              reached: true,
+            },
+          }),
+          ...firstPlanBuckets(),
+        ],
+      },
+    );
+    click('next-month');
+    await settle();
+
+    expect(rows('allocation-cushion-reached')).toHaveLength(1);
   });
 
   it('shows no buckets and an edit action when no plan is in force, and opens the plan dialog for the viewed month', async () => {
