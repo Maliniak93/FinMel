@@ -11,6 +11,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
+  deleteApiPortfolioAllocationPlanVersionsByMonth,
   deleteApiPortfolioRecurringExpensesById,
   deleteApiPortfolioRecurringExpensesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesById,
@@ -18,6 +19,7 @@ import {
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
   getApiPortfolioPlanningMonthsByMonth,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
+  type AllocationResponse,
   type ExpenseDefinitionResponse,
   type IncomeDefinitionResponse,
   type IncomeOccurrenceResponse,
@@ -29,7 +31,12 @@ import { readProblemDetails } from '../../core/auth/problem-details';
 import { PlanningState } from '../../core/planning/planning-state';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
-import { formatDate, formatMoney, formatMonth } from '../../shared/format';
+import { formatDate, formatMoney, formatMonth, formatPercent } from '../../shared/format';
+import {
+  AllocationPlanDialog,
+  type AllocationPlanDialogData,
+} from './allocation-plan-dialog/allocation-plan-dialog';
+import { SHARE_TYPE, bucketKindKey } from './allocation';
 import {
   EndRecurringExpenseDialog,
   type EndRecurringExpenseDialogData,
@@ -133,9 +140,27 @@ export class Planning {
     this.monthResource.hasValue() ? this.monthResource.value().freeFunds : null,
   );
 
+  protected readonly allocation = computed(() =>
+    this.monthResource.hasValue() ? this.monthResource.value().allocation : null,
+  );
+
+  protected readonly fixedBuckets = computed(() =>
+    (this.allocation()?.buckets ?? []).filter(
+      (bucket) => Number(bucket.shareType) === SHARE_TYPE.Fixed,
+    ),
+  );
+
+  protected readonly percentBuckets = computed(() =>
+    (this.allocation()?.buckets ?? []).filter(
+      (bucket) => Number(bucket.shareType) === SHARE_TYPE.Percent,
+    ),
+  );
+
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
+  protected readonly formatPercent = formatPercent;
   protected readonly ruleParts = ruleParts;
+  protected readonly bucketKindKey = bucketKindKey;
 
   protected statusKey(status: RecurringIncomeStatus): string {
     return STATUS_KEYS[status];
@@ -151,6 +176,10 @@ export class Planning {
 
   protected isNegative(amount: number | string): boolean {
     return Number(amount) < 0;
+  }
+
+  protected isPositive(amount: number | string): boolean {
+    return Number(amount) > 0;
   }
 
   protected periodLabel(definition: Pick<IncomeDefinitionResponse, 'startDate' | 'endDate'>): {
@@ -420,6 +449,45 @@ export class Planning {
     if (result.error) {
       this.snackBar.open(
         readProblemDetails(result.error).detail ?? translate('planning.expenses.delete.failed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.monthResource.reload();
+  }
+
+  protected openAllocationDialog(allocation: AllocationResponse): void {
+    const data: AllocationPlanDialogData = { month: this.selectedMonth(), allocation };
+    const ref = this.dialog.open(AllocationPlanDialog, { width: '960px', data });
+    this.reloadMonthWhenSaved(ref.afterClosed());
+  }
+
+  protected async removeAllocationChange(nextChange: string): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.allocation.deleteTitle'),
+            message: translate('planning.allocation.deleteMessage', {
+              month: this.changeMonthLabel(nextChange),
+            }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioAllocationPlanVersionsByMonth({
+      path: { month: nextChange },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.allocation.deleteFailed'),
         translate('common.dismiss'),
       );
       return;

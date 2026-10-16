@@ -1,0 +1,37 @@
+.allocation-plan-dialog__month {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+}
+
+.allocation-plan-dialog__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.allocation-plan-dialog__row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1.6fr auto auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.allocation-plan-dialog__row mat-checkbox {
+  margin-top: 8px;
+}
+
+.allocation-plan-dialog__actions {
+  display: inline-flex;
+  margin-top: 4px;
+}
+
+.allocation-plan-dialog__empty,
+.allocation-plan-dialog__summary {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.allocation-plan-dialog__error {
+  color: var(--mat-sys-error);
+  margin: 0 0 8px;
+}

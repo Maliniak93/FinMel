@@ -134,6 +134,18 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
             .CountAsync(v => v.RecurringExpenseId == expenseId, cancellationToken);
     }
 
+    protected async Task<int> CountAllocationVersionsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = CreateDbContext(userId);
+        return await dbContext.Set<AllocationPlanVersion>().CountAsync(cancellationToken);
+    }
+
+    protected async Task<int> CountAllocationBucketsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = CreateDbContext(userId);
+        return await dbContext.Set<AllocationBucket>().CountAsync(cancellationToken);
+    }
+
     protected async Task<List<BondRedemption>> ReadBondRedemptionsAsync(
         Guid userId, CancellationToken cancellationToken, Guid? assetId = null)
     {

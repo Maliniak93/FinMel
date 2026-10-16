@@ -28,6 +28,9 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<RecurringIncomeOccurrence> RecurringIncomeOccurrences => Set<RecurringIncomeOccurrence>();
     public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
     public DbSet<RecurringExpenseVersion> RecurringExpenseVersions => Set<RecurringExpenseVersion>();
+    public DbSet<AllocationBucket> AllocationBuckets => Set<AllocationBucket>();
+    public DbSet<AllocationPlanVersion> AllocationPlanVersions => Set<AllocationPlanVersion>();
+    public DbSet<AllocationPlanEntry> AllocationPlanEntries => Set<AllocationPlanEntry>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -290,6 +293,34 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             version.Property(v => v.Amount).HasPrecision(18, 2);
             version.Property(v => v.DayKind).HasConversion<string>().HasMaxLength(20);
             version.Property(v => v.Shift).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<AllocationBucket>(bucket =>
+        {
+            bucket.Property(b => b.Kind).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<AllocationPlanVersion>(version =>
+        {
+            version.HasIndex(v => new { v.UserId, v.EffectiveFrom }).IsUnique();
+
+            version.HasMany(v => v.Entries)
+                .WithOne()
+                .HasForeignKey(e => e.VersionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AllocationPlanEntry>(entry =>
+        {
+            entry.Property(e => e.Name).HasMaxLength(100);
+            entry.Property(e => e.ShareType).HasConversion<string>().HasMaxLength(20);
+            entry.Property(e => e.Share).HasPrecision(18, 2);
+
+            // Restrict: the save and delete handlers remove a bucket only after no version references it.
+            entry.HasOne<AllocationBucket>()
+                .WithMany()
+                .HasForeignKey(e => e.BucketId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.
