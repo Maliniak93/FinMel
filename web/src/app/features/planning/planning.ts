@@ -476,7 +476,11 @@ export class Planning {
 
   protected openAllocationDialog(allocation: AllocationResponse): void {
     const data: AllocationPlanDialogData = { month: this.selectedMonth(), allocation };
-    const ref = this.dialog.open(AllocationPlanDialog, { width: '960px', data });
+    const ref = this.dialog.open(AllocationPlanDialog, {
+      width: '960px',
+      maxWidth: '95vw',
+      data,
+    });
     this.reloadMonthWhenSaved(ref.afterClosed());
   }
 
