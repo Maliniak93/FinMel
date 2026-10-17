@@ -54,6 +54,19 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    // The worked example whose plan starts in firstMonth; leaves the clock on PlanningApi.CreationDayUtc (2026-10-15).
+    protected async Task<(Guid IkeAccountId, Guid IkzeAccountId)> SetUpTransferPlanFromAsync(
+        HttpClient client, Guid userId, string firstMonth, CancellationToken cancellationToken)
+    {
+        var setupDay = DateTimeOffset.Parse($"{firstMonth}-15T10:00:00+00:00", System.Globalization.CultureInfo.InvariantCulture);
+        Factory.Clock.SetUtcNow(setupDay);
+        var accounts = await PlanningApi.CreateTransferPlanSetupAsync(client, cancellationToken, firstMonth);
+        await SeedReplicasAsync(userId, cancellationToken, PlanningApi.TransferTargets, PlanningApi.TransferValues, PlanningApi.TransferValuationDate);
+        Factory.Clock.SetUtcNow(PlanningApi.CreationDayUtc);
+
+        return accounts;
+    }
+
     protected async Task<Guid> AddQuotedHoldingAsync(
         HttpClient client,
         Guid accountId,

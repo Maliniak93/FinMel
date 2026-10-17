@@ -1,5 +1,8 @@
+using System.Net;
+using System.Net.Http.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.TransferPlan;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -39,5 +42,47 @@ public sealed class TransferPlanTenancyIsolationTests(SkarbiecContainersFixture 
         Assert.Equal(100, planB.MinimumTransferPln);
         Assert.Equal(new DateOnly(2026, 10, 10), planB.ValuationDate);
         Assert.Equal(100m, planB.Groups.Single().CurrentPercent);
+    }
+
+    [Fact]
+    public async Task AcceptedPlans()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        using var clientA = Factory.CreateAuthenticatedClient(userA);
+        using var clientB = Factory.CreateAuthenticatedClient(userB);
+        await clientA.CreateTransferPlanSetupAsync(cancellationToken);
+        await clientB.CreateTransferPlanSetupAsync(cancellationToken);
+        await SeedReplicasAsync(userA, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
+        await SeedReplicasAsync(userB, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
+        await clientA.AcceptTransferPlanAsync("2026-10", cancellationToken);
+        var rowsA = (await clientA.GetTransferPlanAsync("2026-10", cancellationToken)).Rows;
+        await clientA.CheckTransferPlanRowAsync(rowsA[0].Id!.Value, true, cancellationToken);
+        var before = await clientA.GetTransferPlanAsync("2026-10", cancellationToken);
+
+        var undo = await clientB.PostAsync(TransferPlanActionUri("2026-10", "undo"), content: null, cancellationToken);
+        var unskip = await clientB.DeleteAsync(TransferPlanActionUri("2026-10", "skip"), cancellationToken);
+        var check = await clientB.PutAsJsonAsync(TransferPlanRowCheckedUri(rowsA[1].Id!.Value), new { @checked = true }, cancellationToken);
+        var planBBefore = await clientB.GetTransferPlanAsync("2026-10", cancellationToken);
+        var accept = await clientB.PostAsync(TransferPlanActionUri("2026-10", "accept"), content: null, cancellationToken);
+        var planB = await clientB.GetTransferPlanAsync("2026-10", cancellationToken);
+        var undoOwn = await clientB.PostAsync(TransferPlanActionUri("2026-10", "undo"), content: null, cancellationToken);
+        var skipOwn = await clientB.PostAsync(TransferPlanActionUri("2026-10", "skip"), content: null, cancellationToken);
+
+        await undo.AssertProblemAsync(HttpStatusCode.NotFound, TransferPlanNotFoundErrorCode, cancellationToken);
+        await unskip.AssertProblemAsync(HttpStatusCode.NotFound, TransferPlanNotFoundErrorCode, cancellationToken);
+        await check.AssertProblemAsync(HttpStatusCode.NotFound, TransferPlanRowNotFoundErrorCode, cancellationToken);
+        Assert.True(planBBefore.Status.Is(TransferPlanStatus.Preview));
+        Assert.Equal(HttpStatusCode.NoContent, accept.StatusCode);
+        Assert.True(planB.Status.Is(TransferPlanStatus.Accepted));
+        Assert.DoesNotContain(planB.Rows, r => rowsA.Any(a => a.Id == r.Id));
+        Assert.Equal(HttpStatusCode.NoContent, undoOwn.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, skipOwn.StatusCode);
+
+        var after = await clientA.GetTransferPlanAsync("2026-10", cancellationToken);
+        Assert.True(after.Status.Is(TransferPlanStatus.Accepted));
+        Assert.Equal(before.Rows.Select(r => (r.Id, r.Checked)), after.Rows.Select(r => (r.Id, r.Checked)));
     }
 }

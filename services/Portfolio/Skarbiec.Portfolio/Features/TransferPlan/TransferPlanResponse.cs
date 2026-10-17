@@ -27,10 +27,18 @@ public sealed record TransferPlanResponse
 
     /// <summary>PLN sum of the buckets the rows split.</summary>
     public required decimal ToInvestPln { get; init; }
+
+    /// <summary>True for an accepted plan while none of the latest batch's rows is checked.</summary>
+    public required bool CanUndo { get; init; }
 }
 
 public sealed record TransferRowResponse
 {
+    /// <summary>Null in a preview, the row is not stored yet.</summary>
+    public required Guid? Id { get; init; }
+
+    public required int? BatchNumber { get; init; }
+    public required bool? Checked { get; init; }
     public required Guid BucketId { get; init; }
     public required string BucketName { get; init; }
     public required Guid? AccountId { get; init; }
@@ -57,6 +65,9 @@ public enum TransferPlanStatus
 {
     None,
     Preview,
+    Accepted,
+    Completed,
+    Skipped,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<TransferPlanNoneReason>))]

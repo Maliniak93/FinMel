@@ -779,13 +779,64 @@
     }
 
     @if (transferPlan(); as transfer) {
-      @if (transfer.status === 'Preview' || transfer.noneReason === 'NothingToInvest') {
+      @if (transfer.status !== 'None' || transfer.noneReason === 'NothingToInvest') {
         <section class="planning-section planning-transfer" data-testid="transfer-plan-section">
           <div class="planning-section__header">
             <h2>{{ 'planning.transferPlan.title' | transloco }}</h2>
+            @if (transferStatusKey(transfer.status); as statusKey) {
+              <mat-chip data-testid="transfer-plan-status">{{ statusKey | transloco }}</mat-chip>
+            }
+            <span class="planning-transfer__actions">
+              @if (transfer.status === 'Preview') {
+                <button
+                  mat-flat-button
+                  type="button"
+                  data-testid="transfer-accept"
+                  (click)="acceptTransferPlan()"
+                >
+                  {{ 'planning.transferPlan.accept' | transloco }}
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  data-testid="transfer-skip"
+                  (click)="skipTransferPlan()"
+                >
+                  {{ 'planning.transferPlan.skip' | transloco }}
+                </button>
+              } @else if (transfer.status === 'Accepted' || transfer.status === 'Completed') {
+                @if (!transfer.canUndo) {
+                  <span class="planning-section__empty" data-testid="transfer-undo-hint">
+                    {{ 'planning.transferPlan.undoBlocked' | transloco }}
+                  </span>
+                }
+                <button
+                  mat-button
+                  type="button"
+                  data-testid="transfer-undo"
+                  [disabled]="!transfer.canUndo"
+                  (click)="undoTransferPlan()"
+                >
+                  {{ 'planning.transferPlan.undo' | transloco }}
+                </button>
+              } @else if (transfer.status === 'Skipped') {
+                <button
+                  mat-button
+                  type="button"
+                  data-testid="transfer-unskip"
+                  (click)="unskipTransferPlan()"
+                >
+                  {{ 'planning.transferPlan.unskip' | transloco }}
+                </button>
+              }
+            </span>
           </div>
 
-          @if (transfer.status === 'Preview') {
+          @if (transfer.status === 'Skipped') {
+            <p class="planning-section__empty" data-testid="transfer-plan-skipped">
+              {{ 'planning.transferPlan.skipped' | transloco }}
+            </p>
+          } @else if (transfer.status !== 'None') {
             <div class="planning-transfer__meta">
               @if (transfer.valuationDate; as valuationDate) {
                 <span data-testid="transfer-valuation-date">
@@ -800,18 +851,20 @@
                   </mat-chip>
                 }
               }
-              <label class="planning-transfer__minimum">
-                <span>{{ 'planning.transferPlan.minimum' | transloco }}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="1000000"
-                  step="1"
-                  [value]="transfer.minimumTransferPln"
-                  (change)="saveTransferMinimum($event)"
-                  data-testid="transfer-minimum-input"
-                />
-              </label>
+              @if (transfer.status === 'Preview') {
+                <label class="planning-transfer__minimum">
+                  <span>{{ 'planning.transferPlan.minimum' | transloco }}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1000000"
+                    step="1"
+                    [value]="transfer.minimumTransferPln"
+                    (change)="saveTransferMinimum($event)"
+                    data-testid="transfer-minimum-input"
+                  />
+                </label>
+              }
             </div>
 
             @if (transfer.fallbackReason; as reason) {
@@ -825,7 +878,20 @@
 
             <ul class="planning-definitions">
               @for (row of transfer.rows; track $index) {
-                <li class="planning-transfer__row" data-testid="transfer-plan-row">
+                <li
+                  class="planning-transfer__row"
+                  [class.planning-transfer__row--frozen]="!!row.id"
+                  data-testid="transfer-plan-row"
+                >
+                  @if (row.id; as rowId) {
+                    <input
+                      type="checkbox"
+                      [checked]="row.checked"
+                      [attr.aria-label]="'planning.transferPlan.checkRow' | transloco"
+                      (change)="checkTransferRow(rowId, $event)"
+                      data-testid="transfer-row-check"
+                    />
+                  }
                   <span class="planning-definition__name">{{ row.bucketName }}</span>
                   <span>{{
                     row.accountName ?? ('planning.transferPlan.noAccount' | transloco)

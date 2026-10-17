@@ -165,8 +165,13 @@ public sealed class GetPlanningMonthHandler(
         YearMonth? planStart = versions.Count == 0
             ? null
             : YearMonth.From(WarsawCalendar.DateOf(versions.Min(v => v.CreatedAt)));
+        var transferPlans = await dbContext.TransferPlans
+            .AsNoTracking()
+            .Include(p => p.Batches)
+            .ThenInclude(b => b.Rows)
+            .ToListAsync(cancellationToken);
         var transferPlan = TransferPlanPreview.Build(
-            viewed, YearMonth.From(today), planStart, allocation, accounts, targetReplica, valuationReplica, minimumTransfer);
+            viewed, YearMonth.From(today), planStart, allocation, accounts, targetReplica, valuationReplica, minimumTransfer, transferPlans);
 
         return new PlanningMonthResponse
         {

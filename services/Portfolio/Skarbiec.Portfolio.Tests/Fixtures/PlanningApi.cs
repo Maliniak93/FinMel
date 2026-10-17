@@ -161,7 +161,10 @@ internal static class PlanningApi
         string? AccountName,
         string? GroupName,
         decimal AmountPln,
-        JsonElement Marker);
+        JsonElement Marker,
+        Guid? Id = null,
+        int? BatchNumber = null,
+        bool? Checked = null);
 
     public sealed record TransferGroupView(string Name, decimal CurrentPercent, decimal AfterPercent, decimal TargetPercent);
 
@@ -174,7 +177,8 @@ internal static class PlanningApi
         JsonElement? FallbackReason,
         List<TransferRowView> Rows,
         List<TransferGroupView> Groups,
-        decimal ToInvestPln);
+        decimal ToInvestPln,
+        bool CanUndo = false);
 
     public sealed record PlanningMonthView(
         IncomesView Incomes,
@@ -332,19 +336,72 @@ internal static class PlanningApi
         new(AssetClass.Cash, 5_000m)
     ];
 
-    // Forecast 6 543.27 in 2026-10: IKE 2 260 (Brokerage), IKZE 2 304 (Bonds), Inwestycje 1 979.27 (no account).
-    public static async Task CreateTransferPlanSetupAsync(this HttpClient client, CancellationToken cancellationToken)
+    // Forecast 6 543.27 from firstMonth on: IKE 2 260 (Brokerage), IKZE 2 304 (Bonds), Inwestycje 1 979.27 (no account).
+    public static async Task<(Guid IkeAccountId, Guid IkzeAccountId)> CreateTransferPlanSetupAsync(
+        this HttpClient client, CancellationToken cancellationToken, string firstMonth = "2026-10")
     {
         await client.CreateAllocationSetupAsync(cancellationToken, 6_543.27m);
         var ike = await client.CreateAccountAsync(cancellationToken, "IKE mBank", AccountType.Brokerage, TaxWrapper.Ike);
         var ikze = await client.CreateAccountAsync(cancellationToken, "IKZE Obligacje", AccountType.Bonds, TaxWrapper.Ikze);
         await client.SaveAllocationPlanAsync(
-            "2026-10",
+            firstMonth,
             cancellationToken,
             AllocationRow("IKE", IkeKind, FixedShare, 2_260m, accountId: ike),
             AllocationRow("IKZE", IkzeKind, FixedShare, 2_304m, accountId: ikze),
             AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true));
+
+        return (ike, ikze);
     }
+
+    public const string TransferPlansUri = "/api/portfolio/transfer-plans";
+
+    public const string TransferPlanNotPreviewErrorCode = "Conflict.TransferPlanNotPreview";
+
+    public const string TransferPlanRowCheckedErrorCode = "Conflict.TransferPlanRowChecked";
+
+    public const string TransferPlanNotFoundErrorCode = "NotFound.TransferPlan";
+
+    public const string TransferPlanRowNotFoundErrorCode = "NotFound.TransferPlanRow";
+
+    public const string InvalidMonthErrorCode = "Validation.InvalidMonth";
+
+    public static string TransferPlanActionUri(string month, string action) => $"{TransferPlansUri}/{month}/{action}";
+
+    public static string TransferPlanRowCheckedUri(Guid rowId) => $"{TransferPlansUri}/rows/{rowId}/checked";
+
+    public static async Task AcceptTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(TransferPlanActionUri(month, "accept"), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task UndoTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(TransferPlanActionUri(month, "undo"), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task CheckTransferPlanRowAsync(
+        this HttpClient client, Guid rowId, bool isChecked, CancellationToken cancellationToken)
+    {
+        var response = await client.PutAsJsonAsync(TransferPlanRowCheckedUri(rowId), new { @checked = isChecked }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task SkipTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(TransferPlanActionUri(month, "skip"), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task UnskipTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(TransferPlanActionUri(month, "skip"), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static TransferRowView RowOf(this TransferPlanView plan, string bucketName, string groupName) =>
+        plan.Rows.Single(r => r.BucketName == bucketName && r.GroupName == groupName);
 
     public static async Task SaveTransferPlanSettingsAsync(
         this HttpClient client, int minimumTransferPln, CancellationToken cancellationToken)

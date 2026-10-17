@@ -19,8 +19,13 @@ import {
   deleteApiPortfolioRecurringIncomesById,
   deleteApiPortfolioRecurringIncomesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
+  deleteApiPortfolioTransferPlansByMonthSkip,
   getApiPortfolioPlanningMonthsByMonth,
+  postApiPortfolioTransferPlansByMonthAccept,
+  postApiPortfolioTransferPlansByMonthSkip,
+  postApiPortfolioTransferPlansByMonthUndo,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
+  putApiPortfolioTransferPlansRowsByRowIdChecked,
   putApiPortfolioTransferPlansSettings,
   type AllocationBucketResponse,
   type AllocationResponse,
@@ -32,6 +37,7 @@ import {
   type RecurringIncomeStatus,
   type TransferMarker,
   type TransferPlanFallbackReason,
+  type TransferPlanStatus,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { PlanningState } from '../../core/planning/planning-state';
@@ -101,6 +107,14 @@ const TRANSFER_FALLBACK_KEYS: Record<TransferPlanFallbackReason, string> = {
   NoTargetAllocation: 'planning.transferPlan.fallback.NoTargetAllocation',
   NoValuation: 'planning.transferPlan.fallback.NoValuation',
   EmptyBase: 'planning.transferPlan.fallback.EmptyBase',
+};
+
+const TRANSFER_STATUS_KEYS: Record<TransferPlanStatus, string | null> = {
+  None: null,
+  Preview: 'planning.transferPlan.status.preview',
+  Accepted: 'planning.transferPlan.status.accepted',
+  Completed: 'planning.transferPlan.status.completed',
+  Skipped: 'planning.transferPlan.status.skipped',
 };
 
 function shiftMonth(month: string, delta: number): string {
@@ -557,6 +571,70 @@ export class Planning {
     return TRANSFER_FALLBACK_KEYS[reason];
   }
 
+  protected transferStatusKey(status: TransferPlanStatus): string | null {
+    return TRANSFER_STATUS_KEYS[status];
+  }
+
+  protected async acceptTransferPlan(): Promise<void> {
+    await this.runTransferAction(
+      () => postApiPortfolioTransferPlansByMonthAccept({ path: { month: this.selectedMonth() } }),
+      'planning.transferPlan.acceptFailed',
+    );
+  }
+
+  protected async skipTransferPlan(): Promise<void> {
+    await this.runTransferAction(
+      () => postApiPortfolioTransferPlansByMonthSkip({ path: { month: this.selectedMonth() } }),
+      'planning.transferPlan.skipFailed',
+    );
+  }
+
+  protected async unskipTransferPlan(): Promise<void> {
+    await this.runTransferAction(
+      () => deleteApiPortfolioTransferPlansByMonthSkip({ path: { month: this.selectedMonth() } }),
+      'planning.transferPlan.unskipFailed',
+    );
+  }
+
+  protected async undoTransferPlan(): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.transferPlan.undoTitle'),
+            message: translate('planning.transferPlan.undoMessage'),
+            confirmLabel: translate('planning.transferPlan.undo'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    await this.runTransferAction(
+      () => postApiPortfolioTransferPlansByMonthUndo({ path: { month: this.selectedMonth() } }),
+      'planning.transferPlan.undoFailed',
+    );
+  }
+
+  protected async checkTransferRow(rowId: string, event: Event): Promise<void> {
+    const box = event.target as HTMLInputElement;
+    const checked = box.checked;
+    const failed = await this.runTransferAction(
+      () =>
+        putApiPortfolioTransferPlansRowsByRowIdChecked({
+          path: { rowId },
+          body: { checked },
+        }),
+      'planning.transferPlan.checkFailed',
+    );
+    if (failed) {
+      box.checked = !checked;
+    }
+  }
+
   protected async saveTransferMinimum(event: Event): Promise<void> {
     const raw = (event.target as HTMLInputElement).value.trim();
     if (raw === '') {
@@ -622,6 +700,22 @@ export class Planning {
     }
 
     this.monthResource.reload();
+  }
+
+  private async runTransferAction(
+    call: () => Promise<{ error?: unknown }>,
+    failedKey: string,
+  ): Promise<boolean> {
+    const result = await call();
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate(failedKey),
+        translate('common.dismiss'),
+      );
+    }
+
+    this.monthResource.reload();
+    return !!result.error;
   }
 
   private reloadMonthWhenSaved(closed: {

@@ -85,6 +85,9 @@ export function transferRow(
   extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
+    id: null,
+    batchNumber: null,
+    checked: null,
     bucketId: `bucket-${bucketName}`,
     bucketName,
     accountId: null,
@@ -116,6 +119,7 @@ export function transferPlan(extra: Record<string, unknown> = {}): Record<string
     rows: [],
     groups: [],
     toInvestPln: 0,
+    canUndo: false,
     ...extra,
   };
 }

@@ -875,7 +875,27 @@
         "EmptyBase": "Wycena grup alokacji wynosi zero, więc kwoty nie są rozdzielone na grupy.",
         "setTarget": "Ustaw alokację docelową"
       },
-      "nothingToInvest": "Brak kwoty do zainwestowania."
+      "nothingToInvest": "Brak kwoty do zainwestowania.",
+      "status": {
+        "preview": "Podgląd",
+        "accepted": "Przyjęty",
+        "completed": "Zrealizowany",
+        "skipped": "Pominięty"
+      },
+      "accept": "Przyjmij plan",
+      "acceptFailed": "Nie udało się przyjąć planu.",
+      "skip": "Pomiń",
+      "skipFailed": "Nie udało się pominąć miesiąca.",
+      "skipped": "Przelewy w tym miesiącu są pominięte.",
+      "unskip": "Cofnij pominięcie",
+      "unskipFailed": "Nie udało się cofnąć pominięcia.",
+      "undo": "Cofnij przyjęcie",
+      "undoBlocked": "Odznacz wszystkie wiersze, aby cofnąć przyjęcie.",
+      "undoTitle": "Cofnąć przyjęcie?",
+      "undoMessage": "Przyjęte wiersze zostaną odrzucone, a plan wróci do podglądu.",
+      "undoFailed": "Nie udało się cofnąć przyjęcia.",
+      "checkRow": "Oznacz jako przelane",
+      "checkFailed": "Nie udało się zaktualizować wiersza."
     },
     "freeFunds": {
       "title": "Wolne środki",

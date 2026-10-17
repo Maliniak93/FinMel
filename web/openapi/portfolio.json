@@ -2356,6 +2356,125 @@
         }
       }
     },
+    "/api/portfolio/transfer-plans/{month}/accept": {
+      "post": {
+        "tags": [
+          "AcceptTransferPlanEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/transfer-plans/{month}/undo": {
+      "post": {
+        "tags": [
+          "UndoTransferPlanAcceptanceEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/transfer-plans/rows/{rowId}/checked": {
+      "put": {
+        "tags": [
+          "CheckTransferPlanRowEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "rowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckTransferPlanRowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/transfer-plans/{month}/skip": {
+      "post": {
+        "tags": [
+          "SkipTransferPlanEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "UnskipTransferPlanEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/planning/overdue": {
       "get": {
         "tags": [
@@ -4465,6 +4584,17 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "CheckTransferPlanRowRequest": {
+        "required": [
+          "checked"
+        ],
+        "type": "object",
+        "properties": {
+          "checked": {
+            "type": "boolean"
           }
         }
       },
@@ -6942,7 +7072,8 @@
           "fallbackReason",
           "rows",
           "groups",
-          "toInvestPln"
+          "toInvestPln",
+          "canUndo"
         ],
         "type": "object",
         "properties": {
@@ -7006,17 +7137,26 @@
               "string"
             ],
             "format": "double"
+          },
+          "canUndo": {
+            "type": "boolean"
           }
         }
       },
       "TransferPlanStatus": {
         "enum": [
           "None",
-          "Preview"
+          "Preview",
+          "Accepted",
+          "Completed",
+          "Skipped"
         ]
       },
       "TransferRowResponse": {
         "required": [
+          "id",
+          "batchNumber",
+          "checked",
           "bucketId",
           "bucketName",
           "accountId",
@@ -7027,6 +7167,28 @@
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "batchNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "checked": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
           "bucketId": {
             "type": "string",
             "format": "uuid"
@@ -7987,6 +8149,21 @@
     },
     {
       "name": "SaveTransferPlanSettingsEndpoint"
+    },
+    {
+      "name": "AcceptTransferPlanEndpoint"
+    },
+    {
+      "name": "UndoTransferPlanAcceptanceEndpoint"
+    },
+    {
+      "name": "CheckTransferPlanRowEndpoint"
+    },
+    {
+      "name": "SkipTransferPlanEndpoint"
+    },
+    {
+      "name": "UnskipTransferPlanEndpoint"
     },
     {
       "name": "GetOverdueOccurrencesEndpoint"
