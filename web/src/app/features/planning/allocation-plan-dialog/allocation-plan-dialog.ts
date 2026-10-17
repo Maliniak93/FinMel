@@ -181,6 +181,9 @@ export class AllocationPlanDialog {
       this.data.month,
       [Validators.required, Validators.pattern(/^\d{4}-\d{2}$/), monthInRange],
     ],
+    reserveAccountId: new FormControl<string | null>(
+      this.data.allocation.reserve?.accountId ?? null,
+    ),
     rows: new FormArray(this.data.allocation.buckets.map((bucket) => createRow(bucket))),
   });
 
@@ -268,6 +271,17 @@ export class AllocationPlanDialog {
           (!account.isArchived || account.id === current) &&
           (wrapper === null || Number(account.wrapper) === wrapper),
       );
+  }
+
+  protected reserveAccountOptions(): { id: string; name: string }[] {
+    if (!this.accountsResource.hasValue()) {
+      return [];
+    }
+
+    const current = this.form.controls.reserveAccountId.value;
+    return this.accountsResource
+      .value()
+      .filter((account) => !account.isArchived || account.id === current);
   }
 
   protected isLimited(row: PlanRow): boolean {
@@ -365,6 +379,7 @@ export class AllocationPlanDialog {
     const result = await putApiPortfolioAllocationPlanVersionsByMonth({
       path: { month: values.effectiveFrom },
       body: {
+        reserveAccountId: values.reserveAccountId,
         buckets: values.rows.map((row) =>
           row.kind === BUCKET_KIND.Cushion
             ? {

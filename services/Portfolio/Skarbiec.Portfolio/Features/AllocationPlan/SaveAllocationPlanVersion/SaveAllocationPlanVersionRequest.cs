@@ -9,6 +9,9 @@ public sealed record SaveAllocationPlanVersionRequest : IValidatableObject
 
     public required IReadOnlyList<AllocationPlanRowRequest> Buckets { get; init; }
 
+    /// <summary>The account the expense reserve is kept on; absent for none.</summary>
+    public Guid? ReserveAccountId { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

@@ -300,6 +300,39 @@ describe('AllocationPlanDialog', () => {
     await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));
   });
 
+  it('offers only the non-archived accounts as the reserve account and posts the chosen one', async () => {
+    await setup(firstPlanBuckets(), [
+      { id: 'acc-savings', name: 'Konto oszczędnościowe', wrapper: 0, isArchived: false },
+      { id: 'acc-old', name: 'Stare konto', wrapper: 0, isArchived: true },
+    ]);
+    root()
+      .querySelector<HTMLElement>('[data-testid="reserve-account"] .mat-mdc-select-trigger')!
+      .click();
+    await settle();
+
+    const options = Array.from(document.querySelectorAll<HTMLElement>('mat-option'));
+    const names = options.map((option) => option.textContent!.trim());
+    expect(names).toContain('Konto oszczędnościowe');
+    expect(names).not.toContain('Stare konto');
+    options.find((option) => option.textContent!.includes('Konto oszczędnościowe'))!.click();
+    await settle();
+
+    saveButton().click();
+
+    await vi.waitFor(() => {
+      const puts = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'PUT');
+      expect(puts).toHaveLength(1);
+    });
+    const request = fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .find((candidate: Request) => candidate.method === 'PUT')!;
+    const body = JSON.parse(await request.clone().text()) as { reserveAccountId: string | null };
+    expect(body.reserveAccountId).toBe('acc-savings');
+    await vi.waitFor(() => expect(dialogRef.close).toHaveBeenCalledWith(true));
+  });
+
   describe('limited buckets', () => {
     const accounts = [
       { id: 'acc-ike', name: 'IKE Dominik', wrapper: 1, isArchived: false },

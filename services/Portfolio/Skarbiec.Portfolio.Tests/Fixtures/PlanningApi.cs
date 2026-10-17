@@ -141,6 +141,8 @@ internal static class PlanningApi
     public sealed record CushionView(
         decimal BalanceStartPln, decimal TargetPln, int TargetMonths, decimal BalanceEndPln, bool Reached);
 
+    public sealed record ReserveView(decimal MonthPln, decimal BalancePln, Guid? AccountId, string? AccountName);
+
     public sealed record AllocationView(
         string? EffectiveFrom,
         string? NextChange,
@@ -148,7 +150,8 @@ internal static class PlanningApi
         bool Incomplete,
         decimal DeficitPln,
         List<AllocationBucketView> Buckets,
-        decimal ToInvestPln);
+        decimal ToInvestPln,
+        ReserveView? Reserve = null);
 
     public sealed record PlanningMonthView(
         IncomesView Incomes, ExpensesView Expenses, FreeFundsView FreeFunds, AllocationView Allocation);
@@ -282,6 +285,14 @@ internal static class PlanningApi
         this HttpClient client, string month, CancellationToken cancellationToken, params object[] buckets)
     {
         var response = await client.PutAsJsonAsync(AllocationPlanVersionUri(month), NewAllocationPlanBody(buckets), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task SaveAllocationPlanWithReserveAsync(
+        this HttpClient client, string month, Guid? reserveAccountId, CancellationToken cancellationToken, params object[] buckets)
+    {
+        var response = await client.PutAsJsonAsync(
+            AllocationPlanVersionUri(month), new { buckets, reserveAccountId }, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

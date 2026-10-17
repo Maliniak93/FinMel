@@ -152,6 +152,7 @@ public sealed class GetPlanningMonthHandler(
             versions,
             overrides,
             kinds,
+            forecast.Plans,
             walked => walked == viewed ? viewedFigures : forecast.FiguresIn(walked, rates, today));
 
         return new PlanningMonthResponse
@@ -182,6 +183,7 @@ public sealed class GetPlanningMonthHandler(
         List<AllocationPlanVersion> versions,
         List<AllocationBalanceOverride> overrides,
         IReadOnlyDictionary<Guid, BucketKind> kinds,
+        IReadOnlyList<(RecurringExpense Expense, ReservePlan Plan)> plans,
         Func<YearMonth, MonthFigures> figuresFor)
     {
         var ledger = AllocationLedger.Compute(viewed, versions, overrides, kinds, figuresFor);
@@ -244,7 +246,41 @@ public sealed class GetPlanningMonthHandler(
             Incomplete = incomplete,
             DeficitPln = ledger.Deficit,
             Buckets = buckets,
-            ToInvestPln = buckets.Where(b => b.Kind == BucketKind.Investments || b.Kind.IsLimited()).Sum(b => b.AllocatedPln)
+            ToInvestPln = buckets.Where(b => b.Kind == BucketKind.Investments || b.Kind.IsLimited()).Sum(b => b.AllocatedPln),
+            Reserve = BuildReserve(viewed, plans, ledger.InForce?.ReserveAccountId, accounts)
+        };
+    }
+
+    private static ReserveResponse? BuildReserve(
+        YearMonth viewed,
+        IReadOnlyList<(RecurringExpense Expense, ReservePlan Plan)> plans,
+        Guid? reserveAccountId,
+        Dictionary<Guid, Account> accounts)
+    {
+        var monthPln = plans
+            .Where(p => p.Expense.InForce(viewed).IntervalMonths > 1)
+            .Sum(p => ReserveSchedule.ReservesIn(viewed, p.Plan).Sum(r => r.Amount));
+
+        var balancePln = 0m;
+        foreach (var (_, plan) in plans)
+        {
+            for (var month = plan.CreatedMonth; month <= viewed; month = month.AddMonths(1))
+            {
+                balancePln += ReserveSchedule.CostIn(month, plan) - ReserveSchedule.PaymentsIn(month, plan).Sum(p => p.Amount);
+            }
+        }
+
+        if (monthPln == 0m && balancePln == 0m && reserveAccountId is null)
+        {
+            return null;
+        }
+
+        return new ReserveResponse
+        {
+            MonthPln = monthPln,
+            BalancePln = balancePln,
+            AccountId = reserveAccountId,
+            AccountName = reserveAccountId is { } id && accounts.TryGetValue(id, out var account) ? account.Name : null
         };
     }
 

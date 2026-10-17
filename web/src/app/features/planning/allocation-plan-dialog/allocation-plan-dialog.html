@@ -18,6 +18,18 @@
       }
     </mat-form-field>
 
+    <mat-form-field appearance="outline" data-testid="reserve-account">
+      <mat-label>{{ 'planning.allocation.dialog.reserveAccount' | transloco }}</mat-label>
+      <mat-select formControlName="reserveAccountId">
+        <mat-option [value]="null">{{
+          'planning.allocation.dialog.noAccount' | transloco
+        }}</mat-option>
+        @for (account of reserveAccountOptions(); track account.id) {
+          <mat-option [value]="account.id">{{ account.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
     @if (rowControls().length === 0) {
       <p class="allocation-plan-dialog__empty">
         {{ 'planning.allocation.dialog.empty' | transloco }}

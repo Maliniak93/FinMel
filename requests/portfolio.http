@@ -1329,12 +1329,13 @@ Authorization: Bearer {{authToken}}
 
 ### --- Allocation plan ---
 
-### Save the whole plan from a month (204; month yyyy-MM, 2011-01 to 2099-12; kind 0 = Investments, 1 = Savings, 2 = Cushion (at most one; no shareType, share or remainder; targetMonths 1-24 required; startingBalance >= 0 only on a new cushion, default 0), 3 = Ike, 4 = Ikze, 5 = IkzeJdg (yearly-limited, never the remainder; startingBalance >= 0 = contributed in the month's year before it, only on a new bucket, default 0; an account must have wrapper Ike for Ike, Ikze for Ikze and IkzeJdg, else 400 Validation.BucketAccountWrapper); shareType 0 = Fixed (PLN), 1 = Percent; exactly one remainder in a non-empty plan, an empty buckets list means no split from that month; omit bucketId to create a bucket, send it to keep one; later versions are kept; 400 Validation.PercentSumOver100, 400 Validation.BucketKindMismatch; 404 NotFound.AllocationBucket / NotFound.Account; 409 Conflict.AccountArchived when the account changes to an archived one)
+### Save the whole plan from a month (204; month yyyy-MM, 2011-01 to 2099-12; kind 0 = Investments, 1 = Savings, 2 = Cushion (at most one; no shareType, share or remainder; targetMonths 1-24 required; startingBalance >= 0 only on a new cushion, default 0), 3 = Ike, 4 = Ikze, 5 = IkzeJdg (yearly-limited, never the remainder; startingBalance >= 0 = contributed in the month's year before it, only on a new bucket, default 0; an account must have wrapper Ike for Ike, Ikze for Ikze and IkzeJdg, else 400 Validation.BucketAccountWrapper); shareType 0 = Fixed (PLN), 1 = Percent; exactly one remainder in a non-empty plan, an empty buckets list means no split from that month; omit bucketId to create a bucket, send it to keep one; later versions are kept; 400 Validation.PercentSumOver100, 400 Validation.BucketKindMismatch; 404 NotFound.AllocationBucket / NotFound.Account; 409 Conflict.AccountArchived when the account changes to an archived one; optional reserveAccountId = the account the expense reserve is kept on, same account rules, a version may hold it with no buckets)
 PUT {{baseUrl}}/api/portfolio/allocation-plan/versions/2026-10
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
+  "reserveAccountId": "00000000-0000-0000-0000-000000000000",
   "buckets": [
     { "name": "Poduszka", "kind": 2, "targetMonths": 6, "startingBalance": 20000, "isRemainder": false },
     { "name": "Wakacje", "kind": 1, "shareType": 0, "share": 500, "isRemainder": false },

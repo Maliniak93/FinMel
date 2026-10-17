@@ -49,6 +49,30 @@ public sealed class AllocationPlanTenancyIsolationTests(SkarbiecContainersFixtur
     }
 
     [Fact]
+    public async Task Stranger_CannotChooseOwnersAccountAsReserve()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var account = await owner.CreateAllocationSetupAsync(cancellationToken);
+        await owner.CreateOcToyotaAsync(cancellationToken);
+        await owner.SaveAllocationPlanWithReserveAsync("2026-10", account.AccountId, cancellationToken);
+        var ownersReserve = (await owner.GetAllocationAsync("2026-10", cancellationToken)).Reserve;
+        Assert.Equal(account.AccountId, ownersReserve?.AccountId);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var chosen = await stranger.PutAsJsonAsync(
+            AllocationPlanVersionUri("2026-10"),
+            new { buckets = Array.Empty<object>(), reserveAccountId = account.AccountId },
+            cancellationToken);
+
+        await chosen.AssertProblemAsync(HttpStatusCode.NotFound, "NotFound.Account", cancellationToken);
+        Assert.Null((await stranger.GetAllocationAsync("2026-10", cancellationToken)).Reserve);
+        Assert.Equal(1, await CountAllocationVersionsAsync(ownerId, cancellationToken));
+    }
+
+    [Fact]
     public async Task SetAndDeleteBucketBalance_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

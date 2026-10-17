@@ -721,6 +721,12 @@
       "effectiveFrom": "Plan from",
       "empty": "No allocation plan in force this month.",
       "deficit": "Deficit {{ amount }} — nothing to allocate.",
+      "reserve": {
+        "title": "Expense reserve",
+        "monthly": "You set aside {{ amount }}",
+        "balance": "balance {{ amount }}",
+        "account": "on {{ name }}"
+      },
       "groups": {
         "cushion": "Emergency cushion",
         "fixed": "Fixed amounts",
@@ -774,6 +780,7 @@
         "percentShare": "Percent",
         "account": "Account",
         "noAccount": "No account",
+        "reserveAccount": "Reserve account",
         "remainder": "Remainder",
         "moveUp": "Move up",
         "moveDown": "Move down",

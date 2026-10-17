@@ -47,6 +47,13 @@
   color: var(--mat-sys-on-error-container);
 }
 
+.planning-allocation__reserve {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0;
+}
+
 .planning-allocation__row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1.5fr;
