@@ -6,8 +6,6 @@ Tier is a starting guess (see `workflow.md` → Tier rule); `/design` sets the r
 
 ## Insights (Reporting, after spec-03's `AssetValuation` lines exist)
 
-- **Target allocation** (tier 2) — `TargetAllocation`/`TargetAllocationLine` CRUD, per-portfolio or total-wealth scope, percentages sum to 100 with a tolerance band.
-- **Allocation deviations** (tier 1; depends: target allocation) — current vs. target % per asset class from `AssetValuation`, flagging positions outside the tolerance band.
 - **Rebalancing suggestions** (tier 2; depends: deviations) — asset-class-level buy/sell PLN amounts that close the drift; disclaimer text served from the backend, never hardcoded in the UI.
 - **Contribution plan** ("I'm depositing X — where?") (tier 1; depends: rebalancing) — buy-only split of a new contribution toward target, never a sell.
 - **Emergency fund** (tier 2) — `EmergencyFund` + designated assets, monthly-expenses × target-months coverage %, flags a designated asset later removed from Portfolio.

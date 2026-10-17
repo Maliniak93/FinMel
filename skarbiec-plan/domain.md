@@ -219,7 +219,7 @@ erDiagram
 | `AssetValuation` | `Id, UserId, AccountId?, AssetId, Date, AssetClass, Quantity, PriceUsed?, PriceDate?, FxRateUsed?, ValuePln, IsStale`; unique `(AssetId, Date)` | the basis for P/L per asset, emergency fund and goal math, and TWR — nothing needs recomputing from scratch; `ValuePln` is rounded to 0.01 (midpoint away from zero) and a snapshot's `TotalPln` is the sum of its lines |
 | `LatestInstrumentPrice` | `InstrumentId` (PK), `QuoteCurrency, Date, Close` | last close seen in the daily batch — global reference data, no `UserId` (ADR-025) |
 | `LatestFxRate` | `Pair` (PK, e.g. `USDPLN`), `Date, Rate` | last rate seen in the daily batch — global reference data, no `UserId` (ADR-025) |
-| `TargetAllocation` + `TargetAllocationLine` | scope (`AccountId?`, null = total), lines `AssetClass → TargetPercent, ToleranceBand`; unique `(UserId, AccountId?)` | **(target — insights spec, after spec-03)** |
+| `TargetAllocation` | `UserId` (PK), `UpdatedAt`, `Groups` (`Name, AssetClasses, TargetPercent, BandPp`, a JSON complex collection in the saved order) | the user's one target allocation across all accounts: groups of asset classes with a target % (one decimal, summing to exactly 100) and a ± pp band; a class sits in at most one group; saved whole by `PUT /api/reporting/target-allocation`; `TargetAllocationMath` (pure) compares it with the latest valuation, base = the grouped classes only |
 | `EmergencyFund` + `EmergencyFundAsset` | `MonthlyExpenses, TargetMonths` + designated assets, validated locally against `Position` | **(target — insights spec)** |
 | `SavingsGoal` + `SavingsGoalAsset` | `Name, TargetAmount, Deadline, AnnualReturnRate` + linked assets | **(target — insights spec)** |
 
@@ -228,7 +228,6 @@ Insight math (`AllocationMath`, `RebalancingMath`, `ContributionPlanMath`, `Emer
 ```mermaid
 erDiagram
     POSITION ||--o{ ASSET_VALUATION : "valued over time"
-    TARGET_ALLOCATION ||--o{ TARGET_ALLOCATION_LINE : has
     POSITION {
         uuid asset_id PK "read model"
         uuid account_id "null outside accounts"
@@ -259,15 +258,9 @@ erDiagram
         bool is_stale
     }
     TARGET_ALLOCATION {
-        uuid id PK "target - insights spec"
-        uuid user_id
-        uuid account_id "null = total wealth"
-    }
-    TARGET_ALLOCATION_LINE {
-        uuid id PK
-        string asset_class
-        numeric target_percent
-        numeric tolerance_band
+        uuid user_id PK
+        datetime updated_at
+        json groups "name, asset_classes, target_percent, band_pp"
     }
     LATEST_INSTRUMENT_PRICE {
         uuid instrument_id PK "global reference data"
@@ -310,7 +303,7 @@ No price for a given day → use the last known one (weekends, holidays); mark `
 
 ## Invariants
 
-- `TargetAllocationLine` percentages within one allocation sum to exactly 100.
+- `TargetAllocation` group targets sum to exactly 100 (400 `Validation.TargetAllocationSum`); a class is in at most one group (`Validation.AssetClassInManyGroups`), every group has a class and a unique name (`Validation.GroupWithoutAssetClass`, `Validation.DuplicateGroupName`), and each name, target and band is valid (`Validation.InvalidGroup`).
 - A `Sell` transaction cannot take asset quantity below 0, checked across the asset's full transaction history.
 - Amounts and quantities ≥ 0.
 - An asset's currency is immutable once it has transactions — each transaction's frozen PLN rate belongs to that currency (ADR-026).

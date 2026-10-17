@@ -11,6 +11,7 @@ public sealed class ArchitectureTests
         typeof(Skarbiec.Reporting.Data.LatestInstrumentPrice),
         typeof(Skarbiec.Reporting.Data.LatestFxRate),
         typeof(Skarbiec.Reporting.Data.PositionQuantityPoint),
+        typeof(Skarbiec.Reporting.Data.TargetAllocationGroup),
     ];
 
     [Fact]
