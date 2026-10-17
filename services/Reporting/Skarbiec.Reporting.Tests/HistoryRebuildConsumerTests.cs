@@ -549,11 +549,47 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task Rebuild_PublishesLatestValuation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
+                quantityHistory: [(today.AddDays(-8), 100m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-3), cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+
+            var published = Assert.Single(await provider.GetRequiredService<LatestValuationRecorder>()
+                .SettledDeliveriesForAsync(userId, cancellationToken));
+
+            Assert.Equal(today.AddDays(-1), published.Date);
+            Assert.Equal(100m, published.TotalPln);
+            var line = Assert.Single(published.ByAssetClass);
+            Assert.Equal(AssetClass.Cash, line.AssetClass);
+            Assert.Equal(100m, line.ValuePln);
+        }, cancellationToken);
+    }
+
     private Task RunConsumerAsync(
         IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
             containers,
-            x => x.AddConsumer<HistoryRebuildConsumer>(typeof(TestConsumerDefinition)),
+            x =>
+            {
+                x.AddConsumer<HistoryRebuildConsumer>(typeof(TestConsumerDefinition));
+                x.AddConsumer<LatestValuationRecorderConsumer>();
+            },
             action,
             cancellationToken,
             priceQuoteClient);

@@ -67,6 +67,51 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
     }
 
     [Fact]
+    public async Task Consume_PublishesLatestValuationPerUser()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 10);
+        var stockInstrumentId = Guid.NewGuid();
+        var userAId = Guid.NewGuid();
+        var userBId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userAId, Guid.NewGuid(), cancellationToken,
+                assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.Market,
+                instrumentId: stockInstrumentId, currency: "PLN", quantity: 10m);
+
+            await db.SeedPositionAsync(Guid.NewGuid(), userBId, Guid.NewGuid(), cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
+                currency: "PLN", quantity: 300_000m);
+        }
+
+        var priceQuoteClient = new FakePriceQuoteClient()
+            .WithPrice(stockInstrumentId, new InstrumentPriceLookup("PLN", snapshotDate, 150m));
+
+        await RunConsumerAsync(priceQuoteClient, async provider =>
+        {
+            await PublishSyncAsync(provider, snapshotDate, cancellationToken);
+
+            var recorder = provider.GetRequiredService<LatestValuationRecorder>();
+            var publishedA = Assert.Single(await recorder.SettledDeliveriesForAsync(userAId, cancellationToken));
+            var publishedB = Assert.Single(await recorder.SettledDeliveriesForAsync(userBId, cancellationToken));
+
+            Assert.Equal(snapshotDate, publishedA.Date);
+            Assert.Equal(1_500m, publishedA.TotalPln);
+            var classA = Assert.Single(publishedA.ByAssetClass);
+            Assert.Equal(AssetClass.Stock, classA.AssetClass);
+            Assert.Equal(1_500m, classA.ValuePln);
+
+            Assert.Equal(snapshotDate, publishedB.Date);
+            Assert.Equal(300_000m, publishedB.TotalPln);
+            var classB = Assert.Single(publishedB.ByAssetClass);
+            Assert.Equal(AssetClass.Cash, classB.AssetClass);
+            Assert.Equal(300_000m, classB.ValuePln);
+        }, cancellationToken);
+    }
+
+    [Fact]
     public async Task Consume_SkipsArchivedAssets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -485,6 +530,7 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
             {
                 x.AddConsumer<DailyPricesSyncedConsumer>(typeof(TestConsumerDefinition));
                 x.AddConsumer<RebuildRequestRecorderConsumer>();
+                x.AddConsumer<LatestValuationRecorderConsumer>();
             },
             action,
             cancellationToken,

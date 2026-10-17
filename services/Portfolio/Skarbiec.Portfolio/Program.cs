@@ -86,6 +86,7 @@ using Skarbiec.Portfolio.Features.Watchlist.ListWatchlist;
 using Skarbiec.Portfolio.Features.Watchlist.RemoveWatchlistItem;
 using Skarbiec.Portfolio.Features.Watchlist.UpdateWatchlistItem;
 using Skarbiec.Portfolio.MarketData;
+using Skarbiec.Portfolio.Messaging;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Messaging;
 using Skarbiec.ServiceDefaults.OpenApi;
@@ -102,7 +103,11 @@ if (!OpenApiBuildTime.IsActive)
         ?? throw new InvalidOperationException("Missing connection string 'portfolio-db'.");
     builder.Services.AddDbContext<PortfolioDbContext>(options => options.UseNpgsql(portfolioConnectionString));
 
-    builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>();
+    builder.AddRabbitMqMessaging<WebApplicationBuilder, PortfolioDbContext>(configureConsumers: x =>
+    {
+        x.AddConsumer<TargetAllocationSavedConsumer>(typeof(TargetAllocationSavedConsumerDefinition));
+        x.AddConsumer<LatestValuationChangedConsumer>(typeof(LatestValuationChangedConsumerDefinition));
+    });
 
     builder.Services.AddHttpClient<IInstrumentLookupClient, MarketDataInstrumentLookupClient>(client =>
     {

@@ -204,6 +204,59 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
     }
 
     [Fact]
+    public async Task Consume_PublishesLatestValuationChanged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var stockAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(stockAssetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Stock, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 80_000m);
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Etf, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 30_000m);
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.PreciousMetal, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 12_000m);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(new AssetPositionChanged
+            {
+                AssetId = stockAssetId,
+                AccountId = accountId,
+                UserId = userId,
+                AssetClass = AssetClass.Stock,
+                ValuationMode = AssetValuationMode.CurrencyValued,
+                Currency = "PLN",
+                Quantity = 80_000m,
+                QuoteUnitsPerQuantity = 1m,
+                QuantityHistory = [],
+                IsArchived = false,
+                Version = 1,
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            var published = Assert.Single(await provider.GetRequiredService<LatestValuationRecorder>()
+                .SettledDeliveriesForAsync(userId, cancellationToken));
+
+            Assert.Equal(today, published.Date);
+            Assert.Equal(122_000m, published.TotalPln);
+            Assert.Equal(
+                new Dictionary<AssetClass, decimal>
+                {
+                    [AssetClass.Stock] = 80_000m,
+                    [AssetClass.Etf] = 30_000m,
+                    [AssetClass.PreciousMetal] = 12_000m,
+                },
+                published.ByAssetClass.ToDictionary(c => c.AssetClass, c => c.ValuePln));
+        }, cancellationToken);
+    }
+
+    [Fact]
     public async Task Consume_PlnCash_WritesTodaysLineAndSnapshot()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -618,6 +671,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             {
                 x.AddConsumer<AssetPositionChangedConsumer>(typeof(TestConsumerDefinition));
                 x.AddConsumer<RebuildProbeConsumer>(typeof(RebuildProbeDefinition));
+                x.AddConsumer<LatestValuationRecorderConsumer>();
             },
             action,
             cancellationToken);

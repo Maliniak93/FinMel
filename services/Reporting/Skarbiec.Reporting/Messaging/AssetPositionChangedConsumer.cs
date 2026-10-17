@@ -80,7 +80,7 @@ public sealed class AssetPositionChangedConsumer(
         // Saved first so the revaluation reads this position, inside the same inbox transaction.
         await db.SaveChangesAsync(cancellationToken);
 
-        await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
+        await snapshotWriter.RevalueTodayAsync(context, message.UserId, cancellationToken);
     }
 
     private static List<PositionQuantityPoint> ToHistory(AssetPositionChanged message) =>

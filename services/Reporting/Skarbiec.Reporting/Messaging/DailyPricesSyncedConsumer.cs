@@ -12,6 +12,7 @@ public sealed class DailyPricesSyncedConsumer(
     ReportingDbContext db,
     IPriceQuoteClient priceQuoteClient,
     SnapshotWriter snapshotWriter,
+    TimeProvider timeProvider,
     ILogger<DailyPricesSyncedConsumer> logger) : IConsumer<DailyPricesSynced>
 {
     public async Task Consume(ConsumeContext<DailyPricesSynced> context)
@@ -19,13 +20,13 @@ public sealed class DailyPricesSyncedConsumer(
         var snapshotDate = context.Message.SyncDate;
         var cancellationToken = context.CancellationToken;
 
-        var valued = await ValueAsync(snapshotDate, cancellationToken);
+        var valued = await ValueAsync(context, snapshotDate, cancellationToken);
         var requested = await RequestGapsAsync(context, valued, snapshotDate, cancellationToken);
         await RepublishPendingAsync(context, requested, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<List<Guid>> ValueAsync(DateOnly snapshotDate, CancellationToken cancellationToken)
+    private async Task<List<Guid>> ValueAsync(ConsumeContext context, DateOnly snapshotDate, CancellationToken cancellationToken)
     {
         // IgnoreQueryFilters: this consumer values every user in one pass; archived positions are excluded.
         var positions = await db.Positions
@@ -88,6 +89,11 @@ public sealed class DailyPricesSyncedConsumer(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var userId in valued)
+        {
+            await LatestValuation.PublishAsync(db, context, timeProvider, userId, cancellationToken);
+        }
 
         logger.LogInformation(
             "DailyPricesSyncedConsumer: snapshot run for {SnapshotDate} finished: {Computed} user(s) computed, {Failed} failed.",

@@ -256,3 +256,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** a planned income on a non-PLN account needs a PLN equivalent and the month total is in PLN; nothing about plans is stored in MarketData or Reporting.
 **Decision:** `GetPlanningMonth` calls MarketData's existing `POST /internal/fx/latest-batch` once for the distinct non-PLN currencies of the month's occurrences, as of today, and uses that one rate for every month (an estimate); a missing rate gives `fxUnavailable`, a null `amountPln` and an incomplete total, still 200. Nothing is stored or published. Extends ADR-036 to a third handler.
 **Consequences:** one extra internal call per planning-page load with a foreign income; past and future months show today's rate.
+
+## ADR-038 🕐 Transfer plan in Portfolio; Reporting shares the target allocation and the latest valuation as events
+
+**Context:** the transfer plan needs the to-invest amounts per bucket, account and account type (Portfolio, computed live and changing backwards) and the target groups and per-class values (Reporting); `/internal` may not serve user data (ADR-027).
+**Decision:** the plan lives in Portfolio; Reporting publishes `TargetAllocationSaved` and `LatestValuationChanged` with full state through its outbox, and Portfolio replicates them with idempotent consumers, ignoring older messages (`SavedAtUtc`; `Date` then `OccurredAtUtc`). The loser — the plan in Reporting fed by a Portfolio event — needed a publish on every planning write plus a month-rollover job.
+**Consequences:** Reporting becomes a publisher and Portfolio a consumer; events flow both ways but no consumer calls a publisher back; the replica lags by one delivery. Amends ADR-020, ADR-021.

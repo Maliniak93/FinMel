@@ -1,3 +1,4 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Reporting.Data;
 
@@ -22,7 +23,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
             .ToList();
 
     // Values from the stored last prices and rates only, and drops today's lines of assets that are gone.
-    public async Task RevalueTodayAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task RevalueTodayAsync(ConsumeContext context, Guid userId, CancellationToken cancellationToken)
     {
         var today = Today;
 
@@ -54,6 +55,9 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
         var heldAssetIds = positions.Select(p => p.AssetId).ToHashSet();
         db.AssetValuations.RemoveRange(existingLines.Values.Where(l => !heldAssetIds.Contains(l.AssetId)));
 
+        await db.SaveChangesAsync(cancellationToken);
+
+        await LatestValuation.PublishAsync(db, context, timeProvider, userId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
 
