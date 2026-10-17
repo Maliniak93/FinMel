@@ -38,6 +38,21 @@ public sealed record AllocationResponse
 
     /// <summary>PLN sum of the Investments, IKE, IKZE and IKZE JDG buckets.</summary>
     public required decimal ToInvestPln { get; init; }
+
+    /// <summary>The expense reserve held inside the month's cost, never split again; null when it is 0 and no account is set.</summary>
+    public required ReserveResponse? Reserve { get; init; }
+}
+
+public sealed record ReserveResponse
+{
+    /// <summary>PLN set aside this month for expenses due every more than one month.</summary>
+    public required decimal MonthPln { get; init; }
+
+    /// <summary>PLN accumulated by the end of the month and not yet paid out.</summary>
+    public required decimal BalancePln { get; init; }
+
+    public required Guid? AccountId { get; init; }
+    public required string? AccountName { get; init; }
 }
 
 public sealed record AllocationBucketResponse

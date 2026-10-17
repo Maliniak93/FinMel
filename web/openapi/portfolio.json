@@ -3296,7 +3296,8 @@
           "incomplete",
           "deficitPln",
           "buckets",
-          "toInvestPln"
+          "toInvestPln",
+          "reserve"
         ],
         "type": "object",
         "properties": {
@@ -3344,6 +3345,16 @@
               "string"
             ],
             "format": "double"
+          },
+          "reserve": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReserveResponse"
+              }
+            ]
           }
         }
       },
@@ -6060,6 +6071,46 @@
       "RedeemBondRequest": {
         "type": "object"
       },
+      "ReserveResponse": {
+        "required": [
+          "monthPln",
+          "balancePln",
+          "accountId",
+          "accountName"
+        ],
+        "type": "object",
+        "properties": {
+          "monthPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "balancePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "RollOverDepositRequest": {
         "required": [
           "annualInterestRatePercent"
@@ -6111,6 +6162,13 @@
             "items": {
               "$ref": "#/components/schemas/AllocationPlanRowRequest"
             }
+          },
+          "reserveAccountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

@@ -110,6 +110,7 @@ export type AllocationResponse = {
     deficitPln: number | string;
     buckets: Array<AllocationBucketResponse>;
     toInvestPln: number | string;
+    reserve: null | ReserveResponse;
 };
 
 export type AssetClass = number;
@@ -648,6 +649,13 @@ export type RedeemBondRequest = {
     [key: string]: unknown;
 };
 
+export type ReserveResponse = {
+    monthPln: number | string;
+    balancePln: number | string;
+    accountId: null | string;
+    accountName: null | string;
+};
+
 export type RollOverDepositRequest = {
     annualInterestRatePercent: number | string;
     grossInterest?: null | number | string;
@@ -656,6 +664,7 @@ export type RollOverDepositRequest = {
 
 export type SaveAllocationPlanVersionRequest = {
     buckets: Array<AllocationPlanRowRequest>;
+    reserveAccountId?: null | string;
 };
 
 export type SecuritiesResponse = {

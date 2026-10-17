@@ -799,6 +799,51 @@ describe('Planning', () => {
     expect(rows('allocation-next-change')).toHaveLength(0);
   });
 
+  it('shows the read-only reserve row above the buckets with the month amount, the balance and the account and no actions', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      { planPln: 12243.27, forecastPln: 12243.27 },
+      {
+        effectiveFrom: '2026-10',
+        forecastPln: 12243.27,
+        toInvestPln: 9395.27,
+        buckets: firstPlanBuckets(),
+        reserve: {
+          monthPln: 200,
+          balancePln: 600,
+          accountId,
+          accountName: 'Konto oszczędnościowe',
+        },
+      },
+    );
+    await setup();
+
+    const reserve = rows('reserve-row');
+    expect(reserve).toHaveLength(1);
+    expect(reserve[0].textContent).toContain(formatMoney(200, 'PLN'));
+    expect(reserve[0].textContent).toContain(formatMoney(600, 'PLN'));
+    expect(reserve[0].textContent).toContain('Konto oszczędnościowe');
+    expect(reserve[0].querySelectorAll('button')).toHaveLength(0);
+    const firstGroup = rows('allocation-group-fixed')[0];
+    expect(
+      reserve[0].compareDocumentPosition(firstGroup) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('hides the reserve row when the month has no reserve', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      { buckets: firstPlanBuckets(), forecastPln: 0, toInvestPln: 0 },
+    );
+    await setup();
+
+    expect(rows('allocation-section')).toHaveLength(1);
+    expect(rows('reserve-row')).toHaveLength(0);
+  });
+
   it('renders the cushion first without a share, with its balance against the target and the reached marker', async () => {
     responses['2026-10'] = month(
       {},

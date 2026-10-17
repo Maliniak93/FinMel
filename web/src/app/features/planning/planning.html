@@ -541,6 +541,25 @@
           </p>
         }
 
+        @if (plan.reserve; as reserve) {
+          <p class="planning-allocation__reserve" data-testid="reserve-row">
+            <strong>{{ 'planning.allocation.reserve.title' | transloco }}</strong>
+            <span>{{
+              'planning.allocation.reserve.monthly'
+                | transloco: { amount: formatMoney(reserve.monthPln, 'PLN') }
+            }}</span>
+            <span>{{
+              'planning.allocation.reserve.balance'
+                | transloco: { amount: formatMoney(reserve.balancePln, 'PLN') }
+            }}</span>
+            @if (reserve.accountName; as accountName) {
+              <span>{{
+                'planning.allocation.reserve.account' | transloco: { name: accountName }
+              }}</span>
+            }
+          </p>
+        }
+
         @if (plan.buckets.length === 0) {
           <p class="planning-section__empty">{{ 'planning.allocation.empty' | transloco }}</p>
         } @else {

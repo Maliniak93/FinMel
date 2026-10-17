@@ -361,6 +361,9 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<DateOnly>("EffectiveFrom")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("ReserveAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 

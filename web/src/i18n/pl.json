@@ -721,6 +721,12 @@
       "effectiveFrom": "Obowiązuje od",
       "empty": "Brak podziału obowiązującego w tym miesiącu.",
       "deficit": "Deficyt {{ amount }} — nie ma czego dzielić.",
+      "reserve": {
+        "title": "Rezerwa na wydatki",
+        "monthly": "odkładasz {{ amount }}",
+        "balance": "saldo {{ amount }}",
+        "account": "na koncie {{ name }}"
+      },
       "groups": {
         "cushion": "Poduszka bezpieczeństwa",
         "fixed": "Kwoty stałe",
@@ -774,6 +780,7 @@
         "percentShare": "Procent",
         "account": "Konto",
         "noAccount": "Bez konta",
+        "reserveAccount": "Konto rezerwy",
         "remainder": "Reszta",
         "moveUp": "Przesuń w górę",
         "moveDown": "Przesuń w dół",

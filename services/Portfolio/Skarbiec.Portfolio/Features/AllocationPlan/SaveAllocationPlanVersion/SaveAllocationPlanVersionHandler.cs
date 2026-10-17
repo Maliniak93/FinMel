@@ -82,6 +82,22 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
             }
         }
 
+        if (request.ReserveAccountId is { } reserveAccountId)
+        {
+            var reserveAccount = await dbContext.Accounts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == reserveAccountId, cancellationToken);
+            if (reserveAccount is null)
+            {
+                return AccountErrors.NotFound(reserveAccountId);
+            }
+
+            if (reserveAccount.IsArchived && inForce?.ReserveAccountId != reserveAccountId)
+            {
+                return AccountErrors.Archived(reserveAccountId);
+            }
+        }
+
         var version = versions.FirstOrDefault(v => v.EffectiveFrom == effective.FirstDay);
         if (version is null)
         {
@@ -92,6 +108,8 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
         {
             dbContext.AllocationPlanEntries.RemoveRange(version.Entries);
         }
+
+        version.ReserveAccountId = request.ReserveAccountId;
 
         var positions = new Dictionary<BucketShareType, int>();
         var keptBucketIds = new HashSet<Guid>();
