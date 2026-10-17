@@ -17,6 +17,7 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import type { DashboardResponse, NetWorthHistoryResponse } from '../../api/reporting';
 import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
+import { configuredAllocation } from '../allocation/testing/target-allocation-fixtures';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
@@ -544,5 +545,21 @@ describe('Dashboard', () => {
     expect(element.querySelector('app-net-worth-chart')).not.toBeNull();
     expect(element.querySelector('app-accounts-card')?.textContent).toContain('Retirement');
     expect(element.querySelector('app-cash-card')?.textContent).toContain(formatMoney(1000, 'PLN'));
+  });
+
+  it('the summary grid holds the allocation card beside the accounts and cash cards', async () => {
+    await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
+      allocation: jsonResponse(configuredAllocation),
+    });
+    await switchLanguage(fixture, 'pl');
+    const summary = (fixture.nativeElement as HTMLElement).querySelector(
+      '.dashboard-page__summary',
+    ) as HTMLElement;
+
+    expect(summary.querySelector('app-accounts-card')).not.toBeNull();
+    expect(summary.querySelector('app-cash-card')).not.toBeNull();
+    expect(summary.querySelector('app-allocation-card')?.textContent).toContain(
+      '2 z 3 grup poza pasmem',
+    );
   });
 });

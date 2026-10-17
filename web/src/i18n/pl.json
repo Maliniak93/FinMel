@@ -454,6 +454,15 @@
         "bankInterestDue": "Odsetki na koncie bankowym do rozliczenia, miesiące: {{ count }}"
       }
     },
+    "allocationCard": {
+      "title": "Alokacja",
+      "notConfigured": "Ustaw alokację docelową",
+      "outside": "{{ outside }} z {{ total }} grup poza pasmem",
+      "allInBand": "Wszystkie grupy w paśmie",
+      "noValuation": "brak wyceny",
+      "noAssets": "brak aktywów w alokacji",
+      "loadFailed": "Nie udało się wczytać alokacji docelowej."
+    },
     "goToAccounts": "Przejdź do rachunków",
     "accounts": {
       "title": "Rachunki",

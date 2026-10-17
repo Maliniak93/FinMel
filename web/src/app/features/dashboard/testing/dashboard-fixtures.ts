@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { AccountResponse, CashPlacesResponse } from '../../../api/portfolio';
 import { client as reportingClient } from '../../../api/reporting/client.gen';
-import type { DashboardResponse } from '../../../api/reporting';
+import type { DashboardResponse, TargetAllocationResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { toDateOnly } from '../../../shared/date-only';
 
@@ -86,12 +86,25 @@ export const API_PATHS = {
   cash: '/api/portfolio/cash-places',
   deposits: '/api/portfolio/deposits',
   bonds: '/api/portfolio/bonds',
+  allocation: '/api/reporting/target-allocation',
 } as const;
 
 export type ApiRoute = keyof typeof API_PATHS;
 
 // A Response body is read once, so a plain Response is cloned for each call and a function builds a fresh one.
 export type Responder = Response | ((url: string) => Response);
+
+const notConfiguredAllocation: TargetAllocationResponse = {
+  isConfigured: false,
+  asOf: null,
+  isStale: false,
+  totalPln: 0,
+  basePln: 0,
+  outsidePln: 0,
+  outsideAssetClasses: [],
+  byAssetClass: [],
+  groups: [],
+};
 
 const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   dashboard: jsonResponse(dashboard),
@@ -100,6 +113,7 @@ const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   cash: jsonResponse(cashPlacesResponse([])),
   deposits: jsonResponse([]),
   bonds: jsonResponse([]),
+  allocation: jsonResponse(notConfiguredAllocation),
 };
 
 export function mockApi(overrides: Partial<Record<ApiRoute, Responder>> = {}) {
