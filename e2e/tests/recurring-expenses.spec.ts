@@ -1,15 +1,29 @@
-import { type Locator, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import { expect, logInThroughApi, logInThroughUi, test, warsawDate } from './fixtures';
 import {
   MBANK,
+  addExpense,
   addIncome,
   confirmDelete,
   dateInText,
-  exactly,
-  fillRule,
-  openMonth,
+  day,
+  deleteExpense,
+  editExpenseFrom,
+  endExpense,
+  expectCost,
+  expectFreeFunds,
+  expectReserve,
+  expenseDefinition,
+  expensePayments,
+  fillExpense,
+  lastDay,
+  monthInList,
   occurrences,
+  openAddExpenseDialog,
+  openMonth,
   pln,
+  settle,
+  shiftMonth,
   type IncomeInput,
 } from './planning';
 
@@ -28,144 +42,8 @@ const BENEFIT = '800+';
 
 const CURRENT = warsawDate().slice(0, 7);
 
-function shiftMonth(month: string, offset: number): string {
-  const [year, number] = month.split('-').map(Number) as [number, number];
-  const index = year * 12 + (number - 1) + offset;
-  const shiftedYear = Math.floor(index / 12);
-  return `${shiftedYear}-${String((index % 12) + 1).padStart(2, '0')}`;
-}
-
 function m(offset: number): string {
   return shiftMonth(CURRENT, offset);
-}
-
-function day(month: string, dayOfMonth: number): string {
-  return `${month}-${String(dayOfMonth).padStart(2, '0')}`;
-}
-
-function lastDay(month: string): string {
-  const [year, number] = month.split('-').map(Number) as [number, number];
-  return day(month, new Date(Date.UTC(year, number, 0)).getUTCDate());
-}
-
-function monthInList(month: string): string {
-  const [year, number] = month.split('-') as [string, string];
-  return `${number}.${year}`;
-}
-
-interface ExpenseInput {
-  name: string;
-  amount: string;
-  start: string;
-  end?: string;
-  interval: string;
-  day: number;
-}
-
-function expenseDefinition(page: Page, name: string): Locator {
-  return page.getByTestId('expense-definition-row').filter({
-    has: page.locator('.planning-definition__name', { hasText: exactly(name) }),
-  });
-}
-
-function expensePayments(page: Page, name?: string): Locator {
-  const rows = page.getByTestId('expense-payment-row');
-  return name ? rows.filter({ has: page.getByRole('cell', { name: exactly(name) }) }) : rows;
-}
-
-async function openAddExpenseDialog(page: Page): Promise<Locator> {
-  await page.getByTestId('add-expense').click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Dodaj wydatek cykliczny' })).toBeVisible();
-  return dialog;
-}
-
-async function fillExpense(page: Page, dialog: Locator, expense: ExpenseInput): Promise<void> {
-  await dialog.getByLabel('Nazwa').fill(expense.name);
-  await dialog.getByRole('spinbutton', { name: 'Kwota (PLN)' }).fill(expense.amount);
-  await dialog.getByLabel('Data początku').fill(expense.start);
-  if (expense.end) {
-    await dialog.getByLabel('Data końca').fill(expense.end);
-  }
-  await fillRule(page, dialog, { interval: expense.interval, day: expense.day });
-}
-
-async function addExpense(page: Page, expense: ExpenseInput): Promise<void> {
-  const dialog = await openAddExpenseDialog(page);
-  await fillExpense(page, dialog, expense);
-  await dialog.getByRole('button', { name: 'Zapisz' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(expenseDefinition(page, expense.name)).toHaveCount(1);
-}
-
-async function openEditExpense(page: Page, name: string): Promise<Locator> {
-  await expenseDefinition(page, name).getByTestId('edit-expense').click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Edytuj wydatek cykliczny' })).toBeVisible();
-  return dialog;
-}
-
-async function editExpenseFrom(
-  page: Page,
-  name: string,
-  month: string,
-  change: { amount?: string; name?: string },
-): Promise<void> {
-  const dialog = await openEditExpense(page, name);
-  await dialog.getByLabel('Obowiązuje od').fill(month);
-  if (change.amount) {
-    await dialog.getByRole('spinbutton', { name: 'Kwota (PLN)' }).fill(change.amount);
-  }
-  if (change.name) {
-    await dialog.getByLabel('Nazwa').fill(change.name);
-  }
-  await dialog.getByRole('button', { name: 'Zapisz' }).click();
-  await expect(dialog).toBeHidden();
-}
-
-async function endExpense(page: Page, name: string, endDate: string): Promise<void> {
-  await expenseDefinition(page, name).getByRole('button', { name: 'Zakończ', exact: true }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Data końca').fill(endDate);
-  await dialog.getByRole('button', { name: 'Zapisz' }).click();
-  await expect(dialog).toBeHidden();
-}
-
-async function deleteExpense(page: Page, name: string): Promise<void> {
-  await expenseDefinition(page, name).getByRole('button', { name: 'Usuń', exact: true }).click();
-  await confirmDelete(page);
-  await expect(expenseDefinition(page, name)).toHaveCount(0);
-}
-
-async function expectCost(page: Page, amount: string): Promise<void> {
-  await expect(page.getByTestId('expense-cost').locator('dd')).toContainText(pln(amount));
-}
-
-async function expectReserve(page: Page, name: string, amount: string): Promise<void> {
-  const anchored = new RegExp(`(?<![\\d,.])(?<!\\d[\\s\\u00a0\\u202f])${pln(amount).source}`);
-  await expect(expenseDefinition(page, name).getByTestId('expense-reserve')).toContainText(
-    anchored,
-  );
-}
-
-async function expectFreeFunds(page: Page, plan: string, forecast?: string): Promise<void> {
-  await expect(page.getByTestId('free-funds-plan').locator('dd')).toContainText(pln(plan));
-  if (forecast) {
-    await expect(page.getByTestId('free-funds-forecast').locator('dd')).toContainText(
-      pln(forecast),
-    );
-  }
-}
-
-async function settle(page: Page, name: string, amount: string): Promise<void> {
-  const row = occurrences(page, name);
-  await row.getByTestId('settle-occurrence').click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('spinbutton', { name: 'Faktyczna kwota' }).fill(amount);
-  await dialog.getByRole('textbox', { name: 'Faktyczna data' }).fill(warsawDate());
-  await dialog.getByRole('button', { name: 'Zapisz' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(row.getByTestId('occurrence-status')).toHaveText('rozliczone');
 }
 
 const INCOMES: IncomeInput[] = [
