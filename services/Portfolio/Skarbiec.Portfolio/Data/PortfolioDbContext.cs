@@ -34,6 +34,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<AllocationBalanceOverride> AllocationBalanceOverrides => Set<AllocationBalanceOverride>();
     public DbSet<TargetAllocationReplica> TargetAllocationReplicas => Set<TargetAllocationReplica>();
     public DbSet<ValuationReplica> ValuationReplicas => Set<ValuationReplica>();
+    public DbSet<TransferPlanSettings> TransferPlanSettings => Set<TransferPlanSettings>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -352,6 +353,12 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             replica.Property(r => r.TotalPln).HasPrecision(18, 2);
 
             replica.ComplexCollection(r => r.ByAssetClass, byClass => byClass.ToJson());
+        });
+
+        modelBuilder.Entity<TransferPlanSettings>(settings =>
+        {
+            settings.HasKey(s => s.UserId);
+            settings.Property(s => s.UserId).ValueGeneratedNever();
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

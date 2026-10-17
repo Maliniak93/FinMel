@@ -2334,6 +2334,28 @@
         }
       }
     },
+    "/api/portfolio/transfer-plans/settings": {
+      "put": {
+        "tags": [
+          "SaveTransferPlanSettingsEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveTransferPlanSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/planning/overdue": {
       "get": {
         "tags": [
@@ -5941,7 +5963,8 @@
           "incomes",
           "expenses",
           "freeFunds",
-          "allocation"
+          "allocation",
+          "transferPlan"
         ],
         "type": "object",
         "properties": {
@@ -5956,6 +5979,9 @@
           },
           "allocation": {
             "$ref": "#/components/schemas/AllocationResponse"
+          },
+          "transferPlan": {
+            "$ref": "#/components/schemas/TransferPlanResponse"
           }
         }
       },
@@ -6169,6 +6195,22 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "SaveTransferPlanSettingsRequest": {
+        "required": [
+          "minimumTransferPln"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumTransferPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -6827,6 +6869,202 @@
       },
       "TransferDirection": {
         "type": "integer"
+      },
+      "TransferGroupShare": {
+        "required": [
+          "name",
+          "currentPercent",
+          "afterPercent",
+          "targetPercent"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "currentPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "afterPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "targetPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "TransferMarker": {
+        "enum": [
+          "None",
+          "AboveTarget",
+          "OutsideAllocation",
+          "BelowMinimum"
+        ]
+      },
+      "TransferPlanFallbackReason": {
+        "enum": [
+          "NoTargetAllocation",
+          "NoValuation",
+          "EmptyBase",
+          null
+        ]
+      },
+      "TransferPlanNoneReason": {
+        "enum": [
+          "NothingToInvest",
+          "FutureMonth",
+          "BeforeStart",
+          null
+        ]
+      },
+      "TransferPlanResponse": {
+        "required": [
+          "status",
+          "noneReason",
+          "minimumTransferPln",
+          "valuationDate",
+          "valuationStale",
+          "fallbackReason",
+          "rows",
+          "groups",
+          "toInvestPln"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TransferPlanStatus"
+          },
+          "noneReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransferPlanNoneReason"
+              }
+            ]
+          },
+          "minimumTransferPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "valuationDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "valuationStale": {
+            "type": "boolean"
+          },
+          "fallbackReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransferPlanFallbackReason"
+              }
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRowResponse"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferGroupShare"
+            }
+          },
+          "toInvestPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "TransferPlanStatus": {
+        "enum": [
+          "None",
+          "Preview"
+        ]
+      },
+      "TransferRowResponse": {
+        "required": [
+          "bucketId",
+          "bucketName",
+          "accountId",
+          "accountName",
+          "groupName",
+          "amountPln",
+          "marker"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bucketName": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groupName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "marker": {
+            "$ref": "#/components/schemas/TransferMarker"
+          }
+        }
       },
       "TreasuryBondType": {
         "type": "integer"
@@ -7746,6 +7984,9 @@
     },
     {
       "name": "GetPlanningMonthEndpoint"
+    },
+    {
+      "name": "SaveTransferPlanSettingsEndpoint"
     },
     {
       "name": "GetOverdueOccurrencesEndpoint"

@@ -7,6 +7,7 @@ public sealed class AllocationPlanVersion : IUserOwned
     public required Guid Id { get; init; }
     public Guid UserId { get; set; }
     public required DateOnly EffectiveFrom { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
 
     public Guid? ReserveAccountId { get; set; }
 

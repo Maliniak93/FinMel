@@ -19,6 +19,41 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return new PortfolioDbContext(options, new StubCurrentUser(userId));
     }
 
+    // Replaces both replicas of the user; a null argument leaves that replica absent.
+    protected async Task SeedReplicasAsync(
+        Guid userId,
+        CancellationToken cancellationToken,
+        IReadOnlyList<TargetAllocationReplicaGroup>? targets,
+        IReadOnlyList<ValuationReplicaClassValue>? values,
+        DateOnly? valuationDate = null,
+        bool stale = false)
+    {
+        var savedAt = new DateTimeOffset(2026, 10, 14, 10, 0, 0, TimeSpan.Zero);
+        await using var dbContext = CreateDbContext(userId);
+        await dbContext.Set<TargetAllocationReplica>().ExecuteDeleteAsync(cancellationToken);
+        await dbContext.Set<ValuationReplica>().ExecuteDeleteAsync(cancellationToken);
+        if (targets is not null)
+        {
+            dbContext.Set<TargetAllocationReplica>().Add(
+                new TargetAllocationReplica { UserId = userId, Groups = [.. targets], SavedAtUtc = savedAt });
+        }
+
+        if (values is not null)
+        {
+            dbContext.Set<ValuationReplica>().Add(new ValuationReplica
+            {
+                UserId = userId,
+                Date = valuationDate ?? new DateOnly(2026, 10, 14),
+                IsStale = stale,
+                TotalPln = values.Sum(v => v.ValuePln),
+                ByAssetClass = [.. values],
+                OccurredAtUtc = savedAt,
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     protected async Task<Guid> AddQuotedHoldingAsync(
         HttpClient client,
         Guid accountId,

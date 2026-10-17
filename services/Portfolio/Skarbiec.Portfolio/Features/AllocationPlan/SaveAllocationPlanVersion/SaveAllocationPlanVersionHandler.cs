@@ -10,7 +10,7 @@ using Skarbiec.Portfolio.Features.RecurringIncomes;
 
 namespace Skarbiec.Portfolio.Features.AllocationPlan.SaveAllocationPlanVersion;
 
-public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContext)
+public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
 {
     public async Task<Result> HandleAsync(string month, SaveAllocationPlanVersionRequest request, CancellationToken cancellationToken)
     {
@@ -101,7 +101,12 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
         var version = versions.FirstOrDefault(v => v.EffectiveFrom == effective.FirstDay);
         if (version is null)
         {
-            version = new AllocationPlanVersion { Id = Guid.NewGuid(), EffectiveFrom = effective.FirstDay };
+            version = new AllocationPlanVersion
+            {
+                Id = Guid.NewGuid(),
+                EffectiveFrom = effective.FirstDay,
+                CreatedAt = timeProvider.GetUtcNow()
+            };
             dbContext.AllocationPlanVersions.Add(version);
         }
         else

@@ -777,5 +777,103 @@
         }
       </section>
     }
+
+    @if (transferPlan(); as transfer) {
+      @if (transfer.status === 'Preview' || transfer.noneReason === 'NothingToInvest') {
+        <section class="planning-section planning-transfer" data-testid="transfer-plan-section">
+          <div class="planning-section__header">
+            <h2>{{ 'planning.transferPlan.title' | transloco }}</h2>
+          </div>
+
+          @if (transfer.status === 'Preview') {
+            <div class="planning-transfer__meta">
+              @if (transfer.valuationDate; as valuationDate) {
+                <span data-testid="transfer-valuation-date">
+                  {{
+                    'planning.transferPlan.valuationDate'
+                      | transloco: { date: formatDate(valuationDate) }
+                  }}
+                </span>
+                @if (transfer.valuationStale) {
+                  <mat-chip data-testid="transfer-valuation-stale">
+                    {{ 'planning.transferPlan.valuationStale' | transloco }}
+                  </mat-chip>
+                }
+              }
+              <label class="planning-transfer__minimum">
+                <span>{{ 'planning.transferPlan.minimum' | transloco }}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="1000000"
+                  step="1"
+                  [value]="transfer.minimumTransferPln"
+                  (change)="saveTransferMinimum($event)"
+                  data-testid="transfer-minimum-input"
+                />
+              </label>
+            </div>
+
+            @if (transfer.fallbackReason; as reason) {
+              <p class="planning-section__incomplete" data-testid="transfer-plan-fallback">
+                {{ transferFallbackKey(reason) | transloco }}
+                <a routerLink="/allocation" data-testid="transfer-plan-set-target-link">
+                  {{ 'planning.transferPlan.fallback.setTarget' | transloco }}
+                </a>
+              </p>
+            }
+
+            <ul class="planning-definitions">
+              @for (row of transfer.rows; track $index) {
+                <li class="planning-transfer__row" data-testid="transfer-plan-row">
+                  <span class="planning-definition__name">{{ row.bucketName }}</span>
+                  <span>{{
+                    row.accountName ?? ('planning.transferPlan.noAccount' | transloco)
+                  }}</span>
+                  <span>{{ row.groupName ?? '' }}</span>
+                  <span class="planning-allocation__amount">
+                    {{ formatMoney(row.amountPln, 'PLN') }}
+                  </span>
+                  <span class="planning-allocation__markers">
+                    @if (transferMarkerKey(row.marker); as markerKey) {
+                      <mat-chip [attr.data-testid]="transferMarkerTestId(row.marker)">
+                        {{ markerKey | transloco }}
+                      </mat-chip>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+
+            @if (transfer.groups.length > 0) {
+              <table class="planning-transfer__groups">
+                <thead>
+                  <tr>
+                    <th>{{ 'planning.transferPlan.groups.name' | transloco }}</th>
+                    <th>{{ 'planning.transferPlan.groups.current' | transloco }}</th>
+                    <th>{{ 'planning.transferPlan.groups.after' | transloco }}</th>
+                    <th>{{ 'planning.transferPlan.groups.target' | transloco }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (group of transfer.groups; track group.name) {
+                    <tr data-testid="transfer-group-row">
+                      <td>{{ group.name }}</td>
+                      <td>{{ formatPercent(group.currentPercent) }}</td>
+                      <td>{{ formatPercent(group.afterPercent) }}</td>
+                      <td>{{ formatPercent(group.targetPercent) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          } @else {
+            <p class="planning-section__empty" data-testid="transfer-plan-nothing-to-invest">
+              {{ 'planning.transferPlan.nothingToInvest' | transloco }}
+            </p>
+          }
+        </section>
+      }
+    }
   }
 </div>

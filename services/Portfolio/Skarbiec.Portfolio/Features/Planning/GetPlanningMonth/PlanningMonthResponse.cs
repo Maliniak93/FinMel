@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
+using Skarbiec.Portfolio.Features.TransferPlan;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
 
@@ -14,6 +15,8 @@ public sealed record PlanningMonthResponse
     public required FreeFundsResponse FreeFunds { get; init; }
 
     public required AllocationResponse Allocation { get; init; }
+
+    public required TransferPlanResponse TransferPlan { get; init; }
 }
 
 public sealed record AllocationResponse
