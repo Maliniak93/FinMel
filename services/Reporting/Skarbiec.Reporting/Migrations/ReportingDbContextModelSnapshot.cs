@@ -18,7 +18,7 @@ namespace Skarbiec.Reporting.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -361,6 +361,38 @@ namespace Skarbiec.Reporting.Migrations
                     b.HasKey("AssetId");
 
                     b.ToTable("Positions");
+                });
+
+            modelBuilder.Entity("Skarbiec.Reporting.Data.TargetAllocation", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Groups", "Skarbiec.Reporting.Data.TargetAllocation.Groups#TargetAllocationGroup", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.PrimitiveCollection<string>("AssetClasses")
+                                .IsRequired();
+
+                            b1.Property<decimal>("BandPp");
+
+                            b1.Property<string>("Name")
+                                .IsRequired();
+
+                            b1.Property<decimal>("TargetPercent");
+
+                            b1
+                                .ToJson("Groups")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("TargetAllocations");
                 });
 
             modelBuilder.Entity("Skarbiec.Reporting.Data.ValuationSnapshot", b =>

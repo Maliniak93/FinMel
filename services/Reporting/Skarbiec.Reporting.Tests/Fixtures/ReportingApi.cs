@@ -1,7 +1,11 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Features.GetDashboard;
+using Skarbiec.Reporting.Features.TargetAllocation.GetTargetAllocation;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
@@ -10,6 +14,52 @@ internal static class ReportingApi
 {
     public const string DashboardUri = "/api/reporting/dashboard";
     public const string NetWorthHistoryBaseUri = "/api/reporting/net-worth-history";
+    public const string TargetAllocationUri = "/api/reporting/target-allocation";
+
+    public static object TargetGroup(string name, AssetClass[] assetClasses, decimal targetPercent, decimal bandPp = 5m) =>
+        new { name, assetClasses, targetPercent, bandPp };
+
+    public static async Task SaveTargetAllocationAsync(
+        this HttpClient client, CancellationToken cancellationToken, params object[] groups)
+    {
+        using var response = await client.PutAsJsonAsync(TargetAllocationUri, new { groups }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<TargetAllocationResponse> GetTargetAllocationAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        using var response = await client.GetAsync(TargetAllocationUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TargetAllocationResponse>(cancellationToken))!;
+    }
+
+    public static async Task SeedValuationAsync(
+        this ReportingDbContext db,
+        Guid userId,
+        DateOnly date,
+        (AssetClass AssetClass, decimal ValuePln)[] lines,
+        CancellationToken cancellationToken,
+        bool isStale = false)
+    {
+        await db.SeedSnapshotAsync(userId, date, lines.Sum(l => l.ValuePln), cancellationToken, isStale);
+        foreach (var (assetClass, valuePln) in lines)
+        {
+            await db.SeedValuationLineAsync(
+                userId, null, Guid.NewGuid(), date, valuePln, cancellationToken, assetClass: assetClass, isStale: isStale);
+        }
+    }
+
+    public static async Task AssertProblemAsync(
+        this HttpResponseMessage response, HttpStatusCode status, string errorCode, CancellationToken cancellationToken)
+    {
+        Assert.Equal(status, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.True(problem.Extensions.TryGetValue("errorCode", out var rawCode), "The ProblemDetails carries no errorCode extension.");
+        Assert.Equal(errorCode, rawCode is JsonElement element ? element.GetString() : rawCode?.ToString());
+    }
 
     public static string NetWorthHistoryUri(string? range = null, AssetClass? assetClass = null)
     {

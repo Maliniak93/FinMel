@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Features.GetNetWorthHistory;
+using Skarbiec.Reporting.Features.TargetAllocation.GetTargetAllocation;
+using Skarbiec.Reporting.Features.TargetAllocation.SaveTargetAllocation;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
 using Skarbiec.Reporting.Valuation;
@@ -19,6 +21,8 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<GetDashboardHandler>();
 builder.Services.AddScoped<GetNetWorthHistoryHandler>();
+builder.Services.AddScoped<GetTargetAllocationHandler>();
+builder.Services.AddScoped<SaveTargetAllocationHandler>();
 
 if (!OpenApiBuildTime.IsActive)
 {
@@ -56,6 +60,8 @@ app.MapServiceOpenApi("reporting");
 
 app.MapGetDashboardEndpoint();
 app.MapGetNetWorthHistoryEndpoint();
+app.MapGetTargetAllocationEndpoint();
+app.MapSaveTargetAllocationEndpoint();
 
 // Production applies migrations as an explicit deploy step instead (see deploy/README.md).
 if (!OpenApiBuildTime.IsActive && app.Environment.IsDevelopment())

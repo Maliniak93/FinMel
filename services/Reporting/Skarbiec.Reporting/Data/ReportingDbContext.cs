@@ -16,6 +16,7 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
     public DbSet<LatestInstrumentPrice> LatestInstrumentPrices => Set<LatestInstrumentPrice>();
     public DbSet<LatestFxRate> LatestFxRates => Set<LatestFxRate>();
     public DbSet<HistoryRebuildRequest> HistoryRebuildRequests => Set<HistoryRebuildRequest>();
+    public DbSet<TargetAllocation> TargetAllocations => Set<TargetAllocation>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -41,6 +42,14 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
         {
             request.HasKey(r => r.UserId);
             request.Property(r => r.UserId).ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<TargetAllocation>(allocation =>
+        {
+            allocation.HasKey(a => a.UserId);
+            allocation.Property(a => a.UserId).ValueGeneratedNever();
+
+            allocation.ComplexCollection(a => a.Groups, groups => groups.ToJson());
         });
 
         modelBuilder.Entity<AssetValuation>(line =>
