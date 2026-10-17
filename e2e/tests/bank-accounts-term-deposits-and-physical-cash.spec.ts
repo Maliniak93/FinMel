@@ -129,9 +129,10 @@ test('bank accounts, term deposits and physical cash: money moves only between a
   await registerThroughUi(page, user);
   await logInThroughUi(page, user);
 
-  await test.step('Krok 1: the menu lists Pulpit, Rachunki, Konta bankowe, Lokaty, Akcje i ETF, Obligacje, Metale, Gotówka, Planowanie, Ustawienia in that order', async () => {
+  await test.step('Krok 1: the menu lists Pulpit, Alokacja, Rachunki, Konta bankowe, Lokaty, Akcje i ETF, Obligacje, Metale, Gotówka, Planowanie, Ustawienia in that order', async () => {
     await expect(navigation(page).locator('.mdc-list-item__primary-text')).toHaveText([
       /^Pulpit$/,
+      /^Alokacja$/,
       /^Rachunki$/,
       /^Konta bankowe$/,
       /^Lokaty$/,
