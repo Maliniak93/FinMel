@@ -216,6 +216,13 @@ public sealed class GetPlanningMonthHandler(
                         Reached = b.Limit.Reached,
                         Estimated = b.Limit.Estimated
                     },
+                Adjustments = kinds[b.Entry.BucketId] is BucketKind.Cushion || kinds[b.Entry.BucketId].IsLimited()
+                    ? overrides
+                        .Where(o => o.BucketId == b.Entry.BucketId)
+                        .OrderBy(o => o.Month)
+                        .Select(o => new BalanceAdjustmentResponse { Month = YearMonth.From(o.Month).ToString(), AmountPln = o.Amount })
+                        .ToList()
+                    : null,
                 Cushion = b.Cushion is null
                     ? null
                     : new CushionResponse

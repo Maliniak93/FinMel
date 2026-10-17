@@ -750,6 +750,19 @@
       "deleteTitle": "Usuń zaplanowaną zmianę",
       "deleteMessage": "Usunąć zmianę podziału zaplanowaną od {{ month }}? Wcześniejsze miesiące zostają bez zmian.",
       "deleteFailed": "Nie udało się usunąć zmiany.",
+      "balance": {
+        "action": "Ustaw saldo od miesiąca",
+        "adjustment": "od {{ month }}: {{ amount }}",
+        "delete": "Usuń korektę",
+        "deleteTitle": "Usuń korektę salda",
+        "deleteMessage": "Usunąć saldo „{{ name }}” ustawione od {{ month }}? Wcześniejsze miesiące zostają bez zmian.",
+        "deleteFailed": "Nie udało się usunąć korekty.",
+        "dialogTitle": "Ustaw saldo „{{ name }}”",
+        "month": "Od miesiąca",
+        "amountCushion": "saldo na początek miesiąca",
+        "amountCounter": "wpłacono w roku przed tym miesiącem",
+        "amountInvalid": "Podaj kwotę od 0 do 10 000 000."
+      },
       "dialog": {
         "title": "Edytuj podział",
         "effectiveFrom": "Obowiązuje od",

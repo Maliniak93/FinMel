@@ -69,6 +69,17 @@ public sealed record AllocationBucketResponse
 
     /// <summary>The year's contributions against the statutory limit, null for a bucket without one.</summary>
     public required LimitResponse? Limit { get; init; }
+
+    /// <summary>Every balance adjustment of a cushion or limited bucket by month; null for any other bucket.</summary>
+    public required IReadOnlyList<BalanceAdjustmentResponse>? Adjustments { get; init; }
+}
+
+public sealed record BalanceAdjustmentResponse
+{
+    /// <summary>The month (yyyy-MM) the balance applies from.</summary>
+    public required string Month { get; init; }
+
+    public required decimal AmountPln { get; init; }
 }
 
 public sealed record LimitResponse

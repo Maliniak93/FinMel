@@ -47,4 +47,30 @@ public sealed class AllocationPlanTenancyIsolationTests(SkarbiecContainersFixtur
         Assert.Equal(1, await CountAllocationVersionsAsync(ownerId, cancellationToken));
         Assert.Equal(4, await CountAllocationBucketsAsync(ownerId, cancellationToken));
     }
+
+    [Fact]
+    public async Task SetAndDeleteBucketBalance_ByStranger_ReturnsNotFound()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        var ownerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        await owner.CreateCushionSetupAsync(cancellationToken);
+        await owner.SaveAllocationPlanAsync("2026-10", cancellationToken, CushionPlan());
+        var plan = await owner.GetAllocationAsync("2026-10", cancellationToken);
+        var cushionId = plan.Buckets.Single(b => b.Name == "Poduszka").BucketId;
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var set = await stranger.PutAsJsonAsync(
+            BucketBalanceUri(cushionId, "2026-12"), new { amount = 1_000m }, cancellationToken);
+        var deleted = await stranger.DeleteAsync(BucketBalanceUri(cushionId, "2026-10"), cancellationToken);
+
+        await set.AssertProblemAsync(HttpStatusCode.NotFound, AllocationBucketNotFoundErrorCode, cancellationToken);
+        await deleted.AssertProblemAsync(HttpStatusCode.NotFound, AllocationBucketNotFoundErrorCode, cancellationToken);
+        var before = plan.Buckets.Select(b => (b.BucketId, b.Name, b.AllocatedPln));
+        var after = (await owner.GetAllocationAsync("2026-10", cancellationToken)).Buckets
+            .Select(b => (b.BucketId, b.Name, b.AllocatedPln));
+        Assert.Equal(before, after);
+        Assert.Equal(1, await CountAllocationBalanceOverridesAsync(ownerId, cancellationToken));
+    }
 }

@@ -1348,3 +1348,14 @@ Content-Type: application/json
 ### Delete the plan version starting in a month (204; 404 NotFound.AllocationPlanVersion when none starts there; buckets no version references are removed)
 DELETE {{baseUrl}}/api/portfolio/allocation-plan/versions/2026-10
 Authorization: Bearer {{authToken}}
+
+### Set a cushion balance or an IKE/IKZE counter from a month (204; 400 Validation.BucketHasNoBalance for an Investments or Savings bucket; 404 NotFound.AllocationBucket); take the bucket id from GET planning/months
+PUT {{baseUrl}}/api/portfolio/allocation-buckets/00000000-0000-0000-0000-000000000000/balances/2026-12
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{ "amount": 20000 }
+
+### Delete a balance adjustment (204; 404 NotFound.BalanceAdjustment when none is set at that month)
+DELETE {{baseUrl}}/api/portfolio/allocation-buckets/00000000-0000-0000-0000-000000000000/balances/2026-12
+Authorization: Bearer {{authToken}}

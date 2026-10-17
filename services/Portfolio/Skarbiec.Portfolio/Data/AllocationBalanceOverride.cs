@@ -12,5 +12,5 @@ public sealed class AllocationBalanceOverride : IUserOwned
     public required DateOnly Month { get; init; }
 
     /// <summary>The bucket's balance at the start of that month.</summary>
-    public required decimal Amount { get; init; }
+    public required decimal Amount { get; set; }
 }

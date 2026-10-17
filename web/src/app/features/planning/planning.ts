@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, input, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -11,6 +12,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
 import {
+  deleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonth,
   deleteApiPortfolioAllocationPlanVersionsByMonth,
   deleteApiPortfolioRecurringExpensesById,
   deleteApiPortfolioRecurringExpensesByIdChangesByMonth,
@@ -19,6 +21,7 @@ import {
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
   getApiPortfolioPlanningMonthsByMonth,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
+  type AllocationBucketResponse,
   type AllocationResponse,
   type ExpenseDefinitionResponse,
   type IncomeDefinitionResponse,
@@ -36,7 +39,11 @@ import {
   AllocationPlanDialog,
   type AllocationPlanDialogData,
 } from './allocation-plan-dialog/allocation-plan-dialog';
-import { SHARE_TYPE, bucketKindKey } from './allocation';
+import {
+  BucketBalanceDialog,
+  type BucketBalanceDialogData,
+} from './bucket-balance-dialog/bucket-balance-dialog';
+import { BUCKET_KIND, SHARE_TYPE, bucketKindKey, isLimitedKind } from './allocation';
 import {
   EndRecurringExpenseDialog,
   type EndRecurringExpenseDialogData,
@@ -83,6 +90,7 @@ function shiftMonth(month: string, delta: number): string {
 @Component({
   selector: 'app-planning',
   imports: [
+    NgTemplateOutlet,
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
@@ -497,6 +505,54 @@ export class Planning {
     if (result.error) {
       this.snackBar.open(
         readProblemDetails(result.error).detail ?? translate('planning.allocation.deleteFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.monthResource.reload();
+  }
+
+  protected hasBalance(bucket: AllocationBucketResponse): boolean {
+    return Number(bucket.kind) === BUCKET_KIND.Cushion || isLimitedKind(bucket.kind);
+  }
+
+  protected openBucketBalanceDialog(bucket: AllocationBucketResponse): void {
+    const data: BucketBalanceDialogData = { month: this.selectedMonth(), bucket };
+    const ref = this.dialog.open(BucketBalanceDialog, { width: '420px', data });
+    this.reloadMonthWhenSaved(ref.afterClosed());
+  }
+
+  protected async removeBucketAdjustment(
+    bucket: AllocationBucketResponse,
+    adjustmentMonth: string,
+  ): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.allocation.balance.deleteTitle'),
+            message: translate('planning.allocation.balance.deleteMessage', {
+              name: bucket.name,
+              month: this.changeMonthLabel(adjustmentMonth),
+            }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await deleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonth({
+      path: { bucketId: bucket.bucketId, month: adjustmentMonth },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ??
+          translate('planning.allocation.balance.deleteFailed'),
         translate('common.dismiss'),
       );
       return;
