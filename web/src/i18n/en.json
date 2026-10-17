@@ -851,6 +851,32 @@
         "shareInvalid": "Enter a valid share."
       }
     },
+    "transferPlan": {
+      "title": "Transfer plan",
+      "minimum": "Minimum transfer (PLN)",
+      "minimumFailed": "Could not save the minimum transfer.",
+      "valuationDate": "Valuation of {{ date }}",
+      "valuationStale": "valuation is stale",
+      "noAccount": "no account",
+      "markers": {
+        "aboveTarget": "above target",
+        "outsideAllocation": "outside allocation",
+        "belowMinimum": "below minimum"
+      },
+      "groups": {
+        "name": "Group",
+        "current": "Current %",
+        "after": "After plan %",
+        "target": "Target %"
+      },
+      "fallback": {
+        "NoTargetAllocation": "No target allocation is set, so the amounts are not split into groups.",
+        "NoValuation": "There is no valuation yet, so the amounts are not split into groups.",
+        "EmptyBase": "The allocation groups are worth zero, so the amounts are not split into groups.",
+        "setTarget": "Set the target allocation"
+      },
+      "nothingToInvest": "Nothing to invest."
+    },
     "freeFunds": {
       "title": "Free funds",
       "plan": "Plan",

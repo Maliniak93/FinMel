@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatMoney } from '../../shared/format';
+import { formatMoney, formatPercent } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import {
@@ -16,6 +16,9 @@ import {
   cushionBucket,
   firstPlanBuckets,
   limitedBucket,
+  transferGroup,
+  transferPlan,
+  transferRow,
 } from '../../../testing/allocation-fixtures';
 import { AllocationPlanDialog } from './allocation-plan-dialog/allocation-plan-dialog';
 import { BucketBalanceDialog } from './bucket-balance-dialog/bucket-balance-dialog';
@@ -160,8 +163,10 @@ function month(
   expensesPart: Record<string, unknown> = {},
   freeFundsPart: Record<string, unknown> = {},
   allocationPart: Record<string, unknown> = {},
+  transferPlanPart: Record<string, unknown> | null = null,
 ): Record<string, unknown> {
   return {
+    ...(transferPlanPart ? { transferPlan: transferPlan(transferPlanPart) } : {}),
     incomes: {
       occurrences: [],
       balance: balance(),
@@ -1001,6 +1006,96 @@ describe('Planning', () => {
       expect(deletes[0].url).toContain('/allocation-plan/versions/2027-01');
     });
     await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+  });
+
+  it('renders the transfer plan rows with the three markers, the groups table, the fallback link, the nothing-to-invest message and saves the minimum', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        toInvestPln: 6543.27,
+        rows: [
+          transferRow('IKE', 2260, {
+            accountName: 'IKE mBank',
+            groupName: 'Akcje/ETF',
+            marker: 'AboveTarget',
+          }),
+          transferRow('Kasa', 300, { marker: 'OutsideAllocation' }),
+          transferRow('Inwestycje', 1979.27, { groupName: 'Obligacje', marker: 'BelowMinimum' }),
+        ],
+        groups: [
+          transferGroup('Akcje/ETF', 60.4, 59.5, 50),
+          transferGroup('Obligacje', 33, 33.7, 40),
+        ],
+      },
+    );
+    await setup();
+
+    const planRows = rows('transfer-plan-row');
+    expect(rows('transfer-plan-section')).toHaveLength(1);
+    expect(planRows).toHaveLength(3);
+    expect(planRows[0].textContent).toContain('IKE mBank');
+    expect(planRows[0].textContent).toContain('Akcje/ETF');
+    expect(planRows[0].textContent).toContain(formatMoney(2260, 'PLN'));
+    expect(
+      planRows[0].querySelector('[data-testid="transfer-marker-above-target"]'),
+    ).not.toBeNull();
+    expect(
+      planRows[1].querySelector('[data-testid="transfer-marker-outside-allocation"]'),
+    ).not.toBeNull();
+    expect(
+      planRows[2].querySelector('[data-testid="transfer-marker-below-minimum"]'),
+    ).not.toBeNull();
+    expect(rows('transfer-group-row')).toHaveLength(2);
+    expect(rows('transfer-group-row')[0].textContent).toContain(formatPercent(59.5));
+    expect(rows('transfer-plan-fallback')).toHaveLength(0);
+
+    const input = rows('transfer-minimum-input')[0] as HTMLInputElement;
+    input.value = '250';
+    input.dispatchEvent(new Event('change'));
+
+    await vi.waitFor(async () => {
+      const puts = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'PUT');
+      expect(puts).toHaveLength(1);
+      expect(puts[0].url).toContain('/transfer-plans/settings');
+      expect(await puts[0].clone().json()).toEqual({ minimumTransferPln: 250 });
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+  });
+
+  it('renders the nothing-to-invest message instead of rows', async () => {
+    responses['2026-10'] = month({}, {}, {}, {}, { status: 'None', noneReason: 'NothingToInvest' });
+    await setup();
+
+    expect(rows('transfer-plan-section')).toHaveLength(1);
+    expect(rows('transfer-plan-nothing-to-invest')).toHaveLength(1);
+    expect(rows('transfer-plan-row')).toHaveLength(0);
+  });
+
+  it('shows the fallback with a link to the target allocation', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        fallbackReason: 'NoTargetAllocation',
+        rows: [
+          transferRow('IKE', 2260, { accountName: 'IKE mBank' }),
+          transferRow('Inwestycje', 1979.27),
+        ],
+      },
+    );
+    await setup();
+
+    expect(rows('transfer-plan-row')).toHaveLength(2);
+    expect(rows('transfer-plan-fallback')).toHaveLength(1);
+    expect(rows('transfer-plan-set-target-link')[0].getAttribute('href')).toBe('/allocation');
+    expect(rows('transfer-group-row')).toHaveLength(0);
   });
 
   it('offers the balance action on cushion and limited buckets only, lists their adjustments and deletes one after confirmation', async () => {

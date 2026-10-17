@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
@@ -153,8 +154,34 @@ internal static class PlanningApi
         decimal ToInvestPln,
         ReserveView? Reserve = null);
 
+    public sealed record TransferRowView(
+        Guid BucketId,
+        string BucketName,
+        Guid? AccountId,
+        string? AccountName,
+        string? GroupName,
+        decimal AmountPln,
+        JsonElement Marker);
+
+    public sealed record TransferGroupView(string Name, decimal CurrentPercent, decimal AfterPercent, decimal TargetPercent);
+
+    public sealed record TransferPlanView(
+        JsonElement Status,
+        JsonElement? NoneReason,
+        int MinimumTransferPln,
+        DateOnly? ValuationDate,
+        bool ValuationStale,
+        JsonElement? FallbackReason,
+        List<TransferRowView> Rows,
+        List<TransferGroupView> Groups,
+        decimal ToInvestPln);
+
     public sealed record PlanningMonthView(
-        IncomesView Incomes, ExpensesView Expenses, FreeFundsView FreeFunds, AllocationView Allocation);
+        IncomesView Incomes,
+        ExpensesView Expenses,
+        FreeFundsView FreeFunds,
+        AllocationView Allocation,
+        TransferPlanView? TransferPlan = null);
 
     public const int InvestmentsKind = (int)BucketKind.Investments;
 
@@ -273,13 +300,65 @@ internal static class PlanningApi
 
     // A PLN account with the "Pensja" income: the forecast is 12 243.27 every month.
     public static async Task<BankAccountsApi.BankAccount> CreateAllocationSetupAsync(
-        this HttpClient client, CancellationToken cancellationToken)
+        this HttpClient client, CancellationToken cancellationToken, decimal income = 12_243.27m)
     {
         var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
-        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", 12_243.27m, dayOfMonth: 10);
+        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", income, dayOfMonth: 10);
 
         return account;
     }
+
+    public const string TransferPlanSettingsUri = "/api/portfolio/transfer-plans/settings";
+
+    public const string InvalidMinimumTransferErrorCode = "Validation.InvalidMinimumTransfer";
+
+    public static readonly DateOnly TransferValuationDate = new(2026, 10, 14);
+
+    public static readonly TargetAllocationReplicaGroup[] TransferTargets =
+    [
+        new("Akcje/ETF", [AssetClass.Stock, AssetClass.Etf], 50m, 5m),
+        new("Obligacje", [AssetClass.Bond, AssetClass.Deposit], 40m, 5m),
+        new("Kruszce", [AssetClass.PreciousMetal], 10m, 5m)
+    ];
+
+    // Akcje/ETF 110 000, Obligacje 60 000, Kruszce 12 000, plus 5 000 of Cash outside every group.
+    public static readonly ValuationReplicaClassValue[] TransferValues =
+    [
+        new(AssetClass.Stock, 70_000m),
+        new(AssetClass.Etf, 40_000m),
+        new(AssetClass.Bond, 40_000m),
+        new(AssetClass.Deposit, 20_000m),
+        new(AssetClass.PreciousMetal, 12_000m),
+        new(AssetClass.Cash, 5_000m)
+    ];
+
+    // Forecast 6 543.27 in 2026-10: IKE 2 260 (Brokerage), IKZE 2 304 (Bonds), Inwestycje 1 979.27 (no account).
+    public static async Task CreateTransferPlanSetupAsync(this HttpClient client, CancellationToken cancellationToken)
+    {
+        await client.CreateAllocationSetupAsync(cancellationToken, 6_543.27m);
+        var ike = await client.CreateAccountAsync(cancellationToken, "IKE mBank", AccountType.Brokerage, TaxWrapper.Ike);
+        var ikze = await client.CreateAccountAsync(cancellationToken, "IKZE Obligacje", AccountType.Bonds, TaxWrapper.Ikze);
+        await client.SaveAllocationPlanAsync(
+            "2026-10",
+            cancellationToken,
+            AllocationRow("IKE", IkeKind, FixedShare, 2_260m, accountId: ike),
+            AllocationRow("IKZE", IkzeKind, FixedShare, 2_304m, accountId: ikze),
+            AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true));
+    }
+
+    public static async Task SaveTransferPlanSettingsAsync(
+        this HttpClient client, int minimumTransferPln, CancellationToken cancellationToken)
+    {
+        var response = await client.PutAsJsonAsync(TransferPlanSettingsUri, new { minimumTransferPln }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<TransferPlanView> GetTransferPlanAsync(
+        this HttpClient client, string month, CancellationToken cancellationToken) =>
+        (await client.GetPlanningMonthAsync(month, cancellationToken)).TransferPlan!;
+
+    public static bool Is<TEnum>(this JsonElement? element, TEnum expected) where TEnum : struct, Enum =>
+        element is { } value && value.Is(expected);
 
     public static async Task SaveAllocationPlanAsync(
         this HttpClient client, string month, CancellationToken cancellationToken, params object[] buckets)

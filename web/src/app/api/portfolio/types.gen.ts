@@ -622,6 +622,7 @@ export type PlanningMonthResponse = {
     expenses: PlanningExpensesResponse;
     freeFunds: FreeFundsResponse;
     allocation: AllocationResponse;
+    transferPlan: TransferPlanResponse;
 };
 
 export type RecordTransactionRequest = {
@@ -665,6 +666,10 @@ export type RollOverDepositRequest = {
 export type SaveAllocationPlanVersionRequest = {
     buckets: Array<AllocationPlanRowRequest>;
     reserveAccountId?: null | string;
+};
+
+export type SaveTransferPlanSettingsRequest = {
+    minimumTransferPln: number | string;
 };
 
 export type SecuritiesResponse = {
@@ -792,6 +797,43 @@ export type TransferCandidateResponse = {
 };
 
 export type TransferDirection = number;
+
+export type TransferGroupShare = {
+    name: string;
+    currentPercent: number | string;
+    afterPercent: number | string;
+    targetPercent: number | string;
+};
+
+export type TransferMarker = 'None' | 'AboveTarget' | 'OutsideAllocation' | 'BelowMinimum';
+
+export type TransferPlanFallbackReason = 'NoTargetAllocation' | 'NoValuation' | 'EmptyBase';
+
+export type TransferPlanNoneReason = 'NothingToInvest' | 'FutureMonth' | 'BeforeStart';
+
+export type TransferPlanResponse = {
+    status: TransferPlanStatus;
+    noneReason: null | TransferPlanNoneReason;
+    minimumTransferPln: number | string;
+    valuationDate: null | string;
+    valuationStale: boolean;
+    fallbackReason: null | TransferPlanFallbackReason;
+    rows: Array<TransferRowResponse>;
+    groups: Array<TransferGroupShare>;
+    toInvestPln: number | string;
+};
+
+export type TransferPlanStatus = 'None' | 'Preview';
+
+export type TransferRowResponse = {
+    bucketId: string;
+    bucketName: string;
+    accountId: null | string;
+    accountName: null | string;
+    groupName: null | string;
+    amountPln: number | string;
+    marker: TransferMarker;
+};
 
 export type TreasuryBondType = number;
 
@@ -2194,6 +2236,22 @@ export type GetApiPortfolioPlanningMonthsByMonthResponses = {
 };
 
 export type GetApiPortfolioPlanningMonthsByMonthResponse = GetApiPortfolioPlanningMonthsByMonthResponses[keyof GetApiPortfolioPlanningMonthsByMonthResponses];
+
+export type PutApiPortfolioTransferPlansSettingsData = {
+    body: SaveTransferPlanSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/transfer-plans/settings';
+};
+
+export type PutApiPortfolioTransferPlansSettingsResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioTransferPlansSettingsResponse = PutApiPortfolioTransferPlansSettingsResponses[keyof PutApiPortfolioTransferPlansSettingsResponses];
 
 export type GetApiPortfolioPlanningOverdueData = {
     body?: never;

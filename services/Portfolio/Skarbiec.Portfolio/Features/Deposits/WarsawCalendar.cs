@@ -8,6 +8,8 @@ public static class WarsawCalendar
             ? iana
             : TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
 
-    public static DateOnly Today(TimeProvider timeProvider) =>
-        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), Warsaw).DateTime);
+    public static DateOnly Today(TimeProvider timeProvider) => DateOf(timeProvider.GetUtcNow());
+
+    public static DateOnly DateOf(DateTimeOffset instant) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, Warsaw).DateTime);
 }

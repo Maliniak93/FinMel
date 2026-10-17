@@ -851,6 +851,32 @@
         "shareInvalid": "Podaj poprawny udział."
       }
     },
+    "transferPlan": {
+      "title": "Plan przelewów",
+      "minimum": "Minimalny przelew (zł)",
+      "minimumFailed": "Nie udało się zapisać minimalnego przelewu.",
+      "valuationDate": "Wycena z dnia {{ date }}",
+      "valuationStale": "wycena nieaktualna",
+      "noAccount": "bez konta",
+      "markers": {
+        "aboveTarget": "powyżej celu",
+        "outsideAllocation": "poza alokacją",
+        "belowMinimum": "poniżej minimum"
+      },
+      "groups": {
+        "name": "Grupa",
+        "current": "Bieżący %",
+        "after": "Po planie %",
+        "target": "Cel %"
+      },
+      "fallback": {
+        "NoTargetAllocation": "Nie ustawiono alokacji docelowej, więc kwoty nie są rozdzielone na grupy.",
+        "NoValuation": "Brak wyceny majątku, więc kwoty nie są rozdzielone na grupy.",
+        "EmptyBase": "Wycena grup alokacji wynosi zero, więc kwoty nie są rozdzielone na grupy.",
+        "setTarget": "Ustaw alokację docelową"
+      },
+      "nothingToInvest": "Brak kwoty do zainwestowania."
+    },
     "freeFunds": {
       "title": "Wolne środki",
       "plan": "Plan",

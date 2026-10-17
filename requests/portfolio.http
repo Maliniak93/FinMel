@@ -1360,3 +1360,14 @@ Content-Type: application/json
 ### Delete a balance adjustment (204; 404 NotFound.BalanceAdjustment when none is set at that month)
 DELETE {{baseUrl}}/api/portfolio/allocation-buckets/00000000-0000-0000-0000-000000000000/balances/2026-12
 Authorization: Bearer {{authToken}}
+
+### --- Transfer plan ---
+
+### Set the minimum transfer in whole PLN (204; 0 = no minimum, none saved = 100; 400 Validation.InvalidMinimumTransfer unless an integer from 0 to 1000000); the preview is the transferPlan of GET planning/months
+PUT {{baseUrl}}/api/portfolio/transfer-plans/settings
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "minimumTransferPln": 250
+}

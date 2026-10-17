@@ -359,6 +359,9 @@ namespace Skarbiec.Portfolio.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateOnly>("EffectiveFrom")
                         .HasColumnType("date");
 
@@ -1029,6 +1032,19 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasIndex("TransferId");
 
                     b.ToTable("Transactions");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlanSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("MinimumTransferPln")
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("TransferPlanSettings");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TreasuryBond", b =>

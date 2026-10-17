@@ -79,6 +79,47 @@ export function allocation(extra: Record<string, unknown> = {}): Record<string, 
   };
 }
 
+export function transferRow(
+  bucketName: string,
+  amountPln: number,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    bucketId: `bucket-${bucketName}`,
+    bucketName,
+    accountId: null,
+    accountName: null,
+    groupName: null,
+    amountPln,
+    marker: 'None',
+    ...extra,
+  };
+}
+
+export function transferGroup(
+  name: string,
+  currentPercent: number,
+  afterPercent: number,
+  targetPercent: number,
+): Record<string, unknown> {
+  return { name, currentPercent, afterPercent, targetPercent };
+}
+
+export function transferPlan(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    status: 'Preview',
+    noneReason: null,
+    minimumTransferPln: 100,
+    valuationDate: '2026-10-14',
+    valuationStale: false,
+    fallbackReason: null,
+    rows: [],
+    groups: [],
+    toInvestPln: 0,
+    ...extra,
+  };
+}
+
 export function firstPlanBuckets(): Record<string, unknown>[] {
   return [
     allocationBucket('Wakacje', {

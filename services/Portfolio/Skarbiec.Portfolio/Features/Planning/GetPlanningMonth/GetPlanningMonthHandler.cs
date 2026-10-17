@@ -8,6 +8,7 @@ using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Features.Planning.Reserves;
 using Skarbiec.Portfolio.Features.RecurringExpenses;
 using Skarbiec.Portfolio.Features.RecurringIncomes;
+using Skarbiec.Portfolio.Features.TransferPlan;
 using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
@@ -155,6 +156,18 @@ public sealed class GetPlanningMonthHandler(
             forecast.Plans,
             walked => walked == viewed ? viewedFigures : forecast.FiguresIn(walked, rates, today));
 
+        var targetReplica = await dbContext.TargetAllocationReplicas.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var valuationReplica = await dbContext.ValuationReplicas.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var minimumTransfer = await dbContext.TransferPlanSettings
+            .AsNoTracking()
+            .Select(s => (int?)s.MinimumTransferPln)
+            .FirstOrDefaultAsync(cancellationToken) ?? TransferPlanSettings.DefaultMinimumTransferPln;
+        YearMonth? planStart = versions.Count == 0
+            ? null
+            : YearMonth.From(WarsawCalendar.DateOf(versions.Min(v => v.CreatedAt)));
+        var transferPlan = TransferPlanPreview.Build(
+            viewed, YearMonth.From(today), planStart, allocation, accounts, targetReplica, valuationReplica, minimumTransfer);
+
         return new PlanningMonthResponse
         {
             Incomes = new PlanningIncomesResponse
@@ -171,7 +184,8 @@ public sealed class GetPlanningMonthHandler(
                 ForecastPln = viewedFigures.Forecast,
                 Incomplete = fxUnavailable
             },
-            Allocation = allocation
+            Allocation = allocation,
+            TransferPlan = transferPlan
         };
     }
 

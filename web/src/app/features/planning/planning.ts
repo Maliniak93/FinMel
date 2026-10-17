@@ -7,7 +7,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
@@ -21,6 +21,7 @@ import {
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
   getApiPortfolioPlanningMonthsByMonth,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
+  putApiPortfolioTransferPlansSettings,
   type AllocationBucketResponse,
   type AllocationResponse,
   type ExpenseDefinitionResponse,
@@ -29,6 +30,8 @@ import {
   type OccurrenceStatus,
   type OverdueOccurrenceResponse,
   type RecurringIncomeStatus,
+  type TransferMarker,
+  type TransferPlanFallbackReason,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { PlanningState } from '../../core/planning/planning-state';
@@ -80,6 +83,26 @@ const STATUS_KEYS: Record<RecurringIncomeStatus, string> = {
   Ended: 'planning.status.ended',
 };
 
+const TRANSFER_MARKER_KEYS: Record<TransferMarker, string | null> = {
+  None: null,
+  AboveTarget: 'planning.transferPlan.markers.aboveTarget',
+  OutsideAllocation: 'planning.transferPlan.markers.outsideAllocation',
+  BelowMinimum: 'planning.transferPlan.markers.belowMinimum',
+};
+
+const TRANSFER_MARKER_TEST_IDS: Record<TransferMarker, string | null> = {
+  None: null,
+  AboveTarget: 'transfer-marker-above-target',
+  OutsideAllocation: 'transfer-marker-outside-allocation',
+  BelowMinimum: 'transfer-marker-below-minimum',
+};
+
+const TRANSFER_FALLBACK_KEYS: Record<TransferPlanFallbackReason, string> = {
+  NoTargetAllocation: 'planning.transferPlan.fallback.NoTargetAllocation',
+  NoValuation: 'planning.transferPlan.fallback.NoValuation',
+  EmptyBase: 'planning.transferPlan.fallback.EmptyBase',
+};
+
 function shiftMonth(month: string, delta: number): string {
   const [year, number] = month.split('-').map(Number);
   const index = year * 12 + (number - 1) + delta;
@@ -96,6 +119,7 @@ function shiftMonth(month: string, delta: number): string {
     MatChipsModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    RouterLink,
     TranslocoPipe,
   ],
   templateUrl: './planning.html',
@@ -150,6 +174,10 @@ export class Planning {
 
   protected readonly allocation = computed(() =>
     this.monthResource.hasValue() ? this.monthResource.value().allocation : null,
+  );
+
+  protected readonly transferPlan = computed(() =>
+    this.monthResource.hasValue() ? this.monthResource.value().transferPlan : null,
   );
 
   protected readonly cushionBuckets = computed(() =>
@@ -512,6 +540,37 @@ export class Planning {
         translate('common.dismiss'),
       );
       return;
+    }
+
+    this.monthResource.reload();
+  }
+
+  protected transferMarkerKey(marker: TransferMarker): string | null {
+    return TRANSFER_MARKER_KEYS[marker];
+  }
+
+  protected transferMarkerTestId(marker: TransferMarker): string | null {
+    return TRANSFER_MARKER_TEST_IDS[marker];
+  }
+
+  protected transferFallbackKey(reason: TransferPlanFallbackReason): string {
+    return TRANSFER_FALLBACK_KEYS[reason];
+  }
+
+  protected async saveTransferMinimum(event: Event): Promise<void> {
+    const raw = (event.target as HTMLInputElement).value.trim();
+    if (raw === '') {
+      this.monthResource.reload();
+      return;
+    }
+
+    const minimumTransferPln = Number(raw);
+    const result = await putApiPortfolioTransferPlansSettings({ body: { minimumTransferPln } });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.transferPlan.minimumFailed'),
+        translate('common.dismiss'),
+      );
     }
 
     this.monthResource.reload();
