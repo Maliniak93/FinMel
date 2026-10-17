@@ -146,6 +146,12 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return await dbContext.Set<AllocationBucket>().CountAsync(cancellationToken);
     }
 
+    protected async Task<int> CountAllocationBalanceOverridesAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = CreateDbContext(userId);
+        return await dbContext.Set<AllocationBalanceOverride>().CountAsync(cancellationToken);
+    }
+
     protected async Task<List<BondRedemption>> ReadBondRedemptionsAsync(
         Guid userId, CancellationToken cancellationToken, Guid? assetId = null)
     {

@@ -579,10 +579,50 @@
                       </mat-chip>
                     }
                   </span>
+                  <ng-container
+                    [ngTemplateOutlet]="bucketBalance"
+                    [ngTemplateOutletContext]="{ $implicit: bucket }"
+                  />
                 </li>
               }
             </ul>
           }
+
+          <ng-template #bucketBalance let-bucket>
+            @if (hasBalance(bucket)) {
+              <span class="planning-allocation__balance-action">
+                <button
+                  mat-button
+                  type="button"
+                  (click)="openBucketBalanceDialog(bucket)"
+                  data-testid="set-bucket-balance"
+                >
+                  {{ 'planning.allocation.balance.action' | transloco }}
+                </button>
+              </span>
+              @for (adjustment of bucket.adjustments ?? []; track adjustment.month) {
+                <span class="planning-allocation__adjustment" data-testid="bucket-adjustment">
+                  {{
+                    'planning.allocation.balance.adjustment'
+                      | transloco
+                        : {
+                            month: changeMonthLabel(adjustment.month),
+                            amount: formatMoney(adjustment.amountPln, 'PLN'),
+                          }
+                  }}
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="'planning.allocation.balance.delete' | transloco"
+                    (click)="removeBucketAdjustment(bucket, adjustment.month)"
+                    data-testid="delete-bucket-adjustment"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </span>
+              }
+            }
+          </ng-template>
 
           @if (fixedBuckets().length > 0) {
             <h3>{{ 'planning.allocation.groups.fixed' | transloco }}</h3>
@@ -626,6 +666,10 @@
                       }}
                     </span>
                   }
+                  <ng-container
+                    [ngTemplateOutlet]="bucketBalance"
+                    [ngTemplateOutletContext]="{ $implicit: bucket }"
+                  />
                 </li>
               }
             </ul>
@@ -673,6 +717,10 @@
                       }}
                     </span>
                   }
+                  <ng-container
+                    [ngTemplateOutlet]="bucketBalance"
+                    [ngTemplateOutletContext]="{ $implicit: bucket }"
+                  />
                 </li>
               }
             </ul>

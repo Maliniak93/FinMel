@@ -87,6 +87,7 @@ export type AllocationBucketResponse = {
     cushion: null | CushionResponse;
     limitReached: boolean;
     limit: null | LimitResponse;
+    adjustments: null | Array<BalanceAdjustmentResponse>;
 };
 
 export type AllocationPlanRowRequest = {
@@ -130,6 +131,11 @@ export type AssetResponse = {
 };
 
 export type AssetValuationMode = number;
+
+export type BalanceAdjustmentResponse = {
+    month: string;
+    amountPln: number | string;
+};
 
 export type BankInterestPreviewResponse = {
     periodStart: string;
@@ -686,6 +692,10 @@ export type SecurityHoldingResponse = {
 };
 
 export type SecurityPriceUnavailableReason = number;
+
+export type SetBucketBalanceRequest = {
+    amount: number | string;
+};
 
 export type SetContributionLimitRequest = {
     amount: number | string;
@@ -2062,6 +2072,44 @@ export type PutApiPortfolioAllocationPlanVersionsByMonthResponses = {
 };
 
 export type PutApiPortfolioAllocationPlanVersionsByMonthResponse = PutApiPortfolioAllocationPlanVersionsByMonthResponses[keyof PutApiPortfolioAllocationPlanVersionsByMonthResponses];
+
+export type DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthData = {
+    body?: never;
+    path: {
+        bucketId: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/allocation-buckets/{bucketId}/balances/{month}';
+};
+
+export type DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponse = DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses[keyof DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses];
+
+export type PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthData = {
+    body: SetBucketBalanceRequest;
+    path: {
+        bucketId: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/allocation-buckets/{bucketId}/balances/{month}';
+};
+
+export type PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponse = PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses[keyof PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses];
 
 export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementData = {
     body: SettleOccurrenceRequest;

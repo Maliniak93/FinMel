@@ -18,6 +18,7 @@ import {
   limitedBucket,
 } from '../../../testing/allocation-fixtures';
 import { AllocationPlanDialog } from './allocation-plan-dialog/allocation-plan-dialog';
+import { BucketBalanceDialog } from './bucket-balance-dialog/bucket-balance-dialog';
 import { Planning } from './planning';
 import { RecurringExpenseFormDialog } from './recurring-expense-form-dialog/recurring-expense-form-dialog';
 import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
@@ -940,5 +941,67 @@ describe('Planning', () => {
       expect(deletes[0].url).toContain('/allocation-plan/versions/2027-01');
     });
     await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+  });
+
+  it('offers the balance action on cushion and limited buckets only, lists their adjustments and deletes one after confirmation', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {
+        effectiveFrom: '2026-10',
+        buckets: [
+          cushionBucket({
+            adjustments: [
+              { month: '2026-10', amountPln: 20000 },
+              { month: '2026-12', amountPln: 20000 },
+            ],
+          }),
+          limitedBucket('IKE', { position: 0, share: 50 }),
+          ...firstPlanBuckets(),
+        ],
+      },
+    );
+    await setup();
+
+    const bucketRow = (name: string): HTMLElement =>
+      rows('allocation-bucket-row').find((row) => row.textContent!.includes(name))!;
+    expect(
+      bucketRow('Poduszka').querySelector('[data-testid="set-bucket-balance"]'),
+    ).not.toBeNull();
+    expect(bucketRow('IKE').querySelector('[data-testid="set-bucket-balance"]')).not.toBeNull();
+    for (const name of ['Wakacje', 'Akcje', 'Lokata', 'ETF']) {
+      expect(bucketRow(name).querySelector('[data-testid="set-bucket-balance"]')).toBeNull();
+    }
+    const adjustments = rows('bucket-adjustment');
+    expect(adjustments).toHaveLength(2);
+    expect(adjustments[1].textContent).toContain('2026');
+    expect(adjustments[1].textContent).toContain(formatMoney(20000, 'PLN'));
+
+    (bucketRow('IKE').querySelector('[data-testid="set-bucket-balance"]') as HTMLElement).click();
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      BucketBalanceDialog,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          month: '2026-10',
+          bucket: expect.objectContaining({ name: 'IKE' }),
+        }),
+      }),
+    );
+
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+    (
+      adjustments[1].querySelector('[data-testid="delete-bucket-adjustment"]') as HTMLElement
+    ).click();
+
+    await vi.waitFor(() => {
+      const deletes = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method === 'DELETE');
+      expect(deletes).toHaveLength(1);
+      expect(deletes[0].url).toContain('/allocation-buckets/bucket-Poduszka/balances/2026-12');
+    });
   });
 });

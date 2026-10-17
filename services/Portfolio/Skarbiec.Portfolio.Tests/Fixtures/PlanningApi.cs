@@ -130,7 +130,10 @@ internal static class PlanningApi
         bool Underfunded,
         CushionView? Cushion = null,
         bool LimitReached = false,
-        LimitView? Limit = null);
+        LimitView? Limit = null,
+        List<BalanceAdjustmentView>? Adjustments = null);
+
+    public sealed record BalanceAdjustmentView(string Month, decimal AmountPln);
 
     public sealed record LimitView(
         int Year, decimal LimitPln, decimal ContributedStartPln, decimal ContributedEndPln, bool Reached, bool Estimated);
@@ -174,7 +177,28 @@ internal static class PlanningApi
 
     public const string PercentSumOver100ErrorCode = "Validation.PercentSumOver100";
 
+    public const string BalanceAdjustmentNotFoundErrorCode = "NotFound.BalanceAdjustment";
+
+    public const string BucketHasNoBalanceErrorCode = "Validation.BucketHasNoBalance";
+
     public static string AllocationPlanVersionUri(string month) => $"/api/portfolio/allocation-plan/versions/{month}";
+
+    public static string BucketBalanceUri(Guid bucketId, string month) =>
+        $"/api/portfolio/allocation-buckets/{bucketId}/balances/{month}";
+
+    public static async Task SetBucketBalanceAsync(
+        this HttpClient client, Guid bucketId, string month, decimal amount, CancellationToken cancellationToken)
+    {
+        var response = await client.PutAsJsonAsync(BucketBalanceUri(bucketId, month), new { amount }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task DeleteBucketBalanceAsync(
+        this HttpClient client, Guid bucketId, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(BucketBalanceUri(bucketId, month), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 
     public static object AllocationRow(
         string name,
