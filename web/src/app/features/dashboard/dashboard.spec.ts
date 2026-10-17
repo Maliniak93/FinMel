@@ -15,9 +15,16 @@ import {
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
-import type { DashboardResponse, NetWorthHistoryResponse } from '../../api/reporting';
+import type {
+  DashboardResponse,
+  NetWorthHistoryResponse,
+  TargetAllocationResponse,
+} from '../../api/reporting';
 import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
-import { configuredAllocation } from '../allocation/testing/target-allocation-fixtures';
+import {
+  configuredAllocation,
+  notConfiguredAllocation,
+} from '../allocation/testing/target-allocation-fixtures';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
@@ -149,6 +156,35 @@ describe('Dashboard', () => {
     );
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain("You haven't entered any wealth yet.");
+  });
+
+  it('shows the allocation card in the empty state', async () => {
+    await setup(
+      jsonResponse({
+        netWorthPln: 0,
+        asOf: null,
+        isStale: false,
+        byAssetClass: [],
+        byAccount: [],
+      } satisfies DashboardResponse),
+      undefined,
+      {
+        allocation: jsonResponse({
+          ...notConfiguredAllocation,
+          asOf: null,
+          totalPln: 0,
+          byAssetClass: [],
+        } satisfies TargetAllocationResponse),
+      },
+    );
+    await switchLanguage(fixture, 'pl');
+    const element = fixture.nativeElement as HTMLElement;
+    const card = element.querySelector('app-allocation-card');
+
+    expect(textOf(element)).toContain('Nie wprowadzono jeszcze żadnego majątku.');
+    expect(card).not.toBeNull();
+    expect(textOf(card)).toContain('Ustaw alokację docelową');
+    expect(card?.querySelector('a[href="/allocation"]')).not.toBeNull();
   });
 
   it('surfaces a load failure through the resource error', async () => {
