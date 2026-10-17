@@ -454,6 +454,15 @@
         "bankInterestDue": "Bank interest due, months: {{ count }}"
       }
     },
+    "allocationCard": {
+      "title": "Target allocation",
+      "notConfigured": "Set a target allocation",
+      "outside": "{{ outside }} of {{ total }} groups outside the band",
+      "allInBand": "All groups within the band",
+      "noValuation": "no valuation yet",
+      "noAssets": "no assets in the allocation",
+      "loadFailed": "Failed to load the target allocation."
+    },
     "goToAccounts": "Go to accounts",
     "accounts": {
       "title": "Accounts",

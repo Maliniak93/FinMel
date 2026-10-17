@@ -17,6 +17,7 @@ import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
 import { assetClassLabel } from '../assets/asset-class';
 import { assetClassColor } from './asset-class-color';
+import { AllocationCard } from './allocation-card/allocation-card';
 import { CashCard } from './cash-card/cash-card';
 import { AccountsCard } from './accounts-card/accounts-card';
 import { UpcomingCard } from './upcoming-card/upcoming-card';
@@ -37,6 +38,7 @@ import { NetWorthChart } from './net-worth-chart/net-worth-chart';
     PieChart,
     AccountsCard,
     CashCard,
+    AllocationCard,
     UpcomingCard,
   ],
   templateUrl: './dashboard.html',

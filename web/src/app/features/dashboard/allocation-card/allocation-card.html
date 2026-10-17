@@ -1,0 +1,50 @@
+<mat-card class="allocation-card">
+  <mat-card-content>
+    <h2 class="allocation-card__title">
+      <a routerLink="/allocation">{{ 'dashboard.allocationCard.title' | transloco }}</a>
+    </h2>
+
+    @if (allocationResource.error(); as loadError) {
+      <div class="allocation-card__state" role="alert">
+        <p>{{ loadError.message }}</p>
+        <button mat-button type="button" (click)="allocationResource.reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (allocationResource.isLoading() && !allocationResource.hasValue()) {
+      <div class="allocation-card__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (summary(); as state) {
+      <p class="allocation-card__text">
+        @switch (state.kind) {
+          @case ('notConfigured') {
+            {{ 'dashboard.allocationCard.notConfigured' | transloco }}
+          }
+          @case ('noValuation') {
+            {{ 'dashboard.allocationCard.noValuation' | transloco }}
+          }
+          @case ('noAssets') {
+            {{ 'dashboard.allocationCard.noAssets' | transloco }}
+          }
+          @case ('allInBand') {
+            {{ 'dashboard.allocationCard.allInBand' | transloco }}
+          }
+          @case ('outside') {
+            {{
+              'dashboard.allocationCard.outside'
+                | transloco: { outside: state.outside, total: state.total }
+            }}
+          }
+        }
+      </p>
+      @if (isStale()) {
+        <mat-chip-set>
+          <mat-chip [matTooltip]="'dashboard.staleTooltip' | transloco">
+            {{ 'dashboard.stale' | transloco }}
+          </mat-chip>
+        </mat-chip-set>
+      }
+    }
+  </mat-card-content>
+</mat-card>
