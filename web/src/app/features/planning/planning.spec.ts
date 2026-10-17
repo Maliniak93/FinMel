@@ -964,6 +964,21 @@ describe('Planning', () => {
     );
   });
 
+  it('openAllocationDialog_WideDialog_LiftsMaterialMaxWidth', async () => {
+    responses['2026-10'] = month({}, {}, {}, allocation());
+    await setup();
+
+    click('edit-allocation');
+
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      AllocationPlanDialog,
+      expect.objectContaining({
+        width: '960px',
+        maxWidth: expect.anything(),
+      }),
+    );
+  });
+
   it('deletes the scheduled allocation change after confirmation and reloads the month', async () => {
     responses['2026-10'] = month(
       {},
