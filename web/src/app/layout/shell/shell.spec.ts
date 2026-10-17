@@ -322,6 +322,24 @@ describe('Shell', () => {
     expect(link!.querySelector('mat-icon')?.textContent?.trim()).toBe('diamond');
   });
 
+  it('offers an "Alokacja" nav item linking to /allocation right after the dashboard', async () => {
+    const links = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+          'mat-nav-list a',
+        ),
+      );
+    const english = links().map((a) => a.getAttribute('href'));
+    expect(english.indexOf('/allocation')).toBe(english.indexOf('/dashboard') + 1);
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    const link = links().find((a) => (a.textContent ?? '').includes('Alokacja'));
+    expect(link).toBeDefined();
+    expect(link!.getAttribute('href')).toBe('/allocation');
+  });
+
   it('switches the navigation to Polish without a reload', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const navLabels = () =>
@@ -330,6 +348,7 @@ describe('Shell', () => {
     const englishLabels = navLabels();
     expect(englishLabels).toEqual([
       'Dashboard',
+      'Allocation',
       'Accounts',
       'Bank accounts',
       'Deposits',

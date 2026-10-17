@@ -25,6 +25,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
       },
       {
+        path: 'allocation',
+        loadComponent: () => import('./features/allocation/allocation').then((m) => m.Allocation),
+      },
+      {
         path: 'accounts',
         loadComponent: () => import('./features/accounts/accounts').then((m) => m.Accounts),
       },

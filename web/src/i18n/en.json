@@ -33,6 +33,7 @@
   "shell": {
     "nav": {
       "dashboard": "Dashboard",
+      "allocation": "Allocation",
       "cash": "Cash",
       "planning": "Planning",
       "securities": "Stocks & ETFs",
@@ -381,6 +382,46 @@
         "due": "Due",
         "settled": "Settled"
       }
+    }
+  },
+  "allocation": {
+    "title": "Target allocation",
+    "loadFailed": "Could not load the target allocation.",
+    "noValuation": "Current value: no valuation yet.",
+    "noBase": "Deviations: no assets in the allocation.",
+    "disclaimer": "Information only, not investment advice.",
+    "outOfBand": "Out of band",
+    "outside": "Outside the allocation",
+    "summary": "base {{ base }} of {{ total }}",
+    "columns": {
+      "group": "Group",
+      "value": "Value",
+      "current": "Current share",
+      "target": "Target",
+      "band": "Band",
+      "deviationPp": "Deviation",
+      "deviationPln": "Versus target"
+    },
+    "proposal": {
+      "equities": "Stocks/ETFs",
+      "bonds": "Bonds",
+      "metals": "Metals"
+    },
+    "editor": {
+      "proposalIntro": "A proposed split of your assets. Set a target for each group and save.",
+      "name": "Group name",
+      "classes": "Asset classes",
+      "target": "Target (%)",
+      "band": "Band ± (pp)",
+      "addGroup": "Add group",
+      "removeGroup": "Remove group",
+      "sum": "Sum of targets: {{ sum }}"
+    },
+    "errors": {
+      "nameRequired": "Enter a group name.",
+      "classesRequired": "Pick at least one asset class.",
+      "percent": "Enter 0–100 with at most one decimal.",
+      "duplicateNames": "Group names must differ."
     }
   },
   "dashboard": {

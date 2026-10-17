@@ -6,6 +6,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { App } from './app';
 import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth';
+import { Allocation } from './features/allocation/allocation';
 import { Login } from './features/auth/login/login';
 import { Bonds } from './features/bonds/bonds';
 import { Cash } from './features/cash/cash';
@@ -41,6 +42,11 @@ describe('app routing (authenticated)', () => {
   it('renders Accounts at /accounts', async () => {
     await harness.navigateByUrl('/accounts', Shell);
     expect(harness.fixture.debugElement.query(By.directive(Accounts))).toBeTruthy();
+  });
+
+  it('renders Allocation at /allocation', async () => {
+    await harness.navigateByUrl('/allocation', Shell);
+    expect(harness.fixture.debugElement.query(By.directive(Allocation))).toBeTruthy();
   });
 
   it('renders Cash at /cash', async () => {
