@@ -1,12 +1,15 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.ServiceDefaults.Authentication;
 using AllocationEntity = Skarbiec.Reporting.Data.TargetAllocation;
 
 namespace Skarbiec.Reporting.Features.TargetAllocation.SaveTargetAllocation;
 
-public sealed class SaveTargetAllocationHandler(ReportingDbContext db, ICurrentUser currentUser, TimeProvider timeProvider)
+public sealed class SaveTargetAllocationHandler(
+    ReportingDbContext db, ICurrentUser currentUser, TimeProvider timeProvider, IPublishEndpoint publishEndpoint)
 {
     private const int MaxNameLength = 50;
 
@@ -22,21 +25,40 @@ public sealed class SaveTargetAllocationHandler(ReportingDbContext db, ICurrentU
             return error;
         }
 
+        var savedAt = timeProvider.GetUtcNow();
         var allocation = await db.TargetAllocations.FirstOrDefaultAsync(cancellationToken);
         if (allocation is null)
         {
             db.TargetAllocations.Add(new AllocationEntity
             {
                 UserId = currentUser.UserId,
-                UpdatedAt = timeProvider.GetUtcNow(),
+                UpdatedAt = savedAt,
                 Groups = groups,
             });
         }
         else
         {
             allocation.Groups = groups;
-            allocation.UpdatedAt = timeProvider.GetUtcNow();
+            allocation.UpdatedAt = savedAt;
         }
+
+        await publishEndpoint.Publish(
+            new TargetAllocationSaved
+            {
+                UserId = currentUser.UserId,
+                Groups =
+                [
+                    .. groups.Select(g => new TargetAllocationGroupState
+                    {
+                        Name = g.Name,
+                        AssetClasses = g.AssetClasses,
+                        TargetPercent = g.TargetPercent,
+                        BandPp = g.BandPp,
+                    }),
+                ],
+                SavedAtUtc = savedAt,
+            },
+            cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
 

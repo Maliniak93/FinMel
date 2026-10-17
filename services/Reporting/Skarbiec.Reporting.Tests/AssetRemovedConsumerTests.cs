@@ -130,10 +130,44 @@ public sealed class AssetRemovedConsumerTests(SkarbiecContainersFixture containe
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task Consume_PublishesLatestValuationChanged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, today, 1_000m, cancellationToken, quantity: 1_000m);
+            await db.SeedSnapshotAsync(userId, today, 1_000m, cancellationToken);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(AssetRemovedEvent(assetId, accountId, userId), cancellationToken);
+
+            var published = Assert.Single(await provider.GetRequiredService<LatestValuationRecorder>()
+                .SettledDeliveriesForAsync(userId, cancellationToken));
+
+            Assert.Equal(today, published.Date);
+            Assert.Equal(0m, published.TotalPln);
+            Assert.Empty(published.ByAssetClass);
+        }, cancellationToken);
+    }
+
     private Task RunConsumerAsync(Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
             containers,
-            x => x.AddConsumer<AssetRemovedConsumer>(typeof(TestConsumerDefinition)),
+            x =>
+            {
+                x.AddConsumer<AssetRemovedConsumer>(typeof(TestConsumerDefinition));
+                x.AddConsumer<LatestValuationRecorderConsumer>();
+            },
             action,
             cancellationToken);
 

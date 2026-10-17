@@ -29,7 +29,7 @@ test("facts on this repository finds every service, an internal edge, an event e
   }
 });
 
-test("facts on this repository lists the contract events, the internal message, nine consumers, an ERD per service and RefreshToken without a tenancy filter", () => {
+test("facts on this repository lists the contract events, the internal message, eleven consumers, an ERD per service and RefreshToken without a tenancy filter", () => {
   const out = mkdtempSync(path.join(os.tmpdir(), "docs-smoke-"));
   try {
     const run = runDocs(["facts", "--root", REPO_ROOT, "--out", out]);
@@ -44,13 +44,15 @@ test("facts on this repository lists the contract events, the internal message, 
         "AssetRemoved",
         "DailyPricesSynced",
         "InstrumentHistoryBackfilled",
+        "LatestValuationChanged",
+        "TargetAllocationSaved",
         "UserRegistered",
         "WatchlistItemAdded",
         "WatchlistItemRemoved",
       ],
     );
     assert.equal(messages.find((m) => m.name === "HistoryRebuildRequested")?.kind, "internal");
-    assert.equal(messages.flatMap((m) => m.consumers).length, 9);
+    assert.equal(messages.flatMap((m) => m.consumers).length, 11);
 
     const services = pages["bazy-danych"].facts.services;
     assert.deepEqual(services.map((s) => s.name).sort(), ["Identity", "MarketData", "Portfolio", "Reporting"]);

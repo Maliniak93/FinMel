@@ -28,6 +28,7 @@ internal static class ReportingConsumers
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<SnapshotWriter>();
         services.AddSingleton<RebuildRequestRecorder>();
+        services.AddSingleton<LatestValuationRecorder>();
 
         // Consumers never read ICurrentUser.UserId, but ReportingDbContext's constructor needs an implementation.
         services.AddSingleton<ICurrentUser, DesignTimeCurrentUser>();

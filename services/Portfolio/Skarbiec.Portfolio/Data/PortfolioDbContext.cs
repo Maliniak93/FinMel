@@ -32,6 +32,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<AllocationPlanVersion> AllocationPlanVersions => Set<AllocationPlanVersion>();
     public DbSet<AllocationPlanEntry> AllocationPlanEntries => Set<AllocationPlanEntry>();
     public DbSet<AllocationBalanceOverride> AllocationBalanceOverrides => Set<AllocationBalanceOverride>();
+    public DbSet<TargetAllocationReplica> TargetAllocationReplicas => Set<TargetAllocationReplica>();
+    public DbSet<ValuationReplica> ValuationReplicas => Set<ValuationReplica>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -333,6 +335,23 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
                 .WithMany()
                 .HasForeignKey(o => o.BucketId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TargetAllocationReplica>(replica =>
+        {
+            replica.HasKey(r => r.UserId);
+            replica.Property(r => r.UserId).ValueGeneratedNever();
+
+            replica.ComplexCollection(r => r.Groups, groups => groups.ToJson());
+        });
+
+        modelBuilder.Entity<ValuationReplica>(replica =>
+        {
+            replica.HasKey(r => r.UserId);
+            replica.Property(r => r.UserId).ValueGeneratedNever();
+            replica.Property(r => r.TotalPln).HasPrecision(18, 2);
+
+            replica.ComplexCollection(r => r.ByAssetClass, byClass => byClass.ToJson());
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

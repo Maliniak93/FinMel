@@ -39,6 +39,6 @@ public sealed class AssetRemovedConsumer(ReportingDbContext db, SnapshotWriter s
         // Saved first so the revaluation skips this position, inside the same inbox transaction.
         await db.SaveChangesAsync(cancellationToken);
 
-        await snapshotWriter.RevalueTodayAsync(message.UserId, cancellationToken);
+        await snapshotWriter.RevalueTodayAsync(context, message.UserId, cancellationToken);
     }
 }

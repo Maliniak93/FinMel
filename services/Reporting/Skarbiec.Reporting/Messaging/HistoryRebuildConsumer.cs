@@ -41,7 +41,7 @@ public sealed class HistoryRebuildConsumer(
 
         if (from <= to)
         {
-            await RewriteAsync(request, from, to, cancellationToken);
+            await RewriteAsync(context, request, from, to, cancellationToken);
         }
 
         await DeleteRequestAtRevisionAsync(request, cancellationToken);
@@ -70,7 +70,8 @@ public sealed class HistoryRebuildConsumer(
         }
     }
 
-    private async Task RewriteAsync(HistoryRebuildRequest request, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    private async Task RewriteAsync(
+        ConsumeContext context, HistoryRebuildRequest request, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         var userId = request.UserId;
 
@@ -136,6 +137,9 @@ public sealed class HistoryRebuildConsumer(
             IsStale = day.IsStale,
         }));
 
+        await db.SaveChangesAsync(cancellationToken);
+
+        await LatestValuation.PublishAsync(db, context, timeProvider, userId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
