@@ -89,6 +89,28 @@ export const notConfiguredAllocation: TargetAllocationResponse = {
   groups: [],
 };
 
+export function zeroBaseAllocation(
+  overrides: Partial<TargetAllocationResponse> = {},
+): TargetAllocationResponse {
+  return {
+    ...configuredAllocation,
+    basePln: 0,
+    outsidePln: 0,
+    outsideAssetClasses: [],
+    byAssetClass: [],
+    groups: configuredAllocation.groups.map((group) => ({
+      ...group,
+      valuePln: 0,
+      currentPercent: null,
+      deviationPp: null,
+      targetValuePln: null,
+      deviationPln: null,
+      isInBand: null,
+    })),
+    ...overrides,
+  };
+}
+
 export function savedBody(request: SaveTargetAllocationRequest) {
   return request.groups.map((group) => ({
     name: group.name,

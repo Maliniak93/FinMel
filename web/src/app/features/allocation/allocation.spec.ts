@@ -9,6 +9,7 @@ import { TRANSLATIONS, restoreEnglish, switchLanguage, textOf } from '../../../t
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatMoney } from '../../shared/format';
+import { ASSET_CLASS } from '../assets/asset-class';
 import { jsonResponse } from '../dashboard/testing/dashboard-fixtures';
 import { Allocation } from './allocation';
 import {
@@ -17,6 +18,7 @@ import {
   notConfiguredAllocation,
   savedBody,
   type TargetAllocationApi,
+  zeroBaseAllocation,
 } from './testing/target-allocation-fixtures';
 
 const pl = (key: string) => TRANSLATIONS.pl[key] as string;
@@ -221,7 +223,7 @@ describe('Allocation', () => {
     expect(all('group-row')).toHaveLength(3);
   });
 
-  function expectNoAmounts(): void {
+  function expectNoGroupAmounts(): void {
     expect(one('allocation-view')).not.toBeNull();
     const headers = Array.from(root().querySelectorAll('th')).map((th) => plain(textOf(th)));
     expect(headers).toContain(pl('allocation.columns.group'));
@@ -238,55 +240,52 @@ describe('Allocation', () => {
     }
     expect(all('out-of-band')).toHaveLength(0);
     expect(one('summary')).toBeNull();
+  }
+
+  function expectNoAmounts(): void {
+    expectNoGroupAmounts();
     expect(one('outside-row')).toBeNull();
   }
+
+  it('shows the outside row when the base is zero', async () => {
+    await render({
+      get: () =>
+        jsonResponse(
+          zeroBaseAllocation({
+            totalPln: 5000,
+            outsidePln: 5000,
+            outsideAssetClasses: [ASSET_CLASS.BankAccount],
+          }),
+        ),
+    });
+
+    expect(plain(textOf(root()))).toContain('brak aktywów w alokacji');
+    expectNoGroupAmounts();
+    const outside = plain(textOf(one('outside-row')));
+    expect(outside).toContain('Poza alokacją');
+    expect(outside).toContain('Konta bankowe');
+    expect(outside).toContain(plain(formatMoney(5000)));
+    expect(outside).not.toContain('%');
+  });
 
   it('shows valuation states', async () => {
     await render({
       get: () =>
-        jsonResponse({
-          ...configuredAllocation,
-          asOf: null,
-          totalPln: 0,
-          basePln: 0,
-          outsidePln: 0,
-          outsideAssetClasses: [],
-          byAssetClass: [],
-          groups: configuredAllocation.groups.map((group) => ({
-            ...group,
-            valuePln: 0,
-            currentPercent: null,
-            deviationPp: null,
-            targetValuePln: null,
-            deviationPln: null,
-            isInBand: null,
-          })),
-        }),
+        jsonResponse(
+          zeroBaseAllocation({
+            asOf: null,
+            totalPln: 0,
+            outsidePln: 5000,
+            outsideAssetClasses: [ASSET_CLASS.BankAccount],
+          }),
+        ),
     });
     expect(plain(textOf(root()))).toContain('brak wyceny');
     expectNoAmounts();
     api.fetchSpy.mockRestore();
     TestBed.resetTestingModule();
 
-    await render({
-      get: () =>
-        jsonResponse({
-          ...configuredAllocation,
-          basePln: 0,
-          outsidePln: 0,
-          outsideAssetClasses: [],
-          byAssetClass: [],
-          groups: configuredAllocation.groups.map((group) => ({
-            ...group,
-            valuePln: 0,
-            currentPercent: null,
-            deviationPp: null,
-            targetValuePln: null,
-            deviationPln: null,
-            isInBand: null,
-          })),
-        }),
-    });
+    await render({ get: () => jsonResponse(zeroBaseAllocation()) });
     expect(plain(textOf(root()))).toContain('brak aktywów w alokacji');
     expect(plain(textOf(root()))).not.toContain('brak wyceny');
     expectNoAmounts();
