@@ -169,8 +169,11 @@ export class Allocation {
     return data.asOf !== null && Number(data.basePln) > 0;
   });
 
-  protected readonly hasOutside = computed(
-    () => this.allocation.hasValue() && Number(this.allocation.value().outsidePln) !== 0,
+  protected readonly showOutside = computed(
+    () =>
+      this.allocation.hasValue() &&
+      this.allocation.value().asOf !== null &&
+      Number(this.allocation.value().outsidePln) !== 0,
   );
 
   private readonly selectedByRow = computed(() => {
