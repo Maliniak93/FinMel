@@ -160,6 +160,11 @@ export class Planning {
     ),
   );
 
+  protected readonly estimatedLimitYear = computed(() => {
+    const estimated = (this.allocation()?.buckets ?? []).find((bucket) => bucket.limit?.estimated);
+    return estimated?.limit ? Number(estimated.limit.year) : null;
+  });
+
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
   protected readonly formatPercent = formatPercent;

@@ -75,6 +75,82 @@ public sealed class AllocationCalculatorPropertyTests
         Assert.Equal(Math.Max(forecast, 0m), result.Buckets.Sum(b => b.Allocated));
     }
 
+    private static List<BucketInput> RandomLimitedPlan(Random random, out List<decimal?> rooms)
+    {
+        var plain = RandomPlan(random);
+        rooms = [];
+        var plan = new List<BucketInput>();
+        foreach (var bucket in plain)
+        {
+            if (bucket.IsRemainder || random.Next(2) == 0)
+            {
+                rooms.Add(null);
+                plan.Add(bucket);
+                continue;
+            }
+
+            var room = random.Next(0, 1_500_000) / 100m;
+            rooms.Add(room);
+            plan.Add(BucketInput.Limited(bucket.ShareType, bucket.Share, bucket.IsRemainder, room));
+        }
+
+        return plan;
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void Allocate_RandomPlanWithLimits_NeverExceedsARoomAndKeepsTheSum(int seed)
+    {
+        var random = new Random(seed);
+        var forecast = random.Next(-200_000, 3_000_000) / 100m;
+        var plan = RandomLimitedPlan(random, out var rooms);
+
+        var result = AllocationCalculator.Allocate(forecast, plan);
+
+        Assert.Equal(Math.Max(forecast, 0m), result.Buckets.Sum(b => b.Allocated));
+        for (var i = 0; i < plan.Count; i++)
+        {
+            Assert.True(result.Buckets[i].Allocated >= 0m);
+            if (rooms[i] is { } room)
+            {
+                Assert.True(result.Buckets[i].Allocated <= room, $"bucket {i}: {result.Buckets[i].Allocated} > {room}");
+                if (room < 1m)
+                {
+                    Assert.Equal(0m, result.Buckets[i].Allocated);
+                }
+            }
+
+            if (!plan[i].IsRemainder)
+            {
+                Assert.Equal(Math.Floor(result.Buckets[i].Allocated), result.Buckets[i].Allocated);
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void Allocate_PercentLimitedBucketsOverflow_LandBelowWithRoomOrInTheRemainder(int seed)
+    {
+        var random = new Random(seed);
+        var forecast = random.Next(100_000, 3_000_000) / 100m;
+        var room = random.Next(0, 200_000) / 100m;
+        var plan = new List<BucketInput>
+        {
+            BucketInput.Limited(BucketShareType.Percent, 50m, false, room),
+            new(BucketShareType.Percent, 30m, false),
+            new(BucketShareType.Percent, 20m, true)
+        };
+
+        var result = AllocationCalculator.Allocate(forecast, plan);
+
+        var first = result.Buckets[0].Allocated;
+        var overflow = Math.Max(forecast * 0.5m - (room < 1m ? 0m : room), 0m);
+        Assert.True(first <= room);
+        Assert.True(result.Buckets[1].Allocated <= Math.Floor(forecast * 0.3m + overflow));
+        Assert.True(result.Buckets[1].Allocated >= Math.Floor(forecast * 0.3m));
+        Assert.Equal(forecast, result.Buckets.Sum(b => b.Allocated));
+    }
+
     [Theory]
     [MemberData(nameof(Seeds))]
     public void Allocate_RandomPlan_KeepsTheAllocationInvariants(int seed)

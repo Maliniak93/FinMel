@@ -729,10 +729,16 @@
       "kind": {
         "investments": "Investments",
         "savings": "Savings",
-        "cushion": "Cushion"
+        "cushion": "Cushion",
+        "ike": "IKE",
+        "ikze": "IKZE",
+        "ikzeJdg": "IKZE JDG"
       },
       "cushionBalance": "Balance {{ start }} → {{ end }} / target {{ target }} ({{ months }} mo.)",
       "cushionReached": "target reached",
+      "limitContributed": "Contributed in {{ year }}: {{ contributed }} / {{ limit }}",
+      "limitReached": "limit reached",
+      "limitEstimated": "The {{ year }} limit is estimated from the last known year.",
       "shareType": {
         "fixed": "Fixed amount",
         "percent": "Percent"
@@ -765,6 +771,7 @@
         "targetMonthsInvalid": "Enter a whole number of months from 1 to 24.",
         "startingBalance": "Balance at the start of the month (PLN)",
         "startingBalanceInvalid": "Enter an amount of 0 or more.",
+        "contributed": "Contributed in {{ year }} before {{ month }} (PLN)",
         "empty": "No buckets — nothing will be split from this month.",
         "percentSum": "Percent total: {{ sum }}",
         "percentOver": "The percent shares add up to more than 100.",

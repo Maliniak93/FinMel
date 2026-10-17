@@ -3043,7 +3043,9 @@
           "accountName",
           "allocatedPln",
           "underfunded",
-          "cushion"
+          "cushion",
+          "limitReached",
+          "limit"
         ],
         "type": "object",
         "properties": {
@@ -3118,6 +3120,19 @@
               },
               {
                 "$ref": "#/components/schemas/CushionResponse"
+              }
+            ]
+          },
+          "limitReached": {
+            "type": "boolean"
+          },
+          "limit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LimitResponse"
               }
             ]
           }
@@ -5517,6 +5532,57 @@
             "type": "boolean"
           },
           "overdue": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LimitResponse": {
+        "required": [
+          "year",
+          "limitPln",
+          "contributedStartPln",
+          "contributedEndPln",
+          "reached",
+          "estimated"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "limitPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "contributedStartPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "contributedEndPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "reached": {
+            "type": "boolean"
+          },
+          "estimated": {
             "type": "boolean"
           }
         }

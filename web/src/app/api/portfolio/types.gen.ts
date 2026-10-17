@@ -85,6 +85,8 @@ export type AllocationBucketResponse = {
     allocatedPln: number | string;
     underfunded: boolean;
     cushion: null | CushionResponse;
+    limitReached: boolean;
+    limit: null | LimitResponse;
 };
 
 export type AllocationPlanRowRequest = {
@@ -543,6 +545,15 @@ export type IncomeOccurrenceResponse = {
     actualAmountPln: null | number | string;
     depositCreated: boolean;
     overdue: boolean;
+};
+
+export type LimitResponse = {
+    year: number | string;
+    limitPln: number | string;
+    contributedStartPln: number | string;
+    contributedEndPln: number | string;
+    reached: boolean;
+    estimated: boolean;
 };
 
 export type Metal = number;

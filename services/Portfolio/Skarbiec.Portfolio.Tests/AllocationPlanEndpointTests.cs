@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -196,6 +197,52 @@ public sealed class AllocationPlanEndpointTests(SkarbiecContainersFixture contai
 
         var unchanged = await client.GetAllocationAsync("2026-10", cancellationToken);
         Assert.Equal(["Poduszka", "Wakacje", "Inwestycje"], unchanged.Buckets.Select(b => b.Name));
+        Assert.Equal(1, await CountAllocationVersionsAsync(userId, cancellationToken));
+    }
+
+    [Fact]
+    public async Task InvalidLimitedBuckets_Return400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.CreateAllocationSetupAsync(cancellationToken);
+        var ike = await client.CreateAccountAsync(cancellationToken, "IKE Dominik", AccountType.Brokerage, TaxWrapper.Ike);
+        var regular = await client.CreateAccountAsync(cancellationToken, "XTB", AccountType.Brokerage, TaxWrapper.Regular);
+        await client.SaveAllocationPlanAsync(
+            "2026-10",
+            cancellationToken,
+            AllocationRow("IKE", IkeKind, PercentShare, 50m, accountId: ike, startingBalance: 1_000m),
+            AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 50m, isRemainder: true));
+        var ikeId = (await client.GetAllocationAsync("2026-10", cancellationToken)).Buckets[0].BucketId;
+        var remainder = AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 50m, isRemainder: true);
+
+        var wrapperCases = new (string Case, object[] Buckets)[]
+        {
+            ("IKE on a Regular account", [AllocationRow("IKE", IkeKind, PercentShare, 50m, accountId: regular), remainder]),
+            ("IKZE JDG on an IKE account", [AllocationRow("JDG", IkzeJdgKind, PercentShare, 50m, accountId: ike), remainder])
+        };
+        foreach (var (_, buckets) in wrapperCases)
+        {
+            var response = await client.PutAsJsonAsync(AllocationPlanVersionUri("2026-10"), NewAllocationPlanBody(buckets), cancellationToken);
+
+            await response.AssertProblemAsync(HttpStatusCode.BadRequest, BucketAccountWrapperErrorCode, cancellationToken);
+        }
+
+        var invalid = new (string Case, object[] Buckets)[]
+        {
+            ("IKE as remainder", [AllocationRow("IKE", IkeKind, PercentShare, 50m, isRemainder: true)]),
+            ("negative contributed", [AllocationRow("IKE", IkeKind, PercentShare, 50m, startingBalance: -1m), remainder]),
+            ("contributed on an existing bucket", [AllocationRow("IKE", IkeKind, PercentShare, 50m, bucketId: ikeId, startingBalance: 500m), remainder])
+        };
+        foreach (var (name, buckets) in invalid)
+        {
+            var response = await client.PutAsJsonAsync(AllocationPlanVersionUri("2026-10"), NewAllocationPlanBody(buckets), cancellationToken);
+
+            Assert.True(response.StatusCode == HttpStatusCode.BadRequest, $"{name}: {response.StatusCode}");
+        }
+
         Assert.Equal(1, await CountAllocationVersionsAsync(userId, cancellationToken));
     }
 

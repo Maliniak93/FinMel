@@ -1,4 +1,11 @@
-export const BUCKET_KIND = { Investments: 0, Savings: 1, Cushion: 2 } as const;
+export const BUCKET_KIND = {
+  Investments: 0,
+  Savings: 1,
+  Cushion: 2,
+  Ike: 3,
+  Ikze: 4,
+  IkzeJdg: 5,
+} as const;
 export const SHARE_TYPE = { Fixed: 0, Percent: 1 } as const;
 
 export function allocationBucket(
@@ -34,6 +41,26 @@ export function cushionBucket(extra: Record<string, unknown> = {}): Record<strin
       targetMonths: 6,
       balanceEndPln: 25200,
       reached: false,
+    },
+    ...extra,
+  });
+}
+
+export function limitedBucket(
+  name: string,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return allocationBucket(name, {
+    kind: BUCKET_KIND.Ike,
+    allocatedPln: 2260,
+    limitReached: true,
+    limit: {
+      year: 2026,
+      limitPln: 28260,
+      contributedStartPln: 26000,
+      contributedEndPln: 28260,
+      reached: true,
+      estimated: false,
     },
     ...extra,
   });

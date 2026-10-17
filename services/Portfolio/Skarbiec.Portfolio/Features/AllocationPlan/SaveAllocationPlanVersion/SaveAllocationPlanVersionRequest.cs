@@ -81,17 +81,27 @@ public sealed record SaveAllocationPlanVersionRequest : IValidatableObject
                 [nameof(row.TargetMonths)]);
         }
 
-        if (row.StartingBalance is { } balance)
+        foreach (var problem in ValidateStartingBalance(row))
         {
-            if (row.BucketId is not null)
-            {
-                yield return new ValidationResult("A starting balance is set only on a new cushion.", [nameof(row.StartingBalance)]);
-            }
-            else if (balance is < 0m or > AllocationPlanRowRequest.MaxStartingBalance)
-            {
-                yield return new ValidationResult(
-                    $"A starting balance is between 0 and {AllocationPlanRowRequest.MaxStartingBalance:0}.", [nameof(row.StartingBalance)]);
-            }
+            yield return problem;
+        }
+    }
+
+    private static IEnumerable<ValidationResult> ValidateStartingBalance(AllocationPlanRowRequest row)
+    {
+        if (row.StartingBalance is not { } balance)
+        {
+            yield break;
+        }
+
+        if (row.BucketId is not null)
+        {
+            yield return new ValidationResult("A starting balance is set only on a new bucket.", [nameof(row.StartingBalance)]);
+        }
+        else if (balance is < 0m or > AllocationPlanRowRequest.MaxStartingBalance)
+        {
+            yield return new ValidationResult(
+                $"A starting balance is between 0 and {AllocationPlanRowRequest.MaxStartingBalance:0}.", [nameof(row.StartingBalance)]);
         }
     }
 
@@ -102,9 +112,21 @@ public sealed record SaveAllocationPlanVersionRequest : IValidatableObject
             yield return new ValidationResult("Target months belong to a cushion only.", [nameof(row.TargetMonths)]);
         }
 
-        if (row.StartingBalance is not null)
+        if (row.Kind.IsLimited())
         {
-            yield return new ValidationResult("A starting balance belongs to a cushion only.", [nameof(row.StartingBalance)]);
+            foreach (var problem in ValidateStartingBalance(row))
+            {
+                yield return problem;
+            }
+
+            if (row.IsRemainder)
+            {
+                yield return new ValidationResult("A tax-limited bucket cannot be the remainder.", [nameof(row.IsRemainder)]);
+            }
+        }
+        else if (row.StartingBalance is not null)
+        {
+            yield return new ValidationResult("A starting balance belongs to a cushion or a tax-limited bucket only.", [nameof(row.StartingBalance)]);
         }
 
         if (row.ShareType is not { } shareType || row.Share is not { } share)
@@ -151,6 +173,6 @@ public sealed record AllocationPlanRowRequest
     /// <summary>A cushion's target in months of the month's cost, 1 to 24.</summary>
     public int? TargetMonths { get; init; }
 
-    /// <summary>PLN balance of a new cushion at the start of the effective month, default 0.</summary>
+    /// <summary>PLN of a new cushion's balance, or contributed in the effective month's year before it for a new IKE/IKZE bucket; default 0.</summary>
     public decimal? StartingBalance { get; init; }
 }

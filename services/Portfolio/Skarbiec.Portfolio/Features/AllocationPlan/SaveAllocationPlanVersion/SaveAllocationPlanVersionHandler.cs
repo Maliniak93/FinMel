@@ -68,6 +68,11 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
                 return AccountErrors.NotFound(accountId);
             }
 
+            if (row.Kind.IsLimited() && account.Wrapper != (row.Kind == BucketKind.Ike ? TaxWrapper.Ike : TaxWrapper.Ikze))
+            {
+                return AllocationPlanErrors.BucketAccountWrapper(accountId, row.Kind);
+            }
+
             var unchanged = row.BucketId is { } bucketId
                 && inForceAccounts.TryGetValue(bucketId, out var current)
                 && current == accountId;
@@ -96,7 +101,7 @@ public sealed class SaveAllocationPlanVersionHandler(PortfolioDbContext dbContex
             if (row.BucketId is null)
             {
                 dbContext.AllocationBuckets.Add(new AllocationBucket { Id = bucketId, Kind = row.Kind });
-                if (row.Kind == BucketKind.Cushion)
+                if (row.Kind == BucketKind.Cushion || row.Kind.IsLimited())
                 {
                     dbContext.AllocationBalanceOverrides.Add(new AllocationBalanceOverride
                     {
