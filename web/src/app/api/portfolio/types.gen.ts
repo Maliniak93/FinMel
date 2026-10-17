@@ -320,6 +320,10 @@ export type CashTotalResponse = {
     balance: number | string;
 };
 
+export type CheckTransferPlanRowRequest = {
+    checked: boolean;
+};
+
 export type ContributionResponse = {
     year: number | string;
     contributedPln: number | string;
@@ -821,11 +825,15 @@ export type TransferPlanResponse = {
     rows: Array<TransferRowResponse>;
     groups: Array<TransferGroupShare>;
     toInvestPln: number | string;
+    canUndo: boolean;
 };
 
-export type TransferPlanStatus = 'None' | 'Preview';
+export type TransferPlanStatus = 'None' | 'Preview' | 'Accepted' | 'Completed' | 'Skipped';
 
 export type TransferRowResponse = {
+    id: null | string;
+    batchNumber: null | number | string;
+    checked: null | boolean;
     bucketId: string;
     bucketName: string;
     accountId: null | string;
@@ -2252,6 +2260,96 @@ export type PutApiPortfolioTransferPlansSettingsResponses = {
 };
 
 export type PutApiPortfolioTransferPlansSettingsResponse = PutApiPortfolioTransferPlansSettingsResponses[keyof PutApiPortfolioTransferPlansSettingsResponses];
+
+export type PostApiPortfolioTransferPlansByMonthAcceptData = {
+    body?: never;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfer-plans/{month}/accept';
+};
+
+export type PostApiPortfolioTransferPlansByMonthAcceptResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiPortfolioTransferPlansByMonthAcceptResponse = PostApiPortfolioTransferPlansByMonthAcceptResponses[keyof PostApiPortfolioTransferPlansByMonthAcceptResponses];
+
+export type PostApiPortfolioTransferPlansByMonthUndoData = {
+    body?: never;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfer-plans/{month}/undo';
+};
+
+export type PostApiPortfolioTransferPlansByMonthUndoResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiPortfolioTransferPlansByMonthUndoResponse = PostApiPortfolioTransferPlansByMonthUndoResponses[keyof PostApiPortfolioTransferPlansByMonthUndoResponses];
+
+export type PutApiPortfolioTransferPlansRowsByRowIdCheckedData = {
+    body: CheckTransferPlanRowRequest;
+    path: {
+        rowId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfer-plans/rows/{rowId}/checked';
+};
+
+export type PutApiPortfolioTransferPlansRowsByRowIdCheckedResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioTransferPlansRowsByRowIdCheckedResponse = PutApiPortfolioTransferPlansRowsByRowIdCheckedResponses[keyof PutApiPortfolioTransferPlansRowsByRowIdCheckedResponses];
+
+export type DeleteApiPortfolioTransferPlansByMonthSkipData = {
+    body?: never;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfer-plans/{month}/skip';
+};
+
+export type DeleteApiPortfolioTransferPlansByMonthSkipResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioTransferPlansByMonthSkipResponse = DeleteApiPortfolioTransferPlansByMonthSkipResponses[keyof DeleteApiPortfolioTransferPlansByMonthSkipResponses];
+
+export type PostApiPortfolioTransferPlansByMonthSkipData = {
+    body?: never;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfer-plans/{month}/skip';
+};
+
+export type PostApiPortfolioTransferPlansByMonthSkipResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiPortfolioTransferPlansByMonthSkipResponse = PostApiPortfolioTransferPlansByMonthSkipResponses[keyof PostApiPortfolioTransferPlansByMonthSkipResponses];
 
 export type GetApiPortfolioPlanningOverdueData = {
     body?: never;

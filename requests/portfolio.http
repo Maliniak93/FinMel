@@ -1371,3 +1371,28 @@ Content-Type: application/json
 {
   "minimumTransferPln": 250
 }
+
+### Accept the month's preview, freezing its rows as batch 1 (204; 409 Conflict.TransferPlanNotPreview unless the month's transferPlan.status is Preview; 400 Validation.InvalidMonth)
+POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/accept
+Authorization: Bearer {{authToken}}
+
+### Undo the acceptance of the month (204; 409 Conflict.TransferPlanRowChecked while a row of the latest batch is checked; 404 NotFound.TransferPlan when nothing is accepted)
+POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/undo
+Authorization: Bearer {{authToken}}
+
+### Check or uncheck a frozen row; take the row id from transferPlan.rows of GET planning/months (204; 404 NotFound.TransferPlanRow)
+PUT {{baseUrl}}/api/portfolio/transfer-plans/rows/00000000-0000-0000-0000-000000000000/checked
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "checked": true
+}
+
+### Skip the month (204; 409 Conflict.TransferPlanNotPreview unless the status is Preview)
+POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/skip
+Authorization: Bearer {{authToken}}
+
+### Undo the skip (204; 404 NotFound.TransferPlan when the month is not skipped)
+DELETE {{baseUrl}}/api/portfolio/transfer-plans/2026-10/skip
+Authorization: Bearer {{authToken}}

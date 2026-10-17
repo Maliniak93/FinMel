@@ -206,7 +206,8 @@ describe('Planning', () => {
   async function setup(url = '/planning'): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const requested = /\/planning\/months\/(\d{4}-\d{2})/.exec(requestUrl(input));
-      if ((input as Request).method === 'DELETE' || (input as Request).method === 'PUT') {
+      const method = (input as Request).method;
+      if (method === 'DELETE' || method === 'PUT' || method === 'POST') {
         return new Response(null, { status: 204 });
       }
       if (requestUrl(input).includes('/planning/overdue')) {
@@ -1158,5 +1159,151 @@ describe('Planning', () => {
       expect(deletes).toHaveLength(1);
       expect(deletes[0].url).toContain('/allocation-buckets/bucket-Poduszka/balances/2026-12');
     });
+  });
+
+  function transferRequests(method: string): Request[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter(
+        (request: Request) => request.method === method && /transfer-plans/.test(request.url),
+      );
+  }
+
+  function frozenRow(name: string, id: string, isChecked: boolean): Record<string, unknown> {
+    return transferRow(name, 1000, { id, batchNumber: 1, checked: isChecked });
+  }
+
+  it('accepts or skips a preview and reloads the month', async () => {
+    responses['2026-10'] = month({}, {}, {}, {}, { rows: [transferRow('IKE', 2260)] });
+    await setup();
+
+    expect(rows('transfer-plan-status')[0].textContent).toContain('Preview');
+    expect(rows('transfer-undo')).toHaveLength(0);
+    expect(rows('transfer-unskip')).toHaveLength(0);
+    expect(rows('transfer-row-check')).toHaveLength(0);
+
+    click('transfer-accept');
+    await vi.waitFor(() => {
+      const posts = transferRequests('POST');
+      expect(posts).toHaveLength(1);
+      expect(posts[0].url).toContain('/transfer-plans/2026-10/accept');
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+
+    click('transfer-skip');
+    await vi.waitFor(() => {
+      const posts = transferRequests('POST');
+      expect(posts).toHaveLength(2);
+      expect(posts[1].url).toContain('/transfer-plans/2026-10/skip');
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toHaveLength(3));
+  });
+
+  it('shows an accepted plan with a checkbox per row, checks a row and undoes the acceptance after confirmation', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        status: 'Accepted',
+        canUndo: true,
+        rows: [frozenRow('IKE', 'row-1', false), frozenRow('IKZE', 'row-2', true)],
+      },
+    );
+    await setup();
+
+    const boxes = rows('transfer-row-check') as HTMLInputElement[];
+    expect(rows('transfer-plan-status')[0].textContent).toContain('Accepted');
+    expect(rows('transfer-plan-row')).toHaveLength(2);
+    expect(boxes.map((box) => box.checked)).toEqual([false, true]);
+    expect(rows('transfer-accept')).toHaveLength(0);
+    expect(rows('transfer-minimum-input')).toHaveLength(0);
+    expect((rows('transfer-undo')[0] as HTMLButtonElement).disabled).toBe(false);
+    expect(rows('transfer-undo-hint')).toHaveLength(0);
+
+    boxes[0].checked = true;
+    boxes[0].dispatchEvent(new Event('change'));
+    await vi.waitFor(async () => {
+      const puts = transferRequests('PUT');
+      expect(puts).toHaveLength(1);
+      expect(puts[0].url).toContain('/transfer-plans/rows/row-1/checked');
+      expect(await puts[0].clone().json()).toEqual({ checked: true });
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+    click('transfer-undo');
+    await vi.waitFor(() => {
+      const posts = transferRequests('POST');
+      expect(posts).toHaveLength(1);
+      expect(posts[0].url).toContain('/transfer-plans/2026-10/undo');
+    });
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      ConfirmDialog,
+      expect.objectContaining({ data: expect.objectContaining({ destructive: true }) }),
+    );
+  });
+
+  it('does not undo the acceptance when the confirmation is declined and disables undo while a row is checked', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        status: 'Accepted',
+        canUndo: false,
+        rows: [frozenRow('IKE', 'row-1', true), frozenRow('IKZE', 'row-2', false)],
+      },
+    );
+    await setup();
+
+    expect((rows('transfer-undo')[0] as HTMLButtonElement).disabled).toBe(true);
+    expect(rows('transfer-undo-hint')).toHaveLength(1);
+
+    component['undoTransferPlan']();
+    await settle();
+
+    expect(transferRequests('POST')).toHaveLength(0);
+  });
+
+  it('shows a completed plan as completed', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        status: 'Completed',
+        canUndo: false,
+        rows: [frozenRow('IKE', 'row-1', true)],
+      },
+    );
+    await setup();
+
+    expect(rows('transfer-plan-status')[0].textContent).toContain('Completed');
+    expect((rows('transfer-row-check')[0] as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('shows a skipped month without rows and unskips it', async () => {
+    responses['2026-10'] = month({}, {}, {}, {}, { status: 'Skipped' });
+    await setup();
+
+    expect(rows('transfer-plan-status')[0].textContent).toContain('Skipped');
+    expect(rows('transfer-plan-skipped')).toHaveLength(1);
+    expect(rows('transfer-plan-row')).toHaveLength(0);
+    expect(rows('transfer-accept')).toHaveLength(0);
+    expect(rows('transfer-skip')).toHaveLength(0);
+
+    click('transfer-unskip');
+    await vi.waitFor(() => {
+      const deletes = transferRequests('DELETE');
+      expect(deletes).toHaveLength(1);
+      expect(deletes[0].url).toContain('/transfer-plans/2026-10/skip');
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
   });
 });

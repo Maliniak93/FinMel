@@ -875,7 +875,27 @@
         "EmptyBase": "The allocation groups are worth zero, so the amounts are not split into groups.",
         "setTarget": "Set the target allocation"
       },
-      "nothingToInvest": "Nothing to invest."
+      "nothingToInvest": "Nothing to invest.",
+      "status": {
+        "preview": "Preview",
+        "accepted": "Accepted",
+        "completed": "Completed",
+        "skipped": "Skipped"
+      },
+      "accept": "Accept plan",
+      "acceptFailed": "Could not accept the plan.",
+      "skip": "Skip",
+      "skipFailed": "Could not skip the month.",
+      "skipped": "Transfers are skipped for this month.",
+      "unskip": "Undo skip",
+      "unskipFailed": "Could not undo the skip.",
+      "undo": "Undo acceptance",
+      "undoBlocked": "Uncheck every row to undo the acceptance.",
+      "undoTitle": "Undo the acceptance?",
+      "undoMessage": "The accepted rows are discarded and the plan goes back to a preview.",
+      "undoFailed": "Could not undo the acceptance.",
+      "checkRow": "Mark as transferred",
+      "checkFailed": "Could not update the row."
     },
     "freeFunds": {
       "title": "Free funds",

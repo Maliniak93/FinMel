@@ -35,6 +35,9 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<TargetAllocationReplica> TargetAllocationReplicas => Set<TargetAllocationReplica>();
     public DbSet<ValuationReplica> ValuationReplicas => Set<ValuationReplica>();
     public DbSet<TransferPlanSettings> TransferPlanSettings => Set<TransferPlanSettings>();
+    public DbSet<TransferPlan> TransferPlans => Set<TransferPlan>();
+    public DbSet<TransferPlanBatch> TransferPlanBatches => Set<TransferPlanBatch>();
+    public DbSet<TransferPlanRow> TransferPlanRows => Set<TransferPlanRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -359,6 +362,35 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
         {
             settings.HasKey(s => s.UserId);
             settings.Property(s => s.UserId).ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<TransferPlan>(plan =>
+        {
+            plan.HasIndex(p => new { p.UserId, p.Month }).IsUnique();
+
+            plan.HasMany(p => p.Batches)
+                .WithOne()
+                .HasForeignKey(b => b.PlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TransferPlanBatch>(batch =>
+        {
+            batch.HasIndex(b => new { b.PlanId, b.Number }).IsUnique();
+
+            batch.HasMany(b => b.Rows)
+                .WithOne()
+                .HasForeignKey(r => r.BatchId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TransferPlanRow>(row =>
+        {
+            row.Property(r => r.BucketName).HasMaxLength(100);
+            row.Property(r => r.AccountName).HasMaxLength(200);
+            row.Property(r => r.GroupName).HasMaxLength(100);
+            row.Property(r => r.AmountPln).HasPrecision(18, 2);
+            row.Property(r => r.Marker).HasConversion<string>().HasMaxLength(20);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

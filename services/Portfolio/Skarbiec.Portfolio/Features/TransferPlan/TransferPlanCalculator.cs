@@ -70,18 +70,21 @@ public static class TransferPlanCalculator
         return new TransferPlanResult(rows, shares);
     }
 
-    private static decimal Percent(decimal part, decimal whole) =>
+    internal static decimal Percent(decimal part, decimal whole) =>
         whole > 0m ? Math.Round(part / whole * 100m, 1, MidpointRounding.AwayFromZero) : 0m;
+
+    // Null when the money is not tied to an account: every class can be bought.
+    public static AssetClass[]? BuyableClasses(AccountType? accountType) => accountType switch
+    {
+        AccountType.Brokerage => [AssetClass.Stock, AssetClass.Etf],
+        AccountType.Bonds => [AssetClass.Bond],
+        AccountType.Bank => [AssetClass.Deposit],
+        _ => null
+    };
 
     private static List<int> BuyableGroups(AccountType? accountType, IReadOnlyList<TransferGroup> groups)
     {
-        AssetClass[]? classes = accountType switch
-        {
-            AccountType.Brokerage => [AssetClass.Stock, AssetClass.Etf],
-            AccountType.Bonds => [AssetClass.Bond],
-            AccountType.Bank => [AssetClass.Deposit],
-            _ => null
-        };
+        var classes = BuyableClasses(accountType);
 
         return Enumerable.Range(0, groups.Count)
             .Where(i => classes is null || groups[i].AssetClasses.Any(c => classes.Contains(c)))

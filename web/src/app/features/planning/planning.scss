@@ -87,6 +87,17 @@
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
+.planning-transfer__row--frozen {
+  grid-template-columns: auto 2fr 1.5fr 1.5fr 1fr 1.5fr;
+}
+
+.planning-transfer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
 .planning-transfer__groups {
   margin-top: 16px;
   border-collapse: collapse;
