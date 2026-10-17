@@ -54,6 +54,22 @@ export function formatPercent(value: number | string): string {
   return `${new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 4 }).format(Number(value))} %`;
 }
 
+export function formatSignedMoney(amount: number | string, currency = 'PLN'): string {
+  return new Intl.NumberFormat(activeLocale(), {
+    style: 'currency',
+    currency,
+    signDisplay: 'exceptZero',
+  }).format(Number(amount));
+}
+
+export function formatSignedPoints(value: number | string): string {
+  return `${new Intl.NumberFormat(activeLocale(), {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    signDisplay: 'exceptZero',
+  }).format(Number(value))} pp`;
+}
+
 function toDate(value: string | Date): Date {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? fromDateOnly(value)

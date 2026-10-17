@@ -33,6 +33,7 @@
   "shell": {
     "nav": {
       "dashboard": "Pulpit",
+      "allocation": "Alokacja",
       "cash": "Gotówka",
       "planning": "Planowanie",
       "securities": "Akcje i ETF",
@@ -381,6 +382,46 @@
         "due": "Do rozliczenia",
         "settled": "Rozliczony"
       }
+    }
+  },
+  "allocation": {
+    "title": "Alokacja docelowa",
+    "loadFailed": "Nie udało się wczytać alokacji docelowej.",
+    "noValuation": "Aktualna wartość: brak wyceny.",
+    "noBase": "Odchylenia: brak aktywów w alokacji.",
+    "disclaimer": "Informacja, nie porada inwestycyjna.",
+    "outOfBand": "Poza pasmem",
+    "outside": "Poza alokacją",
+    "summary": "baza {{ base }} z {{ total }}",
+    "columns": {
+      "group": "Grupa",
+      "value": "Wartość",
+      "current": "Udział obecny",
+      "target": "Cel",
+      "band": "Pasmo",
+      "deviationPp": "Odchylenie",
+      "deviationPln": "Względem celu"
+    },
+    "proposal": {
+      "equities": "Akcje/ETF",
+      "bonds": "Obligacje",
+      "metals": "Kruszce"
+    },
+    "editor": {
+      "proposalIntro": "Propozycja podziału majątku. Ustaw cel dla każdej grupy i zapisz.",
+      "name": "Nazwa grupy",
+      "classes": "Klasy aktywów",
+      "target": "Cel (%)",
+      "band": "Pasmo ± (pp)",
+      "addGroup": "Dodaj grupę",
+      "removeGroup": "Usuń grupę",
+      "sum": "Suma celów: {{ sum }}"
+    },
+    "errors": {
+      "nameRequired": "Podaj nazwę grupy.",
+      "classesRequired": "Wybierz co najmniej jedną klasę aktywów.",
+      "percent": "Podaj wartość 0–100 z najwyżej jednym miejscem po przecinku.",
+      "duplicateNames": "Nazwy grup muszą się różnić."
     }
   },
   "dashboard": {
