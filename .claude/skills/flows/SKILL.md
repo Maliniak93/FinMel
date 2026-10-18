@@ -21,15 +21,15 @@ Regenerate the workflow map. Talk to the user in Polish; write the descriptions 
    - `summary`, `title`, `detail`, `condition`, `limit.text`, `next.when` in Polish; `condition`, `agent`, `retries`,
      `limit` and `calls` only when the sources state them; `agent` must be the name of an existing agent;
    - the 7 pipeline nodes (`cmd:idea`, `cmd:design`, `cmd:build`, `cmd:fix`, `wf:build-feature`, `script:ship`,
-     `script:epic`) are graphs: every step has `next` (`[]` on a terminal step), every `to` is a step of the same node, every
+     `script:autobuild`) are graphs: every step has `next` (`[]` on a terminal step), every `to` is a step of the same node, every
      step is reachable from the first. Name every branch the sources state (labels, tier, `skip-tests`, `e2e` part,
      blocked/ready, escalation, CI result) as a `next` with a `when`; a loop is a `next` back to an earlier step;
    - `limit.ref` whenever the limit is one of the `limitKeys` that `facts --node <id>` prints for that node (any node
      may use it); `limit.text` only for a prose limit with no such constant; `calls` for a step that runs another node;
    - `measure`: set it on every step that matches a key of the `measurableKeys` that `facts --node <id>` prints
      (`wf:build-feature`: the `agent:<type>:<label>` of the agent the step spawns, `run:build-feature` for a step
-     that stands for the whole run, `verify:implementer` for the verification inside the implementer; `script:epic`:
-     `epic:build` for the claude build of a part, `epic:ci` for the wait for CI); a step with no matching key, and every
+     that stands for the whole run, `verify:implementer` for the verification inside the implementer; `script:autobuild`:
+     `autobuild:build` for the claude build of a part, `autobuild:ci` for the wait for CI); a step with no matching key, and every
      interactive step (`/idea`, `/design` sessions), gets none. Never copy numbers into a description - `build`
      renders them from the run records and `brak pomiarów` where no sample exists;
    - other nodes keep a plain list: `next` may be omitted;

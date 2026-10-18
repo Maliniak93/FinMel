@@ -1,4 +1,4 @@
-// Usage: imported by epic.mjs - the GitHub-limit wait and the idempotent-write helpers, pure and injectable; runs nothing on import
+// Usage: imported by autobuild.mjs - the GitHub-limit wait and the idempotent-write helpers, pure and injectable; runs nothing on import
 
 import { GhLimitError, hasRunMarker, limitFromText, limitWait } from "./gh.mjs";
 

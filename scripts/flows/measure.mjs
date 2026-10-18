@@ -5,7 +5,7 @@ import path from "node:path";
 const SAMPLE_LIMIT = 10;
 const WORKFLOW = "build-feature";
 
-export const MEASURED_NODES = { "wf:build-feature": /^(agent|run|verify):/, "script:epic": /^epic:/ };
+export const MEASURED_NODES = { "wf:build-feature": /^(agent|run|verify):/, "script:autobuild": /^autobuild:/ };
 
 const KNOWN_KEYS = [
   "run:build-feature",
@@ -21,8 +21,8 @@ const KNOWN_KEYS = [
   "agent:reviewer:adversarial review",
   "agent:reviewer:re-review",
   "verify:implementer",
-  "epic:build",
-  "epic:ci",
+  "autobuild:build",
+  "autobuild:ci",
 ];
 
 export function defaultHistory(root) {
@@ -92,7 +92,7 @@ function workflowSamples(history, add) {
   }
 }
 
-function epicSamples(base, add) {
+function autobuildSamples(base, add) {
   const logsIn = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => /^\d{8}-\d{6}\.log$/.test(f)).map((f) => path.join(dir, f)) : []);
   const files = [...logsIn(base), ...subdirs(base).flatMap((epic) => logsIn(path.join(base, epic)))];
   for (const file of files) {
@@ -104,8 +104,8 @@ function epicSamples(base, add) {
       for (const part of line.slice(at).split(";")) {
         const m = part.match(/#\d+ PR #\d+ \((?:build (\d+) min|ship retried), CI (\d+) min\)/);
         if (!m) continue;
-        if (m[1] !== undefined) add("epic:build", started, Number(m[1]));
-        add("epic:ci", started, Number(m[2]));
+        if (m[1] !== undefined) add("autobuild:build", started, Number(m[1]));
+        add("autobuild:ci", started, Number(m[2]));
       }
     }
   }
@@ -123,18 +123,18 @@ function summarize(samples) {
   return { n: values.length, median: Math.round(median), max: Math.round(values.at(-1)), from: day(Math.min(...times)), to: day(Math.max(...times)) };
 }
 
-export const defaultEpicRuns = (root) => path.join(root, "skarbiec-plan", "epic-runs");
+export const defaultAutobuildRuns = (root) => path.join(root, "skarbiec-plan", "autobuild-runs");
 
-export function collectMeasurements(history, epicRuns) {
+export function collectMeasurements(history, autobuildRuns) {
   const buckets = new Map(KNOWN_KEYS.map((key) => [key, []]));
   const add = (key, at, value) => {
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push({ at, value });
   };
   workflowSamples(history, add);
-  epicSamples(epicRuns, add);
+  autobuildSamples(autobuildRuns, add);
   return Object.fromEntries(
-    [...buckets].map(([key, samples]) => [key, { unit: key.startsWith("epic:") ? "min" : "s", ...summarize(samples) }]),
+    [...buckets].map(([key, samples]) => [key, { unit: key.startsWith("autobuild:") ? "min" : "s", ...summarize(samples) }]),
   );
 }
 

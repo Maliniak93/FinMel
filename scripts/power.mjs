@@ -1,4 +1,4 @@
-// Usage: imported by epic.mjs - wake-timer state, suspend/hibernate with a resume timer, the timed Tak/Nie popup; runs nothing on import
+// Usage: imported by autobuild.mjs - wake-timer state, suspend/hibernate with a resume timer, the timed Tak/Nie popup; runs nothing on import
 import { spawn, spawnSync } from "node:child_process";
 
 const HINT = "run `powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 1`, then `powercfg /setactive SCHEME_CURRENT`";

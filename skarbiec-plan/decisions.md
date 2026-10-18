@@ -229,7 +229,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-034 ✅ An isolated e2e stack on stubbed market data, started by agents
 
-**Context:** the e2e suite needs exact expected amounts, so market data must be fixed and must never come from Yahoo, gold-api, NBP or MF. It must also run unattended inside `epic.mjs`, while CLAUDE.md reserves starting and stopping the stack for the user.
+**Context:** the e2e suite needs exact expected amounts, so market data must be fixed and must never come from Yahoo, gold-api, NBP or MF. It must also run unattended inside `autobuild.mjs`, while CLAUDE.md reserves starting and stopping the stack for the user.
 
 **Decision:** e2e runs only through `node scripts/e2e.mjs`, on a second compose project `skarbiec-e2e`: images `skarbiec-e2e/<svc>` built from the working tree, its own host ports (web `:18080`), Postgres and RabbitMQ on tmpfs, `down --volumes` after every run. A stub container serves a documented data set by impersonating the providers; only the e2e override points MarketData's base URLs at it, so MarketData's sources, parsers and jobs run unchanged and ADR-007 stands. Agents may start and stop this project, and only this one; the user's `skarbiec-local` stack and Aspire stay the user's.
 

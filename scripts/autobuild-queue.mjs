@@ -1,4 +1,4 @@
-// Usage: imported by epic.mjs - the queue plan, the next piece of work, the start and window times; pure, injectable, runs nothing on import
+// Usage: imported by autobuild.mjs - the queue plan, the next piece of work, the start and window times; pure, injectable, runs nothing on import
 
 const partNumbers = (epic) => (epic.subIssues ?? []).map((s) => (typeof s === "object" ? s.number : s));
 const TIME_RE = /^(\d{1,2}):(\d{2})$/;
@@ -47,6 +47,6 @@ export const windowEnd = (hhmm, now) => nextOccurrence(hhmm, now);
 export const mayStart = (until, now) => (until && now.getTime() >= until.getTime() ? "window" : null);
 
 export async function startWork({ item, part, gh, build }) {
-  for (const number of new Set([item, part])) await gh(["issue", "edit", String(number), "--add-label", "epic-run"]);
+  for (const number of new Set([item, part])) await gh(["issue", "edit", String(number), "--add-label", "autobuild"]);
   return build();
 }

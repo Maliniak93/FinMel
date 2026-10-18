@@ -10,13 +10,13 @@ export function queueOf(cards) {
   const inRank = (status) => topLevel.filter((c) => c.status === status);
 
   return [...inRank("In progress"), ...inRank("Todo")].map((c) => {
-    if (!c.epic) return { ...c, manual: c.status === "In progress" && !c.epicRun };
+    if (!c.epic) return { ...c, manual: c.status === "In progress" && !c.autobuild };
 
     const children = partNumbers(c)
       .map((n) => byNumber.get(n))
       .filter(Boolean);
     const running = children.filter((p) => p.status === "In progress");
-    const manual = c.status === "In progress" && !c.epicRun && running.some((p) => !p.epicRun);
+    const manual = c.status === "In progress" && !c.autobuild && running.some((p) => !p.autobuild);
     const next = children.find((p) => p.status !== "Done");
     return { ...c, manual, next: next ? next.number : null };
   });

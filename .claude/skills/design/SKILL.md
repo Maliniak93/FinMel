@@ -130,7 +130,7 @@ lists the parts one line each (title, tier, kind, AC count, plan step count).
 `.claude/skills/design/e2e-part-template.md` as `<slug>-<n>-e2e.md`: fill only its placeholders, keep its four fixed ACs.
 It is created with `--e2e --parent <umbrella> --tier 1 --kind new` (never `--skip-tests`), attached last, and
 depends on the part before it. Its `/build` run automates the umbrella's `## Test manualny` as Playwright tests,
-refreshes that plan and runs the whole e2e suite; a stable app failure blocks it and stops `scripts/epic.mjs`. It has
+refreshes that plan and runs the whole e2e suite; a stable app failure blocks it and stops `scripts/autobuild.mjs`. It has
 no `## Test manualny` of its own. Add no e2e part to an epic with no app-visible change (infrastructure, workflow,
 cleanup), nor to the e2e epic itself, whose smoke is its e2e. The approval summary lists the e2e part like any other
 part (title, tier 1, kind new, 4 ACs, `brak planu`).

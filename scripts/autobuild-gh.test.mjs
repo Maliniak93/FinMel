@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { closeUnlessClosed, createTimeoutBudget, detectChildLimit, mergeUnlessMerged, postOnce, runStepWithLimit } from "./epic-gh.mjs";
+import { closeUnlessClosed, createTimeoutBudget, detectChildLimit, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
 
 const RESET = 1_800_000_600;
 const marker = (kind, resetAt) => `GITHUB_LIMIT ${JSON.stringify({ kind, resetAt })}`;
