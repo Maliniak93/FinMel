@@ -23,6 +23,7 @@ import {
   getApiPortfolioPlanningMonthsByMonth,
   postApiPortfolioTransferPlansByMonthAccept,
   postApiPortfolioTransferPlansByMonthSkip,
+  postApiPortfolioTransferPlansByMonthTopUpAccept,
   postApiPortfolioTransferPlansByMonthUndo,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
   putApiPortfolioTransferPlansRowsByRowIdChecked,
@@ -38,6 +39,7 @@ import {
   type TransferMarker,
   type TransferPlanFallbackReason,
   type TransferPlanStatus,
+  type TransferRowResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { PlanningState } from '../../core/planning/planning-state';
@@ -116,6 +118,12 @@ const TRANSFER_STATUS_KEYS: Record<TransferPlanStatus, string | null> = {
   Completed: 'planning.transferPlan.status.completed',
   Skipped: 'planning.transferPlan.status.skipped',
 };
+
+interface TransferBatchGroup {
+  number: number | null;
+  title: { key: string; params: Record<string, number> } | null;
+  rows: TransferRowResponse[];
+}
 
 function shiftMonth(month: string, delta: number): string {
   const [year, number] = month.split('-').map(Number);
@@ -573,6 +581,37 @@ export class Planning {
 
   protected transferStatusKey(status: TransferPlanStatus): string | null {
     return TRANSFER_STATUS_KEYS[status];
+  }
+
+  protected transferBatches(rows: TransferRowResponse[]): TransferBatchGroup[] {
+    const groups: TransferBatchGroup[] = [];
+    for (const row of rows) {
+      const number = row.batchNumber === null ? null : Number(row.batchNumber);
+      let group = groups.find((candidate) => candidate.number === number);
+      if (!group) {
+        group = {
+          number,
+          title:
+            number === null
+              ? null
+              : number === 1
+                ? { key: 'planning.transferPlan.batch.plan', params: {} }
+                : { key: 'planning.transferPlan.batch.topUp', params: { number: number - 1 } },
+          rows: [],
+        };
+        groups.push(group);
+      }
+      group.rows.push(row);
+    }
+    return groups;
+  }
+
+  protected async acceptTransferTopUp(): Promise<void> {
+    await this.runTransferAction(
+      () =>
+        postApiPortfolioTransferPlansByMonthTopUpAccept({ path: { month: this.selectedMonth() } }),
+      'planning.transferPlan.topUp.acceptFailed',
+    );
   }
 
   protected async acceptTransferPlan(): Promise<void> {

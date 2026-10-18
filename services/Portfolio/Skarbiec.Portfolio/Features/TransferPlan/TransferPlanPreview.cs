@@ -9,6 +9,8 @@ namespace Skarbiec.Portfolio.Features.TransferPlan;
 
 internal static class TransferPlanPreview
 {
+    private const decimal MinimumDifference = 0.01m;
+
     public static TransferPlanResponse Build(
         YearMonth viewed,
         YearMonth current,
@@ -59,7 +61,7 @@ internal static class TransferPlanPreview
 
         return stored is null
             ? BuildPreview(allocation, accounts, target, valuation, minimum, groups, groupValues)
-            : BuildFrozen(stored, allocation, groups, groupValues);
+            : BuildFrozen(stored, allocation, accounts, target, valuation, minimum, groups, groupValues);
     }
 
     // The group holding the lowest class: stable when the user renames, merges or reorders groups.
@@ -95,27 +97,22 @@ internal static class TransferPlanPreview
             Rows = [],
             Groups = [],
             ToInvestPln = toInvest,
-            CanUndo = false
+            CanUndo = false,
+            Differences = [],
+            TopUp = null
         };
 
-    private static TransferPlanResponse BuildPreview(
-        AllocationResponse allocation,
-        IReadOnlyDictionary<Guid, Account> accounts,
+    private sealed record Distribution(
+        TransferPlanFallbackReason? FallbackReason, List<TransferRowResponse> Rows, IReadOnlyList<TransferGroupShare> Groups);
+
+    private static Distribution Distribute(
+        List<TransferBasket> baskets,
         TargetAllocationReplica? target,
         ValuationReplica? valuation,
         int minimum,
         List<TransferGroup> groups,
         Dictionary<string, decimal> groupValues)
     {
-        var baskets = allocation.Buckets
-            .Where(b => (b.Kind == BucketKind.Investments || b.Kind.IsLimited()) && b.AllocatedPln > 0m)
-            .Select((b, order) =>
-            {
-                var account = b.AccountId is { } id && accounts.TryGetValue(id, out var found) ? found : null;
-                return new TransferBasket(b.BucketId, b.Name, order, account?.Id, account?.Name, account?.Type, b.AllocatedPln);
-            })
-            .ToList();
-
         TransferPlanFallbackReason? fallbackReason =
             target is null ? TransferPlanFallbackReason.NoTargetAllocation
             : valuation is null ? TransferPlanFallbackReason.NoValuation
@@ -139,15 +136,9 @@ internal static class TransferPlanPreview
                 .ToList();
         }
 
-        return new TransferPlanResponse
-        {
-            Status = TransferPlanStatus.Preview,
-            NoneReason = null,
-            MinimumTransferPln = minimum,
-            ValuationDate = valuation?.Date,
-            ValuationStale = valuation?.IsStale ?? false,
-            FallbackReason = fallbackReason,
-            Rows = rows
+        return new Distribution(
+            fallbackReason,
+            rows
                 .Select(r => new TransferRowResponse
                 {
                     Id = null,
@@ -162,15 +153,59 @@ internal static class TransferPlanPreview
                     Marker = r.Marker
                 })
                 .ToList(),
-            Groups = shares,
+            shares);
+    }
+
+    private static TransferBasket BasketOf(
+        AllocationBucketResponse bucket, int order, decimal amount, IReadOnlyDictionary<Guid, Account> accounts)
+    {
+        var account = bucket.AccountId is { } id && accounts.TryGetValue(id, out var found) ? found : null;
+        return new TransferBasket(bucket.BucketId, bucket.Name, order, account?.Id, account?.Name, account?.Type, amount);
+    }
+
+    private static bool Invests(AllocationBucketResponse bucket) =>
+        bucket.Kind == BucketKind.Investments || bucket.Kind.IsLimited();
+
+    private static TransferPlanResponse BuildPreview(
+        AllocationResponse allocation,
+        IReadOnlyDictionary<Guid, Account> accounts,
+        TargetAllocationReplica? target,
+        ValuationReplica? valuation,
+        int minimum,
+        List<TransferGroup> groups,
+        Dictionary<string, decimal> groupValues)
+    {
+        var baskets = allocation.Buckets
+            .Where(b => Invests(b) && b.AllocatedPln > 0m)
+            .Select((b, order) => BasketOf(b, order, b.AllocatedPln, accounts))
+            .ToList();
+
+        var distribution = Distribute(baskets, target, valuation, minimum, groups, groupValues);
+
+        return new TransferPlanResponse
+        {
+            Status = TransferPlanStatus.Preview,
+            NoneReason = null,
+            MinimumTransferPln = minimum,
+            ValuationDate = valuation?.Date,
+            ValuationStale = valuation?.IsStale ?? false,
+            FallbackReason = distribution.FallbackReason,
+            Rows = distribution.Rows,
+            Groups = distribution.Groups,
             ToInvestPln = allocation.ToInvestPln,
-            CanUndo = false
+            CanUndo = false,
+            Differences = [],
+            TopUp = null
         };
     }
 
     private static TransferPlanResponse BuildFrozen(
         StoredTransferPlan stored,
         AllocationResponse allocation,
+        IReadOnlyDictionary<Guid, Account> accounts,
+        TargetAllocationReplica? target,
+        ValuationReplica? valuation,
+        int minimum,
         List<TransferGroup> groups,
         Dictionary<string, decimal> groupValues)
     {
@@ -203,6 +238,22 @@ internal static class TransferPlanPreview
         var first = batches[0];
         var latest = batches[^1];
 
+        var (differences, topUpBaskets) = DifferencesOf(rows.Select(x => x.Row).ToList(), allocation, accounts);
+        TransferTopUpResponse? topUp = null;
+        if (topUpBaskets.Count > 0)
+        {
+            var openValues = groups.Select((g, i) => (g.Name, Value: values[i])).ToDictionary(x => x.Name, x => x.Value);
+            var distribution = Distribute(topUpBaskets, target, valuation, minimum, groups, openValues);
+            topUp = new TransferTopUpResponse
+            {
+                MinimumTransferPln = minimum,
+                ValuationDate = valuation?.Date,
+                FallbackReason = distribution.FallbackReason,
+                Rows = distribution.Rows,
+                Groups = distribution.Groups
+            };
+        }
+
         return new TransferPlanResponse
         {
             Status = rows.Count > 0 && open.Count == 0 ? TransferPlanStatus.Completed : TransferPlanStatus.Accepted,
@@ -228,7 +279,53 @@ internal static class TransferPlanPreview
                 .ToList(),
             Groups = shares,
             ToInvestPln = rows.Sum(x => x.Row.AmountPln),
-            CanUndo = latest.Rows.All(r => r.CheckedAtUtc is null)
+            CanUndo = latest.Rows.All(r => r.CheckedAtUtc is null),
+            Differences = differences,
+            TopUp = topUp
         };
+    }
+
+    private static (List<TransferDifferenceResponse> Differences, List<TransferBasket> TopUpBaskets) DifferencesOf(
+        IReadOnlyList<TransferPlanRow> rows, AllocationResponse allocation, IReadOnlyDictionary<Guid, Account> accounts)
+    {
+        var accepted = rows
+            .GroupBy(r => r.BucketId)
+            .ToDictionary(g => g.Key, g => (Name: g.First().BucketName, Amount: g.Sum(r => r.AmountPln)));
+        var investing = allocation.Buckets.Where(Invests).ToList();
+
+        var entries = investing
+            .Select(b => (b.BucketId, b.Name, Current: b.AllocatedPln, Bucket: (AllocationBucketResponse?)b))
+            .Concat(accepted
+                .Where(a => investing.All(b => b.BucketId != a.Key))
+                .Select(a => (BucketId: a.Key, Name: a.Value.Name, Current: 0m, Bucket: (AllocationBucketResponse?)null)))
+            .ToList();
+
+        var differences = new List<TransferDifferenceResponse>();
+        var baskets = new List<TransferBasket>();
+        foreach (var entry in entries)
+        {
+            var acceptedPln = accepted.TryGetValue(entry.BucketId, out var found) ? found.Amount : 0m;
+            var difference = entry.Current - acceptedPln;
+            if (Math.Abs(difference) < MinimumDifference)
+            {
+                continue;
+            }
+
+            differences.Add(new TransferDifferenceResponse
+            {
+                BucketId = entry.BucketId,
+                BucketName = entry.Name,
+                AcceptedPln = acceptedPln,
+                CurrentPln = entry.Current,
+                DifferencePln = difference
+            });
+
+            if (difference > 0m && entry.Bucket is { } bucket)
+            {
+                baskets.Add(BasketOf(bucket, baskets.Count, difference, accounts));
+            }
+        }
+
+        return (differences, baskets);
     }
 }

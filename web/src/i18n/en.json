@@ -895,7 +895,21 @@
       "undoMessage": "The accepted rows are discarded and the plan goes back to a preview.",
       "undoFailed": "Could not undo the acceptance.",
       "checkRow": "Mark as transferred",
-      "checkFailed": "Could not update the row."
+      "checkFailed": "Could not update the row.",
+      "batch": {
+        "plan": "Plan",
+        "topUp": "Top-up {{ number }}"
+      },
+      "differences": {
+        "title": "Changes since the plan was accepted",
+        "change": "Accepted {{ accepted }}, now {{ current }}",
+        "decrease": "Information only, accepted rows stay as they are."
+      },
+      "topUp": {
+        "title": "Top-up",
+        "accept": "Accept top-up",
+        "acceptFailed": "Could not accept the top-up."
+      }
     },
     "freeFunds": {
       "title": "Free funds",
