@@ -10,6 +10,7 @@
 //   --max-wait HOURS  a reset further away than this ends the run with `limit-too-far` (default 12)
 //   --shutdown        ask with a 10 min Tak/Nie popup when the run ends, then shut down (default; no answer shuts down); --no-shutdown does not
 //   --dry-run         print the plan, the start time and what would happen per part; no preflight script, builds, merges, comments or shutdown
+//   in a terminal (stdin and stdout a TTY) a start wizard asks every setting no flag answered, shows a summary and the equivalent command and asks `Start? [T/n]`; n exits 0, Ctrl+C 130, nothing starts
 //   node scripts/epic.mjs --stop   creates the one stop file; the running driver stops before the next build
 //   node scripts/epic.mjs --sleep-test MIN | --hibernate-test MIN   suspend or hibernate with a wake timer MIN minutes ahead (no popup), print the planned and actual wake time and `powercfg /lastwake`, exit
 //   an unknown reset ends the run with `limit-unknown`; a PC that wakes but is not ready within 15 min with `wake-not-ready`; every line also goes to skarbiec-plan/epic-runs/<timestamp>.log
@@ -30,15 +31,13 @@ import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-rep
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./epic-gh.mjs";
 import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./epic-limit.mjs";
 import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./epic-queue.mjs";
+import { UsageError, WizardCancelled, parseFlags, runWizard } from "./epic-wizard.mjs";
 import { confirmPower, suspendUntil, wakeTimers } from "./power.mjs";
 import { queueOf } from "./queue.mjs";
 import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WIN = process.platform === "win32";
-const BOOLEAN_FLAGS = new Set(["dry-run", "shutdown", "no-shutdown", "include-manual", "skip-manual", "stop"]);
-const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "items", "start", "until", "on-limit", "max-wait", "sleep-test", "hibernate-test"]);
-const USAGE = "usage: epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run] | --stop | --sleep-test MIN | --hibernate-test MIN";
 const BUILD_TIMEOUT_MS = 4 * 3600e3;
 const CI_POLL_MS = 30e3;
 const CI_MISSING_MS = 10 * 60e3;
@@ -172,19 +171,12 @@ const gh = (argv) => outcome(spawnGh(argv));
 const git = (argv) => run("git", argv);
 const project = (argv) => run(NODE, ["scripts/gh-project.mjs", ...argv]);
 
-function parseFlags(argv) {
-  const flags = {};
-  for (let i = 0; i < argv.length; i++) {
-    if (/^\d+$/.test(argv[i]) && flags.only === undefined) {
-      flags.only = Number(argv[i]);
-      continue;
-    }
-    const key = argv[i].slice(2);
-    if (!argv[i].startsWith("--") || !KNOWN_FLAGS.has(key)) throw new Stop("usage", `unexpected argument: ${argv[i]}\n${USAGE}`);
-    flags[key] = BOOLEAN_FLAGS.has(key) ? true : argv[++i];
-    if (flags[key] === undefined) throw new Stop("usage", `--${key} needs a value\n${USAGE}`);
+function readFlags(argv) {
+  try {
+    return parseFlags(argv);
+  } catch (err) {
+    throw err instanceof UsageError ? new Stop("usage", err.message) : err;
   }
-  return flags;
 }
 
 const stopFile = () => path.join(os.tmpdir(), "skarbiec-epic.stop");
@@ -965,6 +957,25 @@ function readTimes(flags) {
   }
 }
 
+const planNeeded = (flags) => flags.only === undefined && (flags.items === undefined || (!flags["include-manual"] && !flags["skip-manual"]));
+
+async function startWizard(flags) {
+  const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  if (!tty) return { run: true, flags };
+  let plan = [];
+  if (planNeeded(flags)) {
+    const res = retryTransient("project list", () => project(["list"]));
+    if (!res.ok) throw new Stop("github", `gh-project.mjs list: ${res.firstErr}`);
+    plan = queueOf(JSON.parse(res.out));
+  }
+  try {
+    return await runWizard(flags, { tty, plan, power: wakeTimers(), now: new Date() }, { input: process.stdin, output: process.stdout });
+  } catch (err) {
+    if (err instanceof WizardCancelled) interrupt();
+    throw err;
+  }
+}
+
 const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null };
 
 async function powerTest(mode, minutesAhead) {
@@ -984,7 +995,7 @@ function interrupt() {
 process.on("SIGINT", interrupt);
 
 try {
-  const flags = parseFlags(process.argv.slice(2));
+  let flags = readFlags(process.argv.slice(2));
   ctx.flags = flags;
   ctx.dryRun = Boolean(flags["dry-run"]);
   if (flags["max-tasks"] !== undefined) ctx.maxTasks = Number(flags["max-tasks"]);
@@ -1005,14 +1016,24 @@ try {
     await powerTest(testMode, minutesAhead);
     process.exit(0);
   }
-  const times = readTimes(flags);
-  ctx.until = times.until;
+  readTimes(flags);
 
   if (flags.stop) {
     writeFileSync(stopFile(), new Date().toISOString());
     say(`stop file written (${stopFile()}) - the driver stops before the next build`);
     process.exit(0);
   }
+
+  const wizard = await startWizard(flags);
+  if (!wizard.run) {
+    console.log("Not started.");
+    process.exit(0);
+  }
+  flags = wizard.flags;
+  ctx.flags = flags;
+  if (flags["max-wait"] !== undefined) ctx.maxWaitHours = Number(flags["max-wait"]);
+  const times = readTimes(flags);
+  ctx.until = times.until;
 
   if (!ctx.dryRun) {
     openLog();
