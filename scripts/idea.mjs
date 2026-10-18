@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { AREAS, parseArea } from "./areas.mjs";
 import { GH_LIMIT_EXIT, clockTime, limitFromText } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -138,7 +139,7 @@ function boardLines(issues) {
   const lines = open.map((i) => {
     const subs = (i.subIssues ?? []).map((s) => `#${s.number ?? s}`);
     const epic = subs.length ? ` · epic of ${subs.join(",")}` : "";
-    return `- #${i.number} [${i.status} · Tier ${i.tier ?? "?"} · ${i.kind ?? "?"}${epic}] ${i.title}`;
+    return `- #${i.number} [${i.status} · Tier ${i.tier ?? "?"} · ${i.kind ?? "?"}${i.area ? ` · ${i.area}` : ""}${epic}] ${i.title}`;
   });
   return [...lines, ...done.map((i) => `- #${i.number} ${i.title}`)];
 }
@@ -314,6 +315,16 @@ function check([slug]) {
   for (const name of required) {
     if (!sections.has(name)) problems.push(`missing section "## ${name}"`);
     else if (!sections.get(name).some((l) => l.trim())) problems.push(`section "## ${name}" is empty`);
+  }
+  if (meta.target) {
+    const options = [...AREAS, "epic"].join(" | ");
+    if (!meta.area) problems.push(`frontmatter: missing area (${options})`);
+    else if (meta.area.toLowerCase() === "epic") {
+      const parts = (sections.get("Proponowany podział") ?? []).map((l) => /^\d+\.\s+(.*)$/.exec(l.trim())?.[1]).filter(Boolean);
+      if (!sections.has("Proponowany podział")) problems.push('area epic needs a section "## Proponowany podział"');
+      else if (parts.length < 2) problems.push('section "## Proponowany podział" needs at least two numbered parts');
+      else if (parts.some((p) => !parseArea(/^([^\s—–-]+)/.exec(p)?.[1]))) problems.push(`section "## Proponowany podział": each part starts with an area (${AREAS.join(" | ")})`);
+    } else if (!parseArea(meta.area)) problems.push(`frontmatter: area must be ${options}`);
   }
   if (lines.length > MAX_BODY_LINES) problems.push(`body has ${lines.length} lines, limit is ${MAX_BODY_LINES}`);
   if (body.includes("```")) problems.push("fenced code blocks are not allowed; describe what and why, not code");

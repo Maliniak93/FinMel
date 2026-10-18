@@ -19,6 +19,7 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
    `epic` info in `workflowArgs` (the last part of an epic also gets the epic and sibling bodies written locally).
    `"e2e": true` in `workflowArgs` marks an epic's e2e part: pass it through verbatim, the workflow then runs the
    e2e agent and the review instead of the test-writer and implementer.
+   Print each line of prepare's `notes` (the no-area warning among them) before the workflow starts.
 3. `"ok": false` → print `reason` and `next`, and stop. `stage: "branch"` → the tree held changes that are
    not this spec: name the `files` and stop; never offer to sweep them into the branch.
 4. `"ok": true` → call the `Workflow` tool with `{ ...workflow, args: workflowArgs }`, both verbatim from

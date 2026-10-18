@@ -45,6 +45,11 @@ scope", saved prompts, and "Possibly related" matches. That is your map. Never r
 - A conflict with product "Out of scope", an ADR or a hard rule (no investment advice, money in PLN,
   tenancy, …) → say so plainly, with the ADR number.
 
+- Area: run `node scripts/areas.mjs` for the area -> paths table and set `area:` in the frontmatter to one
+  option, or `epic` with a `## Proponowany podział` section (numbered parts in build order, each
+  `<n>. <Area> — <what>`). The general rule and the Fullstack rule in `skarbiec-plan/workflow.md` → Area
+  decide between them.
+
 A pure question ("dlaczego…?", "czym jest…?") → answer it briefly from the map, or from the one
 `Explore` call (step 4), then ask whether a change or a bug sits behind it. None → stop.
 

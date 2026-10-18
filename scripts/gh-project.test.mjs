@@ -44,7 +44,7 @@ test("move sends the position mutation", () => {
 test("create places the card", () => {
   const sandbox = createSandbox(boardState());
   try {
-    const args = (title, slug) => ["create", "--title", title, "--body-file", sandbox.bodyFile, "--slug", slug, "--tier", "1", "--kind", "change"];
+    const args = (title, slug) => ["create", "--title", title, "--body-file", sandbox.bodyFile, "--slug", slug, "--tier", "1", "--kind", "change", "--area", "Backend"];
 
     const first = sandbox.run("gh-project.mjs", [...args("First", "first"), "--queue", "after:3"]);
     assert.equal(first.code, 0, first.out);
@@ -175,6 +175,26 @@ test("create rejects a bad or epic area", () => {
     assert.match(epic.out, /--area/);
 
     assert.deepEqual(issueCreates(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create requires area unless epic", () => {
+  const sandbox = createSandbox(areaState());
+  try {
+    const missing = sandbox.run("gh-project.mjs", createArgs(sandbox, "noarea"));
+    assert.notEqual(missing.code, 0, missing.out);
+    assert.match(missing.out, /--area/);
+    assert.deepEqual(issueCreates(sandbox), []);
+
+    const epic = sandbox.run("gh-project.mjs", createArgs(sandbox, "splitepic", ["--epic"]));
+    assert.equal(epic.code, 0, epic.out);
+    assert.equal(sandbox.state().issues[lastJson(epic.stdout).number].area ?? null, null);
+
+    const e2e = sandbox.run("gh-project.mjs", createArgs(sandbox, "e2epart", ["--parent", "9", "--e2e"]));
+    assert.equal(e2e.code, 0, e2e.out);
+    assert.equal(sandbox.state().issues[lastJson(e2e.stdout).number].area, "E2E");
   } finally {
     sandbox.cleanup();
   }
