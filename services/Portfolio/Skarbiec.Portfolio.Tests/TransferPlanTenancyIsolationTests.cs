@@ -45,6 +45,30 @@ public sealed class TransferPlanTenancyIsolationTests(SkarbiecContainersFixture 
     }
 
     [Fact]
+    public async Task TopUps()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        using var clientA = Factory.CreateAuthenticatedClient(userA);
+        using var clientB = Factory.CreateAuthenticatedClient(userB);
+        var setupA = await clientA.CreateTransferPlanBenefitSetupAsync(cancellationToken);
+        await SeedReplicasAsync(userA, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
+        await SeedReplicasAsync(userB, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
+        await clientA.AcceptTransferPlanAsync("2026-10", cancellationToken);
+        await clientA.SettleBenefitAsync(setupA, 1_000m, cancellationToken);
+        var before = await clientA.GetTransferPlanAsync("2026-10", cancellationToken);
+
+        var topUp = await clientB.PostAsync(TransferPlanTopUpAcceptUri("2026-10"), content: null, cancellationToken);
+
+        await topUp.AssertProblemAsync(HttpStatusCode.Conflict, TransferPlanNoTopUpErrorCode, cancellationToken);
+        var after = await clientA.GetTransferPlanAsync("2026-10", cancellationToken);
+        Assert.Equal(before.Rows.Select(r => (r.Id, r.BatchNumber, r.Checked)), after.Rows.Select(r => (r.Id, r.BatchNumber, r.Checked)));
+        Assert.Equal(200m, after.TopUp!.Rows.Sum(r => r.AmountPln));
+    }
+
+    [Fact]
     public async Task AcceptedPlans()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

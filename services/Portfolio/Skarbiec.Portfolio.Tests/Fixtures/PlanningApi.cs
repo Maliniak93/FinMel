@@ -168,6 +168,11 @@ internal static class PlanningApi
 
     public sealed record TransferGroupView(string Name, decimal CurrentPercent, decimal AfterPercent, decimal TargetPercent);
 
+    public sealed record TransferDifferenceView(
+        Guid BucketId, string BucketName, decimal AcceptedPln, decimal CurrentPln, decimal DifferencePln);
+
+    public sealed record TransferTopUpView(List<TransferRowView> Rows, List<TransferGroupView> Groups);
+
     public sealed record TransferPlanView(
         JsonElement Status,
         JsonElement? NoneReason,
@@ -178,7 +183,9 @@ internal static class PlanningApi
         List<TransferRowView> Rows,
         List<TransferGroupView> Groups,
         decimal ToInvestPln,
-        bool CanUndo = false);
+        bool CanUndo = false,
+        List<TransferDifferenceView>? Differences = null,
+        TransferTopUpView? TopUp = null);
 
     public sealed record PlanningMonthView(
         IncomesView Incomes,
@@ -340,7 +347,22 @@ internal static class PlanningApi
     public static async Task<(Guid IkeAccountId, Guid IkzeAccountId)> CreateTransferPlanSetupAsync(
         this HttpClient client, CancellationToken cancellationToken, string firstMonth = "2026-10")
     {
-        await client.CreateAllocationSetupAsync(cancellationToken, 6_543.27m);
+        var setup = await client.CreateTransferPlanBenefitSetupAsync(cancellationToken, firstMonth, benefit: 0m);
+
+        return (setup.IkeAccountId, setup.IkzeAccountId);
+    }
+
+    public sealed record TransferPlanBenefitSetup(Guid IkeAccountId, Guid IkzeAccountId, Guid BankAccountId, Guid BenefitId);
+
+    // The same forecast 6 543.27 with "800+" (day 10, from 2026-01-01) as 800 of it; BenefitId is Guid.Empty when benefit is 0.
+    public static async Task<TransferPlanBenefitSetup> CreateTransferPlanBenefitSetupAsync(
+        this HttpClient client, CancellationToken cancellationToken, string firstMonth = "2026-10", decimal benefit = 800m)
+    {
+        var bank = await client.CreateAllocationSetupAsync(cancellationToken, 6_543.27m - benefit);
+        var benefitId = benefit > 0m
+            ? await client.CreateRecurringIncomeAsync(
+                bank.AccountId, cancellationToken, "800+", benefit, new DateOnly(2026, 1, 1), dayOfMonth: 10)
+            : Guid.Empty;
         var ike = await client.CreateAccountAsync(cancellationToken, "IKE mBank", AccountType.Brokerage, TaxWrapper.Ike);
         var ikze = await client.CreateAccountAsync(cancellationToken, "IKZE Obligacje", AccountType.Bonds, TaxWrapper.Ikze);
         await client.SaveAllocationPlanAsync(
@@ -350,8 +372,17 @@ internal static class PlanningApi
             AllocationRow("IKZE", IkzeKind, FixedShare, 2_304m, accountId: ikze),
             AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true));
 
-        return (ike, ikze);
+        return new TransferPlanBenefitSetup(ike, ikze, bank.AccountId, benefitId);
     }
+
+    public static Task SettleBenefitAsync(
+        this HttpClient client, TransferPlanBenefitSetup setup, decimal actualAmount, CancellationToken cancellationToken) =>
+        client.SettleOccurrenceAsync(
+            setup.BenefitId, "2026-10", setup.BankAccountId, actualAmount, new DateOnly(2026, 10, 10), cancellationToken);
+
+    public static Task UndoBenefitSettlementAsync(
+        this HttpClient client, TransferPlanBenefitSetup setup, CancellationToken cancellationToken) =>
+        client.UndoOccurrenceAsync(setup.BenefitId, "2026-10", cancellationToken);
 
     public const string TransferPlansUri = "/api/portfolio/transfer-plans";
 
@@ -372,6 +403,16 @@ internal static class PlanningApi
     public static async Task AcceptTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
     {
         var response = await client.PostAsync(TransferPlanActionUri(month, "accept"), content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public const string TransferPlanNoTopUpErrorCode = "Conflict.TransferPlanNoTopUp";
+
+    public static string TransferPlanTopUpAcceptUri(string month) => $"{TransferPlansUri}/{month}/top-up/accept";
+
+    public static async Task AcceptTransferPlanTopUpAsync(this HttpClient client, string month, CancellationToken cancellationToken)
+    {
+        var response = await client.PostAsync(TransferPlanTopUpAcceptUri(month), content: null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 

@@ -13,6 +13,9 @@ public static class TransferPlanErrors
     public static Error RowChecked(string month) =>
         new("Conflict.TransferPlanRowChecked", $"A row of the transfer plan for {month} is checked — uncheck it before undoing.");
 
+    public static Error NoTopUp(string month) =>
+        new("Conflict.TransferPlanNoTopUp", $"The transfer plan for {month} has no top-up to accept.");
+
     public static Error NotFound(string month) =>
         new("NotFound.TransferPlan", $"There is no accepted or skipped transfer plan for {month}.");
 

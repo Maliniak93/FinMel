@@ -895,7 +895,21 @@
       "undoMessage": "Przyjęte wiersze zostaną odrzucone, a plan wróci do podglądu.",
       "undoFailed": "Nie udało się cofnąć przyjęcia.",
       "checkRow": "Oznacz jako przelane",
-      "checkFailed": "Nie udało się zaktualizować wiersza."
+      "checkFailed": "Nie udało się zaktualizować wiersza.",
+      "batch": {
+        "plan": "Plan",
+        "topUp": "Dopłata {{ number }}"
+      },
+      "differences": {
+        "title": "Zmiany od przyjęcia planu",
+        "change": "Przyjęto {{ accepted }}, teraz {{ current }}",
+        "decrease": "Tylko informacja, przyjęte wiersze zostają bez zmian."
+      },
+      "topUp": {
+        "title": "Dopłata",
+        "accept": "Przyjmij dopłatę",
+        "acceptFailed": "Nie udało się przyjąć dopłaty."
+      }
     },
     "freeFunds": {
       "title": "Wolne środki",

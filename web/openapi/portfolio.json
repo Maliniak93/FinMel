@@ -2378,6 +2378,28 @@
         }
       }
     },
+    "/api/portfolio/transfer-plans/{month}/top-up/accept": {
+      "post": {
+        "tags": [
+          "AcceptTransferPlanTopUpEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/transfer-plans/{month}/undo": {
       "post": {
         "tags": [
@@ -6997,6 +7019,49 @@
           }
         }
       },
+      "TransferDifferenceResponse": {
+        "required": [
+          "bucketId",
+          "bucketName",
+          "acceptedPln",
+          "currentPln",
+          "differencePln"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bucketName": {
+            "type": "string"
+          },
+          "acceptedPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currentPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "differencePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "TransferDirection": {
         "type": "integer"
       },
@@ -7073,7 +7138,9 @@
           "rows",
           "groups",
           "toInvestPln",
-          "canUndo"
+          "canUndo",
+          "differences",
+          "topUp"
         ],
         "type": "object",
         "properties": {
@@ -7140,6 +7207,22 @@
           },
           "canUndo": {
             "type": "boolean"
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferDifferenceResponse"
+            }
+          },
+          "topUp": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransferTopUpResponse"
+              }
+            ]
           }
         }
       },
@@ -7225,6 +7308,55 @@
           },
           "marker": {
             "$ref": "#/components/schemas/TransferMarker"
+          }
+        }
+      },
+      "TransferTopUpResponse": {
+        "required": [
+          "minimumTransferPln",
+          "valuationDate",
+          "fallbackReason",
+          "rows",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumTransferPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "valuationDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "fallbackReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransferPlanFallbackReason"
+              }
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferRowResponse"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferGroupShare"
+            }
           }
         }
       },
@@ -8152,6 +8284,9 @@
     },
     {
       "name": "AcceptTransferPlanEndpoint"
+    },
+    {
+      "name": "AcceptTransferPlanTopUpEndpoint"
     },
     {
       "name": "UndoTransferPlanAcceptanceEndpoint"

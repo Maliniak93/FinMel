@@ -1288,6 +1288,102 @@ describe('Planning', () => {
     expect((rows('transfer-row-check')[0] as HTMLInputElement).checked).toBe(true);
   });
 
+  it('shows the differences, the top-up preview and the batches as separate groups, and accepts the top-up', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        status: 'Accepted',
+        canUndo: true,
+        rows: [
+          frozenRow('IKE', 'row-1', true),
+          transferRow('IKZE', 300, { id: 'row-2', batchNumber: 1, checked: false }),
+          transferRow('Obligacje', 200, { id: 'row-3', batchNumber: 2, checked: false }),
+        ],
+        differences: [
+          {
+            bucketId: 'bucket-IKE',
+            bucketName: 'IKE',
+            acceptedPln: 1000,
+            currentPln: 1200,
+            differencePln: 200,
+          },
+          {
+            bucketId: 'bucket-IKZE',
+            bucketName: 'IKZE',
+            acceptedPln: 300,
+            currentPln: 250,
+            differencePln: -50,
+          },
+        ],
+        topUp: {
+          minimumTransferPln: 100,
+          valuationDate: '2026-10-14',
+          fallbackReason: null,
+          rows: [transferRow('IKE', 200, { marker: 'BelowMinimum' })],
+          groups: [transferGroup('Akcje', 40, 45, 50)],
+        },
+      },
+    );
+    await setup();
+
+    const titles = rows('transfer-batch-title').map((title) => title.textContent!.trim());
+    expect(titles).toEqual(['Plan', 'Top-up 1']);
+    expect(rows('transfer-batch').map((batch) => batch.querySelectorAll('li').length)).toEqual([
+      2, 1,
+    ]);
+
+    const differences = rows('transfer-difference');
+    expect(differences).toHaveLength(2);
+    expect(differences[0].textContent).toContain(formatMoney(200, 'PLN'));
+    expect(differences[0].querySelector('[data-testid="transfer-difference-info"]')).toBeNull();
+    expect(differences[1].textContent).toContain(formatMoney(-50, 'PLN'));
+    expect(differences[1].querySelector('[data-testid="transfer-difference-info"]')).not.toBeNull();
+
+    const topUp = rows('transfer-top-up')[0];
+    expect(topUp.querySelectorAll('[data-testid="transfer-plan-row"]')).toHaveLength(1);
+    expect(topUp.querySelectorAll('[data-testid="transfer-row-check"]')).toHaveLength(0);
+    expect(topUp.querySelector('[data-testid="transfer-marker-below-minimum"]')).not.toBeNull();
+    expect(topUp.querySelectorAll('[data-testid="transfer-group-row"]')).toHaveLength(1);
+
+    click('transfer-top-up-accept');
+    await vi.waitFor(() => {
+      const posts = transferRequests('POST');
+      expect(posts).toHaveLength(1);
+      expect(posts[0].url).toContain('/transfer-plans/2026-10/top-up/accept');
+    });
+    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+  });
+
+  it('shows no top-up block when the response has none', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        status: 'Completed',
+        rows: [frozenRow('IKE', 'row-1', true)],
+        differences: [
+          {
+            bucketId: 'bucket-IKE',
+            bucketName: 'IKE',
+            acceptedPln: 1000,
+            currentPln: 800,
+            differencePln: -200,
+          },
+        ],
+      },
+    );
+    await setup();
+
+    expect(rows('transfer-top-up')).toHaveLength(0);
+    expect(rows('transfer-difference')).toHaveLength(1);
+    expect(rows('transfer-difference-info')).toHaveLength(1);
+  });
+
   it('shows a skipped month without rows and unskips it', async () => {
     responses['2026-10'] = month({}, {}, {}, {}, { status: 'Skipped' });
     await setup();

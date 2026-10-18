@@ -800,6 +800,14 @@ export type TransferCandidateResponse = {
     balance: number | string;
 };
 
+export type TransferDifferenceResponse = {
+    bucketId: string;
+    bucketName: string;
+    acceptedPln: number | string;
+    currentPln: number | string;
+    differencePln: number | string;
+};
+
 export type TransferDirection = number;
 
 export type TransferGroupShare = {
@@ -826,6 +834,8 @@ export type TransferPlanResponse = {
     groups: Array<TransferGroupShare>;
     toInvestPln: number | string;
     canUndo: boolean;
+    differences: Array<TransferDifferenceResponse>;
+    topUp: null | TransferTopUpResponse;
 };
 
 export type TransferPlanStatus = 'None' | 'Preview' | 'Accepted' | 'Completed' | 'Skipped';
@@ -841,6 +851,14 @@ export type TransferRowResponse = {
     groupName: null | string;
     amountPln: number | string;
     marker: TransferMarker;
+};
+
+export type TransferTopUpResponse = {
+    minimumTransferPln: number | string;
+    valuationDate: null | string;
+    fallbackReason: null | TransferPlanFallbackReason;
+    rows: Array<TransferRowResponse>;
+    groups: Array<TransferGroupShare>;
 };
 
 export type TreasuryBondType = number;
@@ -2278,6 +2296,24 @@ export type PostApiPortfolioTransferPlansByMonthAcceptResponses = {
 };
 
 export type PostApiPortfolioTransferPlansByMonthAcceptResponse = PostApiPortfolioTransferPlansByMonthAcceptResponses[keyof PostApiPortfolioTransferPlansByMonthAcceptResponses];
+
+export type PostApiPortfolioTransferPlansByMonthTopUpAcceptData = {
+    body?: never;
+    path: {
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/transfer-plans/{month}/top-up/accept';
+};
+
+export type PostApiPortfolioTransferPlansByMonthTopUpAcceptResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiPortfolioTransferPlansByMonthTopUpAcceptResponse = PostApiPortfolioTransferPlansByMonthTopUpAcceptResponses[keyof PostApiPortfolioTransferPlansByMonthTopUpAcceptResponses];
 
 export type PostApiPortfolioTransferPlansByMonthUndoData = {
     body?: never;

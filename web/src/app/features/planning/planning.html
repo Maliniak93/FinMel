@@ -876,62 +876,151 @@
               </p>
             }
 
-            <ul class="planning-definitions">
-              @for (row of transfer.rows; track $index) {
-                <li
-                  class="planning-transfer__row"
-                  [class.planning-transfer__row--frozen]="!!row.id"
-                  data-testid="transfer-plan-row"
-                >
-                  @if (row.id; as rowId) {
-                    <input
-                      type="checkbox"
-                      [checked]="row.checked"
-                      [attr.aria-label]="'planning.transferPlan.checkRow' | transloco"
-                      (change)="checkTransferRow(rowId, $event)"
-                      data-testid="transfer-row-check"
-                    />
-                  }
-                  <span class="planning-definition__name">{{ row.bucketName }}</span>
-                  <span>{{
-                    row.accountName ?? ('planning.transferPlan.noAccount' | transloco)
-                  }}</span>
-                  <span>{{ row.groupName ?? '' }}</span>
-                  <span class="planning-allocation__amount">
-                    {{ formatMoney(row.amountPln, 'PLN') }}
-                  </span>
-                  <span class="planning-allocation__markers">
-                    @if (transferMarkerKey(row.marker); as markerKey) {
-                      <mat-chip [attr.data-testid]="transferMarkerTestId(row.marker)">
-                        {{ markerKey | transloco }}
-                      </mat-chip>
+            <ng-template #transferRowList let-rows>
+              <ul class="planning-definitions">
+                @for (row of rows; track $index) {
+                  <li
+                    class="planning-transfer__row"
+                    [class.planning-transfer__row--frozen]="!!row.id"
+                    data-testid="transfer-plan-row"
+                  >
+                    @if (row.id; as rowId) {
+                      <input
+                        type="checkbox"
+                        [checked]="row.checked"
+                        [attr.aria-label]="'planning.transferPlan.checkRow' | transloco"
+                        (change)="checkTransferRow(rowId, $event)"
+                        data-testid="transfer-row-check"
+                      />
                     }
-                  </span>
-                </li>
-              }
-            </ul>
+                    <span class="planning-definition__name">{{ row.bucketName }}</span>
+                    <span>{{
+                      row.accountName ?? ('planning.transferPlan.noAccount' | transloco)
+                    }}</span>
+                    <span>{{ row.groupName ?? '' }}</span>
+                    <span class="planning-allocation__amount">
+                      {{ formatMoney(row.amountPln, 'PLN') }}
+                    </span>
+                    <span class="planning-allocation__markers">
+                      @if (transferMarkerKey(row.marker); as markerKey) {
+                        <mat-chip [attr.data-testid]="transferMarkerTestId(row.marker)">
+                          {{ markerKey | transloco }}
+                        </mat-chip>
+                      }
+                    </span>
+                  </li>
+                }
+              </ul>
+            </ng-template>
 
-            @if (transfer.groups.length > 0) {
-              <table class="planning-transfer__groups">
-                <thead>
-                  <tr>
-                    <th>{{ 'planning.transferPlan.groups.name' | transloco }}</th>
-                    <th>{{ 'planning.transferPlan.groups.current' | transloco }}</th>
-                    <th>{{ 'planning.transferPlan.groups.after' | transloco }}</th>
-                    <th>{{ 'planning.transferPlan.groups.target' | transloco }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (group of transfer.groups; track group.name) {
-                    <tr data-testid="transfer-group-row">
-                      <td>{{ group.name }}</td>
-                      <td>{{ formatPercent(group.currentPercent) }}</td>
-                      <td>{{ formatPercent(group.afterPercent) }}</td>
-                      <td>{{ formatPercent(group.targetPercent) }}</td>
+            <ng-template #transferGroupTable let-groups>
+              @if (groups.length > 0) {
+                <table class="planning-transfer__groups">
+                  <thead>
+                    <tr>
+                      <th>{{ 'planning.transferPlan.groups.name' | transloco }}</th>
+                      <th>{{ 'planning.transferPlan.groups.current' | transloco }}</th>
+                      <th>{{ 'planning.transferPlan.groups.after' | transloco }}</th>
+                      <th>{{ 'planning.transferPlan.groups.target' | transloco }}</th>
                     </tr>
+                  </thead>
+                  <tbody>
+                    @for (group of groups; track group.name) {
+                      <tr data-testid="transfer-group-row">
+                        <td>{{ group.name }}</td>
+                        <td>{{ formatPercent(group.currentPercent) }}</td>
+                        <td>{{ formatPercent(group.afterPercent) }}</td>
+                        <td>{{ formatPercent(group.targetPercent) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+            </ng-template>
+
+            @for (batch of transferBatches(transfer.rows); track batch.number) {
+              <div class="planning-transfer__batch" data-testid="transfer-batch">
+                @if (batch.title; as title) {
+                  <h3 data-testid="transfer-batch-title">
+                    {{ title.key | transloco: title.params }}
+                  </h3>
+                }
+                <ng-container
+                  [ngTemplateOutlet]="transferRowList"
+                  [ngTemplateOutletContext]="{ $implicit: batch.rows }"
+                />
+              </div>
+            }
+
+            <ng-container
+              [ngTemplateOutlet]="transferGroupTable"
+              [ngTemplateOutletContext]="{ $implicit: transfer.groups }"
+            />
+
+            @if (transfer.differences.length > 0) {
+              <div class="planning-transfer__differences" data-testid="transfer-differences">
+                <h3>{{ 'planning.transferPlan.differences.title' | transloco }}</h3>
+                <ul class="planning-definitions">
+                  @for (difference of transfer.differences; track difference.bucketId) {
+                    <li class="planning-transfer__difference" data-testid="transfer-difference">
+                      <span class="planning-definition__name">{{ difference.bucketName }}</span>
+                      <span>
+                        {{
+                          'planning.transferPlan.differences.change'
+                            | transloco
+                              : {
+                                  accepted: formatMoney(difference.acceptedPln, 'PLN'),
+                                  current: formatMoney(difference.currentPln, 'PLN'),
+                                }
+                        }}
+                      </span>
+                      <span
+                        class="planning-allocation__amount"
+                        data-testid="transfer-difference-amount"
+                      >
+                        {{ formatMoney(difference.differencePln, 'PLN') }}
+                      </span>
+                      @if (isNegative(difference.differencePln)) {
+                        <span
+                          class="planning-section__empty"
+                          data-testid="transfer-difference-info"
+                        >
+                          {{ 'planning.transferPlan.differences.decrease' | transloco }}
+                        </span>
+                      }
+                    </li>
                   }
-                </tbody>
-              </table>
+                </ul>
+              </div>
+            }
+
+            @if (transfer.topUp; as topUp) {
+              <div class="planning-transfer__top-up" data-testid="transfer-top-up">
+                <div class="planning-section__header">
+                  <h3>{{ 'planning.transferPlan.topUp.title' | transloco }}</h3>
+                  <button
+                    mat-flat-button
+                    type="button"
+                    data-testid="transfer-top-up-accept"
+                    (click)="acceptTransferTopUp()"
+                  >
+                    {{ 'planning.transferPlan.topUp.accept' | transloco }}
+                  </button>
+                </div>
+                @if (topUp.fallbackReason; as reason) {
+                  <p class="planning-section__incomplete" data-testid="transfer-top-up-fallback">
+                    {{ transferFallbackKey(reason) | transloco }}
+                  </p>
+                }
+                <ng-container
+                  [ngTemplateOutlet]="transferRowList"
+                  [ngTemplateOutletContext]="{ $implicit: topUp.rows }"
+                />
+                <ng-container
+                  [ngTemplateOutlet]="transferGroupTable"
+                  [ngTemplateOutletContext]="{ $implicit: topUp.groups }"
+                />
+              </div>
             }
           } @else {
             <p class="planning-section__empty" data-testid="transfer-plan-nothing-to-invest">

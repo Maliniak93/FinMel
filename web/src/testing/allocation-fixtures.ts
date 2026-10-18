@@ -120,6 +120,8 @@ export function transferPlan(extra: Record<string, unknown> = {}): Record<string
     groups: [],
     toInvestPln: 0,
     canUndo: false,
+    differences: [],
+    topUp: null,
     ...extra,
   };
 }
