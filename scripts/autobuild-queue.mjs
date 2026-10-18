@@ -1,5 +1,7 @@
 // Usage: imported by autobuild.mjs - the queue plan, the next piece of work, the start and window times; pure, injectable, runs nothing on import
 
+import { areaText } from "./queue.mjs";
+
 const partNumbers = (epic) => (epic.subIssues ?? []).map((s) => (typeof s === "object" ? s.number : s));
 const TIME_RE = /^(\d{1,2}):(\d{2})$/;
 
@@ -25,6 +27,21 @@ export function nextWork(item, cards) {
     .map((n) => byNumber.get(n))
     .find((p) => p && p.status !== "Done");
   return next ? next.number : null;
+}
+
+export function planLines(plan, cards) {
+  return plan.map((item, i) => {
+    const next = nextWork(item, cards);
+    const action = item.epic ? (next ? `next #${next}` : "no open part") : "standalone";
+    return `${i + 1}. #${item.number} ${item.title}${item.manual ? " (ręczny)" : ""} — ${action} [${areaText(item)}]`;
+  });
+}
+
+export function areaWarning(item, cards) {
+  const number = nextWork(item, cards);
+  if (number === null) return null;
+  const card = cards.find((c) => c.number === number);
+  return card && !card.area ? `⚠ #${number} bez obszaru (Area)` : null;
 }
 
 function nextOccurrence(hhmm, now) {

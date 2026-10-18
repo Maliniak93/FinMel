@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { positionTarget, queueOf } from "./queue.mjs";
+import { positionTarget, queueLines, queueOf } from "./queue.mjs";
 import { buildState, createSandbox } from "./fake-gh-sandbox.mjs";
 
 const card = (number, status, extra = {}) => ({
@@ -126,9 +126,25 @@ test("queue renders numbered with manual", () => {
     assert.equal(code, 0, out);
     assert.match(out, /Queue/);
     assert.doesNotMatch(out, /Next up/);
-    assert.match(out, /^1\. #391 Month dashboard \(In progress, ręczny\) — next #394\s*$/m);
-    assert.match(out, /^2\. #400 Second thing — \/build #400\s*$/m);
+    assert.match(out, /^1\. #391 Month dashboard \(In progress, ręczny\) — next #394 \[—\]\s*$/m);
+    assert.match(out, /^2\. #400 Second thing — \/build #400 \[—\]\s*$/m);
   } finally {
     sandbox.cleanup();
   }
+});
+
+test("queue lines show area", () => {
+  const queue = queueOf([
+    card(1, "Todo", { area: "Backend" }),
+    card(2, "Todo", { area: null }),
+    epic(3, "Todo", [4, 5, 6]),
+    part(4, "Todo", 3, { area: "Backend" }),
+    part(5, "Todo", 3, { area: "Frontend" }),
+    part(6, "Todo", 3, { area: "E2E" }),
+  ]);
+  const [standalone, unlabelled, epicLine] = queueLines(queue);
+
+  assert.match(standalone, /^1\. #1 Issue 1 — \/build #1 \[Backend\]$/);
+  assert.match(unlabelled, /^2\. #2 Issue 2 — \/build #2 \[—\]$/);
+  assert.match(epicLine, /^3\. #3 Issue 3 — next #4 \[Backend → Frontend → E2E\]$/);
 });
