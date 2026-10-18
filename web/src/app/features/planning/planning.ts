@@ -74,6 +74,7 @@ import {
   RecurringIncomeFormDialog,
   type RecurringIncomeFormDialogData,
 } from './recurring-income-form-dialog/recurring-income-form-dialog';
+import { PlanningCalendar } from './planning-calendar/planning-calendar';
 import { PlanningYear } from './planning-year/planning-year';
 import { currentWarsawMonth, ruleParts } from './recurrence';
 import {
@@ -146,6 +147,7 @@ function shiftMonth(month: string, delta: number): string {
     MatIconModule,
     MatProgressSpinnerModule,
     MatTabsModule,
+    PlanningCalendar,
     PlanningYear,
     RouterLink,
     TranslocoPipe,
@@ -168,6 +170,9 @@ export class Planning {
   readonly month = input<string>();
   readonly tab = input<string>();
   readonly year = input<string>();
+  readonly layout = input<string>();
+
+  protected readonly calendarLayout = computed(() => this.layout() === 'calendar');
 
   protected readonly tabIndex = computed(() => (this.tab() === 'year' ? 1 : 0));
 
@@ -207,6 +212,10 @@ export class Planning {
       return result.data;
     },
   });
+
+  protected readonly monthData = computed(() =>
+    this.monthResource.hasValue() ? this.monthResource.value() : null,
+  );
 
   protected readonly incomes = computed(() =>
     this.monthResource.hasValue() ? this.monthResource.value().incomes : null,
@@ -317,6 +326,13 @@ export class Planning {
         index === 1
           ? { tab: 'year', year: this.year() ?? currentWarsawMonth().slice(0, 4) }
           : { tab: null, year: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected selectLayout(calendar: boolean): void {
+    void this.router.navigate([], {
+      queryParams: { layout: calendar ? 'calendar' : null },
       queryParamsHandling: 'merge',
     });
   }

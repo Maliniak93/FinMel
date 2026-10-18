@@ -1,0 +1,132 @@
+<ng-template #itemContent let-item>
+  <span class="planning-calendar__name">{{ item.name }}</span>
+  <span class="planning-calendar__amount">{{ formatMoney(item.amount, item.currency) }}</span>
+  @if (item.status) {
+    <span class="planning-calendar__status">{{ statusKey(item.status) | transloco }}</span>
+  }
+</ng-template>
+
+<div class="planning-calendar" data-testid="planning-calendar">
+  @if (deadlinesFailed()) {
+    <p class="planning-calendar__warning" role="alert" data-testid="calendar-deadlines-failed">
+      {{ 'planning.calendar.deadlinesFailed' | transloco }}
+    </p>
+  }
+
+  <div class="planning-calendar__weekdays">
+    @for (key of weekdayKeys; track key) {
+      <span>{{ key | transloco }}</span>
+    }
+  </div>
+
+  <div class="planning-calendar__grid">
+    @for (cell of cells(); track $index) {
+      <div
+        class="planning-calendar__cell"
+        data-testid="calendar-cell"
+        [class.planning-calendar__cell--empty]="!cell.date"
+        [class.planning-calendar__cell--dimmed]="cell.dimmed"
+        [class.planning-calendar__cell--today]="cell.today"
+        [class.planning-calendar__cell--selected]="!!cell.date && cell.date === selectedDay()"
+        [attr.data-date]="cell.date"
+        [attr.data-dimmed]="cell.dimmed ? 'true' : null"
+        [attr.data-today]="cell.today ? 'true' : null"
+        [attr.tabindex]="cell.date ? 0 : null"
+        (click)="select(cell.date)"
+        (keydown.enter)="select(cell.date)"
+      >
+        @if (cell.date) {
+          <span class="planning-calendar__day">{{ cell.day }}</span>
+          @if (narrow()) {
+            @if (cell.items.length > 0) {
+              <span class="planning-calendar__count" data-testid="calendar-count">{{
+                cell.items.length
+              }}</span>
+            }
+          } @else {
+            @for (item of cell.items.slice(0, maxItemsInCell); track item.key) {
+              @if (item.settleable; as occurrence) {
+                <button
+                  type="button"
+                  class="planning-calendar__item planning-calendar__item--action"
+                  data-testid="calendar-item"
+                  [attr.data-status]="item.status"
+                  [attr.data-kind]="item.kind"
+                  (click)="openSettleDialog(occurrence, $event)"
+                >
+                  <ng-container
+                    [ngTemplateOutlet]="itemContent"
+                    [ngTemplateOutletContext]="{ $implicit: item }"
+                  />
+                </button>
+              } @else {
+                <div
+                  class="planning-calendar__item"
+                  data-testid="calendar-item"
+                  [attr.data-status]="item.status"
+                  [attr.data-kind]="item.kind"
+                >
+                  <ng-container
+                    [ngTemplateOutlet]="itemContent"
+                    [ngTemplateOutletContext]="{ $implicit: item }"
+                  />
+                </div>
+              }
+            }
+            @if (cell.items.length > maxItemsInCell) {
+              <span class="planning-calendar__more" data-testid="calendar-more"
+                >+{{ cell.items.length - maxItemsInCell }}</span
+              >
+            }
+          }
+        }
+      </div>
+    }
+  </div>
+
+  @if (selectedDay(); as day) {
+    <section class="planning-calendar__details" data-testid="calendar-details">
+      <h3>{{ formatDate(day) }}</h3>
+      @if (selectedItems().length === 0) {
+        <p class="planning-calendar__empty">{{ 'planning.calendar.noItems' | transloco }}</p>
+      } @else {
+        <ul class="planning-calendar__list">
+          @for (item of selectedItems(); track item.key) {
+            <li
+              class="planning-calendar__detail"
+              data-testid="calendar-detail-item"
+              [attr.data-status]="item.status"
+              [attr.data-kind]="item.kind"
+            >
+              <span class="planning-calendar__kind">{{ kindKey(item.kind) | transloco }}</span>
+              <span class="planning-calendar__name">{{ item.name }}</span>
+              <span class="planning-calendar__amount">{{
+                formatMoney(item.amount, item.currency)
+              }}</span>
+              @if (item.status) {
+                <span class="planning-calendar__status-text">{{
+                  statusKey(item.status) | transloco
+                }}</span>
+              }
+              @if (item.actualDate) {
+                <span class="planning-calendar__actual-date">{{
+                  'planning.calendar.settledOn' | transloco: { date: formatDate(item.actualDate) }
+                }}</span>
+              }
+              @if (item.settleable; as occurrence) {
+                <button
+                  mat-button
+                  type="button"
+                  data-testid="calendar-detail-settle"
+                  (click)="openSettleDialog(occurrence, $event)"
+                >
+                  {{ 'planning.occurrence.settle' | transloco }}
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</div>

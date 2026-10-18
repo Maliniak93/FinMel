@@ -11,6 +11,15 @@
   gap: 8px;
 }
 
+.planning-page__layout {
+  display: flex;
+  gap: 8px;
+}
+
+.planning-page__layout--active {
+  background: var(--mat-sys-secondary-container);
+}
+
 .planning-page__month {
   min-width: 10rem;
   text-align: center;

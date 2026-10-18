@@ -17,6 +17,9 @@ public sealed record PlanningMonthResponse
     public required AllocationResponse Allocation { get; init; }
 
     public required TransferPlanResponse TransferPlan { get; init; }
+
+    /// <summary>The weekends and Polish holidays of the viewed month, each date once.</summary>
+    public required IReadOnlyList<DateOnly> NonBusinessDays { get; init; }
 }
 
 public sealed record AllocationResponse

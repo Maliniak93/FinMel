@@ -665,6 +665,37 @@
     "title": "Planowanie",
     "previousMonth": "Poprzedni miesiąc",
     "nextMonth": "Następny miesiąc",
+    "calendar": {
+      "layout": {
+        "label": "Widok miesiąca",
+        "list": "Lista",
+        "calendar": "Kalendarz"
+      },
+      "weekday": {
+        "mon": "pon",
+        "tue": "wt",
+        "wed": "śr",
+        "thu": "czw",
+        "fri": "pt",
+        "sat": "sob",
+        "sun": "niedz"
+      },
+      "status": {
+        "pending": "oczekuje",
+        "overdue": "zaległe",
+        "settled": "rozliczone",
+        "skipped": "pominięte"
+      },
+      "kind": {
+        "income": "Wpływ",
+        "payment": "Wydatek",
+        "deposit": "Koniec lokaty",
+        "bond": "Wykup obligacji"
+      },
+      "settledOn": "Rozliczono {{ date }}",
+      "noItems": "Na ten dzień nic nie zaplanowano.",
+      "deadlinesFailed": "Nie udało się wczytać terminów lokat i obligacji."
+    },
     "tabs": {
       "month": "Miesiąc",
       "year": "Rok"

@@ -665,6 +665,37 @@
     "title": "Planning",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
+    "calendar": {
+      "layout": {
+        "label": "Month layout",
+        "list": "List",
+        "calendar": "Calendar"
+      },
+      "weekday": {
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat",
+        "sun": "Sun"
+      },
+      "status": {
+        "pending": "Pending",
+        "overdue": "Overdue",
+        "settled": "Settled",
+        "skipped": "Skipped"
+      },
+      "kind": {
+        "income": "Income",
+        "payment": "Expense",
+        "deposit": "Deposit ends",
+        "bond": "Bond matures"
+      },
+      "settledOn": "Settled on {{ date }}",
+      "noItems": "Nothing planned for this day.",
+      "deadlinesFailed": "Deposit and bond dates could not be loaded."
+    },
     "tabs": {
       "month": "Month",
       "year": "Year"

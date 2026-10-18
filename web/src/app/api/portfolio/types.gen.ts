@@ -627,6 +627,7 @@ export type PlanningMonthResponse = {
     freeFunds: FreeFundsResponse;
     allocation: AllocationResponse;
     transferPlan: TransferPlanResponse;
+    nonBusinessDays: Array<string>;
 };
 
 export type PlanningSettingsResponse = {

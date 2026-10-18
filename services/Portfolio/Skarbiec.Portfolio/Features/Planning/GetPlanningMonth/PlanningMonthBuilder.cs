@@ -114,7 +114,11 @@ internal static class PlanningMonthBuilder
                 Incomplete = fxUnavailable
             },
             Allocation = allocation,
-            TransferPlan = transferPlan
+            TransferPlan = transferPlan,
+            NonBusinessDays = Enumerable.Range(0, viewed.LastDay.Day)
+                .Select(offset => viewed.FirstDay.AddDays(offset))
+                .Where(day => !PolishHolidayCalendar.IsBusinessDay(day))
+                .ToList()
         };
     }
 

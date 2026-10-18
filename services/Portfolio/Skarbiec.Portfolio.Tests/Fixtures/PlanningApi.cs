@@ -192,7 +192,8 @@ internal static class PlanningApi
         ExpensesView Expenses,
         FreeFundsView FreeFunds,
         AllocationView Allocation,
-        TransferPlanView? TransferPlan = null);
+        TransferPlanView? TransferPlan = null,
+        List<DateOnly>? NonBusinessDays = null);
 
     public sealed record PlanningYearView(
         int Year,
