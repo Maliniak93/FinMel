@@ -8,6 +8,7 @@ target: design
 kind: <new|change|cleanup>
 status: draft
 created: <YYYY-MM-DD>
+area: <Backend|Frontend|E2E|Claude|Scripts|CI/Infra|Docs|Fullstack|epic>
 issue:
 ---
 # <tytuł po polsku>
@@ -27,6 +28,9 @@ issue:
 ## Poza zakresem
 <!-- Czego ta zmiana świadomie nie obejmuje — zwłaszcza sąsiednia rzecz, którą łatwo założyć. -->
 
+## Proponowany podział
+<!-- Tylko area: epic (inaczej usuń sekcję): ponumerowane części w kolejności budowy, każda `<n>. <Obszar> — <co>`, np. `1. Backend — API celu`. Min. dwie. -->
+
 ## Ryzyka i uwagi
 <!-- Opcjonalne: kolizje z ADR / hard rules / product "Out of scope", przypadki brzegowe, ryzyka danych. -->
 
@@ -44,6 +48,7 @@ target: fix
 kind: fix
 status: draft
 created: <YYYY-MM-DD>
+area: <Backend|Frontend|E2E|Claude|Scripts|CI/Infra|Docs|Fullstack|epic>
 issue:
 ---
 # <tytuł po polsku>

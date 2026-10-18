@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Usage: node scripts/gh-project.mjs <verb> ...
 //   init                                                   create the custom fields and labels when missing
-//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--area <area>] [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e] [--queue top|bottom|before:N|after:N]   --e2e needs --parent and excludes --skip-tests and defaults --area to E2E; --area (see areas.mjs) is refused with --epic; --before puts the new part ahead of sibling #m; --queue places a top-level item on the board (default bottom), a part goes right after the previous part
+//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix --area <area> [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e] [--queue top|bottom|before:N|after:N]   --e2e needs --parent and excludes --skip-tests and defaults --area to E2E; --area (see areas.mjs) is required except with --epic, which refuses it; --before puts the new part ahead of sibling #m; --queue places a top-level item on the board (default bottom), a part goes right after the previous part
 //   check --body-file <p> [--epic] [--e2e]                 dry run of create's cleaning and checking
 //   edit <n> [--body-file <p>] [--tier 1|2] [--area <area>] [--parent <n>] replace the body, set Tier or Area, or attach the issue to an epic
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
@@ -618,6 +618,10 @@ async function create(flags) {
     );
   if (flags.area && flags.epic)
     throw new Error("--area is for a spec, not an epic: an epic has no area");
+  if (!flags.area && !flags.epic && !flags.e2e)
+    throw new Error(
+      `--area is required for a spec (one of: ${AREAS.join(", ")})`,
+    );
   const area = flags.area ? parseArea(flags.area) : flags.e2e ? "E2E" : null;
   if (flags.area && !area)
     throw new Error(`--area must be one of: ${AREAS.join(", ")}`);

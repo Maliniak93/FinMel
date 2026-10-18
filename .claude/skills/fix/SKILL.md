@@ -61,6 +61,9 @@ In the session scratchpad as `fix-<slug>.md`, from `.claude/skills/design/issue-
   cause, the test class and `Fixtures/` helpers the reproduction test belongs in, the nearest
   precedent. The build agents start from it instead of re-localizing the bug.
 - Depends on = an open issue that must merge first, if any (rare for a fix).
+- Area = `node scripts/areas.mjs of <Code map paths>`, i.e. the area of the file holding the cause; a fix that
+  must change backend and frontend files together is Fullstack by the Fullstack rule, otherwise an epic of fixes
+  (step 3a), one part per area.
 - Design decisions = the fix approach and why it targets the cause.
 - Acceptance criteria: **AC-1 is a reproduction test** that fails today and passes after the fix, named
   `Method_Scenario_Outcome` in the right test project (or `*.spec.ts` for Angular); **AC-2** = the touched
@@ -79,7 +82,8 @@ the evidence shows one of:
 - **several independent root causes** behind one symptom (each has its own reproduction and its own fix);
 - **one cause whose fix must land in sequence** — a contract or data-model change, then its consumer,
   then the UI — where each step leaves master green;
-- a fix too large to review as one diff.
+- a fix too large to review as one diff;
+- the fix spans more than one area and fails the Fullstack rule (`skarbiec-plan/workflow.md` → Area): one part per area.
 
 A neighbouring refactor is never a part — it stays Out of scope, split or not.
 
@@ -93,17 +97,17 @@ A part whose reproduction only goes green once a later part merges is a wrong cu
 
 Run `node scripts/gh-project.mjs check --body-file <scratchpad>/fix-<slug>.md` and fix what it lists.
 Then present at most 10 lines: symptom, root cause + evidence, fix approach, tier, the AC-1 test name — for a
-split, one line per part (title, tier, AC-1 test) instead of the last three. Ask for approval; iterate on the draft until the user says yes. Only after an explicit yes:
+split, one line per part (title, tier, AC-1 test) instead of the last three. Add `Obszar: <Area>` (one per part for a split, none for the umbrella); the user may change it. Ask for approval; iterate on the draft until the user says yes. Only after an explicit yes:
 
 ```
 node scripts/gh-project.mjs create --title "Fix: <symptom>" --body-file <scratchpad>/fix-<slug>.md \
-  --slug <slug> --tier <1|2> --kind fix
+  --slug <slug> --tier <1|2> --kind fix --area <area>
 ```
 
 It prints `{"number","url","branch"}` — the branch is `fix/<slug>`. If it fails after the issue exists it
 prints the URL: finish the missing fields with `node scripts/gh-project.mjs set <number> <field> <value>`
 instead of creating a duplicate. For a split: the umbrella first (`--epic`), then each part in build order
-with `--parent <umbrella number>`.
+with `--parent <umbrella number>` and its own `--area`; the umbrella takes none.
 
 Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the
 previous one has merged. Build it exactly as `/build` steps 1–5 do and report as `/build` does.
@@ -123,7 +127,7 @@ previous one has merged. Build it exactly as `/build` steps 1–5 do and report 
 3. **Decide which side is wrong**, with a quoted line as evidence:
    - **app** — the app contradicts the plan, and nothing in the epic or its parts specifies what the app does → steps 2–3
      above, then `node scripts/gh-project.mjs check --body-file …` and
-     `create … --kind fix --parent <epic> --before <n>` (the part lands ahead of the e2e part, so the run builds and merges
+     `create … --kind fix --area <area> --parent <epic> --before <n>` (the part lands ahead of the e2e part, so the run builds and merges
      it first). Several causes → one part per cause, each `--before <n>`, in build order. No approval step.
    - **plan** — a part's AC or Design decision specifies exactly what the app does, and the plan step contradicts it →
      rewrite only the wrong steps of the epic's `## Test manualny` (numbered, Polish, `→` lines, the whole section) in the

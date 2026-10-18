@@ -33,7 +33,8 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
 1. Run `node scripts/plan-status.mjs` — it lists every open spec issue — and `node scripts/gh-project.mjs queue` (the build
    queue in board order, with each item's `id`, `manual` and an epic's `next`), then read **only** the sections of `architecture.md` / `domain.md` / `ideas.md`
    that this change actually touches. Not the folder. If an open issue already covers the idea, say
-   so and ask whether to extend it instead.
+   so and ask whether to extend it instead. An `idea:<slug>` prompt: its `area:` and `## Proponowany podział`
+   are the starting cut (`epic` means an umbrella with those parts).
 2. Need a fact about the code (does this slice exist, what does that consumer do, is there a
    precedent)? Send an `Explore` subagent for it. Do not read a dozen files yourself.
    **For a change or a refactor this is mandatory before you write a line of the spec**: send
@@ -45,6 +46,8 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
    that will change — as `path:start-end — why` or `path — Member()` lines, 5–15 of them — and paste that list into the draft. The test-writer,
    implementer and reviewer start from it instead of each rediscovering the code, which is where most
    of a build run's tokens went (measure with `node scripts/run-cost.mjs`).
+   The draft's area: `node scripts/areas.mjs of <the Code map paths>`, checked against the general rule in
+   `skarbiec-plan/workflow.md` → Area.
    If Explore finds the change needs another **open** issue merged first, list it under
    `## Depends on` — `prepare` then refuses to build until it is closed.
 3. Ask as many questions as the design genuinely needs — there is no quota. The filter is not the
@@ -103,6 +106,9 @@ Signals worth a proposal:
   master working;
 - one part is mechanical (Tier 1, or `skip-tests` cleanup) and another is a new pattern (Tier 2) —
   splitting lets each run with its own tier and skip;
+- the change has more than one area and fails the Fullstack rule (`skarbiec-plan/workflow.md` → Area; Backend
+  plus Frontend alone is one Fullstack spec): cut an epic Backend → Frontend → E2E, one part per area, the E2E
+  part only when the change is visible in the app;
 - the diff would be too large to review in one sitting (roughly > 8 ACs or > 3 services) — past
   that, a single run's test-writer and implementer contexts grow past 300k tokens.
 
@@ -151,7 +157,7 @@ Run `node scripts/gh-project.mjs check --body-file <scratchpad>/<slug>.md` (`--e
 umbrella) and fix what it lists — it checks Goal, Out of scope, that every AC checkbox names a
 `proof:`, and the shape of `## Test manualny` (a warning when it is missing, an error when it has a `- [ ]`
 line or neither a numbered step nor the `Weryfikacja w planie epica` line). Then present a summary of at most 15 lines: goal (for a change: today → wanted), kind, tier, scope, the
-acceptance criteria as one line each, whether tests are skipped, the manual plan's step count (or `brak planu`), the split (if any), and anything
+acceptance criteria as one line each, `Obszar: <Area>` (one line per part for a split, none for the umbrella; the user may change it before publishing), whether tests are skipped, the manual plan's step count (or `brak planu`), the split (if any), and anything
 still open, plus one line `Kolejka: <position> — <reason>` where the position is `top`, `bottom`, `before:N` or `after:N`
 against the queue (for an epic, the epic's position; parts never get one), e.g. `Kolejka: before:400 — przed #400, bo #400 czyta pole, które dodaje ten spec`.
 Default `bottom`. Then ask for approval. Iterate on the draft until the user says yes; nothing is published
@@ -162,7 +168,7 @@ or a Design decision) — publish. The script cleans and re-checks the draft its
 
 ```
 node scripts/gh-project.mjs create --title "<title>" --body-file <scratchpad>/<slug>.md \
-  --slug <slug> --tier <1|2> --kind <new|change|cleanup> [--skip-tests] --queue <position>
+  --slug <slug> --tier <1|2> --kind <new|change|cleanup> --area <area> [--skip-tests] --queue <position>
 ```
 
 `--queue` is the approved `Kolejka:` position and applies to a top-level item (a single spec or the umbrella). A part
@@ -171,14 +177,14 @@ node scripts/gh-project.mjs create --title "<title>" --body-file <scratchpad>/<s
 
 For a split: first the umbrella with `--epic` (its `--tier` is the highest of its parts, its
 `--kind` the one most parts share), then each part in build order with `--parent <umbrella number>`
-and its own `--slug`, `--tier`, `--kind`, `--skip-tests`, the e2e part last with `--e2e`. The script prints `{"number","url","branch"}` per issue; if it fails
+and its own `--slug`, `--tier`, `--kind`, `--area`, `--skip-tests`, the e2e part last with `--e2e` (which defaults `--area` to E2E). The umbrella takes no `--area`. The script prints `{"number","url","branch"}` per issue; if it fails
 after the issue exists, it prints the URL — finish the missing fields with
 `node scripts/gh-project.mjs set <number> <field> <value>` instead of creating a duplicate.
 
 **Amending an existing issue** (step 1 found one, or `/build` stopped on a spec that needs fixing):
 start the draft from `node scripts/gh-project.mjs get <n> --out <scratchpad>/<slug>.md --raw`, edit
 only what changes, and after the same explicit yes publish with
-`node scripts/gh-project.mjs edit <n> --body-file <scratchpad>/<slug>.md [--tier <1|2>]`. Never create a second issue for
+`node scripts/gh-project.mjs edit <n> --body-file <scratchpad>/<slug>.md [--tier <1|2>] [--area <area>]`. Never create a second issue for
 the same spec.
 
 Reply with the issue link(s) and tell the user to run `/build #<number>` (for a split: the first
