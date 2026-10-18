@@ -469,6 +469,32 @@
       "empty": "Brak aktywnych rachunków z wartością.",
       "outside": "Poza rachunkami",
       "loadFailed": "Nie udało się wczytać rachunków."
+    },
+    "monthCard": {
+      "title": "Ten miesiąc",
+      "setup": "Zaplanuj miesiąc",
+      "plan": "Plan",
+      "forecast": "Prognoza",
+      "deficit": "deficyt",
+      "settled": "Wpływy załatwione: {{ done }} z {{ total }}",
+      "planStatus": "Plan przelewów",
+      "status": {
+        "None": "brak",
+        "Preview": "Podgląd",
+        "Accepted": "Przyjęty",
+        "Completed": "Zakończony",
+        "Skipped": "Pominięty"
+      },
+      "empty": "Wszystko załatwione",
+      "showAll": "pokaż wszystkie",
+      "loadFailed": "Nie udało się wczytać miesiąca.",
+      "todo": {
+        "overdueIncome": "{{ name }} — {{ date }}, zaległe: {{ days }} dni, {{ amount }}",
+        "toAccept": "Plan czeka na przyjęcie — {{ amount }}",
+        "topUp": "Dopłata czeka na przyjęcie — {{ amount }}",
+        "unchecked": "{{ unchecked }} z {{ total }} przelewów nieodhaczone",
+        "payment": "{{ name }} — {{ date }} (za {{ days }} dni), {{ amount }}"
+      }
     }
   },
   "netWorthChart": {
@@ -653,8 +679,7 @@
       "incomplete": "niekompletny — brakuje kursu waluty"
     },
     "overdue": {
-      "title": "Do rozliczenia",
-      "badge": "Zaległe wystąpienia"
+      "title": "Do rozliczenia"
     },
     "loadFailed": "Nie udało się wczytać planu.",
     "incomes": {
@@ -909,7 +934,9 @@
         "title": "Dopłata",
         "accept": "Przyjmij dopłatę",
         "acceptFailed": "Nie udało się przyjąć dopłaty."
-      }
+      },
+      "paymentLeadDays": "Przypominaj o płatnościach (dni wcześniej)",
+      "paymentLeadDaysFailed": "Nie udało się zapisać wyprzedzenia przypomnień."
     },
     "freeFunds": {
       "title": "Wolne środki",
@@ -940,6 +967,9 @@
       "dayOfMonth": "Dzień miesiąca",
       "dayInvalid": "Podaj dzień od 1 do 31.",
       "shift": "Przesunięcie na dzień roboczy"
+    },
+    "todo": {
+      "badge": "Do zrobienia"
     }
   },
   "securities": {

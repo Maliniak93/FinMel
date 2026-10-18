@@ -319,9 +319,66 @@ internal static class PlanningApi
         return account;
     }
 
-    public const string TransferPlanSettingsUri = "/api/portfolio/transfer-plans/settings";
+    public const string PlanningSettingsUri = "/api/portfolio/planning/settings";
 
     public const string InvalidMinimumTransferErrorCode = "Validation.InvalidMinimumTransfer";
+
+    public const string InvalidPaymentLeadDaysErrorCode = "Validation.InvalidPaymentLeadDays";
+
+    public const string TodoUri = "/api/portfolio/planning/todo";
+
+    public const string OverdueIncomeKind = "OverdueIncome";
+
+    public const string TransferPlanToAcceptKind = "TransferPlanToAccept";
+
+    public const string TransferPlanUncheckedKind = "TransferPlanUnchecked";
+
+    public const string UpcomingPaymentKind = "UpcomingPayment";
+
+    public sealed record TodoItemView(
+        string Kind,
+        string? Name,
+        DateOnly? Date,
+        string? Month,
+        decimal? Amount,
+        string? Currency,
+        int? DaysOverdue,
+        int? DaysUntil,
+        bool? IsTopUp,
+        int? UncheckedRows,
+        int? TotalRows);
+
+    public sealed record TodoView(List<TodoItemView> Items, int PaymentLeadDays);
+
+    public sealed record PlanningSettingsView(int MinimumTransferPln, int PaymentLeadDays);
+
+    public static async Task<TodoView> GetTodoAsync(this HttpClient client, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(TodoUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<TodoView>(cancellationToken))!;
+    }
+
+    public static async Task<PlanningSettingsView> GetPlanningSettingsAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(PlanningSettingsUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<PlanningSettingsView>(cancellationToken))!;
+    }
+
+    public static async Task SavePlanningSettingsAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        int minimumTransferPln = 100,
+        int paymentLeadDays = 7)
+    {
+        var response = await client.PutAsJsonAsync(
+            PlanningSettingsUri, new { minimumTransferPln, paymentLeadDays }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 
     public static readonly DateOnly TransferValuationDate = new(2026, 10, 14);
 
@@ -443,13 +500,6 @@ internal static class PlanningApi
 
     public static TransferRowView RowOf(this TransferPlanView plan, string bucketName, string groupName) =>
         plan.Rows.Single(r => r.BucketName == bucketName && r.GroupName == groupName);
-
-    public static async Task SaveTransferPlanSettingsAsync(
-        this HttpClient client, int minimumTransferPln, CancellationToken cancellationToken)
-    {
-        var response = await client.PutAsJsonAsync(TransferPlanSettingsUri, new { minimumTransferPln }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
 
     public static async Task<TransferPlanView> GetTransferPlanAsync(
         this HttpClient client, string month, CancellationToken cancellationToken) =>

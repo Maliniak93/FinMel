@@ -5,13 +5,13 @@
         <a mat-list-item [routerLink]="link.path" routerLinkActive="shell__nav-link--active">
           <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
           <span matListItemTitle>{{ link.label | transloco }}</span>
-          @if (link.path === 'planning' && planningState.overdueCount() > 0) {
+          @if (link.path === 'planning' && planningState.todoCount() > 0) {
             <span
               matListItemMeta
               class="shell__badge"
-              data-testid="overdue-badge"
-              [attr.aria-label]="'planning.overdue.badge' | transloco"
-              >{{ planningState.overdueCount() }}</span
+              data-testid="todo-badge"
+              [attr.aria-label]="'planning.todo.badge' | transloco"
+              >{{ planningState.todoCount() }}</span
             >
           }
         </a>

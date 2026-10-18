@@ -20,6 +20,7 @@ import { assetClassColor } from './asset-class-color';
 import { AllocationCard } from './allocation-card/allocation-card';
 import { CashCard } from './cash-card/cash-card';
 import { AccountsCard } from './accounts-card/accounts-card';
+import { MonthCard } from './month-card/month-card';
 import { UpcomingCard } from './upcoming-card/upcoming-card';
 import type { ChartRange } from './net-worth-chart/chart-scale';
 import { NetWorthChart } from './net-worth-chart/net-worth-chart';
@@ -39,6 +40,7 @@ import { NetWorthChart } from './net-worth-chart/net-worth-chart';
     AccountsCard,
     CashCard,
     AllocationCard,
+    MonthCard,
     UpcomingCard,
   ],
   templateUrl: './dashboard.html',

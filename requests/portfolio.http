@@ -1363,14 +1363,23 @@ Authorization: Bearer {{authToken}}
 
 ### --- Transfer plan ---
 
-### Set the minimum transfer in whole PLN (204; 0 = no minimum, none saved = 100; 400 Validation.InvalidMinimumTransfer unless an integer from 0 to 1000000); the preview is the transferPlan of GET planning/months
-PUT {{baseUrl}}/api/portfolio/transfer-plans/settings
+### Read the planning settings (200; minimumTransferPln defaults to 100, paymentLeadDays to 7)
+GET {{baseUrl}}/api/portfolio/planning/settings
+Authorization: Bearer {{authToken}}
+
+### Save the planning settings (204; minimumTransferPln whole PLN, 0 = no minimum, 400 Validation.InvalidMinimumTransfer unless an integer from 0 to 1000000; paymentLeadDays whole days, 0 = no payment reminders, 400 Validation.InvalidPaymentLeadDays unless an integer from 0 to 90); the minimum drives the transferPlan of GET planning/months, the lead the todo
+PUT {{baseUrl}}/api/portfolio/planning/settings
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "minimumTransferPln": 250
+  "minimumTransferPln": 250,
+  "paymentLeadDays": 7
 }
+
+### The todo list (200; items in the order overdue incomes, transfer plans to accept or check off, payments of rare expenses due within paymentLeadDays; the planning menu counter is its length)
+GET {{baseUrl}}/api/portfolio/planning/todo
+Authorization: Bearer {{authToken}}
 
 ### Accept the month's preview, freezing its rows as batch 1 (204; 409 Conflict.TransferPlanNotPreview unless the month's transferPlan.status is Preview; 400 Validation.InvalidMonth)
 POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/accept

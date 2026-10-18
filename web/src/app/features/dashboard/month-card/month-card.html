@@ -1,0 +1,79 @@
+<mat-card class="month-card">
+  <mat-card-content>
+    <h2 class="month-card__title">{{ 'dashboard.monthCard.title' | transloco }}</h2>
+
+    @if (monthResource.error(); as error) {
+      <div class="month-card__state" role="alert">
+        <p>{{ error.message }}</p>
+        <button mat-button type="button" (click)="monthResource.reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (!month()) {
+      <div class="month-card__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (!hasDefinitions()) {
+      <a mat-button routerLink="/planning" data-testid="month-card-setup">
+        {{ 'dashboard.monthCard.setup' | transloco }}
+      </a>
+    } @else {
+      <dl class="month-card__figures">
+        <div data-testid="month-card-plan">
+          <dt>{{ 'dashboard.monthCard.plan' | transloco }}</dt>
+          <dd>{{ formatMoney(planPln(), 'PLN') }}</dd>
+        </div>
+        <div data-testid="month-card-forecast">
+          <dt>{{ 'dashboard.monthCard.forecast' | transloco }}</dt>
+          <dd>
+            @if (forecastPln() < 0) {
+              <span class="month-card__deficit" data-testid="month-card-deficit">
+                {{ formatMoney(forecastPln(), 'PLN') }}
+                {{ 'dashboard.monthCard.deficit' | transloco }}
+              </span>
+            } @else {
+              {{ formatMoney(forecastPln(), 'PLN') }}
+            }
+          </dd>
+        </div>
+      </dl>
+
+      <p class="month-card__line" data-testid="month-card-settled">
+        {{
+          'dashboard.monthCard.settled'
+            | transloco: { done: settled().done, total: settled().total }
+        }}
+      </p>
+      <p class="month-card__line" data-testid="month-card-plan-status">
+        {{ 'dashboard.monthCard.planStatus' | transloco }}:
+        {{ 'dashboard.monthCard.status.' + planStatus() | transloco }}
+      </p>
+
+      @if (itemCount() === 0) {
+        <p class="month-card__empty" data-testid="month-card-empty">
+          {{ 'dashboard.monthCard.empty' | transloco }}
+        </p>
+      } @else {
+        <ul class="month-card__list">
+          @for (item of visibleItems(); track $index) {
+            <li>
+              <a
+                class="month-card__item"
+                data-testid="month-card-todo-item"
+                routerLink="/planning"
+                [queryParams]="{ month: item.month }"
+                [fragment]="item.fragment"
+                >{{ item.key | transloco: item.params }}</a
+              >
+            </li>
+          }
+        </ul>
+        @if (canExpand()) {
+          <button mat-button type="button" data-testid="month-card-show-all" (click)="showAll()">
+            {{ 'dashboard.monthCard.showAll' | transloco }}
+          </button>
+        }
+      }
+    }
+  </mat-card-content>
+</mat-card>

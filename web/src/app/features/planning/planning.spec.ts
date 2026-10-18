@@ -213,6 +213,9 @@ describe('Planning', () => {
       if (requestUrl(input).includes('/planning/overdue')) {
         return jsonResponse({ items: overdueItems });
       }
+      if (requestUrl(input).includes('/planning/todo')) {
+        return jsonResponse({ items: [], paymentLeadDays: 7 });
+      }
       if (!requested) {
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -1062,8 +1065,8 @@ describe('Planning', () => {
         .map((call: unknown[]) => call[0] as Request)
         .filter((request: Request) => request.method === 'PUT');
       expect(puts).toHaveLength(1);
-      expect(puts[0].url).toContain('/transfer-plans/settings');
-      expect(await puts[0].clone().json()).toEqual({ minimumTransferPln: 250 });
+      expect(puts[0].url).toContain('/planning/settings');
+      expect(await puts[0].clone().json()).toEqual({ minimumTransferPln: 250, paymentLeadDays: 7 });
     });
     await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
   });
@@ -1197,6 +1200,73 @@ describe('Planning', () => {
       expect(posts[1].url).toContain('/transfer-plans/2026-10/skip');
     });
     await vi.waitFor(() => expect(requestedMonths()).toHaveLength(3));
+  });
+
+  function todoRequests(): number {
+    return fetchSpy.mock.calls.filter(
+      (call: unknown[]) =>
+        requestUrl(call[0]).includes('/planning/todo') && (call[0] as Request).method === 'GET',
+    ).length;
+  }
+
+  it('reloads the planning state after a row is checked and after the lead days are saved', async () => {
+    responses['2026-10'] = month(
+      {},
+      {},
+      {},
+      {},
+      {
+        status: 'Accepted',
+        canUndo: true,
+        rows: [frozenRow('IKE', 'row-1', false), frozenRow('IKZE', 'row-2', true)],
+      },
+    );
+    await setup();
+    const loaded = todoRequests();
+    expect(loaded).toBeGreaterThan(0);
+
+    const boxes = rows('transfer-row-check') as HTMLInputElement[];
+    boxes[0].checked = true;
+    boxes[0].dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(todoRequests()).toBeGreaterThan(loaded));
+    const afterCheck = todoRequests();
+
+    const input = rows('payment-lead-days-input')[0] as HTMLInputElement;
+    expect(input.value).toBe('7');
+    input.value = '14';
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(async () => {
+      const puts = fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter(
+          (request: Request) =>
+            request.method === 'PUT' && request.url.includes('/planning/settings'),
+        );
+      expect(puts).toHaveLength(1);
+      expect(await puts[0].clone().json()).toEqual({
+        minimumTransferPln: 100,
+        paymentLeadDays: 14,
+      });
+    });
+    await vi.waitFor(() => expect(todoRequests()).toBeGreaterThan(afterCheck));
+  });
+
+  it('scrolls to the section named in the URL fragment after the month loads', async () => {
+    const scrolled: string[] = [];
+    const scrollIntoView = vi.fn(function (this: HTMLElement) {
+      scrolled.push(this.id);
+    });
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      writable: true,
+      value: scrollIntoView,
+    });
+    responses['2026-10'] = month({}, {}, {}, {}, { rows: [transferRow('IKE', 2260)] });
+
+    await setup('/planning?month=2026-10#plan-przelewow');
+    await vi.waitFor(() => expect(scrolled).toContain('plan-przelewow'));
+
+    expect(element().querySelector('#plan-przelewow')).not.toBeNull();
   });
 
   it('shows an accepted plan with a checkbox per row, checks a row and undoes the acceptance after confirmation', async () => {

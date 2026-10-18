@@ -2334,16 +2334,16 @@
         }
       }
     },
-    "/api/portfolio/transfer-plans/settings": {
+    "/api/portfolio/planning/settings": {
       "put": {
         "tags": [
-          "SaveTransferPlanSettingsEndpoint"
+          "SavePlanningSettingsEndpoint"
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SaveTransferPlanSettingsRequest"
+                "$ref": "#/components/schemas/SavePlanningSettingsRequest"
               }
             }
           },
@@ -2352,6 +2352,42 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "GetPlanningSettingsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/planning/todo": {
+      "get": {
+        "tags": [
+          "GetPlanningTodoEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningTodoResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -6137,6 +6173,54 @@
           }
         }
       },
+      "PlanningSettingsResponse": {
+        "required": [
+          "minimumTransferPln",
+          "paymentLeadDays"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumTransferPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "paymentLeadDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PlanningTodoResponse": {
+        "required": [
+          "items",
+          "paymentLeadDays"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TodoItemResponse"
+            }
+          },
+          "paymentLeadDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "RecordTransactionRequest": {
         "required": [
           "type",
@@ -6350,13 +6434,22 @@
           }
         }
       },
-      "SaveTransferPlanSettingsRequest": {
+      "SavePlanningSettingsRequest": {
         "required": [
-          "minimumTransferPln"
+          "minimumTransferPln",
+          "paymentLeadDays"
         ],
         "type": "object",
         "properties": {
           "minimumTransferPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "paymentLeadDays": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -6839,6 +6932,111 @@
       },
       "TaxWrapper": {
         "type": "integer"
+      },
+      "TodoItemKind": {
+        "enum": [
+          "OverdueIncome",
+          "TransferPlanToAccept",
+          "TransferPlanUnchecked",
+          "UpcomingPayment"
+        ]
+      },
+      "TodoItemResponse": {
+        "required": [
+          "kind",
+          "name",
+          "date",
+          "month",
+          "amount",
+          "currency",
+          "daysOverdue",
+          "daysUntil",
+          "isTopUp",
+          "uncheckedRows",
+          "totalRows"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TodoItemKind"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "month": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "daysOverdue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "daysUntil": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isTopUp": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "uncheckedRows": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalRows": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
       },
       "TransactionResponse": {
         "required": [
@@ -8280,7 +8478,13 @@
       "name": "GetPlanningMonthEndpoint"
     },
     {
-      "name": "SaveTransferPlanSettingsEndpoint"
+      "name": "SavePlanningSettingsEndpoint"
+    },
+    {
+      "name": "GetPlanningSettingsEndpoint"
+    },
+    {
+      "name": "GetPlanningTodoEndpoint"
     },
     {
       "name": "AcceptTransferPlanEndpoint"
