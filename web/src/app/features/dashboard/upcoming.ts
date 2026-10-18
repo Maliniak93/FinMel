@@ -2,6 +2,7 @@ import type { AccountResponse, BondResponse, DepositResponse } from '../../api/p
 import { fromDateOnly, toDateOnly } from '../../shared/date-only';
 import { BOND_STATUS } from '../bonds/bond-interest';
 import { DEPOSIT_STATUS } from '../deposits/deposit-terms';
+import { assetDeadlines } from './asset-deadlines';
 
 const HORIZON_DAYS = 30;
 
@@ -53,24 +54,21 @@ export function upcomingItems(
   const horizonDate = fromDateOnly(today);
   horizonDate.setDate(horizonDate.getDate() + HORIZON_DAYS);
   const horizon = toDateOnly(horizonDate);
-  const inWindow = (date: string) => date >= today && date <= horizon;
 
   const items: UpcomingItem[] = [];
 
   for (const deposit of deposits.filter(isActive)) {
-    const status = Number(deposit.status);
-    const base = {
-      name: deposit.name,
-      date: deposit.maturityDate,
-      count: null,
-      amount: deposit.projection.finalAmount,
-      currency: deposit.currency,
-      link: '/deposits',
-    } as const;
-    if (status === DEPOSIT_STATUS.Due) {
-      items.push({ ...base, kind: 'depositDue', actionNeeded: true });
-    } else if (status === DEPOSIT_STATUS.Active && inWindow(deposit.maturityDate)) {
-      items.push({ ...base, kind: 'depositMaturing', actionNeeded: false });
+    if (Number(deposit.status) === DEPOSIT_STATUS.Due) {
+      items.push({
+        name: deposit.name,
+        kind: 'depositDue',
+        actionNeeded: true,
+        date: deposit.maturityDate,
+        count: null,
+        amount: deposit.projection.finalAmount,
+        currency: deposit.currency,
+        link: '/deposits',
+      });
     }
   }
 
@@ -98,13 +96,31 @@ export function upcomingItems(
         date: null,
         count: Number(bond.duePeriodCount),
       });
-    } else if (status === BOND_STATUS.Active && inWindow(bond.maturityDate)) {
+    }
+  }
+
+  for (const deadline of assetDeadlines(deposits, bonds, today, horizon)) {
+    if (deadline.kind === 'deposit' && deadline.status === DEPOSIT_STATUS.Active) {
       items.push({
-        ...base,
+        name: deadline.name,
+        kind: 'depositMaturing',
+        actionNeeded: false,
+        date: deadline.date,
+        count: null,
+        amount: deadline.amount,
+        currency: deadline.currency,
+        link: deadline.link,
+      });
+    } else if (deadline.kind === 'bond' && deadline.status === BOND_STATUS.Active) {
+      items.push({
+        name: deadline.name,
         kind: 'bondMaturing',
         actionNeeded: false,
-        date: bond.maturityDate,
+        date: deadline.date,
         count: null,
+        amount: deadline.amount,
+        currency: deadline.currency,
+        link: deadline.link,
       });
     }
   }

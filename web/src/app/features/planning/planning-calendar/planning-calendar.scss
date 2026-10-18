@@ -1,0 +1,161 @@
+.planning-calendar__warning {
+  color: var(--mat-sys-error);
+}
+
+.planning-calendar__weekdays,
+.planning-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.planning-calendar__weekdays {
+  margin-bottom: 4px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.planning-calendar__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 96px;
+  padding: 4px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.planning-calendar__cell--empty {
+  border-style: dashed;
+  cursor: default;
+}
+
+.planning-calendar__cell--dimmed {
+  background: var(--mat-sys-surface-container);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.planning-calendar__cell--today {
+  border-color: var(--mat-sys-primary);
+  border-width: 2px;
+}
+
+.planning-calendar__cell--selected {
+  background: var(--mat-sys-secondary-container);
+}
+
+.planning-calendar__day {
+  font-weight: 500;
+}
+
+.planning-calendar__cell--today .planning-calendar__day {
+  color: var(--mat-sys-primary);
+}
+
+.planning-calendar__item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-left: 3px solid var(--mat-sys-outline);
+  border-radius: 2px;
+  background: var(--mat-sys-surface-container-high);
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+}
+
+.planning-calendar__item--action {
+  cursor: pointer;
+}
+
+.planning-calendar__item[data-status='pending'] {
+  border-left-color: var(--mat-sys-primary);
+}
+
+.planning-calendar__item[data-status='overdue'] {
+  border-left-color: var(--mat-sys-error);
+  background: var(--mat-sys-error-container);
+}
+
+.planning-calendar__item[data-status='settled'] {
+  border-left-color: var(--mat-sys-tertiary);
+}
+
+.planning-calendar__item[data-status='skipped'] {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.planning-calendar__name {
+  overflow-wrap: anywhere;
+}
+
+.planning-calendar__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.planning-calendar__more,
+.planning-calendar__count {
+  font-size: 0.75rem;
+}
+
+.planning-calendar__count {
+  align-self: flex-start;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+  font-weight: 500;
+}
+
+.planning-calendar__details {
+  margin-top: 16px;
+}
+
+.planning-calendar__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planning-calendar__detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 8px;
+  border-left: 3px solid var(--mat-sys-outline);
+  background: var(--mat-sys-surface-container-high);
+}
+
+.planning-calendar__detail[data-status='overdue'] {
+  border-left-color: var(--mat-sys-error);
+}
+
+.planning-calendar__kind {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.planning-calendar__detail .planning-calendar__name {
+  flex: 1 1 8rem;
+  font-weight: 500;
+}
+
+@media (max-width: 599.98px) {
+  .planning-calendar__cell {
+    min-height: 56px;
+  }
+}

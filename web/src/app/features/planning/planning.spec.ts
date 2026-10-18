@@ -177,6 +177,7 @@ function month(
     expenses: expenses(expensesPart),
     freeFunds: freeFunds(freeFundsPart),
     allocation: allocation(allocationPart),
+    nonBusinessDays: [],
   };
 }
 
@@ -1525,6 +1526,28 @@ describe('Planning', () => {
 
     expect(new Set(requestedYears())).toEqual(new Set(['2027']));
     expect(tabs()[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('shows the calendar from layout=calendar, drops layout on Lista and keeps it across months', async () => {
+    await setup('/planning?month=2027-03&layout=calendar');
+
+    expect(rows('calendar-cell').length).toBeGreaterThan(0);
+
+    click('next-month');
+    await vi.waitFor(async () => {
+      await settle();
+      expect(TestBed.inject(Router).url).toContain('month=2027-04');
+    });
+    expect(TestBed.inject(Router).url).toContain('layout=calendar');
+    expect(rows('calendar-cell').length).toBeGreaterThan(0);
+
+    click('layout-list');
+    await vi.waitFor(async () => {
+      await settle();
+      expect(TestBed.inject(Router).url).not.toContain('layout');
+    });
+    expect(TestBed.inject(Router).url).toContain('month=2027-04');
+    expect(rows('calendar-cell')).toHaveLength(0);
   });
 
   it('switches to the Rok tab and back, keeping the year in the query params', async () => {

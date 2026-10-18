@@ -197,6 +197,22 @@ public sealed class PlanningMonthEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
+    public async Task NonBusinessDays()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var november = await client.GetPlanningMonthAsync("2026-11", cancellationToken);
+
+        Assert.NotNull(november.NonBusinessDays);
+        Assert.Equal(
+            [1, 7, 8, 11, 14, 15, 21, 22, 28, 29],
+            november.NonBusinessDays.Select(d => d.Day).Order().ToArray());
+        Assert.All(november.NonBusinessDays, d => Assert.Equal((2026, 11), (d.Year, d.Month)));
+    }
+
+    [Fact]
     public async Task Definitions_CarryStatusAndValuesInForce()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

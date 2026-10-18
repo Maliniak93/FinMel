@@ -6183,7 +6183,8 @@
           "expenses",
           "freeFunds",
           "allocation",
-          "transferPlan"
+          "transferPlan",
+          "nonBusinessDays"
         ],
         "type": "object",
         "properties": {
@@ -6201,6 +6202,13 @@
           },
           "transferPlan": {
             "$ref": "#/components/schemas/TransferPlanResponse"
+          },
+          "nonBusinessDays": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
           }
         }
       },
