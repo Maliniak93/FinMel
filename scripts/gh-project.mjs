@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Usage: node scripts/gh-project.mjs <verb> ...
 //   init                                                   create the custom fields and labels when missing
-//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e] [--queue top|bottom|before:N|after:N]   --e2e needs --parent and excludes --skip-tests; --before puts the new part ahead of sibling #m; --queue places a top-level item on the board (default bottom), a part goes right after the previous part
+//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--area <area>] [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e] [--queue top|bottom|before:N|after:N]   --e2e needs --parent and excludes --skip-tests and defaults --area to E2E; --area (see areas.mjs) is refused with --epic; --before puts the new part ahead of sibling #m; --queue places a top-level item on the board (default bottom), a part goes right after the previous part
 //   check --body-file <p> [--epic] [--e2e]                 dry run of create's cleaning and checking
-//   edit <n> [--body-file <p>] [--tier 1|2] [--parent <n>] replace the body, or attach the issue to an epic
+//   edit <n> [--body-file <p>] [--tier 1|2] [--area <area>] [--parent <n>] replace the body, set Tier or Area, or attach the issue to an epic
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
 //   set <n> <field> <value>                                set one project field
 //   get <n> [--out <path> [--raw]]                         print the issue as JSON (parent, lastPart), optionally write a local copy
@@ -46,6 +46,7 @@ import {
   runMarker,
   spawnGh,
 } from "./gh.mjs";
+import { AREAS, parseArea } from "./areas.mjs";
 import { positionTarget, queueOf } from "./queue.mjs";
 
 const REPO_ROOT = path.resolve(
@@ -64,6 +65,7 @@ const FIELDS = [
     type: "SINGLE_SELECT",
     options: ["New", "Change", "Cleanup", "Fix"],
   },
+  { name: "Area", type: "SINGLE_SELECT", options: AREAS },
   { name: "Branch", type: "TEXT" },
 ];
 const LABELS = [
@@ -418,6 +420,7 @@ const ITEM_FIELDS = `
   status: fieldValueByName(name: "Status") { ${SINGLE_SELECT} }
   tier: fieldValueByName(name: "Tier") { ${SINGLE_SELECT} }
   kind: fieldValueByName(name: "Kind") { ${SINGLE_SELECT} }
+  area: fieldValueByName(name: "Area") { ${SINGLE_SELECT} }
   branch: fieldValueByName(name: "Branch") { ... on ProjectV2ItemFieldTextValue { text } }
 `;
 
@@ -483,6 +486,7 @@ function fieldsOf(item, labels) {
     status: item.status?.name ?? null,
     tier: item.tier?.name ?? null,
     kind: item.kind?.name ?? null,
+    area: item.area?.name ?? null,
     branch: item.branch?.text ?? null,
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),
@@ -612,6 +616,15 @@ async function create(flags) {
     throw new Error(
       "--queue is for a top-level item: a part goes right after the previous part",
     );
+  if (flags.area && flags.epic)
+    throw new Error("--area is for a spec, not an epic: an epic has no area");
+  const area = flags.area ? parseArea(flags.area) : flags.e2e ? "E2E" : null;
+  if (flags.area && !area)
+    throw new Error(`--area must be one of: ${AREAS.join(", ")}`);
+  if (area && !projectFields().fields.has("Area"))
+    throw new Error(
+      "the project has no Area field — run node scripts/gh-project.mjs init",
+    );
   const branch = flags.epic
     ? null
     : `${flags.kind === "fix" ? "fix" : "feat"}/${flags.slug}`;
@@ -644,6 +657,7 @@ async function create(flags) {
     setField(issueNumber, "Status", "Todo");
     setField(issueNumber, "Tier", flags.tier);
     setField(issueNumber, "Kind", kind);
+    if (area) setField(issueNumber, "Area", area);
     if (branch) setField(issueNumber, "Branch", branch);
     if (flags.before)
       placeBefore(flags.parent, issueNumber, Number(flags.before));
@@ -689,11 +703,17 @@ function placeBefore(parent, number, before) {
 function edit([number, ...rest]) {
   const flags = parseFlags(rest);
   const usage =
-    "usage: edit <issue number> [--body-file <path>] [--tier 1|2] [--parent <epic number>]";
-  if (!number || !(flags["body-file"] || flags.tier || flags.parent))
+    "usage: edit <issue number> [--body-file <path>] [--tier 1|2] [--area <area>] [--parent <epic number>]";
+  if (
+    !number ||
+    !(flags["body-file"] || flags.tier || flags.area || flags.parent)
+  )
     throw new Error(usage);
   if (flags.tier && !["1", "2"].includes(flags.tier))
     throw new Error("--tier must be 1 or 2");
+  const area = flags.area ? parseArea(flags.area) : null;
+  if (flags.area && !area)
+    throw new Error(`--area must be one of: ${AREAS.join(", ")}`);
   const done = [];
   if (flags["body-file"]) {
     const labels = JSON.parse(
@@ -712,6 +732,10 @@ function edit([number, ...rest]) {
   if (flags.tier) {
     setField(number, "Tier", flags.tier);
     done.push(`Tier = ${flags.tier}`);
+  }
+  if (area) {
+    setField(number, "Area", area);
+    done.push(`Area = ${area}`);
   }
   if (flags.parent) {
     const parent = JSON.parse(
@@ -1044,12 +1068,22 @@ function prepare([number, ...rest]) {
     attempt: !flags.fresh && action === "resumed" && dirty.length > 0,
     dryRun,
   });
+  const areaNote = issue.area
+    ? []
+    : [
+        `Brak obszaru (Area) na #${n} — ustaw: node scripts/gh-project.mjs set ${n} Area <obszar>`,
+      ];
+  for (const note of areaNote) process.stderr.write(`${note}\n`);
   const out = {
     ok: true,
     resumed,
     url: issue.url,
     branch: { name: target, action },
-    notes: [...(action === "resumed" ? dirty : []), ...rebuild.notes],
+    notes: [
+      ...(action === "resumed" ? dirty : []),
+      ...rebuild.notes,
+      ...areaNote,
+    ],
     workflow: replay.workflow,
     replay: replay.summary,
     workflowArgs,
