@@ -1,15 +1,18 @@
 #!/usr/bin/env node
-// Usage: node scripts/epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--shutdown|--no-shutdown] [--dry-run]
+// Usage: node scripts/epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run]
 //   <n>               build only that epic or standalone issue (manual or not); without it the whole build queue, item by item
 //   --items N|all     take the first N queue items (default all)
 //   --include-manual  also take an In progress item that is not marked epic-run (default --skip-manual)
 //   --start           keep the PC awake from launch but start the work (preflight included) at that time: now, in MIN minutes or at the next HH:MM; the stop file ends the wait
 //   --until HH:MM     no new claude session starts at or after the next HH:MM; the one running finishes, then the run ends with reason `window`
 //   --max-tasks N     stop before the (N+1)th build of this run (0 = preflight only)
-//   --shutdown        schedule `shutdown /s /t 600` when the run ends (default); --no-shutdown does not
+//   --on-limit        a build that hits the Claude usage limit: sleep (default; suspend under 1 h, hibernate from 1 h, awake up to 15 min or without wake timers), wait (awake) or exit (ends the run with reason `limit`)
+//   --max-wait HOURS  a reset further away than this ends the run with `limit-too-far` (default 12)
+//   --shutdown        ask with a 10 min Tak/Nie popup when the run ends, then shut down (default; no answer shuts down); --no-shutdown does not
 //   --dry-run         print the plan, the start time and what would happen per part; no preflight script, builds, merges, comments or shutdown
 //   node scripts/epic.mjs --stop   creates the one stop file; the running driver stops before the next build
-//   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<timestamp>.log
+//   node scripts/epic.mjs --sleep-test MIN | --hibernate-test MIN   suspend or hibernate with a wake timer MIN minutes ahead (no popup), print the planned and actual wake time and `powercfg /lastwake`, exit
+//   an unknown reset ends the run with `limit-unknown`; a PC that wakes but is not ready within 15 min with `wake-not-ready`; every line also goes to skarbiec-plan/epic-runs/<timestamp>.log
 //   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
@@ -25,15 +28,17 @@ import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./epic-gh.mjs";
+import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./epic-limit.mjs";
 import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./epic-queue.mjs";
+import { confirmPower, suspendUntil, wakeTimers } from "./power.mjs";
 import { queueOf } from "./queue.mjs";
 import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WIN = process.platform === "win32";
 const BOOLEAN_FLAGS = new Set(["dry-run", "shutdown", "no-shutdown", "include-manual", "skip-manual", "stop"]);
-const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "items", "start", "until"]);
-const USAGE = "usage: epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--shutdown|--no-shutdown] [--dry-run] | --stop";
+const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "items", "start", "until", "on-limit", "max-wait", "sleep-test", "hibernate-test"]);
+const USAGE = "usage: epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run] | --stop | --sleep-test MIN | --hibernate-test MIN";
 const BUILD_TIMEOUT_MS = 4 * 3600e3;
 const CI_POLL_MS = 30e3;
 const CI_MISSING_MS = 10 * 60e3;
@@ -600,8 +605,77 @@ function assertWindowOpen(ctx) {
 
 function resumeCommand(ctx) {
   const { flags } = ctx;
-  const args = [flags.only, flags.items && `--items ${flags.items}`, flags["include-manual"] && "--include-manual", flags["skip-manual"] && "--skip-manual", flags["max-tasks"] !== undefined && `--max-tasks ${flags["max-tasks"]}`, flags.until && `--until ${flags.until}`, flags.shutdown && "--shutdown", flags["no-shutdown"] && "--no-shutdown"];
+  const args = [flags.only, flags.items && `--items ${flags.items}`, flags["include-manual"] && "--include-manual", flags["skip-manual"] && "--skip-manual", flags["max-tasks"] !== undefined && `--max-tasks ${flags["max-tasks"]}`, flags.until && `--until ${flags.until}`, flags["on-limit"] && `--on-limit ${flags["on-limit"]}`, flags["max-wait"] && `--max-wait ${flags["max-wait"]}`, flags.shutdown && "--shutdown", flags["no-shutdown"] && "--no-shutdown"];
   return ["node scripts/epic.mjs", ...args.filter((a) => a !== undefined && a !== false)].join(" ");
+}
+
+function awakeWait(at) {
+  const until = at.getTime();
+  let nextBeat = Date.now() + HEARTBEAT_MS;
+  while (Date.now() < until) {
+    blockingSleep(Math.min(60e3, until - Date.now()));
+    if (existsSync(stopFile())) return;
+    if (Date.now() >= nextBeat && Date.now() < until) {
+      say(`limit Claude: ${Math.round((until - Date.now()) / 60e3)} min left`);
+      nextBeat += HEARTBEAT_MS;
+    }
+  }
+}
+
+async function sleepUntil(at, mode) {
+  const armed = await suspendUntil(at, mode);
+  if (armed) say(`obudzony o ${clock()}`);
+  else say(`${mode}: could not arm the wake timer - waiting awake`);
+  awakeWait(at);
+}
+
+const wakeLine = (power) => (power.works ? "wake timers: on" : `wake timers: off — ${power.hint}`);
+
+function wakeReady() {
+  if (!preflightResult().ok) {
+    say("wake: preflight not ready yet");
+    return false;
+  }
+  const runners = gh(["api", `repos/${REPO}/actions/runners`, "--jq", '[.runners[] | select(.status == "online")] | length']);
+  if (runners.ok && Number(runners.out) > 0) return true;
+  say(`wake: ${runners.ok ? "no runner online" : `gh failed (${short(runners.firstErr, 100)})`} yet`);
+  return false;
+}
+
+function limitStopDetail(number, reason, resetsAt, ctx) {
+  const resets = resetsAt ? clock(new Date(resetsAt > 1e12 ? resetsAt : resetsAt * 1000)) : "unknown";
+  const tail = reason === "window" ? `, after the window end ${clock(ctx.until)}` : "";
+  return `#${number}: usage limit reached, resets ${resets}${tail}; resume with ${resumeCommand(ctx)}`;
+}
+
+async function onUsageLimit(limit, number) {
+  const power = ctx.power;
+  const decision = await handleLimit(
+    { resetsAt: limit.resetsAt ? new Date(limit.resetsAt > 1e12 ? limit.resetsAt : limit.resetsAt * 1000) : null, now: new Date(), onLimit: ctx.flags["on-limit"] ?? "sleep", maxWaitHours: ctx.maxWaitHours, timersWork: power.works, hibernateAvailable: power.hibernateAvailable, windowEnd: ctx.until },
+    { confirm: confirmPower, suspendUntil: sleepUntil, waitUntil: awakeWait, log: say },
+  );
+  if (decision.action === "end") throw new Stop(decision.reason, limitStopDetail(number, decision.reason, limit.resetsAt, ctx));
+  if (existsSync(stopFile())) throw new Stop("stopped", "stop file found during the limit wait");
+  assertWindowOpen(ctx);
+}
+
+async function waitForReady(number) {
+  say("wake: checking preflight, GitHub and the runner");
+  const ready = await awaitReady({ check: wakeReady, now: Date.now, sleep });
+  if (!ready.ready) throw new Stop(ready.reason, `#${number}: the PC was not ready 15 min after the limit wait; resume with ${resumeCommand(ctx)}`);
+  say("wake: ready - building the same part again");
+}
+
+function buildThroughLimit(part) {
+  return buildWithResume({
+    part,
+    build: async () => {
+      const result = await build(ctx.claude, part.number, part.title);
+      return result.limitHit && !result.timedOut ? { ...result, limit: { resetsAt: result.resetsAt } } : result;
+    },
+    onLimit: (limit) => onUsageLimit(limit, part.number),
+    awaitReady: () => waitForReady(part.number),
+  });
 }
 
 async function handlePart(sub, ctx) {
@@ -624,14 +698,13 @@ async function handlePart(sub, ctx) {
       const buildStart = Date.now();
       // a build that ends on the GitHub limit without a PR is rerun after the reset; the workflow journal replays what it finished
       const { built, pr: builtPr } = await runStepWithLimit(async () => {
-        const result = await startWork({ item: ctx.item, part: part.number, gh: labelAsRun, build: () => build(ctx.claude, part.number, part.title) });
-        const stopped = result.timedOut || result.limitHit;
+        const result = await startWork({ item: ctx.item, part: part.number, gh: labelAsRun, build: () => buildThroughLimit(part) });
+        const stopped = result.timedOut;
         const found = stopped ? null : openPr(part.branch);
         return { code: result.code, output: result.ghLimit && !found && !stopped ? `GITHUB_LIMIT ${JSON.stringify(result.ghLimit)}` : "", built: result, pr: found };
       }, stepWait);
       entry.buildMin = minutes(built.ms);
       if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
-      if (built.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached, resets ${resetClock(built.resetsAt)}; resume with ${resumeCommand(ctx)}`);
       pr = builtPr;
       const blockedAtE2e = pr ? null : e2eBlock(part.number);
       if (blockedAtE2e) return repairE2e(part, blockedAtE2e, ctx);
@@ -685,7 +758,7 @@ function runnerOnline() {
 // an epic's sub-issues, or a standalone issue as its own single part
 const partsOf = (issue) => (issue.epic ? issue.subIssues : [{ number: issue.number, title: issue.title, state: issue.state }]);
 
-function runPreflight() {
+function preflightResult() {
   const pre = run(NODE, ["scripts/preflight.mjs"], { timeout: 30 * 60e3 });
   const line = pre.out.split(/\r?\n/).reverse().find((l) => l.startsWith("PREFLIGHT_RESULT: "));
   let parsed = null;
@@ -693,7 +766,12 @@ function runPreflight() {
     parsed = JSON.parse(line.slice("PREFLIGHT_RESULT: ".length));
   } catch {
   }
-  if (!parsed?.ok) throw new Stop("preflight", `preflight.mjs reported problems:\n${pre.out.split(/\r?\n/).slice(-15).join("\n")}`);
+  return { ok: Boolean(parsed?.ok), out: pre.out };
+}
+
+function runPreflight() {
+  const pre = preflightResult();
+  if (!pre.ok) throw new Stop("preflight", `preflight.mjs reported problems:\n${pre.out.split(/\r?\n/).slice(-15).join("\n")}`);
 }
 
 function preChecks(first, flags) {
@@ -808,10 +886,7 @@ async function finishRun(reason, detail, ctx) {
       const failure = await postSummary(number, summary(reason, detail, parts, resume, ok ? costLine(parts) : null));
       if (failure) say(`could not post the comment on #${number}: ${failure}`);
     }
-    if (!ctx.flags["no-shutdown"] && IS_WIN) {
-      run("shutdown", ["/s", "/t", "600", "/c", `Skarbiec epic run: ${reason}`]);
-      say("shutting down in 10 min — cancel: shutdown /a");
-    }
+    if (IS_WIN) await finishShutdown({ confirm: confirmPower, run, noShutdown: ctx.flags["no-shutdown"], dryRun: ctx.dryRun, log: say });
   }
   process.exit(ok ? 0 : 2);
 }
@@ -890,7 +965,15 @@ function readTimes(flags) {
   }
 }
 
-const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, until: null, claude: null };
+const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null };
+
+async function powerTest(mode, minutesAhead) {
+  const planned = new Date(Date.now() + minutesAhead * 60e3);
+  say(`${mode}: wake timer at ${planned.toTimeString().slice(0, 8)} (${minutesAhead} min)`);
+  const armed = await suspendUntil(planned, mode);
+  say(`${mode}: ${armed ? "resumed" : "could not arm the wake timer"} at ${new Date().toTimeString().slice(0, 8)}, planned ${planned.toTimeString().slice(0, 8)}`);
+  say(run("powercfg", ["/lastwake"]).out);
+}
 
 function interrupt() {
   killTree(buildChild);
@@ -909,6 +992,19 @@ try {
   if (flags.items !== undefined && flags.items !== "all" && !/^[1-9]\d*$/.test(flags.items)) throw new Stop("usage", "--items must be a positive number or all");
   if (flags["include-manual"] && flags["skip-manual"]) throw new Stop("usage", "--include-manual and --skip-manual exclude each other");
   if (flags.shutdown && flags["no-shutdown"]) throw new Stop("usage", "--shutdown and --no-shutdown exclude each other");
+  if (flags["on-limit"] !== undefined && !["sleep", "wait", "exit"].includes(flags["on-limit"])) throw new Stop("usage", "--on-limit must be sleep, wait or exit");
+  if (flags["max-wait"] !== undefined) {
+    ctx.maxWaitHours = Number(flags["max-wait"]);
+    if (!(ctx.maxWaitHours > 0)) throw new Stop("usage", "--max-wait must be a positive number of hours");
+  }
+  const testMode = flags["sleep-test"] !== undefined ? "suspend" : flags["hibernate-test"] !== undefined ? "hibernate" : null;
+  if (testMode) {
+    const minutesAhead = Number(flags["sleep-test"] ?? flags["hibernate-test"]);
+    if (flags["sleep-test"] !== undefined && flags["hibernate-test"] !== undefined) throw new Stop("usage", "--sleep-test and --hibernate-test exclude each other");
+    if (!(minutesAhead > 0)) throw new Stop("usage", "--sleep-test and --hibernate-test need a positive number of minutes");
+    await powerTest(testMode, minutesAhead);
+    process.exit(0);
+  }
   const times = readTimes(flags);
   ctx.until = times.until;
 
@@ -922,7 +1018,12 @@ try {
     openLog();
     rmSync(stopFile(), { force: true });
     startSleepGuard();
+    ctx.power = wakeTimers();
+    say(wakeLine(ctx.power));
     if (times.start.getTime() > Date.now()) waitUntil(times.start);
+  } else {
+    ctx.power = wakeTimers();
+    say(wakeLine(ctx.power));
   }
   ctx.claude = resolveClaude();
   if (!ctx.dryRun) runPreflight();

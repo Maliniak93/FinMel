@@ -17,6 +17,11 @@ Known failure modes, what causes them, and the fix. If you hit something not lis
 **Cause:** the GitHub limit (primary GraphQL or REST, or a secondary one) is exhausted; `gh-project.mjs`, `ship.mjs` and `gh-usage.mjs` never wait. The second line, `GITHUB_LIMIT {"kind":…,"resetAt":<epoch seconds>}`, carries the reset (`resetAt` is null for a secondary limit: wait a few minutes).
 **Fix:** re-run the same command after the reset time (`node scripts/gh-usage.mjs` shows the state; it is free). `/build` stops at once on an exit 4 from `prepare` or `ship.mjs`; the work stays on its branch and a re-run ships it. `epic.mjs` waits by itself and resumes; `plan-status.mjs` and `idea.mjs context` print `limit GitHuba do HH:MM` instead of the board.
 
+## An epic run does not sleep through the Claude limit (`wake timers: off`)
+
+**Cause:** the first log lines say `wake timers: off — <hint>`: wake timers are off on mains power (AC index of `powercfg /query SCHEME_CURRENT SUB_SLEEP RTCWAKE` is 0 or 2) or `powercfg /a` lists no sleep state, so the limit is waited out awake.
+**Fix:** `powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 1` then `powercfg /setactive SCHEME_CURRENT`; check with `node scripts/epic.mjs --sleep-test 3` and `--hibernate-test 3` (the PC must wake by itself and `powercfg /lastwake` names the timer). A run that ends `wake-not-ready` woke but preflight, `gh` or the runner did not come up within 15 min: fix it and re-run.
+
 ## Gateway 429s during a seed script or smoke test
 
 **Cause:** the Gateway rate-limits at 100 requests / 10 seconds. A seed or smoke script that fires requests in a tight loop (e.g. creating many assets) can hit it well before a human would.
