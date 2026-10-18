@@ -469,6 +469,32 @@
       "empty": "No active accounts with a value yet.",
       "outside": "Outside accounts",
       "loadFailed": "Failed to load accounts."
+    },
+    "monthCard": {
+      "title": "This month",
+      "setup": "Plan the month",
+      "plan": "Plan",
+      "forecast": "Forecast",
+      "deficit": "deficit",
+      "settled": "Incomes settled: {{ done }} of {{ total }}",
+      "planStatus": "Transfer plan",
+      "status": {
+        "None": "none",
+        "Preview": "Preview",
+        "Accepted": "Accepted",
+        "Completed": "Completed",
+        "Skipped": "Skipped"
+      },
+      "empty": "All done",
+      "showAll": "show all",
+      "loadFailed": "Failed to load the month.",
+      "todo": {
+        "overdueIncome": "{{ name }} — {{ date }}, overdue by {{ days }} d, {{ amount }}",
+        "toAccept": "Transfer plan waits for acceptance — {{ amount }}",
+        "topUp": "Top-up waits for acceptance — {{ amount }}",
+        "unchecked": "Transfers not checked off: {{ unchecked }} of {{ total }}",
+        "payment": "{{ name }} — {{ date }} (in {{ days }} d), {{ amount }}"
+      }
     }
   },
   "netWorthChart": {
@@ -653,8 +679,7 @@
       "incomplete": "incomplete — an exchange rate is missing"
     },
     "overdue": {
-      "title": "To settle",
-      "badge": "Overdue occurrences"
+      "title": "To settle"
     },
     "loadFailed": "Failed to load the plan.",
     "incomes": {
@@ -909,7 +934,9 @@
         "title": "Top-up",
         "accept": "Accept top-up",
         "acceptFailed": "Could not accept the top-up."
-      }
+      },
+      "paymentLeadDays": "Remind about payments (days ahead)",
+      "paymentLeadDaysFailed": "Could not save the reminder lead time."
     },
     "freeFunds": {
       "title": "Free funds",
@@ -940,6 +967,9 @@
       "dayOfMonth": "Day of the month",
       "dayInvalid": "Enter a day from 1 to 31.",
       "shift": "Business-day shift"
+    },
+    "todo": {
+      "badge": "Things to do"
     }
   },
   "securities": {

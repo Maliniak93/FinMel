@@ -18,17 +18,15 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { THEME_STORAGE_KEY, ThemeService } from '../../core/theme/theme';
 import { Shell } from './shell';
 
-function overdueItem(name: string): Record<string, unknown> {
+function todoItem(name: string): Record<string, unknown> {
   return {
-    recurringIncomeId: `id-${name}`,
-    nominalMonth: '2026-11',
-    date: '2026-11-10',
+    kind: 'OverdueIncome',
     name,
-    accountId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    accountName: 'mBank ROR',
-    accountArchived: false,
+    date: '2026-11-10',
+    month: '2026-11',
     amount: 800,
     currency: 'PLN',
+    daysOverdue: 5,
   };
 }
 
@@ -47,8 +45,8 @@ describe('Shell planning badge', () => {
     fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async (input) =>
-        requestUrl(input).includes('/planning/overdue')
-          ? jsonResponse({ items })
+        requestUrl(input).includes('/planning/todo')
+          ? jsonResponse({ items, paymentLeadDays: 7 })
           : jsonResponse({ detail: 'Not found.' }, 404),
       );
     await TestBed.configureTestingModule({
@@ -70,25 +68,29 @@ describe('Shell planning badge', () => {
     )!;
   }
 
-  it('shows the overdue count as a badge at Planning when it is above zero', async () => {
-    const element = await createShell([overdueItem('800+'), overdueItem('Wypłata żona')]);
+  it('shows the todo count as a badge at Planning when it is above zero', async () => {
+    const element = await createShell([
+      todoItem('800+'),
+      todoItem('Wypłata żona'),
+      todoItem('Premia'),
+    ]);
 
-    const badge = planningLink(element).querySelector('[data-testid="overdue-badge"]');
+    const badge = planningLink(element).querySelector('[data-testid="todo-badge"]');
     expect(badge).not.toBeNull();
-    expect(badge!.textContent!.trim()).toBe('2');
+    expect(badge!.textContent!.trim()).toBe('3');
   });
 
-  it('shows no badge at Planning when nothing is overdue', async () => {
+  it('shows no badge at Planning when the todo list is empty', async () => {
     const element = await createShell([]);
 
-    expect(planningLink(element).querySelector('[data-testid="overdue-badge"]')).toBeNull();
+    expect(planningLink(element).querySelector('[data-testid="todo-badge"]')).toBeNull();
   });
 
   it('follows the second shell when a new session starts in the same tab', async () => {
-    let items = [overdueItem('800+'), overdueItem('Wypłata żona')];
+    let items = [todoItem('800+'), todoItem('Wypłata żona')];
     fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(async () => jsonResponse({ items }));
+      .mockImplementation(async () => jsonResponse({ items, paymentLeadDays: 7 }));
     await TestBed.configureTestingModule({
       imports: [Shell],
       providers: [provideRouter([]), provideI18nTesting()],
@@ -100,12 +102,12 @@ describe('Shell planning badge', () => {
     await first.whenStable();
     first.detectChanges();
     const firstBadge = planningLink(first.nativeElement).querySelector(
-      '[data-testid="overdue-badge"]',
+      '[data-testid="todo-badge"]',
     );
     expect(firstBadge!.textContent!.trim()).toBe('2');
     first.destroy();
 
-    items = [overdueItem('Premia')];
+    items = [todoItem('Premia')];
     const second = TestBed.createComponent(Shell);
     await second.whenStable();
     second.detectChanges();
@@ -113,7 +115,7 @@ describe('Shell planning badge', () => {
     second.detectChanges();
 
     const secondBadge = planningLink(second.nativeElement).querySelector(
-      '[data-testid="overdue-badge"]',
+      '[data-testid="todo-badge"]',
     );
     expect(secondBadge!.textContent!.trim()).toBe('1');
   });

@@ -629,6 +629,16 @@ export type PlanningMonthResponse = {
     transferPlan: TransferPlanResponse;
 };
 
+export type PlanningSettingsResponse = {
+    minimumTransferPln: number | string;
+    paymentLeadDays: number | string;
+};
+
+export type PlanningTodoResponse = {
+    items: Array<TodoItemResponse>;
+    paymentLeadDays: number | string;
+};
+
 export type RecordTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
@@ -672,8 +682,9 @@ export type SaveAllocationPlanVersionRequest = {
     reserveAccountId?: null | string;
 };
 
-export type SaveTransferPlanSettingsRequest = {
+export type SavePlanningSettingsRequest = {
     minimumTransferPln: number | string;
+    paymentLeadDays: number | string;
 };
 
 export type SecuritiesResponse = {
@@ -764,6 +775,22 @@ export type SwapNewBondRequest = {
 };
 
 export type TaxWrapper = number;
+
+export type TodoItemKind = 'OverdueIncome' | 'TransferPlanToAccept' | 'TransferPlanUnchecked' | 'UpcomingPayment';
+
+export type TodoItemResponse = {
+    kind: TodoItemKind;
+    name: null | string;
+    date: null | string;
+    month: null | string;
+    amount: null | number | string;
+    currency: null | string;
+    daysOverdue: null | number | string;
+    daysUntil: null | number | string;
+    isTopUp: null | boolean;
+    uncheckedRows: null | number | string;
+    totalRows: null | number | string;
+};
 
 export type TransactionResponse = {
     id: string;
@@ -2263,21 +2290,53 @@ export type GetApiPortfolioPlanningMonthsByMonthResponses = {
 
 export type GetApiPortfolioPlanningMonthsByMonthResponse = GetApiPortfolioPlanningMonthsByMonthResponses[keyof GetApiPortfolioPlanningMonthsByMonthResponses];
 
-export type PutApiPortfolioTransferPlansSettingsData = {
-    body: SaveTransferPlanSettingsRequest;
+export type GetApiPortfolioPlanningSettingsData = {
+    body?: never;
     path?: never;
     query?: never;
-    url: '/api/portfolio/transfer-plans/settings';
+    url: '/api/portfolio/planning/settings';
 };
 
-export type PutApiPortfolioTransferPlansSettingsResponses = {
+export type GetApiPortfolioPlanningSettingsResponses = {
+    /**
+     * OK
+     */
+    200: PlanningSettingsResponse;
+};
+
+export type GetApiPortfolioPlanningSettingsResponse = GetApiPortfolioPlanningSettingsResponses[keyof GetApiPortfolioPlanningSettingsResponses];
+
+export type PutApiPortfolioPlanningSettingsData = {
+    body: SavePlanningSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/planning/settings';
+};
+
+export type PutApiPortfolioPlanningSettingsResponses = {
     /**
      * No Content
      */
     204: void;
 };
 
-export type PutApiPortfolioTransferPlansSettingsResponse = PutApiPortfolioTransferPlansSettingsResponses[keyof PutApiPortfolioTransferPlansSettingsResponses];
+export type PutApiPortfolioPlanningSettingsResponse = PutApiPortfolioPlanningSettingsResponses[keyof PutApiPortfolioPlanningSettingsResponses];
+
+export type GetApiPortfolioPlanningTodoData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/planning/todo';
+};
+
+export type GetApiPortfolioPlanningTodoResponses = {
+    /**
+     * OK
+     */
+    200: PlanningTodoResponse;
+};
+
+export type GetApiPortfolioPlanningTodoResponse = GetApiPortfolioPlanningTodoResponses[keyof GetApiPortfolioPlanningTodoResponses];
 
 export type PostApiPortfolioTransferPlansByMonthAcceptData = {
     body?: never;

@@ -200,7 +200,7 @@ test('income settlement: settle, skip, edit and undo occurrences with the cash d
     await expect(page.getByTestId('occurrence-row')).toHaveCount(4);
     await expect(page.getByTestId('overdue-section')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Do rozliczenia' })).toHaveCount(0);
-    await expect(page.getByTestId('overdue-badge')).toHaveCount(0);
+    await expect(page.getByTestId('todo-badge')).toHaveCount(0);
   });
 
   await test.step('Krok 2: settling Wypłata Dominik with 9 143,27 zł on 2026-09-30 gives rozliczone, plan 9 200, actual 9 143,27, difference -56,73 zł', async () => {

@@ -1,5 +1,6 @@
-import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, inject, input, resource } from '@angular/core';
+import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
+import { Component, afterRenderEffect, computed, inject, input, resource } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -7,7 +8,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
@@ -21,13 +22,14 @@ import {
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
   deleteApiPortfolioTransferPlansByMonthSkip,
   getApiPortfolioPlanningMonthsByMonth,
+  getApiPortfolioPlanningSettings,
   postApiPortfolioTransferPlansByMonthAccept,
   postApiPortfolioTransferPlansByMonthSkip,
   postApiPortfolioTransferPlansByMonthTopUpAccept,
   postApiPortfolioTransferPlansByMonthUndo,
+  putApiPortfolioPlanningSettings,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
   putApiPortfolioTransferPlansRowsByRowIdChecked,
-  putApiPortfolioTransferPlansSettings,
   type AllocationBucketResponse,
   type AllocationResponse,
   type ExpenseDefinitionResponse,
@@ -152,8 +154,12 @@ export class Planning {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly planningState = inject(PlanningState);
+  private readonly document = inject(DOCUMENT);
+  private readonly fragment = toSignal(inject(ActivatedRoute).fragment);
+  private scrolledTo: string | null = null;
 
   protected readonly overdue = this.planningState.overdue;
+  protected readonly paymentLeadDays = this.planningState.paymentLeadDays;
 
   readonly month = input<string>();
 
@@ -173,6 +179,18 @@ export class Planning {
         path: { month: params.month },
         signal: abortSignal,
       });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('planning.loadFailed'),
+        );
+      }
+      return result.data;
+    },
+  });
+
+  private readonly settingsResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioPlanningSettings({ signal: abortSignal });
       if (result.error) {
         throw new Error(
           readProblemDetails(result.error).detail ?? translate('planning.loadFailed'),
@@ -222,6 +240,23 @@ export class Planning {
     const estimated = (this.allocation()?.buckets ?? []).find((bucket) => bucket.limit?.estimated);
     return estimated?.limit ? Number(estimated.limit.year) : null;
   });
+
+  constructor() {
+    afterRenderEffect(() => {
+      const fragment = this.fragment();
+      if (!fragment || !this.monthResource.hasValue() || this.monthResource.isLoading()) {
+        return;
+      }
+
+      const key = `${this.selectedMonth()}#${fragment}`;
+      if (key === this.scrolledTo) {
+        return;
+      }
+
+      this.scrolledTo = key;
+      this.document.getElementById(fragment)?.scrollIntoView();
+    });
+  }
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
@@ -441,13 +476,13 @@ export class Planning {
 
   protected openAddExpenseDialog(): void {
     const ref = this.dialog.open(RecurringExpenseFormDialog, { width: '520px' });
-    this.reloadMonthWhenSaved(ref.afterClosed());
+    this.reloadWhenSaved(ref.afterClosed());
   }
 
   protected openEditExpenseDialog(definition: ExpenseDefinitionResponse): void {
     const data: RecurringExpenseFormDialogData = { definition };
     const ref = this.dialog.open(RecurringExpenseFormDialog, { width: '520px', data });
-    this.reloadMonthWhenSaved(ref.afterClosed());
+    this.reloadWhenSaved(ref.afterClosed());
   }
 
   protected async removeExpenseChange(definition: ExpenseDefinitionResponse): Promise<void> {
@@ -486,13 +521,13 @@ export class Planning {
       return;
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
   }
 
   protected openEndExpenseDialog(definition: ExpenseDefinitionResponse): void {
     const data: EndRecurringExpenseDialogData = { id: definition.id, name: definition.name };
     const ref = this.dialog.open(EndRecurringExpenseDialog, { width: '420px', data });
-    this.reloadMonthWhenSaved(ref.afterClosed());
+    this.reloadWhenSaved(ref.afterClosed());
   }
 
   protected async removeExpense(definition: ExpenseDefinitionResponse): Promise<void> {
@@ -521,7 +556,7 @@ export class Planning {
       return;
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
   }
 
   protected openAllocationDialog(allocation: AllocationResponse): void {
@@ -531,7 +566,7 @@ export class Planning {
       maxWidth: '95vw',
       data,
     });
-    this.reloadMonthWhenSaved(ref.afterClosed());
+    this.reloadWhenSaved(ref.afterClosed());
   }
 
   protected async removeAllocationChange(nextChange: string): Promise<void> {
@@ -564,7 +599,7 @@ export class Planning {
       return;
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
   }
 
   protected transferMarkerKey(marker: TransferMarker): string | null {
@@ -681,16 +716,28 @@ export class Planning {
       return;
     }
 
-    const minimumTransferPln = Number(raw);
-    const result = await putApiPortfolioTransferPlansSettings({ body: { minimumTransferPln } });
-    if (result.error) {
-      this.snackBar.open(
-        readProblemDetails(result.error).detail ?? translate('planning.transferPlan.minimumFailed'),
-        translate('common.dismiss'),
-      );
+    await this.savePlanningSettings(
+      Number(raw),
+      this.planningState.paymentLeadDays(),
+      'planning.transferPlan.minimumFailed',
+    );
+  }
+
+  protected async savePaymentLeadDays(event: Event): Promise<void> {
+    const raw = (event.target as HTMLInputElement).value.trim();
+    if (raw === '') {
+      this.planningState.reload();
+      return;
     }
 
-    this.monthResource.reload();
+    const minimum = this.settingsResource.hasValue()
+      ? Number(this.settingsResource.value().minimumTransferPln)
+      : Number(this.transferPlan()?.minimumTransferPln ?? 100);
+    await this.savePlanningSettings(
+      minimum,
+      Number(raw),
+      'planning.transferPlan.paymentLeadDaysFailed',
+    );
   }
 
   protected hasBalance(bucket: AllocationBucketResponse): boolean {
@@ -700,7 +747,7 @@ export class Planning {
   protected openBucketBalanceDialog(bucket: AllocationBucketResponse): void {
     const data: BucketBalanceDialogData = { month: this.selectedMonth(), bucket };
     const ref = this.dialog.open(BucketBalanceDialog, { width: '420px', data });
-    this.reloadMonthWhenSaved(ref.afterClosed());
+    this.reloadWhenSaved(ref.afterClosed());
   }
 
   protected async removeBucketAdjustment(
@@ -738,7 +785,7 @@ export class Planning {
       return;
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
   }
 
   private async runTransferAction(
@@ -753,23 +800,32 @@ export class Planning {
       );
     }
 
-    this.monthResource.reload();
+    this.reloadAll();
     return !!result.error;
   }
 
-  private reloadMonthWhenSaved(closed: {
-    subscribe(next: (saved: boolean | undefined) => void): unknown;
-  }): void {
-    closed.subscribe((saved) => {
-      if (saved) {
-        this.monthResource.reload();
-      }
+  private async savePlanningSettings(
+    minimumTransferPln: number,
+    paymentLeadDays: number,
+    failedKey: string,
+  ): Promise<void> {
+    const result = await putApiPortfolioPlanningSettings({
+      body: { minimumTransferPln, paymentLeadDays },
     });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate(failedKey),
+        translate('common.dismiss'),
+      );
+    }
+
+    this.settingsResource.reload();
+    this.reloadAll();
   }
 
   private reloadAll(): void {
     this.monthResource.reload();
-    this.planningState.reloadOverdue();
+    this.planningState.reload();
   }
 
   private reloadWhenSaved(closed: {

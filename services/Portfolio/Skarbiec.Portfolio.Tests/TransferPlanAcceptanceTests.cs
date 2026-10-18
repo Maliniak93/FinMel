@@ -38,7 +38,7 @@ public sealed class TransferPlanAcceptanceTests(SkarbiecContainersFixture contai
             ],
             TransferValues,
             new DateOnly(2026, 10, 16));
-        await client.SaveTransferPlanSettingsAsync(2_000, cancellationToken);
+        await client.SavePlanningSettingsAsync(cancellationToken, minimumTransferPln: 2_000);
 
         var plan = await client.GetTransferPlanAsync("2026-10", cancellationToken);
 

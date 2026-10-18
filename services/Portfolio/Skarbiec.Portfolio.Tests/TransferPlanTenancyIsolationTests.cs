@@ -30,7 +30,7 @@ public sealed class TransferPlanTenancyIsolationTests(SkarbiecContainersFixture 
             [new TargetAllocationReplicaGroup("Wszystko", [AssetClass.Stock, AssetClass.Etf, AssetClass.Bond, AssetClass.Deposit, AssetClass.PreciousMetal], 100m, 5m)],
             [new ValuationReplicaClassValue(AssetClass.Stock, 50_000m)],
             new DateOnly(2026, 10, 10));
-        await clientA.SaveTransferPlanSettingsAsync(250, cancellationToken);
+        await clientA.SavePlanningSettingsAsync(cancellationToken, minimumTransferPln: 250);
 
         var planA = await clientA.GetTransferPlanAsync("2026-10", cancellationToken);
         var planB = await clientB.GetTransferPlanAsync("2026-10", cancellationToken);

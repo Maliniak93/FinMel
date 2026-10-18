@@ -670,6 +670,22 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("MetalHoldings");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.PlanningSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("MinimumTransferPln")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PaymentLeadDays")
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("PlanningSettings");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpense", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1144,19 +1160,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasIndex("BatchId");
 
                     b.ToTable("TransferPlanRows");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlanSettings", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("MinimumTransferPln")
-                        .HasColumnType("integer");
-
-                    b.HasKey("UserId");
-
-                    b.ToTable("TransferPlanSettings");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TreasuryBond", b =>

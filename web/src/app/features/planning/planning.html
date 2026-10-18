@@ -25,7 +25,7 @@
   </div>
 
   @if (overdue().length > 0) {
-    <section class="planning-section" data-testid="overdue-section">
+    <section class="planning-section" id="do-rozliczenia" data-testid="overdue-section">
       <h2>{{ 'planning.overdue.title' | transloco }}</h2>
       <table class="planning-table">
         <tbody>
@@ -321,7 +321,7 @@
       </section>
 
       @if (expenses(); as spending) {
-        <section class="planning-section" data-testid="expenses-section">
+        <section class="planning-section" id="wydatki" data-testid="expenses-section">
           <div class="planning-section__header">
             <h2>{{ 'planning.expenses.title' | transloco }}</h2>
             <button
@@ -780,7 +780,11 @@
 
     @if (transferPlan(); as transfer) {
       @if (transfer.status !== 'None' || transfer.noneReason === 'NothingToInvest') {
-        <section class="planning-section planning-transfer" data-testid="transfer-plan-section">
+        <section
+          class="planning-section planning-transfer"
+          id="plan-przelewow"
+          data-testid="transfer-plan-section"
+        >
           <div class="planning-section__header">
             <h2>{{ 'planning.transferPlan.title' | transloco }}</h2>
             @if (transferStatusKey(transfer.status); as statusKey) {
@@ -831,6 +835,19 @@
               }
             </span>
           </div>
+
+          <label class="planning-transfer__minimum">
+            <span>{{ 'planning.transferPlan.paymentLeadDays' | transloco }}</span>
+            <input
+              type="number"
+              min="0"
+              max="90"
+              step="1"
+              [value]="paymentLeadDays()"
+              (change)="savePaymentLeadDays($event)"
+              data-testid="payment-lead-days-input"
+            />
+          </label>
 
           @if (transfer.status === 'Skipped') {
             <p class="planning-section__empty" data-testid="transfer-plan-skipped">

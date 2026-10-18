@@ -1,7 +1,9 @@
 import { Injectable, computed, resource, signal } from '@angular/core';
 
-import { getApiPortfolioPlanningOverdue } from '../../api/portfolio';
+import { getApiPortfolioPlanningOverdue, getApiPortfolioPlanningTodo } from '../../api/portfolio';
 import { readProblemDetails } from '../auth/problem-details';
+
+const DEFAULT_PAYMENT_LEAD_DAYS = 7;
 
 @Injectable({ providedIn: 'root' })
 export class PlanningState {
@@ -18,17 +20,39 @@ export class PlanningState {
     },
   });
 
+  private readonly todoResource = resource({
+    params: () => this.session(),
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioPlanningTodo({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(readProblemDetails(result.error).detail ?? 'Failed to load.');
+      }
+      return result.data;
+    },
+  });
+
   readonly overdue = computed(() =>
     this.overdueResource.hasValue() ? this.overdueResource.value() : [],
   );
 
-  readonly overdueCount = computed(() => this.overdue().length);
+  readonly todo = computed(() =>
+    this.todoResource.hasValue() ? (this.todoResource.value()?.items ?? []) : [],
+  );
+
+  readonly todoCount = computed(() => this.todo().length);
+
+  readonly paymentLeadDays = computed(() =>
+    this.todoResource.hasValue()
+      ? Number(this.todoResource.value()?.paymentLeadDays ?? DEFAULT_PAYMENT_LEAD_DAYS)
+      : DEFAULT_PAYMENT_LEAD_DAYS,
+  );
 
   startSession(): void {
     this.session.update((value) => value + 1);
   }
 
-  reloadOverdue(): void {
+  reload(): void {
     this.overdueResource.reload();
+    this.todoResource.reload();
   }
 }

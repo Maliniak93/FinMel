@@ -34,7 +34,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<AllocationBalanceOverride> AllocationBalanceOverrides => Set<AllocationBalanceOverride>();
     public DbSet<TargetAllocationReplica> TargetAllocationReplicas => Set<TargetAllocationReplica>();
     public DbSet<ValuationReplica> ValuationReplicas => Set<ValuationReplica>();
-    public DbSet<TransferPlanSettings> TransferPlanSettings => Set<TransferPlanSettings>();
+    public DbSet<PlanningSettings> PlanningSettings => Set<PlanningSettings>();
     public DbSet<TransferPlan> TransferPlans => Set<TransferPlan>();
     public DbSet<TransferPlanBatch> TransferPlanBatches => Set<TransferPlanBatch>();
     public DbSet<TransferPlanRow> TransferPlanRows => Set<TransferPlanRow>();
@@ -358,7 +358,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             replica.ComplexCollection(r => r.ByAssetClass, byClass => byClass.ToJson());
         });
 
-        modelBuilder.Entity<TransferPlanSettings>(settings =>
+        modelBuilder.Entity<PlanningSettings>(settings =>
         {
             settings.HasKey(s => s.UserId);
             settings.Property(s => s.UserId).ValueGeneratedNever();

@@ -24,7 +24,7 @@ public sealed class TransferPlanTopUpTests(SkarbiecContainersFixture containers)
 
         await client.SettleBenefitAsync(setup, 1_000m, cancellationToken);
         var withMinimum = await client.GetTransferPlanAsync("2026-10", cancellationToken);
-        await client.SaveTransferPlanSettingsAsync(0, cancellationToken);
+        await client.SavePlanningSettingsAsync(cancellationToken, minimumTransferPln: 0);
         var withoutMinimum = await client.GetTransferPlanAsync("2026-10", cancellationToken);
 
         Assert.Empty(unchanged.Differences!);

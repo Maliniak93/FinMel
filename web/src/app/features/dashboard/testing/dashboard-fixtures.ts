@@ -87,6 +87,9 @@ export const API_PATHS = {
   deposits: '/api/portfolio/deposits',
   bonds: '/api/portfolio/bonds',
   allocation: '/api/reporting/target-allocation',
+  planningMonth: '/api/portfolio/planning/months',
+  todo: '/api/portfolio/planning/todo',
+  overdue: '/api/portfolio/planning/overdue',
 } as const;
 
 export type ApiRoute = keyof typeof API_PATHS;
@@ -106,6 +109,23 @@ const notConfiguredAllocation: TargetAllocationResponse = {
   groups: [],
 };
 
+export function planningMonthResponse(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    incomes: {
+      occurrences: [],
+      balance: { planPln: 0, actualPln: 0, pendingPln: 0, differencePln: 0 },
+      fxUnavailable: false,
+      definitions: [],
+    },
+    expenses: { payments: [], costPln: 0, definitions: [] },
+    freeFunds: { planPln: 0, forecastPln: 0, incomplete: false },
+    transferPlan: null,
+    ...overrides,
+  };
+}
+
 const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   dashboard: jsonResponse(dashboard),
   history: jsonResponse({ range: '1Y', points: [] }),
@@ -114,6 +134,9 @@ const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   deposits: jsonResponse([]),
   bonds: jsonResponse([]),
   allocation: jsonResponse(notConfiguredAllocation),
+  planningMonth: jsonResponse(planningMonthResponse()),
+  todo: jsonResponse({ items: [], paymentLeadDays: 7 }),
+  overdue: jsonResponse({ items: [] }),
 };
 
 export function mockApi(overrides: Partial<Record<ApiRoute, Responder>> = {}) {
