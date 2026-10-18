@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { areaWarning, mayStart, nextWork, planFrom, planLines, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { queueOf } from "./queue.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -76,6 +77,28 @@ test("start labels item and part", async () => {
   assert.ok(labels.some((c) => c.includes(" 6 ") && c.includes("autobuild")));
   assert.equal(calls.at(-1), "build");
   assert.ok(calls.indexOf("build") > calls.findLastIndex((c) => c.includes("--add-label")));
+});
+
+const areaCards = [
+  { number: 10, title: "Helper item", status: "Todo", area: "Scripts", epic: false, parent: null, autobuild: false },
+  { number: 11, title: "Bare item", status: "Todo", area: null, epic: false, parent: null, autobuild: false },
+  { number: 12, title: "Area epic", status: "Todo", area: null, epic: true, parent: null, autobuild: false, subIssues: [13, 14] },
+  { number: 13, title: "Epic part one", status: "Done", area: "Backend", epic: false, parent: 12, autobuild: false },
+  { number: 14, title: "Epic part two", status: "Todo", area: null, epic: false, parent: 12, autobuild: false },
+];
+
+test("plan lines show area", () => {
+  const [helper, bare, epic] = planLines(queueOf(areaCards), areaCards);
+
+  assert.match(helper, /Helper item.*Scripts/);
+  assert.match(bare, /Bare item.*—/);
+  assert.match(epic, /Area epic.*Backend → —/);
+});
+
+test("missing area warns and continues", () => {
+  assert.equal(areaWarning(areaCards[1], areaCards), "⚠ #11 bez obszaru (Area)");
+  assert.equal(areaWarning(areaCards[2], areaCards), "⚠ #14 bez obszaru (Area)");
+  assert.equal(areaWarning(areaCards[0], areaCards), null);
 });
 
 test("delay is an unknown flag", () => {

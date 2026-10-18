@@ -5,6 +5,7 @@ import { PassThrough, Writable } from "node:stream";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { ask, equivalentCommand, parseFlags, questions, runWizard, summary } from "./autobuild-wizard.mjs";
+import { queueOf } from "./queue.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -88,6 +89,25 @@ test("summary and command round trip", () => {
   const command = equivalentCommand(answers);
   assert.ok(command.startsWith("node scripts/autobuild.mjs "));
   assert.deepEqual(parseFlags(command.split(/\s+/).slice(2)), answers);
+});
+
+test("summary shows area", () => {
+  const plan = queueOf([
+    { number: 1, title: "Helper item", status: "Todo", area: "Scripts", epic: false, parent: null, autobuild: false },
+    { number: 2, title: "Area epic", status: "Todo", area: null, epic: true, parent: null, autobuild: false, subIssues: [3, 4] },
+    { number: 3, title: "Epic backend", status: "Todo", area: "Backend", epic: false, parent: 2, autobuild: false },
+    { number: 4, title: "Epic frontend", status: "Todo", area: "Frontend", epic: false, parent: 2, autobuild: false },
+  ]);
+  const ctx = { tty: true, plan, power: working, now };
+  const lineOf = (text, n) => text.split(/\r?\n/).find((l) => l.includes(`#${n} `));
+
+  const items = questions({}, ctx).find((q) => q.id === "items");
+  assert.match(lineOf(items.prompt, 1), /Helper item.*Scripts/);
+  assert.match(lineOf(items.prompt, 2), /Area epic.*Backend → Frontend/);
+
+  const text = summary({ items: "all", "on-limit": "wait", "max-wait": "12", shutdown: true, start: "now" }, ctx);
+  assert.match(lineOf(text, 1), /Helper item.*Scripts/);
+  assert.match(lineOf(text, 2), /Area epic.*Backend → Frontend/);
 });
 
 test("declined wizard starts nothing", async () => {

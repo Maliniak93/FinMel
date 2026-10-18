@@ -1,12 +1,12 @@
 ---
 name: board
 description: Show the FinMel GitHub project board against git - open spec issues, the build queue in board order, and cards whose state disagrees with the branches. Changes nothing.
-argument-hint: ""
+argument-hint: "[area]"
 disable-model-invocation: true
 model: haiku
 effort: low
 allowed-tools: Bash
 ---
 
-Run `node scripts/plan-status.mjs` and print its output verbatim, minus the first two lines (title and
+Run `node scripts/plan-status.mjs`, or `node scripts/plan-status.mjs --area <arg>` when an area argument is given, and print its output verbatim, minus the first two lines (title and
 generated-comment). Add nothing, change nothing.

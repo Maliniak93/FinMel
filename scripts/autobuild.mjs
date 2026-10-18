@@ -30,10 +30,10 @@ import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
 import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
-import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { areaWarning, mayStart, planFrom, planLines, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { UsageError, WizardCancelled, parseFlags, runWizard } from "./autobuild-wizard.mjs";
 import { confirmPower, suspendUntil, wakeTimers } from "./power.mjs";
-import { queueOf } from "./queue.mjs";
+import { areaText, queueOf } from "./queue.mjs";
 import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -902,7 +902,8 @@ async function runEpic(number) {
   if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
 }
 
-async function runItem(number) {
+async function runItem(item, cards) {
+  const number = item.number;
   const issue = getIssue(number);
   if (issue.state === "CLOSED") {
     say(`#${number} ${issue.title} is closed - skipped`);
@@ -910,7 +911,9 @@ async function runItem(number) {
   }
   ctx.item = number;
   ctx.touched.add(number);
-  say(`── item #${number} ${issue.title}`);
+  say(`── item #${number} ${issue.title} [${areaText(item)}]`);
+  const warning = areaWarning(item, cards);
+  if (warning) say(warning);
   if (issue.epic) await runEpic(number);
   else {
     sayUsage(`#${number} start`);
@@ -936,10 +939,7 @@ function readPlan(flags) {
 }
 
 function sayPlan(plan, cards) {
-  plan.forEach((item, i) => {
-    const next = nextWork(item, cards);
-    say(`${i + 1}. #${item.number} ${item.title}${item.manual ? " (ręczny)" : ""} — ${item.epic ? (next ? `next #${next}` : "no open part") : "standalone"}`);
-  });
+  for (const line of planLines(plan, cards)) say(line);
 }
 
 function readTimes(flags) {
@@ -1067,7 +1067,7 @@ try {
   }
 
   ctx.started = true;
-  for (const item of plan) await runItem(item.number);
+  for (const item of plan) await runItem(item, cards);
   await finishRun("done", null, ctx);
 } catch (err) {
   const stop = err instanceof Stop ? err : new Stop("error", err.stack ?? err.message);
