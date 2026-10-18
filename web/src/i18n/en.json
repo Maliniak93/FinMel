@@ -665,6 +665,28 @@
     "title": "Planning",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
+    "tabs": {
+      "month": "Month",
+      "year": "Year"
+    },
+    "year": {
+      "previous": "Previous year",
+      "next": "Next year",
+      "total": "Total",
+      "overdue": "Overdue occurrences",
+      "empty": "No definitions",
+      "columns": {
+        "month": "Month",
+        "incomePlan": "Income plan",
+        "incomeActual": "Income actual",
+        "difference": "Difference",
+        "cost": "Expenses",
+        "freeFundsPlan": "Free funds plan",
+        "freeFundsForecast": "Free funds forecast",
+        "toInvest": "To invest",
+        "status": "Transfer plan"
+      }
+    },
     "add": "Add income",
     "account": "Account",
     "archivedAccount": "account archived — change the account",

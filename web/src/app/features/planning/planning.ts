@@ -8,6 +8,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
@@ -73,6 +74,7 @@ import {
   RecurringIncomeFormDialog,
   type RecurringIncomeFormDialogData,
 } from './recurring-income-form-dialog/recurring-income-form-dialog';
+import { PlanningYear } from './planning-year/planning-year';
 import { currentWarsawMonth, ruleParts } from './recurrence';
 import {
   SettleOccurrenceDialog,
@@ -143,6 +145,8 @@ function shiftMonth(month: string, delta: number): string {
     MatChipsModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatTabsModule,
+    PlanningYear,
     RouterLink,
     TranslocoPipe,
   ],
@@ -162,6 +166,10 @@ export class Planning {
   protected readonly paymentLeadDays = this.planningState.paymentLeadDays;
 
   readonly month = input<string>();
+  readonly tab = input<string>();
+  readonly year = input<string>();
+
+  protected readonly tabIndex = computed(() => (this.tab() === 'year' ? 1 : 0));
 
   protected readonly selectedMonth = computed(() => {
     const requested = this.month();
@@ -297,6 +305,20 @@ export class Planning {
           key: 'planning.definitions.periodOpen',
           params: { start: formatDate(definition.startDate) },
         };
+  }
+
+  protected selectTab(index: number): void {
+    if (index === this.tabIndex()) {
+      return;
+    }
+
+    void this.router.navigate([], {
+      queryParams:
+        index === 1
+          ? { tab: 'year', year: this.year() ?? currentWarsawMonth().slice(0, 4) }
+          : { tab: null, year: null },
+      queryParamsHandling: 'merge',
+    });
   }
 
   protected goToMonth(delta: number): void {

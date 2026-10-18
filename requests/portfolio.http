@@ -1246,6 +1246,10 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/planning/months/2026-10
 Authorization: Bearer {{authToken}}
 
+### Read a calendar year: twelve month rows (plan, actual, difference, cost, free funds, to invest, transfer status; null values for months without definitions, null actual after the current month), the totals and the firstYear/lastYear bounds (a year outside them is 400 Validation.InvalidYear)
+GET {{baseUrl}}/api/portfolio/planning/years/2026
+Authorization: Bearer {{authToken}}
+
 ### List the overdue occurrences: pending, planned before today and not before the income was created, by date then name
 GET {{baseUrl}}/api/portfolio/planning/overdue
 Authorization: Bearer {{authToken}}
