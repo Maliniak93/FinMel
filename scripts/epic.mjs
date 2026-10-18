@@ -1,11 +1,15 @@
 #!/usr/bin/env node
-// Usage: node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] [--delay MIN]
-//   --dry-run      print what would happen per part; no preflight script, builds, merges, comments or shutdown
-//   --max-tasks N  stop before the (N+1)th build of this run (0 = preflight only)
-//   --no-shutdown  do not schedule `shutdown /s /t 600` when the run ends
-//   --delay MIN    keep the PC awake from launch but start the work (preflight included) only after MIN minutes; the stop file ends the wait
-//   node scripts/epic.mjs <epic> --stop   creates the stop file; the running driver stops before the next build
-//   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
+// Usage: node scripts/epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--shutdown|--no-shutdown] [--dry-run]
+//   <n>               build only that epic or standalone issue (manual or not); without it the whole build queue, item by item
+//   --items N|all     take the first N queue items (default all)
+//   --include-manual  also take an In progress item that is not marked epic-run (default --skip-manual)
+//   --start           keep the PC awake from launch but start the work (preflight included) at that time: now, in MIN minutes or at the next HH:MM; the stop file ends the wait
+//   --until HH:MM     no new claude session starts at or after the next HH:MM; the one running finishes, then the run ends with reason `window`
+//   --max-tasks N     stop before the (N+1)th build of this run (0 = preflight only)
+//   --shutdown        schedule `shutdown /s /t 600` when the run ends (default); --no-shutdown does not
+//   --dry-run         print the plan, the start time and what would happen per part; no preflight script, builds, merges, comments or shutdown
+//   node scripts/epic.mjs --stop   creates the one stop file; the running driver stops before the next build
+//   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<timestamp>.log
 //   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
@@ -21,13 +25,15 @@ import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./epic-gh.mjs";
+import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./epic-queue.mjs";
+import { queueOf } from "./queue.mjs";
 import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WIN = process.platform === "win32";
-const BOOLEAN_FLAGS = new Set(["dry-run", "no-shutdown", "stop"]);
-const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "delay"]);
-const USAGE = "usage: epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] [--delay MIN] | --stop";
+const BOOLEAN_FLAGS = new Set(["dry-run", "shutdown", "no-shutdown", "include-manual", "skip-manual", "stop"]);
+const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "items", "start", "until"]);
+const USAGE = "usage: epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--shutdown|--no-shutdown] [--dry-run] | --stop";
 const BUILD_TIMEOUT_MS = 4 * 3600e3;
 const CI_POLL_MS = 30e3;
 const CI_MISSING_MS = 10 * 60e3;
@@ -68,14 +74,14 @@ function sayUsage(label) {
   }
 }
 
-function openLog(epic) {
-  const dir = path.join(REPO_ROOT, "skarbiec-plan", "epic-runs", String(epic));
+function openLog() {
+  const dir = path.join(REPO_ROOT, "skarbiec-plan", "epic-runs");
   mkdirSync(dir, { recursive: true });
   const d = new Date();
   const stamped = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
   runStamp = stamped;
   logPath = path.join(dir, `${stamped}.log`);
-  say(`epic #${epic} · log ${path.relative(REPO_ROOT, logPath).replaceAll("\\", "/")}`);
+  say(`epic run · log ${path.relative(REPO_ROOT, logPath).replaceAll("\\", "/")}`);
 }
 
 function outcome(res) {
@@ -105,19 +111,19 @@ function limitSleep(ms) {
   }
 }
 
-function delayStart(ms, epic) {
-  const until = Date.now() + ms;
-  say(`delay: the work starts at ${clock(new Date(until))} (${minutes(ms)} min)`);
+function waitUntil(at) {
+  const until = at.getTime();
+  say(`start: the work starts at ${clock(at)} (${minutes(until - Date.now())} min)`);
   let nextBeat = Date.now() + HEARTBEAT_MS;
   while (Date.now() < until) {
     blockingSleep(Math.min(60e3, until - Date.now()));
-    if (existsSync(stopFile(epic))) throw new Stop("stopped", "stop file found during the delay");
+    if (existsSync(stopFile())) throw new Stop("stopped", "stop file found during the wait for the start");
     if (Date.now() >= nextBeat && Date.now() < until) {
-      say(`delay: ${Math.round((until - Date.now()) / 60e3)} min left`);
+      say(`start: ${Math.round((until - Date.now()) / 60e3)} min left`);
       nextBeat += HEARTBEAT_MS;
     }
   }
-  say("delay over - starting");
+  say("start time reached - starting");
 }
 
 const excludeFromBudgets = (ms) => waitBudgets.forEach((budget) => budget.exclude(ms));
@@ -164,15 +170,19 @@ const project = (argv) => run(NODE, ["scripts/gh-project.mjs", ...argv]);
 function parseFlags(argv) {
   const flags = {};
   for (let i = 0; i < argv.length; i++) {
+    if (/^\d+$/.test(argv[i]) && flags.only === undefined) {
+      flags.only = Number(argv[i]);
+      continue;
+    }
     const key = argv[i].slice(2);
     if (!argv[i].startsWith("--") || !KNOWN_FLAGS.has(key)) throw new Stop("usage", `unexpected argument: ${argv[i]}\n${USAGE}`);
     flags[key] = BOOLEAN_FLAGS.has(key) ? true : argv[++i];
+    if (flags[key] === undefined) throw new Stop("usage", `--${key} needs a value\n${USAGE}`);
   }
   return flags;
 }
 
-const [epicArg, ...rest] = process.argv.slice(2);
-const stopFile = (epic) => path.join(os.tmpdir(), `skarbiec-epic-${epic}.stop`);
+const stopFile = () => path.join(os.tmpdir(), "skarbiec-epic.stop");
 
 function getIssue(number) {
   const res = retryTransient(`project get ${number}`, () => project(["get", String(number)]));
@@ -579,14 +589,29 @@ async function mergeAndSync(pr, branch, number) {
   await closeIssue(number);
 }
 
+function labelAsRun(argv) {
+  const res = retryTransient(`gh ${argv.slice(0, 3).join(" ")}`, () => gh([...argv, "--repo", REPO]));
+  if (!res.ok) throw new Stop("github", `gh ${argv.slice(0, 3).join(" ")}: ${res.firstErr}`);
+}
+
+function assertWindowOpen(ctx) {
+  if (mayStart(ctx.until, new Date())) throw new Stop("window", `no new build after ${clock(ctx.until)}`);
+}
+
+function resumeCommand(ctx) {
+  const { flags } = ctx;
+  const args = [flags.only, flags.items && `--items ${flags.items}`, flags["include-manual"] && "--include-manual", flags["skip-manual"] && "--skip-manual", flags["max-tasks"] !== undefined && `--max-tasks ${flags["max-tasks"]}`, flags.until && `--until ${flags.until}`, flags.shutdown && "--shutdown", flags["no-shutdown"] && "--no-shutdown"];
+  return ["node scripts/epic.mjs", ...args.filter((a) => a !== undefined && a !== false)].join(" ");
+}
+
 async function handlePart(sub, ctx) {
   const part = getIssue(sub.number);
   if (!part.branch) throw new Stop("no-branch", `#${part.number} has no Branch field`);
-  const entry = { number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null };
+  const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null };
   let pr = openPr(part.branch);
 
   if (!pr) {
-    if (existsSync(stopFile(ctx.epic))) throw new Stop("stopped", "stop file found");
+    if (existsSync(stopFile())) throw new Stop("stopped", "stop file found");
     if (ctx.builds >= ctx.maxTasks) throw new Stop("max-tasks", `${ctx.maxTasks} build(s) done in this run`);
     if (partPlan(part, dirtyFiles().length) === "ship") {
       entry.shipOnly = true;
@@ -594,18 +619,19 @@ async function handlePart(sub, ctx) {
       pr = openPr(part.branch);
       if (!pr) throw new Stop("ship-failed", `#${part.number}: ship.mjs succeeded but no open PR exists for ${part.branch}`);
     } else {
+      assertWindowOpen(ctx);
       ctx.builds++;
       const buildStart = Date.now();
       // a build that ends on the GitHub limit without a PR is rerun after the reset; the workflow journal replays what it finished
       const { built, pr: builtPr } = await runStepWithLimit(async () => {
-        const result = await build(ctx.claude, part.number, part.title);
+        const result = await startWork({ item: ctx.item, part: part.number, gh: labelAsRun, build: () => build(ctx.claude, part.number, part.title) });
         const stopped = result.timedOut || result.limitHit;
         const found = stopped ? null : openPr(part.branch);
         return { code: result.code, output: result.ghLimit && !found && !stopped ? `GITHUB_LIMIT ${JSON.stringify(result.ghLimit)}` : "", built: result, pr: found };
       }, stepWait);
       entry.buildMin = minutes(built.ms);
       if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
-      if (built.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached, resets ${resetClock(built.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
+      if (built.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached, resets ${resetClock(built.resetsAt)}; resume with ${resumeCommand(ctx)}`);
       pr = builtPr;
       const blockedAtE2e = pr ? null : e2eBlock(part.number);
       if (blockedAtE2e) return repairE2e(part, blockedAtE2e, ctx);
@@ -620,9 +646,9 @@ async function handlePart(sub, ctx) {
   await mergeAndSync(pr, part.branch, part.number);
 }
 
-// returns after a repair so runLoop picks the next open part: a fix part placed ahead of the e2e part, or the e2e part again
+// returns after a repair so runEpic picks the next open part: a fix part placed ahead of the e2e part, or the e2e part again
 async function repairE2e(part, block, ctx) {
-  const giveUp = (why) => new Stop(block.reason, `#${part.number}: ${block.reason} failure, ${block.where} - ${why}, then resume with node scripts/epic.mjs ${ctx.epic}`);
+  const giveUp = (why) => new Stop(block.reason, `#${part.number}: ${block.reason} failure, ${block.where} - ${why}, then resume with ${resumeCommand(ctx)}`);
   if (block.cls === "environment") {
     if (ctx.envRetried.has(part.number)) throw giveUp("the environment failed twice in this run; fix the machine");
     ctx.envRetried.add(part.number);
@@ -632,18 +658,19 @@ async function repairE2e(part, block, ctx) {
   }
   const blocks = e2eAppBlocks(part.number);
   if (blocks > MAX_E2E_REPAIRS) throw giveUp(`${blocks} app blocks, ${MAX_E2E_REPAIRS} unattended repairs did not make it green; fix it with /fix`);
-  if (existsSync(stopFile(ctx.epic))) throw new Stop("stopped", "stop file found");
+  if (existsSync(stopFile())) throw new Stop("stopped", "stop file found");
   if (ctx.builds >= ctx.maxTasks) throw new Stop("max-tasks", `${ctx.maxTasks} build(s) done in this run`);
+  assertWindowOpen(ctx);
   ctx.builds++;
   say(`#${part.number}: e2e app failure, ${block.where} - unattended repair ${blocks}/${MAX_E2E_REPAIRS}`);
   const fixed = await runClaude(ctx.claude, part.number, `${part.title} — e2e repair`, `/fix e2e:#${part.number}`, FIX_MODEL);
   if (fixed.timedOut) throw new Stop("timeout", `#${part.number}: the e2e repair exceeded 4 h and was killed`);
-  if (fixed.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached during the e2e repair, resets ${resetClock(fixed.resetsAt)}; resume with node scripts/epic.mjs ${ctx.epic}`);
+  if (fixed.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached during the e2e repair, resets ${resetClock(fixed.resetsAt)}; resume with ${resumeCommand(ctx)}`);
   const result = parseFixResult(fixed.text);
   if (!result?.ok) throw giveUp(result ? `the repair stopped: ${result.summary}` : `the repair gave no FIX_RESULT (exit ${fixed.code})`);
   const dirty = dirtyFiles();
   if (dirty.length || currentBranch() !== "master") throw new Stop("dirty-tree", `the e2e repair left ${currentBranch()} with ${dirty.length} uncommitted file(s): ${dirty.slice(0, 5).join(", ")}`);
-  const nextOpen = getIssue(ctx.epic).subIssues.find((s) => s.state !== "CLOSED")?.number;
+  const nextOpen = (getIssue(ctx.item).subIssues ?? []).find((s) => s.state !== "CLOSED")?.number;
   const outcome = repairOutcome(result, { part: part.number, nextOpen });
   if (outcome.action === "stop") throw new Stop("blocked", `#${part.number}: ${outcome.reason}`);
   if (result.kind === "test") say(`repair ${blocks}/${MAX_E2E_REPAIRS}: test defect in #${part.number} - ${short(result.summary, 120)}`);
@@ -655,22 +682,24 @@ function runnerOnline() {
   return res.ok ? Number(res.out) : 0;
 }
 
-function preChecks(epic, flags) {
-  if (!flags["dry-run"]) {
-    const pre = run(NODE, ["scripts/preflight.mjs"], { timeout: 30 * 60e3 });
-    const line = pre.out.split(/\r?\n/).reverse().find((l) => l.startsWith("PREFLIGHT_RESULT: "));
-    let parsed = null;
-    try {
-      parsed = JSON.parse(line.slice("PREFLIGHT_RESULT: ".length));
-    } catch {
-    }
-    if (!parsed?.ok) throw new Stop("preflight", `preflight.mjs reported problems:\n${pre.out.split(/\r?\n/).slice(-15).join("\n")}`);
+// an epic's sub-issues, or a standalone issue as its own single part
+const partsOf = (issue) => (issue.epic ? issue.subIssues : [{ number: issue.number, title: issue.title, state: issue.state }]);
+
+function runPreflight() {
+  const pre = run(NODE, ["scripts/preflight.mjs"], { timeout: 30 * 60e3 });
+  const line = pre.out.split(/\r?\n/).reverse().find((l) => l.startsWith("PREFLIGHT_RESULT: "));
+  let parsed = null;
+  try {
+    parsed = JSON.parse(line.slice("PREFLIGHT_RESULT: ".length));
+  } catch {
   }
-  const issue = getIssue(epic);
-  if (!issue.epic) throw new Stop("not-epic", `#${epic} is not an epic`);
+  if (!parsed?.ok) throw new Stop("preflight", `preflight.mjs reported problems:\n${pre.out.split(/\r?\n/).slice(-15).join("\n")}`);
+}
+
+function preChecks(first, flags) {
   const dirty = dirtyFiles();
   if (dirty.length) {
-    const next = issue.subIssues.find((s) => s.state !== "CLOSED");
+    const next = partsOf(getIssue(first.number)).find((s) => s.state !== "CLOSED");
     const part = next ? getIssue(next.number) : null;
     if (part?.branch && currentBranch() === part.branch && !openPr(part.branch)) {
       const shipping = partPlan(part, dirty.length) === "ship";
@@ -686,12 +715,12 @@ function preChecks(epic, flags) {
   }
   const runners = runnerOnline();
   if (!runners) throw new Stop("runner-offline", "no self-hosted runner is online - the WSL runner is down, see skarbiec-plan/runbooks/ci.md");
-  return { issue, runners };
+  return runners;
 }
 
 function dryRunTable(issue) {
   let first = true;
-  for (const sub of issue.subIssues) {
+  for (const sub of partsOf(issue)) {
     let action = "skip (closed)";
     if (sub.state !== "CLOSED") {
       if (!first) action = "waits";
@@ -712,13 +741,13 @@ function dryRunTable(issue) {
   }
 }
 
-function summary(reason, detail, parts, epic, costLine) {
+function summary(reason, detail, parts, resume, costLine) {
   const lines = [`## Epic run: ${reason}`, ""];
   lines.push(parts.length ? "Parts handled in this run:" : "No part was merged in this run.");
   for (const p of parts) lines.push(`- #${p.number} ${p.title} - ${p.prUrl ?? "no PR"} (${p.shipOnly ? "ship retried" : `build ${p.buildMin ?? "-"} min`}, CI ${p.ciMin ?? "-"} min)`);
   if (detail) lines.push("", "Detail:", "", "```", detail, "```");
   if (costLine) lines.push("", costLine);
-  lines.push("", `Resume with \`node scripts/epic.mjs ${epic}\`.`);
+  lines.push("", `Resume with \`${resume}\`.`);
   return lines.join("\n");
 }
 
@@ -768,25 +797,30 @@ const partLine = (p) => `#${p.number} PR #${prNumber(p.prUrl)} (${p.shipOnly ? "
 
 async function finishRun(reason, detail, ctx) {
   const ok = reason === "done" || reason === "dry-run";
-  say(`epic #${ctx.epic ?? "?"}: ${reason}${detail ? ` — ${detail}` : ""}`);
+  say(`run: ${reason}${detail ? ` — ${detail}` : ""}`);
+  if (ctx.itemsDone.length) say(`items done in this run: ${ctx.itemsDone.map((n) => `#${n}`).join(", ")}`);
   if (ctx.parts.length) say(`done in this run: ${ctx.parts.map(partLine).join("; ")}`);
-  if (!ok && ctx.epic && reason !== "usage") say(`resume: node scripts/epic.mjs ${ctx.epic}`);
+  const resume = resumeCommand(ctx);
+  if (!ok && reason !== "usage") say(`resume: ${resume}`);
   if (!ctx.dryRun && ctx.started) {
-    const failure = await postSummary(ctx.epic, summary(reason, detail, ctx.parts, ctx.epic, ok ? costLine(ctx.parts) : null));
-    if (failure) say(`could not post the epic comment: ${failure}`);
+    for (const number of ctx.touched) {
+      const parts = ctx.parts.filter((p) => p.item === number);
+      const failure = await postSummary(number, summary(reason, detail, parts, resume, ok ? costLine(parts) : null));
+      if (failure) say(`could not post the comment on #${number}: ${failure}`);
+    }
     if (!ctx.flags["no-shutdown"] && IS_WIN) {
-      run("shutdown", ["/s", "/t", "600", "/c", `Skarbiec epic #${ctx.epic}: ${reason}`]);
+      run("shutdown", ["/s", "/t", "600", "/c", `Skarbiec epic run: ${reason}`]);
       say("shutting down in 10 min — cancel: shutdown /a");
     }
   }
   process.exit(ok ? 0 : 2);
 }
 
-async function runLoop(ctx) {
+async function runEpic(number) {
   while (true) {
-    const issue = getIssue(ctx.epic);
+    const issue = getIssue(number);
     if (issue.state === "CLOSED") return;
-    if (!issue.subIssues.length) throw new Stop("no-parts", `#${ctx.epic} has no sub-issues`);
+    if (!issue.subIssues.length) throw new Stop("no-parts", `#${number} has no sub-issues`);
     const next = issue.subIssues.find((s) => s.state !== "CLOSED");
     if (!next) break;
     sayUsage(`#${next.number} start`);
@@ -796,12 +830,67 @@ async function runLoop(ctx) {
       sayUsage(`#${next.number} end`);
     }
   }
-  await closeIssue(ctx.epic);
-  const moved = retryTransient(`set ${ctx.epic} Done`, () => project(["set", String(ctx.epic), "Status", "Done"]));
+  await closeIssue(number);
+  const moved = retryTransient(`set ${number} Done`, () => project(["set", String(number), "Status", "Done"]));
   if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
 }
 
-const ctx = { epic: /^[0-9]+$/.test(epicArg ?? "") ? Number(epicArg) : null, parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, claude: null };
+async function runItem(number) {
+  const issue = getIssue(number);
+  if (issue.state === "CLOSED") {
+    say(`#${number} ${issue.title} is closed - skipped`);
+    return;
+  }
+  ctx.item = number;
+  ctx.touched.add(number);
+  say(`── item #${number} ${issue.title}`);
+  if (issue.epic) await runEpic(number);
+  else {
+    sayUsage(`#${number} start`);
+    try {
+      await handlePart({ number }, ctx);
+    } finally {
+      sayUsage(`#${number} end`);
+    }
+  }
+  ctx.itemsDone.push(number);
+}
+
+function readPlan(flags) {
+  const res = retryTransient("project list", () => project(["list"]));
+  if (!res.ok) throw new Stop("github", `gh-project.mjs list: ${res.firstErr}`);
+  const cards = JSON.parse(res.out);
+  const items = flags.items === undefined || flags.items === "all" ? Infinity : Number(flags.items);
+  try {
+    return { cards, plan: planFrom(queueOf(cards), { only: flags.only, includeManual: Boolean(flags["include-manual"]), items }, cards) };
+  } catch (err) {
+    throw new Stop("usage", err.message);
+  }
+}
+
+function sayPlan(plan, cards) {
+  plan.forEach((item, i) => {
+    const next = nextWork(item, cards);
+    say(`${i + 1}. #${item.number} ${item.title}${item.manual ? " (ręczny)" : ""} — ${item.epic ? (next ? `next #${next}` : "no open part") : "standalone"}`);
+  });
+}
+
+function readTimes(flags) {
+  const now = new Date();
+  let start;
+  try {
+    start = startAt(flags.start, now);
+  } catch (err) {
+    throw new Stop("usage", `--start: ${err.message.replace("use HH:MM", "use now, MIN or HH:MM")}`);
+  }
+  try {
+    return { start, until: flags.until === undefined ? null : windowEnd(flags.until, start) };
+  } catch (err) {
+    throw new Stop("usage", `--until: ${err.message}`);
+  }
+}
+
+const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, until: null, claude: null };
 
 function interrupt() {
   killTree(buildChild);
@@ -812,40 +901,51 @@ function interrupt() {
 process.on("SIGINT", interrupt);
 
 try {
-  if (!/^\d+$/.test(epicArg ?? "")) throw new Stop("usage", USAGE);
-  const flags = parseFlags(rest);
+  const flags = parseFlags(process.argv.slice(2));
   ctx.flags = flags;
   ctx.dryRun = Boolean(flags["dry-run"]);
   if (flags["max-tasks"] !== undefined) ctx.maxTasks = Number(flags["max-tasks"]);
   if (Number.isNaN(ctx.maxTasks)) throw new Stop("usage", "--max-tasks must be a number");
-  const delayMs = flags.delay === undefined ? 0 : Number(flags.delay) * 60e3;
-  if (!(delayMs >= 0)) throw new Stop("usage", "--delay must be a non-negative number of minutes");
+  if (flags.items !== undefined && flags.items !== "all" && !/^[1-9]\d*$/.test(flags.items)) throw new Stop("usage", "--items must be a positive number or all");
+  if (flags["include-manual"] && flags["skip-manual"]) throw new Stop("usage", "--include-manual and --skip-manual exclude each other");
+  if (flags.shutdown && flags["no-shutdown"]) throw new Stop("usage", "--shutdown and --no-shutdown exclude each other");
+  const times = readTimes(flags);
+  ctx.until = times.until;
 
   if (flags.stop) {
-    writeFileSync(stopFile(ctx.epic), new Date().toISOString());
-    say(`stop file written (${stopFile(ctx.epic)}) - the driver stops before the next build`);
+    writeFileSync(stopFile(), new Date().toISOString());
+    say(`stop file written (${stopFile()}) - the driver stops before the next build`);
     process.exit(0);
   }
 
   if (!ctx.dryRun) {
-    openLog(ctx.epic);
-    rmSync(stopFile(ctx.epic), { force: true });
+    openLog();
+    rmSync(stopFile(), { force: true });
     startSleepGuard();
-    if (delayMs) delayStart(delayMs, ctx.epic);
+    if (times.start.getTime() > Date.now()) waitUntil(times.start);
   }
   ctx.claude = resolveClaude();
-  const { issue, runners } = preChecks(ctx.epic, flags);
-  if (issue.state === "CLOSED") await finishRun("done", "the epic is already closed - nothing to do", { ...ctx, started: false });
+  if (!ctx.dryRun) runPreflight();
+  const { cards, plan } = readPlan(flags);
+  if (!plan.length) await finishRun("done", "kolejka pusta", { ...ctx, started: false });
+
+  const runners = preChecks(plan[0], flags);
 
   if (ctx.dryRun) {
     say(`runner online: ${runners}`);
     sayUsage("now");
-    dryRunTable(issue);
+    say(`start: ${clock(times.start)}${flags.start === undefined || flags.start === "now" ? " (now)" : ""}`);
+    say(`window end: ${times.until ? `${clock(times.until)} (${times.until.toLocaleDateString("en-CA")})` : "none"}`);
+    sayPlan(plan, cards);
+    for (const item of plan) {
+      say(`── item #${item.number} ${item.title}`);
+      dryRunTable(getIssue(item.number));
+    }
     await finishRun("dry-run", null, ctx);
   }
 
   ctx.started = true;
-  await runLoop(ctx);
+  for (const item of plan) await runItem(item.number);
   await finishRun("done", null, ctx);
 } catch (err) {
   const stop = err instanceof Stop ? err : new Stop("error", err.stack ?? err.message);

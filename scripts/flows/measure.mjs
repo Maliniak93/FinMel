@@ -93,19 +93,19 @@ function workflowSamples(history, add) {
 }
 
 function epicSamples(base, add) {
-  for (const epic of subdirs(base)) {
-    for (const file of readdirSync(path.join(base, epic)).filter((f) => /^\d{8}-\d{6}\.log$/.test(f))) {
-      const [, y, mo, d, h, mi, s] = file.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
-      const started = new Date(+y, +mo - 1, +d, +h, +mi, +s).getTime();
-      for (const line of readFileSync(path.join(base, epic, file), "utf8").split(/\r?\n/)) {
-        const at = line.indexOf("done in this run:");
-        if (at < 0) continue;
-        for (const part of line.slice(at).split(";")) {
-          const m = part.match(/#\d+ PR #\d+ \((?:build (\d+) min|ship retried), CI (\d+) min\)/);
-          if (!m) continue;
-          if (m[1] !== undefined) add("epic:build", started, Number(m[1]));
-          add("epic:ci", started, Number(m[2]));
-        }
+  const logsIn = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => /^\d{8}-\d{6}\.log$/.test(f)).map((f) => path.join(dir, f)) : []);
+  const files = [...logsIn(base), ...subdirs(base).flatMap((epic) => logsIn(path.join(base, epic)))];
+  for (const file of files) {
+    const [, y, mo, d, h, mi, s] = path.basename(file).match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+    const started = new Date(+y, +mo - 1, +d, +h, +mi, +s).getTime();
+    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+      const at = line.indexOf("done in this run:");
+      if (at < 0) continue;
+      for (const part of line.slice(at).split(";")) {
+        const m = part.match(/#\d+ PR #\d+ \((?:build (\d+) min|ship retried), CI (\d+) min\)/);
+        if (!m) continue;
+        if (m[1] !== undefined) add("epic:build", started, Number(m[1]));
+        add("epic:ci", started, Number(m[2]));
       }
     }
   }
