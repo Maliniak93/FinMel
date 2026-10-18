@@ -665,6 +665,28 @@
     "title": "Planowanie",
     "previousMonth": "Poprzedni miesiąc",
     "nextMonth": "Następny miesiąc",
+    "tabs": {
+      "month": "Miesiąc",
+      "year": "Rok"
+    },
+    "year": {
+      "previous": "Poprzedni rok",
+      "next": "Następny rok",
+      "total": "Razem",
+      "overdue": "Zaległe wpływy",
+      "empty": "Brak definicji",
+      "columns": {
+        "month": "Miesiąc",
+        "incomePlan": "Wpływy plan",
+        "incomeActual": "Wpływy faktycznie",
+        "difference": "Różnica",
+        "cost": "Wydatki",
+        "freeFundsPlan": "Wolne środki plan",
+        "freeFundsForecast": "Wolne środki prognoza",
+        "toInvest": "Do zainwestowania",
+        "status": "Plan przelewów"
+      }
+    },
     "add": "Dodaj wpływ",
     "account": "Konto",
     "archivedAccount": "konto zarchiwizowane — zmień konto",

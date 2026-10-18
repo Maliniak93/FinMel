@@ -194,6 +194,36 @@ internal static class PlanningApi
         AllocationView Allocation,
         TransferPlanView? TransferPlan = null);
 
+    public sealed record PlanningYearView(
+        int Year,
+        int FirstYear,
+        int LastYear,
+        List<PlanningYearMonthView> Months,
+        PlanningYearTotalsView Totals);
+
+    public sealed record PlanningYearMonthView(
+        string Month,
+        bool HasDefinitions,
+        decimal? IncomePlanPln,
+        decimal? IncomeActualPln,
+        decimal? DifferencePln,
+        decimal? CostPln,
+        decimal? FreeFundsPlanPln,
+        decimal? FreeFundsForecastPln,
+        decimal? ToInvestPln,
+        JsonElement? TransferPlanStatus,
+        bool HasOverdue,
+        bool Incomplete);
+
+    public sealed record PlanningYearTotalsView(
+        decimal IncomePlanPln,
+        decimal IncomeActualPln,
+        decimal DifferencePln,
+        decimal CostPln,
+        decimal FreeFundsPlanPln,
+        decimal FreeFundsForecastPln,
+        decimal ToInvestPln);
+
     public const int InvestmentsKind = (int)BucketKind.Investments;
 
     public const int SavingsKind = (int)BucketKind.Savings;
@@ -898,6 +928,19 @@ internal static class PlanningApi
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<PlanningMonthView>(cancellationToken))!;
+    }
+
+    public const string InvalidYearErrorCode = "Validation.InvalidYear";
+
+    public static string PlanningYearUri(int year) => $"/api/portfolio/planning/years/{year}";
+
+    public static async Task<PlanningYearView> GetPlanningYearAsync(
+        this HttpClient client, int year, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(PlanningYearUri(year), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<PlanningYearView>(cancellationToken))!;
     }
 
     public static async Task<ExpenseDefinitionView> ExpenseDefinitionAsync(

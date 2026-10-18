@@ -1,1051 +1,1077 @@
 <div class="planning-page">
-  <div class="planning-page__header">
-    <h1>{{ 'planning.title' | transloco }}</h1>
-    <div class="planning-page__months">
-      <button
-        mat-icon-button
-        type="button"
-        data-testid="previous-month"
-        [attr.aria-label]="'planning.previousMonth' | transloco"
-        (click)="goToMonth(-1)"
-      >
-        <mat-icon>chevron_left</mat-icon>
-      </button>
-      <span class="planning-page__month" data-testid="month-label">{{ monthLabel() }}</span>
-      <button
-        mat-icon-button
-        type="button"
-        data-testid="next-month"
-        [attr.aria-label]="'planning.nextMonth' | transloco"
-        (click)="goToMonth(1)"
-      >
-        <mat-icon>chevron_right</mat-icon>
-      </button>
-    </div>
-  </div>
-
-  @if (overdue().length > 0) {
-    <section class="planning-section" id="do-rozliczenia" data-testid="overdue-section">
-      <h2>{{ 'planning.overdue.title' | transloco }}</h2>
-      <table class="planning-table">
-        <tbody>
-          @for (item of overdue(); track item.recurringIncomeId + item.nominalMonth) {
-            <tr data-testid="overdue-row">
-              <td>{{ formatDate(item.date) }}</td>
-              <td>{{ item.name }}</td>
-              <td>{{ item.accountName }}</td>
-              <td class="planning-table__amount">
-                {{ formatMoney(item.amount, item.currency) }}
-              </td>
-              <td class="planning-table__actions">
-                <button
-                  mat-button
-                  type="button"
-                  data-testid="settle-overdue"
-                  (click)="openSettleOverdueDialog(item)"
-                >
-                  {{ 'planning.occurrence.settle' | transloco }}
-                </button>
-                <button
-                  mat-button
-                  type="button"
-                  data-testid="skip-overdue"
-                  (click)="skipOccurrence(item)"
-                >
-                  {{ 'planning.occurrence.skip' | transloco }}
-                </button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </section>
-  }
-
-  @if (monthResource.error(); as loadError) {
-    <div class="planning-page__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="monthResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
-  } @else if (monthResource.isLoading() && !monthResource.hasValue()) {
-    <div class="planning-page__state">
-      <mat-spinner diameter="32" />
-    </div>
-  } @else if (incomes(); as plan) {
-    <div class="planning-columns">
-      <section class="planning-section">
-        <div class="planning-section__header">
-          <h2>{{ 'planning.incomes.title' | transloco }}</h2>
-          <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
-            <mat-icon>add</mat-icon>
-            {{ 'planning.add' | transloco }}
+  <h1>{{ 'planning.title' | transloco }}</h1>
+  <mat-tab-group [selectedIndex]="tabIndex()" (selectedIndexChange)="selectTab($event)">
+    <mat-tab [label]="'planning.tabs.month' | transloco">
+      <div class="planning-page__header">
+        <div class="planning-page__months">
+          <button
+            mat-icon-button
+            type="button"
+            data-testid="previous-month"
+            [attr.aria-label]="'planning.previousMonth' | transloco"
+            (click)="goToMonth(-1)"
+          >
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <span class="planning-page__month" data-testid="month-label">{{ monthLabel() }}</span>
+          <button
+            mat-icon-button
+            type="button"
+            data-testid="next-month"
+            [attr.aria-label]="'planning.nextMonth' | transloco"
+            (click)="goToMonth(1)"
+          >
+            <mat-icon>chevron_right</mat-icon>
           </button>
         </div>
+      </div>
 
-        @if (plan.occurrences.length === 0) {
-          <p class="planning-section__empty">{{ 'planning.incomes.empty' | transloco }}</p>
-        } @else {
+      @if (overdue().length > 0) {
+        <section class="planning-section" id="do-rozliczenia" data-testid="overdue-section">
+          <h2>{{ 'planning.overdue.title' | transloco }}</h2>
           <table class="planning-table">
-            <thead>
-              <tr>
-                <th>{{ 'common.date' | transloco }}</th>
-                <th>{{ 'common.name' | transloco }}</th>
-                <th>{{ 'planning.account' | transloco }}</th>
-                <th class="planning-table__amount">{{ 'common.amount' | transloco }}</th>
-                <th>{{ 'common.status' | transloco }}</th>
-                <th class="planning-table__amount">
-                  {{ 'planning.occurrence.actual' | transloco }}
-                </th>
-                <th class="planning-table__amount">
-                  {{ 'planning.occurrence.difference' | transloco }}
-                </th>
-                <th></th>
-              </tr>
-            </thead>
             <tbody>
-              @for (
-                occurrence of plan.occurrences;
-                track occurrence.recurringIncomeId + occurrence.nominalMonth
-              ) {
-                <tr
-                  data-testid="occurrence-row"
-                  [class.planning-table__row--overdue]="occurrence.overdue"
-                >
-                  <td>{{ formatDate(occurrence.date) }}</td>
-                  <td>{{ occurrence.name }}</td>
-                  <td>
-                    {{ occurrence.accountName }}
-                    @if (occurrence.accountArchived) {
-                      <span class="planning-table__warning" data-testid="archived-warning">
-                        <mat-icon>warning</mat-icon>
-                        {{ 'planning.archivedAccount' | transloco }}
-                      </span>
-                    }
-                  </td>
+              @for (item of overdue(); track item.recurringIncomeId + item.nominalMonth) {
+                <tr data-testid="overdue-row">
+                  <td>{{ formatDate(item.date) }}</td>
+                  <td>{{ item.name }}</td>
+                  <td>{{ item.accountName }}</td>
                   <td class="planning-table__amount">
-                    <span>{{ formatMoney(occurrence.amount, occurrence.currency) }}</span>
-                    @if (occurrence.estimated) {
-                      <span class="planning-table__estimate">
-                        @if (occurrence.amountPln !== null && occurrence.amountPln !== undefined) {
-                          {{
-                            'planning.estimate'
-                              | transloco: { amount: formatMoney(occurrence.amountPln, 'PLN') }
-                          }}
-                        } @else {
-                          {{ 'planning.estimateUnavailable' | transloco }}
-                        }
-                      </span>
-                    }
-                  </td>
-                  <td>
-                    <span data-testid="occurrence-status">{{
-                      occurrenceStatusKey(occurrence.status) | transloco
-                    }}</span>
-                    @if (occurrence.depositCreated) {
-                      <span class="planning-table__deposit" data-testid="deposit-created">
-                        {{ 'planning.occurrence.depositCreated' | transloco }}
-                      </span>
-                    }
-                    @if (occurrence.outOfRule) {
-                      <span class="planning-table__warning" data-testid="out-of-rule">
-                        {{ 'planning.occurrence.outOfRule' | transloco }}
-                      </span>
-                    }
-                  </td>
-                  <td class="planning-table__amount">
-                    @if (
-                      occurrence.actualAmount !== null && occurrence.actualAmount !== undefined
-                    ) {
-                      <span data-testid="occurrence-actual">
-                        {{ formatMoney(occurrence.actualAmount, occurrence.currency) }}
-                        @if (occurrence.actualDate) {
-                          ({{ formatDate(occurrence.actualDate) }})
-                        }
-                      </span>
-                    }
-                  </td>
-                  <td class="planning-table__amount">
-                    @if (occurrence.difference !== null && occurrence.difference !== undefined) {
-                      <span data-testid="occurrence-difference">
-                        {{ formatMoney(occurrence.difference, occurrence.currency) }}
-                      </span>
-                    }
+                    {{ formatMoney(item.amount, item.currency) }}
                   </td>
                   <td class="planning-table__actions">
-                    @if (occurrence.status === 'Pending' || occurrence.status === 'Skipped') {
-                      <button
-                        mat-button
-                        type="button"
-                        data-testid="settle-occurrence"
-                        (click)="openSettleDialog(occurrence)"
-                      >
-                        {{ 'planning.occurrence.settle' | transloco }}
-                      </button>
-                    }
-                    @if (occurrence.status === 'Pending') {
-                      <button
-                        mat-button
-                        type="button"
-                        data-testid="skip-occurrence"
-                        (click)="skipOccurrence(occurrence)"
-                      >
-                        {{ 'planning.occurrence.skip' | transloco }}
-                      </button>
-                    }
-                    @if (occurrence.status === 'Settled') {
-                      <button
-                        mat-button
-                        type="button"
-                        data-testid="edit-settlement"
-                        (click)="openSettleDialog(occurrence)"
-                      >
-                        {{ 'planning.occurrence.edit' | transloco }}
-                      </button>
-                    }
-                    @if (occurrence.status !== 'Pending') {
-                      <button
-                        mat-button
-                        type="button"
-                        data-testid="undo-occurrence"
-                        (click)="undoOccurrence(occurrence)"
-                      >
-                        {{ 'planning.occurrence.undo' | transloco }}
-                      </button>
-                    }
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="settle-overdue"
+                      (click)="openSettleOverdueDialog(item)"
+                    >
+                      {{ 'planning.occurrence.settle' | transloco }}
+                    </button>
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="skip-overdue"
+                      (click)="skipOccurrence(item)"
+                    >
+                      {{ 'planning.occurrence.skip' | transloco }}
+                    </button>
                   </td>
                 </tr>
               }
             </tbody>
           </table>
-        }
-
-        <div class="planning-balance">
-          <h3>{{ 'planning.balance.title' | transloco }}</h3>
-          <dl class="planning-balance__values">
-            <div data-testid="balance-plan">
-              <dt>{{ 'planning.balance.plan' | transloco }}</dt>
-              <dd>{{ formatMoney(plan.balance.planPln, 'PLN') }}</dd>
-            </div>
-            <div data-testid="balance-actual">
-              <dt>{{ 'planning.balance.actual' | transloco }}</dt>
-              <dd>{{ formatMoney(plan.balance.actualPln, 'PLN') }}</dd>
-            </div>
-            <div data-testid="balance-pending">
-              <dt>{{ 'planning.balance.pending' | transloco }}</dt>
-              <dd>{{ formatMoney(plan.balance.pendingPln, 'PLN') }}</dd>
-            </div>
-            <div data-testid="balance-difference">
-              <dt>{{ 'planning.balance.difference' | transloco }}</dt>
-              <dd>{{ formatMoney(plan.balance.differencePln, 'PLN') }}</dd>
-            </div>
-          </dl>
-          @if (plan.fxUnavailable) {
-            <span class="planning-section__incomplete" data-testid="balance-incomplete">
-              {{ 'planning.balance.incomplete' | transloco }}
-            </span>
-          }
-        </div>
-
-        <h3>{{ 'planning.definitions.title' | transloco }}</h3>
-        @if (plan.definitions.length === 0) {
-          <p class="planning-section__empty">{{ 'planning.definitions.empty' | transloco }}</p>
-        } @else {
-          <ul class="planning-definitions">
-            @for (definition of plan.definitions; track definition.id) {
-              @let period = periodLabel(definition);
-              <li class="planning-definition" data-testid="definition-row">
-                <div class="planning-definition__main">
-                  <span class="planning-definition__name">{{ definition.name }}</span>
-                  <mat-chip-set>
-                    <mat-chip>{{ statusKey(definition.status) | transloco }}</mat-chip>
-                  </mat-chip-set>
-                </div>
-                <div class="planning-definition__details">
-                  <span>{{ formatMoney(definition.amount, definition.currency) }}</span>
-                  <span>{{ definition.accountName }}</span>
-                  <span class="planning-definition__rule">
-                    @for (part of ruleParts(definition); track $index) {
-                      <span class="planning-definition__rule-part">{{
-                        part.key | transloco: part.params
-                      }}</span>
-                    }
-                  </span>
-                  <span>{{ period.key | transloco: period.params }}</span>
-                  @if (definition.nextChange; as change) {
-                    <span class="planning-definition__change" data-testid="next-change">
-                      {{
-                        'planning.change.next'
-                          | transloco
-                            : {
-                                month: changeMonthLabel(change.effectiveFrom),
-                                amount: formatMoney(change.amount, change.currency),
-                              }
-                      }}
-                      @if (change.accountName !== definition.accountName) {
-                        {{ 'planning.change.account' | transloco: { account: change.accountName } }}
-                      }
-                      <button
-                        mat-icon-button
-                        type="button"
-                        data-testid="delete-change"
-                        [attr.aria-label]="'planning.change.delete' | transloco"
-                        (click)="removeChange(definition)"
-                      >
-                        <mat-icon>close</mat-icon>
-                      </button>
-                    </span>
-                  }
-                </div>
-                <div class="planning-definition__actions">
-                  <button
-                    mat-button
-                    type="button"
-                    data-testid="edit-income"
-                    (click)="openEditDialog(definition)"
-                  >
-                    {{ 'planning.edit.action' | transloco }}
-                  </button>
-                  <button mat-button type="button" (click)="openEndDialog(definition)">
-                    {{ 'planning.end.action' | transloco }}
-                  </button>
-                  <button mat-button type="button" (click)="remove(definition)">
-                    {{ 'common.delete' | transloco }}
-                  </button>
-                </div>
-              </li>
-            }
-          </ul>
-        }
-      </section>
-
-      @if (expenses(); as spending) {
-        <section class="planning-section" id="wydatki" data-testid="expenses-section">
-          <div class="planning-section__header">
-            <h2>{{ 'planning.expenses.title' | transloco }}</h2>
-            <button
-              mat-flat-button
-              color="primary"
-              type="button"
-              data-testid="add-expense"
-              (click)="openAddExpenseDialog()"
-            >
-              <mat-icon>add</mat-icon>
-              {{ 'planning.expenses.add' | transloco }}
-            </button>
-          </div>
-
-          @if (spending.payments.length === 0) {
-            <p class="planning-section__empty">{{ 'planning.expenses.empty' | transloco }}</p>
-          } @else {
-            <table class="planning-table">
-              <thead>
-                <tr>
-                  <th>{{ 'common.date' | transloco }}</th>
-                  <th>{{ 'common.name' | transloco }}</th>
-                  <th class="planning-table__amount">{{ 'common.amount' | transloco }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (
-                  payment of spending.payments;
-                  track payment.recurringExpenseId + payment.nominalMonth
-                ) {
-                  <tr data-testid="expense-payment-row">
-                    <td>{{ formatDate(payment.date) }}</td>
-                    <td>{{ payment.name }}</td>
-                    <td class="planning-table__amount">{{ formatMoney(payment.amount, 'PLN') }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
-
-          <div class="planning-balance">
-            <dl class="planning-balance__values">
-              <div data-testid="expense-cost">
-                <dt>{{ 'planning.expenses.cost' | transloco }}</dt>
-                <dd>{{ formatMoney(spending.costPln, 'PLN') }}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <h3>{{ 'planning.expenses.definitions.title' | transloco }}</h3>
-          @if (spending.definitions.length === 0) {
-            <p class="planning-section__empty">
-              {{ 'planning.expenses.definitions.empty' | transloco }}
-            </p>
-          } @else {
-            <ul class="planning-definitions">
-              @for (definition of spending.definitions; track definition.id) {
-                @let period = periodLabel(definition);
-                <li class="planning-definition" data-testid="expense-definition-row">
-                  <div class="planning-definition__main">
-                    <span class="planning-definition__name">{{ definition.name }}</span>
-                    <mat-chip-set>
-                      <mat-chip>{{ statusKey(definition.status) | transloco }}</mat-chip>
-                    </mat-chip-set>
-                  </div>
-                  <div class="planning-definition__details">
-                    <span>{{ formatMoney(definition.amount, 'PLN') }}</span>
-                    <span class="planning-definition__rule">
-                      @for (part of ruleParts(definition); track $index) {
-                        <span class="planning-definition__rule-part">{{
-                          part.key | transloco: part.params
-                        }}</span>
-                      }
-                    </span>
-                    <span>{{ period.key | transloco: period.params }}</span>
-                    <span data-testid="expense-reserve">
-                      {{
-                        'planning.expenses.reserve'
-                          | transloco: { amount: formatMoney(definition.reservePln, 'PLN') }
-                      }}
-                    </span>
-                    @if (definition.nextPayment; as next) {
-                      @if (isMultiMonth(definition)) {
-                        <span data-testid="expense-next-payment">
-                          {{
-                            'planning.expenses.nextPayment'
-                              | transloco: { date: formatDate(next.date) }
-                          }}
-                        </span>
-                      }
-                    }
-                    @if (definition.nextChange; as change) {
-                      <span class="planning-definition__change" data-testid="expense-next-change">
-                        {{
-                          'planning.change.next'
-                            | transloco
-                              : {
-                                  month: changeMonthLabel(change.effectiveFrom),
-                                  amount: formatMoney(change.amount, 'PLN'),
-                                }
-                        }}
-                        <button
-                          mat-icon-button
-                          type="button"
-                          data-testid="delete-expense-change"
-                          [attr.aria-label]="'planning.change.delete' | transloco"
-                          (click)="removeExpenseChange(definition)"
-                        >
-                          <mat-icon>close</mat-icon>
-                        </button>
-                      </span>
-                    }
-                  </div>
-                  <div class="planning-definition__actions">
-                    <button
-                      mat-button
-                      type="button"
-                      data-testid="edit-expense"
-                      (click)="openEditExpenseDialog(definition)"
-                    >
-                      {{ 'planning.edit.action' | transloco }}
-                    </button>
-                    <button mat-button type="button" (click)="openEndExpenseDialog(definition)">
-                      {{ 'planning.end.action' | transloco }}
-                    </button>
-                    <button mat-button type="button" (click)="removeExpense(definition)">
-                      {{ 'common.delete' | transloco }}
-                    </button>
-                  </div>
-                </li>
-              }
-            </ul>
-          }
         </section>
       }
-    </div>
 
-    @if (freeFunds(); as free) {
-      <section class="planning-section planning-free-funds" data-testid="free-funds">
-        <h2>{{ 'planning.freeFunds.title' | transloco }}</h2>
-        <dl class="planning-balance__values">
-          <div data-testid="free-funds-plan">
-            <dt>{{ 'planning.freeFunds.plan' | transloco }}</dt>
-            <dd>
-              @if (isNegative(free.planPln)) {
-                <span class="planning-free-funds__deficit" data-testid="free-funds-deficit">
-                  {{ formatMoney(free.planPln, 'PLN') }}
-                  {{ 'planning.freeFunds.deficit' | transloco }}
-                </span>
-              } @else {
-                {{ formatMoney(free.planPln, 'PLN') }}
-              }
-            </dd>
-          </div>
-          <div data-testid="free-funds-forecast">
-            <dt>{{ 'planning.freeFunds.forecast' | transloco }}</dt>
-            <dd>
-              @if (isNegative(free.forecastPln)) {
-                <span class="planning-free-funds__deficit" data-testid="free-funds-deficit">
-                  {{ formatMoney(free.forecastPln, 'PLN') }}
-                  {{ 'planning.freeFunds.deficit' | transloco }}
-                </span>
-              } @else {
-                {{ formatMoney(free.forecastPln, 'PLN') }}
-              }
-            </dd>
-          </div>
-        </dl>
-        @if (free.incomplete) {
-          <span class="planning-section__incomplete" data-testid="free-funds-incomplete">
-            {{ 'planning.balance.incomplete' | transloco }}
-          </span>
-        }
-      </section>
-    }
-
-    @if (allocation(); as plan) {
-      <section class="planning-section planning-allocation" data-testid="allocation-section">
-        <div class="planning-section__header">
-          <h2>{{ 'planning.allocation.title' | transloco }}</h2>
-          <button
-            mat-flat-button
-            color="primary"
-            type="button"
-            data-testid="edit-allocation"
-            (click)="openAllocationDialog(plan)"
-          >
-            <mat-icon>edit</mat-icon>
-            {{ 'planning.allocation.edit' | transloco }}
+      @if (monthResource.error(); as loadError) {
+        <div class="planning-page__state" role="alert">
+          <p>{{ loadError.message }}</p>
+          <button mat-button type="button" (click)="monthResource.reload()">
+            {{ 'common.retry' | transloco }}
           </button>
         </div>
-
-        <dl class="planning-balance__values">
-          <div data-testid="allocation-forecast">
-            <dt>{{ 'planning.allocation.forecast' | transloco }}</dt>
-            <dd>{{ formatMoney(plan.forecastPln, 'PLN') }}</dd>
-          </div>
-          @if (plan.effectiveFrom; as effectiveFrom) {
-            <div data-testid="allocation-effective-from">
-              <dt>{{ 'planning.allocation.effectiveFrom' | transloco }}</dt>
-              <dd>{{ changeMonthLabel(effectiveFrom) }}</dd>
+      } @else if (monthResource.isLoading() && !monthResource.hasValue()) {
+        <div class="planning-page__state">
+          <mat-spinner diameter="32" />
+        </div>
+      } @else if (incomes(); as plan) {
+        <div class="planning-columns">
+          <section class="planning-section">
+            <div class="planning-section__header">
+              <h2>{{ 'planning.incomes.title' | transloco }}</h2>
+              <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+                <mat-icon>add</mat-icon>
+                {{ 'planning.add' | transloco }}
+              </button>
             </div>
-          }
-        </dl>
-        @if (plan.incomplete) {
-          <span class="planning-section__incomplete" data-testid="allocation-incomplete">
-            {{ 'planning.balance.incomplete' | transloco }}
-          </span>
-        }
 
-        @if (isPositive(plan.deficitPln)) {
-          <p class="planning-free-funds__deficit" data-testid="allocation-deficit">
-            {{
-              'planning.allocation.deficit'
-                | transloco: { amount: formatMoney(plan.deficitPln, 'PLN') }
-            }}
-          </p>
-        }
-
-        @if (plan.reserve; as reserve) {
-          <p class="planning-allocation__reserve" data-testid="reserve-row">
-            <strong>{{ 'planning.allocation.reserve.title' | transloco }}</strong>
-            <span>{{
-              'planning.allocation.reserve.monthly'
-                | transloco: { amount: formatMoney(reserve.monthPln, 'PLN') }
-            }}</span>
-            <span>{{
-              'planning.allocation.reserve.balance'
-                | transloco: { amount: formatMoney(reserve.balancePln, 'PLN') }
-            }}</span>
-            @if (reserve.accountName; as accountName) {
-              <span>{{
-                'planning.allocation.reserve.account' | transloco: { name: accountName }
-              }}</span>
-            }
-          </p>
-        }
-
-        @if (plan.buckets.length === 0) {
-          <p class="planning-section__empty">{{ 'planning.allocation.empty' | transloco }}</p>
-        } @else {
-          @if (cushionBuckets().length > 0) {
-            <h3>{{ 'planning.allocation.groups.cushion' | transloco }}</h3>
-            <ul class="planning-definitions" data-testid="allocation-group-cushion">
-              @for (bucket of cushionBuckets(); track bucket.bucketId) {
-                <li class="planning-allocation__row" data-testid="allocation-bucket-row">
-                  <span class="planning-definition__name">{{ bucket.name }}</span>
-                  <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
-                  @if (bucket.cushion; as cushion) {
-                    <span
-                      class="planning-allocation__cushion"
-                      data-testid="allocation-cushion-balance"
+            @if (plan.occurrences.length === 0) {
+              <p class="planning-section__empty">{{ 'planning.incomes.empty' | transloco }}</p>
+            } @else {
+              <table class="planning-table">
+                <thead>
+                  <tr>
+                    <th>{{ 'common.date' | transloco }}</th>
+                    <th>{{ 'common.name' | transloco }}</th>
+                    <th>{{ 'planning.account' | transloco }}</th>
+                    <th class="planning-table__amount">{{ 'common.amount' | transloco }}</th>
+                    <th>{{ 'common.status' | transloco }}</th>
+                    <th class="planning-table__amount">
+                      {{ 'planning.occurrence.actual' | transloco }}
+                    </th>
+                    <th class="planning-table__amount">
+                      {{ 'planning.occurrence.difference' | transloco }}
+                    </th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (
+                    occurrence of plan.occurrences;
+                    track occurrence.recurringIncomeId + occurrence.nominalMonth
+                  ) {
+                    <tr
+                      data-testid="occurrence-row"
+                      [class.planning-table__row--overdue]="occurrence.overdue"
                     >
-                      {{
-                        'planning.allocation.cushionBalance'
-                          | transloco
-                            : {
-                                start: formatMoney(cushion.balanceStartPln, 'PLN'),
-                                end: formatMoney(cushion.balanceEndPln, 'PLN'),
-                                target: formatMoney(cushion.targetPln, 'PLN'),
-                                months: cushion.targetMonths,
-                              }
-                      }}
-                    </span>
+                      <td>{{ formatDate(occurrence.date) }}</td>
+                      <td>{{ occurrence.name }}</td>
+                      <td>
+                        {{ occurrence.accountName }}
+                        @if (occurrence.accountArchived) {
+                          <span class="planning-table__warning" data-testid="archived-warning">
+                            <mat-icon>warning</mat-icon>
+                            {{ 'planning.archivedAccount' | transloco }}
+                          </span>
+                        }
+                      </td>
+                      <td class="planning-table__amount">
+                        <span>{{ formatMoney(occurrence.amount, occurrence.currency) }}</span>
+                        @if (occurrence.estimated) {
+                          <span class="planning-table__estimate">
+                            @if (
+                              occurrence.amountPln !== null && occurrence.amountPln !== undefined
+                            ) {
+                              {{
+                                'planning.estimate'
+                                  | transloco: { amount: formatMoney(occurrence.amountPln, 'PLN') }
+                              }}
+                            } @else {
+                              {{ 'planning.estimateUnavailable' | transloco }}
+                            }
+                          </span>
+                        }
+                      </td>
+                      <td>
+                        <span data-testid="occurrence-status">{{
+                          occurrenceStatusKey(occurrence.status) | transloco
+                        }}</span>
+                        @if (occurrence.depositCreated) {
+                          <span class="planning-table__deposit" data-testid="deposit-created">
+                            {{ 'planning.occurrence.depositCreated' | transloco }}
+                          </span>
+                        }
+                        @if (occurrence.outOfRule) {
+                          <span class="planning-table__warning" data-testid="out-of-rule">
+                            {{ 'planning.occurrence.outOfRule' | transloco }}
+                          </span>
+                        }
+                      </td>
+                      <td class="planning-table__amount">
+                        @if (
+                          occurrence.actualAmount !== null && occurrence.actualAmount !== undefined
+                        ) {
+                          <span data-testid="occurrence-actual">
+                            {{ formatMoney(occurrence.actualAmount, occurrence.currency) }}
+                            @if (occurrence.actualDate) {
+                              ({{ formatDate(occurrence.actualDate) }})
+                            }
+                          </span>
+                        }
+                      </td>
+                      <td class="planning-table__amount">
+                        @if (
+                          occurrence.difference !== null && occurrence.difference !== undefined
+                        ) {
+                          <span data-testid="occurrence-difference">
+                            {{ formatMoney(occurrence.difference, occurrence.currency) }}
+                          </span>
+                        }
+                      </td>
+                      <td class="planning-table__actions">
+                        @if (occurrence.status === 'Pending' || occurrence.status === 'Skipped') {
+                          <button
+                            mat-button
+                            type="button"
+                            data-testid="settle-occurrence"
+                            (click)="openSettleDialog(occurrence)"
+                          >
+                            {{ 'planning.occurrence.settle' | transloco }}
+                          </button>
+                        }
+                        @if (occurrence.status === 'Pending') {
+                          <button
+                            mat-button
+                            type="button"
+                            data-testid="skip-occurrence"
+                            (click)="skipOccurrence(occurrence)"
+                          >
+                            {{ 'planning.occurrence.skip' | transloco }}
+                          </button>
+                        }
+                        @if (occurrence.status === 'Settled') {
+                          <button
+                            mat-button
+                            type="button"
+                            data-testid="edit-settlement"
+                            (click)="openSettleDialog(occurrence)"
+                          >
+                            {{ 'planning.occurrence.edit' | transloco }}
+                          </button>
+                        }
+                        @if (occurrence.status !== 'Pending') {
+                          <button
+                            mat-button
+                            type="button"
+                            data-testid="undo-occurrence"
+                            (click)="undoOccurrence(occurrence)"
+                          >
+                            {{ 'planning.occurrence.undo' | transloco }}
+                          </button>
+                        }
+                      </td>
+                    </tr>
                   }
-                  <span>{{ bucket.accountName ?? '' }}</span>
-                  <span class="planning-allocation__amount">
-                    {{ formatMoney(bucket.allocatedPln, 'PLN') }}
-                  </span>
-                  <span class="planning-allocation__markers">
-                    @if (bucket.cushion?.reached) {
-                      <mat-chip data-testid="allocation-cushion-reached">
-                        {{ 'planning.allocation.cushionReached' | transloco }}
-                      </mat-chip>
-                    }
-                  </span>
-                  <ng-container
-                    [ngTemplateOutlet]="bucketBalance"
-                    [ngTemplateOutletContext]="{ $implicit: bucket }"
-                  />
-                </li>
-              }
-            </ul>
-          }
-
-          <ng-template #bucketBalance let-bucket>
-            @if (hasBalance(bucket)) {
-              <span class="planning-allocation__balance-action">
-                <button
-                  mat-button
-                  type="button"
-                  (click)="openBucketBalanceDialog(bucket)"
-                  data-testid="set-bucket-balance"
-                >
-                  {{ 'planning.allocation.balance.action' | transloco }}
-                </button>
-              </span>
-              @for (adjustment of bucket.adjustments ?? []; track adjustment.month) {
-                <span class="planning-allocation__adjustment" data-testid="bucket-adjustment">
-                  {{
-                    'planning.allocation.balance.adjustment'
-                      | transloco
-                        : {
-                            month: changeMonthLabel(adjustment.month),
-                            amount: formatMoney(adjustment.amountPln, 'PLN'),
-                          }
-                  }}
-                  <button
-                    mat-icon-button
-                    type="button"
-                    [attr.aria-label]="'planning.allocation.balance.delete' | transloco"
-                    (click)="removeBucketAdjustment(bucket, adjustment.month)"
-                    data-testid="delete-bucket-adjustment"
-                  >
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </span>
-              }
+                </tbody>
+              </table>
             }
-          </ng-template>
 
-          @if (fixedBuckets().length > 0) {
-            <h3>{{ 'planning.allocation.groups.fixed' | transloco }}</h3>
-            <ul class="planning-definitions" data-testid="allocation-group-fixed">
-              @for (bucket of fixedBuckets(); track bucket.bucketId) {
-                <li class="planning-allocation__row" data-testid="allocation-bucket-row">
-                  <span class="planning-definition__name">{{ bucket.name }}</span>
-                  <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
-                  <span>{{ formatMoney(bucket.share ?? 0, 'PLN') }}</span>
-                  <span>{{ bucket.accountName ?? '' }}</span>
-                  <span class="planning-allocation__amount">
-                    {{ formatMoney(bucket.allocatedPln, 'PLN') }}
-                  </span>
-                  <span class="planning-allocation__markers">
-                    @if (bucket.underfunded) {
-                      <mat-chip data-testid="allocation-underfunded">
-                        {{ 'planning.allocation.underfunded' | transloco }}
-                      </mat-chip>
-                    }
-                    @if (bucket.isRemainder) {
-                      <mat-chip data-testid="allocation-remainder">
-                        {{ 'planning.allocation.remainder' | transloco }}
-                      </mat-chip>
-                    }
-                    @if (bucket.limit?.reached) {
-                      <mat-chip data-testid="allocation-limit-reached">
-                        {{ 'planning.allocation.limitReached' | transloco }}
-                      </mat-chip>
-                    }
-                  </span>
-                  @if (bucket.limit; as limit) {
-                    <span class="planning-allocation__limit" data-testid="allocation-limit">
-                      {{
-                        'planning.allocation.limitContributed'
-                          | transloco
-                            : {
-                                year: limit.year,
-                                contributed: formatMoney(limit.contributedEndPln, 'PLN'),
-                                limit: formatMoney(limit.limitPln, 'PLN'),
-                              }
-                      }}
-                    </span>
-                  }
-                  <ng-container
-                    [ngTemplateOutlet]="bucketBalance"
-                    [ngTemplateOutletContext]="{ $implicit: bucket }"
-                  />
-                </li>
-              }
-            </ul>
-          }
-
-          @if (percentBuckets().length > 0) {
-            <h3>{{ 'planning.allocation.groups.percent' | transloco }}</h3>
-            <ul class="planning-definitions" data-testid="allocation-group-percent">
-              @for (bucket of percentBuckets(); track bucket.bucketId) {
-                <li class="planning-allocation__row" data-testid="allocation-bucket-row">
-                  <span class="planning-definition__name">{{ bucket.name }}</span>
-                  <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
-                  <span>{{ formatPercent(bucket.share ?? 0) }}</span>
-                  <span>{{ bucket.accountName ?? '' }}</span>
-                  <span class="planning-allocation__amount">
-                    {{ formatMoney(bucket.allocatedPln, 'PLN') }}
-                  </span>
-                  <span class="planning-allocation__markers">
-                    @if (bucket.underfunded) {
-                      <mat-chip data-testid="allocation-underfunded">
-                        {{ 'planning.allocation.underfunded' | transloco }}
-                      </mat-chip>
-                    }
-                    @if (bucket.isRemainder) {
-                      <mat-chip data-testid="allocation-remainder">
-                        {{ 'planning.allocation.remainder' | transloco }}
-                      </mat-chip>
-                    }
-                    @if (bucket.limit?.reached) {
-                      <mat-chip data-testid="allocation-limit-reached">
-                        {{ 'planning.allocation.limitReached' | transloco }}
-                      </mat-chip>
-                    }
-                  </span>
-                  @if (bucket.limit; as limit) {
-                    <span class="planning-allocation__limit" data-testid="allocation-limit">
-                      {{
-                        'planning.allocation.limitContributed'
-                          | transloco
-                            : {
-                                year: limit.year,
-                                contributed: formatMoney(limit.contributedEndPln, 'PLN'),
-                                limit: formatMoney(limit.limitPln, 'PLN'),
-                              }
-                      }}
-                    </span>
-                  }
-                  <ng-container
-                    [ngTemplateOutlet]="bucketBalance"
-                    [ngTemplateOutletContext]="{ $implicit: bucket }"
-                  />
-                </li>
-              }
-            </ul>
-          }
-
-          @if (estimatedLimitYear(); as year) {
-            <p class="planning-section__incomplete" data-testid="allocation-limit-estimated">
-              {{ 'planning.allocation.limitEstimated' | transloco: { year: year } }}
-            </p>
-          }
-
-          <dl class="planning-balance__values">
-            <div data-testid="allocation-to-invest">
-              <dt>{{ 'planning.allocation.toInvest' | transloco }}</dt>
-              <dd>{{ formatMoney(plan.toInvestPln, 'PLN') }}</dd>
-            </div>
-          </dl>
-        }
-
-        @if (plan.nextChange; as nextChange) {
-          <span class="planning-definition__change" data-testid="allocation-next-change">
-            {{
-              'planning.allocation.nextChange' | transloco: { month: changeMonthLabel(nextChange) }
-            }}
-            <button
-              mat-icon-button
-              type="button"
-              data-testid="delete-allocation-change"
-              [attr.aria-label]="'planning.change.delete' | transloco"
-              (click)="removeAllocationChange(nextChange)"
-            >
-              <mat-icon>close</mat-icon>
-            </button>
-          </span>
-        }
-      </section>
-    }
-
-    @if (transferPlan(); as transfer) {
-      @if (transfer.status !== 'None' || transfer.noneReason === 'NothingToInvest') {
-        <section
-          class="planning-section planning-transfer"
-          id="plan-przelewow"
-          data-testid="transfer-plan-section"
-        >
-          <div class="planning-section__header">
-            <h2>{{ 'planning.transferPlan.title' | transloco }}</h2>
-            @if (transferStatusKey(transfer.status); as statusKey) {
-              <mat-chip data-testid="transfer-plan-status">{{ statusKey | transloco }}</mat-chip>
-            }
-            <span class="planning-transfer__actions">
-              @if (transfer.status === 'Preview') {
-                <button
-                  mat-flat-button
-                  type="button"
-                  data-testid="transfer-accept"
-                  (click)="acceptTransferPlan()"
-                >
-                  {{ 'planning.transferPlan.accept' | transloco }}
-                </button>
-                <button
-                  mat-button
-                  type="button"
-                  data-testid="transfer-skip"
-                  (click)="skipTransferPlan()"
-                >
-                  {{ 'planning.transferPlan.skip' | transloco }}
-                </button>
-              } @else if (transfer.status === 'Accepted' || transfer.status === 'Completed') {
-                @if (!transfer.canUndo) {
-                  <span class="planning-section__empty" data-testid="transfer-undo-hint">
-                    {{ 'planning.transferPlan.undoBlocked' | transloco }}
-                  </span>
-                }
-                <button
-                  mat-button
-                  type="button"
-                  data-testid="transfer-undo"
-                  [disabled]="!transfer.canUndo"
-                  (click)="undoTransferPlan()"
-                >
-                  {{ 'planning.transferPlan.undo' | transloco }}
-                </button>
-              } @else if (transfer.status === 'Skipped') {
-                <button
-                  mat-button
-                  type="button"
-                  data-testid="transfer-unskip"
-                  (click)="unskipTransferPlan()"
-                >
-                  {{ 'planning.transferPlan.unskip' | transloco }}
-                </button>
-              }
-            </span>
-          </div>
-
-          <label class="planning-transfer__minimum">
-            <span>{{ 'planning.transferPlan.paymentLeadDays' | transloco }}</span>
-            <input
-              type="number"
-              min="0"
-              max="90"
-              step="1"
-              [value]="paymentLeadDays()"
-              (change)="savePaymentLeadDays($event)"
-              data-testid="payment-lead-days-input"
-            />
-          </label>
-
-          @if (transfer.status === 'Skipped') {
-            <p class="planning-section__empty" data-testid="transfer-plan-skipped">
-              {{ 'planning.transferPlan.skipped' | transloco }}
-            </p>
-          } @else if (transfer.status !== 'None') {
-            <div class="planning-transfer__meta">
-              @if (transfer.valuationDate; as valuationDate) {
-                <span data-testid="transfer-valuation-date">
-                  {{
-                    'planning.transferPlan.valuationDate'
-                      | transloco: { date: formatDate(valuationDate) }
-                  }}
+            <div class="planning-balance">
+              <h3>{{ 'planning.balance.title' | transloco }}</h3>
+              <dl class="planning-balance__values">
+                <div data-testid="balance-plan">
+                  <dt>{{ 'planning.balance.plan' | transloco }}</dt>
+                  <dd>{{ formatMoney(plan.balance.planPln, 'PLN') }}</dd>
+                </div>
+                <div data-testid="balance-actual">
+                  <dt>{{ 'planning.balance.actual' | transloco }}</dt>
+                  <dd>{{ formatMoney(plan.balance.actualPln, 'PLN') }}</dd>
+                </div>
+                <div data-testid="balance-pending">
+                  <dt>{{ 'planning.balance.pending' | transloco }}</dt>
+                  <dd>{{ formatMoney(plan.balance.pendingPln, 'PLN') }}</dd>
+                </div>
+                <div data-testid="balance-difference">
+                  <dt>{{ 'planning.balance.difference' | transloco }}</dt>
+                  <dd>{{ formatMoney(plan.balance.differencePln, 'PLN') }}</dd>
+                </div>
+              </dl>
+              @if (plan.fxUnavailable) {
+                <span class="planning-section__incomplete" data-testid="balance-incomplete">
+                  {{ 'planning.balance.incomplete' | transloco }}
                 </span>
-                @if (transfer.valuationStale) {
-                  <mat-chip data-testid="transfer-valuation-stale">
-                    {{ 'planning.transferPlan.valuationStale' | transloco }}
-                  </mat-chip>
-                }
-              }
-              @if (transfer.status === 'Preview') {
-                <label class="planning-transfer__minimum">
-                  <span>{{ 'planning.transferPlan.minimum' | transloco }}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="1000000"
-                    step="1"
-                    [value]="transfer.minimumTransferPln"
-                    (change)="saveTransferMinimum($event)"
-                    data-testid="transfer-minimum-input"
-                  />
-                </label>
               }
             </div>
 
-            @if (transfer.fallbackReason; as reason) {
-              <p class="planning-section__incomplete" data-testid="transfer-plan-fallback">
-                {{ transferFallbackKey(reason) | transloco }}
-                <a routerLink="/allocation" data-testid="transfer-plan-set-target-link">
-                  {{ 'planning.transferPlan.fallback.setTarget' | transloco }}
-                </a>
-              </p>
-            }
-
-            <ng-template #transferRowList let-rows>
+            <h3>{{ 'planning.definitions.title' | transloco }}</h3>
+            @if (plan.definitions.length === 0) {
+              <p class="planning-section__empty">{{ 'planning.definitions.empty' | transloco }}</p>
+            } @else {
               <ul class="planning-definitions">
-                @for (row of rows; track $index) {
-                  <li
-                    class="planning-transfer__row"
-                    [class.planning-transfer__row--frozen]="!!row.id"
-                    data-testid="transfer-plan-row"
-                  >
-                    @if (row.id; as rowId) {
-                      <input
-                        type="checkbox"
-                        [checked]="row.checked"
-                        [attr.aria-label]="'planning.transferPlan.checkRow' | transloco"
-                        (change)="checkTransferRow(rowId, $event)"
-                        data-testid="transfer-row-check"
-                      />
-                    }
-                    <span class="planning-definition__name">{{ row.bucketName }}</span>
-                    <span>{{
-                      row.accountName ?? ('planning.transferPlan.noAccount' | transloco)
-                    }}</span>
-                    <span>{{ row.groupName ?? '' }}</span>
-                    <span class="planning-allocation__amount">
-                      {{ formatMoney(row.amountPln, 'PLN') }}
-                    </span>
-                    <span class="planning-allocation__markers">
-                      @if (transferMarkerKey(row.marker); as markerKey) {
-                        <mat-chip [attr.data-testid]="transferMarkerTestId(row.marker)">
-                          {{ markerKey | transloco }}
-                        </mat-chip>
+                @for (definition of plan.definitions; track definition.id) {
+                  @let period = periodLabel(definition);
+                  <li class="planning-definition" data-testid="definition-row">
+                    <div class="planning-definition__main">
+                      <span class="planning-definition__name">{{ definition.name }}</span>
+                      <mat-chip-set>
+                        <mat-chip>{{ statusKey(definition.status) | transloco }}</mat-chip>
+                      </mat-chip-set>
+                    </div>
+                    <div class="planning-definition__details">
+                      <span>{{ formatMoney(definition.amount, definition.currency) }}</span>
+                      <span>{{ definition.accountName }}</span>
+                      <span class="planning-definition__rule">
+                        @for (part of ruleParts(definition); track $index) {
+                          <span class="planning-definition__rule-part">{{
+                            part.key | transloco: part.params
+                          }}</span>
+                        }
+                      </span>
+                      <span>{{ period.key | transloco: period.params }}</span>
+                      @if (definition.nextChange; as change) {
+                        <span class="planning-definition__change" data-testid="next-change">
+                          {{
+                            'planning.change.next'
+                              | transloco
+                                : {
+                                    month: changeMonthLabel(change.effectiveFrom),
+                                    amount: formatMoney(change.amount, change.currency),
+                                  }
+                          }}
+                          @if (change.accountName !== definition.accountName) {
+                            {{
+                              'planning.change.account' | transloco: { account: change.accountName }
+                            }}
+                          }
+                          <button
+                            mat-icon-button
+                            type="button"
+                            data-testid="delete-change"
+                            [attr.aria-label]="'planning.change.delete' | transloco"
+                            (click)="removeChange(definition)"
+                          >
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        </span>
                       }
-                    </span>
+                    </div>
+                    <div class="planning-definition__actions">
+                      <button
+                        mat-button
+                        type="button"
+                        data-testid="edit-income"
+                        (click)="openEditDialog(definition)"
+                      >
+                        {{ 'planning.edit.action' | transloco }}
+                      </button>
+                      <button mat-button type="button" (click)="openEndDialog(definition)">
+                        {{ 'planning.end.action' | transloco }}
+                      </button>
+                      <button mat-button type="button" (click)="remove(definition)">
+                        {{ 'common.delete' | transloco }}
+                      </button>
+                    </div>
                   </li>
                 }
               </ul>
-            </ng-template>
+            }
+          </section>
 
-            <ng-template #transferGroupTable let-groups>
-              @if (groups.length > 0) {
-                <table class="planning-transfer__groups">
+          @if (expenses(); as spending) {
+            <section class="planning-section" id="wydatki" data-testid="expenses-section">
+              <div class="planning-section__header">
+                <h2>{{ 'planning.expenses.title' | transloco }}</h2>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  data-testid="add-expense"
+                  (click)="openAddExpenseDialog()"
+                >
+                  <mat-icon>add</mat-icon>
+                  {{ 'planning.expenses.add' | transloco }}
+                </button>
+              </div>
+
+              @if (spending.payments.length === 0) {
+                <p class="planning-section__empty">{{ 'planning.expenses.empty' | transloco }}</p>
+              } @else {
+                <table class="planning-table">
                   <thead>
                     <tr>
-                      <th>{{ 'planning.transferPlan.groups.name' | transloco }}</th>
-                      <th>{{ 'planning.transferPlan.groups.current' | transloco }}</th>
-                      <th>{{ 'planning.transferPlan.groups.after' | transloco }}</th>
-                      <th>{{ 'planning.transferPlan.groups.target' | transloco }}</th>
+                      <th>{{ 'common.date' | transloco }}</th>
+                      <th>{{ 'common.name' | transloco }}</th>
+                      <th class="planning-table__amount">{{ 'common.amount' | transloco }}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    @for (group of groups; track group.name) {
-                      <tr data-testid="transfer-group-row">
-                        <td>{{ group.name }}</td>
-                        <td>{{ formatPercent(group.currentPercent) }}</td>
-                        <td>{{ formatPercent(group.afterPercent) }}</td>
-                        <td>{{ formatPercent(group.targetPercent) }}</td>
+                    @for (
+                      payment of spending.payments;
+                      track payment.recurringExpenseId + payment.nominalMonth
+                    ) {
+                      <tr data-testid="expense-payment-row">
+                        <td>{{ formatDate(payment.date) }}</td>
+                        <td>{{ payment.name }}</td>
+                        <td class="planning-table__amount">
+                          {{ formatMoney(payment.amount, 'PLN') }}
+                        </td>
                       </tr>
                     }
                   </tbody>
                 </table>
               }
-            </ng-template>
 
-            @for (batch of transferBatches(transfer.rows); track batch.number) {
-              <div class="planning-transfer__batch" data-testid="transfer-batch">
-                @if (batch.title; as title) {
-                  <h3 data-testid="transfer-batch-title">
-                    {{ title.key | transloco: title.params }}
-                  </h3>
-                }
-                <ng-container
-                  [ngTemplateOutlet]="transferRowList"
-                  [ngTemplateOutletContext]="{ $implicit: batch.rows }"
-                />
+              <div class="planning-balance">
+                <dl class="planning-balance__values">
+                  <div data-testid="expense-cost">
+                    <dt>{{ 'planning.expenses.cost' | transloco }}</dt>
+                    <dd>{{ formatMoney(spending.costPln, 'PLN') }}</dd>
+                  </div>
+                </dl>
               </div>
-            }
 
-            <ng-container
-              [ngTemplateOutlet]="transferGroupTable"
-              [ngTemplateOutletContext]="{ $implicit: transfer.groups }"
-            />
-
-            @if (transfer.differences.length > 0) {
-              <div class="planning-transfer__differences" data-testid="transfer-differences">
-                <h3>{{ 'planning.transferPlan.differences.title' | transloco }}</h3>
+              <h3>{{ 'planning.expenses.definitions.title' | transloco }}</h3>
+              @if (spending.definitions.length === 0) {
+                <p class="planning-section__empty">
+                  {{ 'planning.expenses.definitions.empty' | transloco }}
+                </p>
+              } @else {
                 <ul class="planning-definitions">
-                  @for (difference of transfer.differences; track difference.bucketId) {
-                    <li class="planning-transfer__difference" data-testid="transfer-difference">
-                      <span class="planning-definition__name">{{ difference.bucketName }}</span>
-                      <span>
-                        {{
-                          'planning.transferPlan.differences.change'
-                            | transloco
-                              : {
-                                  accepted: formatMoney(difference.acceptedPln, 'PLN'),
-                                  current: formatMoney(difference.currentPln, 'PLN'),
-                                }
-                        }}
-                      </span>
-                      <span
-                        class="planning-allocation__amount"
-                        data-testid="transfer-difference-amount"
-                      >
-                        {{ formatMoney(difference.differencePln, 'PLN') }}
-                      </span>
-                      @if (isNegative(difference.differencePln)) {
-                        <span
-                          class="planning-section__empty"
-                          data-testid="transfer-difference-info"
-                        >
-                          {{ 'planning.transferPlan.differences.decrease' | transloco }}
+                  @for (definition of spending.definitions; track definition.id) {
+                    @let period = periodLabel(definition);
+                    <li class="planning-definition" data-testid="expense-definition-row">
+                      <div class="planning-definition__main">
+                        <span class="planning-definition__name">{{ definition.name }}</span>
+                        <mat-chip-set>
+                          <mat-chip>{{ statusKey(definition.status) | transloco }}</mat-chip>
+                        </mat-chip-set>
+                      </div>
+                      <div class="planning-definition__details">
+                        <span>{{ formatMoney(definition.amount, 'PLN') }}</span>
+                        <span class="planning-definition__rule">
+                          @for (part of ruleParts(definition); track $index) {
+                            <span class="planning-definition__rule-part">{{
+                              part.key | transloco: part.params
+                            }}</span>
+                          }
                         </span>
-                      }
+                        <span>{{ period.key | transloco: period.params }}</span>
+                        <span data-testid="expense-reserve">
+                          {{
+                            'planning.expenses.reserve'
+                              | transloco: { amount: formatMoney(definition.reservePln, 'PLN') }
+                          }}
+                        </span>
+                        @if (definition.nextPayment; as next) {
+                          @if (isMultiMonth(definition)) {
+                            <span data-testid="expense-next-payment">
+                              {{
+                                'planning.expenses.nextPayment'
+                                  | transloco: { date: formatDate(next.date) }
+                              }}
+                            </span>
+                          }
+                        }
+                        @if (definition.nextChange; as change) {
+                          <span
+                            class="planning-definition__change"
+                            data-testid="expense-next-change"
+                          >
+                            {{
+                              'planning.change.next'
+                                | transloco
+                                  : {
+                                      month: changeMonthLabel(change.effectiveFrom),
+                                      amount: formatMoney(change.amount, 'PLN'),
+                                    }
+                            }}
+                            <button
+                              mat-icon-button
+                              type="button"
+                              data-testid="delete-expense-change"
+                              [attr.aria-label]="'planning.change.delete' | transloco"
+                              (click)="removeExpenseChange(definition)"
+                            >
+                              <mat-icon>close</mat-icon>
+                            </button>
+                          </span>
+                        }
+                      </div>
+                      <div class="planning-definition__actions">
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="edit-expense"
+                          (click)="openEditExpenseDialog(definition)"
+                        >
+                          {{ 'planning.edit.action' | transloco }}
+                        </button>
+                        <button mat-button type="button" (click)="openEndExpenseDialog(definition)">
+                          {{ 'planning.end.action' | transloco }}
+                        </button>
+                        <button mat-button type="button" (click)="removeExpense(definition)">
+                          {{ 'common.delete' | transloco }}
+                        </button>
+                      </div>
                     </li>
                   }
                 </ul>
+              }
+            </section>
+          }
+        </div>
+
+        @if (freeFunds(); as free) {
+          <section class="planning-section planning-free-funds" data-testid="free-funds">
+            <h2>{{ 'planning.freeFunds.title' | transloco }}</h2>
+            <dl class="planning-balance__values">
+              <div data-testid="free-funds-plan">
+                <dt>{{ 'planning.freeFunds.plan' | transloco }}</dt>
+                <dd>
+                  @if (isNegative(free.planPln)) {
+                    <span class="planning-free-funds__deficit" data-testid="free-funds-deficit">
+                      {{ formatMoney(free.planPln, 'PLN') }}
+                      {{ 'planning.freeFunds.deficit' | transloco }}
+                    </span>
+                  } @else {
+                    {{ formatMoney(free.planPln, 'PLN') }}
+                  }
+                </dd>
               </div>
+              <div data-testid="free-funds-forecast">
+                <dt>{{ 'planning.freeFunds.forecast' | transloco }}</dt>
+                <dd>
+                  @if (isNegative(free.forecastPln)) {
+                    <span class="planning-free-funds__deficit" data-testid="free-funds-deficit">
+                      {{ formatMoney(free.forecastPln, 'PLN') }}
+                      {{ 'planning.freeFunds.deficit' | transloco }}
+                    </span>
+                  } @else {
+                    {{ formatMoney(free.forecastPln, 'PLN') }}
+                  }
+                </dd>
+              </div>
+            </dl>
+            @if (free.incomplete) {
+              <span class="planning-section__incomplete" data-testid="free-funds-incomplete">
+                {{ 'planning.balance.incomplete' | transloco }}
+              </span>
+            }
+          </section>
+        }
+
+        @if (allocation(); as plan) {
+          <section class="planning-section planning-allocation" data-testid="allocation-section">
+            <div class="planning-section__header">
+              <h2>{{ 'planning.allocation.title' | transloco }}</h2>
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                data-testid="edit-allocation"
+                (click)="openAllocationDialog(plan)"
+              >
+                <mat-icon>edit</mat-icon>
+                {{ 'planning.allocation.edit' | transloco }}
+              </button>
+            </div>
+
+            <dl class="planning-balance__values">
+              <div data-testid="allocation-forecast">
+                <dt>{{ 'planning.allocation.forecast' | transloco }}</dt>
+                <dd>{{ formatMoney(plan.forecastPln, 'PLN') }}</dd>
+              </div>
+              @if (plan.effectiveFrom; as effectiveFrom) {
+                <div data-testid="allocation-effective-from">
+                  <dt>{{ 'planning.allocation.effectiveFrom' | transloco }}</dt>
+                  <dd>{{ changeMonthLabel(effectiveFrom) }}</dd>
+                </div>
+              }
+            </dl>
+            @if (plan.incomplete) {
+              <span class="planning-section__incomplete" data-testid="allocation-incomplete">
+                {{ 'planning.balance.incomplete' | transloco }}
+              </span>
             }
 
-            @if (transfer.topUp; as topUp) {
-              <div class="planning-transfer__top-up" data-testid="transfer-top-up">
-                <div class="planning-section__header">
-                  <h3>{{ 'planning.transferPlan.topUp.title' | transloco }}</h3>
-                  <button
-                    mat-flat-button
-                    type="button"
-                    data-testid="transfer-top-up-accept"
-                    (click)="acceptTransferTopUp()"
-                  >
-                    {{ 'planning.transferPlan.topUp.accept' | transloco }}
-                  </button>
+            @if (isPositive(plan.deficitPln)) {
+              <p class="planning-free-funds__deficit" data-testid="allocation-deficit">
+                {{
+                  'planning.allocation.deficit'
+                    | transloco: { amount: formatMoney(plan.deficitPln, 'PLN') }
+                }}
+              </p>
+            }
+
+            @if (plan.reserve; as reserve) {
+              <p class="planning-allocation__reserve" data-testid="reserve-row">
+                <strong>{{ 'planning.allocation.reserve.title' | transloco }}</strong>
+                <span>{{
+                  'planning.allocation.reserve.monthly'
+                    | transloco: { amount: formatMoney(reserve.monthPln, 'PLN') }
+                }}</span>
+                <span>{{
+                  'planning.allocation.reserve.balance'
+                    | transloco: { amount: formatMoney(reserve.balancePln, 'PLN') }
+                }}</span>
+                @if (reserve.accountName; as accountName) {
+                  <span>{{
+                    'planning.allocation.reserve.account' | transloco: { name: accountName }
+                  }}</span>
+                }
+              </p>
+            }
+
+            @if (plan.buckets.length === 0) {
+              <p class="planning-section__empty">{{ 'planning.allocation.empty' | transloco }}</p>
+            } @else {
+              @if (cushionBuckets().length > 0) {
+                <h3>{{ 'planning.allocation.groups.cushion' | transloco }}</h3>
+                <ul class="planning-definitions" data-testid="allocation-group-cushion">
+                  @for (bucket of cushionBuckets(); track bucket.bucketId) {
+                    <li class="planning-allocation__row" data-testid="allocation-bucket-row">
+                      <span class="planning-definition__name">{{ bucket.name }}</span>
+                      <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
+                      @if (bucket.cushion; as cushion) {
+                        <span
+                          class="planning-allocation__cushion"
+                          data-testid="allocation-cushion-balance"
+                        >
+                          {{
+                            'planning.allocation.cushionBalance'
+                              | transloco
+                                : {
+                                    start: formatMoney(cushion.balanceStartPln, 'PLN'),
+                                    end: formatMoney(cushion.balanceEndPln, 'PLN'),
+                                    target: formatMoney(cushion.targetPln, 'PLN'),
+                                    months: cushion.targetMonths,
+                                  }
+                          }}
+                        </span>
+                      }
+                      <span>{{ bucket.accountName ?? '' }}</span>
+                      <span class="planning-allocation__amount">
+                        {{ formatMoney(bucket.allocatedPln, 'PLN') }}
+                      </span>
+                      <span class="planning-allocation__markers">
+                        @if (bucket.cushion?.reached) {
+                          <mat-chip data-testid="allocation-cushion-reached">
+                            {{ 'planning.allocation.cushionReached' | transloco }}
+                          </mat-chip>
+                        }
+                      </span>
+                      <ng-container
+                        [ngTemplateOutlet]="bucketBalance"
+                        [ngTemplateOutletContext]="{ $implicit: bucket }"
+                      />
+                    </li>
+                  }
+                </ul>
+              }
+
+              <ng-template #bucketBalance let-bucket>
+                @if (hasBalance(bucket)) {
+                  <span class="planning-allocation__balance-action">
+                    <button
+                      mat-button
+                      type="button"
+                      (click)="openBucketBalanceDialog(bucket)"
+                      data-testid="set-bucket-balance"
+                    >
+                      {{ 'planning.allocation.balance.action' | transloco }}
+                    </button>
+                  </span>
+                  @for (adjustment of bucket.adjustments ?? []; track adjustment.month) {
+                    <span class="planning-allocation__adjustment" data-testid="bucket-adjustment">
+                      {{
+                        'planning.allocation.balance.adjustment'
+                          | transloco
+                            : {
+                                month: changeMonthLabel(adjustment.month),
+                                amount: formatMoney(adjustment.amountPln, 'PLN'),
+                              }
+                      }}
+                      <button
+                        mat-icon-button
+                        type="button"
+                        [attr.aria-label]="'planning.allocation.balance.delete' | transloco"
+                        (click)="removeBucketAdjustment(bucket, adjustment.month)"
+                        data-testid="delete-bucket-adjustment"
+                      >
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </span>
+                  }
+                }
+              </ng-template>
+
+              @if (fixedBuckets().length > 0) {
+                <h3>{{ 'planning.allocation.groups.fixed' | transloco }}</h3>
+                <ul class="planning-definitions" data-testid="allocation-group-fixed">
+                  @for (bucket of fixedBuckets(); track bucket.bucketId) {
+                    <li class="planning-allocation__row" data-testid="allocation-bucket-row">
+                      <span class="planning-definition__name">{{ bucket.name }}</span>
+                      <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
+                      <span>{{ formatMoney(bucket.share ?? 0, 'PLN') }}</span>
+                      <span>{{ bucket.accountName ?? '' }}</span>
+                      <span class="planning-allocation__amount">
+                        {{ formatMoney(bucket.allocatedPln, 'PLN') }}
+                      </span>
+                      <span class="planning-allocation__markers">
+                        @if (bucket.underfunded) {
+                          <mat-chip data-testid="allocation-underfunded">
+                            {{ 'planning.allocation.underfunded' | transloco }}
+                          </mat-chip>
+                        }
+                        @if (bucket.isRemainder) {
+                          <mat-chip data-testid="allocation-remainder">
+                            {{ 'planning.allocation.remainder' | transloco }}
+                          </mat-chip>
+                        }
+                        @if (bucket.limit?.reached) {
+                          <mat-chip data-testid="allocation-limit-reached">
+                            {{ 'planning.allocation.limitReached' | transloco }}
+                          </mat-chip>
+                        }
+                      </span>
+                      @if (bucket.limit; as limit) {
+                        <span class="planning-allocation__limit" data-testid="allocation-limit">
+                          {{
+                            'planning.allocation.limitContributed'
+                              | transloco
+                                : {
+                                    year: limit.year,
+                                    contributed: formatMoney(limit.contributedEndPln, 'PLN'),
+                                    limit: formatMoney(limit.limitPln, 'PLN'),
+                                  }
+                          }}
+                        </span>
+                      }
+                      <ng-container
+                        [ngTemplateOutlet]="bucketBalance"
+                        [ngTemplateOutletContext]="{ $implicit: bucket }"
+                      />
+                    </li>
+                  }
+                </ul>
+              }
+
+              @if (percentBuckets().length > 0) {
+                <h3>{{ 'planning.allocation.groups.percent' | transloco }}</h3>
+                <ul class="planning-definitions" data-testid="allocation-group-percent">
+                  @for (bucket of percentBuckets(); track bucket.bucketId) {
+                    <li class="planning-allocation__row" data-testid="allocation-bucket-row">
+                      <span class="planning-definition__name">{{ bucket.name }}</span>
+                      <span>{{ bucketKindKey(bucket.kind) | transloco }}</span>
+                      <span>{{ formatPercent(bucket.share ?? 0) }}</span>
+                      <span>{{ bucket.accountName ?? '' }}</span>
+                      <span class="planning-allocation__amount">
+                        {{ formatMoney(bucket.allocatedPln, 'PLN') }}
+                      </span>
+                      <span class="planning-allocation__markers">
+                        @if (bucket.underfunded) {
+                          <mat-chip data-testid="allocation-underfunded">
+                            {{ 'planning.allocation.underfunded' | transloco }}
+                          </mat-chip>
+                        }
+                        @if (bucket.isRemainder) {
+                          <mat-chip data-testid="allocation-remainder">
+                            {{ 'planning.allocation.remainder' | transloco }}
+                          </mat-chip>
+                        }
+                        @if (bucket.limit?.reached) {
+                          <mat-chip data-testid="allocation-limit-reached">
+                            {{ 'planning.allocation.limitReached' | transloco }}
+                          </mat-chip>
+                        }
+                      </span>
+                      @if (bucket.limit; as limit) {
+                        <span class="planning-allocation__limit" data-testid="allocation-limit">
+                          {{
+                            'planning.allocation.limitContributed'
+                              | transloco
+                                : {
+                                    year: limit.year,
+                                    contributed: formatMoney(limit.contributedEndPln, 'PLN'),
+                                    limit: formatMoney(limit.limitPln, 'PLN'),
+                                  }
+                          }}
+                        </span>
+                      }
+                      <ng-container
+                        [ngTemplateOutlet]="bucketBalance"
+                        [ngTemplateOutletContext]="{ $implicit: bucket }"
+                      />
+                    </li>
+                  }
+                </ul>
+              }
+
+              @if (estimatedLimitYear(); as year) {
+                <p class="planning-section__incomplete" data-testid="allocation-limit-estimated">
+                  {{ 'planning.allocation.limitEstimated' | transloco: { year: year } }}
+                </p>
+              }
+
+              <dl class="planning-balance__values">
+                <div data-testid="allocation-to-invest">
+                  <dt>{{ 'planning.allocation.toInvest' | transloco }}</dt>
+                  <dd>{{ formatMoney(plan.toInvestPln, 'PLN') }}</dd>
                 </div>
-                @if (topUp.fallbackReason; as reason) {
-                  <p class="planning-section__incomplete" data-testid="transfer-top-up-fallback">
+              </dl>
+            }
+
+            @if (plan.nextChange; as nextChange) {
+              <span class="planning-definition__change" data-testid="allocation-next-change">
+                {{
+                  'planning.allocation.nextChange'
+                    | transloco: { month: changeMonthLabel(nextChange) }
+                }}
+                <button
+                  mat-icon-button
+                  type="button"
+                  data-testid="delete-allocation-change"
+                  [attr.aria-label]="'planning.change.delete' | transloco"
+                  (click)="removeAllocationChange(nextChange)"
+                >
+                  <mat-icon>close</mat-icon>
+                </button>
+              </span>
+            }
+          </section>
+        }
+
+        @if (transferPlan(); as transfer) {
+          @if (transfer.status !== 'None' || transfer.noneReason === 'NothingToInvest') {
+            <section
+              class="planning-section planning-transfer"
+              id="plan-przelewow"
+              data-testid="transfer-plan-section"
+            >
+              <div class="planning-section__header">
+                <h2>{{ 'planning.transferPlan.title' | transloco }}</h2>
+                @if (transferStatusKey(transfer.status); as statusKey) {
+                  <mat-chip data-testid="transfer-plan-status">{{
+                    statusKey | transloco
+                  }}</mat-chip>
+                }
+                <span class="planning-transfer__actions">
+                  @if (transfer.status === 'Preview') {
+                    <button
+                      mat-flat-button
+                      type="button"
+                      data-testid="transfer-accept"
+                      (click)="acceptTransferPlan()"
+                    >
+                      {{ 'planning.transferPlan.accept' | transloco }}
+                    </button>
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="transfer-skip"
+                      (click)="skipTransferPlan()"
+                    >
+                      {{ 'planning.transferPlan.skip' | transloco }}
+                    </button>
+                  } @else if (transfer.status === 'Accepted' || transfer.status === 'Completed') {
+                    @if (!transfer.canUndo) {
+                      <span class="planning-section__empty" data-testid="transfer-undo-hint">
+                        {{ 'planning.transferPlan.undoBlocked' | transloco }}
+                      </span>
+                    }
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="transfer-undo"
+                      [disabled]="!transfer.canUndo"
+                      (click)="undoTransferPlan()"
+                    >
+                      {{ 'planning.transferPlan.undo' | transloco }}
+                    </button>
+                  } @else if (transfer.status === 'Skipped') {
+                    <button
+                      mat-button
+                      type="button"
+                      data-testid="transfer-unskip"
+                      (click)="unskipTransferPlan()"
+                    >
+                      {{ 'planning.transferPlan.unskip' | transloco }}
+                    </button>
+                  }
+                </span>
+              </div>
+
+              <label class="planning-transfer__minimum">
+                <span>{{ 'planning.transferPlan.paymentLeadDays' | transloco }}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="90"
+                  step="1"
+                  [value]="paymentLeadDays()"
+                  (change)="savePaymentLeadDays($event)"
+                  data-testid="payment-lead-days-input"
+                />
+              </label>
+
+              @if (transfer.status === 'Skipped') {
+                <p class="planning-section__empty" data-testid="transfer-plan-skipped">
+                  {{ 'planning.transferPlan.skipped' | transloco }}
+                </p>
+              } @else if (transfer.status !== 'None') {
+                <div class="planning-transfer__meta">
+                  @if (transfer.valuationDate; as valuationDate) {
+                    <span data-testid="transfer-valuation-date">
+                      {{
+                        'planning.transferPlan.valuationDate'
+                          | transloco: { date: formatDate(valuationDate) }
+                      }}
+                    </span>
+                    @if (transfer.valuationStale) {
+                      <mat-chip data-testid="transfer-valuation-stale">
+                        {{ 'planning.transferPlan.valuationStale' | transloco }}
+                      </mat-chip>
+                    }
+                  }
+                  @if (transfer.status === 'Preview') {
+                    <label class="planning-transfer__minimum">
+                      <span>{{ 'planning.transferPlan.minimum' | transloco }}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="1000000"
+                        step="1"
+                        [value]="transfer.minimumTransferPln"
+                        (change)="saveTransferMinimum($event)"
+                        data-testid="transfer-minimum-input"
+                      />
+                    </label>
+                  }
+                </div>
+
+                @if (transfer.fallbackReason; as reason) {
+                  <p class="planning-section__incomplete" data-testid="transfer-plan-fallback">
                     {{ transferFallbackKey(reason) | transloco }}
+                    <a routerLink="/allocation" data-testid="transfer-plan-set-target-link">
+                      {{ 'planning.transferPlan.fallback.setTarget' | transloco }}
+                    </a>
                   </p>
                 }
-                <ng-container
-                  [ngTemplateOutlet]="transferRowList"
-                  [ngTemplateOutletContext]="{ $implicit: topUp.rows }"
-                />
+
+                <ng-template #transferRowList let-rows>
+                  <ul class="planning-definitions">
+                    @for (row of rows; track $index) {
+                      <li
+                        class="planning-transfer__row"
+                        [class.planning-transfer__row--frozen]="!!row.id"
+                        data-testid="transfer-plan-row"
+                      >
+                        @if (row.id; as rowId) {
+                          <input
+                            type="checkbox"
+                            [checked]="row.checked"
+                            [attr.aria-label]="'planning.transferPlan.checkRow' | transloco"
+                            (change)="checkTransferRow(rowId, $event)"
+                            data-testid="transfer-row-check"
+                          />
+                        }
+                        <span class="planning-definition__name">{{ row.bucketName }}</span>
+                        <span>{{
+                          row.accountName ?? ('planning.transferPlan.noAccount' | transloco)
+                        }}</span>
+                        <span>{{ row.groupName ?? '' }}</span>
+                        <span class="planning-allocation__amount">
+                          {{ formatMoney(row.amountPln, 'PLN') }}
+                        </span>
+                        <span class="planning-allocation__markers">
+                          @if (transferMarkerKey(row.marker); as markerKey) {
+                            <mat-chip [attr.data-testid]="transferMarkerTestId(row.marker)">
+                              {{ markerKey | transloco }}
+                            </mat-chip>
+                          }
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                </ng-template>
+
+                <ng-template #transferGroupTable let-groups>
+                  @if (groups.length > 0) {
+                    <table class="planning-transfer__groups">
+                      <thead>
+                        <tr>
+                          <th>{{ 'planning.transferPlan.groups.name' | transloco }}</th>
+                          <th>{{ 'planning.transferPlan.groups.current' | transloco }}</th>
+                          <th>{{ 'planning.transferPlan.groups.after' | transloco }}</th>
+                          <th>{{ 'planning.transferPlan.groups.target' | transloco }}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (group of groups; track group.name) {
+                          <tr data-testid="transfer-group-row">
+                            <td>{{ group.name }}</td>
+                            <td>{{ formatPercent(group.currentPercent) }}</td>
+                            <td>{{ formatPercent(group.afterPercent) }}</td>
+                            <td>{{ formatPercent(group.targetPercent) }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  }
+                </ng-template>
+
+                @for (batch of transferBatches(transfer.rows); track batch.number) {
+                  <div class="planning-transfer__batch" data-testid="transfer-batch">
+                    @if (batch.title; as title) {
+                      <h3 data-testid="transfer-batch-title">
+                        {{ title.key | transloco: title.params }}
+                      </h3>
+                    }
+                    <ng-container
+                      [ngTemplateOutlet]="transferRowList"
+                      [ngTemplateOutletContext]="{ $implicit: batch.rows }"
+                    />
+                  </div>
+                }
+
                 <ng-container
                   [ngTemplateOutlet]="transferGroupTable"
-                  [ngTemplateOutletContext]="{ $implicit: topUp.groups }"
+                  [ngTemplateOutletContext]="{ $implicit: transfer.groups }"
                 />
-              </div>
-            }
-          } @else {
-            <p class="planning-section__empty" data-testid="transfer-plan-nothing-to-invest">
-              {{ 'planning.transferPlan.nothingToInvest' | transloco }}
-            </p>
+
+                @if (transfer.differences.length > 0) {
+                  <div class="planning-transfer__differences" data-testid="transfer-differences">
+                    <h3>{{ 'planning.transferPlan.differences.title' | transloco }}</h3>
+                    <ul class="planning-definitions">
+                      @for (difference of transfer.differences; track difference.bucketId) {
+                        <li class="planning-transfer__difference" data-testid="transfer-difference">
+                          <span class="planning-definition__name">{{ difference.bucketName }}</span>
+                          <span>
+                            {{
+                              'planning.transferPlan.differences.change'
+                                | transloco
+                                  : {
+                                      accepted: formatMoney(difference.acceptedPln, 'PLN'),
+                                      current: formatMoney(difference.currentPln, 'PLN'),
+                                    }
+                            }}
+                          </span>
+                          <span
+                            class="planning-allocation__amount"
+                            data-testid="transfer-difference-amount"
+                          >
+                            {{ formatMoney(difference.differencePln, 'PLN') }}
+                          </span>
+                          @if (isNegative(difference.differencePln)) {
+                            <span
+                              class="planning-section__empty"
+                              data-testid="transfer-difference-info"
+                            >
+                              {{ 'planning.transferPlan.differences.decrease' | transloco }}
+                            </span>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+
+                @if (transfer.topUp; as topUp) {
+                  <div class="planning-transfer__top-up" data-testid="transfer-top-up">
+                    <div class="planning-section__header">
+                      <h3>{{ 'planning.transferPlan.topUp.title' | transloco }}</h3>
+                      <button
+                        mat-flat-button
+                        type="button"
+                        data-testid="transfer-top-up-accept"
+                        (click)="acceptTransferTopUp()"
+                      >
+                        {{ 'planning.transferPlan.topUp.accept' | transloco }}
+                      </button>
+                    </div>
+                    @if (topUp.fallbackReason; as reason) {
+                      <p
+                        class="planning-section__incomplete"
+                        data-testid="transfer-top-up-fallback"
+                      >
+                        {{ transferFallbackKey(reason) | transloco }}
+                      </p>
+                    }
+                    <ng-container
+                      [ngTemplateOutlet]="transferRowList"
+                      [ngTemplateOutletContext]="{ $implicit: topUp.rows }"
+                    />
+                    <ng-container
+                      [ngTemplateOutlet]="transferGroupTable"
+                      [ngTemplateOutletContext]="{ $implicit: topUp.groups }"
+                    />
+                  </div>
+                }
+              } @else {
+                <p class="planning-section__empty" data-testid="transfer-plan-nothing-to-invest">
+                  {{ 'planning.transferPlan.nothingToInvest' | transloco }}
+                </p>
+              }
+            </section>
           }
-        </section>
+        }
       }
-    }
-  }
+    </mat-tab>
+    <mat-tab [label]="'planning.tabs.year' | transloco">
+      <ng-template matTabContent>
+        <app-planning-year [year]="year()" />
+      </ng-template>
+    </mat-tab>
+  </mat-tab-group>
 </div>

@@ -1,0 +1,85 @@
+<div class="planning-year">
+  <div class="planning-year__nav">
+    <button
+      mat-icon-button
+      type="button"
+      data-testid="year-previous"
+      [attr.aria-label]="'planning.year.previous' | transloco"
+      [disabled]="!hasPrevious()"
+      (click)="goToYear(-1)"
+    >
+      <mat-icon>chevron_left</mat-icon>
+    </button>
+    <span class="planning-year__label" data-testid="year-label">{{ selectedYear() }}</span>
+    <button
+      mat-icon-button
+      type="button"
+      data-testid="year-next"
+      [attr.aria-label]="'planning.year.next' | transloco"
+      [disabled]="!hasNext()"
+      (click)="goToYear(1)"
+    >
+      <mat-icon>chevron_right</mat-icon>
+    </button>
+  </div>
+
+  @if (yearResource.isLoading() && !yearResource.hasValue()) {
+    <div class="planning-year__state">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (yearResource.error()) {
+    <p class="planning-year__state" role="alert">{{ yearResource.error()?.message }}</p>
+  }
+
+  @if (yearResource.hasValue()) {
+    <table class="planning-year__table">
+      <thead>
+        <tr>
+          <th scope="col">{{ 'planning.year.columns.month' | transloco }}</th>
+          @for (column of columns; track column.key) {
+            <th scope="col" class="planning-year__amount">{{ column.label | transloco }}</th>
+          }
+          <th scope="col">{{ 'planning.year.columns.status' | transloco }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.month) {
+          <tr
+            class="planning-year__row"
+            data-testid="year-row"
+            tabindex="0"
+            [class.planning-year__row--current]="row.current"
+            [attr.aria-current]="row.current ? 'date' : null"
+            (click)="openMonth(row.month)"
+            (keydown.enter)="openMonth(row.month)"
+          >
+            <th scope="row" class="planning-year__month">
+              {{ row.label }}
+              @if (row.overdue) {
+                <mat-icon
+                  class="planning-year__overdue"
+                  data-testid="year-overdue"
+                  [attr.aria-label]="'planning.year.overdue' | transloco"
+                  >warning</mat-icon
+                >
+              }
+            </th>
+            @for (cell of row.cells; track $index) {
+              <td class="planning-year__amount">{{ cell }}</td>
+            }
+            <td>{{ row.status ? (row.status | transloco) : '—' }}</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        <tr data-testid="year-total">
+          <th scope="row">{{ 'planning.year.total' | transloco }}</th>
+          @for (total of totals(); track $index) {
+            <td class="planning-year__amount">{{ total }}</td>
+          }
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  }
+</div>

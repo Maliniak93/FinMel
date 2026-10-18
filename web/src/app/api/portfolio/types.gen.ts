@@ -639,6 +639,39 @@ export type PlanningTodoResponse = {
     paymentLeadDays: number | string;
 };
 
+export type PlanningYearMonthResponse = {
+    month: string;
+    hasDefinitions: boolean;
+    incomePlanPln: null | number | string;
+    incomeActualPln: null | number | string;
+    differencePln: null | number | string;
+    costPln: null | number | string;
+    freeFundsPlanPln: null | number | string;
+    freeFundsForecastPln: null | number | string;
+    toInvestPln: null | number | string;
+    transferPlanStatus: null | TransferPlanStatus;
+    hasOverdue: boolean;
+    incomplete: boolean;
+};
+
+export type PlanningYearResponse = {
+    year: number | string;
+    firstYear: number | string;
+    lastYear: number | string;
+    months: Array<PlanningYearMonthResponse>;
+    totals: PlanningYearTotalsResponse;
+};
+
+export type PlanningYearTotalsResponse = {
+    incomePlanPln: number | string;
+    incomeActualPln: number | string;
+    differencePln: number | string;
+    costPln: number | string;
+    freeFundsPlanPln: number | string;
+    freeFundsForecastPln: number | string;
+    toInvestPln: number | string;
+};
+
 export type RecordTransactionRequest = {
     type: TransactionType;
     quantity?: number | string;
@@ -2289,6 +2322,24 @@ export type GetApiPortfolioPlanningMonthsByMonthResponses = {
 };
 
 export type GetApiPortfolioPlanningMonthsByMonthResponse = GetApiPortfolioPlanningMonthsByMonthResponses[keyof GetApiPortfolioPlanningMonthsByMonthResponses];
+
+export type GetApiPortfolioPlanningYearsByYearData = {
+    body?: never;
+    path: {
+        year: number;
+    };
+    query?: never;
+    url: '/api/portfolio/planning/years/{year}';
+};
+
+export type GetApiPortfolioPlanningYearsByYearResponses = {
+    /**
+     * OK
+     */
+    200: PlanningYearResponse;
+};
+
+export type GetApiPortfolioPlanningYearsByYearResponse = GetApiPortfolioPlanningYearsByYearResponses[keyof GetApiPortfolioPlanningYearsByYearResponses];
 
 export type GetApiPortfolioPlanningSettingsData = {
     body?: never;

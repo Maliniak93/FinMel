@@ -1,0 +1,62 @@
+.planning-year__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-block: 16px;
+}
+
+.planning-year__label {
+  min-width: 6rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.planning-year__state {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.planning-year__table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 8px;
+    text-align: start;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  tfoot th,
+  tfoot td {
+    font-weight: 600;
+  }
+}
+
+.planning-year__table .planning-year__amount {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.planning-year__row {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-low);
+  }
+}
+
+.planning-year__row--current {
+  background: var(--mat-sys-secondary-container);
+}
+
+.planning-year__month {
+  text-transform: capitalize;
+}
+
+.planning-year__overdue {
+  vertical-align: middle;
+  color: var(--mat-sys-error);
+}

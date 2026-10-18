@@ -180,6 +180,39 @@ function month(
   };
 }
 
+function yearPage(year: number): Record<string, unknown> {
+  const months = Array.from({ length: 12 }, (_, index) => ({
+    month: `${year}-${String(index + 1).padStart(2, '0')}`,
+    hasDefinitions: true,
+    incomePlanPln: 16500,
+    incomeActualPln: null,
+    differencePln: 0,
+    costPln: 4200,
+    freeFundsPlanPln: 12300,
+    freeFundsForecastPln: 12300,
+    toInvestPln: null,
+    transferPlanStatus: 'None',
+    hasOverdue: false,
+    incomplete: false,
+  }));
+
+  return {
+    year,
+    firstYear: 2026,
+    lastYear: 2027,
+    months,
+    totals: {
+      incomePlanPln: 198000,
+      incomeActualPln: 0,
+      differencePln: 0,
+      costPln: 50400,
+      freeFundsPlanPln: 147600,
+      freeFundsForecastPln: 147600,
+      toInvestPln: 0,
+    },
+  };
+}
+
 describe('Planning', () => {
   let harness: RouterTestingHarness;
   let component: Planning;
@@ -216,6 +249,10 @@ describe('Planning', () => {
       if (requestUrl(input).includes('/planning/todo')) {
         return jsonResponse({ items: [], paymentLeadDays: 7 });
       }
+      const requestedYear = /\/planning\/years\/(\d{4})/.exec(requestUrl(input));
+      if (requestedYear) {
+        return jsonResponse(yearPage(Number(requestedYear[1])));
+      }
       if (!requested) {
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -250,6 +287,16 @@ describe('Planning', () => {
     return fetchSpy.mock.calls
       .map((call: unknown[]) => /\/planning\/months\/(\d{4}-\d{2})/.exec(requestUrl(call[0]))?.[1])
       .filter((value: string | undefined): value is string => value !== undefined);
+  }
+
+  function requestedYears(): string[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => /\/planning\/years\/(\d{4})/.exec(requestUrl(call[0]))?.[1])
+      .filter((value: string | undefined): value is string => value !== undefined);
+  }
+
+  function tabs(): HTMLElement[] {
+    return Array.from(element().querySelectorAll<HTMLElement>('[role="tab"]'));
   }
 
   function click(testId: string): void {
@@ -1471,5 +1518,31 @@ describe('Planning', () => {
       expect(deletes[0].url).toContain('/transfer-plans/2026-10/skip');
     });
     await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+  });
+
+  it('opens the Rok tab from the query params and loads the requested year', async () => {
+    await setup('/planning?tab=year&year=2027');
+
+    expect(new Set(requestedYears())).toEqual(new Set(['2027']));
+    expect(tabs()[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('switches to the Rok tab and back, keeping the year in the query params', async () => {
+    await setup();
+
+    tabs()[1].click();
+    await vi.waitFor(async () => {
+      await settle();
+      expect(TestBed.inject(Router).url).toContain('tab=year');
+      expect(TestBed.inject(Router).url).toContain('year=2026');
+      expect(new Set(requestedYears())).toEqual(new Set(['2026']));
+    });
+
+    tabs()[0].click();
+    await vi.waitFor(async () => {
+      await settle();
+      expect(tabs()[0].getAttribute('aria-selected')).toBe('true');
+      expect(TestBed.inject(Router).url).not.toContain('tab=year');
+    });
   });
 });

@@ -2334,6 +2334,37 @@
         }
       }
     },
+    "/api/portfolio/planning/years/{year}": {
+      "get": {
+        "tags": [
+          "GetPlanningYearEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningYearResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/planning/settings": {
       "put": {
         "tags": [
@@ -6221,6 +6252,225 @@
           }
         }
       },
+      "PlanningYearMonthResponse": {
+        "required": [
+          "month",
+          "hasDefinitions",
+          "incomePlanPln",
+          "incomeActualPln",
+          "differencePln",
+          "costPln",
+          "freeFundsPlanPln",
+          "freeFundsForecastPln",
+          "toInvestPln",
+          "transferPlanStatus",
+          "hasOverdue",
+          "incomplete"
+        ],
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "hasDefinitions": {
+            "type": "boolean"
+          },
+          "incomePlanPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "incomeActualPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "differencePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "freeFundsPlanPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "freeFundsForecastPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "toInvestPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "transferPlanStatus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransferPlanStatus"
+              }
+            ]
+          },
+          "hasOverdue": {
+            "type": "boolean"
+          },
+          "incomplete": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PlanningYearResponse": {
+        "required": [
+          "year",
+          "firstYear",
+          "lastYear",
+          "months",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "firstYear": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastYear": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningYearMonthResponse"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PlanningYearTotalsResponse"
+          }
+        }
+      },
+      "PlanningYearTotalsResponse": {
+        "required": [
+          "incomePlanPln",
+          "incomeActualPln",
+          "differencePln",
+          "costPln",
+          "freeFundsPlanPln",
+          "freeFundsForecastPln",
+          "toInvestPln"
+        ],
+        "type": "object",
+        "properties": {
+          "incomePlanPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "incomeActualPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "differencePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "freeFundsPlanPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "freeFundsForecastPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "toInvestPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "RecordTransactionRequest": {
         "required": [
           "type",
@@ -8476,6 +8726,9 @@
     },
     {
       "name": "GetPlanningMonthEndpoint"
+    },
+    {
+      "name": "GetPlanningYearEndpoint"
     },
     {
       "name": "SavePlanningSettingsEndpoint"
