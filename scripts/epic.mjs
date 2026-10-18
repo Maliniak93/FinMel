@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Usage: node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown]
+// Usage: node scripts/epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] [--delay MIN]
 //   --dry-run      print what would happen per part; no preflight script, builds, merges, comments or shutdown
 //   --max-tasks N  stop before the (N+1)th build of this run (0 = preflight only)
 //   --no-shutdown  do not schedule `shutdown /s /t 600` when the run ends
+//   --delay MIN    keep the PC awake from launch but start the work (preflight included) only after MIN minutes; the stop file ends the wait
 //   node scripts/epic.mjs <epic> --stop   creates the stop file; the running driver stops before the next build
 //   a build that runs into the usage limit ends the run with reason `limit`; every line also goes to skarbiec-plan/epic-runs/<epic>/<timestamp>.log
 //   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
@@ -25,8 +26,8 @@ import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, lim
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WIN = process.platform === "win32";
 const BOOLEAN_FLAGS = new Set(["dry-run", "no-shutdown", "stop"]);
-const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks"]);
-const USAGE = "usage: epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] | --stop";
+const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "delay"]);
+const USAGE = "usage: epic.mjs <epic> [--dry-run] [--max-tasks N] [--no-shutdown] [--delay MIN] | --stop";
 const BUILD_TIMEOUT_MS = 4 * 3600e3;
 const CI_POLL_MS = 30e3;
 const CI_MISSING_MS = 10 * 60e3;
@@ -102,6 +103,21 @@ function limitSleep(ms) {
     blockingSleep(Math.min(HEARTBEAT_MS, until - Date.now()));
     if (Date.now() < until) say(`still waiting for the GitHub limit, ${Math.round((until - Date.now()) / 60e3)} min left`);
   }
+}
+
+function delayStart(ms, epic) {
+  const until = Date.now() + ms;
+  say(`delay: the work starts at ${clock(new Date(until))} (${minutes(ms)} min)`);
+  let nextBeat = Date.now() + HEARTBEAT_MS;
+  while (Date.now() < until) {
+    blockingSleep(Math.min(60e3, until - Date.now()));
+    if (existsSync(stopFile(epic))) throw new Stop("stopped", "stop file found during the delay");
+    if (Date.now() >= nextBeat && Date.now() < until) {
+      say(`delay: ${Math.round((until - Date.now()) / 60e3)} min left`);
+      nextBeat += HEARTBEAT_MS;
+    }
+  }
+  say("delay over - starting");
 }
 
 const excludeFromBudgets = (ms) => waitBudgets.forEach((budget) => budget.exclude(ms));
@@ -270,16 +286,16 @@ let sleepGuard = null;
 
 function startSleepGuard() {
   if (!IS_WIN) return;
-  // 0x80000001 = ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+  // 0x80000003 = ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED - the display staying on also keeps the idle lock off
   const script = [
     "$sig = '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint esFlags);'",
     "Add-Type -MemberDefinition $sig -Name Power -Namespace Skarbiec | Out-Null",
-    "[Skarbiec.Power]::SetThreadExecutionState([uint32]2147483649) | Out-Null",
+    "[Skarbiec.Power]::SetThreadExecutionState([uint32]2147483651) | Out-Null",
     `Wait-Process -Id ${process.pid} -ErrorAction SilentlyContinue`,
   ].join("; ");
   sleepGuard = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], { windowsHide: true, stdio: "ignore" });
   sleepGuard.on("error", () => {});
-  say("sleep blocked while the run lasts (closing the lid still sleeps)");
+  say("sleep, display-off and idle lock blocked while the run lasts (closing the lid still sleeps)");
 }
 
 function killTree(child) {
@@ -802,6 +818,8 @@ try {
   ctx.dryRun = Boolean(flags["dry-run"]);
   if (flags["max-tasks"] !== undefined) ctx.maxTasks = Number(flags["max-tasks"]);
   if (Number.isNaN(ctx.maxTasks)) throw new Stop("usage", "--max-tasks must be a number");
+  const delayMs = flags.delay === undefined ? 0 : Number(flags.delay) * 60e3;
+  if (!(delayMs >= 0)) throw new Stop("usage", "--delay must be a non-negative number of minutes");
 
   if (flags.stop) {
     writeFileSync(stopFile(ctx.epic), new Date().toISOString());
@@ -809,7 +827,12 @@ try {
     process.exit(0);
   }
 
-  if (!ctx.dryRun) openLog(ctx.epic);
+  if (!ctx.dryRun) {
+    openLog(ctx.epic);
+    rmSync(stopFile(ctx.epic), { force: true });
+    startSleepGuard();
+    if (delayMs) delayStart(delayMs, ctx.epic);
+  }
   ctx.claude = resolveClaude();
   const { issue, runners } = preChecks(ctx.epic, flags);
   if (issue.state === "CLOSED") await finishRun("done", "the epic is already closed - nothing to do", { ...ctx, started: false });
@@ -821,8 +844,6 @@ try {
     await finishRun("dry-run", null, ctx);
   }
 
-  rmSync(stopFile(ctx.epic), { force: true });
-  startSleepGuard();
   ctx.started = true;
   await runLoop(ctx);
   await finishRun("done", null, ctx);
