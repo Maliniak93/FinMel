@@ -201,6 +201,7 @@ export function cardFromIssueNode(node, projectNumber = PROJECT_NUMBER) {
     status: item?.status?.name ?? null,
     tier: item?.tier?.name ?? null,
     kind: item?.kind?.name ?? null,
+    area: item?.area?.name ?? null,
     branch: item?.branch?.text ?? null,
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),

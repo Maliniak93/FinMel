@@ -31,6 +31,7 @@ function fieldNodes(i) {
     status: statusOf(i),
     tier: i.tier ? { name: i.tier } : null,
     kind: i.kind ? { name: i.kind } : null,
+    area: i.area ? { name: i.area } : null,
     branch: i.branch ? { text: i.branch } : null,
   };
 }
@@ -65,14 +66,49 @@ function itemsPage(query, variables) {
         __typename: "Issue",
         number: n,
         title: issues[n].title,
+        body: issues[n].body ?? "",
+        state: issues[n].state,
         labels: { nodes: issues[n].labels.map((name) => ({ name })) },
       },
     })),
   };
 }
 
+function applyField(n, fieldName, value) {
+  if (fieldName === "Status") issues[n].status = value;
+  if (fieldName === "Tier") issues[n].tier = value;
+  if (fieldName === "Kind") issues[n].kind = value;
+  if (fieldName === "Area") issues[n].area = value;
+  if (fieldName === "Branch") issues[n].branch = value;
+}
+
+function aliasedFieldUpdates(query, variables) {
+  const parts = query.split(/\w+\s*:\s*updateProjectV2ItemFieldValue\s*\(/).slice(1);
+  const pick = (part, key) => {
+    const m = part.match(new RegExp(`${key}\\s*:\\s*(?:"([^"]+)"|\\$(\\w+))`));
+    return m ? (m[1] ?? variables[m[2]]) : undefined;
+  };
+  return parts.map((part) => ({
+    item: pick(part, "itemId"),
+    field: pick(part, "fieldId"),
+    option: pick(part, "singleSelectOptionId"),
+  }));
+}
+
 function graphql() {
   const { query, variables = {} } = JSON.parse(readInput());
+  if (/^\s*mutation[^{]*\{\s*\w+\s*:\s*updateProjectV2ItemFieldValue/.test(query)) {
+    const updates = aliasedFieldUpdates(query, variables);
+    log({ kind: "fieldBatch", size: updates.length });
+    for (const u of updates) {
+      const field = Object.entries(state.fields).find(([, f]) => f.id === u.field);
+      const option = (field?.[1].options ?? []).find((o) => o.id === u.option);
+      const value = option ? option.name : null;
+      applyField(numberOfItem(u.item), field?.[0], value);
+      log({ kind: "setField", item: u.item, field: field?.[0], value });
+    }
+    return out(JSON.stringify({ data: {} }));
+  }
   const mutation = query.match(/^\s*mutation[^{]*\{\s*(\w+)\s*\(/);
   if (mutation) {
     const name = mutation[1];
@@ -82,10 +118,7 @@ function graphql() {
       const option = (field[1].options ?? []).find((o) => o.id === variables.value.singleSelectOptionId);
       const value = option ? option.name : variables.value.text;
       const n = numberOfItem(variables.item);
-      if (fieldName === "Status") issues[n].status = value;
-      if (fieldName === "Tier") issues[n].tier = value;
-      if (fieldName === "Kind") issues[n].kind = value;
-      if (fieldName === "Branch") issues[n].branch = value;
+      applyField(n, fieldName, value);
       log({ kind: "setField", item: variables.item, field: fieldName, value });
     } else if (name === "addProjectV2ItemById") {
       const n = Number(String(variables.content).replace("ISSUE_", ""));
@@ -180,6 +213,23 @@ if (args[0] === "issue" && args[1] === "create") {
 if (args[0] === "issue" && args[1] === "view") {
   const i = issues[Number(args[2])];
   out(JSON.stringify(i ? { number: i.number, title: i.title, state: i.state, comments: [] } : {}));
+}
+if (args[0] === "project" && args[1] === "field-list") {
+  out(JSON.stringify({ fields: Object.entries(state.fields).map(([name, f]) => ({ id: f.id, name })) }));
+}
+if (args[0] === "project" && args[1] === "field-create") {
+  const name = flag("--name");
+  const options = flag("--single-select-options");
+  state.fields[name] = {
+    id: `F_${name}`,
+    ...(options ? { options: options.split(",").map((o) => ({ id: `O_${name}_${o}`, name: o })) } : {}),
+  };
+  log({ kind: "fieldCreate", name, options: options ? options.split(",") : null });
+  out("");
+}
+if (args[0] === "pr" && args[1] === "list") {
+  log({ kind: "prList", args });
+  out(JSON.stringify(state.prs ?? []));
 }
 if (args[0] === "pr") out("[]");
 log({ kind: "other", args });

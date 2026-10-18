@@ -34,7 +34,9 @@ const optionsOf = (name, names) => ({
   options: names.map((n) => ({ id: `O_${name}_${n}`, name: n })),
 });
 
-export function buildState({ issues, order, nextNumber = 100 }) {
+export const AREA_OPTIONS = ["Backend", "Frontend", "E2E", "Claude", "Scripts", "CI/Infra", "Docs", "Fullstack"];
+
+export function buildState({ issues, order, nextNumber = 100, withArea = true, prs = [] }) {
   const map = {};
   for (const i of issues) {
     map[i.number] = {
@@ -43,6 +45,7 @@ export function buildState({ issues, order, nextNumber = 100 }) {
       parent: null,
       tier: "1",
       kind: "Change",
+      area: null,
       branch: null,
       body: "",
       ...i,
@@ -53,10 +56,12 @@ export function buildState({ issues, order, nextNumber = 100 }) {
     nextNumber,
     order: order ?? issues.map((i) => i.number),
     issues: map,
+    prs,
     fields: {
       Status: optionsOf("Status", ["Todo", "In progress", "Done"]),
       Tier: optionsOf("Tier", ["1", "2"]),
       Kind: optionsOf("Kind", ["New", "Change", "Cleanup", "Fix"]),
+      ...(withArea ? { Area: optionsOf("Area", AREA_OPTIONS) } : {}),
       Branch: { id: "F_Branch" },
     },
   };

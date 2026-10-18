@@ -91,6 +91,162 @@ test("list reads board order", () => {
   }
 });
 
+const lastJson = (stdout) => JSON.parse(stdout.trim().split(/\r?\n/).pop());
+const areaOptions = ["Backend", "Frontend", "E2E", "Claude", "Scripts", "CI/Infra", "Docs", "Fullstack"];
+
+function areaState(extra = {}) {
+  return buildState({
+    issues: [
+      { number: 1, status: "Done", area: "Backend" },
+      { number: 4, status: "Todo", labels: ["spec"], area: "CI/Infra" },
+      { number: 3, status: "Todo", labels: ["spec"] },
+      { number: 9, status: "Todo", labels: ["epic"] },
+      { number: 8, status: "Todo", labels: ["spec"], parent: 9 },
+    ],
+    ...extra,
+  });
+}
+
+const createArgs = (sandbox, slug, extra = []) => ["create", "--title", slug, "--body-file", sandbox.bodyFile, "--slug", slug, "--tier", "1", "--kind", "change", ...extra];
+const issueCreates = (sandbox) => sandbox.log().filter((e) => e.kind === "issueCreate");
+
+test("list and get include area", () => {
+  const sandbox = createSandbox(areaState());
+  try {
+    const listed = sandbox.run("gh-project.mjs", ["list"]);
+    assert.equal(listed.code, 0, listed.out);
+    const cards = lastJson(listed.stdout);
+    assert.equal(cards.find((c) => c.number === 1).area, "Backend");
+    assert.equal(cards.find((c) => c.number === 4).area, "CI/Infra");
+    assert.equal(cards.find((c) => c.number === 3).area, null);
+
+    const queued = sandbox.run("gh-project.mjs", ["queue"]);
+    assert.equal(queued.code, 0, queued.out);
+    const queue = lastJson(queued.stdout);
+    assert.equal(queue.find((c) => c.number === 4).area, "CI/Infra");
+    assert.equal(queue.find((c) => c.number === 3).area, null);
+
+    const got = sandbox.run("gh-project.mjs", ["get", "4"]);
+    assert.equal(got.code, 0, got.out);
+    assert.equal(lastJson(got.stdout).area, "CI/Infra");
+    assert.equal(lastJson(sandbox.run("gh-project.mjs", ["get", "3"]).stdout).area, null);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("init creates Area", () => {
+  const sandbox = createSandbox(areaState({ withArea: false }));
+  try {
+    const run = sandbox.run("gh-project.mjs", ["init"]);
+
+    assert.equal(run.code, 0, run.out);
+    const created = sandbox.log().filter((e) => e.kind === "fieldCreate");
+    assert.equal(created.length, 1);
+    assert.equal(created[0].name, "Area");
+    assert.deepEqual(created[0].options, areaOptions);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create sets Area", () => {
+  const sandbox = createSandbox(areaState());
+  try {
+    const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "areaful", ["--area", "fullstack"]));
+
+    assert.equal(run.code, 0, run.out);
+    const { number } = lastJson(run.stdout);
+    assert.equal(sandbox.state().issues[number].area, "Fullstack");
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create rejects a bad or epic area", () => {
+  const sandbox = createSandbox(areaState());
+  try {
+    const bad = sandbox.run("gh-project.mjs", createArgs(sandbox, "bad", ["--area", "nope"]));
+    assert.notEqual(bad.code, 0, bad.out);
+    for (const option of areaOptions) assert.ok(bad.out.includes(option), `${option} listed in: ${bad.out}`);
+
+    const epic = sandbox.run("gh-project.mjs", createArgs(sandbox, "epicarea", ["--area", "Backend", "--epic"]));
+    assert.notEqual(epic.code, 0, epic.out);
+    assert.match(epic.out, /--area/);
+
+    assert.deepEqual(issueCreates(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("e2e part defaults to E2E", () => {
+  const sandbox = createSandbox(areaState());
+  try {
+    const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "e2epart", ["--parent", "9", "--e2e"]));
+
+    assert.equal(run.code, 0, run.out);
+    const { number } = lastJson(run.stdout);
+    assert.equal(sandbox.state().issues[number].area, "E2E");
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("edit sets Area", () => {
+  const sandbox = createSandbox(areaState());
+  try {
+    const run = sandbox.run("gh-project.mjs", ["edit", "3", "--area", "Docs"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.equal(sandbox.state().issues[3].area, "Docs");
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create without the Area field fails first", () => {
+  const sandbox = createSandbox(areaState({ withArea: false }));
+  try {
+    const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "noarea", ["--area", "Backend"]));
+
+    assert.notEqual(run.code, 0, run.out);
+    assert.match(run.out, /node scripts\/gh-project\.mjs init/);
+    assert.deepEqual(issueCreates(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("prepare warns without area", () => {
+  const warning = "Brak obszaru (Area) na #5 — ustaw: node scripts/gh-project.mjs set 5 Area <obszar>";
+  const without = createSandbox(prepareState("Todo"), { branch: "feat/part-one" });
+  try {
+    const run = without.run("gh-project.mjs", ["prepare", "5"]);
+
+    assert.equal(run.code, 0, run.out);
+    const out = lastJson(run.stdout);
+    assert.equal(out.ok, true);
+    assert.ok(out.notes.includes(warning), JSON.stringify(out.notes));
+    assert.ok(run.stderr.includes(warning), run.stderr);
+  } finally {
+    without.cleanup();
+  }
+
+  const state = prepareState("Todo");
+  state.issues[5].area = "Docs";
+  const withArea = createSandbox(state, { branch: "feat/part-one" });
+  try {
+    const run = withArea.run("gh-project.mjs", ["prepare", "5"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.ok(!lastJson(run.stdout).notes.some((n) => n.includes("Brak obszaru")));
+    assert.ok(!run.stderr.includes("Brak obszaru"));
+  } finally {
+    withArea.cleanup();
+  }
+});
+
 function prepareState(epicStatus) {
   return buildState({
     issues: [
