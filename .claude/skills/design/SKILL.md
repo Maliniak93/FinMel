@@ -30,7 +30,8 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
 
 ## Steps
 
-1. Run `node scripts/plan-status.mjs` — it lists every open spec issue — then read **only** the sections of `architecture.md` / `domain.md` / `ideas.md`
+1. Run `node scripts/plan-status.mjs` — it lists every open spec issue — and `node scripts/gh-project.mjs queue` (the build
+   queue in board order, with each item's `id`, `manual` and an epic's `next`), then read **only** the sections of `architecture.md` / `domain.md` / `ideas.md`
    that this change actually touches. Not the folder. If an open issue already covers the idea, say
    so and ask whether to extend it instead.
 2. Need a fact about the code (does this slice exist, what does that consumer do, is there a
@@ -151,7 +152,9 @@ umbrella) and fix what it lists — it checks Goal, Out of scope, that every AC 
 `proof:`, and the shape of `## Test manualny` (a warning when it is missing, an error when it has a `- [ ]`
 line or neither a numbered step nor the `Weryfikacja w planie epica` line). Then present a summary of at most 15 lines: goal (for a change: today → wanted), kind, tier, scope, the
 acceptance criteria as one line each, whether tests are skipped, the manual plan's step count (or `brak planu`), the split (if any), and anything
-still open. Then ask for approval. Iterate on the draft until the user says yes; nothing is published
+still open, plus one line `Kolejka: <position> — <reason>` where the position is `top`, `bottom`, `before:N` or `after:N`
+against the queue (for an epic, the epic's position; parts never get one), e.g. `Kolejka: before:400 — przed #400, bo #400 czyta pole, które dodaje ten spec`.
+Default `bottom`. Then ask for approval. Iterate on the draft until the user says yes; nothing is published
 before that.
 
 Only after an explicit yes — and with no open question left (each becomes an AC, an Out of scope line
@@ -159,8 +162,12 @@ or a Design decision) — publish. The script cleans and re-checks the draft its
 
 ```
 node scripts/gh-project.mjs create --title "<title>" --body-file <scratchpad>/<slug>.md \
-  --slug <slug> --tier <1|2> --kind <new|change|cleanup> [--skip-tests]
+  --slug <slug> --tier <1|2> --kind <new|change|cleanup> [--skip-tests] --queue <position>
 ```
+
+`--queue` is the approved `Kolejka:` position and applies to a top-level item (a single spec or the umbrella). A part
+(`--parent`) takes no `--queue`: it lands right after the previous part. Move an existing item later with
+`node scripts/gh-project.mjs move <n> <position>`.
 
 For a split: first the umbrella with `--epic` (its `--tier` is the highest of its parts, its
 `--kind` the one most parts share), then each part in build order with `--parent <umbrella number>`

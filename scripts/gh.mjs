@@ -205,6 +205,7 @@ export function cardFromIssueNode(node, projectNumber = PROJECT_NUMBER) {
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),
     e2e: labels.includes("e2e"),
+    epicRun: labels.includes("epic-run"),
     parent: node.parent?.number ?? null,
     subIssues: node.subIssues.nodes.map((s) => ({ number: s.number, title: s.title, state: s.state.toUpperCase() })),
   };

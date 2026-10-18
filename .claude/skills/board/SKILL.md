@@ -1,6 +1,6 @@
 ---
 name: board
-description: Show the FinMel GitHub project board against git - open spec issues, what to build next, and cards whose state disagrees with the branches. Changes nothing.
+description: Show the FinMel GitHub project board against git - open spec issues, the build queue in board order, and cards whose state disagrees with the branches. Changes nothing.
 argument-hint: ""
 disable-model-invocation: true
 model: haiku

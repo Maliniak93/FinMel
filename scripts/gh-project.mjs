@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Usage: node scripts/gh-project.mjs <verb> ...
 //   init                                                   create the custom fields and labels when missing
-//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e]   --e2e needs --parent and excludes --skip-tests; --before puts the new part ahead of sibling #m
+//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e] [--queue top|bottom|before:N|after:N]   --e2e needs --parent and excludes --skip-tests; --before puts the new part ahead of sibling #m; --queue places a top-level item on the board (default bottom), a part goes right after the previous part
 //   check --body-file <p> [--epic] [--e2e]                 dry run of create's cleaning and checking
 //   edit <n> [--body-file <p>] [--tier 1|2] [--parent <n>] replace the body, or attach the issue to an epic
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
@@ -9,7 +9,9 @@
 //   get <n> [--out <path> [--raw]]                         print the issue as JSON (parent, lastPart), optionally write a local copy
 //   prepare <n> [--tier 1|2] [--skip tests,review] [--fresh] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch (an e2e part's idle branch is recut from origin/master), moves the card; a last epic part also gets the epic and sibling bodies; on a resumed dirty branch it replays the interrupted run's finished steps (--fresh starts over)
 //   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise); a shipped one also replaces ## Test manualny per manualTest
-//   list                                                   every issue on the project as JSON
+//   list                                                   every issue on the project as JSON, in board order
+//   queue                                                  the build queue as JSON: top-level items, In progress then Todo, board order (manual, an epic's next part)
+//   move <n> top|bottom|before:N|after:N                   place a queue item on the board
 //   comment <n> --body-file <path>                         post a comment
 //   tick <n>                                               tick every acceptance-criterion checkbox
 //   exit 1 on an error, 4 when the GitHub limit is exhausted (stderr: reset time and a GITHUB_LIMIT line; never waits)
@@ -44,6 +46,7 @@ import {
   runMarker,
   spawnGh,
 } from "./gh.mjs";
+import { positionTarget, queueOf } from "./queue.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -86,6 +89,11 @@ const LABELS = [
     color: "0e8a16",
     description:
       "Last part of an epic: automates the epic's manual test plan as Playwright tests",
+  },
+  {
+    name: "epic-run",
+    color: "fbca04",
+    description: "Built unattended by epic.mjs; an In progress item without it is a manual build",
   },
 ];
 const KINDS = { new: "New", change: "Change", cleanup: "Cleanup", fix: "Fix" };
@@ -206,6 +214,19 @@ function addToProject(number) {
     { project: meta.id, content: repository.issue.id },
   );
   itemIds.set(Number(number), addProjectV2ItemById.item.id);
+}
+
+// A null afterId puts the item at the top of the board.
+function setPosition(number, afterId) {
+  const meta = projectFields();
+  graphql(
+    `mutation ($project: ID!, $item: ID!, $after: ID) {
+      updateProjectV2ItemPosition(input: { projectId: $project, itemId: $item, afterId: $after }) {
+        items(first: 1) { nodes { id } }
+      }
+    }`,
+    { project: meta.id, item: itemIdOf(number), after: afterId },
+  );
 }
 
 function parseFlags(argv) {
@@ -405,7 +426,11 @@ const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
     issue(number: $number) {
       number title body state url
       labels(first: 30) { nodes { name } }
-      parent { number subIssues(first: 100) { nodes { number state } } }
+      parent {
+        number
+        subIssues(first: 100) { nodes { number state } }
+        projectItems(first: 10) { nodes { id project { number } status: fieldValueByName(name: "Status") { ${SINGLE_SELECT} } } }
+      }
       subIssues(first: 100) { nodes { number title state } }
       projectItems(first: 10) { nodes { id project { number } ${ITEM_FIELDS} } }
     }
@@ -415,9 +440,10 @@ const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
 const ITEMS_QUERY = `query ($owner: String!, $number: Int!, $cursor: String) {
   user(login: $owner) {
     projectV2(number: $number) {
-      items(first: 100, after: $cursor) {
+      items(first: 100, after: $cursor, orderBy: { field: POSITION, direction: ASC }) {
         pageInfo { hasNextPage endCursor }
         nodes {
+          id
           ${ITEM_FIELDS}
           content {
             __typename
@@ -461,6 +487,7 @@ function fieldsOf(item, labels) {
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),
     e2e: labels.includes("e2e"),
+    epicRun: labels.includes("epic-run"),
   };
 }
 
@@ -482,7 +509,15 @@ function fetchIssue(number) {
     issue.parent.subIssues.nodes.every(
       (s) => s.number === issue.number || s.state === "CLOSED",
     );
-  return { result, body: issue.body.replace(/\r\n/g, "\n").trim() };
+  const parentItem = issue.parent?.projectItems.nodes.find(
+    (i) => i.project.number === PROJECT_NUMBER,
+  );
+  if (parentItem) itemIds.set(issue.parent.number, parentItem.id);
+  return {
+    result,
+    body: issue.body.replace(/\r\n/g, "\n").trim(),
+    parentStatus: parentItem?.status?.name ?? null,
+  };
 }
 
 function writeCopy(result, body, out, raw) {
@@ -554,7 +589,7 @@ function init() {
   }
 }
 
-function create(flags) {
+async function create(flags) {
   for (const required of ["title", "body-file", "slug", "tier", "kind"]) {
     if (!flags[required]) throw new Error(`--${required} is required`);
   }
@@ -573,10 +608,19 @@ function create(flags) {
     );
   if (flags.before && !flags.parent)
     throw new Error("--before needs --parent <epic number>");
+  if (flags.queue && flags.parent)
+    throw new Error(
+      "--queue is for a top-level item: a part goes right after the previous part",
+    );
   const branch = flags.epic
     ? null
     : `${flags.kind === "fix" ? "fix" : "feat"}/${flags.slug}`;
   const body = preparedBody(flags["body-file"], flags.epic, flags.e2e);
+  let afterId = null;
+  if (!flags.parent) {
+    const { board, queue: items } = await projectQueue();
+    afterId = positionTarget(items, flags.queue ?? "bottom", board);
+  }
 
   const argv = [
     "issue",
@@ -603,6 +647,11 @@ function create(flags) {
     if (branch) setField(issueNumber, "Branch", branch);
     if (flags.before)
       placeBefore(flags.parent, issueNumber, Number(flags.before));
+    if (flags.parent) {
+      const parts = subIssues(flags.parent).map((s) => s.number);
+      const at = parts.indexOf(issueNumber);
+      setPosition(issueNumber, itemIdOf(at > 0 ? parts[at - 1] : flags.parent));
+    } else setPosition(issueNumber, afterId);
   } catch (err) {
     if (err instanceof GhLimitError) {
       err.message = `${err.message}\nissue already created: ${url}`;
@@ -734,7 +783,7 @@ function prepare([number, ...rest]) {
       "usage: prepare <issue number> [--tier 1|2] [--skip tests,review] [--fresh] [--dry-run]",
     );
   const flags = parseFlags(rest);
-  const { result: issue, body } = fetchIssue(n);
+  const { result: issue, body, parentStatus } = fetchIssue(n);
   const refuse = (reason, next) =>
     console.log(
       JSON.stringify({
@@ -963,6 +1012,8 @@ function prepare([number, ...rest]) {
   }
   const resumed = issue.status === "In progress";
   if (!resumed && !dryRun) setField(issue.number, "Status", "In progress");
+  if (issue.parent && parentStatus === "Todo" && !dryRun)
+    setField(issue.parent, "Status", "In progress");
   if (!dryRun) saveUsageStart();
   const ownPlan = issue.e2e && /^\s*\d+\.\s/m.test(section(body, TEST_PLAN));
   const rebuild = prepareRebuild({
@@ -1332,9 +1383,10 @@ function reportMarker(number, run) {
   });
 }
 
-async function list() {
-  const result = (await projectItems()).map((item) => {
+async function listCards() {
+  const cards = (await projectItems()).map((item) => {
     const entry = {
+      id: item.id,
       number: item.content.number,
       title: item.content.title,
       ...fieldsOf(
@@ -1346,7 +1398,39 @@ async function list() {
       entry.subIssues = subIssues(entry.number).map((s) => s.number);
     return entry;
   });
-  console.log(JSON.stringify(result));
+  for (const c of cards) itemIds.set(c.number, c.id);
+  return cards;
+}
+
+async function projectQueue() {
+  const board = await listCards();
+  return { board, queue: queueOf(board) };
+}
+
+async function list() {
+  console.log(JSON.stringify(await listCards()));
+}
+
+async function queue() {
+  console.log(JSON.stringify((await projectQueue()).queue));
+}
+
+async function move([number, target]) {
+  const n = Number(String(number ?? "").replace(/^#/, ""));
+  if (!n || !target)
+    throw new Error("usage: move <n> top|bottom|before:N|after:N");
+  const { board, queue: items } = await projectQueue();
+  if (!items.some((q) => q.number === n))
+    throw new Error(`#${n} is not in the queue`);
+  setPosition(
+    n,
+    positionTarget(
+      items.filter((q) => q.number !== n),
+      target,
+      board,
+    ),
+  );
+  console.log(`#${n}: moved ${target}`);
 }
 
 function comment([number, ...rest]) {
@@ -1405,6 +1489,8 @@ const VERBS = {
   prepare,
   report,
   list,
+  queue,
+  move,
   comment,
   tick,
 };

@@ -9,7 +9,7 @@ effort: low
 
 You relay; scripts and the `build-feature` workflow do all the work. Decide nothing yourself. Run in a fresh session or `claude --model haiku "/build #<n>"`.
 
-1. No issue number in `$ARGUMENTS` → run `node scripts/plan-status.mjs` instead, print its **Next up** line
+1. No issue number in `$ARGUMENTS` → run `node scripts/plan-status.mjs` instead, print its **Queue** list
    and stop. Otherwise run `node scripts/preflight.mjs` and read its last stdout line, `PREFLIGHT_RESULT: <json>`.
    `"ok": false` → print each failed check as `name — detail → fix` and stop (the card is not moved). Checks with
    `"status": "fixed"` → one line saying what was started, stopped or installed, then continue.

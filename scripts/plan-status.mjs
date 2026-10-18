@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { GH_LIMIT_EXIT, clockTime, limitFromGhFailure, limitFromText, spawnGh } from "./gh.mjs";
+import { queueLines, queueOf } from "./queue.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GH_PROJECT = path.join(REPO_ROOT, "scripts", "gh-project.mjs");
@@ -90,20 +91,6 @@ function pullRequests(enabled) {
   }
 }
 
-function nextUp(specs) {
-  const byNumber = new Map(specs.map((s) => [s.number, s]));
-  const inEpic = new Set(specs.flatMap((s) => (s.epic ? s.subIssues || [] : [])));
-  const ready = [];
-  for (const epic of specs.filter((s) => s.epic && s.status !== "Done")) {
-    const first = (epic.subIssues || []).map((n) => byNumber.get(n)).find((s) => s && s.status !== "Done");
-    if (first?.status === "Todo") ready.push({ ...first, via: `epic #${epic.number}` });
-  }
-  const standalone = specs
-    .filter((s) => !s.epic && s.status === "Todo" && !inEpic.has(s.number))
-    .sort((a, b) => Number(a.tier ?? 9) - Number(b.tier ?? 9));
-  return [...ready, ...standalone];
-}
-
 function mismatches(specs, facts, prs) {
   const merged = new Set((prs || []).filter((p) => p.state === "MERGED").map((p) => p.headRefName));
   const out = [];
@@ -177,12 +164,9 @@ function render(specs, facts, allPrs) {
   out.push("");
 
   if (specs) {
-    const next = nextUp(specs);
-    out.push(
-      next.length
-        ? `**Next up:** ${next.map((s) => `\`/build #${s.number}\`${s.via ? ` or \`node scripts/epic.mjs ${s.via.replace("epic #", "")}\`` : ""} ${s.title} (tier ${s.tier ?? "?"}${s.via ? `, ${s.via}` : ""})`).join(" · ")}`
-        : "**Next up:** nothing in Todo — `/design` something.",
-    );
+    const queue = queueOf(specs);
+    if (queue.length) out.push("**Queue:**", "", ...queueLines(queue));
+    else out.push("**Queue:** nothing in Todo — `/design` something.");
     const wrong = mismatches(specs, facts, allPrs);
     if (wrong.length) out.push(`**Mismatches:** ${wrong.join(" · ")}`);
     out.push("");
