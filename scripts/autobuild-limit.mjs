@@ -1,4 +1,4 @@
-// Usage: imported by epic.mjs - what to do when a build hits the Claude usage limit, readiness after the wait, the end-of-run shutdown; pure, injectable, runs nothing on import
+// Usage: imported by autobuild.mjs - what to do when a build hits the Claude usage limit, readiness after the wait, the end-of-run shutdown; pure, injectable, runs nothing on import
 
 const MIN = 60e3;
 const WAKE_AFTER_RESET_MS = 5 * MIN;

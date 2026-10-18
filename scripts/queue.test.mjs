@@ -15,7 +15,7 @@ const card = (number, status, extra = {}) => ({
   epic: false,
   skipTests: false,
   e2e: false,
-  epicRun: false,
+  autobuild: false,
   parent: null,
   ...extra,
 });
@@ -38,26 +38,26 @@ test("queue orders In progress then Todo by position", () => {
   const queue = queueOf([
     card(10, "Done"),
     card(11, "Todo"),
-    card(12, "In progress", { epicRun: true }),
+    card(12, "In progress", { autobuild: true }),
     epic(13, "Todo", [14, 15]),
     part(14, "Todo", 13),
     part(15, "Todo", 13),
-    card(16, "In progress", { epicRun: true }),
+    card(16, "In progress", { autobuild: true }),
     card(17, "Todo"),
   ]);
 
   assert.deepEqual(numbers(queue), [12, 16, 11, 13, 17]);
 });
 
-test("manual is In progress without epic-run", () => {
+test("manual is In progress without autobuild", () => {
   const queue = queueOf([
     card(20, "In progress"),
-    card(21, "In progress", { epicRun: true }),
+    card(21, "In progress", { autobuild: true }),
     epic(22, "In progress", [23]),
     part(23, "In progress", 22),
     epic(24, "In progress", [25, 26]),
     part(25, "Done", 24),
-    part(26, "In progress", 24, { epicRun: true }),
+    part(26, "In progress", 24, { autobuild: true }),
     card(27, "Todo"),
   ]);
   const manual = Object.fromEntries(queue.map((q) => [q.number, Boolean(q.manual)]));
@@ -79,8 +79,8 @@ test("epic next is first open part", () => {
 
 test("position target resolves", () => {
   const queue = queueOf([
-    card(12, "In progress", { epicRun: true }),
-    card(16, "In progress", { epicRun: true }),
+    card(12, "In progress", { autobuild: true }),
+    card(16, "In progress", { autobuild: true }),
     card(11, "Todo"),
     epic(13, "Todo", [14]),
     part(14, "Todo", 13),

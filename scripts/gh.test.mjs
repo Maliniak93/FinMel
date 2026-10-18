@@ -83,7 +83,7 @@ test("cardFromIssueNode maps fields", () => {
   assert.equal(card.epic, false);
   assert.equal(card.skipTests, true);
   assert.equal(card.e2e, false);
-  assert.equal(card.epicRun, false);
+  assert.equal(card.autobuild, false);
   assert.deepEqual(card.subIssues, []);
 });
 

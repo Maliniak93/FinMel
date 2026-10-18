@@ -7,7 +7,7 @@ Known failure modes, what causes them, and the fix. If you hit something not lis
 **Cause:** Postgres and RabbitMQ bake their admin credentials into the data volume the *first* time they initialize and never change them again. The AppHost uses **fixed** literal passwords (not Aspire's generated-and-persisted-to-user-secrets default) specifically so this can't drift — but if a fixed password is ever edited in code without also resetting local state, the volume still expects the old value and every connection fails authentication, with no self-healing.
 **Fix:** remove the named Postgres/RabbitMQ volumes so they reinitialize cleanly (`docker volume ls` to find the names, then `docker volume rm ...`) — see `runbooks/local-dev.md` → "Resetting local databases". Always safe: no real data exists in local-only development.
 
-## A script or an epic run eats the GitHub rate limit
+## A script or an autobuild run eats the GitHub rate limit
 
 **Cause:** GraphQL has a 5000-point hourly window; a wide query (a whole project with bodies) spends hundreds of points per call. `gh api rate_limit` is free and shows what is left.
 **Fix:** measure the command: `node scripts/gh-usage.mjs -- node scripts/gh-project.mjs get <n>` prints the GraphQL points and REST requests it consumed (or says the window reset meanwhile); `node scripts/gh-usage.mjs` alone prints the current state. Budgets: `get` ≤ 2, `list` ≤ 5, `set` ≤ 3, session start 0, one epic part ≤ 100. `SKARBIEC_GH_BIN` points every script at another `gh` binary (a fake, in tests).
@@ -15,12 +15,12 @@ Known failure modes, what causes them, and the fix. If you hit something not lis
 ## A script exits 4 with `Limit GitHuba (...) wyczerpany`
 
 **Cause:** the GitHub limit (primary GraphQL or REST, or a secondary one) is exhausted; `gh-project.mjs`, `ship.mjs` and `gh-usage.mjs` never wait. The second line, `GITHUB_LIMIT {"kind":…,"resetAt":<epoch seconds>}`, carries the reset (`resetAt` is null for a secondary limit: wait a few minutes).
-**Fix:** re-run the same command after the reset time (`node scripts/gh-usage.mjs` shows the state; it is free). `/build` stops at once on an exit 4 from `prepare` or `ship.mjs`; the work stays on its branch and a re-run ships it. `epic.mjs` waits by itself and resumes; `plan-status.mjs` and `idea.mjs context` print `limit GitHuba do HH:MM` instead of the board.
+**Fix:** re-run the same command after the reset time (`node scripts/gh-usage.mjs` shows the state; it is free). `/build` stops at once on an exit 4 from `prepare` or `ship.mjs`; the work stays on its branch and a re-run ships it. `autobuild.mjs` waits by itself and resumes; `plan-status.mjs` and `idea.mjs context` print `limit GitHuba do HH:MM` instead of the board.
 
-## An epic run does not sleep through the Claude limit (`wake timers: off`)
+## An autobuild run does not sleep through the Claude limit (`wake timers: off`)
 
 **Cause:** the first log lines say `wake timers: off — <hint>`: wake timers are off on mains power (AC index of `powercfg /query SCHEME_CURRENT SUB_SLEEP RTCWAKE` is 0 or 2) or `powercfg /a` lists no sleep state, so the limit is waited out awake.
-**Fix:** `powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 1` then `powercfg /setactive SCHEME_CURRENT`; check with `node scripts/epic.mjs --sleep-test 3` and `--hibernate-test 3` (the PC must wake by itself and `powercfg /lastwake` names the timer). A run that ends `wake-not-ready` woke but preflight, `gh` or the runner did not come up within 15 min: fix it and re-run.
+**Fix:** `powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 1` then `powercfg /setactive SCHEME_CURRENT`; check with `node scripts/autobuild.mjs --sleep-test 3` and `--hibernate-test 3` (the PC must wake by itself and `powercfg /lastwake` names the timer). A run that ends `wake-not-ready` woke but preflight, `gh` or the runner did not come up within 15 min: fix it and re-run.
 
 ## Gateway 429s during a seed script or smoke test
 

@@ -1,10 +1,10 @@
-// Usage: imported by epic.mjs - the flag parser and the interactive start wizard (questions, summary, equivalent command); runs nothing on import
+// Usage: imported by autobuild.mjs - the flag parser and the interactive start wizard (questions, summary, equivalent command); runs nothing on import
 import { createInterface } from "node:readline/promises";
-import { planFrom, startAt, windowEnd } from "./epic-queue.mjs";
+import { planFrom, startAt, windowEnd } from "./autobuild-queue.mjs";
 
 const BOOLEAN_FLAGS = new Set(["dry-run", "shutdown", "no-shutdown", "include-manual", "skip-manual", "stop"]);
 const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "items", "start", "until", "on-limit", "max-wait", "sleep-test", "hibernate-test"]);
-const USAGE = "usage: epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run] | --stop | --sleep-test MIN | --hibernate-test MIN";
+const USAGE = "usage: autobuild.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run] | --stop | --sleep-test MIN | --hibernate-test MIN";
 const COMMAND_ORDER = ["items", "include-manual", "skip-manual", "on-limit", "max-wait", "shutdown", "no-shutdown", "start", "until", "max-tasks", "dry-run"];
 const LIMIT_MODES = { a: "sleep", b: "wait", c: "exit" };
 const LIMIT_LABELS = { sleep: "sleep and wake after the reset", wait: "wait awake", exit: "end the run" };
@@ -117,7 +117,7 @@ export function questions(flags, ctx) {
   const planned = flags.only === undefined;
   if (planned && flags.items === undefined) list.push(itemsQuestion(ctx));
   if (planned && !flags["include-manual"] && !flags["skip-manual"] && ctx.plan.some((item) => item.manual)) {
-    list.push(confirmQuestion("manual", "Skip manual items (In progress, not started by epic.mjs)?", { "skip-manual": true }, { "include-manual": true }));
+    list.push(confirmQuestion("manual", "Skip manual items (In progress, not started by autobuild.mjs)?", { "skip-manual": true }, { "include-manual": true }));
   }
   if (flags["on-limit"] === undefined) list.push(limitQuestion(ctx.power));
   if (flags["max-wait"] === undefined && flags["on-limit"] !== "exit") list.push(maxWaitQuestion);
@@ -183,7 +183,7 @@ export async function ask(list, io) {
 }
 
 export function equivalentCommand(flags) {
-  const parts = ["node", "scripts/epic.mjs"];
+  const parts = ["node", "scripts/autobuild.mjs"];
   if (flags.only !== undefined) parts.push(String(flags.only));
   for (const key of COMMAND_ORDER) {
     if (flags[key] === undefined) continue;

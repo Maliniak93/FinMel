@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { GRAPH, epicSource, makeSandbox, pipelineReady, put, readFacts, runBuild, snapshot, step, writeDescription } from "./helpers.mjs";
+import { GRAPH, autobuildSource, makeSandbox, pipelineReady, put, readFacts, runBuild, snapshot, step, writeDescription } from "./helpers.mjs";
 
 const html = (sb) => readFileSync(path.join(sb.out, "index.html"), "utf8");
 const decode = (text) => text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
@@ -40,10 +40,10 @@ test("build rejects a pipeline description with a step lacking next, a missing t
       { what: "unreachable", steps: [step("p1", { next: [] }), step("p2", { next: [] })], named: "p2" },
     ];
     for (const c of cases) {
-      writeDescription(sb, "script:epic", c.steps);
+      writeDescription(sb, "script:autobuild", c.steps);
       const run = runBuild(sb);
       assert.notEqual(run.status, 0, `${c.what}: ${run.output}`);
-      assert.ok(run.output.includes("epic"), `${c.what} names the node: ${run.output}`);
+      assert.ok(run.output.includes("autobuild"),`${c.what} names the node: ${run.output}`);
       assert.ok(run.output.includes(c.named), `${c.what} names step ${c.named}: ${run.output}`);
       assert.deepEqual(snapshot(sb.out, { skip: [".work"] }), before, `${c.what}: page untouched`);
     }
@@ -98,34 +98,34 @@ test("build gives a step with a tiered agent the start and escalated level rows 
 });
 
 test("build resolves limit.ref to the current constant and calls to a node link, follows a changed constant without a description change and rejects a ref or call naming nothing", () => {
-  const callsBuild = GRAPH.map((s) => (s.id === "krok-b" ? { ...s, calls: "script:epic" } : s));
-  const epicSteps = [
-    step("e1", { limit: { ref: "script:epic#CI_TIMEOUT_MS", text: "Unikat-tekst-limitu" }, next: [{ to: "e2" }] }),
+  const callsBuild = GRAPH.map((s) => (s.id === "krok-b" ? { ...s, calls: "script:autobuild" } : s));
+  const autobuildSteps = [
+    step("e1", { limit: { ref: "script:autobuild#CI_TIMEOUT_MS", text: "Unikat-tekst-limitu" }, next: [{ to: "e2" }] }),
     step("e2", { next: [] }),
   ];
-  const sb = makeBase({ build: callsBuild, epic: epicSteps });
+  const sb = makeBase({ build: callsBuild, autobuild: autobuildSteps });
   try {
     const first = runBuild(sb);
     assert.equal(first.status, 0, first.output);
-    const limitPanel = panelOf(sb, "script-epic-e1");
+    const limitPanel = panelOf(sb, "script-autobuild-e1");
     assert.ok(limitPanel.includes("CI_TIMEOUT_MS") && limitPanel.includes("5400000") && limitPanel.includes("Unikat-tekst-limitu"));
-    assert.ok(limitPanel.includes('href="#card-script-epic"'), "limit links to the constant's node");
-    assert.ok(card(sb, "cmd-build").includes('href="#card-script-epic"'), "link to the called node");
+    assert.ok(limitPanel.includes('href="#card-script-autobuild"'), "limit links to the constant's node");
+    assert.ok(card(sb, "cmd-build").includes('href="#card-script-autobuild"'), "link to the called node");
 
-    put(sb, "scripts/epic.mjs", epicSource(45));
+    put(sb, "scripts/autobuild.mjs", autobuildSource(45));
     const second = runBuild(sb);
     assert.equal(second.status, 0, second.output);
-    const changed = panelOf(sb, "script-epic-e1");
+    const changed = panelOf(sb, "script-autobuild-e1");
     assert.ok(changed.includes("2700000"), "new value shown in the step panel");
     assert.ok(!changed.includes("5400000"), "old value gone from the step panel");
 
     const before = snapshot(sb.out, { skip: [".work"] });
-    writeDescription(sb, "script:epic", [step("e1", { limit: { ref: "script:epic#NOPE" }, next: [] })]);
+    writeDescription(sb, "script:autobuild", [step("e1", { limit: { ref: "script:autobuild#NOPE" }, next: [] })]);
     const badRef = runBuild(sb);
     assert.notEqual(badRef.status, 0, badRef.output);
-    assert.ok(badRef.output.includes("epic") && badRef.output.includes("e1"), badRef.output);
+    assert.ok(badRef.output.includes("autobuild") && badRef.output.includes("e1"), badRef.output);
 
-    writeDescription(sb, "script:epic", epicSteps);
+    writeDescription(sb, "script:autobuild", autobuildSteps);
     writeDescription(sb, "cmd:build", GRAPH.map((s) => (s.id === "krok-b" ? { ...s, calls: "script:ghost" } : s)));
     const badCall = runBuild(sb);
     assert.notEqual(badCall.status, 0, badCall.output);

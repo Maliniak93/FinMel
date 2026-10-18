@@ -4,13 +4,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./epic-queue.mjs";
+import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const cards = [
-  { number: 1, title: "running", status: "In progress", epic: false, epicRun: true },
-  { number: 2, title: "manual", status: "In progress", epic: false, epicRun: false },
+  { number: 1, title: "running", status: "In progress", epic: false, autobuild: true },
+  { number: 2, title: "manual", status: "In progress", epic: false, autobuild: false },
   { number: 3, title: "todo a", status: "Todo", epic: false },
   { number: 4, title: "todo b", status: "Todo", epic: true, subIssues: [5, 6] },
   { number: 5, title: "part 1", status: "Done", parent: 4 },
@@ -72,14 +72,14 @@ test("start labels item and part", async () => {
     build: async () => void calls.push("build"),
   });
   const labels = calls.filter((c) => c.includes("--add-label"));
-  assert.ok(labels.some((c) => c.includes(" 4 ") && c.includes("epic-run")));
-  assert.ok(labels.some((c) => c.includes(" 6 ") && c.includes("epic-run")));
+  assert.ok(labels.some((c) => c.includes(" 4 ") && c.includes("autobuild")));
+  assert.ok(labels.some((c) => c.includes(" 6 ") && c.includes("autobuild")));
   assert.equal(calls.at(-1), "build");
   assert.ok(calls.indexOf("build") > calls.findLastIndex((c) => c.includes("--add-label")));
 });
 
 test("delay is an unknown flag", () => {
-  const res = spawnSync(process.execPath, ["scripts/epic.mjs", "423", "--dry-run", "--delay", "5"], { cwd: root, encoding: "utf8" });
+  const res = spawnSync(process.execPath, ["scripts/autobuild.mjs", "423", "--dry-run", "--delay", "5"], { cwd: root, encoding: "utf8" });
   assert.equal(res.status, 2);
   const out = `${res.stdout}${res.stderr}`;
   assert.match(out, /unexpected argument: --delay/);
@@ -88,7 +88,7 @@ test("delay is an unknown flag", () => {
 
 test("docs no longer mention delay and describe the window", () => {
   const read = (f) => readFileSync(path.join(root, f), "utf8");
-  for (const f of ["CLAUDE.md", "skarbiec-plan/workflow.md", "scripts/epic.mjs"]) assert.doesNotMatch(read(f), /--delay/, f);
+  for (const f of ["CLAUDE.md", "skarbiec-plan/workflow.md", "scripts/autobuild.mjs"]) assert.doesNotMatch(read(f), /--delay/, f);
   assert.match(read("skarbiec-plan/workflow.md"), /--until/);
   assert.match(read("CLAUDE.md"), /--until/);
 });

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { awaitReady, buildWithResume, decideOnLimit, finishShutdown, handleLimit } from "./epic-limit.mjs";
+import { awaitReady, buildWithResume, decideOnLimit, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MIN = 60e3;
@@ -124,7 +124,7 @@ test("docs list the limit flags and no shutdown delay", () => {
     assert.ok(workflow.includes(word), word);
   }
   const stale = "/t " + "600";
-  for (const file of [["skarbiec-plan", "workflow.md"], ["CLAUDE.md"], ["scripts", "epic.mjs"]]) {
+  for (const file of [["skarbiec-plan", "workflow.md"], ["CLAUDE.md"], ["scripts", "autobuild.mjs"]]) {
     assert.ok(!readFileSync(path.join(root, ...file), "utf8").includes(stale), file.join("/"));
   }
 });

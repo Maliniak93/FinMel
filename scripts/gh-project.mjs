@@ -91,9 +91,9 @@ const LABELS = [
       "Last part of an epic: automates the epic's manual test plan as Playwright tests",
   },
   {
-    name: "epic-run",
+    name: "autobuild",
     color: "fbca04",
-    description: "Built unattended by epic.mjs; an In progress item without it is a manual build",
+    description: "Built unattended by autobuild.mjs; an In progress item without it is a manual build",
   },
 ];
 const KINDS = { new: "New", change: "Change", cleanup: "Cleanup", fix: "Fix" };
@@ -487,7 +487,7 @@ function fieldsOf(item, labels) {
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),
     e2e: labels.includes("e2e"),
-    epicRun: labels.includes("epic-run"),
+    autobuild: labels.includes("autobuild"),
   };
 }
 
@@ -1270,7 +1270,7 @@ function report([number, ...rest]) {
     );
     if (run.resumedShip) {
       lines.push(
-        "- Shipped by `scripts/epic.mjs` after the earlier ship step failed — tests and review are in the blocked report above.",
+        "- Shipped by `scripts/autobuild.mjs` after the earlier ship step failed — tests and review are in the blocked report above.",
       );
     } else {
       if (run.e2e) {
@@ -1308,8 +1308,8 @@ function report([number, ...rest]) {
         ? "Verified and reviewed, but not shipped: finish the commit, push and PR by hand — a re-run of `/build` would repeat the whole pipeline."
         : e2eBlock
           ? run.class === "environment"
-            ? `An environment problem, not an app defect: fix the machine, then re-run \`/build #${number}\` (or \`node scripts/epic.mjs <epic>\`) — the e2e tests are written again from master.`
-            : `A stable app failure: fix the app with \`/fix\` and merge it, then re-run \`/build #${number}\` (or \`node scripts/epic.mjs <epic>\`) — the branch is recut from master and the e2e tests are written again; the patch is for reference only.`
+            ? `An environment problem, not an app defect: fix the machine, then re-run \`/build #${number}\` (or \`node scripts/autobuild.mjs <epic>\`) — the e2e tests are written again from master.`
+            : `A stable app failure: fix the app with \`/fix\` and merge it, then re-run \`/build #${number}\` (or \`node scripts/autobuild.mjs <epic>\`) — the branch is recut from master and the e2e tests are written again; the patch is for reference only.`
           : `Fix the spec or the named problem, then re-run \`/build #${number}\` — the work stays on its branch.`,
     );
   }

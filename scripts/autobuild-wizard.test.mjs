@@ -4,7 +4,7 @@ import path from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { ask, equivalentCommand, parseFlags, questions, runWizard, summary } from "./epic-wizard.mjs";
+import { ask, equivalentCommand, parseFlags, questions, runWizard, summary } from "./autobuild-wizard.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -86,7 +86,7 @@ test("summary and command round trip", () => {
   assert.ok(windowLine, "window end shown as the next day's 07:00");
 
   const command = equivalentCommand(answers);
-  assert.ok(command.startsWith("node scripts/epic.mjs "));
+  assert.ok(command.startsWith("node scripts/autobuild.mjs "));
   assert.deepEqual(parseFlags(command.split(/\s+/).slice(2)), answers);
 });
 

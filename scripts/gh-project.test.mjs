@@ -67,7 +67,7 @@ test("create places the card", () => {
 
 test("list reads board order", () => {
   const state = boardState();
-  state.issues[5].labels.push("epic-run");
+  state.issues[5].labels.push("autobuild");
   const sandbox = createSandbox(state);
   try {
     const { code, stdout, out } = sandbox.run("gh-project.mjs", ["list"]);
@@ -83,9 +83,9 @@ test("list reads board order", () => {
       cards.map((c) => c.number),
       [1, 4, 3, 5, 9, 8],
     );
-    for (const c of cards) assert.equal(typeof c.epicRun, "boolean", `#${c.number}`);
-    assert.equal(cards.find((c) => c.number === 5).epicRun, true);
-    assert.equal(cards.find((c) => c.number === 3).epicRun, false);
+    for (const c of cards) assert.equal(typeof c.autobuild, "boolean", `#${c.number}`);
+    assert.equal(cards.find((c) => c.number === 5).autobuild, true);
+    assert.equal(cards.find((c) => c.number === 3).autobuild, false);
   } finally {
     sandbox.cleanup();
   }

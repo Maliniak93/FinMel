@@ -43,8 +43,8 @@ skarbiec-plan/prompts/
 skarbiec-plan/przewodnik/
 # Generated local workflow map (scripts/flows.mjs, /flows)
 skarbiec-plan/flows/
-# Logs of unattended epic runs (scripts/epic.mjs)
-skarbiec-plan/epic-runs/
+# Logs of unattended autobuild runs (scripts/autobuild.mjs)
+skarbiec-plan/autobuild-runs/
 
 # e2e run output (scripts/e2e.mjs)
 e2e/test-results/

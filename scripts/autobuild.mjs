@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Usage: node scripts/epic.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run]
+// Usage: node scripts/autobuild.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run]
 //   <n>               build only that epic or standalone issue (manual or not); without it the whole build queue, item by item
 //   --items N|all     take the first N queue items (default all)
-//   --include-manual  also take an In progress item that is not marked epic-run (default --skip-manual)
+//   --include-manual  also take an In progress item that is not marked autobuild (default --skip-manual)
 //   --start           keep the PC awake from launch but start the work (preflight included) at that time: now, in MIN minutes or at the next HH:MM; the stop file ends the wait
 //   --until HH:MM     no new claude session starts at or after the next HH:MM; the one running finishes, then the run ends with reason `window`
 //   --max-tasks N     stop before the (N+1)th build of this run (0 = preflight only)
@@ -11,9 +11,9 @@
 //   --shutdown        ask with a 10 min Tak/Nie popup when the run ends, then shut down (default; no answer shuts down); --no-shutdown does not
 //   --dry-run         print the plan, the start time and what would happen per part; no preflight script, builds, merges, comments or shutdown
 //   in a terminal (stdin and stdout a TTY) a start wizard asks every setting no flag answered, shows a summary and the equivalent command and asks `Start? [T/n]`; n exits 0, Ctrl+C 130, nothing starts
-//   node scripts/epic.mjs --stop   creates the one stop file; the running driver stops before the next build
-//   node scripts/epic.mjs --sleep-test MIN | --hibernate-test MIN   suspend or hibernate with a wake timer MIN minutes ahead (no popup), print the planned and actual wake time and `powercfg /lastwake`, exit
-//   an unknown reset ends the run with `limit-unknown`; a PC that wakes but is not ready within 15 min with `wake-not-ready`; every line also goes to skarbiec-plan/epic-runs/<timestamp>.log
+//   node scripts/autobuild.mjs --stop   creates the one stop file; the running driver stops before the next build
+//   node scripts/autobuild.mjs --sleep-test MIN | --hibernate-test MIN   suspend or hibernate with a wake timer MIN minutes ahead (no popup), print the planned and actual wake time and `powercfg /lastwake`, exit
+//   an unknown reset ends the run with `limit-unknown`; a PC that wakes but is not ready within 15 min with `wake-not-ready`; every line also goes to skarbiec-plan/autobuild-runs/<timestamp>.log
 //   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
@@ -28,10 +28,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
-import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./epic-gh.mjs";
-import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./epic-limit.mjs";
-import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./epic-queue.mjs";
-import { UsageError, WizardCancelled, parseFlags, runWizard } from "./epic-wizard.mjs";
+import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
+import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
+import { mayStart, nextWork, planFrom, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { UsageError, WizardCancelled, parseFlags, runWizard } from "./autobuild-wizard.mjs";
 import { confirmPower, suspendUntil, wakeTimers } from "./power.mjs";
 import { queueOf } from "./queue.mjs";
 import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
@@ -79,13 +79,13 @@ function sayUsage(label) {
 }
 
 function openLog() {
-  const dir = path.join(REPO_ROOT, "skarbiec-plan", "epic-runs");
+  const dir = path.join(REPO_ROOT, "skarbiec-plan", "autobuild-runs");
   mkdirSync(dir, { recursive: true });
   const d = new Date();
   const stamped = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
   runStamp = stamped;
   logPath = path.join(dir, `${stamped}.log`);
-  say(`epic run · log ${path.relative(REPO_ROOT, logPath).replaceAll("\\", "/")}`);
+  say(`autobuild · log ${path.relative(REPO_ROOT, logPath).replaceAll("\\", "/")}`);
 }
 
 function outcome(res) {
@@ -179,7 +179,7 @@ function readFlags(argv) {
   }
 }
 
-const stopFile = () => path.join(os.tmpdir(), "skarbiec-epic.stop");
+const stopFile = () => path.join(os.tmpdir(), "skarbiec-autobuild.stop");
 
 function getIssue(number) {
   const res = retryTransient(`project get ${number}`, () => project(["get", String(number)]));
@@ -598,7 +598,7 @@ function assertWindowOpen(ctx) {
 function resumeCommand(ctx) {
   const { flags } = ctx;
   const args = [flags.only, flags.items && `--items ${flags.items}`, flags["include-manual"] && "--include-manual", flags["skip-manual"] && "--skip-manual", flags["max-tasks"] !== undefined && `--max-tasks ${flags["max-tasks"]}`, flags.until && `--until ${flags.until}`, flags["on-limit"] && `--on-limit ${flags["on-limit"]}`, flags["max-wait"] && `--max-wait ${flags["max-wait"]}`, flags.shutdown && "--shutdown", flags["no-shutdown"] && "--no-shutdown"];
-  return ["node scripts/epic.mjs", ...args.filter((a) => a !== undefined && a !== false)].join(" ");
+  return ["node scripts/autobuild.mjs", ...args.filter((a) => a !== undefined && a !== false)].join(" ");
 }
 
 function awakeWait(at) {
@@ -812,7 +812,7 @@ function dryRunTable(issue) {
 }
 
 function summary(reason, detail, parts, resume, costLine) {
-  const lines = [`## Epic run: ${reason}`, ""];
+  const lines = [`## Autobuild run: ${reason}`, ""];
   lines.push(parts.length ? "Parts handled in this run:" : "No part was merged in this run.");
   for (const p of parts) lines.push(`- #${p.number} ${p.title} - ${p.prUrl ?? "no PR"} (${p.shipOnly ? "ship retried" : `build ${p.buildMin ?? "-"} min`}, CI ${p.ciMin ?? "-"} min)`);
   if (detail) lines.push("", "Detail:", "", "```", detail, "```");
@@ -845,8 +845,8 @@ function epicComments(epic) {
 
 // A summary hit by the limit mid-post is not repeated: the run's marker in a comment means it was posted
 async function postSummary(epic, body) {
-  const marker = `<!-- skarbiec-epic-summary:${epic}:${runStamp} -->`;
-  const file = path.join(os.tmpdir(), `skarbiec-epic-${epic}-comment.md`);
+  const marker = `<!-- skarbiec-autobuild-summary:${epic}:${runStamp} -->`;
+  const file = path.join(os.tmpdir(), `skarbiec-autobuild-${epic}-comment.md`);
   let failure = null;
   await postOnce({
     comments: () => epicComments(epic),

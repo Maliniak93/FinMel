@@ -137,8 +137,8 @@ await step('implementer', 'Implement', ['go'])
 await step('scout', 'Scout', ['go'])
 `;
 
-export const epicSource = (minutes) => `#!/usr/bin/env node
-// Usage: node scripts/epic.mjs <epic> [--dry-run]
+export const autobuildSource = (minutes) => `#!/usr/bin/env node
+// Usage: node scripts/autobuild.mjs <epic> [--dry-run]
 
 const CI_TIMEOUT_MS = ${minutes} * 60 * 1000;
 const MAX_E2E_REPAIRS = 3;
@@ -173,7 +173,7 @@ description: Builds a spec.
 
 Run the build-feature workflow.
 `);
-  put(sb, "scripts/epic.mjs", epicSource(90));
+  put(sb, "scripts/autobuild.mjs", autobuildSource(90));
 }
 
 export const step = (id, extra = {}) => ({ id, title: `Unikat-${id}`, detail: `Opis-${id}`, ...extra });
@@ -193,12 +193,12 @@ export const GRAPH = [
   step("krok-e", { next: [] }),
 ];
 
-export function pipelineReady(sb, { build = GRAPH, wf, epic } = {}) {
+export function pipelineReady(sb, { build = GRAPH, wf, autobuild } = {}) {
   addPipelineFixture(sb);
   readyToBuild(sb);
   writeDescription(sb, "cmd:build", build);
   writeDescription(sb, "wf:build-feature", wf ?? [step("a", { agent: "implementer", next: [{ to: "b" }] }), step("b", { agent: "scout", next: [] })]);
-  writeDescription(sb, "script:epic", epic ?? [step("e1", { next: [{ to: "e2" }] }), step("e2", { next: [] })]);
+  writeDescription(sb, "script:autobuild", autobuild ??[step("e1", { next: [{ to: "e2" }] }), step("e2", { next: [] })]);
 }
 
 const iso = (ms) => new Date(ms).toISOString();
@@ -249,8 +249,8 @@ export function writeRun(history, run, session = "session-1") {
   });
 }
 
-export function putEpicLog(sb, epic, stamp, lines) {
-  put(sb, `skarbiec-plan/epic-runs/${epic}/${stamp}.log`, `${lines.join("\n")}\n`);
+export function putAutobuildLog(sb, epic, stamp, lines) {
+  put(sb, `skarbiec-plan/autobuild-runs/${epic}/${stamp}.log`, `${lines.join("\n")}\n`);
 }
 
 export function historyDir(sb) {

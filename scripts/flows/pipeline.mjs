@@ -1,4 +1,4 @@
-export const PIPELINE = ["cmd:idea", "cmd:design", "cmd:build", "cmd:fix", "wf:build-feature", "script:ship", "script:epic"];
+export const PIPELINE = ["cmd:idea", "cmd:design", "cmd:build", "cmd:fix", "wf:build-feature", "script:ship", "script:autobuild"];
 
 export const LEVEL_WORKFLOW = "wf:build-feature";
 

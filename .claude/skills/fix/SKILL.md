@@ -14,7 +14,7 @@ so the author of the fix is never its reviewer.
 start the reproduction from its "Kroki reprodukcji"; its "Hipotezy" are unverified; its "Powiązane"
 names related issues. After `create` publishes, run `node scripts/idea.mjs mark <slug> used --issue <n>`.
 
-`$ARGUMENTS` = `e2e:#<n>` → **unattended e2e repair**, launched by `scripts/epic.mjs` after e2e part `#<n>` blocked
+`$ARGUMENTS` = `e2e:#<n>` → **unattended e2e repair**, launched by `scripts/autobuild.mjs` after e2e part `#<n>` blocked
 at `e2e` (app). Nobody is watching: never call `AskUserQuestion`, never build. Follow **Unattended e2e repair** below
 instead of steps 0 and 4.
 
@@ -119,7 +119,7 @@ previous one has merged. Build it exactly as `/build` steps 1–5 do and report 
    means the earlier fix missed the cause — go deeper, never repeat it.
 2. **Reproduce** below the browser, as in step 1: a filtered `dotnet test`, an Angular spec, or the stack and an
    `.http` request. The e2e run counts as the symptom, not as the reproduction. Stop the stack when done; never start
-   `scripts/e2e.mjs` or touch `scripts/compose.mjs`. Leave the working tree clean and on master — `epic.mjs` refuses a dirty one.
+   `scripts/e2e.mjs` or touch `scripts/compose.mjs`. Leave the working tree clean and on master — `autobuild.mjs` refuses a dirty one.
 3. **Decide which side is wrong**, with a quoted line as evidence:
    - **app** — the app contradicts the plan, and nothing in the epic or its parts specifies what the app does → steps 2–3
      above, then `node scripts/gh-project.mjs check --body-file …` and
