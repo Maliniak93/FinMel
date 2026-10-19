@@ -97,17 +97,17 @@ A part whose reproduction only goes green once a later part merges is a wrong cu
 
 Run `node scripts/gh-project.mjs check --body-file <scratchpad>/fix-<slug>.md` and fix what it lists.
 Then present at most 10 lines: symptom, root cause + evidence, fix approach, tier, the AC-1 test name — for a
-split, one line per part (title, tier, AC-1 test) instead of the last three. Add `Obszar: <Area>` (one per part for a split, none for the umbrella); the user may change it. Ask for approval; iterate on the draft until the user says yes. Only after an explicit yes:
+split, one line per part (title, tier, AC-1 test) instead of the last three. Add `Obszar: <Area>` (one per part for a split, none for the umbrella); the user may change it. Add one line `Priorytet: P1 — <powód> → <output of node scripts/gh-project.mjs priority --where P1 --body-file <scratchpad>/fix-<slug>.md>` (P0 when the feature does not work at all; for a split the umbrella's, parts none; the user may change it). Ask for approval; iterate on the draft until the user says yes. Only after an explicit yes:
 
 ```
 node scripts/gh-project.mjs create --title "Fix: <symptom>" --body-file <scratchpad>/fix-<slug>.md \
-  --slug <slug> --tier <1|2> --kind fix --area <area>
+  --slug <slug> --tier <1|2> --kind fix --area <area> --priority <P0|P1>
 ```
 
 It prints `{"number","url","branch"}` — the branch is `fix/<slug>`. If it fails after the issue exists it
 prints the URL: finish the missing fields with `node scripts/gh-project.mjs set <number> <field> <value>`
 instead of creating a duplicate. For a split: the umbrella first (`--epic`), then each part in build order
-with `--parent <umbrella number>` and its own `--area`; the umbrella takes none.
+with `--parent <umbrella number>` and its own `--area` (no `--priority`); the umbrella takes `--priority` and no `--area`.
 
 Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the
 previous one has merged. Build it exactly as `/build` steps 1–5 do and report as `/build` does.

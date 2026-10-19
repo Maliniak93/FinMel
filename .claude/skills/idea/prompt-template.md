@@ -9,6 +9,7 @@ kind: <new|change|cleanup>
 status: draft
 created: <YYYY-MM-DD>
 area: <Backend|Frontend|E2E|Claude|Scripts|CI/Infra|Docs|Fullstack|epic>
+priority: <P0|P1|P2|P3> — <powód>
 issue:
 ---
 # <tytuł po polsku>
@@ -49,6 +50,7 @@ kind: fix
 status: draft
 created: <YYYY-MM-DD>
 area: <Backend|Frontend|E2E|Claude|Scripts|CI/Infra|Docs|Fullstack|epic>
+priority: <P0|P1|P2|P3> — <powód>
 issue:
 ---
 # <tytuł po polsku>

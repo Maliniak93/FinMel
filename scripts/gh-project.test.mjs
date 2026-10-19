@@ -47,7 +47,7 @@ test("create places the card", () => {
   try {
     const args = (title, slug) => ["create", "--title", title, "--body-file", sandbox.bodyFile, "--slug", slug, "--tier", "1", "--kind", "change", "--area", "Backend"];
 
-    const first = sandbox.run("gh-project.mjs", [...args("First", "first"), "--queue", "after:3"]);
+    const first = sandbox.run("gh-project.mjs", [...args("First", "first"), "--priority", "P2", "--queue", "after:3"]);
     assert.equal(first.code, 0, first.out);
     const firstNumber = JSON.parse(first.stdout.trim().split(/\r?\n/).pop()).number;
 
@@ -108,7 +108,7 @@ function areaState(extra = {}) {
   });
 }
 
-const createArgs = (sandbox, slug, extra = []) => ["create", "--title", slug, "--body-file", sandbox.bodyFile, "--slug", slug, "--tier", "1", "--kind", "change", ...extra];
+const createArgs = (sandbox, slug, extra = []) => ["create", "--title", slug, "--body-file", sandbox.bodyFile, "--slug", slug, "--tier", "1", "--kind", "change", ...(extra.includes("--parent") || extra.includes("--priority") ? [] : ["--priority", "P2"]), ...extra];
 const issueCreates = (sandbox) => sandbox.log().filter((e) => e.kind === "issueCreate");
 
 test("list and get include area", () => {
@@ -399,6 +399,26 @@ test("create refuses a cross-band queue", () => {
     assert.notEqual(part.code, 0, part.out);
 
     assert.deepEqual(issueCreates(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create requires priority unless part", () => {
+  const state = priorityState();
+  state.issues[9] = { ...state.issues[442], number: 9, labels: ["epic"], priority: null };
+  state.order.push(9);
+  const sandbox = createSandbox(state);
+  try {
+    const bare = ["create", "--title", "noprio", "--body-file", sandbox.bodyFile, "--slug", "noprio", "--tier", "1", "--kind", "change", "--area", "Backend"];
+    const missing = sandbox.run("gh-project.mjs", bare);
+    assert.notEqual(missing.code, 0, missing.out);
+    assert.match(missing.out, /--priority/);
+    assert.deepEqual(issueCreates(sandbox), []);
+
+    const part = sandbox.run("gh-project.mjs", createArgs(sandbox, "partnoprio", ["--parent", "9", "--area", "Backend"]));
+    assert.equal(part.code, 0, part.out);
+    assert.equal(issueCreates(sandbox).length, 1);
   } finally {
     sandbox.cleanup();
   }

@@ -24,7 +24,7 @@ function sandboxRepo() {
   return root;
 }
 
-function prompt({ target = "design", area, split }) {
+function prompt({ target = "design", area, split, priority = "P2 — do zrobienia" }) {
   const kind = target === "fix" ? "fix" : "change";
   const sections =
     target === "fix"
@@ -52,6 +52,7 @@ function prompt({ target = "design", area, split }) {
     `kind: ${kind}`,
     "status: draft",
     "created: 2026-10-19",
+    ...(priority === null ? [] : [`priority: ${priority}`]),
     ...(area === undefined ? [] : [`area: ${area}`]),
     "---",
     "",
@@ -118,4 +119,21 @@ test("epic needs a proposed split by area", () => {
   const noArea = check(root);
   assert.equal(noArea.code, 1, noArea.out);
   assert.equal(noArea.result.ok, false);
+});
+
+test("check requires a priority with a reason", () => {
+  const root = sandboxRepo();
+
+  writePrompt(root, { area: "Backend", priority: "P1 — blokuje #440" });
+  const ok = check(root);
+  assert.equal(ok.code, 0, ok.out);
+  assert.equal(ok.result.ok, true);
+
+  for (const priority of [null, "P5 — x", "P1"]) {
+    writePrompt(root, { area: "Backend", priority });
+    const bad = check(root);
+    assert.equal(bad.code, 1, `priority ${priority}: ${bad.out}`);
+    assert.equal(bad.result.ok, false);
+    assert.ok(bad.result.problems.some((p) => /\bpriority\b/.test(p)), `priority ${priority}: ${JSON.stringify(bad.result.problems)}`);
+  }
 });
