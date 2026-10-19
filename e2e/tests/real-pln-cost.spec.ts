@@ -41,7 +41,7 @@ async function expectAccountCash(page: Page, amount: string): Promise<void> {
   await page.getByRole('link', { name: ACCOUNT, exact: true }).click();
   const cash = page
     .locator('.account-detail__totals > div')
-    .filter({ has: page.locator('dt', { hasText: /^\s*Gotówka\s*$/ }) })
+    .filter({ has: page.locator('dt', { hasText: /^\s*Wolne środki\s*$/ }) })
     .locator('dd');
   await expect(cash).toContainText(pln(amount));
 }

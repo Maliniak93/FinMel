@@ -8,6 +8,7 @@ import {
   test,
   warsawDate,
 } from './fixtures';
+import { ASSET_CLASS, expectClassesProjected } from './cash-class';
 import { expectProjected } from './projection';
 
 function pln(amount: string): RegExp {
@@ -78,37 +79,6 @@ async function createBondThroughApi(
   expect(created.ok()).toBeTruthy();
 }
 
-interface AccountValue {
-  accountId: string | null;
-  valuePln: number;
-  cashPln: number;
-}
-
-// Reporting applies position events per asset without ordering between consumers, so each setup write is awaited in the projection before the next one.
-async function expectAccountProjected(
-  request: APIRequestContext,
-  token: string,
-  accountId: string,
-  expected: { valuePln: number; cashPln: number },
-): Promise<void> {
-  let current: AccountValue | undefined;
-  await expectProjected(
-    async () => {
-      const response = await request.get('/api/reporting/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      expect(response.ok()).toBeTruthy();
-      current = ((await response.json()) as { byAccount: AccountValue[] }).byAccount.find(
-        (account) => account.accountId === accountId,
-      );
-    },
-    async () => {
-      expect(current?.valuePln).toBe(expected.valuePln);
-      expect(current?.cashPln).toBe(expected.cashPln);
-    },
-  );
-}
-
 function legendItem(page: Page, label: string): Locator {
   return page.getByRole('button', { name: new RegExp(`^${label} — `) });
 }
@@ -144,9 +114,8 @@ test('dashboard: net worth, allocation legend, asset-class chips, chart periods 
     quantity: 2000,
     date: warsawDate(),
   });
-  await expectAccountProjected(request, token, bonds.id, { valuePln: 2000, cashPln: 2000 });
+  await expectClassesProjected(request, token, { [ASSET_CLASS.bond]: 2000 });
   await createBondThroughApi(request, token, bonds.id);
-  await expectAccountProjected(request, token, bonds.id, { valuePln: 2000, cashPln: 1000 });
   const brokerage = await createAccountThroughApi(request, token, {
     name: 'XTB',
     type: ACCOUNT_TYPE_BROKERAGE,
@@ -156,9 +125,16 @@ test('dashboard: net worth, allocation legend, asset-class chips, chart periods 
     quantity: 1000,
     date: warsawDate(),
   });
-  await expectAccountProjected(request, token, brokerage.id, { valuePln: 1000, cashPln: 1000 });
+  await expectClassesProjected(request, token, {
+    [ASSET_CLASS.bond]: 2000,
+    [ASSET_CLASS.cash]: 1000,
+  });
   await createStockThroughApi(request, token, brokerage.id);
-  await expectAccountProjected(request, token, brokerage.id, { valuePln: 1000, cashPln: 0 });
+  await expectClassesProjected(request, token, {
+    [ASSET_CLASS.bond]: 2000,
+    [ASSET_CLASS.stock]: 1000,
+    [ASSET_CLASS.cash]: 0,
+  });
 
   await page.goto('/login');
   await logInThroughUi(page, user);
@@ -185,9 +161,10 @@ test('dashboard: net worth, allocation legend, asset-class chips, chart periods 
     });
   });
 
-  await test.step('Krok 3: the allocation legend shows Gotówka, Obligacje and Akcje at 1 000,00 zł each and nothing is highlighted', async () => {
-    for (const label of ['Gotówka', 'Obligacje', 'Akcje']) {
-      await expect(legendItem(page, label)).toContainText(pln('1 000,00'));
+  await test.step('Krok 3: the allocation legend shows Obligacje at 2 000,00 zł (the bond and its free cash) and Akcje at 1 000,00 zł and nothing is highlighted', async () => {
+    await expect(legendItem(page, 'Obligacje')).toContainText(pln('2 000,00'));
+    await expect(legendItem(page, 'Akcje')).toContainText(pln('1 000,00'));
+    for (const label of ['Obligacje', 'Akcje']) {
       await expect(legendItem(page, label)).toHaveAttribute('aria-pressed', 'false');
     }
   });
@@ -196,7 +173,6 @@ test('dashboard: net worth, allocation legend, asset-class chips, chart periods 
     await chip(page, 'Akcje').click();
     await expect(chip(page, 'Akcje')).toHaveAttribute('aria-selected', 'true');
     await expect(legendItem(page, 'Akcje')).toHaveAttribute('aria-pressed', 'true');
-    await expect(legendItem(page, 'Gotówka')).toHaveAttribute('aria-pressed', 'false');
     await expect(legendItem(page, 'Obligacje')).toHaveAttribute('aria-pressed', 'false');
     await expect(historyChart(page)).toBeVisible();
     await expect(netWorth).toContainText(pln('3 000,00'));
@@ -205,7 +181,7 @@ test('dashboard: net worth, allocation legend, asset-class chips, chart periods 
   await test.step('Krok 5: the Wszystko chip clears the highlight', async () => {
     await chip(page, 'Wszystko').click();
     await expect(chip(page, 'Wszystko')).toHaveAttribute('aria-selected', 'true');
-    for (const label of ['Gotówka', 'Obligacje', 'Akcje']) {
+    for (const label of ['Obligacje', 'Akcje']) {
       await expect(legendItem(page, label)).toHaveAttribute('aria-pressed', 'false');
     }
   });

@@ -9,6 +9,12 @@ import {
   warsawDate,
   type Credentials,
 } from './fixtures';
+import {
+  ASSET_CLASS,
+  ASSET_CLASS_BANK_ACCOUNT,
+  ASSET_CLASS_DEPOSIT,
+  expectClassesProjected,
+} from './cash-class';
 import { expectProjected } from './projection';
 
 const ACCOUNT_TYPE_BROKERAGE = 0;
@@ -284,37 +290,6 @@ async function createGoldBarThroughApi(request: APIRequestContext, token: string
   await expectGoldProjected(request, token);
 }
 
-interface AccountValue {
-  accountId: string | null;
-  valuePln: number;
-  cashPln: number;
-}
-
-// Reporting applies position events per asset without ordering between consumers, so each setup write is awaited in the projection before the next one.
-async function expectAccountProjected(
-  request: APIRequestContext,
-  token: string,
-  accountId: string,
-  expected: { valuePln: number; cashPln: number },
-): Promise<void> {
-  let current: AccountValue | undefined;
-  await expectProjected(
-    async () => {
-      const response = await request.get('/api/reporting/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      expect(response.ok()).toBeTruthy();
-      current = ((await response.json()) as { byAccount: AccountValue[] }).byAccount.find(
-        (account) => account.accountId === accountId,
-      );
-    },
-    async () => {
-      expect(current?.valuePln).toBe(expected.valuePln);
-      expect(current?.cashPln).toBe(expected.cashPln);
-    },
-  );
-}
-
 async function expectNetWorthProjected(
   request: APIRequestContext,
   token: string,
@@ -398,10 +373,7 @@ test('target allocation: the editor, the deviations table, the dashboard card, E
       quantity: 120000,
       date: warsawDate(),
     });
-    await expectAccountProjected(request, accessToken, broker.id, {
-      valuePln: 120000,
-      cashPln: 120000,
-    });
+    await expectClassesProjected(request, accessToken, { [ASSET_CLASS.cash]: 120000 });
     await createSecurityThroughApi(request, accessToken, {
       accountId: broker.id,
       ticker: 'VWCE.DE',
@@ -422,9 +394,10 @@ test('target allocation: the editor, the deviations table, the dashboard card, E
       quantity: 350,
       unitPrice: 100,
     });
-    await expectAccountProjected(request, accessToken, broker.id, {
-      valuePln: 120000,
-      cashPln: 0,
+    await expectClassesProjected(request, accessToken, {
+      [ASSET_CLASS.etf]: 85000,
+      [ASSET_CLASS.stock]: 35000,
+      [ASSET_CLASS.cash]: 0,
     });
   });
 
@@ -438,15 +411,8 @@ test('target allocation: the editor, the deviations table, the dashboard card, E
       quantity: 50000,
       date: warsawDate(),
     });
-    await expectAccountProjected(request, accessToken, bonds.id, {
-      valuePln: 50000,
-      cashPln: 50000,
-    });
+    await expectClassesProjected(request, accessToken, { [ASSET_CLASS.bond]: 50000 });
     await createBondThroughApi(request, accessToken, bonds.id);
-    await expectAccountProjected(request, accessToken, bonds.id, {
-      valuePln: 50000,
-      cashPln: 0,
-    });
   });
 
   await test.step('Przygotowanie 5: the bank account Konto deposits 38 000 zł and 18 000 zł of it goes to a term deposit', async () => {
@@ -455,14 +421,11 @@ test('target allocation: the editor, the deviations table, the dashboard card, E
       quantity: 38000,
       date: warsawDate(),
     });
-    await expectAccountProjected(request, accessToken, bank.id, {
-      valuePln: 38000,
-      cashPln: 0,
-    });
+    await expectClassesProjected(request, accessToken, { [ASSET_CLASS_BANK_ACCOUNT]: 38000 });
     await createDepositThroughApi(request, accessToken, bank.id);
-    await expectAccountProjected(request, accessToken, bank.id, {
-      valuePln: 20000,
-      cashPln: 0,
+    await expectClassesProjected(request, accessToken, {
+      [ASSET_CLASS_BANK_ACCOUNT]: 20000,
+      [ASSET_CLASS_DEPOSIT]: 18000,
     });
   });
 
