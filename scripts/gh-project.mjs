@@ -450,7 +450,7 @@ const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
       labels(first: 30) { nodes { name } }
       parent {
         number
-        subIssues(first: 100) { nodes { number state } }
+        subIssues(first: 100) { nodes { number state labels(first: 30) { nodes { name } } } }
         projectItems(first: 10) { nodes { id project { number } status: fieldValueByName(name: "Status") { ${SINGLE_SELECT} } } }
       }
       subIssues(first: 100) { nodes { number title state } }
@@ -533,6 +533,18 @@ function fetchIssue(number) {
     issue.parent.subIssues.nodes.every(
       (s) => s.number === issue.number || s.state === "CLOSED",
     );
+  result.lastBuild =
+    result.parent !== null &&
+    !result.e2e &&
+    issue.parent.subIssues.nodes
+      .slice(
+        issue.parent.subIssues.nodes.findIndex((s) => s.number === issue.number) + 1,
+      )
+      .every(
+        (s) =>
+          s.state === "CLOSED" ||
+          s.labels.nodes.some((l) => l.name === "e2e"),
+      );
   const parentItem = issue.parent?.projectItems.nodes.find(
     (i) => i.project.number === PROJECT_NUMBER,
   );
@@ -1109,6 +1121,8 @@ function prepare([number, ...rest]) {
     skip,
     epic,
     e2e: issue.e2e,
+    verifyAll: issue.lastBuild,
+    area: issue.area ?? null,
     ...(ownPlan ? { ownPlan: true } : {}),
     ...(rebuild.diagnosis
       ? { diagnosis: rebuild.diagnosis, patchApplied: rebuild.patchApplied }
@@ -1437,6 +1451,9 @@ function report([number, ...rest]) {
       }
     }
   }
+
+  if (run.outsideArea?.length)
+    lines.push("", `**Poza obszarem:** ${run.outsideArea.join(", ")}`);
 
   const usage = usageReportLine();
   if (usage) lines.push("", usage);

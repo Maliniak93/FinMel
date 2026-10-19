@@ -49,7 +49,7 @@ function issueNode(n, withParent = true) {
     url: `https://github.com/Maliniak93/FinMel/issues/${n}`,
     labels: { nodes: i.labels.map((name) => ({ name })) },
     parent: withParent && i.parent ? issueNode(i.parent, false) : null,
-    subIssues: { nodes: childrenOf(n).map((c) => ({ number: c.number, title: c.title, state: c.state })) },
+    subIssues: { nodes: childrenOf(n).map((c) => ({ number: c.number, title: c.title, state: c.state, labels: { nodes: c.labels.map((name) => ({ name })) } })) },
     projectItems: { nodes: i.inProject === false ? [] : [{ id: itemOf(n), project: { number: 1 }, ...fieldNodes(i) }] },
   };
 }
@@ -216,6 +216,10 @@ if (args[0] === "issue" && args[1] === "create") {
 if (args[0] === "issue" && args[1] === "view") {
   const i = issues[Number(args[2])];
   out(JSON.stringify(i ? { number: i.number, title: i.title, state: i.state, labels: i.labels.map((name) => ({ name })), comments: [] } : {}));
+}
+if (args[0] === "issue" && args[1] === "comment") {
+  log({ kind: "comment", number: Number(args[2]), body: readInput() });
+  out("");
 }
 if (args[0] === "project" && args[1] === "field-list") {
   out(JSON.stringify({ fields: Object.entries(state.fields).map(([name, f]) => ({ id: f.id, name })) }));

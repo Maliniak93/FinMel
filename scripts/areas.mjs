@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Usage: node scripts/areas.mjs [of <path…>]   no argument prints the area -> paths table; `of` prints the area of the given files (— when none)
+// Usage: node scripts/areas.mjs [of <path…> | outside <Area> [path…]]   no argument prints the area -> paths table; `of` prints the area of the given files (— when none)
+//   outside prints the paths outside the ticket Area, one per line (no paths: the uncommitted change incl. untracked files)
 
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -82,9 +84,29 @@ export function areaOfFiles(paths) {
   return pick(own, PRIMARY) ?? pick(own, SECONDARY) ?? pick(files.filter(isCompanion));
 }
 
+export function outsideArea(area, paths) {
+  const allowed = area === "Fullstack" ? new Set(["Backend", "Frontend"]) : new Set([area]);
+  return paths.filter((f) => {
+    const p = f.replaceAll("\\", "/").replace(/^\.\//, "");
+    return !COMPANIONS.some((c) => c.test(p)) && !allowed.has(areaOfPath(p));
+  });
+}
+
+function uncommittedFiles() {
+  const res = spawnSync("git", ["status", "--porcelain", "-uall"], { encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  if (res.error || res.status !== 0) throw new Error(res.error?.message ?? res.stderr.trim());
+  return res.stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((l) => l.slice(3).split(" -> ").pop().replace(/^"|"$/g, ""));
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const [verb, ...rest] = process.argv.slice(2);
   if (verb === "of") console.log(areaOfFiles(rest) ?? "—");
-  else
+  else if (verb === "outside") {
+    const [area, ...paths] = rest;
+    for (const f of outsideArea(area, paths.length ? paths : uncommittedFiles())) console.log(f);
+  } else
     for (const { area, paths } of PATH_MAP) console.log(`${area.padEnd(9)} ${paths.join(" ")}`);
 }
