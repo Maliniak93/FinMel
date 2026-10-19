@@ -32,6 +32,8 @@ import {
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatAmount, formatDate } from '../../../shared/format';
+import { assignGroup } from '../../../shared/group-select/assign-group';
+import { GroupSelect } from '../../../shared/group-select/group-select';
 import { ACCOUNT_TYPE } from '../../accounts/account-type';
 import {
   DEPOSIT_CAPITALIZATIONS,
@@ -65,6 +67,7 @@ function termLengthWithinCap(control: AbstractControl): ValidationErrors | null 
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    GroupSelect,
     TranslocoPipe,
   ],
   templateUrl: './deposit-form-dialog.html',
@@ -88,6 +91,7 @@ export class DepositFormDialog {
 
   protected readonly form = this.formBuilder.nonNullable.group({
     name: [this.deposit?.name ?? '', [Validators.required, Validators.maxLength(200)]],
+    groupId: [this.deposit?.groupId ?? (null as string | null)],
     bankName: [this.deposit?.bankName ?? '', [Validators.maxLength(100)]],
     sourceAccountId: [
       { value: null as string | null, disabled: this.isEdit },
@@ -233,8 +237,18 @@ export class DepositFormDialog {
             ...terms,
             sourceAccountId: values.sourceAccountId!,
             returnAccountId: values.returnAccountId ?? undefined,
+            groupId: values.groupId,
           },
         });
+
+    if (!result.error && this.deposit && values.groupId !== (this.deposit.groupId ?? null)) {
+      const assignmentError = await assignGroup(this.deposit.assetId, values.groupId);
+      if (assignmentError) {
+        this.submitting.set(false);
+        this.formError.set(assignmentError);
+        return;
+      }
+    }
 
     this.submitting.set(false);
 

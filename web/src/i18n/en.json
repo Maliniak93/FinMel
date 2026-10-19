@@ -672,6 +672,11 @@
     "empty": "No groups yet. Add a group to split your wealth into goals such as retirement or an emergency cushion.",
     "limitHint": "You reached the limit of 12 groups. Delete a group to add a new one.",
     "loadFailed": "Failed to load groups.",
+    "field": {
+      "group": "Group",
+      "defaultGroup": "Default group",
+      "none": "No group"
+    },
     "assetCount": "Assets: {{ count }}",
     "target": "Target: {{ amount }}",
     "colors": {

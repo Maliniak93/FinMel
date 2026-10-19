@@ -12,6 +12,8 @@ import {
   hasControl,
   jsonResponse,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { pickSelectOption } from '../../deposits/testing/deposit-fixtures';
+import { assetGroups, blueGroupId, isGroupListRequest } from '../../groups/testing/group-fixtures';
 import { MetalFormDialog, type MetalFormDialogData } from './metal-form-dialog';
 
 describe('MetalFormDialog', () => {
@@ -38,9 +40,11 @@ describe('MetalFormDialog', () => {
     writeResponse: () => Response = () => jsonResponse(metalResponse(), 201),
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      return writeResponse();
-    });
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) =>
+        isGroupListRequest(input) ? jsonResponse(assetGroups) : writeResponse(),
+      );
 
     await TestBed.configureTestingModule({
       imports: [MetalFormDialog],
@@ -95,8 +99,20 @@ describe('MetalFormDialog', () => {
         metal: METAL.Gold,
         fineWeight: 1,
         weightUnit: 'TroyOunce',
+        groupId: null,
       });
       expect(dialogRef.close).toHaveBeenCalledWith(true);
+    });
+
+    it('sends groupId', async () => {
+      await setup({});
+      await fill({ metal: METAL.Gold, name: 'Krugerrand', fineWeight: 1, weightUnit: 'TroyOunce' });
+      await pickSelectOption(fixture, 'groupId', 'Emerytura');
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect((await request.json()).groupId).toBe(blueGroupId);
     });
 
     it.each([

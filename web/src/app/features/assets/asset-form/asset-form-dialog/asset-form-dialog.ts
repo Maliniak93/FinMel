@@ -1,4 +1,14 @@
-import { Component, computed, inject, resource, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  resource,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -6,6 +16,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
+import { startWith } from 'rxjs';
 
 import {
   getApiPortfolioAccounts,
@@ -19,6 +30,7 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../../core/auth/problem-details';
+import { assignGroup } from '../../../../shared/group-select/assign-group';
 import { ACCOUNT_TYPE } from '../../../accounts/account-type';
 import { ASSET_CLASS } from '../../asset-class';
 import { ASSET_FORM, INITIAL_TRANSACTION_KEY } from '../asset-form';
@@ -99,6 +111,35 @@ export class AssetFormDialog {
 
   private readonly activeForm = viewChild(ASSET_FORM);
 
+  private readonly selectedAccountId = toSignal(
+    this.accountForm.controls.accountId.valueChanges.pipe(
+      startWith(this.accountForm.controls.accountId.value),
+    ),
+    { requireSync: true },
+  );
+
+  private readonly accountDefaultGroup = computed(() => {
+    if (!this.accountsResource.hasValue()) {
+      return null;
+    }
+    const accountId = this.selectedAccountId();
+    return (
+      this.accountsResource.value().find((candidate) => candidate.id === accountId)?.groupId ?? null
+    );
+  });
+
+  constructor() {
+    effect(() => {
+      const groupId = this.accountDefaultGroup();
+      const group = this.activeForm()?.form.get('groupId');
+      untracked(() => {
+        if (this.choosesAccount && group && !group.dirty) {
+          group.setValue(groupId);
+        }
+      });
+    });
+  }
+
   // A native submit: the FormGroups live in the child forms, so there is no [formGroup] here to raise (ngSubmit).
   protected submit(event: Event): void {
     event.preventDefault();
@@ -137,6 +178,18 @@ export class AssetFormDialog {
             ? { ...body, accountId: this.accountForm.controls.accountId.value }
             : body,
         });
+
+    if (!result.error && this.data.asset) {
+      const groupId: string | null = active.form.get('groupId')?.value ?? null;
+      if (groupId !== (this.data.asset.groupId ?? null)) {
+        const assignmentError = await assignGroup(this.data.asset.id, groupId);
+        if (assignmentError) {
+          this.submitting.set(false);
+          this.formError.set(assignmentError);
+          return;
+        }
+      }
+    }
 
     this.submitting.set(false);
 

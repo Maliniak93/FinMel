@@ -20,7 +20,12 @@ import {
   renderedText,
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
-import { selectOptionLabels, pickSelectOption } from '../../deposits/testing/deposit-fixtures';
+import {
+  pickSelectOption,
+  selectOptionLabels,
+  selectTriggerState,
+} from '../../deposits/testing/deposit-fixtures';
+import { assetGroups, blueGroupId, isGroupListRequest } from '../../groups/testing/group-fixtures';
 import { BondPurchaseDialog, type BondPurchaseDialogData } from './bond-purchase-dialog';
 
 const bondsAccountId = 'b1111111-1111-1111-1111-111111111111';
@@ -34,6 +39,7 @@ const accountList = [
     wrapper: 1,
     isArchived: false,
     cashBalance: 5000,
+    groupId: blueGroupId,
   },
   {
     id: reserveBondsAccountId,
@@ -88,6 +94,9 @@ describe('BondPurchaseDialog', () => {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
+      if (isGroupListRequest(input)) {
+        return jsonResponse(assetGroups);
+      }
       if (method(input) === 'GET' && url.includes('/api/marketdata/bond-series')) {
         const onSaleOn = new URL(url).searchParams.get('onSaleOn');
         return jsonResponse(
@@ -349,6 +358,23 @@ describe('BondPurchaseDialog', () => {
       fixture.detectChanges();
 
       expect(renderedText(fixture)).toContain('Brak środków na rachunku');
+    });
+  });
+
+  describe('group', () => {
+    it('prefills the account default', async () => {
+      await setup({});
+      await fill({ ...manualPurchase, accountId: bondsAccountId });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('Emerytura');
+      });
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect(request.url).toContain(`/api/portfolio/bonds`);
+      expect((await request.json()).groupId).toBe(blueGroupId);
     });
   });
 

@@ -12,6 +12,7 @@ import {
   etfSearchResult,
   findControl,
   instrumentId,
+  jsonResponse,
   mountAssetForm,
   pickInstrument,
   renderedText,
@@ -35,7 +36,7 @@ describe('SecurityAssetForm', () => {
   });
 
   async function setup(assetClass: number): Promise<void> {
-    fetchSpy = vi.spyOn(globalThis, 'fetch');
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse([]));
     fixture = await mountAssetForm(SecurityAssetForm, assetClass);
     component = fixture.componentInstance;
   }
@@ -62,6 +63,7 @@ describe('SecurityAssetForm', () => {
       name: 'Vanguard FTSE All-World',
       currency: 'EUR',
       instrumentId,
+      groupId: null,
       initialTransaction: null,
     });
   });

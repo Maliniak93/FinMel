@@ -7,7 +7,8 @@ import {
   type FirstTransactionGroup,
 } from './blocks/first-transaction-fields/first-transaction-fields';
 
-export type AssetFormBody = UpdateAssetRequest & Pick<AddAssetRequest, 'initialTransaction'>;
+export type AssetFormBody = UpdateAssetRequest &
+  Pick<AddAssetRequest, 'initialTransaction' | 'groupId'>;
 
 export interface AssetForm {
   readonly form: FormGroup;

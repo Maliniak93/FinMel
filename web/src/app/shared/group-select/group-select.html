@@ -1,0 +1,22 @@
+@if (groupList.groups().length > 0) {
+  <mat-form-field appearance="outline" class="group-select">
+    <mat-label>{{ labelKey() | transloco }}</mat-label>
+    <mat-select
+      [value]="selected()"
+      [disabled]="disabled()"
+      (selectionChange)="choose($event.value)"
+      (openedChange)="touch($event)"
+    >
+      <mat-option [value]="noGroup">{{ 'groups.field.none' | transloco }}</mat-option>
+      @for (group of groupList.groups(); track group.id) {
+        <mat-option [value]="group.id">
+          <span
+            class="group-select__swatch"
+            [style.background-color]="groupColor(group.color)"
+          ></span>
+          {{ group.name }}
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+}

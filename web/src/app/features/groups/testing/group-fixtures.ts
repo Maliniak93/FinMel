@@ -19,6 +19,15 @@ export const greenGroup: AssetGroupResponse = {
   assetCount: 1,
 };
 
+export const assetGroups: AssetGroupResponse[] = [blueGroup, greenGroup];
+
+export function isGroupListRequest(input: unknown): boolean {
+  const request = input as Request | string;
+  const url = typeof request === 'string' ? request : request.url;
+  const method = typeof request === 'string' ? 'GET' : request.method;
+  return method === 'GET' && /\/api\/portfolio\/asset-groups(\?|$)/.test(url);
+}
+
 export const memberAssetId = '11111111-1111-1111-1111-111111111111';
 export const freeAssetId = '22222222-2222-2222-2222-222222222222';
 export const otherGroupAssetId = '33333333-3333-3333-3333-333333333333';

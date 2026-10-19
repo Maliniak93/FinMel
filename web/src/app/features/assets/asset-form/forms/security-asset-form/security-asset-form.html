@@ -1,5 +1,9 @@
 <app-asset-basics-fields [group]="form.controls.basics" />
 
+<div [formGroup]="form">
+  <app-group-select formControlName="groupId" />
+</div>
+
 <app-instrument-picker
   [control]="form.controls.instrument"
   [nameControl]="form.controls.basics.controls.name"

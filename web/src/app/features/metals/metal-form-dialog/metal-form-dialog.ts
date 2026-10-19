@@ -28,6 +28,8 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
+import { assignGroup } from '../../../shared/group-select/assign-group';
+import { GroupSelect } from '../../../shared/group-select/group-select';
 import { METAL, METALS } from '../metal';
 
 export interface MetalFormDialogData {
@@ -39,6 +41,7 @@ interface MetalForm {
   name: FormControl<string>;
   fineWeight: FormControl<number | null>;
   weightUnit: FormControl<WeightUnit>;
+  groupId: FormControl<string | null>;
 }
 
 const WEIGHT_UNITS: readonly { value: WeightUnit; label: string }[] = [
@@ -64,6 +67,7 @@ function positive(control: AbstractControl): ValidationErrors | null {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    GroupSelect,
     TranslocoPipe,
   ],
   templateUrl: './metal-form-dialog.html',
@@ -99,6 +103,7 @@ export class MetalFormDialog {
       nonNullable: true,
       validators: [Validators.required],
     }),
+    groupId: new FormControl<string | null>(this.holding?.groupId ?? null),
   });
 
   protected hasError(controlName: keyof MetalForm, errorCode: string): boolean {
@@ -135,7 +140,16 @@ export class MetalFormDialog {
           path: { assetId: this.holding.assetId },
           body: product,
         })
-      : await postApiPortfolioMetals({ body: product });
+      : await postApiPortfolioMetals({ body: { ...product, groupId: values.groupId } });
+
+    if (!result.error && this.holding && values.groupId !== (this.holding.groupId ?? null)) {
+      const assignmentError = await assignGroup(this.holding.assetId, values.groupId);
+      if (assignmentError) {
+        this.submitting.set(false);
+        this.formError.set(assignmentError);
+        return;
+      }
+    }
 
     this.submitting.set(false);
 

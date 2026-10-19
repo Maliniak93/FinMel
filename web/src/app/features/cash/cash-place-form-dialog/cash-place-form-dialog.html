@@ -23,6 +23,8 @@
           <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
         }
       </mat-form-field>
+
+      <app-group-select formControlName="groupId" [labelKey]="'groups.field.defaultGroup'" />
     }
 
     @if (mode === 'create') {
