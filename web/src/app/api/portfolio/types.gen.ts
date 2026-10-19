@@ -115,6 +115,14 @@ export type AllocationResponse = {
 
 export type AssetClass = number;
 
+export type AssetGroupResponse = {
+    id: string;
+    name: string;
+    color: string;
+    targetPln: null | number | string;
+    assetCount: number | string;
+};
+
 export type AssetResponse = {
     id: string;
     accountId?: null | string;
@@ -132,6 +140,23 @@ export type AssetResponse = {
 };
 
 export type AssetValuationMode = number;
+
+export type AssignAssetsToGroupRequest = {
+    assetIds: Array<string>;
+    groupId?: null | string;
+};
+
+export type AssignableAssetResponse = {
+    assetId: string;
+    name: string;
+    assetClass: AssetClass;
+    currency: string;
+    accountId: null | string;
+    accountName: null | string;
+    cashPlaceName: null | string;
+    groupId: null | string;
+    isArchived: boolean;
+};
 
 export type BalanceAdjustmentResponse = {
     month: string;
@@ -338,6 +363,12 @@ export type CreateAccountRequest = {
     variant?: null | BankVariant;
     bankName?: null | string;
     annualInterestRatePercent?: null | number | string;
+};
+
+export type CreateAssetGroupRequest = {
+    name: string;
+    color: string;
+    targetPln?: null | number | string;
 };
 
 export type CreateCashPlaceRequest = {
@@ -929,6 +960,12 @@ export type UpdateAccountRequest = {
     variant?: null | BankVariant;
     bankName?: null | string;
     annualInterestRatePercent?: null | number | string;
+};
+
+export type UpdateAssetGroupRequest = {
+    name: string;
+    color: string;
+    targetPln?: null | number | string;
 };
 
 export type UpdateAssetRequest = {
@@ -1856,6 +1893,106 @@ export type PutApiPortfolioMetalsByAssetIdResponses = {
 };
 
 export type PutApiPortfolioMetalsByAssetIdResponse = PutApiPortfolioMetalsByAssetIdResponses[keyof PutApiPortfolioMetalsByAssetIdResponses];
+
+export type GetApiPortfolioAssetGroupsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/asset-groups';
+};
+
+export type GetApiPortfolioAssetGroupsResponses = {
+    /**
+     * OK
+     */
+    200: Array<AssetGroupResponse>;
+};
+
+export type GetApiPortfolioAssetGroupsResponse = GetApiPortfolioAssetGroupsResponses[keyof GetApiPortfolioAssetGroupsResponses];
+
+export type PostApiPortfolioAssetGroupsData = {
+    body: CreateAssetGroupRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/asset-groups';
+};
+
+export type PostApiPortfolioAssetGroupsResponses = {
+    /**
+     * Created
+     */
+    201: AssetGroupResponse;
+};
+
+export type PostApiPortfolioAssetGroupsResponse = PostApiPortfolioAssetGroupsResponses[keyof PostApiPortfolioAssetGroupsResponses];
+
+export type DeleteApiPortfolioAssetGroupsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/asset-groups/{id}';
+};
+
+export type DeleteApiPortfolioAssetGroupsByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioAssetGroupsByIdResponse = DeleteApiPortfolioAssetGroupsByIdResponses[keyof DeleteApiPortfolioAssetGroupsByIdResponses];
+
+export type PutApiPortfolioAssetGroupsByIdData = {
+    body: UpdateAssetGroupRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/asset-groups/{id}';
+};
+
+export type PutApiPortfolioAssetGroupsByIdResponses = {
+    /**
+     * OK
+     */
+    200: AssetGroupResponse;
+};
+
+export type PutApiPortfolioAssetGroupsByIdResponse = PutApiPortfolioAssetGroupsByIdResponses[keyof PutApiPortfolioAssetGroupsByIdResponses];
+
+export type PutApiPortfolioAssetGroupsAssignmentData = {
+    body: AssignAssetsToGroupRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/asset-groups/assignment';
+};
+
+export type PutApiPortfolioAssetGroupsAssignmentResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioAssetGroupsAssignmentResponse = PutApiPortfolioAssetGroupsAssignmentResponses[keyof PutApiPortfolioAssetGroupsAssignmentResponses];
+
+export type GetApiPortfolioAssetGroupsAssetsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/asset-groups/assets';
+};
+
+export type GetApiPortfolioAssetGroupsAssetsResponses = {
+    /**
+     * OK
+     */
+    200: Array<AssignableAssetResponse>;
+};
+
+export type GetApiPortfolioAssetGroupsAssetsResponse = GetApiPortfolioAssetGroupsAssetsResponses[keyof GetApiPortfolioAssetGroupsAssetsResponses];
 
 export type GetApiPortfolioCashPlacesData = {
     body?: never;

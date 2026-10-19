@@ -773,6 +773,54 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/bonds/{{addMaturedBond.response.body.assetId}}
 Authorization: Bearer {{authToken}}
 
+### --- Asset groups ---
+
+### Create an asset group (colour is one of 12 keys, unique per user; 409 Conflict.DuplicateName, Conflict.GroupLimitReached, Conflict.GroupColorTaken; 400 Validation.InvalidColor, Validation.InvalidTarget)
+# @name createAssetGroup
+POST {{baseUrl}}/api/portfolio/asset-groups
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Poduszka",
+  "color": "blue",
+  "targetPln": 50000
+}
+
+### List asset groups by name, with the asset count
+GET {{baseUrl}}/api/portfolio/asset-groups
+Authorization: Bearer {{authToken}}
+
+### Update a group (publishes nothing)
+PUT {{baseUrl}}/api/portfolio/asset-groups/{{createAssetGroup.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Poduszka bezpieczeństwa",
+  "color": "green",
+  "targetPln": null
+}
+
+### Every asset the user can assign, archived ones and managed cash included
+# @name listAssignableAssets
+GET {{baseUrl}}/api/portfolio/asset-groups/assets
+Authorization: Bearer {{authToken}}
+
+### Assign assets to a group, or clear them with groupId null (publishes AssetPositionChanged per changed asset; 404 NotFound.AssetGroup, NotFound.Asset; 400 Validation.AssetIdsRequired)
+PUT {{baseUrl}}/api/portfolio/asset-groups/assignment
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assetIds": ["{{listAssignableAssets.response.body.$[0].assetId}}"],
+  "groupId": "{{createAssetGroup.response.body.id}}"
+}
+
+### Delete a group (clears and republishes its assets)
+DELETE {{baseUrl}}/api/portfolio/asset-groups/{{createAssetGroup.response.body.id}}
+Authorization: Bearer {{authToken}}
+
 ### --- Cash places ---
 
 ### Create a cash place with a balance per currency (PLN, EUR, USD; PLN alone when omitted; 409 Conflict.DuplicateName)

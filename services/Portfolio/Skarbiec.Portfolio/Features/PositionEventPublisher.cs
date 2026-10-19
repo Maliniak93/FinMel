@@ -80,6 +80,7 @@ public sealed class PositionEventPublisher(
             QuantityHistory = quantityHistory,
             ClassHistory = classHistory,
             IsArchived = asset.IsArchived,
+            GroupId = asset.GroupId,
             Version = asset.Version,
             OccurredAtUtc = timeProvider.GetUtcNow()
         }, cancellationToken);

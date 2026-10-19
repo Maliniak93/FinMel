@@ -22,4 +22,6 @@ public sealed class Asset : IUserOwned
     public long Version { get; set; }
 
     public bool IsArchived { get; set; }
+
+    public Guid? GroupId { get; set; }
 }

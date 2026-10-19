@@ -30,6 +30,9 @@ public sealed record AssetPositionChanged
     /// <summary>The asset's own archived flag.</summary>
     public required bool IsArchived { get; init; }
 
+    /// <summary>The user's asset group the asset belongs to; null when it is in none.</summary>
+    public Guid? GroupId { get; init; }
+
     /// <summary>Strictly increasing per AssetId from 0; xmin would not move when only the archive flag changes.</summary>
     public required long Version { get; init; }
 
