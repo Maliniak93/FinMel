@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Usage: node scripts/gh-project.mjs <verb> ...
 //   init                                                   create the custom fields and labels when missing
-//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix --area <area> [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e] [--queue top|bottom|before:N|after:N]   --e2e needs --parent and excludes --skip-tests and defaults --area to E2E; --area (see areas.mjs) is required except with --epic, which refuses it; --before puts the new part ahead of sibling #m; --queue places a top-level item on the board (default bottom), a part goes right after the previous part
+//   create --title <t> --body-file <p> --slug <s> --tier 1|2 --kind new|change|cleanup|fix --area <area> [--skip-tests] [--parent <n> [--before <m>]] [--epic] [--e2e] [--priority P0|P1|P2|P3] [--queue top|bottom|before:N|after:N]   --priority (top-level only, default P2) places the item in its priority band and --queue refines inside it; --e2e needs --parent and excludes --skip-tests and defaults --area to E2E; --area (see areas.mjs) is required except with --epic, which refuses it; --before puts the new part ahead of sibling #m; --queue places a top-level item on the board (default bottom), a part goes right after the previous part
 //   check --body-file <p> [--epic] [--e2e]                 dry run of create's cleaning and checking
 //   edit <n> [--body-file <p>] [--tier 1|2] [--area <area>] [--parent <n>] replace the body, set Tier or Area, or attach the issue to an epic
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
@@ -11,7 +11,10 @@
 //   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise); a shipped one also replaces ## Test manualny per manualTest
 //   list                                                   every issue on the project as JSON, in board order
 //   queue                                                  the build queue as JSON: top-level items, In progress then Todo, board order (manual, an epic's next part)
-//   move <n> top|bottom|before:N|after:N                   place a queue item on the board
+//   move <n> top|bottom|before:N|after:N                   place a queue item on the board; a Todo item stays in its priority band
+//   priority <n> <P0|P1|P2|P3>                             set the priority and re-place a Todo item in its band; a part follows its epic
+//   priority --where <P> [--queue <spec>]                  preview the queue spot of a new item, writes nothing
+//   priority --backfill [--apply]                          set P2 on every open top-level item without Priority; no card moves
 //   comment <n> --body-file <path>                         post a comment
 //   tick <n>                                               tick every acceptance-criterion checkbox
 //   exit 1 on an error, 4 when the GitHub limit is exhausted (stderr: reset time and a GITHUB_LIMIT line; never waits)
@@ -47,6 +50,15 @@ import {
   spawnGh,
 } from "./gh.mjs";
 import { AREAS, parseArea } from "./areas.mjs";
+import {
+  DEFAULT_PRIORITY,
+  PRIORITIES,
+  describeSpot,
+  inBand,
+  parsePriority,
+  placeTarget,
+  shortOf,
+} from "./priority.mjs";
 import { positionTarget, queueOf } from "./queue.mjs";
 
 const REPO_ROOT = path.resolve(
@@ -66,6 +78,7 @@ const FIELDS = [
     options: ["New", "Change", "Cleanup", "Fix"],
   },
   { name: "Area", type: "SINGLE_SELECT", options: AREAS },
+  { name: "Priority", type: "SINGLE_SELECT", options: PRIORITIES },
   { name: "Branch", type: "TEXT" },
 ];
 const LABELS = [
@@ -106,6 +119,8 @@ const BOOLEAN_FLAGS = new Set([
   "raw",
   "dry-run",
   "fresh",
+  "backfill",
+  "apply",
 ]);
 const SKIPPABLE = new Set(["tests", "review"]);
 
@@ -421,6 +436,7 @@ const ITEM_FIELDS = `
   tier: fieldValueByName(name: "Tier") { ${SINGLE_SELECT} }
   kind: fieldValueByName(name: "Kind") { ${SINGLE_SELECT} }
   area: fieldValueByName(name: "Area") { ${SINGLE_SELECT} }
+  priority: fieldValueByName(name: "Priority") { ${SINGLE_SELECT} }
   branch: fieldValueByName(name: "Branch") { ... on ProjectV2ItemFieldTextValue { text } }
 `;
 
@@ -487,6 +503,7 @@ function fieldsOf(item, labels) {
     tier: item.tier?.name ?? null,
     kind: item.kind?.name ?? null,
     area: item.area?.name ?? null,
+    priority: item.priority?.name ?? null,
     branch: item.branch?.text ?? null,
     epic: labels.includes("epic"),
     skipTests: labels.includes("skip-tests"),
@@ -616,6 +633,17 @@ async function create(flags) {
     throw new Error(
       "--queue is for a top-level item: a part goes right after the previous part",
     );
+  if (flags.priority && flags.parent)
+    throw new Error(
+      "--priority is for a top-level item: a part follows its epic's priority",
+    );
+  const priority = flags.parent
+    ? null
+    : flags.priority
+      ? parsePriority(flags.priority)
+      : DEFAULT_PRIORITY;
+  if (flags.priority && !priority)
+    throw new Error(`--priority must be one of: ${PRIORITIES.join(", ")}`);
   if (flags.area && flags.epic)
     throw new Error("--area is for a spec, not an epic: an epic has no area");
   if (!flags.area && !flags.epic && !flags.e2e)
@@ -629,6 +657,10 @@ async function create(flags) {
     throw new Error(
       "the project has no Area field — run node scripts/gh-project.mjs init",
     );
+  if (priority && !projectFields().fields.has("Priority"))
+    throw new Error(
+      "the project has no Priority field — run node scripts/gh-project.mjs init",
+    );
   const branch = flags.epic
     ? null
     : `${flags.kind === "fix" ? "fix" : "feat"}/${flags.slug}`;
@@ -636,7 +668,10 @@ async function create(flags) {
   let afterId = null;
   if (!flags.parent) {
     const { board, queue: items } = await projectQueue();
-    afterId = positionTarget(items, flags.queue ?? "bottom", board);
+    afterId = placeTarget(items, board, {
+      priority,
+      spec: flags.queue ?? "bottom",
+    });
   }
 
   const argv = [
@@ -662,6 +697,7 @@ async function create(flags) {
     setField(issueNumber, "Tier", flags.tier);
     setField(issueNumber, "Kind", kind);
     if (area) setField(issueNumber, "Area", area);
+    if (priority) setField(issueNumber, "Priority", priority);
     if (branch) setField(issueNumber, "Branch", branch);
     if (flags.before)
       placeBefore(flags.parent, issueNumber, Number(flags.before));
@@ -1458,17 +1494,125 @@ async function move([number, target]) {
   if (!n || !target)
     throw new Error("usage: move <n> top|bottom|before:N|after:N");
   const { board, queue: items } = await projectQueue();
-  if (!items.some((q) => q.number === n))
-    throw new Error(`#${n} is not in the queue`);
-  setPosition(
-    n,
-    positionTarget(
-      items.filter((q) => q.number !== n),
-      target,
-      board,
-    ),
-  );
+  const card = items.find((q) => q.number === n);
+  if (!card) throw new Error(`#${n} is not in the queue`);
+  const afterId =
+    card.status === "Todo"
+      ? placeTarget(items, board, {
+          priority: card.priority ?? DEFAULT_PRIORITY,
+          spec: target,
+          self: n,
+        })
+      : positionTarget(
+          items.filter((q) => q.number !== n),
+          target,
+          board,
+        );
+  setPosition(n, afterId);
   console.log(`#${n}: moved ${target}`);
+}
+
+function partsOf(board) {
+  const parents = new Map();
+  for (const c of board)
+    if (c.epic) for (const s of c.subIssues ?? []) parents.set(s, c.number);
+  return parents;
+}
+
+function backfillPriority(board, apply) {
+  const parts = partsOf(board);
+  const todo = board.filter(
+    (c) => c.status !== "Done" && !c.priority && !parts.has(c.number),
+  );
+  for (const c of todo) console.log(`#${c.number} → ${DEFAULT_PRIORITY}`);
+  console.log(
+    `${todo.length} to set, ${apply ? "applying" : "dry run (use --apply to write)"}`,
+  );
+  if (!apply || !todo.length) return;
+
+  const meta = projectFields();
+  const field = meta.fields.get("Priority");
+  const option = field?.options?.find((o) => o.name === DEFAULT_PRIORITY);
+  if (!option)
+    throw new Error(
+      "the project has no Priority field — run node scripts/gh-project.mjs init",
+    );
+  const BATCH = 20;
+  for (let at = 0; at < todo.length; at += BATCH) {
+    const mutations = todo
+      .slice(at, at + BATCH)
+      .map(
+        (c, k) =>
+          `m${k}: updateProjectV2ItemFieldValue(input: {projectId: ${JSON.stringify(meta.id)}, itemId: ${JSON.stringify(c.id)}, fieldId: ${JSON.stringify(field.id)}, value: {singleSelectOptionId: ${JSON.stringify(option.id)}}}) { projectV2Item { id } }`,
+      );
+    graphql(`mutation { ${mutations.join(" ")} }`);
+  }
+}
+
+async function priorityVerb(rest) {
+  const positional = [];
+  while (rest.length && !rest[0].startsWith("--")) positional.push(rest.shift());
+  const flags = parseFlags(rest);
+  const { board, queue: items } = await projectQueue();
+
+  if (flags.backfill) return backfillPriority(board, Boolean(flags.apply));
+
+  if (flags.where !== undefined) {
+    const priority = parsePriority(flags.where);
+    if (!priority)
+      throw new Error(`priority must be one of: ${PRIORITIES.join(", ")}`);
+    const afterId = placeTarget(items, board, {
+      priority,
+      spec: flags.queue ?? "bottom",
+    });
+    const preview = { number: 0, id: "NEW", status: "Todo", priority, parent: null, epic: false };
+    const at = afterId === null ? 0 : board.findIndex((c) => c.id === afterId) + 1;
+    const hypothetical = [...board.slice(0, at), preview, ...board.slice(at)];
+    console.log(describeSpot(queueOf(hypothetical), 0));
+    return;
+  }
+
+  const n = Number(String(positional[0] ?? "").replace(/^#/, ""));
+  if (!n || !positional[1])
+    throw new Error(
+      "usage: priority <n> <P0|P1|P2|P3> | priority --where <P> [--queue <spec>] | priority --backfill [--apply]",
+    );
+  const priority = parsePriority(positional[1]);
+  if (!priority)
+    throw new Error(`priority must be one of: ${PRIORITIES.join(", ")}`);
+  const epic = partsOf(board).get(n);
+  if (epic)
+    throw new Error(
+      `#${n} is a part of epic #${epic} — set the epic's priority`,
+    );
+  const card = items.find((q) => q.number === n);
+  if (!card) throw new Error(`#${n} is not in the queue`);
+  if (!projectFields().fields.has("Priority"))
+    throw new Error(
+      "the project has no Priority field — run node scripts/gh-project.mjs init",
+    );
+
+  const was = card.priority ?? DEFAULT_PRIORITY;
+  setField(n, "Priority", priority);
+  const head = `#${n} ${shortOf(was)} → ${shortOf(priority)}`;
+  if (card.status !== "Todo") {
+    console.log(`${head}, ${card.status}: only the field is set`);
+    return;
+  }
+  if (was === priority && inBand(board, card)) {
+    console.log(`${head}, unchanged`);
+    return;
+  }
+
+  const positionOf = (cards) =>
+    queueOf(cards).findIndex((q) => q.number === n) + 1;
+  const afterId = placeTarget(items, board, { priority, self: n });
+  setPosition(n, afterId);
+  const moved = { ...card, priority };
+  const others = board.filter((c) => c.number !== n);
+  const at = afterId === null ? 0 : others.findIndex((c) => c.id === afterId) + 1;
+  const after = [...others.slice(0, at), moved, ...others.slice(at)];
+  console.log(`${head}, ${positionOf(board)}. → ${positionOf(after)}. w kolejce`);
 }
 
 function comment([number, ...rest]) {
@@ -1529,6 +1673,7 @@ const VERBS = {
   list,
   queue,
   move,
+  priority: priorityVerb,
   comment,
   tick,
 };

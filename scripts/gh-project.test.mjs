@@ -305,3 +305,223 @@ test("prepare moves the epic with its part", () => {
     started.cleanup();
   }
 });
+
+const P1 = "P1 Wysoki";
+const P2 = "P2 Normalny";
+const priorityOptions = ["P0 Pilne", "P1 Wysoki", "P2 Normalny", "P3 Niski"];
+const writesOf = (sandbox) => sandbox.log().filter((e) => ["setField", "fieldBatch", "position", "mutation", "issueCreate"].includes(e.kind));
+
+function priorityState(extra = {}) {
+  return buildState({
+    issues: [
+      { number: 1, status: "Done" },
+      { number: 440, status: "Todo", labels: ["spec"], priority: P1 },
+      { number: 441, status: "Todo", labels: ["spec"], priority: P2 },
+      { number: 442, status: "Todo", labels: ["spec"], priority: P2 },
+      { number: 443, status: "Todo", labels: ["spec"] },
+    ],
+    ...extra,
+  });
+}
+
+test("init creates Priority", () => {
+  const sandbox = createSandbox(priorityState({ withPriority: false }));
+  try {
+    const run = sandbox.run("gh-project.mjs", ["init"]);
+
+    assert.equal(run.code, 0, run.out);
+    const created = sandbox.log().filter((e) => e.kind === "fieldCreate");
+    assert.equal(created.length, 1);
+    assert.equal(created[0].name, "Priority");
+    assert.deepEqual(created[0].options, priorityOptions);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("list and get include priority", () => {
+  const sandbox = createSandbox(priorityState());
+  try {
+    const listed = sandbox.run("gh-project.mjs", ["list"]);
+    assert.equal(listed.code, 0, listed.out);
+    const cards = lastJson(listed.stdout);
+    assert.equal(cards.find((c) => c.number === 440).priority, P1);
+    assert.equal(cards.find((c) => c.number === 443).priority, null);
+
+    const queued = sandbox.run("gh-project.mjs", ["queue"]);
+    assert.equal(queued.code, 0, queued.out);
+    const queue = lastJson(queued.stdout);
+    assert.equal(queue.find((c) => c.number === 441).priority, P2);
+    assert.equal(queue.find((c) => c.number === 443).priority, null);
+
+    assert.equal(lastJson(sandbox.run("gh-project.mjs", ["get", "440"]).stdout).priority, P1);
+    assert.equal(lastJson(sandbox.run("gh-project.mjs", ["get", "443"]).stdout).priority, null);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create places by priority", () => {
+  const sandbox = createSandbox(priorityState());
+  try {
+    const urgent = sandbox.run("gh-project.mjs", createArgs(sandbox, "urgent", ["--area", "Backend", "--priority", "p1"]));
+    assert.equal(urgent.code, 0, urgent.out);
+    const urgentNumber = lastJson(urgent.stdout).number;
+    assert.equal(sandbox.state().issues[urgentNumber].priority, P1);
+
+    const plain = sandbox.run("gh-project.mjs", createArgs(sandbox, "plain", ["--area", "Backend"]));
+    assert.equal(plain.code, 0, plain.out);
+    const plainNumber = lastJson(plain.stdout).number;
+    assert.equal(sandbox.state().issues[plainNumber].priority, P2);
+
+    const sent = positions(sandbox);
+    assert.equal(sent[0].itemId, `ITEM_${urgentNumber}`);
+    assert.equal(sent[0].afterId, "ITEM_440");
+    assert.equal(sent[1].itemId, `ITEM_${plainNumber}`);
+    assert.equal(sent[1].afterId, "ITEM_443");
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create refuses a cross-band queue", () => {
+  const state = priorityState();
+  state.issues[9] = { ...state.issues[442], number: 9, labels: ["epic"], priority: null };
+  state.order.push(9);
+  const sandbox = createSandbox(state);
+  try {
+    const cross = sandbox.run("gh-project.mjs", createArgs(sandbox, "cross", ["--area", "Backend", "--priority", "P1", "--queue", "after:441"]));
+    assert.notEqual(cross.code, 0, cross.out);
+    assert.match(cross.out, /\/prio/);
+
+    const part = sandbox.run("gh-project.mjs", createArgs(sandbox, "part", ["--area", "Backend", "--priority", "P1", "--parent", "9"]));
+    assert.notEqual(part.code, 0, part.out);
+
+    assert.deepEqual(issueCreates(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("priority sets and re-places", () => {
+  const sandbox = createSandbox(priorityState());
+  try {
+    const run = sandbox.run("gh-project.mjs", ["priority", "442", "P1"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.equal(sandbox.state().issues[442].priority, P1);
+    const sent = positions(sandbox);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].itemId, "ITEM_442");
+    assert.equal(sent[0].afterId, "ITEM_440");
+    assert.match(run.stdout, /#442 P2 → P1, 3\. → 2\. w kolejce/);
+  } finally {
+    sandbox.cleanup();
+  }
+
+  const running = createSandbox(
+    buildState({
+      issues: [
+        { number: 10, status: "In progress", labels: ["spec"], priority: P2 },
+        { number: 11, status: "Todo", labels: ["spec"], priority: P2 },
+      ],
+    }),
+  );
+  try {
+    const run = running.run("gh-project.mjs", ["priority", "10", "P1"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.equal(running.state().issues[10].priority, P1);
+    assert.equal(positions(running).length, 0);
+  } finally {
+    running.cleanup();
+  }
+});
+
+test("priority refuses a part", () => {
+  const sandbox = createSandbox(
+    buildState({
+      issues: [
+        { number: 9, status: "Todo", labels: ["epic"] },
+        { number: 8, status: "Todo", labels: ["spec"], parent: 9 },
+      ],
+    }),
+  );
+  try {
+    const run = sandbox.run("gh-project.mjs", ["priority", "8", "P1"]);
+
+    assert.notEqual(run.code, 0, run.out);
+    assert.match(run.out, /#8 is a part of epic #9/);
+    assert.deepEqual(writesOf(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("priority where previews", () => {
+  const sandbox = createSandbox(priorityState());
+  try {
+    const run = sandbox.run("gh-project.mjs", ["priority", "--where", "P1"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.match(run.stdout, /2\. w kolejce, za #440 \(P1\)/);
+    assert.deepEqual(writesOf(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("move stays in the band", () => {
+  const sandbox = createSandbox(priorityState());
+  try {
+    const top = sandbox.run("gh-project.mjs", ["move", "442", "top"]);
+    assert.equal(top.code, 0, top.out);
+    assert.equal(positions(sandbox).length, 1);
+    assert.equal(positions(sandbox)[0].afterId, "ITEM_440");
+
+    const refused = sandbox.run("gh-project.mjs", ["move", "442", "before:440"]);
+    assert.notEqual(refused.code, 0, refused.out);
+    assert.match(refused.out, /\/prio/);
+    assert.equal(positions(sandbox).length, 1);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("priority backfill batches and keeps order", () => {
+  const issues = [
+    { number: 1, status: "Done" },
+    { number: 2, status: "Todo", labels: ["spec"], priority: P1 },
+    { number: 9, status: "Todo", labels: ["epic"], priority: "P3 Niski" },
+    { number: 8, status: "Todo", labels: ["spec"], parent: 9 },
+  ];
+  for (let n = 101; n <= 125; n++) issues.push({ number: n, status: "Todo", labels: ["spec"] });
+  const sandbox = createSandbox(buildState({ issues }));
+  try {
+    const dry = sandbox.run("gh-project.mjs", ["priority", "--backfill"]);
+    assert.equal(dry.code, 0, dry.out);
+    for (let n = 101; n <= 125; n++) assert.match(dry.stdout, new RegExp(`#${n} → P2`));
+    assert.doesNotMatch(dry.stdout, /#(1|2|8|9) →/);
+    assert.deepEqual(writesOf(sandbox), []);
+
+    const applied = sandbox.run("gh-project.mjs", ["priority", "--backfill", "--apply"]);
+    assert.equal(applied.code, 0, applied.out);
+    const batches = sandbox.log().filter((e) => e.kind === "fieldBatch");
+    assert.deepEqual(
+      batches.map((b) => b.size),
+      [20, 5],
+    );
+    assert.equal(positions(sandbox).length, 0);
+    const state = sandbox.state();
+    for (let n = 101; n <= 125; n++) assert.equal(state.issues[n].priority, P2);
+    assert.equal(state.issues[8].priority, null);
+    assert.equal(state.issues[1].priority, null);
+    assert.equal(state.issues[2].priority, P1);
+
+    const again = sandbox.run("gh-project.mjs", ["priority", "--backfill", "--apply"]);
+    assert.equal(again.code, 0, again.out);
+    assert.equal(sandbox.log().filter((e) => e.kind === "fieldBatch").length, 2);
+  } finally {
+    sandbox.cleanup();
+  }
+});

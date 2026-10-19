@@ -49,6 +49,16 @@ test("queue orders In progress then Todo by position", () => {
   assert.deepEqual(numbers(queue), [12, 16, 11, 13, 17]);
 });
 
+test("P0 lifts above In progress", () => {
+  const queue = queueOf([
+    card(10, "In progress", { priority: "P2 Normalny", autobuild: true }),
+    card(11, "Todo", { priority: "P1 Wysoki" }),
+    card(12, "Todo", { priority: "P0 Pilne" }),
+  ]);
+
+  assert.deepEqual(numbers(queue), [12, 10, 11]);
+});
+
 test("manual is In progress without autobuild", () => {
   const queue = queueOf([
     card(20, "In progress"),
