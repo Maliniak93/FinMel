@@ -96,6 +96,46 @@ public sealed class HistoryRebuildPropertyTests
         Assert.Equal(expectedDates, days.Select(d => d.Date).Order());
     }
 
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void ClassSplitSumsToTotal(int seed)
+    {
+        var random = new Random(seed);
+        var from = new DateOnly(2026, 3, 1).AddDays(random.Next(0, 30));
+        var to = from.AddDays(random.Next(15, 36));
+        var classes = new[] { AssetClass.Cash, AssetClass.Stock, AssetClass.Etf };
+
+        var positions = new List<Position>();
+        for (var i = 0; i < random.Next(1, 6); i++)
+        {
+            var position = NewPosition(random, from, to, market: false, instrumentId: null, currency: "PLN");
+            var pointDates = Enumerable.Range(0, random.Next(0, 4))
+                .Select(_ => from.AddDays(random.Next(-30, to.DayNumber - from.DayNumber + 1)))
+                .Distinct()
+                .Order();
+            position.ClassHistory = [.. pointDates.Select(d => new PositionClassPoint { Date = d, AssetClass = classes[random.Next(classes.Length)] })];
+            position.AssetClass = position.ClassHistory.Count > 0 ? position.ClassHistory[^1].AssetClass : classes[random.Next(classes.Length)];
+            positions.Add(position);
+        }
+
+        var days = HistoryRebuild.Compute(
+            positions,
+            new Dictionary<Guid, IReadOnlyList<InstrumentPriceLookup>>(),
+            new Dictionary<string, IReadOnlyList<FxRateLookup>>(),
+            from,
+            to);
+
+        Assert.NotEmpty(days);
+        foreach (var day in days)
+        {
+            Assert.Equal(day.TotalPln, day.Lines.GroupBy(l => l.AssetClass).Sum(g => g.Sum(l => l.ValuePln)));
+            foreach (var line in day.Lines)
+            {
+                Assert.Equal(positions.Single(p => p.AssetId == line.AssetId).ClassOn(day.Date), line.AssetClass);
+            }
+        }
+    }
+
     private static Position NewPosition(Random random, DateOnly from, DateOnly to, bool market, Guid? instrumentId, string currency)
     {
         var span = to.DayNumber - from.DayNumber;

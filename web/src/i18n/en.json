@@ -1278,7 +1278,7 @@
     "filteredNotice": "Showing one account only.",
     "showAll": "Show all",
     "balances": {
-      "cash": "Cash",
+      "cash": "Free funds",
       "securities": "Securities",
       "total": "Total"
     },

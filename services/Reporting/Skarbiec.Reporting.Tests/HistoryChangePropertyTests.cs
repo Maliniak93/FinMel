@@ -81,6 +81,31 @@ public sealed class HistoryChangePropertyTests
         Assert.Equal(expected, HistoryChange.EarliestAffectedDate(stored, incoming));
     }
 
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void ClassTimeline(int seed)
+    {
+        var random = new Random(seed);
+        var oldTimeline = RandomTimeline(random);
+        var newTimeline = random.Next(3) == 0 ? oldTimeline : RandomTimeline(random);
+        var history = new[] { (Origin, 10m) };
+
+        var stored = Stored(history: history, assetClass: oldTimeline[^1].AssetClass, classHistory: oldTimeline);
+        var incoming = Incoming(history: history, assetClass: newTimeline[^1].AssetClass, classHistory: newTimeline);
+
+        DateOnly? expected = null;
+        for (var day = Origin; day <= Origin.AddDays(80); day = day.AddDays(1))
+        {
+            if (ClassOn(oldTimeline, day) != ClassOn(newTimeline, day))
+            {
+                expected = day;
+                break;
+            }
+        }
+
+        Assert.Equal(expected, HistoryChange.EarliestAffectedDate(stored, incoming));
+    }
+
     [Fact]
     public void EarliestAffectedDate_AssetArchived_IsTheUtcDateOfTheEvent()
     {
@@ -110,6 +135,22 @@ public sealed class HistoryChangePropertyTests
         var history = new[] { (Origin, 10m), (Origin.AddDays(5), 12m) };
 
         Assert.Null(HistoryChange.EarliestAffectedDate(Stored(history: history), Incoming(history: history)));
+    }
+
+    private static readonly AssetClass[] TimelineClasses = [AssetClass.Cash, AssetClass.Stock, AssetClass.Etf];
+
+    private static AssetClass ClassOn(IReadOnlyList<(DateOnly Date, AssetClass AssetClass)> timeline, DateOnly day) =>
+        timeline.Last(p => p.Date <= day).AssetClass;
+
+    // The first point sits on Origin, where the quantity starts, so every day before it is unheld.
+    private static (DateOnly Date, AssetClass AssetClass)[] RandomTimeline(Random random)
+    {
+        var dates = Enumerable.Range(0, random.Next(0, 4))
+            .Select(_ => Origin.AddDays(random.Next(1, 60)))
+            .Distinct()
+            .Order();
+
+        return [(Origin, TimelineClasses[random.Next(TimelineClasses.Length)]), .. dates.Select(d => (d, TimelineClasses[random.Next(TimelineClasses.Length)]))];
     }
 
     private static decimal QuantityOn(IReadOnlyList<(DateOnly Date, decimal Quantity)> history, DateOnly day) =>
@@ -154,8 +195,10 @@ public sealed class HistoryChangePropertyTests
         Guid? instrumentId = null,
         string currency = "PLN",
         bool isArchived = false,
-        DateOnly? archivedOn = null) => new()
+        DateOnly? archivedOn = null,
+        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null) => new()
         {
+            ClassHistory = [.. (classHistory ?? []).Select(p => new PositionClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             AssetId = AssetId,
             UserId = Guid.NewGuid(),
             AccountId = AccountId,
@@ -178,7 +221,8 @@ public sealed class HistoryChangePropertyTests
         Guid? instrumentId = null,
         string currency = "PLN",
         bool isArchived = false,
-        DateTimeOffset? occurredAt = null) => new()
+        DateTimeOffset? occurredAt = null,
+        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null) => new()
         {
             AssetId = AssetId,
             AccountId = AccountId,
@@ -190,7 +234,7 @@ public sealed class HistoryChangePropertyTests
             Quantity = history.Count > 0 ? history[^1].Quantity : 0m,
             QuoteUnitsPerQuantity = 1m,
             QuantityHistory = [.. history.Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
-            ClassHistory = [],
+            ClassHistory = [.. (classHistory ?? []).Select(p => new ClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             IsArchived = isArchived,
             Version = 1,
             OccurredAtUtc = occurredAt ?? DateTimeOffset.UtcNow,

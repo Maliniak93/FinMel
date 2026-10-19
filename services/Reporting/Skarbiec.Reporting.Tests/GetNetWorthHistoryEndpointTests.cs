@@ -390,6 +390,41 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
         Assert.Contains("Validation.InvalidAssetClass", problem);
     }
 
+    [Fact]
+    public async Task ClassFilter_FollowsTimeline()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Etf, valuationMode: AssetValuationMode.CurrencyValued, quantity: 400m,
+                quantityHistory: [(Today.AddDays(-10), 400m)],
+                classHistory: [(Today.AddDays(-10), AssetClass.Cash), (Today.AddDays(-6), AssetClass.Stock), (Today.AddDays(-3), AssetClass.Etf)]);
+            await db.RebuildHistoryAsync(Bus, userId, Today.AddDays(-10), cancellationToken);
+        }
+
+        for (var offset = 10; offset >= 1; offset--)
+        {
+            Assert.Equal(400m, Assert.Single(await GetSeriesAsync(client, null, cancellationToken), p => p.Date == Today.AddDays(-offset)).NetWorthPln);
+        }
+
+        foreach (var (assetClass, firstOffset, lastOffset) in new[] { (AssetClass.Cash, 10, 7), (AssetClass.Stock, 6, 4), (AssetClass.Etf, 3, 1) })
+        {
+            var series = await GetSeriesAsync(client, assetClass, cancellationToken);
+            for (var offset = 10; offset >= 1; offset--)
+            {
+                var expected = offset <= firstOffset && offset >= lastOffset ? 400m : 0m;
+                Assert.Equal(expected, Assert.Single(series, p => p.Date == Today.AddDays(-offset)).NetWorthPln);
+            }
+        }
+    }
+
     private static async Task<IReadOnlyList<NetWorthHistoryPoint>> GetSeriesAsync(
         HttpClient client, AssetClass? assetClass, CancellationToken cancellationToken)
     {

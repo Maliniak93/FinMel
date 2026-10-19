@@ -582,6 +582,73 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task StampsClassPerDay()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await SeedFreeCashAsync(db, assetId, userId, accountId, today, cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            for (var offset = 10; offset >= 1; offset--)
+            {
+                var expected = offset >= 7 ? AssetClass.Cash : offset >= 4 ? AssetClass.Stock : AssetClass.Etf;
+                var line = Assert.Single(await GetLinesAsync(containers, accountId, today.AddDays(-offset), cancellationToken));
+                Assert.Equal(expected, line.AssetClass);
+                Assert.Equal(400m, line.ValuePln);
+            }
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task PublishedByAssetClass_FollowsTimeline()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await SeedFreeCashAsync(db, assetId, userId, accountId, today, cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+
+            var published = Assert.Single(await provider.GetRequiredService<LatestValuationRecorder>()
+                .SettledDeliveriesForAsync(userId, cancellationToken));
+
+            Assert.Equal(today.AddDays(-1), published.Date);
+            var line = Assert.Single(published.ByAssetClass);
+            Assert.Equal(AssetClass.Etf, line.AssetClass);
+            Assert.Equal(400m, line.ValuePln);
+        }, cancellationToken);
+    }
+
+    private static async Task SeedFreeCashAsync(
+        ReportingDbContext db, Guid assetId, Guid userId, Guid accountId, DateOnly today, CancellationToken cancellationToken)
+    {
+        await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+            assetClass: AssetClass.Etf, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 400m,
+            quantityHistory: [(today.AddDays(-10), 400m)],
+            classHistory: [(today.AddDays(-10), AssetClass.Cash), (today.AddDays(-6), AssetClass.Stock), (today.AddDays(-3), AssetClass.Etf)]);
+        await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-10), cancellationToken);
+    }
+
     private Task RunConsumerAsync(
         IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(

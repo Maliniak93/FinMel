@@ -1278,7 +1278,7 @@
     "filteredNotice": "Widoczny tylko jeden rachunek.",
     "showAll": "Pokaż wszystkie",
     "balances": {
-      "cash": "Gotówka",
+      "cash": "Wolne środki",
       "securities": "Papiery",
       "total": "Razem"
     },

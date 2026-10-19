@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
@@ -149,31 +150,56 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
-    public async Task ByAccount_CashSplit()
+    public async Task ByAccount_EntryHasNoCashPln()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         var accountId = Guid.NewGuid();
-        var emptyOfCashId = Guid.NewGuid();
         var snapshotDate = new DateOnly(2026, 8, 1);
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, snapshotDate, 2_000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, snapshotDate, 1_500m, cancellationToken);
             await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), snapshotDate, 1_000m, cancellationToken, assetClass: AssetClass.Cash);
             await db.SeedValuationLineAsync(userId, accountId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Etf);
-            await db.SeedValuationLineAsync(userId, emptyOfCashId, Guid.NewGuid(), snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Stock);
         }
 
         using var client = Factory.CreateAuthenticatedClient(userId);
         var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("valuePln", json);
+        Assert.DoesNotContain("cashPln", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FreeCash_CountsTowardHoldingClass()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+
+        await Bus.PublishCashPositionAsync(
+            userId, accountId, 400m, cancellationToken,
+            quantityHistory: [new QuantityPoint { Date = today.AddDays(-10), Quantity = 400m }],
+            assetClass: AssetClass.Etf,
+            classHistory:
+            [
+                new ClassPoint { Date = today.AddDays(-10), AssetClass = AssetClass.Cash },
+                new ClassPoint { Date = today.AddDays(-3), AssetClass = AssetClass.Etf },
+            ]);
+
+        using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 400m, cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var split = Assert.Single(body!.ByAccount, a => a.AccountId == accountId);
-        Assert.Equal(1_500m, split.ValuePln);
-        Assert.Equal(1_000m, split.CashPln);
-        Assert.Equal(0m, Assert.Single(body.ByAccount, a => a.AccountId == emptyOfCashId).CashPln);
+        Assert.Equal(400m, Assert.Single(body!.ByAssetClass, c => c.AssetClass == AssetClass.Etf).ValuePln);
+        Assert.DoesNotContain(body.ByAssetClass, c => c.AssetClass == AssetClass.Cash);
     }
 
     [Fact]

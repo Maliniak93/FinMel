@@ -18,14 +18,14 @@ public static class HistoryChange
         var oldStart = Start(stored.QuantityHistory.Select(p => p.Date));
         var candidates = new List<DateOnly?>();
 
-        if (stored.AssetClass != incoming.AssetClass
-            || stored.ValuationMode != incoming.ValuationMode
+        if (stored.ValuationMode != incoming.ValuationMode
             || stored.InstrumentId != incoming.InstrumentId
             || !string.Equals(stored.Currency, incoming.Currency, StringComparison.Ordinal))
         {
             candidates.Add(Earlier(oldStart, newStart));
         }
 
+        candidates.Add(FirstClassDifference(stored, incoming, oldStart, newStart));
         candidates.Add(FirstQuantityDifference(stored.QuantityHistory, incoming.QuantityHistory));
 
         if (stored.IsArchived != incoming.IsArchived)
@@ -51,6 +51,29 @@ public static class HistoryChange
             var oldQuantity = oldHistory.LastOrDefault(p => p.Date <= date)?.Quantity ?? 0m;
             var newQuantity = newHistory.LastOrDefault(p => p.Date <= date)?.Quantity ?? 0m;
             if (oldQuantity != newQuantity)
+            {
+                return date;
+            }
+        }
+
+        return null;
+    }
+
+    // The class is constant between points, so the first difference is at a point or at a quantity start of one of the two.
+    private static DateOnly? FirstClassDifference(
+        Position stored, AssetPositionChanged incoming, DateOnly? oldStart, DateOnly? newStart)
+    {
+        var dates = stored.ClassHistory.Select(p => p.Date)
+            .Concat(incoming.ClassHistory.Select(p => p.Date))
+            .Concat(new[] { oldStart, newStart }.OfType<DateOnly>())
+            .Distinct()
+            .Order();
+
+        foreach (var date in dates)
+        {
+            var oldClass = stored.ClassOn(date);
+            var newClass = incoming.ClassHistory.LastOrDefault(p => p.Date <= date)?.AssetClass ?? incoming.AssetClass;
+            if (oldClass != newClass)
             {
                 return date;
             }

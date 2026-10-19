@@ -123,7 +123,6 @@ const dashboard = {
     {
       accountId,
       valuePln: 5000,
-      cashPln: 2000,
       percentage: 100,
       snapshotDate: '2026-10-15',
       isStale: false,
@@ -238,6 +237,16 @@ describe('AccountDetail', () => {
     expect(text()).toContain(formatMoney(2000, 'PLN').replace(/\s+/g, ' '));
     expect(text()).toContain(formatMoney(3000, 'PLN').replace(/\s+/g, ' '));
     expect(text()).toContain(formatMoney(5000, 'PLN').replace(/\s+/g, ' '));
+  });
+
+  it('labels the account cash Free funds, and Wolne środki in Polish', async () => {
+    await setup();
+
+    expect(text()).toContain('Free funds');
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(text()).toContain('Wolne środki');
   });
 
   it('lists the deposits a bank account funds or receives and links to the deposits page', async () => {

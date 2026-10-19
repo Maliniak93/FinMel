@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MassTransit;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Features.GetDashboard;
@@ -111,7 +113,8 @@ internal static class ReportingApi
         long version = 0,
         bool isArchived = false,
         IReadOnlyList<(DateOnly Date, decimal Quantity)>? quantityHistory = null,
-        DateOnly? archivedOn = null)
+        DateOnly? archivedOn = null,
+        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null)
     {
         db.Positions.Add(new Data.Position
         {
@@ -128,9 +131,29 @@ internal static class ReportingApi
             UpdatedAt = DateTimeOffset.UtcNow,
             QuantityHistory = [.. (quantityHistory ?? []).Select(p => new PositionQuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             ArchivedOn = archivedOn,
+            ClassHistory = [.. (classHistory ?? []).Select(p => new PositionClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
         });
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Seeds the request and publishes it; returns once the host's rebuild consumer has deleted the request.
+    public static async Task RebuildHistoryAsync(
+        this ReportingDbContext db, IBus bus, Guid userId, DateOnly fromDate, CancellationToken cancellationToken)
+    {
+        await db.SeedHistoryRebuildRequestAsync(userId, fromDate, cancellationToken);
+        await bus.PublishRebuildRequestedAsync(userId, cancellationToken);
+
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (await db.HistoryRebuildRequests.IgnoreQueryFilters().AsNoTracking().AnyAsync(r => r.UserId == userId, cancellationToken))
+        {
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException($"The history rebuild of user {userId} never finished.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
     }
 
     public static async Task SeedHistoryRebuildRequestAsync(
