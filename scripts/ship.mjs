@@ -18,7 +18,8 @@ import { GH_LIMIT_EXIT, GhLimitError, limitFromGhFailure, limitFromText, limitTe
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
 const BOOLEAN_FLAGS = new Set(["blocked", "dry-run", "from-run"]);
-const VERIFY_ARGV = ["scripts/verify.mjs", "--all", "--cache-check"];
+const VERIFY_ARGV = ["scripts/verify.mjs", "--cache-check"];
+const VERIFY_ALL_ARGV = ["scripts/verify.mjs", "--all", "--cache-check"];
 const E2E_VERIFY_ARGV = ["scripts/verify.mjs", "--projects", "e2e", "--cache-check"];
 const E2E_CHECK_ARGV = ["scripts/e2e.mjs", "check"];
 const NOT_GREEN = "the tree was not proven green by verify.mjs (cache miss)";
@@ -57,7 +58,7 @@ function parseFlags(argv) {
   return flags;
 }
 
-const [issue, ...rest] = process.argv.slice(2);
+let issue;
 let result = { ok: false };
 let exitCode = 2;
 
@@ -66,8 +67,13 @@ function finish() {
   process.exit(exitCode);
 }
 
-function checkVerified(e2e) {
-  const argv = e2e ? E2E_VERIFY_ARGV : VERIFY_ARGV;
+function verifyArgv({ e2e, lastBuild }) {
+  if (e2e) return E2E_VERIFY_ARGV;
+  return lastBuild ? VERIFY_ALL_ARGV : VERIFY_ARGV;
+}
+
+function checkVerified(gate) {
+  const argv = verifyArgv(gate);
   const res = run(process.execPath, argv);
   const line = res.all.split(/\r?\n/).reverse().find((l) => l.startsWith("VERIFY_RESULT: "));
   let parsed = null;
@@ -79,7 +85,7 @@ function checkVerified(e2e) {
   return {
     ok: false,
     error: parsed
-      ? `${NOT_GREEN}; run node scripts/verify.mjs ${e2e ? "--projects e2e" : "--all"} --fix --cache first`
+      ? `${NOT_GREEN}; run node scripts/verify.mjs ${gate.e2e ? "--projects e2e " : gate.lastBuild ? "--all " : ""}--fix --cache first`
       : `${NOT_GREEN}; node ${argv.join(" ")} gave no result: ${res.firstErr}`,
   };
 }
@@ -96,16 +102,29 @@ function checkE2e() {
   return { ok: false, error: `${NOT_E2E_GREEN}; ${parsed?.error ?? `node ${E2E_CHECK_ARGV.join(" ")} gave no result: ${res.firstErr}`}` };
 }
 
-function checkGate(e2e) {
-  const verified = checkVerified(e2e);
-  if (!e2e) return verified;
+function checkGate(gate) {
+  const verified = checkVerified(gate);
+  if (!gate.e2e) return verified;
   const suite = checkE2e();
   if (verified.ok && suite.ok) return suite;
   return { ok: false, error: [verified.ok ? null : verified.error, suite.ok ? null : suite.error].filter(Boolean).join("; ") };
 }
 
-function gateCommand(e2e) {
-  return `node ${(e2e ? E2E_VERIFY_ARGV : VERIFY_ARGV).join(" ")}${e2e ? ` && node ${E2E_CHECK_ARGV.join(" ")}` : ""}`;
+export function gateCommand(gate) {
+  return `node ${verifyArgv(gate).join(" ")}${gate.e2e ? ` && node ${E2E_CHECK_ARGV.join(" ")}` : ""}`;
+}
+
+function readCard() {
+  const res = run(process.execPath, ["scripts/gh-project.mjs", "get", issue]);
+  if (!res.ok) throw new Error(`gh-project.mjs get ${issue} failed: ${res.firstErr}`);
+  return JSON.parse(res.out.split(/\r?\n/).pop());
+}
+
+function outsideOf(area) {
+  if (!area) return [];
+  const res = run(process.execPath, ["scripts/areas.mjs", "outside", area]);
+  if (!res.ok) throw new Error(`areas.mjs outside ${area} failed: ${res.firstErr}`);
+  return res.out.split(/\r?\n/).filter(Boolean);
 }
 
 function blockedE2e(issue, branch, report, dryRun) {
@@ -172,6 +191,9 @@ function fromRun(issue) {
   return { branch: record.args.branch, title: record.args.title, json: JSON.stringify(record.result.ship.report), blocked: Boolean(record.result.ship.blocked) };
 }
 
+function main() {
+  const [first, ...rest] = process.argv.slice(2);
+  issue = first;
 try {
   if (!/^\d+$/.test(issue ?? "")) throw new Error("usage: ship.mjs <issue> (--from-run | --branch <b> --title <t> --json '<run report>' [--blocked]) [--dry-run]");
   const flags = parseFlags(rest);
@@ -182,6 +204,7 @@ try {
   result = { ok: false, branch };
 
   const e2e = Boolean(report.e2e);
+  let gate = { e2e, lastBuild: false };
 
   if (flags.blocked && report.stage === "e2e") {
     result = blockedE2e(issue, branch, report, Boolean(flags["dry-run"]));
@@ -195,6 +218,11 @@ try {
     exitCode = posted.ok ? 0 : 2;
     finish();
   }
+
+  const card = readCard();
+  gate = { e2e, lastBuild: Boolean(card.lastBuild) };
+  const outsideArea = outsideOf(card.area);
+  if (outsideArea.length) report.outsideArea = outsideArea;
 
   const body = `Spec: #${issue} - the build run report is on the issue.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)`;
   const steps = [
@@ -215,11 +243,11 @@ try {
     const existingUrl = existing.ok ? JSON.parse(existing.out || "[]")[0]?.url : null;
     if (existingUrl) console.log(`an open PR exists and will be reused: ${existingUrl}`);
     if (failed) console.log(`guard failed: ${failed.error}`);
-    console.log(`would run: ${gateCommand(e2e)}`);
+    console.log(`would run: ${gateCommand(gate)}`);
     if (!failed) {
-      const verified = checkGate(e2e);
+      const verified = checkGate(gate);
       console.log(verified.ok ? `${e2e ? "verify and e2e gate" : "verify cache"}: green` : `${e2e ? "gate" : "verify cache"}: ${verified.error}`);
-      if (!verified.ok) failed = { command: gateCommand(e2e), error: verified.error };
+      if (!verified.ok) failed = { command: gateCommand(gate), error: verified.error };
     }
     for (const s of steps) console.log(`would run: ${s.cmd} ${s.argv.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ")}`);
     console.log("would run: node scripts/compose.mjs build --ref <sha>");
@@ -231,10 +259,10 @@ try {
   }
 
   if (!failed) {
-    const verified = checkGate(e2e);
+    const verified = checkGate(gate);
     if (!verified.ok) {
       const posted = postReport({ deviations: report.deviations, status: "blocked", stage: "verify", reason: e2e ? NOT_E2E_GREEN : NOT_GREEN });
-      result = { ok: false, branch, reportPosted: posted.ok, failedCommand: gateCommand(e2e), error: verified.error };
+      result = { ok: false, branch, reportPosted: posted.ok, failedCommand: gateCommand(gate), error: verified.error };
       exitCode = 2;
       finish();
     }
@@ -296,3 +324,6 @@ try {
   }
 }
 finish();
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) main();

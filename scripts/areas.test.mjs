@@ -48,6 +48,24 @@ test("areaOfFiles applies companions, Fullstack and ties", () => {
   assert.equal(areaOfFiles([]), null);
 });
 
+test("outside", () => {
+  const run = (args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8", windowsHide: true });
+  const outside = (args) => {
+    const res = run(["outside", ...args]);
+    assert.equal(res.status, 0, res.stderr);
+    return res.stdout.trim() === "" ? [] : res.stdout.trim().split(/\r?\n/);
+  };
+
+  assert.deepEqual(outside(["Backend", "services/Portfolio/X.cs", "web/src/app/a.ts", "skarbiec-plan/workflow.md"]), [
+    "web/src/app/a.ts",
+    "skarbiec-plan/workflow.md",
+  ]);
+  assert.deepEqual(outside(["Fullstack", "services/Portfolio/X.cs", "web/src/app/a.ts"]), []);
+  assert.deepEqual(outside(["Fullstack", "services/Portfolio/X.cs", "web/src/app/a.ts", "skarbiec-plan/workflow.md"]), ["skarbiec-plan/workflow.md"]);
+  assert.deepEqual(outside(["Backend", "web/src/app/api/client.ts", "requests/x.http", "Skarbiec.AppHost/Program.cs"]), []);
+  assert.deepEqual(outside(["Frontend", "requests/x.http", "Skarbiec.AppHost/Program.cs", "web/src/app/api/client.ts"]), []);
+});
+
 test("cli prints the area", () => {
   const run = (args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8", windowsHide: true });
 

@@ -682,3 +682,114 @@ test("lowering a blocking dependency fails", () => {
     sandbox.cleanup();
   }
 });
+
+test("lastBuild", () => {
+  const lastBuildOf = (sandbox, n) => {
+    const got = sandbox.run("gh-project.mjs", ["get", String(n)]);
+    assert.equal(got.code, 0, got.out);
+    return lastJson(got.stdout).lastBuild;
+  };
+  const epic = { number: 30, status: "Todo", labels: ["epic"] };
+  const sandboxes = [];
+  try {
+    const withE2e = createSandbox(
+      buildState({
+        issues: [
+          epic,
+          { number: 31, status: "Todo", labels: ["spec"], parent: 30, area: "Backend" },
+          { number: 32, status: "Todo", labels: ["spec"], parent: 30, area: "Frontend" },
+          { number: 33, status: "Todo", labels: ["spec", "e2e"], parent: 30, area: "E2E" },
+        ],
+      }),
+    );
+    sandboxes.push(withE2e);
+    assert.equal(lastBuildOf(withE2e, 31), false);
+    assert.equal(lastBuildOf(withE2e, 32), true);
+    assert.equal(lastBuildOf(withE2e, 33), false);
+
+    const firstClosed = createSandbox(
+      buildState({
+        issues: [
+          epic,
+          { number: 31, status: "Done", labels: ["spec"], parent: 30, area: "Backend" },
+          { number: 32, status: "Todo", labels: ["spec"], parent: 30, area: "Frontend" },
+          { number: 33, status: "Todo", labels: ["spec", "e2e"], parent: 30, area: "E2E" },
+        ],
+      }),
+    );
+    sandboxes.push(firstClosed);
+    assert.equal(lastBuildOf(firstClosed, 32), true);
+
+    const noE2e = createSandbox(
+      buildState({
+        issues: [
+          epic,
+          { number: 41, status: "Todo", labels: ["spec"], parent: 30, area: "Backend" },
+          { number: 42, status: "Todo", labels: ["spec"], parent: 30, area: "Backend" },
+          { number: 34, status: "Todo", labels: ["spec"], area: "Backend" },
+        ],
+      }),
+    );
+    sandboxes.push(noE2e);
+    assert.equal(lastBuildOf(noE2e, 41), false);
+    assert.equal(lastBuildOf(noE2e, 42), true);
+    assert.equal(lastBuildOf(noE2e, 34), false);
+  } finally {
+    for (const sandbox of sandboxes) sandbox.cleanup();
+  }
+});
+
+test("prepare workflowArgs verifyAll and area", () => {
+  const first = prepareState("Todo");
+  first.issues[5].area = "Docs";
+  const open = createSandbox(first, { branch: "feat/part-one" });
+  try {
+    const run = open.run("gh-project.mjs", ["prepare", "5"]);
+
+    assert.equal(run.code, 0, run.out);
+    const { workflowArgs } = lastJson(run.stdout);
+    assert.equal(workflowArgs.verifyAll, false);
+    assert.equal(workflowArgs.area, "Docs");
+  } finally {
+    open.cleanup();
+  }
+
+  const last = prepareState("Todo");
+  last.issues[5].status = "Done";
+  last.issues[5].state = "CLOSED";
+  const closed = createSandbox(last, { branch: "feat/part-two" });
+  try {
+    const run = closed.run("gh-project.mjs", ["prepare", "6"]);
+
+    assert.equal(run.code, 0, run.out);
+    const { workflowArgs } = lastJson(run.stdout);
+    assert.equal(workflowArgs.verifyAll, true);
+    assert.equal(workflowArgs.area, null);
+  } finally {
+    closed.cleanup();
+  }
+});
+
+test("report Poza obszarem", () => {
+  const sandbox = createSandbox(
+    buildState({ issues: [{ number: 60, status: "In progress", labels: ["spec"], area: "Backend", branch: "feat/outside" }] }),
+  );
+  try {
+    const post = (extra) => {
+      const run = sandbox.run("gh-project.mjs", [
+        "report",
+        "60",
+        "--json",
+        JSON.stringify({ status: "shipped", branch: "feat/outside", tests: [], rounds: 0, ...extra }),
+      ]);
+      assert.equal(run.code, 0, run.out);
+      return sandbox.log().filter((e) => e.kind === "comment").at(-1).body;
+    };
+
+    assert.ok(post({ outsideArea: ["a", "b"] }).includes("**Poza obszarem:** a, b"));
+    assert.ok(!post({ outsideArea: [] }).includes("Poza obszarem"));
+    assert.ok(!post({}).includes("Poza obszarem"));
+  } finally {
+    sandbox.cleanup();
+  }
+});
