@@ -2,7 +2,7 @@
 
 import { queueOf } from "./queue.mjs";
 
-export const PRIORITIES =["P0 Pilne", "P1 Wysoki", "P2 Normalny", "P3 Niski"];
+export const PRIORITIES = ["P0", "P1", "P2", "P3"];
 export const DEFAULT_PRIORITY = PRIORITIES[2];
 
 const itemIdOf = (card) => card.id ?? card.itemId ?? null;
@@ -153,6 +153,9 @@ export function orderWarnings(queue, deps) {
   const indexOf = new Map(queue.map((q, i) => [q.number, i]));
   const warnings = [];
   queue.forEach((item, i) => {
+    if (!item.priority) warnings.push({ number: item.number, text: `#${item.number} bez priorytetu — liczony jako ${DEFAULT_PRIORITY}` });
+    else if (!PRIORITIES.includes(item.priority))
+      warnings.push({ number: item.number, text: `#${item.number} ma nieznany priorytet "${item.priority}" — liczony jako ${DEFAULT_PRIORITY}` });
     if (item.status !== "Todo") return;
     const lower = queue.slice(i + 1).find((q) => q.status === "Todo" && rankOf(q) < rankOf(item));
     if (lower) warnings.push({ number: item.number, text: `#${item.number} ${shortOf(item.priority)} stoi nad #${lower.number} ${shortOf(lower.priority)} — /prio albo przesuń` });

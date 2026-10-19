@@ -309,9 +309,9 @@ test("prepare moves the epic with its part", () => {
   }
 });
 
-const P1 = "P1 Wysoki";
-const P2 = "P2 Normalny";
-const priorityOptions = ["P0 Pilne", "P1 Wysoki", "P2 Normalny", "P3 Niski"];
+const P1 = "P1";
+const P2 = "P2";
+const priorityOptions = ["P0", "P1", "P2", "P3"];
 const writesOf = (sandbox) => sandbox.log().filter((e) => ["setField", "fieldBatch", "position", "mutation", "issueCreate"].includes(e.kind));
 
 function priorityState(extra = {}) {
@@ -359,6 +359,19 @@ test("list and get include priority", () => {
 
     assert.equal(lastJson(sandbox.run("gh-project.mjs", ["get", "440"]).stdout).priority, P1);
     assert.equal(lastJson(sandbox.run("gh-project.mjs", ["get", "443"]).stdout).priority, null);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create writes the board priority option", () => {
+  const sandbox = createSandbox(priorityState());
+  try {
+    const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "board-option", ["--area", "Backend", "--priority", "P2"]));
+    assert.equal(run.code, 0, run.out);
+    const issue = sandbox.state().issues[lastJson(run.stdout).number];
+    assert.equal(issue.priority, "P2");
+    assert.equal(issue.branch, "feat/board-option");
   } finally {
     sandbox.cleanup();
   }
@@ -515,7 +528,7 @@ test("priority backfill batches and keeps order", () => {
   const issues = [
     { number: 1, status: "Done" },
     { number: 2, status: "Todo", labels: ["spec"], priority: P1 },
-    { number: 9, status: "Todo", labels: ["epic"], priority: "P3 Niski" },
+    { number: 9, status: "Todo", labels: ["epic"], priority: "P3" },
     { number: 8, status: "Todo", labels: ["spec"], parent: 9 },
   ];
   for (let n = 101; n <= 125; n++) issues.push({ number: n, status: "Todo", labels: ["spec"] });
@@ -549,7 +562,7 @@ test("priority backfill batches and keeps order", () => {
   }
 });
 
-const P3 = "P3 Niski";
+const P3 = "P3";
 const dependsBody = (...numbers) => `## Depends on\n\n${numbers.map((n) => `- #${n} — x`).join("\n")}\n`;
 const jsonLine = (stdout) => JSON.parse(stdout.split(/\r?\n/).find((l) => l.startsWith("{")));
 const orderOfState = (sandbox) => sandbox.state().order;
@@ -889,6 +902,43 @@ test("report Poza obszarem", () => {
     assert.ok(post({ outsideArea: ["a", "b"] }).includes("**Poza obszarem:** a, b"));
     assert.ok(!post({ outsideArea: [] }).includes("Poza obszarem"));
     assert.ok(!post({}).includes("Poza obszarem"));
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create checks options before creating", () => {
+  const cases = [
+    { field: "Priority", state: (s) => (s.fields.Priority.options = s.fields.Priority.options.filter((o) => o.name !== "P2")), args: [] },
+    { field: "Area", state: (s) => (s.fields.Area.options = s.fields.Area.options.filter((o) => o.name !== "Backend")), args: [] },
+    { field: "Kind", state: (s) => (s.fields.Kind.options = s.fields.Kind.options.filter((o) => o.name !== "Change")), args: [] },
+    { field: "Tier", state: (s) => (s.fields.Tier.options = s.fields.Tier.options.filter((o) => o.name !== "1")), args: [] },
+  ];
+  for (const { field, state: strip, args } of cases) {
+    const state = priorityState();
+    strip(state);
+    const sandbox = createSandbox(state);
+    try {
+      const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "unknown-option", ["--area", "Backend", ...args]));
+      assert.notEqual(run.code, 0, run.out);
+      assert.match(run.out, new RegExp(`${field} has no option`));
+      assert.equal(sandbox.log().filter((e) => e.kind === "issueCreate").length, 0, field);
+    } finally {
+      sandbox.cleanup();
+    }
+  }
+});
+
+test("create names unwritten fields", () => {
+  const state = priorityState();
+  state.failFields = ["Area"];
+  const sandbox = createSandbox(state);
+  try {
+    const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "half", ["--area", "Backend"]));
+    assert.notEqual(run.code, 0, run.out);
+    const number = sandbox.log().find((e) => e.kind === "issueCreate").number;
+    assert.match(run.out, new RegExp(`issue #${number} already created: https://github.com/[^ ]+/issues/${number}`));
+    assert.match(run.out, /fields not written: Area, Priority, Branch/);
   } finally {
     sandbox.cleanup();
   }

@@ -111,7 +111,7 @@ test("summary shows area", () => {
 });
 
 test("summary shows priority", () => {
-  const plan = queueOf([{ number: 1, title: "Helper item", status: "Todo", area: "Scripts", priority: "P1 Wysoki", epic: false, parent: null, autobuild: false }]);
+  const plan = queueOf([{ number: 1, title: "Helper item", status: "Todo", area: "Scripts", priority: "P1", epic: false, parent: null, autobuild: false }]);
   const ctx = { tty: true, plan, power: working, now };
   const lineOf = (text, n) => text.split(/\r?\n/).find((l) => l.includes(`#${n} `));
 

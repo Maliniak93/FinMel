@@ -679,6 +679,22 @@ async function create(flags) {
   const branch = flags.epic
     ? null
     : `${flags.kind === "fix" ? "fix" : "feat"}/${flags.slug}`;
+  const writes = [
+    ["Status", "Todo"],
+    ["Tier", flags.tier],
+    ["Kind", kind],
+    ...(area ? [["Area", area]] : []),
+    ...(priority ? [["Priority", priority]] : []),
+    ...(branch ? [["Branch", branch]] : []),
+  ];
+  const known = projectFields().fields;
+  for (const [field, value] of writes) {
+    const options = known.get(field)?.options;
+    if (options && !options.some((o) => o.name === value))
+      throw new Error(
+        `${field} has no option ${value}: ${options.map((o) => o.name).join(", ")}`,
+      );
+  }
   const body = preparedBody(flags["body-file"], flags.epic, flags.e2e);
   let afterId = null;
   if (!flags.parent) {
@@ -706,14 +722,13 @@ async function create(flags) {
   const url = gh(argv, { input: body }).split(/\r?\n/).pop();
   const issueNumber = Number(url.split("/").pop());
 
+  const written = new Set();
   try {
     addToProject(issueNumber);
-    setField(issueNumber, "Status", "Todo");
-    setField(issueNumber, "Tier", flags.tier);
-    setField(issueNumber, "Kind", kind);
-    if (area) setField(issueNumber, "Area", area);
-    if (priority) setField(issueNumber, "Priority", priority);
-    if (branch) setField(issueNumber, "Branch", branch);
+    for (const [field, value] of writes) {
+      setField(issueNumber, field, value);
+      written.add(field);
+    }
     if (flags.before)
       placeBefore(flags.parent, issueNumber, Number(flags.before));
     if (flags.parent) {
@@ -724,11 +739,13 @@ async function create(flags) {
     const { board } = await projectQueue();
     applyRaises(raiseChanges(board, issueNumber).changes);
   } catch (err) {
+    const missing = writes.map(([f]) => f).filter((f) => !written.has(f));
+    const note = `\nissue #${issueNumber} already created: ${url}${missing.length ? `\nfields not written: ${missing.join(", ")}` : ""}`;
     if (err instanceof GhLimitError) {
-      err.message = `${err.message}\nissue already created: ${url}`;
+      err.message = `${err.message}${note}`;
       throw err;
     }
-    throw new Error(`${err.message}\nissue already created: ${url}`);
+    throw new Error(`${err.message}${note}`);
   }
   console.log(
     JSON.stringify({ number: issueNumber, url, branch }),

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { describeSpot, parsePriority, placeTarget, raisePlan } from "./priority.mjs";
+import { describeSpot, orderWarnings, parsePriority, placeTarget, rankOf, raisePlan } from "./priority.mjs";
 import { queueOf } from "./queue.mjs";
 
 const card = (number, status, priority = null) => ({
@@ -28,35 +28,35 @@ function place(board, priority, spec = "bottom", self = 999) {
 }
 
 test("placement follows bands", () => {
-  const board = [card(440, "Todo", "P1 Wysoki"), card(441, "Todo", "P2 Normalny"), card(442, "Todo", "P2 Normalny"), card(443, "Todo", null)];
+  const board = [card(440, "Todo", "P1"), card(441, "Todo", "P2"), card(442, "Todo", "P2"), card(443, "Todo", null)];
 
-  assert.equal(place(board, "P1 Wysoki"), "ITEM_440");
-  assert.equal(place(board, "P0 Pilne"), null);
-  assert.equal(place(board, "P3 Niski"), "ITEM_443");
-  assert.equal(place(board, "P2 Normalny"), "ITEM_443");
+  assert.equal(place(board, "P1"), "ITEM_440");
+  assert.equal(place(board, "P0"), null);
+  assert.equal(place(board, "P3"), "ITEM_443");
+  assert.equal(place(board, "P2"), "ITEM_443");
 });
 
 test("parsePriority", () => {
-  assert.equal(parsePriority("p1"), "P1 Wysoki");
-  assert.equal(parsePriority("1"), "P1 Wysoki");
-  assert.equal(parsePriority("P1 Wysoki"), "P1 Wysoki");
+  assert.equal(parsePriority("p1"), "P1");
+  assert.equal(parsePriority("1"), "P1");
+  assert.equal(parsePriority("P1"), "P1");
   assert.equal(parsePriority("P5"), null);
 });
 
 test("describeSpot", () => {
-  const board = [card(440, "Todo", "P1 Wysoki"), card(441, "Todo", "P2 Normalny"), card(442, "Todo", "P2 Normalny"), card(443, "Todo", null)];
-  const afterId = place(board, "P1 Wysoki");
+  const board = [card(440, "Todo", "P1"), card(441, "Todo", "P2"), card(442, "Todo", "P2"), card(443, "Todo", null)];
+  const afterId = place(board, "P1");
   assert.equal(afterId, "ITEM_440");
 
-  const withNew = [board[0], card(444, "Todo", "P1 Wysoki"), ...board.slice(1)];
+  const withNew = [board[0], card(444, "Todo", "P1"), ...board.slice(1)];
   assert.equal(describeSpot(queueOf(withNew), 444), "2. w kolejce, za #440 (P1)");
 
-  const atTop = [card(445, "Todo", "P0 Pilne"), ...board];
+  const atTop = [card(445, "Todo", "P0"), ...board];
   assert.equal(describeSpot(queueOf(atTop), 445), "1. w kolejce (góra Todo)");
 });
 
-const P1 = "P1 Wysoki";
-const P3 = "P3 Niski";
+const P1 = "P1";
+const P3 = "P3";
 
 const epicCard = (number, status, priority, parts) => ({ ...card(number, status, priority), epic: true, subIssues: parts });
 const partCard = (number, parent, status = "Todo") => ({ ...card(number, status, null), parent });
@@ -114,7 +114,7 @@ test("raise re-places a moved dependency's own chain in a diamond", () => {
 
 test("raise skips and lifts whole epics", () => {
   const skipped = [
-    card(435, "Todo", "P0 Pilne"),
+    card(435, "Todo", "P0"),
     card(433, "Todo", P1),
     card(440, "Todo", P1),
     { ...card(432, "In progress", P3), autobuild: true },
@@ -134,4 +134,16 @@ test("raise skips and lifts whole epics", () => {
     [[20, P3, P1]],
   );
   assert.deepEqual(orderOf(applyChanges(other, changes)), [20, 440]);
+});
+
+test("rankOf ranks P0-P3 and counts an unknown value as P2", () => {
+  assert.deepEqual(["P0", "P1", "P2", "P3"].map((priority) => rankOf({ priority })), [0, 1, 2, 3]);
+  assert.equal(rankOf({ priority: "Other" }), 2);
+  assert.equal(rankOf({ priority: null }), 2);
+});
+
+test("orderWarnings names a missing and an unknown priority", () => {
+  const queue = [card(1, "Todo", null), card(2, "Todo", "Urgent"), card(3, "Todo", "P2")];
+  const texts = orderWarnings(queue, new Map()).map((w) => w.text);
+  assert.deepEqual(texts, ["#1 bez priorytetu — liczony jako P2", '#2 ma nieznany priorytet "Urgent" — liczony jako P2']);
 });

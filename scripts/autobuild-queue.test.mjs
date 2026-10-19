@@ -102,13 +102,13 @@ test("missing area warns and continues", () => {
 });
 
 const flowCards = () => [
-  { number: 434, title: "Running epic", status: "In progress", epic: true, parent: null, autobuild: true, subIssues: [435, 436, 437], priority: "P2 Normalny", area: null },
+  { number: 434, title: "Running epic", status: "In progress", epic: true, parent: null, autobuild: true, subIssues: [435, 436, 437], priority: "P2", area: null },
   { number: 435, title: "Part one", status: "Done", parent: 434, area: "Backend" },
   { number: 436, title: "Part two", status: "Todo", parent: 434, area: "Backend" },
   { number: 437, title: "Part three", status: "Todo", parent: 434, area: "Backend" },
-  { number: 440, title: "Other", status: "Todo", epic: false, parent: null, priority: "P2 Normalny", area: "Scripts" },
+  { number: 440, title: "Other", status: "Todo", epic: false, parent: null, priority: "P2", area: "Scripts" },
 ];
-const urgent = { number: 450, title: "Fire", status: "Todo", epic: false, parent: null, priority: "P0 Pilne", area: "Scripts" };
+const urgent = { number: 450, title: "Fire", status: "Todo", epic: false, parent: null, priority: "P0", area: "Scripts" };
 const setStatus = (cards, number, status) => cards.map((c) => (c.number === number ? { ...c, status } : c));
 
 test("pickNext takes a new P0 between parts", () => {
@@ -178,7 +178,7 @@ test("a merged part is not built again while its card lags behind the closed iss
 });
 
 test("plan lines show priority", () => {
-  const cards = [{ number: 1, title: "Helper item", status: "Todo", area: "Scripts", priority: "P1 Wysoki", epic: false, parent: null, autobuild: false }];
+  const cards = [{ number: 1, title: "Helper item", status: "Todo", area: "Scripts", priority: "P1", epic: false, parent: null, autobuild: false }];
   assert.match(planLines(queueOf(cards), cards)[0], /Helper item.*\[P1 · Scripts\]/);
 });
 

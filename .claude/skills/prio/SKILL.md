@@ -1,6 +1,6 @@
 ---
 name: prio
-description: Change the priority of a FinMel top-level item (P0 Pilne, P1 Wysoki, P2 Normalny, P3 Niski); the card is re-placed by the priority rule.
+description: Change the priority of a FinMel top-level item (P0, P1, P2, P3); the card is re-placed by the priority rule.
 argument-hint: "#<n> <P0|P1|P2|P3>"
 disable-model-invocation: true
 model: haiku

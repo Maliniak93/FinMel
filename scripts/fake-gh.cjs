@@ -117,6 +117,10 @@ function graphql() {
     if (name === "updateProjectV2ItemFieldValue") {
       const field = Object.entries(state.fields).find(([, f]) => f.id === variables.field);
       const fieldName = field[0];
+      if ((state.failFields ?? []).includes(fieldName)) {
+        fs.writeSync(2, `injected failure writing ${fieldName}`);
+        process.exit(1);
+      }
       const option = (field[1].options ?? []).find((o) => o.id === variables.value.singleSelectOptionId);
       const value = option ? option.name : variables.value.text;
       const n = numberOfItem(variables.item);
