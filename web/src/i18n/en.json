@@ -42,7 +42,8 @@
       "metals": "Precious metals",
       "settings": "Settings",
       "accounts": "Investment accounts",
-      "bankAccounts": "Bank accounts"
+      "bankAccounts": "Bank accounts",
+      "groups": "Groups"
     },
     "navSection": {
       "overview": "Overview",
@@ -663,6 +664,65 @@
       "archived": "The place is archived — restore it first.",
       "duplicateName": "A cash place with this name already exists.",
       "duplicateCurrency": "The place already holds this currency."
+    }
+  },
+  "groups": {
+    "title": "Groups",
+    "add": "Add group",
+    "empty": "No groups yet. Add a group to split your wealth into goals such as retirement or an emergency cushion.",
+    "limitHint": "You reached the limit of 12 groups. Delete a group to add a new one.",
+    "loadFailed": "Failed to load groups.",
+    "assetCount": "Assets: {{ count }}",
+    "target": "Target: {{ amount }}",
+    "colors": {
+      "blue": "Blue",
+      "green": "Green",
+      "orange": "Orange",
+      "purple": "Purple",
+      "red": "Red",
+      "teal": "Teal",
+      "pink": "Pink",
+      "amber": "Amber",
+      "indigo": "Indigo",
+      "lime": "Lime",
+      "cyan": "Cyan",
+      "brown": "Brown"
+    },
+    "form": {
+      "createTitle": "Add group",
+      "editTitle": "Edit group",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name can be at most 50 characters.",
+      "color": "Colour",
+      "colorRequired": "Choose a colour.",
+      "target": "Target (PLN)",
+      "targetHint": "Optional",
+      "targetInvalid": "The target must be above 0."
+    },
+    "errors": {
+      "duplicateName": "A group with this name already exists.",
+      "colorTaken": "This colour is already used by another group.",
+      "invalidTarget": "The target must be above 0, have at most 2 decimals and stay within the allowed maximum.",
+      "limitReached": "You reached the limit of 12 groups."
+    },
+    "delete": {
+      "title": "Delete this group?",
+      "message": "Group \"{{ name }}\" has {{ count }} assets. Its history moves to \"Ungrouped\", and its assets and the account and place defaults return to \"Ungrouped\".",
+      "failed": "Failed to delete the group."
+    },
+    "assets": {
+      "manage": "Assets",
+      "title": "Assets in group \"{{ name }}\"",
+      "loadFailed": "Failed to load the assets.",
+      "saveFailed": "Failed to save the assignment.",
+      "empty": "You have no assets to assign yet.",
+      "filter": "Search",
+      "classFilter": "Class",
+      "allClasses": "All classes",
+      "selectAllShown": "Select all shown",
+      "class": "Class",
+      "location": "Account or place",
+      "group": "Group"
     }
   },
   "planning": {

@@ -1,0 +1,82 @@
+<h2 mat-dialog-title>
+  {{ (mode === 'create' ? 'groups.form.createTitle' : 'groups.form.editTitle') | transloco }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline" class="group-form-dialog__field">
+      <mat-label>{{ 'common.name' | transloco }}</mat-label>
+      <input matInput type="text" formControlName="name" autocomplete="off" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error data-testid="name-error">{{ 'groups.form.nameRequired' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error data-testid="name-error">{{ 'groups.form.nameTooLong' | transloco }}</mat-error>
+      } @else if (form.controls.name.hasError('server')) {
+        <mat-error data-testid="name-error">{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <fieldset class="group-form-dialog__colors">
+      <legend>{{ 'groups.form.color' | transloco }}</legend>
+      <div class="group-form-dialog__palette" role="radiogroup">
+        @for (color of palette(); track color.key) {
+          <button
+            type="button"
+            role="radio"
+            class="group-form-dialog__swatch"
+            [class.group-form-dialog__swatch--selected]="color.selected"
+            [style.background-color]="color.css"
+            [attr.data-color]="color.key"
+            [attr.aria-checked]="color.selected"
+            [attr.aria-label]="color.label | transloco"
+            [disabled]="color.disabled"
+            (click)="pickColor(color.key)"
+          ></button>
+        }
+      </div>
+      @if (form.controls.color.hasError('server')) {
+        <p class="group-form-dialog__error" role="alert" data-testid="color-error">
+          {{ form.controls.color.getError('server') }}
+        </p>
+      } @else if (form.controls.color.hasError('required') && form.controls.color.touched) {
+        <p class="group-form-dialog__error" role="alert" data-testid="color-error">
+          {{ 'groups.form.colorRequired' | transloco }}
+        </p>
+      }
+    </fieldset>
+
+    <mat-form-field appearance="outline" class="group-form-dialog__field">
+      <mat-label>{{ 'groups.form.target' | transloco }}</mat-label>
+      <input matInput type="number" min="0" step="0.01" formControlName="targetPln" />
+      <mat-hint>{{ 'groups.form.targetHint' | transloco }}</mat-hint>
+      @if (form.controls.targetPln.hasError('min')) {
+        <mat-error data-testid="target-error">{{
+          'groups.form.targetInvalid' | transloco
+        }}</mat-error>
+      } @else if (form.controls.targetPln.hasError('server')) {
+        <mat-error data-testid="target-error">{{
+          form.controls.targetPln.getError('server')
+        }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="group-form-dialog__error" role="alert" data-testid="form-error">
+        {{ formError() }}
+      </p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+      @if (submitting()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ 'common.save' | transloco }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

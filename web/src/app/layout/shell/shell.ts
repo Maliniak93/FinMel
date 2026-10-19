@@ -86,6 +86,7 @@ export class Shell {
         { path: 'bonds', label: 'shell.nav.bonds', icon: 'receipt_long' },
         { path: 'securities', label: 'shell.nav.securities', icon: 'show_chart' },
         { path: 'metals', label: 'shell.nav.metals', icon: 'diamond' },
+        { path: 'groups', label: 'shell.nav.groups', icon: 'category' },
       ],
     },
   ];
