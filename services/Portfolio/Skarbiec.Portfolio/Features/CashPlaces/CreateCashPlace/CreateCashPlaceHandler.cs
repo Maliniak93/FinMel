@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.AssetGroups;
 
 namespace Skarbiec.Portfolio.Features.CashPlaces.CreateCashPlace;
 
@@ -17,7 +18,12 @@ public sealed class CreateCashPlaceHandler(PortfolioDbContext dbContext, Positio
             return CashPlaceErrors.DuplicateName(request.Name);
         }
 
-        var place = new CashPlace { Id = Guid.NewGuid(), Name = request.Name };
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
+        var place = new CashPlace { Id = Guid.NewGuid(), Name = request.Name, DefaultGroupId = request.GroupId };
         var balances = request.Currencies.Select(currency => CashPlaceBalances.NewBalance(place, currency)).ToList();
 
         dbContext.CashPlaces.Add(place);

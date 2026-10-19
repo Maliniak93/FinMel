@@ -43,6 +43,7 @@ public sealed class SwapBondHandler(
         {
             Id = Guid.NewGuid(),
             AccountId = bond.AccountId,
+            GroupId = bond.GroupId,
             AssetClass = AssetClass.Bond,
             Name = newBond.Name,
             Currency = Currency,

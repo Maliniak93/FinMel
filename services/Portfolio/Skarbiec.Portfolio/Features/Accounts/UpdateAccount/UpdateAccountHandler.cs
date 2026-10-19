@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.AssetGroups;
 
 namespace Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
 
-public sealed class UpdateAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
+public sealed class UpdateAccountHandler(
+    PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher, TimeProvider timeProvider)
 {
     public async Task<Result<AccountResponse>> HandleAsync(Guid id, UpdateAccountRequest request, CancellationToken cancellationToken)
     {
@@ -41,11 +43,26 @@ public sealed class UpdateAccountHandler(PortfolioDbContext dbContext, TimeProvi
             }
         }
 
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
         var cash = await dbContext.LoadAccountCashAsync(id, cancellationToken);
 
         // The cash carries the account's name; no event, since AssetPositionChanged holds no name.
         account.Name = request.Name;
         cash.Name = request.Name;
+
+        if (account.Type != AccountType.Bank)
+        {
+            account.DefaultGroupId = request.GroupId;
+        }
+        else if (cash.GroupId != request.GroupId)
+        {
+            cash.GroupId = request.GroupId;
+            await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+        }
 
         if (terms is not null)
         {

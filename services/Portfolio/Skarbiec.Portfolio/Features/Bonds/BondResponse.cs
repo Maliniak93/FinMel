@@ -87,6 +87,8 @@ public sealed record BondResponse
 
     public required bool IsArchived { get; init; }
 
+    public Guid? GroupId { get; init; }
+
     public required string Name { get; init; }
     public required string SeriesCode { get; init; }
     public required TreasuryBondType Type { get; init; }
@@ -167,6 +169,7 @@ public static class BondMappingExtensions
             AccountName = account.Name,
             TaxWrapper = account.Wrapper,
             IsArchived = asset.IsArchived,
+            GroupId = asset.GroupId,
             Name = asset.Name,
             SeriesCode = terms.SeriesCode,
             Type = terms.Type,

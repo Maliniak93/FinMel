@@ -10,6 +10,8 @@ public sealed record AddMetalRequest : IValidatableObject
 
     public required Metal Metal { get; init; }
 
+    public Guid? GroupId { get; init; }
+
     /// <summary>Fine weight of one piece, in WeightUnit.</summary>
     [Range(typeof(decimal), "0", "79228162514264337593543950335", MinimumIsExclusive = true)]
     public required decimal FineWeight { get; init; }

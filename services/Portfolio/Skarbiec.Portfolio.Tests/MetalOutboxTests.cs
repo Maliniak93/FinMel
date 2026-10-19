@@ -13,6 +13,22 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class MetalOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]
+    public async Task AddMetalWithGroup_FirstPositionCarriesGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var groupId = await CreateGroupAsync(scope.ServiceProvider, "Poduszka", cancellationToken);
+
+        var result = await scope.ServiceProvider.GetRequiredService<AddMetalHandler>()
+            .HandleAsync(PortfolioApi.NewMetalRequest() with { GroupId = groupId }, cancellationToken);
+
+        Assert.True(result.IsSuccess);
+        var first = (await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).First(e => e.AssetId == result.Value.AssetId);
+        Assert.Equal(groupId, first.GroupId);
+    }
+
+    [Fact]
     public async Task AddMetal_PublishesPositionChangedWithFineWeight()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

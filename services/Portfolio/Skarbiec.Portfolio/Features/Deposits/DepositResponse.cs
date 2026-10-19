@@ -28,6 +28,8 @@ public sealed record DepositResponse
 
     public required bool IsArchived { get; init; }
 
+    public Guid? GroupId { get; init; }
+
     public required string Name { get; init; }
     public string? BankName { get; init; }
     public required string Currency { get; init; }
@@ -90,6 +92,7 @@ public static class DepositMappingExtensions
         {
             AssetId = asset.Id,
             IsArchived = asset.IsArchived,
+            GroupId = asset.GroupId,
             Name = asset.Name,
             BankName = terms.BankName,
             Currency = asset.Currency,

@@ -9,6 +9,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
@@ -19,6 +20,22 @@ public sealed class AddDepositEndpointTests(SkarbiecContainersFixture containers
     private static readonly DateOnly MBankOpening = new(2026, 7, 1);
 
     private static readonly DateOnly DepositOpening = new(2026, 10, 1);
+
+    [Fact]
+    public async Task GroupId_IsStored()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        var funded = await client.WithFundingAsync(NewDepositRequest() with { GroupId = group.Id }, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(AllDepositsUri, funded, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DepositResponse>(cancellationToken);
+        Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, body!.AssetId))[body.AssetId].GroupId);
+    }
 
     [Fact]
     public async Task FromBankAccount_DebitsSource()

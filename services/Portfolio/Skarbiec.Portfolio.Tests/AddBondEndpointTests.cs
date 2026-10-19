@@ -8,12 +8,31 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task GroupId_IsStored()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        var accountId = await client.CreateAccountAsync(cancellationToken, "Bonds", AccountType.Bonds);
+        await client.FundAccountAsync(accountId, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            AllBondsUri, NewBondRequest() with { AccountId = accountId, GroupId = group.Id }, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);
+        Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, body!.AssetId))[body.AssetId].GroupId);
+    }
+
     [Fact]
     public async Task Add_Valid_CreatesAssetTermsAndOpeningTransaction()
     {

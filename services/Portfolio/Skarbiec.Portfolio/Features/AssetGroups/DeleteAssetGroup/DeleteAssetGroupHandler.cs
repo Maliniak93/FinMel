@@ -23,6 +23,16 @@ public sealed class DeleteAssetGroupHandler(PortfolioDbContext dbContext, Positi
             await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
         }
 
+        foreach (var account in await dbContext.Accounts.Where(a => a.DefaultGroupId == id).ToListAsync(cancellationToken))
+        {
+            account.DefaultGroupId = null;
+        }
+
+        foreach (var place in await dbContext.CashPlaces.Where(p => p.DefaultGroupId == id).ToListAsync(cancellationToken))
+        {
+            place.DefaultGroupId = null;
+        }
+
         dbContext.AssetGroups.Remove(group);
         await dbContext.SaveChangesAsync(cancellationToken);
 

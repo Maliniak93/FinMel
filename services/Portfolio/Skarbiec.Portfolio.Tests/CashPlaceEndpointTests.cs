@@ -2,11 +2,13 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.UpdateAsset;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.CashPlacesApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
@@ -20,6 +22,48 @@ public sealed class CashPlaceEndpointTests(SkarbiecContainersFixture containers)
     private static readonly DateOnly Oct3 = new(2026, 10, 3);
 
     private static readonly DateOnly Oct4 = new(2026, 10, 4);
+
+    [Fact]
+    public async Task DefaultGroup_AppliesToNewBalances()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var first = await client.CreateAssetGroupAsync(cancellationToken, "Poduszka");
+        var second = await client.CreateAssetGroupAsync(cancellationToken, "Akcje", ColorKey(3));
+        var created = await client.PostAsJsonAsync(
+            CashPlacesUri, new { name = "Sejf", currencies = new[] { "PLN" }, groupId = first.Id }, cancellationToken);
+        var placeId = (await created.ReadJsonAsync(cancellationToken)).GetProperty("id").GetGuid();
+
+        var added = await client.PostAsJsonAsync(CashPlaceCurrenciesUri(placeId), new { currency = "USD" }, cancellationToken);
+        var renamed = await client.PutAsJsonAsync(CashPlaceUri(placeId), new { name = "Sejf", groupId = second.Id }, cancellationToken);
+
+        Assert.True(added.IsSuccessStatusCode, $"Adding a currency answered {(int)added.StatusCode}.");
+        Assert.True(renamed.IsSuccessStatusCode, $"Changing the default answered {(int)renamed.StatusCode}.");
+        await using var dbContext = CreateDbContext(userId);
+        var balances = await dbContext.Assets.AsNoTracking()
+            .Where(a => a.CashPlaceId == placeId)
+            .Select(a => new { a.Currency, a.GroupId })
+            .ToListAsync(cancellationToken);
+        Assert.Equal(["PLN", "USD"], balances.Select(b => b.Currency).Order().ToArray());
+        Assert.All(balances, b => Assert.Equal(first.Id, b.GroupId));
+        Assert.Equal(second.Id, (await dbContext.Set<CashPlace>().SingleAsync(p => p.Id == placeId, cancellationToken)).DefaultGroupId);
+    }
+
+    [Fact]
+    public async Task ReturnsGroupId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        var created = await client.PostAsJsonAsync(
+            CashPlacesUri, new { name = "Sejf", currencies = new[] { "PLN" }, groupId = group.Id }, cancellationToken);
+        var placeId = (await created.ReadJsonAsync(cancellationToken)).GetProperty("id").GetGuid();
+
+        var response = await client.GetAsync(CashPlaceUri(placeId), cancellationToken);
+
+        Assert.Equal(group.Id, (await response.ReadJsonAsync(cancellationToken)).GetProperty("groupId").GetGuid());
+    }
 
     [Fact]
     public async Task CreateDepositAndList()

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.AssetGroups;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;
 
@@ -17,6 +18,11 @@ public sealed class AddBondHandler(
     public async Task<Result<BondResponse>> HandleAsync(
         AddBondRequest request, CancellationToken cancellationToken)
     {
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
         var resolved = await dbContext.ResolveAsync(AssetClass.Bond, request.AccountId, cancellationToken);
         if (resolved.IsFailure)
         {
@@ -29,6 +35,7 @@ public sealed class AddBondHandler(
         {
             Id = Guid.NewGuid(),
             AccountId = account.Id,
+            GroupId = request.GroupId,
             AssetClass = AssetClass.Bond,
             Name = request.Name,
             Currency = Currency,

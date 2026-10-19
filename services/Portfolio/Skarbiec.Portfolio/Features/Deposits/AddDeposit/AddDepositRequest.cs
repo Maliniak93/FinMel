@@ -18,6 +18,8 @@ public sealed record AddDepositRequest : IValidatableObject
     /// <summary>An unarchived Bank account in the source's currency; omitted, the source.</summary>
     public Guid? ReturnAccountId { get; init; }
 
+    public Guid? GroupId { get; init; }
+
     [Range(typeof(decimal), "0", "79228162514264337593543950335", MinimumIsExclusive = true)]
     public required decimal Principal { get; init; }
 

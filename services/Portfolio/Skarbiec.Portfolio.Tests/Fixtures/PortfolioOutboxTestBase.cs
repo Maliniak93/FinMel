@@ -160,6 +160,16 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         return result.Value.Id;
     }
 
+    protected static async Task<Guid> CreateGroupAsync(IServiceProvider services, string name, CancellationToken cancellationToken)
+    {
+        var usedColors = await services.GetRequiredService<PortfolioDbContext>().AssetGroups.CountAsync(cancellationToken);
+        var created = await services.GetRequiredService<CreateAssetGroupHandler>().HandleAsync(
+            new CreateAssetGroupRequest { Name = name, Color = AssetGroupColors.Keys[usedColors] }, cancellationToken);
+        Assert.True(created.IsSuccess, created.IsFailure ? created.Error.Code : null);
+
+        return created.Value.Id;
+    }
+
     protected sealed record CreatedBank(Guid Id, Guid CashAssetId);
 
     protected static async Task<CreatedBank> CreateBankAccountAsync(
@@ -168,7 +178,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         string currency,
         decimal annualInterestRatePercent,
         CancellationToken cancellationToken,
-        decimal balance = 0m)
+        decimal balance = 0m,
+        Guid? groupId = null)
     {
         var created = await services.GetRequiredService<CreateAccountHandler>().HandleAsync(
             new CreateAccountRequest
@@ -179,7 +190,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
                 Currency = currency,
                 Variant = BankVariant.Savings,
                 BankName = name,
-                AnnualInterestRatePercent = annualInterestRatePercent
+                AnnualInterestRatePercent = annualInterestRatePercent,
+                GroupId = groupId
             },
             cancellationToken);
         Assert.True(created.IsSuccess, created.IsFailure ? created.Error.Code : null);

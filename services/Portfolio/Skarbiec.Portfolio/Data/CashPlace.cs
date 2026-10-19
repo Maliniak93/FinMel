@@ -8,4 +8,5 @@ public sealed class CashPlace : IUserOwned
     public Guid UserId { get; set; }
     public required string Name { get; set; }
     public bool IsArchived { get; set; }
+    public Guid? DefaultGroupId { get; set; }
 }

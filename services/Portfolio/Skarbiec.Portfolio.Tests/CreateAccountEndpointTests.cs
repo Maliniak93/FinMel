@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
@@ -9,6 +10,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -16,6 +18,48 @@ namespace Skarbiec.Portfolio.Tests;
 // Creation is under test, so these facts post directly: AccountsApi.CreateAccountAsync asserts success.
 public sealed class CreateAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task WithGroup_GivesCashTheGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            AccountsUri,
+            new CreateAccountRequest { Name = "XTB IKE", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Ike, GroupId = group.Id },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.ReadJsonAsync(cancellationToken);
+        Assert.Equal(group.Id, body.GetProperty("groupId").GetGuid());
+        var cashId = body.GetProperty("cashAssetId").GetGuid();
+        Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, cashId))[cashId].GroupId);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Equal(group.Id, (await dbContext.Set<Account>().SingleAsync(a => a.Id == body.GetProperty("id").GetGuid(), cancellationToken)).DefaultGroupId);
+    }
+
+    [Fact]
+    public async Task WithoutGroup_LeavesDefaultAndCashEmpty()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+
+        var response = await client.PostAsJsonAsync(
+            AccountsUri,
+            new CreateAccountRequest { Name = "XTB IKE", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Ike },
+            cancellationToken);
+
+        var body = await response.ReadJsonAsync(cancellationToken);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("groupId").ValueKind);
+        var cashId = body.GetProperty("cashAssetId").GetGuid();
+        Assert.Null((await ReadAssetGroupStatesAsync(userId, cancellationToken, cashId))[cashId].GroupId);
+        await using var dbContext = CreateDbContext(userId);
+        Assert.Null((await dbContext.Set<Account>().SingleAsync(a => a.Id == body.GetProperty("id").GetGuid(), cancellationToken)).DefaultGroupId);
+    }
+
     [Fact]
     public async Task Create_WithValidRequest_ReturnsCreatedWithTypeAndWrapper()
     {

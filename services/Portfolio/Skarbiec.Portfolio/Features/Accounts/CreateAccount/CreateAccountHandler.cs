@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts.BankInterest;
+using Skarbiec.Portfolio.Features.AssetGroups;
 
 namespace Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 
@@ -40,19 +41,26 @@ public sealed class CreateAccountHandler(PortfolioDbContext dbContext, PositionE
             return AccountErrors.DuplicateName(request.Name);
         }
 
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
         var account = new Account
         {
             Id = Guid.NewGuid(),
             Name = request.Name,
             Type = request.Type,
             Wrapper = request.Wrapper,
-            Currency = currency
+            Currency = currency,
+            DefaultGroupId = request.Type == AccountType.Bank ? null : request.GroupId
         };
 
         var money = new Asset
         {
             Id = Guid.NewGuid(),
             AccountId = account.Id,
+            GroupId = request.GroupId,
             AssetClass = AccountCash.MoneyClassOf(request.Type),
             Name = account.Name,
             Currency = currency,

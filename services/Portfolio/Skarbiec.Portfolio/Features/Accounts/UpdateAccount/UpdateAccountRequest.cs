@@ -8,6 +8,9 @@ public sealed record UpdateAccountRequest
     [Required, MaxLength(200)]
     public required string Name { get; init; }
 
+    /// <summary>The default group of new assets, replaced as sent; for a Bank account, the group of its balance.</summary>
+    public Guid? GroupId { get; init; }
+
     /// <summary>Required for, and only for, a Bank account.</summary>
     public BankVariant? Variant { get; init; }
 

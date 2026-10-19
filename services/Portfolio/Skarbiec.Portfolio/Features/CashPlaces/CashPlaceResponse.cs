@@ -17,6 +17,10 @@ public sealed record CashPlaceResponse
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required bool IsArchived { get; init; }
+
+    /// <summary>The group every new balance of the place takes.</summary>
+    public Guid? GroupId { get; init; }
+
     public required IReadOnlyList<CashBalanceResponse> Balances { get; init; }
 
     /// <summary>Null when any balance has no rate, and not computed by the writes.</summary>
@@ -48,6 +52,7 @@ public static class CashPlaceMappingExtensions
         Id = place.Id,
         Name = place.Name,
         IsArchived = place.IsArchived,
+        GroupId = place.DefaultGroupId,
         Balances = [.. balances
             .OrderBy(b => b.Currency == CashPlaceBalances.BaseCurrency ? 0 : 1)
             .ThenBy(b => b.Currency, StringComparer.Ordinal)

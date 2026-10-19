@@ -23,6 +23,20 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class DepositOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]
+    public async Task AddDepositWithGroup_FirstPositionCarriesGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var groupId = await CreateGroupAsync(scope.ServiceProvider, "Poduszka", cancellationToken);
+
+        var opened = await OpenDepositAsync(scope.ServiceProvider, cancellationToken, PortfolioApi.NewDepositRequest() with { GroupId = groupId });
+
+        var first = (await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).First(e => e.AssetId == opened.AssetId);
+        Assert.Equal(groupId, first.GroupId);
+    }
+
+    [Fact]
     public async Task AddDeposit_PublishesPositionChangedWithPrincipal()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

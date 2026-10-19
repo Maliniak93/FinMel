@@ -8,6 +8,9 @@ public sealed record CreateCashPlaceRequest : IValidatableObject
     [Required, MaxLength(200)]
     public required string Name { get; init; }
 
+    /// <summary>The group every new balance of the place takes.</summary>
+    public Guid? GroupId { get; init; }
+
     /// <summary>One or more distinct supported currencies, one balance each; PLN alone when omitted.</summary>
     public IReadOnlyList<string> Currencies { get; init; } = [SupportedCurrencies.Default];
 
