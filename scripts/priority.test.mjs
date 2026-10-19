@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { describeSpot, parsePriority, placeTarget } from "./priority.mjs";
+import { describeSpot, parsePriority, placeTarget, raisePlan } from "./priority.mjs";
 import { queueOf } from "./queue.mjs";
 
 const card = (number, status, priority = null) => ({
@@ -53,4 +53,85 @@ test("describeSpot", () => {
 
   const atTop = [card(445, "Todo", "P0 Pilne"), ...board];
   assert.equal(describeSpot(queueOf(atTop), 445), "1. w kolejce (góra Todo)");
+});
+
+const P1 = "P1 Wysoki";
+const P3 = "P3 Niski";
+
+const epicCard = (number, status, priority, parts) => ({ ...card(number, status, priority), epic: true, subIssues: parts });
+const partCard = (number, parent, status = "Todo") => ({ ...card(number, status, null), parent });
+
+function applyChanges(board, changes) {
+  let cards = board.map((c) => ({ ...c }));
+  for (const change of changes) {
+    const moved = cards.find((c) => c.number === change.number);
+    moved.priority = change.to;
+    if (change.afterId !== undefined) {
+      cards = cards.filter((c) => c !== moved);
+      const at = change.afterId === null ? 0 : cards.findIndex((c) => c.id === change.afterId) + 1;
+      cards.splice(at, 0, moved);
+    }
+  }
+  return cards;
+}
+
+const orderOf = (cards) => queueOf(cards).map((q) => q.number);
+
+test("raise follows the chain", () => {
+  const board = [card(450, "Todo", P1), card(440, "Todo", P1), card(431, "Todo", P3), card(432, "Todo", P3)];
+  const deps = new Map([
+    [440, [432]],
+    [432, [431]],
+  ]);
+
+  const changes = raisePlan(queueOf(board), deps, { number: 440, priority: P1 });
+
+  assert.deepEqual(changes.map((c) => c.number).sort(), [431, 432]);
+  for (const change of changes) {
+    assert.equal(change.from, P3);
+    assert.equal(change.to, P1);
+  }
+  assert.deepEqual(orderOf(applyChanges(board, changes)), [450, 431, 432, 440]);
+  assert.ok(applyChanges(board, changes).every((c) => c.number === 450 || c.priority === P1));
+});
+
+test("raise re-places a moved dependency's own chain in a diamond", () => {
+  const board = [10, 40, 30, 5, 20].map((n) => card(n, "Todo", P1));
+  const deps = new Map([
+    [40, [30, 10]],
+    [30, [20]],
+    [10, [20]],
+    [20, [5]],
+  ]);
+
+  const changes = raisePlan(queueOf(board), deps, { number: 40, priority: P1 });
+  const order = orderOf(applyChanges(board, changes));
+
+  for (const [dependent, wanted] of deps) {
+    for (const dep of wanted) assert.ok(order.indexOf(dep) < order.indexOf(dependent), `#${dep} before #${dependent} in ${order}`);
+  }
+});
+
+test("raise skips and lifts whole epics", () => {
+  const skipped = [
+    card(435, "Todo", "P0 Pilne"),
+    card(433, "Todo", P1),
+    card(440, "Todo", P1),
+    { ...card(432, "In progress", P3), autobuild: true },
+    card(431, "Done", P3),
+  ];
+  const skipDeps = new Map([[440, [431, 432, 433, 435]]]);
+  assert.deepEqual(raisePlan(queueOf(skipped), skipDeps, { number: 440, priority: P1 }), []);
+
+  const sameEpic = [epicCard(9, "Todo", P1, [7, 8]), partCard(7, 9), partCard(8, 9)];
+  assert.deepEqual(raisePlan(queueOf(sameEpic), new Map([[9, [8]]]), { number: 9, priority: P1 }), []);
+
+  const other = [card(440, "Todo", P1), epicCard(20, "Todo", P3, [8, 21]), partCard(8, 20), partCard(21, 20)];
+  const changes = raisePlan(queueOf(other), new Map([[440, [8]]]), { number: 440, priority: P1 });
+
+  assert.deepEqual(
+    changes.map((c) => [c.number, c.from, c.to]),
+    [[20, P3, P1]],
+  );
+  assert.deepEqual(orderOf(applyChanges(other, changes)), [20, 440]);
 });

@@ -215,7 +215,7 @@ if (args[0] === "issue" && args[1] === "create") {
 }
 if (args[0] === "issue" && args[1] === "view") {
   const i = issues[Number(args[2])];
-  out(JSON.stringify(i ? { number: i.number, title: i.title, state: i.state, comments: [] } : {}));
+  out(JSON.stringify(i ? { number: i.number, title: i.title, state: i.state, labels: i.labels.map((name) => ({ name })), comments: [] } : {}));
 }
 if (args[0] === "project" && args[1] === "field-list") {
   out(JSON.stringify({ fields: Object.entries(state.fields).map(([name, f]) => ({ id: f.id, name })) }));

@@ -13,7 +13,7 @@
 //   queue                                                  the build queue as JSON: top-level items, In progress then Todo, board order (manual, an epic's next part)
 //   move <n> top|bottom|before:N|after:N                   place a queue item on the board; a Todo item stays in its priority band
 //   priority <n> <P0|P1|P2|P3>                             set the priority and re-place a Todo item in its band; a part follows its epic
-//   priority --where <P> [--queue <spec>]                  preview the queue spot of a new item, writes nothing
+//   priority --where <P> [--queue <spec>] [--body-file <p>] preview the queue spot of a new item and the dependency raises of its body, writes nothing
 //   priority --backfill [--apply]                          set P2 on every open top-level item without Priority; no card moves
 //   comment <n> --body-file <path>                         post a comment
 //   tick <n>                                               tick every acceptance-criterion checkbox
@@ -53,10 +53,12 @@ import { AREAS, parseArea } from "./areas.mjs";
 import {
   DEFAULT_PRIORITY,
   PRIORITIES,
+  blockingDependent,
   describeSpot,
   inBand,
   parsePriority,
   placeTarget,
+  raisePlan,
   shortOf,
 } from "./priority.mjs";
 import { positionTarget, queueOf } from "./queue.mjs";
@@ -140,6 +142,7 @@ function git(argv) {
 
 let projectMeta = null;
 const itemIds = new Map();
+const bodies = new Map();
 
 // One query per process: the project id and every field with its options.
 function projectFields() {
@@ -466,7 +469,7 @@ const ITEMS_QUERY = `query ($owner: String!, $number: Int!, $cursor: String) {
           ${ITEM_FIELDS}
           content {
             __typename
-            ... on Issue { number title labels(first: 10) { nodes { name } } }
+            ... on Issue { number title body labels(first: 10) { nodes { name } } }
           }
         }
       }
@@ -706,6 +709,8 @@ async function create(flags) {
       const at = parts.indexOf(issueNumber);
       setPosition(issueNumber, itemIdOf(at > 0 ? parts[at - 1] : flags.parent));
     } else setPosition(issueNumber, afterId);
+    const { board } = await projectQueue();
+    applyRaises(raiseChanges(board, issueNumber).changes);
   } catch (err) {
     if (err instanceof GhLimitError) {
       err.message = `${err.message}\nissue already created: ${url}`;
@@ -740,7 +745,7 @@ function placeBefore(parent, number, before) {
     );
 }
 
-function edit([number, ...rest]) {
+async function edit([number, ...rest]) {
   const flags = parseFlags(rest);
   const usage =
     "usage: edit <issue number> [--body-file <path>] [--tier 1|2] [--area <area>] [--parent <epic number>]";
@@ -755,6 +760,7 @@ function edit([number, ...rest]) {
   if (flags.area && !area)
     throw new Error(`--area must be one of: ${AREAS.join(", ")}`);
   const done = [];
+  let changes = [];
   if (flags["body-file"]) {
     const labels = JSON.parse(
       gh(["issue", "view", number, "--repo", REPO, "--json", "labels"]),
@@ -764,6 +770,12 @@ function edit([number, ...rest]) {
       labels.includes("epic"),
       labels.includes("e2e"),
     );
+    const { board } = await projectQueue();
+    changes = raiseChanges(
+      board,
+      Number(number),
+      new Map([[Number(number), body]]),
+    ).changes;
     gh(["issue", "edit", number, "--repo", REPO, "--body-file", "-"], {
       input: body,
     });
@@ -789,6 +801,7 @@ function edit([number, ...rest]) {
     done.push(`sub-issue of #${flags.parent}`);
   }
   console.log(`#${number}: ${done.join(", ")}`);
+  applyRaises(changes);
 }
 
 function sectionEdit(number, heading, file) {
@@ -1468,12 +1481,71 @@ async function listCards() {
         item.content.labels.nodes.map((l) => l.name),
       ),
     };
+    bodies.set(entry.number, item.content.body ?? "");
     if (entry.epic)
       entry.subIssues = subIssues(entry.number).map((s) => s.number);
     return entry;
   });
   for (const c of cards) itemIds.set(c.number, c.id);
   return cards;
+}
+
+function dependencyMap(board, queue, overrides = new Map()) {
+  const statusOf = new Map(board.map((c) => [c.number, c.status]));
+  const openDeps = (n) => {
+    const body = overrides.has(n) ? overrides.get(n) : (bodies.get(n) ?? "");
+    return dependsOn(body).filter((d) => d !== n && statusOf.get(d) !== "Done");
+  };
+  return new Map(
+    queue.map((q) => [
+      q.number,
+      [q.number, ...(q.epic ? q.subIssues ?? [] : [])].flatMap(openDeps),
+    ]),
+  );
+}
+
+function raiseChanges(board, root, overrides = new Map()) {
+  const queue = queueOf(board);
+  const item = queue.find(
+    (q) => q.number === root || (q.epic && (q.subIssues ?? []).includes(root)),
+  );
+  const deps = dependencyMap(board, queue, overrides);
+  if (!item) return { queue, deps, item: null, changes: [] };
+  const changes = raisePlan(queue, deps, {
+    number: item.number,
+    priority: item.priority ?? DEFAULT_PRIORITY,
+  });
+  return { queue, deps, item, changes };
+}
+
+function raiseLine(change, dependent) {
+  return change.from === change.to
+    ? `przesunięto #${change.number} przed ${dependent} (zależność)`
+    : `podniesiono #${change.number} ${shortOf(change.from)} → ${shortOf(change.to)} (zależność ${dependent})`;
+}
+
+function applyRaises(changes) {
+  for (const c of changes) {
+    if (c.from !== c.to) setField(c.number, "Priority", c.to);
+    setPosition(c.number, c.afterId);
+    console.log(raiseLine(c, `#${c.for}`));
+  }
+}
+
+function placed(board, number, afterId, patch = {}) {
+  const moved = { ...board.find((c) => c.number === number), ...patch };
+  const others = board.filter((c) => c.number !== number);
+  const at = afterId === null ? 0 : others.findIndex((c) => c.id === afterId) + 1;
+  return [...others.slice(0, at), moved, ...others.slice(at)];
+}
+
+function assertNoBlocker(board, number, deps) {
+  const queue = queueOf(board);
+  const blocked = blockingDependent(queue, deps, number);
+  if (blocked)
+    throw new Error(
+      `#${number} blokuje #${blocked.number} (${shortOf(blocked.priority)}) — najpierw obniż #${blocked.number}`,
+    );
 }
 
 async function projectQueue() {
@@ -1508,8 +1580,12 @@ async function move([number, target]) {
           target,
           board,
         );
+  const after = placed(board, n, afterId);
+  const { deps, changes } = raiseChanges(after, n);
+  if (card.status === "Todo") assertNoBlocker(after, n, deps);
   setPosition(n, afterId);
   console.log(`#${n}: moved ${target}`);
+  applyRaises(changes);
 }
 
 function partsOf(board) {
@@ -1569,6 +1645,11 @@ async function priorityVerb(rest) {
     const at = afterId === null ? 0 : board.findIndex((c) => c.id === afterId) + 1;
     const hypothetical = [...board.slice(0, at), preview, ...board.slice(at)];
     console.log(describeSpot(queueOf(hypothetical), 0));
+    if (flags["body-file"]) {
+      const body = cleanBody(readFileSync(path.resolve(REPO_ROOT, flags["body-file"]), "utf8"));
+      const { changes } = raiseChanges(hypothetical, 0, new Map([[0, body]]));
+      for (const c of changes) console.log(raiseLine(c, "#nowy"));
+    }
     return;
   }
 
@@ -1593,26 +1674,24 @@ async function priorityVerb(rest) {
     );
 
   const was = card.priority ?? DEFAULT_PRIORITY;
-  setField(n, "Priority", priority);
   const head = `#${n} ${shortOf(was)} → ${shortOf(priority)}`;
-  if (card.status !== "Todo") {
-    console.log(`${head}, ${card.status}: only the field is set`);
-    return;
-  }
-  if (was === priority && inBand(board, card)) {
-    console.log(`${head}, unchanged`);
-    return;
-  }
+  const replace = card.status === "Todo" && !(was === priority && inBand(board, card));
+  const afterId = replace ? placeTarget(items, board, { priority, self: n }) : undefined;
+  const after = replace
+    ? placed(board, n, afterId, { priority })
+    : board.map((c) => (c.number === n ? { ...c, priority } : c));
+  const { deps, changes } = raiseChanges(after, n);
+  if (replace) assertNoBlocker(after, n, deps);
 
-  const positionOf = (cards) =>
-    queueOf(cards).findIndex((q) => q.number === n) + 1;
-  const afterId = placeTarget(items, board, { priority, self: n });
-  setPosition(n, afterId);
-  const moved = { ...card, priority };
-  const others = board.filter((c) => c.number !== n);
-  const at = afterId === null ? 0 : others.findIndex((c) => c.id === afterId) + 1;
-  const after = [...others.slice(0, at), moved, ...others.slice(at)];
-  console.log(`${head}, ${positionOf(board)}. → ${positionOf(after)}. w kolejce`);
+  setField(n, "Priority", priority);
+  if (card.status !== "Todo") console.log(`${head}, ${card.status}: only the field is set`);
+  else if (!replace) console.log(`${head}, unchanged`);
+  else {
+    setPosition(n, afterId);
+    const positionOf = (cards) => queueOf(cards).findIndex((q) => q.number === n) + 1;
+    console.log(`${head}, ${positionOf(board)}. → ${positionOf(after)}. w kolejce`);
+  }
+  applyRaises(changes);
 }
 
 function comment([number, ...rest]) {

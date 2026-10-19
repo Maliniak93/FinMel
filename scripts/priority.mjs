@@ -1,6 +1,8 @@
 // Usage: imported by queue.mjs and gh-project.mjs - priority levels, their bands on the board and where an item lands in its band
 
-export const PRIORITIES = ["P0 Pilne", "P1 Wysoki", "P2 Normalny", "P3 Niski"];
+import { queueOf } from "./queue.mjs";
+
+export const PRIORITIES =["P0 Pilne", "P1 Wysoki", "P2 Normalny", "P3 Niski"];
 export const DEFAULT_PRIORITY = PRIORITIES[2];
 
 const itemIdOf = (card) => card.id ?? card.itemId ?? null;
@@ -54,6 +56,96 @@ export function inBand(board, card) {
   const at = todo.findIndex((b) => b.number === card.number);
   const rank = rankOf(card);
   return todo.every((b, i) => i === at || (i < at ? rankOf(b) <= rank : rankOf(b) >= rank));
+}
+
+const partsOf = (epic) => (epic.subIssues ?? []).map((s) => (typeof s === "object" ? s.number : s));
+
+function ownersOf(queue) {
+  const owner = new Map();
+  for (const item of queue) {
+    owner.set(item.number, item.number);
+    if (item.epic) for (const part of partsOf(item)) owner.set(part, item.number);
+  }
+  return owner;
+}
+
+function dependenciesOf(owner, deps, number) {
+  const found = (deps.get(number) ?? []).map((d) => owner.get(d)).filter((d) => d !== undefined && d !== number);
+  return [...new Set(found)];
+}
+
+export function raisePlan(queue, deps, { number, priority }) {
+  const board = queue.map((q) => ({ ...q }));
+  const byNumber = (n) => board.find((c) => c.number === n);
+  const root = byNumber(number);
+  if (!root) return [];
+  root.priority = priority;
+
+  const owner = ownersOf(board);
+  const changes = [];
+  const seen = new Map();
+  const orderOf = () => queueOf(board).map((q) => q.number);
+
+  const isAhead = (dep, dependent) => {
+    const rank = rankOf(dependent);
+    if (dependent.status === "Todo") {
+      const order = orderOf();
+      return rankOf(dep) <= rank && order.indexOf(dep.number) < order.indexOf(dependent.number);
+    }
+    if (rankOf(dep) < rank) return true;
+    const first = queueOf(board).find((q) => q.status === "Todo" && rankOf(q) >= rank);
+    return rankOf(dep) === rank && first?.number === dep.number;
+  };
+
+  const place = (dep, dependent) => {
+    board.splice(board.indexOf(dep), 1);
+    let at;
+    if (dependent.status === "Todo") at = board.indexOf(dependent);
+    else {
+      const rank = rankOf(dependent);
+      const lastUrgent = board.filter((c) => c.status === "Todo" && rankOf(c) < rank).pop();
+      at = lastUrgent ? board.indexOf(lastUrgent) + 1 : 0;
+    }
+    board.splice(at, 0, dep);
+    const before = board.slice(0, at).filter((c) => c.status === "Todo").pop();
+    return before ? itemIdOf(before) : null;
+  };
+
+  const walk = (current, path) => {
+    const dependent = byNumber(current);
+    for (const dep of dependenciesOf(owner, deps, current)) {
+      if (path.includes(dep)) {
+        const loop = [...path.slice(path.indexOf(dep)), dep];
+        throw new Error(`cykl zależności: ${loop.map((n) => `#${n}`).join(" → ")}`);
+      }
+      const card = byNumber(dep);
+      if (card.status !== "Todo") continue;
+
+      const from = card.priority ?? DEFAULT_PRIORITY;
+      const raised = rankOf(card) > rankOf(dependent);
+      if (raised) card.priority = PRIORITIES[rankOf(dependent)];
+      let moved = false;
+      if (raised || !isAhead(card, dependent)) {
+        const afterId = place(card, dependent);
+        changes.push({ number: dep, from, to: card.priority ?? DEFAULT_PRIORITY, afterId, for: current });
+        moved = true;
+      }
+
+      const rank = rankOf(card);
+      if (!moved && seen.has(dep) && seen.get(dep) <= rank) continue;
+      seen.set(dep, rank);
+      walk(dep, [...path, dep]);
+    }
+  };
+
+  walk(number, [number]);
+  return changes;
+}
+
+export function blockingDependent(queue, deps, number) {
+  const owner = ownersOf(queue);
+  const at = queue.findIndex((q) => q.number === number);
+  return queue.find((q, i) => i < at && q.status === "Todo" && dependenciesOf(owner, deps, q.number).includes(number)) ?? null;
 }
 
 export function describeSpot(queue, number) {
