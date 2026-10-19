@@ -7,8 +7,17 @@ namespace Skarbiec.Reporting.Features.GetNetWorthHistory;
 public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvider timeProvider)
 {
     public async Task<Result<NetWorthHistoryResponse>> HandleAsync(
-        string range, AssetClass? assetClass, CancellationToken cancellationToken)
+        string range,
+        AssetClass? assetClass,
+        CancellationToken cancellationToken,
+        Guid? groupId = null,
+        bool ungrouped = false)
     {
+        if (groupId is not null && ungrouped)
+        {
+            return NetWorthHistoryErrors.InvalidGroupFilter;
+        }
+
         if (assetClass is { } requestedClass && !Enum.IsDefined(requestedClass))
         {
             return NetWorthHistoryErrors.InvalidAssetClass(requestedClass);
@@ -29,7 +38,7 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             .Select(s => new { s.Date, NetWorthPln = s.TotalPln })
             .ToListAsync(cancellationToken);
 
-        if (assetClass is { } filterClass)
+        if (assetClass is { } filterClass && groupId is null && !ungrouped)
         {
             var classTotals = await db.AssetValuations
                 .AsNoTracking()
@@ -41,6 +50,29 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
 
             points = points
                 .Select(p => new { p.Date, NetWorthPln = classTotals.GetValueOrDefault(p.Date) })
+                .ToList();
+        }
+        else if (groupId is not null || ungrouped)
+        {
+            // The group is the position's current one, read at query time; a line with no position has no match.
+            var lines = db.AssetValuations
+                .AsNoTracking()
+                .Where(v => start == null || v.Date >= start)
+                .Join(db.Positions, v => v.AssetId, p => p.AssetId, (v, p) => new { v.Date, v.AssetClass, v.ValuePln, p.GroupId })
+                .Where(x => x.GroupId == groupId);
+
+            if (assetClass is { } groupClass)
+            {
+                lines = lines.Where(x => x.AssetClass == groupClass);
+            }
+
+            var groupTotals = await lines
+                .GroupBy(x => x.Date)
+                .Select(g => new { Date = g.Key, ValuePln = g.Sum(x => x.ValuePln) })
+                .ToDictionaryAsync(t => t.Date, t => t.ValuePln, cancellationToken);
+
+            points = points
+                .Select(p => new { p.Date, NetWorthPln = groupTotals.GetValueOrDefault(p.Date) })
                 .ToList();
         }
 

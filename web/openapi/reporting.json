@@ -44,6 +44,22 @@
             "schema": {
               "$ref": "#/components/schemas/AssetClass"
             }
+          },
+          {
+            "name": "groupId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "ungrouped",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -175,13 +191,46 @@
           }
         }
       },
+      "DashboardGroupValue": {
+        "required": [
+          "valuePln",
+          "percentage"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "percentage": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "DashboardResponse": {
         "required": [
           "netWorthPln",
           "asOf",
           "isStale",
           "byAssetClass",
-          "byAccount"
+          "byAccount",
+          "byGroup"
         ],
         "type": "object",
         "properties": {
@@ -213,6 +262,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DashboardAccountValue"
+            }
+          },
+          "byGroup": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardGroupValue"
             }
           }
         }

@@ -425,6 +425,192 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
         }
     }
 
+    [Fact]
+    public async Task GroupFilter_SumsGroupLines()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var group = Guid.NewGuid();
+        var inGroup1 = Guid.NewGuid();
+        var inGroup2 = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var days = new[] { Today.AddDays(-20), Today.AddDays(-10), Today };
+        var first = new[] { 100m, 150m, 200m };
+        var second = new[] { 50m, 50m, 100m };
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(inGroup1, userId, null, cancellationToken, groupId: group);
+            await db.SeedPositionAsync(inGroup2, userId, null, cancellationToken, groupId: group);
+            await db.SeedPositionAsync(other, userId, null, cancellationToken);
+            for (var i = 0; i < days.Length; i++)
+            {
+                await db.SeedSnapshotAsync(userId, days[i], first[i] + second[i] + 1000m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, inGroup1, days[i], first[i], cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, inGroup2, days[i], second[i], cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, other, days[i], 1000m, cancellationToken);
+            }
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(NetWorthHistoryUri("1Y", groupId: group), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(days, body!.Points.Select(p => p.Date).ToArray());
+        Assert.Equal([150m, 200m, 300m], body.Points.Select(p => p.NetWorthPln).ToArray());
+    }
+
+    [Fact]
+    public async Task GroupFilter_FollowsCurrentAssignment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var groupA = Guid.NewGuid();
+        var groupB = Guid.NewGuid();
+        var moved = Guid.NewGuid();
+        var stays = Guid.NewGuid();
+        var days = new[] { Today.AddDays(-20), Today.AddDays(-10), Today };
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(moved, userId, null, cancellationToken, groupId: groupB);
+            await db.SeedPositionAsync(stays, userId, null, cancellationToken, groupId: groupA);
+            foreach (var day in days)
+            {
+                await db.SeedSnapshotAsync(userId, day, 700m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, moved, day, 300m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, stays, day, 400m, cancellationToken);
+            }
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var seriesA = await GetFilteredSeriesAsync(client, cancellationToken, groupId: groupA);
+        var seriesB = await GetFilteredSeriesAsync(client, cancellationToken, groupId: groupB);
+
+        Assert.Equal([400m, 400m, 400m], seriesA.Select(p => p.NetWorthPln).ToArray());
+        Assert.Equal([300m, 300m, 300m], seriesB.Select(p => p.NetWorthPln).ToArray());
+        Assert.Equal(days, seriesB.Select(p => p.Date).ToArray());
+    }
+
+    [Fact]
+    public async Task GroupAndClassFilter()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var group = Guid.NewGuid();
+        var etfInGroup = Guid.NewGuid();
+        var cashInGroup = Guid.NewGuid();
+        var etfOutside = Guid.NewGuid();
+        var days = new[] { Today.AddDays(-10), Today };
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(etfInGroup, userId, null, cancellationToken, assetClass: AssetClass.Etf, groupId: group);
+            await db.SeedPositionAsync(cashInGroup, userId, null, cancellationToken, assetClass: AssetClass.Cash, groupId: group);
+            await db.SeedPositionAsync(etfOutside, userId, null, cancellationToken, assetClass: AssetClass.Etf);
+            foreach (var day in days)
+            {
+                await db.SeedSnapshotAsync(userId, day, 1_110m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, etfInGroup, day, 100m, cancellationToken, AssetClass.Etf);
+                await db.SeedValuationLineAsync(userId, null, cashInGroup, day, 10m, cancellationToken, AssetClass.Cash);
+                await db.SeedValuationLineAsync(userId, null, etfOutside, day, 1_000m, cancellationToken, AssetClass.Etf);
+            }
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var series = await GetFilteredSeriesAsync(client, cancellationToken, groupId: group, assetClass: AssetClass.Etf);
+
+        Assert.Equal([100m, 100m], series.Select(p => p.NetWorthPln).ToArray());
+    }
+
+    [Fact]
+    public async Task Ungrouped()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var group = Guid.NewGuid();
+        var grouped = Guid.NewGuid();
+        var loose = Guid.NewGuid();
+        var days = new[] { Today.AddDays(-10), Today };
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(grouped, userId, null, cancellationToken, groupId: group);
+            await db.SeedPositionAsync(loose, userId, null, cancellationToken);
+            foreach (var day in days)
+            {
+                await db.SeedSnapshotAsync(userId, day, 350m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, grouped, day, 300m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, loose, day, 50m, cancellationToken);
+            }
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var series = await GetFilteredSeriesAsync(client, cancellationToken, ungrouped: true);
+
+        Assert.Equal([50m, 50m], series.Select(p => p.NetWorthPln).ToArray());
+    }
+
+    [Fact]
+    public async Task GroupAndUngrouped_Returns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        using var response = await client.GetAsync(
+            NetWorthHistoryUri("MAX", groupId: Guid.NewGuid(), ungrouped: true), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, "Validation.InvalidGroupFilter", cancellationToken);
+    }
+
+    [Fact]
+    public async Task ArchivedAsset_StaysInGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var group = Guid.NewGuid();
+        var archived = Guid.NewGuid();
+        var active = Guid.NewGuid();
+        var days = new[] { Today.AddDays(-20), Today.AddDays(-10), Today.AddDays(-5), Today };
+        var archiveDate = Today.AddDays(-8);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(archived, userId, null, cancellationToken,
+                groupId: group, isArchived: true, archivedOn: archiveDate);
+            await db.SeedPositionAsync(active, userId, null, cancellationToken);
+            foreach (var day in days)
+            {
+                await db.SeedSnapshotAsync(userId, day, 600m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, active, day, 500m, cancellationToken);
+                if (day < archiveDate)
+                {
+                    await db.SeedValuationLineAsync(userId, null, archived, day, 100m, cancellationToken);
+                }
+            }
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var series = await GetFilteredSeriesAsync(client, cancellationToken, groupId: group);
+
+        Assert.Equal(days, series.Select(p => p.Date).ToArray());
+        Assert.Equal([100m, 100m, 0m, 0m], series.Select(p => p.NetWorthPln).ToArray());
+    }
+
+    private static async Task<IReadOnlyList<NetWorthHistoryPoint>> GetFilteredSeriesAsync(
+        HttpClient client,
+        CancellationToken cancellationToken,
+        Guid? groupId = null,
+        bool? ungrouped = null,
+        AssetClass? assetClass = null)
+    {
+        var response = await client.GetAsync(NetWorthHistoryUri("MAX", assetClass, groupId, ungrouped), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+        return body!.Points;
+    }
+
     private static async Task<IReadOnlyList<NetWorthHistoryPoint>> GetSeriesAsync(
         HttpClient client, AssetClass? assetClass, CancellationToken cancellationToken)
     {

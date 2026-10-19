@@ -14,6 +14,15 @@ public sealed record DashboardResponse
 
     public required IReadOnlyList<DashboardAssetClassValue> ByAssetClass { get; init; }
     public required IReadOnlyList<DashboardAccountValue> ByAccount { get; init; }
+    public required IReadOnlyList<DashboardGroupValue> ByGroup { get; init; }
+}
+
+public sealed record DashboardGroupValue
+{
+    /// <summary>Null groups the lines of assets that sit in no group.</summary>
+    public Guid? GroupId { get; init; }
+    public required decimal ValuePln { get; init; }
+    public required decimal Percentage { get; init; }
 }
 
 public sealed record DashboardAssetClassValue

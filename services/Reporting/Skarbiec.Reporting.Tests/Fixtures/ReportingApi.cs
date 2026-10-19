@@ -63,12 +63,23 @@ internal static class ReportingApi
         Assert.Equal(errorCode, rawCode is JsonElement element ? element.GetString() : rawCode?.ToString());
     }
 
-    public static string NetWorthHistoryUri(string? range = null, AssetClass? assetClass = null)
+    public static string NetWorthHistoryUri(
+        string? range = null, AssetClass? assetClass = null, Guid? groupId = null, bool? ungrouped = null)
     {
         var parameters = new List<string>();
         if (assetClass is not null)
         {
             parameters.Add($"assetClass={assetClass}");
+        }
+
+        if (groupId is not null)
+        {
+            parameters.Add($"groupId={groupId}");
+        }
+
+        if (ungrouped is not null)
+        {
+            parameters.Add($"ungrouped={ungrouped.Value.ToString().ToLowerInvariant()}");
         }
 
         if (range is not null)
@@ -114,10 +125,12 @@ internal static class ReportingApi
         bool isArchived = false,
         IReadOnlyList<(DateOnly Date, decimal Quantity)>? quantityHistory = null,
         DateOnly? archivedOn = null,
-        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null)
+        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
+        Guid? groupId = null)
     {
         db.Positions.Add(new Data.Position
         {
+            GroupId = groupId,
             AssetId = assetId,
             UserId = userId,
             AccountId = accountId,

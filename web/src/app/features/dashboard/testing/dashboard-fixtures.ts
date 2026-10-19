@@ -29,6 +29,7 @@ export const dashboard: DashboardResponse = {
       percentage: 100,
     },
   ],
+  byGroup: [{ groupId: null, valuePln: 15000, percentage: 100 }],
 };
 
 export const dashboardWithClasses: DashboardResponse = {

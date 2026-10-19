@@ -20,12 +20,19 @@ export type DashboardAssetClassValue = {
     percentage: number | string;
 };
 
+export type DashboardGroupValue = {
+    groupId?: null | string;
+    valuePln: number | string;
+    percentage: number | string;
+};
+
 export type DashboardResponse = {
     netWorthPln: number | string;
     asOf: null | string;
     isStale: boolean;
     byAssetClass: Array<DashboardAssetClassValue>;
     byAccount: Array<DashboardAccountValue>;
+    byGroup: Array<DashboardGroupValue>;
 };
 
 export type NetWorthHistoryPoint = {
@@ -105,6 +112,8 @@ export type GetApiReportingNetWorthHistoryData = {
     query?: {
         range?: string;
         assetClass?: AssetClass;
+        groupId?: string;
+        ungrouped?: boolean;
     };
     url: '/api/reporting/net-worth-history';
 };
