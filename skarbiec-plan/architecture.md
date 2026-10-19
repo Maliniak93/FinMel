@@ -26,7 +26,7 @@ Angular talks only to the Gateway (ADR-013).
 
 | Event | Payload | Published when |
 |---|---|---|
-| `AssetPositionChanged` | `AssetId, AccountId?, UserId, AssetClass, ValuationMode, InstrumentId?, Currency, Quantity, FirstTransactionDate?, QuantityHistory (end-of-day `(Date, Quantity)` per transaction date), ClassHistory (`(Date, AssetClass)`, the class the position counts under from that date), IsArchived, Version` | after **every** position mutation: add/update asset, record/update/delete transaction, archive/restore the asset (`IsArchived`, asset-archive); `AccountId` is null for assets that sit in no account |
+| `AssetPositionChanged` | `AssetId, AccountId?, UserId, AssetClass, ValuationMode, InstrumentId?, Currency, Quantity, FirstTransactionDate?, QuantityHistory (end-of-day `(Date, Quantity)` per transaction date), ClassHistory (`(Date, AssetClass)`, the class the position counts under from that date), IsArchived, GroupId?, Version` | after **every** position mutation: add/update asset, record/update/delete transaction, archive/restore the asset (`IsArchived`, asset-archive), assign/clear/delete an asset group (`GroupId`, ADR-040); `AccountId` is null for assets that sit in no account |
 | `AssetRemoved` | `AssetId, AccountId?, UserId` | remove asset (its transactions go with it) |
 | `WatchlistItemAdded` | `WatchlistItemId, UserId, InstrumentId, OccurredAtUtc` | add a watchlist item; no consumer yet (MarketData counts watchers in watchlist part 2) |
 | `WatchlistItemRemoved` | `WatchlistItemId, UserId, InstrumentId, OccurredAtUtc` | remove a watchlist item; updating one publishes nothing |

@@ -1551,6 +1551,160 @@
         }
       }
     },
+    "/api/portfolio/asset-groups": {
+      "post": {
+        "tags": [
+          "CreateAssetGroupEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssetGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetGroupResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "ListAssetGroupsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssetGroupResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/asset-groups/{id}": {
+      "put": {
+        "tags": [
+          "UpdateAssetGroupEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetGroupResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeleteAssetGroupEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/asset-groups/assignment": {
+      "put": {
+        "tags": [
+          "AssignAssetsToGroupEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignAssetsToGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/asset-groups/assets": {
+      "get": {
+        "tags": [
+          "ListAssignableAssetsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignableAssetResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/portfolio/cash-places": {
       "post": {
         "tags": [
@@ -3591,6 +3745,45 @@
       "AssetClass": {
         "type": "integer"
       },
+      "AssetGroupResponse": {
+        "required": [
+          "id",
+          "name",
+          "color",
+          "targetPln",
+          "assetCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "targetPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "assetCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "AssetResponse": {
         "required": [
           "id",
@@ -3679,6 +3872,86 @@
       },
       "AssetValuationMode": {
         "type": "integer"
+      },
+      "AssignAssetsToGroupRequest": {
+        "required": [
+          "assetIds"
+        ],
+        "type": "object",
+        "properties": {
+          "assetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "AssignableAssetResponse": {
+        "required": [
+          "assetId",
+          "name",
+          "assetClass",
+          "currency",
+          "accountId",
+          "accountName",
+          "cashPlaceName",
+          "groupId",
+          "isArchived"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cashPlaceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "isArchived": {
+            "type": "boolean"
+          }
+        }
       },
       "BalanceAdjustmentResponse": {
         "required": [
@@ -4765,6 +5038,30 @@
           "annualInterestRatePercent": {
             "maximum": 100,
             "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "CreateAssetGroupRequest": {
+        "required": [
+          "name",
+          "color"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "targetPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "null",
@@ -7859,6 +8156,30 @@
           }
         }
       },
+      "UpdateAssetGroupRequest": {
+        "required": [
+          "name",
+          "color"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "targetPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "UpdateAssetRequest": {
         "required": [
           "assetClass",
@@ -8656,6 +8977,24 @@
     },
     {
       "name": "GetMetalEndpoint"
+    },
+    {
+      "name": "CreateAssetGroupEndpoint"
+    },
+    {
+      "name": "ListAssetGroupsEndpoint"
+    },
+    {
+      "name": "UpdateAssetGroupEndpoint"
+    },
+    {
+      "name": "DeleteAssetGroupEndpoint"
+    },
+    {
+      "name": "AssignAssetsToGroupEndpoint"
+    },
+    {
+      "name": "ListAssignableAssetsEndpoint"
     },
     {
       "name": "CreateCashPlaceEndpoint"

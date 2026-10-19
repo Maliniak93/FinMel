@@ -401,6 +401,9 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("InstrumentId")
                         .HasColumnType("uuid");
 
@@ -435,12 +438,45 @@ namespace Skarbiec.Portfolio.Migrations
 
                     b.HasIndex("AccountId");
 
+                    b.HasIndex("GroupId");
+
                     b.HasIndex("InstrumentId");
 
                     b.HasIndex("CashPlaceId", "Currency")
                         .IsUnique();
 
                     b.ToTable("Assets");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.AssetGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("TargetPln")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Color")
+                        .IsUnique();
+
+                    b.ToTable("AssetGroups");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.BankAccountTerms", b =>

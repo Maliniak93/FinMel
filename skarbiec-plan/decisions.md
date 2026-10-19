@@ -126,7 +126,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-021 ✅ Event-carried state transfer for positions; REST narrowed to validation + batch
 
-**Amended by ADR-026, ADR-027, ADR-032, ADR-039.**
+**Amended by ADR-026, ADR-027, ADR-032, ADR-039, ADR-040.**
 
 **Shipped:** 2026-09-22 (spec-02 publishes the events, spec-03 consumes them and deletes the REST query).
 
@@ -269,3 +269,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Decision:** `AssetPositionChanged` gains `required ClassHistory` (`ClassPoint { Date, AssetClass }`, ascending, empty = `AssetClass` holds on every date). Portfolio derives it for a Brokerage account's cash: on date `d` the class of the latest Buy by `(Date, EntryOrder)` on or before `d` whose asset has end-of-day quantity above 0, else Cash; `AssetClass` is the class today. A Bonds account's cash publishes Bond. `Transaction.EntryOrder` is a database sequence value set at insert and never changed by an edit, so two buys on one date order deterministically. The stored `Asset.AssetClass` of the cash stays Cash. Amends ADR-021.
 **Consequences:** a buy, sell, edit, delete or class change in a Brokerage account republishes its cash with the whole timeline recomputed; consumers ignore `ClassHistory` until they adopt it.
 **Reporting adopts it (amends ADR-021, ADR-032):** `Position` stores `ClassHistory` and `AssetClass` as the event's today-class; `ClassOn(date)` is the class of the last point on or before `date`, else `AssetClass`, and stamps every valuation line (today by `SnapshotWriter`, each past day by the history rebuild). A class timeline that differs from the stored one requests a rebuild from the first date whose class differs, like a quantity change; a difference effective only today revalues today without one. the dashboard's per-account Cash-class sum is deleted: "Cash-class lines of an account" no longer identifies free cash.
+
+## ADR-040 🕐 The asset group travels on `AssetPositionChanged`
+
+**Context:** the user sorts assets into groups (name, colour, optional PLN target) and net worth is reported by group (epic #472). Portfolio owns the assignment; Reporting values from events (ADR-021).
+**Decision:** `Asset.GroupId` (plain id, no FK, ADR-003) is part of the position state, published as `AssetPositionChanged.GroupId` (`Guid?`, null = no group) by `PositionEventPublisher` for every publish. Assigning assets to a group, clearing them and deleting a group each republish every asset whose group changes through `PublishChangedAsync` (`Version + 1`) in the same save; assigning an asset to the group it is already in publishes nothing. Renaming, recolouring and retargeting a group publish nothing, since the event carries only the id. Amends ADR-021.
+**Consequences:** a group change fans out one event per asset; consumers ignore `GroupId` until they adopt it (MarketData never will).

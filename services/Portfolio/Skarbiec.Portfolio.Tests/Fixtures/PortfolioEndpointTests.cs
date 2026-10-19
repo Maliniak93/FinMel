@@ -19,6 +19,19 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return new PortfolioDbContext(options, new StubCurrentUser(userId));
     }
 
+    protected async Task<Dictionary<Guid, (Guid? GroupId, long Version)>> ReadAssetGroupStatesAsync(
+        Guid userId, CancellationToken cancellationToken, params Guid[] assetIds)
+    {
+        await using var dbContext = CreateDbContext(userId);
+        var rows = await dbContext.Assets
+            .AsNoTracking()
+            .Where(a => assetIds.Contains(a.Id))
+            .Select(a => new { a.Id, a.GroupId, a.Version })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(r => r.Id, r => (r.GroupId, r.Version));
+    }
+
     // Replaces both replicas of the user; a null argument leaves that replica absent.
     protected async Task SeedReplicasAsync(
         Guid userId,

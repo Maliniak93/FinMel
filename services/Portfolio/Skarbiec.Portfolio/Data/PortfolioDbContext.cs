@@ -14,6 +14,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<AccountContributionLimit> AccountContributionLimits => Set<AccountContributionLimit>();
     public DbSet<CashPlace> CashPlaces => Set<CashPlace>();
+    public DbSet<AssetGroup> AssetGroups => Set<AssetGroup>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TermDeposit> TermDeposits => Set<TermDeposit>();
@@ -73,9 +74,22 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             place.HasIndex(p => new { p.UserId, p.Name }).IsUnique();
         });
 
+        // The case-insensitive (UserId, lower(Name)) unique index is raw SQL in the AssetGroups migration: the model cannot express it.
+        modelBuilder.Entity<AssetGroup>(group =>
+        {
+            group.Property(g => g.Name).HasMaxLength(50);
+            group.Property(g => g.Color).HasMaxLength(20);
+            group.Property(g => g.TargetPln).HasPrecision(18, 2);
+
+            group.HasIndex(g => new { g.UserId, g.Color }).IsUnique();
+        });
+
         modelBuilder.Entity<Asset>(asset =>
         {
             asset.Property(a => a.Name).HasMaxLength(200);
+
+            // No FK to AssetGroup; indexed because the group's assets are read and cleared by GroupId.
+            asset.HasIndex(a => a.GroupId);
             asset.Property(a => a.Currency).HasMaxLength(3);
             asset.Property(a => a.Quantity).HasPrecision(18, 8);
 
