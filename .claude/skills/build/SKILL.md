@@ -19,6 +19,8 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
    `epic` info in `workflowArgs` (the last part of an epic also gets the epic and sibling bodies written locally).
    `"e2e": true` in `workflowArgs` marks an epic's e2e part: pass it through verbatim, the workflow then runs the
    e2e agent and the review instead of the test-writer and implementer.
+   `workflowArgs.profile` (the build profile of the ticket's Area: phases, playbooks, review-checklist sections, label)
+   is passed through verbatim too; the workflow follows it and a ticket without an Area runs the full path.
    Print each line of prepare's `notes` (the no-area warning among them) before the workflow starts.
 3. `"ok": false` → print `reason` and `next`, and stop. `stage: "branch"` → the tree held changes that are
    not this spec: name the `files` and stop; never offer to sweep them into the branch.
@@ -41,7 +43,7 @@ You relay; scripts and the `build-feature` workflow do all the work. Decide noth
 
 - `replay: <steps> → live from <liveFrom>` first, when prepare returned `replay`.
 - `ready` and SHIP_RESULT `ok` → the `prUrl` (the merge is the user's), the issue `url`, `branch` and
-  `commit`, tests (`tests`, or "none — skip-tests"), `filesTouched` count, `rounds`, each of
+  `commit`, `Profil: <label>` (the workflow's `ship.report.profile`; omit it when there is none), tests (`tests`, or "none — skip-tests"), `filesTouched` count, `rounds`, each of
   `minorFindings` as `file:line — claim` ("none" when empty), and `images` (the rebuilt compose
   image `revision` from `scripts/compose.mjs build`, or its `error`; a failed image build does not make the ship fail),
   and the issues whose `## Test manualny` the run updated (`manualTest[].issue`, or "none"). An e2e part
