@@ -46,7 +46,10 @@ test('accounts: an IKE account with a contribution limit, deposits, withdrawals,
   }
 
   await test.step('Krok 1: the IKE Bossa brokerage account with the IKE wrapper is on the list with 0,00 zł', async () => {
-    await page.locator('mat-sidenav').getByRole('link', { name: 'Rachunki', exact: true }).click();
+    await page
+      .locator('mat-sidenav')
+      .getByRole('link', { name: 'Rachunki inwestycyjne', exact: true })
+      .click();
     await page
       .getByRole('button', { name: /^(Nowy rachunek|Utwórz pierwszy rachunek)$/ })
       .first()

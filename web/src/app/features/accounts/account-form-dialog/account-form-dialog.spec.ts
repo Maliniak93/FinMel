@@ -98,6 +98,27 @@ describe('AccountFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
+  it('offers only investment types without a preset', async () => {
+    await setup({});
+
+    expect(component['types'].map((type) => type.value)).toEqual([0, 1]);
+  });
+
+  it('fixes the type to Bank with the Bank preset', async () => {
+    await setup({ type: 2 });
+
+    expect(component['types'].map((type) => type.value)).toEqual([2]);
+    expect(component['form'].controls.type.value).toBe(2);
+  });
+
+  it('fixes the type to Bank when editing a Bank account', async () => {
+    await setup({ account: { ...existingAccount, type: 2, wrapper: 0 } });
+
+    expect(component['types'].map((type) => type.value)).toEqual([2]);
+    expect(component['form'].controls.type.value).toBe(2);
+    expect(component['form'].controls.type.disabled).toBe(true);
+  });
+
   it('keeps type and wrapper enabled on create', async () => {
     await setup({});
 

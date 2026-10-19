@@ -18,10 +18,18 @@ export const TAX_WRAPPER = {
   Ikze: 2,
 } as const satisfies Record<string, TaxWrapper>;
 
-export const ACCOUNT_TYPES: readonly { value: AccountType; label: string }[] = [
+export const INVESTMENT_ACCOUNT_TYPES: readonly { value: AccountType; label: string }[] = [
   { value: ACCOUNT_TYPE.Brokerage, label: 'enums.accountType.brokerage' },
   { value: ACCOUNT_TYPE.Bonds, label: 'enums.accountType.bonds' },
+];
+
+export const BANK_ACCOUNT_TYPES: readonly { value: AccountType; label: string }[] = [
   { value: ACCOUNT_TYPE.Bank, label: 'enums.accountType.bank' },
+];
+
+export const ACCOUNT_TYPES: readonly { value: AccountType; label: string }[] = [
+  ...INVESTMENT_ACCOUNT_TYPES,
+  ...BANK_ACCOUNT_TYPES,
 ];
 
 export const BANK_VARIANTS: readonly { value: BankVariant; label: string }[] = [

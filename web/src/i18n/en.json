@@ -41,7 +41,7 @@
       "bonds": "Bonds",
       "metals": "Precious metals",
       "settings": "Settings",
-      "accounts": "Accounts",
+      "accounts": "Investment accounts",
       "bankAccounts": "Bank accounts"
     },
     "navSection": {
@@ -1264,7 +1264,7 @@
     }
   },
   "accounts": {
-    "title": "Accounts",
+    "title": "Investment accounts",
     "showArchived": "Show archived",
     "newAccount": "New account",
     "empty": "You don't have any accounts yet.",

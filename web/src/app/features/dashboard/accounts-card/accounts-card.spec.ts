@@ -87,6 +87,31 @@ describe('AccountsCard', () => {
     );
   });
 
+  it('links a Bank account to bank-accounts/:id', async () => {
+    const bankId = '55555555-5555-5555-5555-555555555555';
+    const { fixture } = await renderCard(AccountsCard, {
+      accounts: jsonResponse([
+        accountResponse({ id: BROKERAGE_ID, name: 'XTB IKE', type: 0, wrapper: 1 }),
+        accountResponse({ id: bankId, name: 'mBank', type: 2 }),
+      ]),
+      dashboard: jsonResponse({
+        ...withOutsideAccounts,
+        byAccount: [
+          { ...withOutsideAccounts.byAccount[0] },
+          { ...withOutsideAccounts.byAccount[0], accountId: bankId, valuePln: 300 },
+        ],
+      }),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector(`a[href="/bank-accounts/${bankId}"]`)?.textContent).toContain(
+      'mBank',
+    );
+    expect(element.querySelector(`a[href="/accounts/${BROKERAGE_ID}"]`)?.textContent).toContain(
+      'XTB IKE',
+    );
+  });
+
   it('shows the Poza rachunkami row in Polish', async () => {
     const { fixture } = await renderCard(AccountsCard, {
       accounts: jsonResponse(accounts),

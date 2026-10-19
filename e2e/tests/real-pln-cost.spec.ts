@@ -37,7 +37,7 @@ async function selectOption(page: Page, select: Locator, option: string): Promis
 }
 
 async function expectAccountCash(page: Page, amount: string): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Rachunki' }).click();
+  await navigation(page).getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
   await page.getByRole('link', { name: ACCOUNT, exact: true }).click();
   const cash = page
     .locator('.account-detail__totals > div')
@@ -86,7 +86,7 @@ test('real PLN cost: the PLN really paid drives cost basis, P/L and account cash
   });
 
   await test.step('Krok 2: new Brokerage / Regular account XTB with 0,00 PLN cash', async () => {
-    await sidebar.getByRole('link', { name: 'Rachunki' }).click();
+    await sidebar.getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
     await page.getByRole('button', { name: 'Utwórz pierwszy rachunek' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nazwa').fill(ACCOUNT);
