@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--jobs N] [--deadline-min N] [--out <file>] [--cache] [--cache-check] [--detach] [--await <file> [--max-min N]]
-//   (no flags)        affected .NET test projects and web/api checks, picked from the files changed against master
+//   (no flags)        steps picked from the files changed against master: scripts tests always, build + format only with .NET in scope, a full-scope file means --all
 //   --quick           format + build only; overrides everything below
 //   --projects a,b    exactly these .NET test projects; web/api still need --web/--api/--all
 //   --web             force the web checks
@@ -10,14 +10,14 @@
 //   --jobs N          run N .NET test projects at once, alongside the web checks (default 1: sequential, then web)
 //   --deadline-min N  wall-clock budget for the whole run (default 120)
 //   --out <file>      also write the result JSON to <file>
-//   --cache           skip the run when the same working tree and scope already passed (green results only, .git/verify-cache.json)
-//   --cache-check     run nothing: ok if this exact working tree and scope already passed under --cache, else a "cache" failure (exit 2)
+//   --cache           skip the run when the same working tree already passed these steps or a superset of them (green only, .git/verify-cache.json)
+//   --cache-check     run nothing: ok if this exact working tree already passed these steps under --cache, else a "cache" failure (exit 2)
 //   --detach          needs --out: start the run as an independent process, print VERIFY_STARTED and exit 0 at once (log in <out>.log); collect it with --await
 //   --await <file>    do not verify: wait (at most --max-min N, default 55) for a detached run's --out file; VERIFY_PENDING (exit 3) while it runs, exit 2 if it died
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stopStack } from "./stop-stack.mjs";
@@ -212,7 +212,20 @@ function unquotePath(raw) {
   return s;
 }
 
-const ROOT_BUILD_FILES = new Set(["directory.build.props", "directory.packages.props", "skarbiec.slnx"]);
+const FULL_SCOPE_ROOT_FILES = new Set([
+  "directory.build.props",
+  "directory.packages.props",
+  "skarbiec.slnx",
+  ".editorconfig",
+  ".globalconfig",
+  ".github/workflows/ci.yml",
+]);
+const FULL_SCOPE_PREFIXES = ["contracts/", "skarbiec.servicedefaults/", "skarbiec.servicedefaults.sample/", "skarbiec.testing/", "skarbiec.testing.sample/"];
+const INFRA_RE = /^(deploy\/|compose[^/]*\.ya?ml$|\.github\/workflows\/[^/]+\.ya?ml$)/;
+
+function isFullScopeFile(lower) {
+  return FULL_SCOPE_ROOT_FILES.has(lower) || FULL_SCOPE_PREFIXES.some((p) => lower.startsWith(p));
+}
 
 function isApiSurfaceFile(lower) {
   if (/^services\/[^/]+\/skarbiec\.[^/]+\/features\//.test(lower)) return true;
@@ -228,27 +241,23 @@ function computeAffected(changedFiles, serviceNames) {
   let web = false;
   let api = false;
   let e2e = false;
+  let full = false;
+  let appHost = false;
 
   for (const raw of changedFiles) {
     const f = normalizeSlashes(raw);
     const lower = f.toLowerCase();
 
-    if (!f.includes("/") && ROOT_BUILD_FILES.has(lower)) {
-      affectedKeys.add("__all__");
+    if (isFullScopeFile(lower)) {
+      full = true;
     } else if (lower.startsWith("gateway/")) {
       affectedKeys.add("gateway");
-    } else if (lower.startsWith("contracts/")) {
-      affectedKeys.add("contracts");
-      affectedKeys.add("gateway");
-      for (const k of serviceKeys) affectedKeys.add(k);
-    } else if (lower.startsWith("skarbiec.servicedefaults/")) {
+    } else if (lower.startsWith("skarbiec.apphost/")) {
+      appHost = true;
+    } else if (lower.startsWith("skarbiec.servicedefaults.tests/")) {
       affectedKeys.add("servicedefaults");
-      affectedKeys.add("gateway");
-      for (const k of serviceKeys) affectedKeys.add(k);
-    } else if (lower.startsWith("skarbiec.testing/")) {
+    } else if (lower.startsWith("skarbiec.testing.tests/")) {
       affectedKeys.add("testing");
-      affectedKeys.add("gateway");
-      for (const k of serviceKeys) affectedKeys.add(k);
     } else {
       for (const svc of serviceKeys) {
         if (lower.startsWith(`services/${svc}/`)) {
@@ -259,11 +268,11 @@ function computeAffected(changedFiles, serviceNames) {
     }
 
     if (lower.startsWith("web/")) web = true;
-    if (lower.startsWith("e2e/")) e2e = true;
+    if (lower.startsWith("e2e/") || INFRA_RE.test(lower)) e2e = true;
     if (isApiSurfaceFile(lower)) api = true;
   }
 
-  return { affectedKeys, web, api, e2e };
+  return { affectedKeys, web, api, e2e, full, appHost };
 }
 
 function quoteArg(a) {
@@ -665,13 +674,13 @@ function gitBuffer(args) {
   return res.status === 0 ? res.stdout : null;
 }
 
-function computeFingerprint(scope) {
+function computeTreeHash() {
   const head = gitBuffer(["rev-parse", "HEAD"]);
   const diff = gitBuffer(["diff", "HEAD", "--binary"]);
   const untracked = gitBuffer(["ls-files", "--others", "--exclude-standard", "-z"]);
   if (!head || !diff || !untracked) return null;
   const hash = createHash("sha1");
-  hash.update(scope).update(SEP).update(head).update(SEP).update(diff);
+  hash.update(head).update(SEP).update(diff);
   for (const rel of untracked.toString("utf8").split(SEP).filter(Boolean).sort()) {
     hash.update(SEP).update(rel).update(SEP);
     try {
@@ -699,8 +708,9 @@ function readCache(file) {
 function storeGreen(ctx, result) {
   const file = cacheFile();
   if (!file) return;
-  const entries = readCache(file).filter((e) => e.fingerprint !== ctx.fingerprint);
-  entries.push({ fingerprint: ctx.fingerprint, scope: ctx.scope, at: new Date().toISOString(), result });
+  const superseded = (e) => e.tree === ctx.tree && !!e.quick === !!ctx.quick && Array.isArray(e.steps) && e.steps.every((s) => ctx.steps.includes(s));
+  const entries = readCache(file).filter((e) => !superseded(e));
+  entries.push({ tree: ctx.tree, quick: !!ctx.quick, steps: [...ctx.steps], at: new Date().toISOString(), result });
   try {
     writeFileSync(file, JSON.stringify(entries.slice(-CACHE_MAX_ENTRIES)));
   } catch (e) {
@@ -852,12 +862,14 @@ function detach(args) {
   console.log(`VERIFY_STARTED: pid ${child.pid} — log ${logPath} — wait with: node scripts/verify.mjs --await ${outArg}`);
 }
 
-function computeScope(args, serviceNames, projectMap) {
+function computeScope(args, serviceNames, projectMap, changedInput) {
   const allProjectRels = () => [...projectMap.values()].map((v) => v.rel);
   let selectedRels;
   let runWeb;
   let runApi;
   let runE2e;
+  let runBuild;
+  let runScriptsTest;
   let modeDescription;
   let changed = null;
 
@@ -866,6 +878,8 @@ function computeScope(args, serviceNames, projectMap) {
     runWeb = true;
     runApi = true;
     runE2e = true;
+    runBuild = true;
+    runScriptsTest = true;
     modeDescription = "--all: every test project + web + api + e2e";
   } else if (args.projects) {
     const includesWeb = args.projects.some((t) => t.toLowerCase() === "web");
@@ -882,46 +896,75 @@ function computeScope(args, serviceNames, projectMap) {
     runWeb = args.web || includesWeb;
     runApi = args.api;
     runE2e = includesE2e;
+    runBuild = selectedRels.length > 0;
+    runScriptsTest = false;
     modeDescription = `--projects ${args.projects.join(",")}`;
   } else {
-    changed = getChangedFiles();
+    changed = changedInput ?? getChangedFiles();
     const { files, treatAsAll, base } = changed;
-    if (treatAsAll) {
+    runScriptsTest = true;
+    const affected = treatAsAll ? null : computeAffected(files, serviceNames);
+    if (treatAsAll || affected.full) {
       selectedRels = allProjectRels();
       runWeb = true;
       runApi = true;
       runE2e = true;
-      modeDescription = "auto: no master or origin/master ref found — treating as --all";
+      runBuild = true;
+      modeDescription = treatAsAll
+        ? "auto: no master or origin/master ref found — treating as --all"
+        : `auto (diff base: ${base}): full-scope file changed — treating as --all`;
     } else {
-      const { affectedKeys, web, api, e2e } = computeAffected(files, serviceNames);
-      selectedRels = affectedKeys.has("__all__")
-        ? allProjectRels()
-        : [...affectedKeys].map((k) => projectMap.get(k)?.rel).filter(Boolean);
+      const { affectedKeys, web, api, e2e, appHost } = affected;
+      selectedRels = [...affectedKeys].map((k) => projectMap.get(k)?.rel).filter(Boolean);
       runWeb = args.web || web;
       runApi = args.api || api;
       runE2e = e2e;
+      runBuild = selectedRels.length > 0 || appHost;
       modeDescription = `auto (diff base: ${base}): ${files.length} changed path(s)`;
     }
   }
 
   selectedRels = [...new Set(selectedRels)].sort();
-  return { selectedRels, runWeb, runApi, runE2e, modeDescription, changed };
+  return { selectedRels, runWeb, runApi, runE2e, runBuild, runScriptsTest, modeDescription, changed };
+}
+
+function stepSet(scope) {
+  const steps = new Set();
+  if (scope.runBuild) {
+    steps.add("build");
+    steps.add("format");
+  }
+  if (scope.runScriptsTest) steps.add("scripts-test");
+  if (scope.runWeb) steps.add("web");
+  if (scope.runApi) steps.add("api");
+  if (scope.runE2e) steps.add("e2e");
+  for (const rel of scope.selectedRels) steps.add(`test:${rel}`);
+  return steps;
+}
+
+function neededSteps(args, scope) {
+  return args.quick ? ["build", "format"] : [...stepSet(scope)];
+}
+
+function findCacheHit(entries, { tree, quick, steps }) {
+  if (!tree) return null;
+  return (
+    entries.find(
+      (e) =>
+        e.tree === tree &&
+        !!e.quick === !!quick &&
+        Array.isArray(e.steps) &&
+        steps.every((s) => e.steps.includes(s)) &&
+        e.result?.ok === true,
+    ) ?? null
+  );
 }
 
 function lookupCache(args, scope) {
-  const scopeKey = JSON.stringify({
-    quick: args.quick,
-    all: args.all,
-    web: scope.runWeb,
-    api: scope.runApi,
-    e2e: scope.runE2e,
-    projects: scope.selectedRels,
-  });
-  const fingerprint = computeFingerprint(scopeKey);
+  const ctx = { tree: computeTreeHash(), quick: args.quick, steps: neededSteps(args, scope) };
   const file = cacheFile();
-  if (!fingerprint || !file) return { scopeKey, fingerprint: null, hit: null };
-  const hit = readCache(file).find((e) => e.fingerprint === fingerprint && e.result?.ok === true) ?? null;
-  return { scopeKey, fingerprint, hit };
+  if (!ctx.tree || !file) return { ctx: null, hit: null };
+  return { ctx, hit: findCacheHit(readCache(file), ctx) };
 }
 
 function testRank(rel) {
@@ -1128,6 +1171,7 @@ async function main() {
   console.log(`mode: ${scope.modeDescription}`);
   console.log(`quick: ${args.quick ? "yes (stop after build)" : "no"}`);
   console.log(`test projects: ${selectedRels.length ? selectedRels.join(", ") : "(none)"}`);
+  console.log(`dotnet build + format: ${args.quick || scope.runBuild ? "yes" : "no"} · scripts tests: ${scope.runScriptsTest && !args.quick ? "yes" : "no"}`);
   console.log(`web checks: ${runWeb ? "yes" : "no"}${args.quick && runWeb ? " (skipped by --quick)" : ""}`);
   console.log(`api check: ${runApi ? "yes" : "no"}${args.quick && runApi ? " (skipped by --quick)" : ""}`);
   console.log(`e2e checks: ${runE2e ? "yes" : "no"}${args.quick && runE2e ? " (skipped by --quick)" : ""}`);
@@ -1141,30 +1185,33 @@ async function main() {
   }
 
   if (args.cache) {
-    const { scopeKey, fingerprint, hit } = lookupCache(args, scope);
+    const { ctx, hit } = lookupCache(args, scope);
     if (hit) {
-      console.log(`\ncache: this exact working tree and scope already passed at ${hit.at} — nothing to run`);
+      console.log(`\ncache: this exact working tree already passed these checks at ${hit.at} — nothing to run`);
       return finish(true, hit.result.failures ?? [], { cached: true });
     }
-    if (fingerprint) cacheCtx = { fingerprint, scope: scopeKey };
+    if (ctx) cacheCtx = ctx;
   }
 
-  const formatResult = await checkFormat(changed);
-  if (!formatResult.ok) return finish(false, [buildFailure("format", formatResult)]);
+  const runDotnet = args.quick || scope.runBuild;
+  if (runDotnet) {
+    const formatResult = await checkFormat(changed);
+    if (!formatResult.ok) return finish(false, [buildFailure("format", formatResult)]);
 
-  let buildResult = await step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
-  if (!buildResult.ok && LOCKED_OUTPUT_RE.test(`${buildResult.stdout}\n${buildResult.stderr}`)) {
-    const { stopped, left } = stopStack();
-    const names = stopped.map((p) => `${p.name} (${p.what})`).join(", ") || "nothing found";
-    console.log(`\nbuild outputs are locked by the running stack; stopped: ${names}`);
-    if (left?.length) console.log(`still running: ${left.map((p) => `${p.name} #${p.pid}`).join(", ")}`);
-    buildResult = await step("build (retry after stopping the stack)", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+    let buildResult = await step("build", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+    if (!buildResult.ok && LOCKED_OUTPUT_RE.test(`${buildResult.stdout}\n${buildResult.stderr}`)) {
+      const { stopped, left } = stopStack();
+      const names = stopped.map((p) => `${p.name} (${p.what})`).join(", ") || "nothing found";
+      console.log(`\nbuild outputs are locked by the running stack; stopped: ${names}`);
+      if (left?.length) console.log(`still running: ${left.map((p) => `${p.name} #${p.pid}`).join(", ")}`);
+      buildResult = await step("build (retry after stopping the stack)", () => runCommand("dotnet", ["build", "Skarbiec.slnx"]));
+    }
+    if (!buildResult.ok) return finish(false, [buildFailure("build", buildResult)]);
   }
-  if (!buildResult.ok) return finish(false, [buildFailure("build", buildResult)]);
 
   if (args.quick) return finish(true, []);
 
-  const scriptsFailures = await runScriptsTest();
+  const scriptsFailures = scope.runScriptsTest ? await runScriptsTest() : [];
 
   // Parallel test projects fight over Docker and CPU: Respawn deadlocks and timing-based tests go red, so one at a time unless asked.
   const [testFailures, webFailures] =
@@ -1182,4 +1229,8 @@ async function main() {
   return failures.length ? finish(false, failures) : finish(true, []);
 }
 
-main().catch((e) => fatal(`verify.mjs crashed: ${e?.stack ?? e}`));
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  main().catch((e) => fatal(`verify.mjs crashed: ${e?.stack ?? e}`));
+}
+
+export { computeAffected, computeScope, computeTreeHash, findCacheHit, stepSet, storeGreen };
