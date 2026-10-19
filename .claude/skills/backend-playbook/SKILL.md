@@ -72,8 +72,9 @@ Compare `<Service>` against Portfolio/Reporting/MarketData/Identity — every on
 Changing a convention or a hard rule in the same change that motivated it: update `.claude/rules/*.md` and/or append an entry to `skarbiec-plan/decisions.md`. Never leave the code and the documented rule disagreeing.
 
 ## Definition of done
-- Tests green, including tenancy isolation for any new user-owned resource.
+- Tests green, including tenancy isolation for any new user-owned resource: the four isolation facts of `TenancyIsolationTests<TProgram>`, or their hand-written nested equivalents.
 - Zero warnings (`TreatWarningsAsErrors`), `dotnet format` clean.
+- Migration added → reviewed for destructiveness and named after the change; the runbook note in the spec's Verification section still holds.
 
 > **Who runs what.** While implementing, run only `dotnet test <project> --filter "FullyQualifiedName~<Name>"`
 > for the tests you are driving green. `dotnet format`, a solution build, the full suites and
