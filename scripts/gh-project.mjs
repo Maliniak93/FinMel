@@ -640,11 +640,11 @@ async function create(flags) {
     throw new Error(
       "--priority is for a top-level item: a part follows its epic's priority",
     );
-  const priority = flags.parent
-    ? null
-    : flags.priority
-      ? parsePriority(flags.priority)
-      : DEFAULT_PRIORITY;
+  if (!flags.parent && !flags.priority)
+    throw new Error(
+      `--priority is required for a top-level item (one of: ${PRIORITIES.join(", ")})`,
+    );
+  const priority = flags.priority ? parsePriority(flags.priority) : null;
   if (flags.priority && !priority)
     throw new Error(`--priority must be one of: ${PRIORITIES.join(", ")}`);
   if (flags.area && flags.epic)

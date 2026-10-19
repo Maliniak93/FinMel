@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AREAS, parseArea } from "./areas.mjs";
 import { GH_LIMIT_EXIT, clockTime, limitFromText } from "./gh.mjs";
+import { parsePriority, shortOf } from "./priority.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GH_PROJECT = path.join(REPO_ROOT, "scripts", "gh-project.mjs");
@@ -139,7 +140,7 @@ function boardLines(issues) {
   const lines = open.map((i) => {
     const subs = (i.subIssues ?? []).map((s) => `#${s.number ?? s}`);
     const epic = subs.length ? ` · epic of ${subs.join(",")}` : "";
-    return `- #${i.number} [${i.status} · Tier ${i.tier ?? "?"} · ${i.kind ?? "?"}${i.area ? ` · ${i.area}` : ""}${epic}] ${i.title}`;
+    return `- #${i.number} [${i.status} · Tier ${i.tier ?? "?"} · ${i.kind ?? "?"}${i.area ? ` · ${i.area}` : ""}${i.priority ? ` · ${shortOf(i.priority)}` : ""}${epic}] ${i.title}`;
   });
   return [...lines, ...done.map((i) => `- #${i.number} ${i.title}`)];
 }
@@ -325,6 +326,10 @@ function check([slug]) {
       else if (parts.length < 2) problems.push('section "## Proponowany podział" needs at least two numbered parts');
       else if (parts.some((p) => !parseArea(/^([^\s—–-]+)/.exec(p)?.[1]))) problems.push(`section "## Proponowany podział": each part starts with an area (${AREAS.join(" | ")})`);
     } else if (!parseArea(meta.area)) problems.push(`frontmatter: area must be ${options}`);
+  }
+  if (meta.target) {
+    const priority = /^(P[0-3]) — \S/.exec(meta.priority ?? "");
+    if (!priority || !parsePriority(priority[1])) problems.push("frontmatter: priority must be P0-P3 followed by ` — ` and a reason");
   }
   if (lines.length > MAX_BODY_LINES) problems.push(`body has ${lines.length} lines, limit is ${MAX_BODY_LINES}`);
   if (body.includes("```")) problems.push("fenced code blocks are not allowed; describe what and why, not code");

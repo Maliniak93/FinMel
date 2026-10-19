@@ -49,6 +49,8 @@ scope", saved prompts, and "Possibly related" matches. That is your map. Never r
   option, or `epic` with a `## Proponowany podział` section (numbered parts in build order, each
   `<n>. <Area> — <what>`). The general rule and the Fullstack rule in `skarbiec-plan/workflow.md` → Area
   decide between them.
+- Priority: set `priority: P<k> — <powód>` in the frontmatter (P0 Pilne, P1 Wysoki, P2 Normalny, P3 Niski;
+  definitions in `skarbiec-plan/workflow.md` → Priority); P2 unless the reason says otherwise.
 
 A pure question ("dlaczego…?", "czym jest…?") → answer it briefly from the map, or from the one
 `Explore` call (step 4), then ask whether a change or a bug sits behind it. None → stop.

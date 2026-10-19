@@ -33,7 +33,7 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
 1. Run `node scripts/plan-status.mjs` — it lists every open spec issue — and `node scripts/gh-project.mjs queue` (the build
    queue in board order, with each item's `id`, `manual` and an epic's `next`), then read **only** the sections of `architecture.md` / `domain.md` / `ideas.md`
    that this change actually touches. Not the folder. If an open issue already covers the idea, say
-   so and ask whether to extend it instead. An `idea:<slug>` prompt: its `area:` and `## Proponowany podział`
+   so and ask whether to extend it instead. An `idea:<slug>` prompt: its `priority:` is the proposed priority; its `area:` and `## Proponowany podział`
    are the starting cut (`epic` means an umbrella with those parts).
 2. Need a fact about the code (does this slice exist, what does that consumer do, is there a
    precedent)? Send an `Explore` subagent for it. Do not read a dozen files yourself.
@@ -158,9 +158,10 @@ umbrella) and fix what it lists — it checks Goal, Out of scope, that every AC 
 `proof:`, and the shape of `## Test manualny` (a warning when it is missing, an error when it has a `- [ ]`
 line or neither a numbered step nor the `Weryfikacja w planie epica` line). Then present a summary of at most 15 lines: goal (for a change: today → wanted), kind, tier, scope, the
 acceptance criteria as one line each, `Obszar: <Area>` (one line per part for a split, none for the umbrella; the user may change it before publishing), whether tests are skipped, the manual plan's step count (or `brak planu`), the split (if any), and anything
-still open, plus one line `Kolejka: <position> — <reason>` where the position is `top`, `bottom`, `before:N` or `after:N`
-against the queue (for an epic, the epic's position; parts never get one), e.g. `Kolejka: before:400 — przed #400, bo #400 czyta pole, które dodaje ten spec`.
-Default `bottom`. Then ask for approval. Iterate on the draft until the user says yes; nothing is published
+still open, plus one line `Priorytet: P<k> — <powód> → <output of node scripts/gh-project.mjs priority --where P<k> --body-file <scratchpad>/<slug>.md>`
+(with the raises it prints; for an epic, the umbrella's priority and draft; parts never get one). The proposal is an `idea:` prompt's `priority:`,
+otherwise chosen from the definitions in `skarbiec-plan/workflow.md` → Priority. Refine within the band only with `--queue before:N|after:N`
+(add it to `--where` and to `create`). Then ask for approval. Iterate on the draft until the user says yes; nothing is published
 before that.
 
 Only after an explicit yes — and with no open question left (each becomes an AC, an Out of scope line
@@ -168,12 +169,12 @@ or a Design decision) — publish. The script cleans and re-checks the draft its
 
 ```
 node scripts/gh-project.mjs create --title "<title>" --body-file <scratchpad>/<slug>.md \
-  --slug <slug> --tier <1|2> --kind <new|change|cleanup> --area <area> [--skip-tests] --queue <position>
+  --slug <slug> --tier <1|2> --kind <new|change|cleanup> --area <area> [--skip-tests] --priority <P0|P1|P2|P3> [--queue before:N|after:N]
 ```
 
-`--queue` is the approved `Kolejka:` position and applies to a top-level item (a single spec or the umbrella). A part
-(`--parent`) takes no `--queue`: it lands right after the previous part. Move an existing item later with
-`node scripts/gh-project.mjs move <n> <position>`.
+`--priority` is the approved `Priorytet:` and is required for a top-level item (a single spec or the umbrella); `--queue` only
+refines the position within the band. A part (`--parent`) takes neither: it lands right after the previous part and follows its epic.
+Change an existing item's priority with `/prio #<n> P<k>` (an amend never uses `edit` for it).
 
 For a split: first the umbrella with `--epic` (its `--tier` is the highest of its parts, its
 `--kind` the one most parts share), then each part in build order with `--parent <umbrella number>`
