@@ -29,9 +29,6 @@ public sealed record DashboardAccountValue
     public Guid? AccountId { get; init; }
     public required decimal ValuePln { get; init; }
 
-    /// <summary>The part of ValuePln held in Cash-class lines.</summary>
-    public required decimal CashPln { get; init; }
-
     public required decimal Percentage { get; init; }
     public required DateOnly SnapshotDate { get; init; }
     public required bool IsStale { get; init; }

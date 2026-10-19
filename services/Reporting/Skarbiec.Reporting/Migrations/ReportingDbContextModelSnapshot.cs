@@ -345,6 +345,19 @@ namespace Skarbiec.Reporting.Migrations
                     b.Property<long>("Version")
                         .HasColumnType("bigint");
 
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "ClassHistory", "Skarbiec.Reporting.Data.Position.ClassHistory#PositionClassPoint", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<int>("AssetClass");
+
+                            b1.Property<DateOnly>("Date");
+
+                            b1
+                                .ToJson("ClassHistory")
+                                .HasColumnType("jsonb");
+                        });
+
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "QuantityHistory", "Skarbiec.Reporting.Data.Position.QuantityHistory#PositionQuantityPoint", b1 =>
                         {
                             b1.IsRequired();

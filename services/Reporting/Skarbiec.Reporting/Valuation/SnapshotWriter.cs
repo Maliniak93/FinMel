@@ -79,7 +79,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
             .Select(p => new ValuationPosition
             {
                 AssetId = p.AssetId,
-                AssetClass = p.AssetClass,
+                AssetClass = p.ClassOn(snapshotDate),
                 ValuationMode = p.ValuationMode,
                 Currency = p.Currency,
                 Quantity = p.Quantity,

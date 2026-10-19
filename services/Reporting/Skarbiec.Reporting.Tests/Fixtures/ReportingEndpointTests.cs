@@ -1,4 +1,6 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Testing.Containers;
 
@@ -7,6 +9,8 @@ namespace Skarbiec.Reporting.Tests.Fixtures;
 public abstract class ReportingEndpointTests(SkarbiecContainersFixture containers) : ServiceEndpointTests<Program>
 {
     protected override ReportingApiFactory Factory { get; } = new(containers);
+
+    protected IBus Bus => Factory.Services.GetRequiredService<IBus>();
 
     // Snapshots have no HTTP write path, so slice tests seed them directly.
     protected ReportingDbContext CreateDbContext(Guid userId)

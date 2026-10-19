@@ -9,7 +9,6 @@ export type AssetClass = number;
 export type DashboardAccountValue = {
     accountId?: null | string;
     valuePln: number | string;
-    cashPln: number | string;
     percentage: number | string;
     snapshotDate: string;
     isStale: boolean;

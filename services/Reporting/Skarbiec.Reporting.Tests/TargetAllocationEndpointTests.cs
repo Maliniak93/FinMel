@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Features.TargetAllocation.GetTargetAllocation;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
@@ -67,6 +68,38 @@ public sealed class TargetAllocationEndpointTests(SkarbiecContainersFixture cont
             ],
             body.Groups.Select(g => (g.ValuePln, g.CurrentPercent!.Value, g.DeviationPp!.Value, g.BandLowPercent, g.BandHighPercent, g.IsInBand!.Value, g.DeviationPln!.Value)));
         Assert.Equal([90_000m, 72_000m, 18_000m], body.Groups.Select(g => g.TargetValuePln!.Value));
+    }
+
+    [Fact]
+    public async Task FreeCash_CountsInGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+
+        await Bus.PublishCashPositionAsync(
+            userId, Guid.NewGuid(), 400m, cancellationToken,
+            quantityHistory: [new QuantityPoint { Date = today.AddDays(-10), Quantity = 400m }],
+            assetClass: AssetClass.Etf,
+            classHistory:
+            [
+                new ClassPoint { Date = today.AddDays(-10), AssetClass = AssetClass.Cash },
+                new ClassPoint { Date = today.AddDays(-3), AssetClass = AssetClass.Etf },
+            ]);
+        using var consumed = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 400m, cancellationToken);
+
+        await client.SaveTargetAllocationAsync(
+            cancellationToken,
+            TargetGroup("Akcje/ETF", [AssetClass.Stock, AssetClass.Etf], 80m),
+            TargetGroup("Gotówka", [AssetClass.Cash], 20m));
+
+        var body = await client.GetTargetAllocationAsync(cancellationToken);
+
+        Assert.Equal(400m, Assert.Single(body.Groups, g => g.Name == "Akcje/ETF").ValuePln);
+        Assert.Equal(0m, Assert.Single(body.Groups, g => g.Name == "Gotówka").ValuePln);
     }
 
     [Fact]

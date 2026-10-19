@@ -30,6 +30,9 @@ public sealed class Position : IUserOwned
     // End-of-day quantity per transaction date, ascending; empty for a position with no transactions.
     public List<PositionQuantityPoint> QuantityHistory { get; set; } = [];
 
+    // The class per date, ascending; empty when AssetClass holds on every day.
+    public List<PositionClassPoint> ClassHistory { get; set; } = [];
+
     // UTC date of the event that archived the asset; null while it is not archived.
     public DateOnly? ArchivedOn { get; set; }
 
@@ -38,4 +41,7 @@ public sealed class Position : IUserOwned
 
     // Diagnostics only, never part of ordering.
     public required DateTimeOffset UpdatedAt { get; set; }
+
+    public AssetClass ClassOn(DateOnly date) =>
+        ClassHistory.LastOrDefault(p => p.Date <= date)?.AssetClass ?? AssetClass;
 }

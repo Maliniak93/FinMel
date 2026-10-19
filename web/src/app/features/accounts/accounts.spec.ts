@@ -7,7 +7,7 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
-import { restoreEnglish } from '../../../testing/i18n';
+import { restoreEnglish, switchLanguage } from '../../../testing/i18n';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AccountResponse } from '../../api/portfolio';
@@ -179,7 +179,6 @@ describe('Accounts', () => {
         {
           accountId: brokerage.id,
           valuePln: 12345.67,
-          cashPln: 0,
           percentage: 100,
           snapshotDate: '2026-08-10',
           isStale: false,
@@ -208,7 +207,6 @@ describe('Accounts', () => {
         {
           accountId: brokerage.id,
           valuePln: 5000,
-          cashPln: 2000,
           percentage: 100,
           snapshotDate: '2026-08-10',
           isStale: false,
@@ -220,6 +218,16 @@ describe('Accounts', () => {
     expect(pageText()).toContain(formatMoney(2000));
     expect(pageText()).toContain(formatMoney(3000));
     expect(pageText()).toContain(formatMoney(5000));
+  });
+
+  it('labels the account cash column Free funds, and Wolne środki in Polish', async () => {
+    await setup(jsonResponse([brokerage]));
+
+    expect(pageText()).toContain('Free funds');
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(pageText()).toContain('Wolne środki');
   });
 
   it('reloads after a successful create-dialog save', async () => {

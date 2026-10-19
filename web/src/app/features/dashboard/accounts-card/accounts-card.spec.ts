@@ -23,7 +23,6 @@ const withOutsideAccounts: DashboardResponse = {
     {
       accountId: BROKERAGE_ID,
       valuePln: 1000,
-      cashPln: 0,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 50,
@@ -31,7 +30,6 @@ const withOutsideAccounts: DashboardResponse = {
     {
       accountId: BONDS_ID,
       valuePln: 600,
-      cashPln: 0,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 30,
@@ -39,7 +37,6 @@ const withOutsideAccounts: DashboardResponse = {
     {
       accountId: null,
       valuePln: 400,
-      cashPln: 0,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 20,

@@ -43,6 +43,7 @@ public sealed class AssetPositionChangedConsumer(
                 Version = message.Version,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 QuantityHistory = ToHistory(message),
+                ClassHistory = ToClassHistory(message),
                 ArchivedOn = message.IsArchived ? occurredOn : null,
             });
         }
@@ -68,6 +69,7 @@ public sealed class AssetPositionChangedConsumer(
             position.Version = message.Version;
             position.UpdatedAt = DateTimeOffset.UtcNow;
             position.QuantityHistory = ToHistory(message);
+            position.ClassHistory = ToClassHistory(message);
 
             position.ArchivedOn = message.IsArchived ? position.ArchivedOn ?? occurredOn : null;
         }
@@ -85,4 +87,7 @@ public sealed class AssetPositionChangedConsumer(
 
     private static List<PositionQuantityPoint> ToHistory(AssetPositionChanged message) =>
         [.. message.QuantityHistory.Select(p => new PositionQuantityPoint { Date = p.Date, Quantity = p.Quantity })];
+
+    private static List<PositionClassPoint> ToClassHistory(AssetPositionChanged message) =>
+        [.. message.ClassHistory.Select(p => new PositionClassPoint { Date = p.Date, AssetClass = p.AssetClass })];
 }

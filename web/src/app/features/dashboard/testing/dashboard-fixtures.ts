@@ -24,7 +24,6 @@ export const dashboard: DashboardResponse = {
     {
       accountId: RETIREMENT_ID,
       valuePln: 15000,
-      cashPln: 5000,
       snapshotDate: '2026-08-09',
       isStale: false,
       percentage: 100,

@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using MassTransit;
-using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Tests.Fixtures;
@@ -95,6 +93,4 @@ public sealed class DashboardFreshnessTests(SkarbiecContainersFixture containers
 
         Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
     }
-
-    private IBus Bus => Factory.Services.GetRequiredService<IBus>();
 }

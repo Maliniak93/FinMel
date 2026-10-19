@@ -36,6 +36,7 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
             position.Property(p => p.QuoteUnitsPerQuantity).HasPrecision(18, 8);
 
             position.ComplexCollection(p => p.QuantityHistory, history => history.ToJson());
+            position.ComplexCollection(p => p.ClassHistory, history => history.ToJson());
         });
 
         modelBuilder.Entity<HistoryRebuildRequest>(request =>

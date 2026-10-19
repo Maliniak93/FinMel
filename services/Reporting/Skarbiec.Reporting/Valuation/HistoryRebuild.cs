@@ -50,7 +50,7 @@ public static class HistoryRebuild
 
                 if (state.HasLineOn(day))
                 {
-                    valued.Add(state.ToValuationPosition(quantity));
+                    valued.Add(state.ToValuationPosition(day, quantity));
                 }
             }
 
@@ -93,10 +93,10 @@ public static class HistoryRebuild
             return _next > 0 ? history[_next - 1].Quantity : 0m;
         }
 
-        public ValuationPosition ToValuationPosition(decimal quantity) => new()
+        public ValuationPosition ToValuationPosition(DateOnly day, decimal quantity) => new()
         {
             AssetId = position.AssetId,
-            AssetClass = position.AssetClass,
+            AssetClass = position.ClassOn(day),
             ValuationMode = position.ValuationMode,
             Currency = position.Currency,
             Quantity = quantity,
