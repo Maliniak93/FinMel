@@ -194,6 +194,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
                         Currency = "PLN",
                         Quantity = 150m,
                         QuoteUnitsPerQuantity = 1m,
+                        ClassHistory = [],
                         QuantityHistory =
                         [
                             new QuantityPoint { Date = today.AddDays(-20), Quantity = 100m },

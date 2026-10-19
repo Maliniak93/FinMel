@@ -42,6 +42,10 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
    `AssetPositionChanged.QuantityHistory` (`QuantityPoint { Date, Quantity }`) is `required`: the
    end-of-day quantity on each distinct transaction date, ascending, empty without transactions,
    its last point equal to `Quantity`.
+   `AssetPositionChanged.ClassHistory` (`ClassPoint { Date, AssetClass }`) is `required` too: the class
+   the asset counts under from each date on, ascending, empty meaning `AssetClass` holds on every date.
+   Only a Brokerage account's cash carries points (class of the last bought asset still held, else Cash);
+   `AssetClass` is then the class today. A Bonds account's cash publishes `Bond` with no points.
 
 `WatchlistItemAdded` and `WatchlistItemRemoved` (`WatchlistItemId, UserId, InstrumentId, OccurredAtUtc`) are
 Portfolio's facts about a user's watchlist; MarketData counts watchers from them (watchlist part 2).

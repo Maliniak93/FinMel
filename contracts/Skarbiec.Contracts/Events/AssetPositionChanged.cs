@@ -24,6 +24,9 @@ public sealed record AssetPositionChanged
     /// <summary>End-of-day quantity on each distinct transaction date, ascending; empty when there are no transactions. The last point equals Quantity.</summary>
     public required IReadOnlyList<QuantityPoint> QuantityHistory { get; init; }
 
+    /// <summary>Class in effect from each Date on, ascending; empty means AssetClass holds on every date. Only a Brokerage account's cash carries points.</summary>
+    public required IReadOnlyList<ClassPoint> ClassHistory { get; init; }
+
     /// <summary>The asset's own archived flag.</summary>
     public required bool IsArchived { get; init; }
 

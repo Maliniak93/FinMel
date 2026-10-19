@@ -23,6 +23,8 @@ namespace Skarbiec.Portfolio.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("transaction_entry_order");
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
                 {
                     b.Property<long>("Id")
@@ -1009,6 +1011,11 @@ namespace Skarbiec.Portfolio.Migrations
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<long>("EntryOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValueSql("nextval('transaction_entry_order')");
 
                     b.Property<decimal?>("FeeAmount")
                         .HasPrecision(18, 2)

@@ -56,6 +56,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
 {
     protected static readonly Guid UserId = Guid.NewGuid();
 
+    private StubCurrentUser CurrentUser { get; } = new(UserId);
+
     private protected SaveChangesCounter SaveChanges { get; } = new();
 
     private protected TransactionReadCounter TransactionReads { get; } = new();
@@ -67,7 +69,7 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         Provider = HostlessOutboxProvider.Build<PortfolioDbContext>(containers, services =>
         {
             services.ConfigureDbContext<PortfolioDbContext>(options => options.AddInterceptors(SaveChanges, TransactionReads));
-            services.AddSingleton<ICurrentUser>(new StubCurrentUser(UserId));
+            services.AddSingleton<ICurrentUser>(CurrentUser);
             services.AddSingleton<IInstrumentLookupClient>(new FakeInstrumentLookupClient());
             services.AddSingleton<IFxRateLookupClient>(new FakeFxRateLookupClient());
             services.AddSingleton<IBondRateLookupClient>(new FakeBondRateLookupClient());
@@ -125,6 +127,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
     }
 
     public async ValueTask DisposeAsync() => await Provider.DisposeAsync();
+
+    protected void ActAs(Guid userId) => CurrentUser.UserId = userId;
 
     protected async Task<int> CountPositionEventsAsync(CancellationToken cancellationToken)
     {
@@ -309,5 +313,33 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         }
 
         return (assetResult.Value.Id, transactionIds);
+    }
+
+    protected static async Task<Guid> AddSecurityAsync(
+        IServiceProvider services, Guid accountId, AssetClass assetClass, string name, CancellationToken cancellationToken)
+    {
+        var added = await services.GetRequiredService<AddAssetHandler>().HandleAsync(
+            new AddAssetRequest { AccountId = accountId, AssetClass = assetClass, Name = name, Currency = "PLN", InstrumentId = FakeInstrumentLookupClient.IdFor(assetClass, "PLN") },
+            cancellationToken);
+        Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+
+        return added.Value.Id;
+    }
+
+    protected static async Task<Guid> RecordTradeAsync(
+        IServiceProvider services,
+        Guid assetId,
+        TransactionType type,
+        decimal quantity,
+        DateOnly date,
+        CancellationToken cancellationToken)
+    {
+        var recorded = await services.GetRequiredService<RecordTransactionHandler>().HandleAsync(
+            assetId,
+            new RecordTransactionRequest { Type = type, Quantity = quantity, UnitPrice = 10m, Date = date },
+            cancellationToken);
+        Assert.True(recorded.IsSuccess, recorded.IsFailure ? recorded.Error.Code : null);
+
+        return recorded.Value.Id;
     }
 }

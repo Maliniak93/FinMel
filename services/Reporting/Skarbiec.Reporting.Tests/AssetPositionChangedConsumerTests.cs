@@ -48,6 +48,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Currency = "USD",
                 Quantity = 12m,
                 QuoteUnitsPerQuantity = 1m,
+                ClassHistory = [],
                 QuantityHistory = [],
                 IsArchived = false,
                 Version = 0,
@@ -234,6 +235,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Currency = "PLN",
                 Quantity = 80_000m,
                 QuoteUnitsPerQuantity = 1m,
+                ClassHistory = [],
                 QuantityHistory = [],
                 IsArchived = false,
                 Version = 1,
@@ -337,6 +339,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 Currency = "PLN",
                 Quantity = 10m,
                 QuoteUnitsPerQuantity = 1m,
+                ClassHistory = [],
                 QuantityHistory = [],
                 IsArchived = false,
                 Version = 0,
@@ -651,6 +654,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         IReadOnlyList<(DateOnly Date, decimal Quantity)>? history = null) => new()
         {
             QuoteUnitsPerQuantity = quoteUnitsPerQuantity,
+            ClassHistory = [],
             QuantityHistory = [.. (history ?? []).Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             IsArchived = isArchived,
             AssetId = assetId,
