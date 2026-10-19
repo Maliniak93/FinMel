@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildState, createSandbox } from "./fake-gh-sandbox.mjs";
+import fs from "node:fs";
+import { BODY, buildState, createSandbox } from "./fake-gh-sandbox.mjs";
 
 const positions = (sandbox) => sandbox.log().filter((e) => e.kind === "position");
 const setFields = (sandbox) => sandbox.log().filter((e) => e.kind === "setField");
@@ -521,6 +522,142 @@ test("priority backfill batches and keeps order", () => {
     const again = sandbox.run("gh-project.mjs", ["priority", "--backfill", "--apply"]);
     assert.equal(again.code, 0, again.out);
     assert.equal(sandbox.log().filter((e) => e.kind === "fieldBatch").length, 2);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+const P3 = "P3 Niski";
+const dependsBody = (...numbers) => `## Depends on\n\n${numbers.map((n) => `- #${n} — x`).join("\n")}\n`;
+const jsonLine = (stdout) => JSON.parse(stdout.split(/\r?\n/).find((l) => l.startsWith("{")));
+const orderOfState = (sandbox) => sandbox.state().order;
+
+function dependencyState() {
+  return buildState({
+    issues: [
+      { number: 450, status: "Todo", labels: ["spec"], priority: P1 },
+      { number: 440, status: "Todo", labels: ["spec"], priority: P2, body: dependsBody(432) },
+      { number: 441, status: "Todo", labels: ["spec"], priority: P2 },
+      { number: 432, status: "Todo", labels: ["spec"], priority: P3 },
+    ],
+  });
+}
+
+test("cycle fails without writes", () => {
+  const state = dependencyState();
+  state.issues[432].body = dependsBody(440);
+  const sandbox = createSandbox(state);
+  try {
+    const run = sandbox.run("gh-project.mjs", ["priority", "440", "P1"]);
+
+    assert.notEqual(run.code, 0, run.out);
+    assert.match(run.out, /cykl zależności: #440 → #432 → #440/);
+    assert.deepEqual(writesOf(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("priority raises dependencies", () => {
+  const sandbox = createSandbox(dependencyState());
+  try {
+    const run = sandbox.run("gh-project.mjs", ["priority", "440", "P1"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.match(run.stdout, /podniesiono #432 P3 → P1 \(zależność #440\)/);
+    const state = sandbox.state();
+    assert.equal(state.issues[440].priority, P1);
+    assert.equal(state.issues[432].priority, P1);
+    assert.deepEqual(state.order, [450, 432, 440, 441]);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("lowering the dependent keeps raised dependencies", () => {
+  const sandbox = createSandbox(dependencyState());
+  try {
+    assert.equal(sandbox.run("gh-project.mjs", ["priority", "440", "P1"]).code, 0);
+
+    const run = sandbox.run("gh-project.mjs", ["priority", "440", "P3"]);
+
+    assert.equal(run.code, 0, run.out);
+    const state = sandbox.state();
+    assert.equal(state.issues[440].priority, P3);
+    assert.equal(state.issues[432].priority, P1);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create and edit raise dependencies", () => {
+  const created = createSandbox(dependencyState());
+  try {
+    fs.writeFileSync(created.bodyFile, `${BODY}\n${dependsBody(432)}`);
+    const run = created.run("gh-project.mjs", createArgs(created, "dependent", ["--area", "Backend", "--priority", "P1"]));
+
+    assert.equal(run.code, 0, run.out);
+    const { number } = jsonLine(run.stdout);
+    assert.match(run.stdout, /podniesiono #432 P3 → P1 \(zależność #\d+\)/);
+    const state = created.state();
+    assert.equal(state.issues[432].priority, P1);
+    assert.equal(state.order.indexOf(432) + 1, state.order.indexOf(number));
+  } finally {
+    created.cleanup();
+  }
+
+  const edited = createSandbox(dependencyState());
+  try {
+    fs.writeFileSync(edited.bodyFile, `${BODY}\n${dependsBody(432)}`);
+    assert.equal(edited.run("gh-project.mjs", ["priority", "441", "P1"]).code, 0);
+
+    const run = edited.run("gh-project.mjs", ["edit", "441", "--body-file", edited.bodyFile]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.match(run.stdout, /podniesiono #432 P3 → P1 \(zależność #441\)/);
+    const state = edited.state();
+    assert.equal(state.issues[432].priority, P1);
+    assert.equal(state.order.indexOf(432) + 1, state.order.indexOf(441));
+  } finally {
+    edited.cleanup();
+  }
+});
+
+test("priority where previews raises", () => {
+  const sandbox = createSandbox(dependencyState());
+  try {
+    fs.writeFileSync(sandbox.bodyFile, `${BODY}\n${dependsBody(432)}`);
+
+    const run = sandbox.run("gh-project.mjs", ["priority", "--where", "P1", "--body-file", sandbox.bodyFile]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.match(run.stdout, /podniesiono #432 P3 → P1/);
+    assert.deepEqual(writesOf(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("lowering a blocking dependency fails", () => {
+  const sandbox = createSandbox(
+    buildState({
+      issues: [
+        { number: 432, status: "Todo", labels: ["spec"], priority: P1 },
+        { number: 440, status: "Todo", labels: ["spec"], priority: P1, body: dependsBody(432) },
+      ],
+    }),
+  );
+  try {
+    const lowered = sandbox.run("gh-project.mjs", ["priority", "432", "P3"]);
+    assert.notEqual(lowered.code, 0, lowered.out);
+    assert.match(lowered.out, /#432 blokuje #440 \(P1\)/);
+
+    const moved = sandbox.run("gh-project.mjs", ["move", "432", "after:440"]);
+    assert.notEqual(moved.code, 0, moved.out);
+    assert.match(moved.out, /#432 blokuje #440 \(P1\)/);
+
+    assert.deepEqual(writesOf(sandbox), []);
+    assert.deepEqual(orderOfState(sandbox), [432, 440]);
   } finally {
     sandbox.cleanup();
   }
