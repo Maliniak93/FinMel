@@ -7,6 +7,8 @@ public sealed record AddBondRequest : IValidatableObject
 {
     public Guid? AccountId { get; init; }
 
+    public Guid? GroupId { get; init; }
+
     [Required, MaxLength(200)]
     public required string Name { get; init; }
 

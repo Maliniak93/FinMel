@@ -12,7 +12,7 @@ Content-Type: application/json
 
 ### --- Accounts ---
 
-### Create a Brokerage account (type 0 = Brokerage, 1 = Bonds, 2 = Bank; wrapper 0 = Regular, 1 = Ike, 2 = Ikze; 400 Validation.BankFieldsNotAllowed for a bank field or a non-PLN currency)
+### Create a Brokerage account (type 0 = Brokerage, 1 = Bonds, 2 = Bank; wrapper 0 = Regular, 1 = Ike, 2 = Ikze; 400 Validation.BankFieldsNotAllowed for a bank field or a non-PLN currency; groupId is the default group of its cash, a Bank account's balance group; 404 NotFound.AssetGroup)
 # @name createBrokerageAccount
 POST {{baseUrl}}/api/portfolio/accounts
 Authorization: Bearer {{authToken}}
@@ -21,7 +21,8 @@ Content-Type: application/json
 {
   "name": "XTB IKE",
   "type": 0,
-  "wrapper": 1
+  "wrapper": 1,
+  "groupId": "{{createAssetGroup.response.body.id}}"
 }
 
 ### Create a Bonds account
@@ -55,13 +56,14 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### Rename an account (type, wrapper and currency never change)
+### Rename an account (type, wrapper and currency never change; groupId replaces the default group and changes no existing asset, a Bank account's changes its balance and publishes it)
 PUT {{baseUrl}}/api/portfolio/accounts/{{createBrokerageAccount.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "name": "XTB IKE (renamed)"
+  "name": "XTB IKE (renamed)",
+  "groupId": "{{createAssetGroup.response.body.id}}"
 }
 
 ### Deposit money into the account (its cash is the cashAssetId of the account; unit price is always 1, 400 Validation.InsufficientFunds if a Withdraw would leave the balance below zero on any day)
@@ -267,7 +269,7 @@ Content-Type: application/json
   "currency": "PLN"
 }
 
-### Add a market-valuation asset
+### Add a market-valuation asset (groupId is optional and never defaulted from the account; 404 NotFound.AssetGroup; AddBond, AddMetal and AddDeposit take it too)
 # @name addAsset
 POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
@@ -278,7 +280,8 @@ Content-Type: application/json
   "assetClass": "Stock",
   "name": "Example stock",
   "currency": "USD",
-  "instrumentId": "{{addCustomInstrument.response.body.id}}"
+  "instrumentId": "{{addCustomInstrument.response.body.id}}",
+  "groupId": "{{createAssetGroup.response.body.id}}"
 }
 
 ### List assets
@@ -823,7 +826,7 @@ Authorization: Bearer {{authToken}}
 
 ### --- Cash places ---
 
-### Create a cash place with a balance per currency (PLN, EUR, USD; PLN alone when omitted; 409 Conflict.DuplicateName)
+### Create a cash place with a balance per currency (PLN, EUR, USD; PLN alone when omitted; 409 Conflict.DuplicateName; groupId is the default group of its balances; 404 NotFound.AssetGroup)
 # @name createCashPlace
 POST {{baseUrl}}/api/portfolio/cash-places
 Authorization: Bearer {{authToken}}
@@ -831,7 +834,8 @@ Content-Type: application/json
 
 {
   "name": "Sejf",
-  "currencies": ["PLN", "USD"]
+  "currencies": ["PLN", "USD"],
+  "groupId": "{{createAssetGroup.response.body.id}}"
 }
 
 ### Add a currency balance (409 Conflict.DuplicateCurrency, 409 Conflict.CashPlaceArchived)

@@ -415,9 +415,10 @@ internal static class PortfolioApi
             marginPercent: null);
 
     public static async Task<FundedBond> CreateSettledTosAsync(
-        this HttpClient client, CancellationToken cancellationToken, TaxWrapper wrapper = TaxWrapper.Regular)
+        this HttpClient client, CancellationToken cancellationToken, TaxWrapper wrapper = TaxWrapper.Regular, Guid? groupId = null)
     {
-        var funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest(), wrapper: wrapper);
+        var funded = await client.CreateFundedBondAsync(
+            cancellationToken, request: NewTosBondRequest() with { GroupId = groupId }, wrapper: wrapper);
         await client.SettleBondInterestAsync(
             funded.Bond.AssetId, [(1, null), (2, null), (3, null)], cancellationToken);
 

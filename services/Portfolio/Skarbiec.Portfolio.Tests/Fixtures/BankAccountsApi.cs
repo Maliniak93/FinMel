@@ -59,7 +59,8 @@ internal static class BankAccountsApi
         string currency = "PLN",
         string? bankName = "mBank",
         decimal annualInterestRatePercent = 0m,
-        TaxWrapper wrapper = TaxWrapper.Regular) => new
+        TaxWrapper wrapper = TaxWrapper.Regular,
+        Guid? groupId = null) => new
         {
             name,
             type = (int)AccountType.Bank,
@@ -67,19 +68,22 @@ internal static class BankAccountsApi
             currency,
             variant = VariantValue(variant),
             bankName,
-            annualInterestRatePercent
+            annualInterestRatePercent,
+            groupId
         };
 
     public static object NewUpdateBankBody(
         string name = "mBank",
         string variant = SavingsVariant,
         string? bankName = "Nest Bank",
-        decimal annualInterestRatePercent = 4m) => new
+        decimal annualInterestRatePercent = 4m,
+        Guid? groupId = null) => new
         {
             name,
             variant = VariantValue(variant),
             bankName,
-            annualInterestRatePercent
+            annualInterestRatePercent,
+            groupId
         };
 
     public static object NewSettleInterestBody(DateOnly periodEnd, decimal grossInterest, decimal tax) =>

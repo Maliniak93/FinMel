@@ -3161,6 +3161,13 @@
             "type": "string",
             "format": "uuid"
           },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "cashBalance": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -3225,6 +3232,13 @@
             ],
             "format": "uuid"
           },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "initialTransaction": {
             "oneOf": [
               {
@@ -3251,6 +3265,13 @@
         "type": "object",
         "properties": {
           "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "groupId": {
             "type": [
               "null",
               "string"
@@ -3371,6 +3392,13 @@
             ],
             "format": "uuid"
           },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "principal": {
             "maximum": 79228162514264337593543950335,
             "exclusiveMinimum": 0,
@@ -3438,6 +3466,13 @@
           },
           "metal": {
             "$ref": "#/components/schemas/Metal"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "fineWeight": {
             "maximum": 79228162514264337593543950335,
@@ -3802,6 +3837,13 @@
             "format": "uuid"
           },
           "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "groupId": {
             "type": [
               "null",
               "string"
@@ -4610,6 +4652,13 @@
           "isArchived": {
             "type": "boolean"
           },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "name": {
             "type": "string"
           },
@@ -4878,6 +4927,13 @@
           "isArchived": {
             "type": "boolean"
           },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "balances": {
             "type": "array",
             "items": {
@@ -5012,6 +5068,13 @@
           "wrapper": {
             "$ref": "#/components/schemas/TaxWrapper"
           },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "currency": {
             "type": [
               "null",
@@ -5081,6 +5144,13 @@
           "name": {
             "maxLength": 200,
             "type": "string"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "currencies": {
             "type": "array",
@@ -5422,6 +5492,13 @@
           },
           "isArchived": {
             "type": "boolean"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "name": {
             "type": "string"
@@ -6257,6 +6334,13 @@
           },
           "isArchived": {
             "type": "boolean"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "name": {
             "type": "string"
@@ -8126,6 +8210,13 @@
             "maxLength": 200,
             "type": "string"
           },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "variant": {
             "oneOf": [
               {
@@ -8297,6 +8388,13 @@
           "name": {
             "maxLength": 200,
             "type": "string"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

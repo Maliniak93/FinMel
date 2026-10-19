@@ -2,17 +2,47 @@ using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 using Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 public sealed class UpdateAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task DefaultGroupChange_LeavesAssets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var first = await client.CreateAssetGroupAsync(cancellationToken, "Poduszka");
+        var second = await client.CreateAssetGroupAsync(cancellationToken, "Akcje", ColorKey(3));
+        var created = await client.PostAsJsonAsync(
+            AccountsUri,
+            new CreateAccountRequest { Name = "XTB IKE", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Ike, GroupId = first.Id },
+            cancellationToken);
+        var accountId = (await created.ReadJsonAsync(cancellationToken)).GetProperty("id").GetGuid();
+        var cashId = await client.GetAccountCashAssetIdAsync(accountId, cancellationToken);
+        var stockId = await client.AddAssetAsync(accountId, cancellationToken);
+        var before = await ReadAssetGroupStatesAsync(userId, cancellationToken, cashId, stockId);
+
+        var response = await client.PutAsJsonAsync(
+            AccountUri(accountId), new UpdateAccountRequest { Name = "XTB IKE", GroupId = second.Id }, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(second.Id, (await response.ReadJsonAsync(cancellationToken)).GetProperty("groupId").GetGuid());
+        var after = await ReadAssetGroupStatesAsync(userId, cancellationToken, cashId, stockId);
+        Assert.Equal(first.Id, before[cashId].GroupId);
+        Assert.Equal(before[cashId], after[cashId]);
+        Assert.Equal(before[stockId], after[stockId]);
+    }
+
     [Fact]
     public async Task Update_Rename_ChangesOnlyTheName()
     {

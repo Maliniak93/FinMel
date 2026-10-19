@@ -204,6 +204,9 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<Guid?>("DefaultGroupId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
@@ -667,6 +670,9 @@ namespace Skarbiec.Portfolio.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DefaultGroupId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsArchived")

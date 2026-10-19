@@ -12,6 +12,7 @@ export type AccountResponse = {
     currency: string;
     isArchived: boolean;
     cashAssetId: string;
+    groupId?: null | string;
     cashBalance: number | string;
     contribution?: null | ContributionResponse;
     bank?: null | BankTermsResponse;
@@ -25,11 +26,13 @@ export type AddAssetRequest = {
     name: string;
     currency?: string;
     instrumentId?: null | string;
+    groupId?: null | string;
     initialTransaction?: null | RecordTransactionRequest;
 };
 
 export type AddBondRequest = {
     accountId?: null | string;
+    groupId?: null | string;
     name: string;
     seriesCode: string;
     type: TreasuryBondType;
@@ -50,6 +53,7 @@ export type AddDepositRequest = {
     bankName?: null | string;
     sourceAccountId: string;
     returnAccountId?: null | string;
+    groupId?: null | string;
     principal: number | string;
     startDate: string;
     termLength: number | string;
@@ -62,6 +66,7 @@ export type AddDepositRequest = {
 export type AddMetalRequest = {
     name: string;
     metal: Metal;
+    groupId?: null | string;
     fineWeight: number | string;
     weightUnit: WeightUnit;
 };
@@ -126,6 +131,7 @@ export type AssetGroupResponse = {
 export type AssetResponse = {
     id: string;
     accountId?: null | string;
+    groupId?: null | string;
     assetClass: AssetClass;
     valuationMode: AssetValuationMode;
     name: string;
@@ -275,6 +281,7 @@ export type BondResponse = {
     accountName: string;
     taxWrapper: TaxWrapper;
     isArchived: boolean;
+    groupId?: null | string;
     name: string;
     seriesCode: string;
     type: TreasuryBondType;
@@ -329,6 +336,7 @@ export type CashPlaceResponse = {
     id: string;
     name: string;
     isArchived: boolean;
+    groupId?: null | string;
     balances: Array<CashBalanceResponse>;
     valuePln?: null | number | string;
 };
@@ -359,6 +367,7 @@ export type CreateAccountRequest = {
     name: string;
     type: AccountType;
     wrapper: TaxWrapper;
+    groupId?: null | string;
     currency?: null | string;
     variant?: null | BankVariant;
     bankName?: null | string;
@@ -373,6 +382,7 @@ export type CreateAssetGroupRequest = {
 
 export type CreateCashPlaceRequest = {
     name: string;
+    groupId?: null | string;
     currencies?: Array<string>;
 };
 
@@ -439,6 +449,7 @@ export type DepositProjectionResponse = {
 export type DepositResponse = {
     assetId: string;
     isArchived: boolean;
+    groupId?: null | string;
     name: string;
     bankName?: null | string;
     currency: string;
@@ -603,6 +614,7 @@ export type Metal = number;
 export type MetalResponse = {
     assetId: string;
     isArchived: boolean;
+    groupId?: null | string;
     name: string;
     metal: Metal;
     fineWeightGramsPerPiece: number | string;
@@ -957,6 +969,7 @@ export type TreasuryBondType = number;
 
 export type UpdateAccountRequest = {
     name: string;
+    groupId?: null | string;
     variant?: null | BankVariant;
     bankName?: null | string;
     annualInterestRatePercent?: null | number | string;
@@ -989,6 +1002,7 @@ export type UpdateBondRequest = {
 
 export type UpdateCashPlaceRequest = {
     name: string;
+    groupId?: null | string;
 };
 
 export type UpdateDepositRequest = {

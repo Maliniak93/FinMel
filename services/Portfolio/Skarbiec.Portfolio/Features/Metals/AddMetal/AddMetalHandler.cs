@@ -1,5 +1,6 @@
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.AssetGroups;
 
 namespace Skarbiec.Portfolio.Features.Metals.AddMetal;
 
@@ -7,9 +8,15 @@ public sealed class AddMetalHandler(PortfolioDbContext dbContext, PositionEventP
 {
     public async Task<Result<MetalResponse>> HandleAsync(AddMetalRequest request, CancellationToken cancellationToken)
     {
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
+            GroupId = request.GroupId,
             AssetClass = AssetClass.PreciousMetal,
             Name = request.Name,
             Currency = Money.BaseCurrency,

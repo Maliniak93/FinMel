@@ -13,6 +13,9 @@ public sealed record CreateAccountRequest
 
     public required TaxWrapper Wrapper { get; init; }
 
+    /// <summary>The default group of the account's new assets and its cash; for a Bank account, the group of its balance.</summary>
+    public Guid? GroupId { get; init; }
+
     /// <summary>PLN when omitted; only a Bank account may hold another supported currency.</summary>
     [SupportedCurrency]
     public string? Currency { get; init; }

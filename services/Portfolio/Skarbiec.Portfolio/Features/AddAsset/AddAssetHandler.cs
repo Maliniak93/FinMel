@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.AssetGroups;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.CashPlaces;
 using Skarbiec.Portfolio.Features.Deposits;
@@ -79,6 +80,11 @@ public sealed class AddAssetHandler(
             }
         }
 
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
         var account = await dbContext.ResolveAsync(request.AssetClass, request.AccountId, cancellationToken);
         if (account.IsFailure)
         {
@@ -89,6 +95,7 @@ public sealed class AddAssetHandler(
         {
             Id = Guid.NewGuid(),
             AccountId = account.Value?.Id,
+            GroupId = request.GroupId,
             AssetClass = request.AssetClass,
             Name = request.Name,
             Currency = request.Currency,

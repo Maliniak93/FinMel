@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.AssetGroups;
 
 namespace Skarbiec.Portfolio.Features.CashPlaces.UpdateCashPlace;
 
@@ -26,10 +27,16 @@ public sealed class UpdateCashPlaceHandler(PortfolioDbContext dbContext)
             }
         }
 
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
         var balances = await dbContext.LoadBalancesAsync(id, cancellationToken);
 
         // The balances carry the place's name; no event, since AssetPositionChanged holds no name.
         place.Name = request.Name;
+        place.DefaultGroupId = request.GroupId;
         foreach (var balance in balances)
         {
             balance.Name = request.Name;

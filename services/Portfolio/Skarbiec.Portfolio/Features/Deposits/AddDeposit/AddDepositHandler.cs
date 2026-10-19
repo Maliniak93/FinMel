@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.AssetGroups;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.MarketData;
 
@@ -16,6 +17,11 @@ public sealed class AddDepositHandler(
     public async Task<Result<DepositResponse>> HandleAsync(
         AddDepositRequest request, CancellationToken cancellationToken)
     {
+        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
+        {
+            return groupError;
+        }
+
         var source = await dbContext.ResolveSourceAsync(request.SourceAccountId, cancellationToken);
         if (source.IsFailure)
         {
@@ -38,6 +44,7 @@ public sealed class AddDepositHandler(
         var asset = new Asset
         {
             Id = Guid.NewGuid(),
+            GroupId = request.GroupId,
             AssetClass = AssetClass.Deposit,
             Name = request.Name,
             Currency = sourceAccount.Currency,

@@ -3,10 +3,13 @@ using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -14,6 +17,27 @@ namespace Skarbiec.Portfolio.Tests;
 // The account read is under test, so GET is called directly; AccountsApi and PortfolioApi helpers only arrange.
 public sealed class GetAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task ReturnsGroupId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        var brokerage = await client.PostAsJsonAsync(
+            AccountsUri,
+            new CreateAccountRequest { Name = "XTB", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Regular, GroupId = group.Id },
+            cancellationToken);
+        var brokerageId = (await brokerage.ReadJsonAsync(cancellationToken)).GetProperty("id").GetGuid();
+        var bank = await client.PostAsJsonAsync(AccountsUri, NewBankAccountBody("mBank", groupId: group.Id), cancellationToken);
+        var bankId = (await bank.ReadJsonAsync(cancellationToken)).GetProperty("id").GetGuid();
+
+        var storedBrokerage = await client.GetAsync(AccountUri(brokerageId), cancellationToken);
+        var storedBank = await client.GetAsync(AccountUri(bankId), cancellationToken);
+
+        Assert.Equal(group.Id, (await storedBrokerage.ReadJsonAsync(cancellationToken)).GetProperty("groupId").GetGuid());
+        Assert.Equal(group.Id, (await storedBank.ReadJsonAsync(cancellationToken)).GetProperty("groupId").GetGuid());
+    }
+
     [Fact]
     public async Task Contribution_CountsExternalAndIncomingOnly()
     {

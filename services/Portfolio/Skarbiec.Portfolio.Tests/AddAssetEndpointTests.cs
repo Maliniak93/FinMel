@@ -6,18 +6,54 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
+using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
 using Skarbiec.Portfolio.Features.AddAsset;
 using Skarbiec.Portfolio.Features.RecordTransaction;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task GroupId_IsStored()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var defaultGroup = await client.CreateAssetGroupAsync(cancellationToken, "Poduszka");
+        var group = await client.CreateAssetGroupAsync(cancellationToken, "Akcje", ColorKey(3));
+        var account = await client.PostAsJsonAsync(
+            AccountsUri,
+            new CreateAccountRequest { Name = "XTB", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Regular, GroupId = defaultGroup.Id },
+            cancellationToken);
+        var accountId = (await account.ReadJsonAsync(cancellationToken)).GetProperty("id").GetGuid();
+        var stock = new AddAssetRequest
+        {
+            AccountId = accountId,
+            AssetClass = AssetClass.Stock,
+            Name = "Stock",
+            Currency = "PLN",
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN")
+        };
+
+        var withGroup = await client.PostAsJsonAsync(AllAssetsUri, stock with { GroupId = group.Id }, cancellationToken);
+        var withoutGroup = await client.PostAsJsonAsync(AllAssetsUri, stock with { Name = "Without group" }, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, withGroup.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, withoutGroup.StatusCode);
+        var grouped = (await withGroup.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+        var ungrouped = (await withoutGroup.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+        var states = await ReadAssetGroupStatesAsync(userId, cancellationToken, grouped, ungrouped);
+        Assert.Equal(group.Id, states[grouped].GroupId);
+        Assert.Null(states[ungrouped].GroupId);
+    }
+
     [Fact]
     public async Task Account_RulesPerClass()
     {

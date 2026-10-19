@@ -54,6 +54,32 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
     }
 
     [Fact]
+    public async Task AddAssetWithGroup_FirstPositionCarriesGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
+        var groupId = await CreateGroupAsync(scope.ServiceProvider, "Poduszka", cancellationToken);
+
+        var added = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
+            new AddAssetRequest
+            {
+                AccountId = accountId,
+                AssetClass = AssetClass.Stock,
+                Name = "Grouped",
+                Currency = "PLN",
+                InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN"),
+                GroupId = groupId
+            },
+            cancellationToken);
+
+        Assert.True(added.IsSuccess);
+        var first = (await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).First(e => e.AssetId == added.Value.Id);
+        Assert.Equal(groupId, first.GroupId);
+    }
+
+    [Fact]
     public async Task AddAsset_WritesAssetPositionChangedInSameTransactionAsAssetRow()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

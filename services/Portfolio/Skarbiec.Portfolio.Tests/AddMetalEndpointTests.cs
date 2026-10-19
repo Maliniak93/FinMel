@@ -7,12 +7,29 @@ using Skarbiec.Portfolio.Features.Metals;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 public sealed class AddMetalEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task GroupId_IsStored()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+
+        var response = await client.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { GroupId = group.Id }, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<MetalResponse>(cancellationToken);
+        Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, body!.AssetId))[body.AssetId].GroupId);
+    }
+
     [Fact]
     public async Task AddMetal_NoHolding()
     {

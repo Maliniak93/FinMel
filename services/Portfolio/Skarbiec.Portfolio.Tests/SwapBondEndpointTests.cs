@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -13,6 +14,24 @@ namespace Skarbiec.Portfolio.Tests;
 // The swap under test is called directly; fixture helpers only arrange.
 public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task NewBond_TakesOldGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        var funded = await client.CreateSettledTosAsync(cancellationToken, groupId: group.Id);
+        var tosId = funded.Bond.AssetId;
+
+        var response = await client.SwapBondRawAsync(tosId, NewSwapBody(10), cancellationToken);
+
+        Assert.True(response.IsSuccessStatusCode, $"Swap answered {(int)response.StatusCode}.");
+        var edo = await client.FindSwappedBondAsync(tosId, cancellationToken);
+        Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, edo.AssetId))[edo.AssetId].GroupId);
+    }
+
     [Fact]
     public async Task Swap_Whole_CreatesBondAndPaysLeftover()
     {

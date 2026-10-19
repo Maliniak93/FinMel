@@ -1,10 +1,18 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
+using Skarbiec.Portfolio.Features.AddAsset;
+using Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.CashPlacesApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -89,6 +97,63 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
         await foreignAsset.AssertProblemAsync(HttpStatusCode.NotFound, AssetNotFoundErrorCode, cancellationToken);
         Assert.Equal(ownerBefore[ownerAsset], (await ReadAssetGroupStatesAsync(ownerId, cancellationToken, ownerAsset))[ownerAsset]);
         Assert.Equal(strangerBefore[strangerAsset], (await ReadAssetGroupStatesAsync(strangerId, cancellationToken, strangerAsset))[strangerAsset]);
+    }
+
+    [Fact]
+    public async Task ForeignGroupOnCreateRequests()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var foreignGroupId = (await owner.CreateAssetGroupAsync(cancellationToken)).Id;
+        var strangerId = Guid.NewGuid();
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var strangerAccount = await stranger.CreateAccountAsync(cancellationToken, "Stranger", AccountType.Brokerage);
+        var strangerBonds = await stranger.CreateAccountAsync(cancellationToken, "Stranger bonds", AccountType.Bonds);
+        await stranger.FundAccountAsync(strangerBonds, cancellationToken);
+        var strangerBank = await stranger.CreateBankAccountAsync(cancellationToken, "Stranger bank", balance: 10_000m);
+        var strangerPlace = await stranger.CreateCashPlaceAsync(cancellationToken, "Sejf");
+        var before = await SnapshotUserRowsAsync(strangerId, cancellationToken);
+        var stock = new AddAssetRequest
+        {
+            AccountId = strangerAccount,
+            AssetClass = AssetClass.Stock,
+            Name = "Foreign asset",
+            Currency = "PLN",
+            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN"),
+            GroupId = foreignGroupId
+        };
+
+        var responses = new[]
+        {
+            await stranger.PostAsJsonAsync(
+                AccountsUri,
+                new CreateAccountRequest { Name = "Foreign account", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Regular, GroupId = foreignGroupId },
+                cancellationToken),
+            await stranger.PostAsJsonAsync(
+                CashPlacesUri, new { name = "Foreign place", currencies = new[] { "PLN" }, groupId = foreignGroupId }, cancellationToken),
+            await stranger.PostAsJsonAsync(AllAssetsUri, stock, cancellationToken),
+            await stranger.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { AccountId = strangerBonds, GroupId = foreignGroupId }, cancellationToken),
+            await stranger.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { GroupId = foreignGroupId }, cancellationToken),
+            await stranger.PostAsJsonAsync(
+                AllDepositsUri, NewDepositRequest() with { SourceAccountId = strangerBank.AccountId, GroupId = foreignGroupId }, cancellationToken),
+            await stranger.PutAsJsonAsync(
+                AccountUri(strangerAccount), new UpdateAccountRequest { Name = "Stranger", GroupId = foreignGroupId }, cancellationToken),
+            await stranger.PutAsJsonAsync(
+                AccountUri(strangerBank.AccountId), NewUpdateBankBody("Stranger bank", groupId: foreignGroupId), cancellationToken),
+            await stranger.PutAsJsonAsync(CashPlaceUri(strangerPlace.Id), new { name = "Sejf", groupId = foreignGroupId }, cancellationToken),
+        };
+
+        foreach (var response in responses)
+        {
+            await response.AssertProblemAsync(HttpStatusCode.NotFound, AssetGroupNotFoundErrorCode, cancellationToken);
+        }
+
+        Assert.Equal(before, await SnapshotUserRowsAsync(strangerId, cancellationToken));
+        await using var dbContext = CreateDbContext(strangerId);
+        Assert.Equal(3, await dbContext.Set<Account>().CountAsync(cancellationToken));
+        Assert.Equal(1, await dbContext.Set<CashPlace>().CountAsync(cancellationToken));
+        Assert.All(await dbContext.Set<Account>().ToListAsync(cancellationToken), a => Assert.Null(a.DefaultGroupId));
+        Assert.DoesNotContain(await dbContext.Assets.ToListAsync(cancellationToken), a => a.GroupId == foreignGroupId);
     }
 
     [Fact]

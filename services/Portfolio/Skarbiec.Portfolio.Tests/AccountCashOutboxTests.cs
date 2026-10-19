@@ -20,6 +20,43 @@ public sealed class AccountCashOutboxTests(SkarbiecContainersFixture containers)
     private static readonly DateOnly Day2 = new(2026, 10, 2);
 
     [Fact]
+    public async Task CreateAccountWithGroup_FirstCashPositionCarriesGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var groupId = await CreateGroupAsync(scope.ServiceProvider, "Poduszka", cancellationToken);
+
+        var created = await scope.ServiceProvider.GetRequiredService<CreateAccountHandler>().HandleAsync(
+            new CreateAccountRequest { Name = "XTB IKE", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Ike, GroupId = groupId },
+            cancellationToken);
+
+        Assert.True(created.IsSuccess);
+        var evt = Assert.Single(
+            await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>().ReadPublishedAsync<AssetPositionChanged>(cancellationToken),
+            e => e.AssetId == created.Value.CashAssetId);
+        Assert.Equal(groupId, evt.GroupId);
+    }
+
+    [Fact]
+    public async Task UpdateDefaultGroup_PublishesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var firstId = await CreateGroupAsync(scope.ServiceProvider, "Poduszka", cancellationToken);
+        var secondId = await CreateGroupAsync(scope.ServiceProvider, "Akcje", cancellationToken);
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "XTB IKE", cancellationToken);
+        await AddAssetWithBuyAsync(scope.ServiceProvider, accountId, "Shares", cancellationToken);
+        var outboxRowsBefore = await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken);
+
+        var updated = await scope.ServiceProvider.GetRequiredService<UpdateAccountHandler>().HandleAsync(
+            accountId, new UpdateAccountRequest { Name = "XTB IKE", GroupId = secondId }, cancellationToken);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(outboxRowsBefore, await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken));
+    }
+
+    [Fact]
     public async Task CreateAccount_WritesCashPositionInSameSaveAsAccountAndCash()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

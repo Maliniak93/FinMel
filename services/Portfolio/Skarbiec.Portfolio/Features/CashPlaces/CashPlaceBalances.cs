@@ -14,6 +14,7 @@ internal static class CashPlaceBalances
     {
         Id = Guid.NewGuid(),
         CashPlaceId = place.Id,
+        GroupId = place.DefaultGroupId,
         AssetClass = AssetClass.Cash,
         Name = place.Name,
         Currency = currency,

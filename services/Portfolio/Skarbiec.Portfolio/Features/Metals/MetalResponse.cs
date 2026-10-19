@@ -9,6 +9,8 @@ public sealed record MetalResponse
 
     public required bool IsArchived { get; init; }
 
+    public Guid? GroupId { get; init; }
+
     public required string Name { get; init; }
     public required Metal Metal { get; init; }
 
@@ -28,6 +30,7 @@ public static class MetalMappingExtensions
         {
             AssetId = asset.Id,
             IsArchived = asset.IsArchived,
+            GroupId = asset.GroupId,
             Name = asset.Name,
             Metal = holding.Metal,
             FineWeightGramsPerPiece = holding.FineWeightGramsPerPiece,

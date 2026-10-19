@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
@@ -7,12 +8,33 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
 
 public sealed class ListAssetsEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    [Fact]
+    public async Task ReturnsGroupId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var grouped = await client.AddAssetAsync(accountId, cancellationToken, "Grouped asset");
+        await client.AddAssetAsync(accountId, cancellationToken, "Ungrouped asset");
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        await client.AssignAssetsAsync(group.Id, cancellationToken, grouped);
+
+        var response = await client.GetAsync(AssetsUri(accountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var assets = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray()
+            .ToDictionary(a => a.GetProperty("name").GetString()!, a => a.GetProperty("groupId"));
+        Assert.Equal(group.Id, assets["Grouped asset"].GetGuid());
+        Assert.Equal(JsonValueKind.Null, assets["Ungrouped asset"].ValueKind);
+    }
+
     [Fact]
     public async Task List_FilteredByAccount_ReturnsOnlyAssetsOfThatAccount()
     {
