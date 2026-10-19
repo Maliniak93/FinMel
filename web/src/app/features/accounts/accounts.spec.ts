@@ -135,6 +135,29 @@ describe('Accounts', () => {
     expect(pageText()).toContain('Obligacje IKE');
   });
 
+  it('titles the page Investment accounts', async () => {
+    await setup(jsonResponse([brokerage]));
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('h1')?.textContent).toContain(
+      'Investment accounts',
+    );
+  });
+
+  it('shows the empty state when only bank accounts exist', async () => {
+    const bank: AccountResponse = {
+      ...brokerage,
+      id: '44444444-4444-4444-4444-444444444444',
+      name: 'mBank',
+      type: 2,
+    };
+    await setup(jsonResponse([bank]));
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(pageText()).toContain("You don't have any accounts yet.");
+    expect(pageText()).not.toContain('mBank');
+    expect(element.querySelector('table')).toBeNull();
+  });
+
   it('shows archived rows only with the toggle on', async () => {
     await setup(jsonResponse([brokerage, archived]));
 

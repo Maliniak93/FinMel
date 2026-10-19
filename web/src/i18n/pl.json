@@ -41,7 +41,7 @@
       "bonds": "Obligacje",
       "metals": "Metale szlachetne",
       "settings": "Ustawienia",
-      "accounts": "Rachunki",
+      "accounts": "Rachunki inwestycyjne",
       "bankAccounts": "Konta bankowe"
     },
     "navSection": {
@@ -1264,7 +1264,7 @@
     }
   },
   "accounts": {
-    "title": "Rachunki",
+    "title": "Rachunki inwestycyjne",
     "showArchived": "Pokaż zarchiwizowane",
     "newAccount": "Nowy rachunek",
     "empty": "Nie masz jeszcze żadnych rachunków.",

@@ -15,6 +15,8 @@ import { Deposits } from './features/deposits/deposits';
 import { Metals } from './features/metals/metals';
 import { NotFound } from './features/not-found/not-found';
 import { Accounts } from './features/accounts/accounts';
+import { AccountDetail } from './features/accounts/account-detail/account-detail';
+import { client as portfolioClient } from './api/portfolio/client.gen';
 import { Settings } from './features/settings/settings';
 import { Shell } from './layout/shell/shell';
 import { provideI18nTesting } from './core/i18n/testing';
@@ -42,6 +44,32 @@ describe('app routing (authenticated)', () => {
   it('renders Accounts at /accounts', async () => {
     await harness.navigateByUrl('/accounts', Shell);
     expect(harness.fixture.debugElement.query(By.directive(Accounts))).toBeTruthy();
+  });
+
+  it('renders AccountDetail at bank-accounts/:id', async () => {
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+    const bankId = '11111111-1111-1111-1111-111111111111';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: bankId,
+            name: 'mBank',
+            type: 2,
+            wrapper: 0,
+            currency: 'PLN',
+            isArchived: false,
+            cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            cashBalance: 0,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    await harness.navigateByUrl(`/bank-accounts/${bankId}`, Shell);
+    fetchSpy.mockRestore();
+
+    expect(harness.fixture.debugElement.query(By.directive(AccountDetail))).toBeTruthy();
   });
 
   it('renders Allocation at /allocation', async () => {

@@ -25,8 +25,9 @@ import {
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
 import {
   ACCOUNT_TYPE,
-  ACCOUNT_TYPES,
+  BANK_ACCOUNT_TYPES,
   BANK_VARIANT,
+  INVESTMENT_ACCOUNT_TYPES,
   BANK_VARIANTS,
   TAX_WRAPPER,
   TAX_WRAPPERS,
@@ -60,7 +61,10 @@ export class AccountFormDialog {
   protected readonly isEdit = !!this.data.account;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
-  protected readonly types = ACCOUNT_TYPES;
+  protected readonly types =
+    (this.data.account?.type ?? this.data.type) === ACCOUNT_TYPE.Bank
+      ? BANK_ACCOUNT_TYPES
+      : INVESTMENT_ACCOUNT_TYPES;
   protected readonly wrappers = TAX_WRAPPERS;
   protected readonly variants = BANK_VARIANTS;
   protected readonly currencies = SUPPORTED_CURRENCIES;

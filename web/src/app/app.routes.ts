@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, publicGuard } from './core/auth/auth.guard';
+import { accountTypeGuard } from './features/accounts/account-detail/account-type.guard';
 import { Shell } from './layout/shell/shell';
 
 export const routes: Routes = [
@@ -34,6 +35,13 @@ export const routes: Routes = [
       },
       {
         path: 'accounts/:id',
+        canActivate: [accountTypeGuard],
+        loadComponent: () =>
+          import('./features/accounts/account-detail/account-detail').then((m) => m.AccountDetail),
+      },
+      {
+        path: 'bank-accounts/:id',
+        canActivate: [accountTypeGuard],
         loadComponent: () =>
           import('./features/accounts/account-detail/account-detail').then((m) => m.AccountDetail),
       },

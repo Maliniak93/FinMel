@@ -64,7 +64,7 @@ async function createStockThroughApi(
 }
 
 async function expectAccountCash(page: Page, amount: string): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Rachunki', exact: true }).click();
+  await navigation(page).getByRole('link', { name: 'Rachunki inwestycyjne', exact: true }).click();
   await page.getByRole('link', { name: ACCOUNT, exact: true }).click();
   await expect(page.getByTestId('account-cash')).toContainText(pln(amount));
 }

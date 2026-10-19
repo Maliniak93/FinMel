@@ -737,7 +737,9 @@ test('transfer plan: preview, minimum, skip, accept, check off, undo, top-up and
       page.getByTestId('group-row').nth(2).locator('.allocation-page__group-name'),
     ).toHaveText('Metale');
 
-    await navigation(page).getByRole('link', { name: 'Rachunki', exact: true }).click();
+    await navigation(page)
+      .getByRole('link', { name: 'Rachunki inwestycyjne', exact: true })
+      .click();
     await page
       .getByRole('row')
       .filter({ has: page.getByRole('link', { name: IKE_ACCOUNT, exact: true }) })

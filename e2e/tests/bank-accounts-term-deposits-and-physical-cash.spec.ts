@@ -129,12 +129,12 @@ test('bank accounts, term deposits and physical cash: money moves only between a
   await registerThroughUi(page, user);
   await logInThroughUi(page, user);
 
-  await test.step('Krok 1: the menu lists Pulpit, Alokacja, Planowanie, Rachunki, Konta bankowe, Gotówka, Lokaty, Obligacje, Akcje i ETF, Metale, Ustawienia in that order', async () => {
+  await test.step('Krok 1: the menu lists Pulpit, Alokacja, Planowanie, Rachunki inwestycyjne, Konta bankowe, Gotówka, Lokaty, Obligacje, Akcje i ETF, Metale, Ustawienia in that order', async () => {
     await expect(navigation(page).locator('.mdc-list-item__primary-text')).toHaveText([
       /^Pulpit$/,
       /^Alokacja$/,
       /^Planowanie$/,
-      /^Rachunki$/,
+      /^Rachunki inwestycyjne$/,
       /^Konta bankowe$/,
       /^Gotówka$/,
       /^Lokaty$/,
@@ -146,7 +146,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
   });
 
   await test.step('Krok 2: brokerage IKE account XTB IKE is on the list with 0,00 zł', async () => {
-    await openPage(page, 'Rachunki');
+    await openPage(page, 'Rachunki inwestycyjne');
     await page
       .getByRole('button', { name: /^(Nowy rachunek|Utwórz pierwszy rachunek)$/ })
       .first()
@@ -280,7 +280,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
       page.locator('.account-detail__totals > div').filter({ hasText: 'Saldo' }),
     ).toContainText(pln('17 000,00'));
 
-    await openPage(page, 'Rachunki');
+    await openPage(page, 'Rachunki inwestycyjne');
     await expect(page.getByRole('row', { name: /XTB IKE/ })).toContainText(pln('3 000,00'));
     await page.getByRole('link', { name: 'XTB IKE', exact: true }).click();
     await expect(page.locator('.contribution-bar')).toContainText(/Wpłacono\s3\s?000,00\szł/);
@@ -489,7 +489,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
 
   await test.step('Krok 28: the dashboard shows net worth 33 856,89 zł, classes Konta bankowe 28 506,89 zł and Gotówka 5 350,00 zł, the cash card 1 150,00 zł and 300,00 USD totalling 2 350,00 zł, XTB IKE 3 000,00 zł and Sejf under Poza rachunkami', async () => {
     await expect(async () => {
-      await openPage(page, 'Rachunki');
+      await openPage(page, 'Rachunki inwestycyjne');
       await openPage(page, 'Pulpit');
       await expect(page.getByTestId('net-worth')).toContainText(pln('33 856,89'), {
         timeout: 3_000,

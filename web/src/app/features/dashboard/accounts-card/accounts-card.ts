@@ -9,10 +9,12 @@ import { getApiPortfolioAccounts } from '../../../api/portfolio';
 import { getApiReportingDashboard, type DashboardAccountValue } from '../../../api/reporting';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { formatMoney, formatPercent } from '../../../shared/format';
+import { ACCOUNT_TYPE } from '../../accounts/account-type';
 
 interface AccountRow {
   id: string | null;
   name: string | null;
+  isBank: boolean;
   entry: DashboardAccountValue;
 }
 
@@ -64,11 +66,18 @@ export class AccountsCard {
       .value()
       .byAccount.flatMap((entry): AccountRow[] => {
         if (!entry.accountId) {
-          return [{ id: null, name: null, entry }];
+          return [{ id: null, name: null, isBank: false, entry }];
         }
         const account = accounts.get(entry.accountId);
         return account && !account.isArchived
-          ? [{ id: account.id, name: account.name, entry }]
+          ? [
+              {
+                id: account.id,
+                name: account.name,
+                isBank: Number(account.type) === ACCOUNT_TYPE.Bank,
+                entry,
+              },
+            ]
           : [];
       })
       .sort((a, b) => Number(b.entry.valuePln) - Number(a.entry.valuePln));

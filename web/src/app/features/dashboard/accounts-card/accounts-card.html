@@ -20,7 +20,11 @@
         @for (row of rows(); track row.id) {
           <li class="accounts-card__row">
             @if (row.id !== null) {
-              <a class="accounts-card__name" [routerLink]="['/accounts', row.id]">{{ row.name }}</a>
+              <a
+                class="accounts-card__name"
+                [routerLink]="[row.isBank ? '/bank-accounts' : '/accounts', row.id]"
+                >{{ row.name }}</a
+              >
             } @else {
               <span class="accounts-card__name">{{
                 'dashboard.accounts.outside' | transloco
