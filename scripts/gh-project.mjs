@@ -49,7 +49,7 @@ import {
   runMarker,
   spawnGh,
 } from "./gh.mjs";
-import { AREAS, parseArea } from "./areas.mjs";
+import { AREAS, parseArea, profileOf } from "./areas.mjs";
 import {
   DEFAULT_PRIORITY,
   PRIORITIES,
@@ -1123,6 +1123,7 @@ function prepare([number, ...rest]) {
     e2e: issue.e2e,
     verifyAll: issue.lastBuild,
     area: issue.area ?? null,
+    profile: profileOf(issue.area, { skip, e2e: issue.e2e }),
     ...(ownPlan ? { ownPlan: true } : {}),
     ...(rebuild.diagnosis
       ? { diagnosis: rebuild.diagnosis, patchApplied: rebuild.patchApplied }
@@ -1249,10 +1250,10 @@ function planReplay({ n, body, workflowArgs, attempt, dryRun }) {
     if (previous && previous.bodyHash !== bodyHash)
       skipped = "spec changed since the last run";
     else {
-      const { tier, skip, e2e } = workflowArgs;
+      const { tier, skip, e2e, profile } = workflowArgs;
       found = findReplay({
         issue: Number(n),
-        args: { tier, skip, e2e },
+        args: { tier, skip, e2e, profile },
         previous,
       });
       if (!found.ok) {
@@ -1390,6 +1391,8 @@ function report([number, ...rest]) {
       for (const f of run.minor ?? [])
         lines.push(`  - \`${where(f)}\` — ${f.claim}`);
     }
+    if (typeof run.profile === "string" && run.profile)
+      lines.push(`- **Profil:** ${run.profile}`);
   } else {
     const e2eBlock = run.stage === "e2e";
     lines.push(

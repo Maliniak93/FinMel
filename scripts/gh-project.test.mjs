@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { BODY, buildState, createSandbox } from "./fake-gh-sandbox.mjs";
 
 const positions = (sandbox) => sandbox.log().filter((e) => e.kind === "position");
@@ -767,6 +769,104 @@ test("prepare workflowArgs verifyAll and area", () => {
     assert.equal(workflowArgs.area, null);
   } finally {
     closed.cleanup();
+  }
+});
+
+test("prepare workflowArgs profile", async () => {
+  const { profileOf } = await import("./areas.mjs");
+  const warning = "Brak obszaru (Area) na #5";
+  for (const area of ["Scripts", null]) {
+    const state = prepareState("Todo");
+    if (area) state.issues[5].area = area;
+    const sandbox = createSandbox(state, { branch: "feat/part-one" });
+    try {
+      const run = sandbox.run("gh-project.mjs", ["prepare", "5"]);
+
+      assert.equal(run.code, 0, run.out);
+      const out = lastJson(run.stdout);
+      const { workflowArgs } = out;
+      assert.deepEqual(workflowArgs.profile, profileOf(area, { skip: workflowArgs.skip, e2e: workflowArgs.e2e }), String(area));
+      assert.equal(out.notes.some((n) => n.startsWith(warning)), area === null);
+    } finally {
+      sandbox.cleanup();
+    }
+  }
+});
+
+test("prepare replay profile", () => {
+  const config = fs.mkdtempSync(path.join(os.tmpdir(), "profile-config-"));
+  const saved = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = config;
+  const state = prepareState("Todo");
+  state.issues[5].area = "Scripts";
+  const sandbox = createSandbox(state, { branch: "feat/part-one" });
+  process.env.CLAUDE_CONFIG_DIR = saved ?? "";
+  if (saved === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+  try {
+    fs.mkdirSync(path.join(sandbox.dir, ".claude", "workflows"), { recursive: true });
+    fs.copyFileSync(new URL("../.claude/workflows/build-feature.js", import.meta.url), path.join(sandbox.dir, ".claude", "workflows", "build-feature.js"));
+    fs.writeFileSync(path.join(sandbox.dir, "scratch.txt"), "work in progress\n");
+
+    const first = sandbox.run("gh-project.mjs", ["prepare", "5"]);
+    assert.equal(first.code, 0, first.out);
+    const { workflowArgs } = lastJson(first.stdout);
+    assert.equal(typeof workflowArgs.profile?.label, "string", String(JSON.stringify(workflowArgs.profile)));
+
+    const history = path.join(config, "projects", fs.realpathSync(sandbox.dir).replace(/[^A-Za-z0-9]/g, "-"));
+    const record = (runId, label) => {
+      const dir = path.join(history, "s1", "subagents", "workflows", runId);
+      fs.mkdirSync(dir, { recursive: true });
+      const journal = [
+        { type: "started", key: "k0", agentId: "a0", label: "implement the spec", phase: "p" },
+        { type: "result", key: "k0", agentId: "a0", result: { n: 0 } },
+      ];
+      fs.writeFileSync(path.join(dir, "journal.jsonl"), journal.map((e) => JSON.stringify(e)).join("\n") + "\n");
+      fs.mkdirSync(path.join(history, "s1", "workflows"), { recursive: true });
+      const args = { ...workflowArgs, profile: { ...workflowArgs.profile, label } };
+      fs.writeFileSync(path.join(history, "s1", "workflows", `${runId}.json`), JSON.stringify({ runId, workflowName: "build-feature", args, result: { status: "ready" } }));
+    };
+
+    record("wf_changed", "Docs (implementer → reviewer)");
+    const changed = sandbox.run("gh-project.mjs", ["prepare", "5"]);
+    assert.equal(changed.code, 0, changed.out);
+    const changedOut = lastJson(changed.stdout);
+    assert.equal(changedOut.replay, null);
+    assert.ok(changedOut.replaySkipped, JSON.stringify(changedOut));
+
+    fs.rmSync(path.join(history, "s1"), { recursive: true, force: true });
+    record("wf_same", workflowArgs.profile.label);
+    const same = sandbox.run("gh-project.mjs", ["prepare", "5"]);
+    assert.equal(same.code, 0, same.out);
+    const sameOut = lastJson(same.stdout);
+    assert.deepEqual(sameOut.replay?.steps, ["implement the spec"], JSON.stringify(sameOut));
+    assert.equal(sameOut.replaySkipped, undefined);
+  } finally {
+    sandbox.cleanup();
+    fs.rmSync(config, { recursive: true, force: true });
+  }
+});
+
+test("report Profil", () => {
+  const sandbox = createSandbox(
+    buildState({ issues: [{ number: 60, status: "In progress", labels: ["spec"], area: "Scripts", branch: "feat/profil" }] }),
+  );
+  try {
+    const post = (extra) => {
+      const run = sandbox.run("gh-project.mjs", [
+        "report",
+        "60",
+        "--json",
+        JSON.stringify({ status: "shipped", branch: "feat/profil", tests: [], rounds: 0, ...extra }),
+      ]);
+      assert.equal(run.code, 0, run.out);
+      return sandbox.log().filter((e) => e.kind === "comment").at(-1).body;
+    };
+
+    assert.ok(post({ profile: "Scripts (implementer → reviewer)" }).includes("**Profil:** Scripts (implementer → reviewer)"));
+    assert.ok(!post({}).includes("Profil"));
+    assert.ok(!post({ profile: "" }).includes("Profil"));
+  } finally {
+    sandbox.cleanup();
   }
 });
 
