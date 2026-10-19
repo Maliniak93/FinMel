@@ -33,6 +33,7 @@ public sealed class AssetPositionChangedConsumer(
                 AssetId = message.AssetId,
                 UserId = message.UserId,
                 AccountId = message.AccountId,
+                GroupId = message.GroupId,
                 AssetClass = message.AssetClass,
                 ValuationMode = message.ValuationMode,
                 InstrumentId = message.InstrumentId,
@@ -59,6 +60,7 @@ public sealed class AssetPositionChangedConsumer(
             earliestAffected = HistoryChange.EarliestAffectedDate(position, message);
             position.UserId = message.UserId;
             position.AccountId = message.AccountId;
+            position.GroupId = message.GroupId;
             position.AssetClass = message.AssetClass;
             position.ValuationMode = message.ValuationMode;
             position.InstrumentId = message.InstrumentId;

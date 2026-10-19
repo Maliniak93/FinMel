@@ -18,11 +18,13 @@ internal static class PositionEvents
         bool isArchived = false,
         IReadOnlyList<QuantityPoint>? quantityHistory = null,
         AssetClass assetClass = AssetClass.Cash,
-        IReadOnlyList<ClassPoint>? classHistory = null)
+        IReadOnlyList<ClassPoint>? classHistory = null,
+        Guid? groupId = null)
     {
         var id = assetId ?? Guid.NewGuid();
         await bus.Publish(new AssetPositionChanged
         {
+            GroupId = groupId,
             AssetId = id,
             AccountId = accountId,
             UserId = userId,

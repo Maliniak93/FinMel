@@ -42,6 +42,7 @@ const withOutsideAccounts: DashboardResponse = {
       percentage: 20,
     },
   ],
+  byGroup: [],
 };
 
 describe('AccountsCard', () => {

@@ -10,7 +10,7 @@ Content-Type: application/json
   "password": "P@ssw0rd!123"
 }
 
-### Dashboard — the user's latest snapshot (byAccount rows carry percentage of net worth; accountId null = assets outside accounts)
+### Dashboard — the user's latest snapshot (byAccount rows carry percentage of net worth; accountId null = assets outside accounts; byGroup rows likewise, groupId null = assets in no group)
 GET {{baseUrl}}/api/reporting/dashboard
 Authorization: Bearer {{authToken}}
 
@@ -37,4 +37,12 @@ Content-Type: application/json
 
 ### Net worth history — one asset class (AssetClass int: 3 = Etf), 0 on days the class was not held
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y&assetClass=3
+Authorization: Bearer {{authToken}}
+
+### Net worth history — one asset group (groupId from /api/portfolio/asset-groups), by each asset's current group; add &assetClass= to narrow it
+GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y&groupId=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{authToken}}
+
+### Net worth history — assets in no group (ungrouped=true cannot be combined with groupId: 400 Validation.InvalidGroupFilter)
+GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y&ungrouped=true
 Authorization: Bearer {{authToken}}

@@ -319,6 +319,9 @@ namespace Skarbiec.Reporting.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("InstrumentId")
                         .HasColumnType("uuid");
 

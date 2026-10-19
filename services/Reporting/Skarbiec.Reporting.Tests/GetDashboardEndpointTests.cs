@@ -278,4 +278,50 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(bankAccountId, account.AccountId);
         Assert.Equal(2_000m, account.ValuePln);
     }
+
+    [Fact]
+    public async Task ByGroup_SplitsNetWorth()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var groupA = Guid.NewGuid();
+        var groupB = Guid.NewGuid();
+        var emptyGroup = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+        var assetA = Guid.NewGuid();
+        var assetA2 = Guid.NewGuid();
+        var assetB = Guid.NewGuid();
+        var assetNone = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(assetA, userId, null, cancellationToken, groupId: groupA);
+            await db.SeedPositionAsync(assetA2, userId, null, cancellationToken, groupId: groupA);
+            await db.SeedPositionAsync(assetB, userId, null, cancellationToken, groupId: groupB);
+            await db.SeedPositionAsync(assetNone, userId, null, cancellationToken);
+            await db.SeedSnapshotAsync(userId, snapshotDate, 1_000m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, null, assetA, snapshotDate, 400m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, null, assetA2, snapshotDate, 100m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, null, assetB, snapshotDate, 300m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, null, assetNone, snapshotDate, 200m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(3, body!.ByGroup.Count);
+        var a = Assert.Single(body.ByGroup, g => g.GroupId == groupA);
+        Assert.Equal(500m, a.ValuePln);
+        Assert.Equal(50m, a.Percentage);
+        var b = Assert.Single(body.ByGroup, g => g.GroupId == groupB);
+        Assert.Equal(300m, b.ValuePln);
+        Assert.Equal(30m, b.Percentage);
+        var none = Assert.Single(body.ByGroup, g => g.GroupId == null);
+        Assert.Equal(200m, none.ValuePln);
+        Assert.Equal(20m, none.Percentage);
+        Assert.DoesNotContain(body.ByGroup, g => g.GroupId == emptyGroup);
+        Assert.Equal(body.NetWorthPln, body.ByGroup.Sum(g => g.ValuePln));
+    }
 }

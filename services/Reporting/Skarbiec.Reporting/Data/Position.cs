@@ -13,6 +13,10 @@ public sealed class Position : IUserOwned
     public Guid UserId { get; set; }
 
     public Guid? AccountId { get; set; }
+
+    // Portfolio's asset group id, no FK; a dangling id after a deleted group is a normal state.
+    public Guid? GroupId { get; set; }
+
     public required AssetClass AssetClass { get; set; }
     public required AssetValuationMode ValuationMode { get; set; }
 

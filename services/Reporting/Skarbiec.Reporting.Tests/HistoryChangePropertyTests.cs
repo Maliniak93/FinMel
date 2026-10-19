@@ -106,6 +106,21 @@ public sealed class HistoryChangePropertyTests
         Assert.Equal(expected, HistoryChange.EarliestAffectedDate(stored, incoming));
     }
 
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void GroupIsNotACandidate(int seed)
+    {
+        var random = new Random(seed);
+        var history = RandomHistory(random);
+        var storedGroup = random.Next(2) == 0 ? (Guid?)null : Guid.NewGuid();
+        var incomingGroup = random.Next(2) == 0 ? (Guid?)null : Guid.NewGuid();
+
+        var stored = Stored(history: history, groupId: storedGroup);
+        var incoming = Incoming(history: history, groupId: incomingGroup);
+
+        Assert.Null(HistoryChange.EarliestAffectedDate(stored, incoming));
+    }
+
     [Fact]
     public void EarliestAffectedDate_AssetArchived_IsTheUtcDateOfTheEvent()
     {
@@ -196,8 +211,10 @@ public sealed class HistoryChangePropertyTests
         string currency = "PLN",
         bool isArchived = false,
         DateOnly? archivedOn = null,
-        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null) => new()
+        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
+        Guid? groupId = null) => new()
         {
+            GroupId = groupId,
             ClassHistory = [.. (classHistory ?? []).Select(p => new PositionClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             AssetId = AssetId,
             UserId = Guid.NewGuid(),
@@ -222,8 +239,10 @@ public sealed class HistoryChangePropertyTests
         string currency = "PLN",
         bool isArchived = false,
         DateTimeOffset? occurredAt = null,
-        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null) => new()
+        IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
+        Guid? groupId = null) => new()
         {
+            GroupId = groupId,
             AssetId = AssetId,
             AccountId = AccountId,
             UserId = Guid.NewGuid(),
