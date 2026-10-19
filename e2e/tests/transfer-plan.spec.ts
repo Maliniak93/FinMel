@@ -25,6 +25,7 @@ import {
   shiftMonth,
   type IncomeInput,
 } from './planning';
+import { ASSET_CLASS, expectClassesProjected } from './cash-class';
 import { expectProjected } from './projection';
 
 const ACCOUNT_TYPE_BROKERAGE = 0;
@@ -359,36 +360,6 @@ async function createBondThroughApi(
   expect(created.ok()).toBeTruthy();
 }
 
-interface AccountValue {
-  accountId: string | null;
-  valuePln: number;
-  cashPln: number;
-}
-
-async function expectAccountProjected(
-  request: APIRequestContext,
-  token: string,
-  accountId: string,
-  expected: { valuePln: number; cashPln: number },
-): Promise<void> {
-  let current: AccountValue | undefined;
-  await expectProjected(
-    async () => {
-      const response = await request.get('/api/reporting/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      expect(response.ok()).toBeTruthy();
-      current = ((await response.json()) as { byAccount: AccountValue[] }).byAccount.find(
-        (account) => account.accountId === accountId,
-      );
-    },
-    async () => {
-      expect(current?.valuePln).toBe(expected.valuePln);
-      expect(current?.cashPln).toBe(expected.cashPln);
-    },
-  );
-}
-
 async function expectNetWorthProjected(
   request: APIRequestContext,
   token: string,
@@ -517,12 +488,12 @@ test('transfer plan: preview, minimum, skip, accept, check off, undo, top-up and
       quantity: 110000,
       date: warsawDate(),
     });
-    await expectAccountProjected(request, token, broker.id, {
-      valuePln: 110000,
-      cashPln: 110000,
-    });
+    await expectClassesProjected(request, token, { [ASSET_CLASS.cash]: 110000 });
     await createStockThroughApi(request, token, broker.id);
-    await expectAccountProjected(request, token, broker.id, { valuePln: 110000, cashPln: 0 });
+    await expectClassesProjected(request, token, {
+      [ASSET_CLASS.stock]: 110000,
+      [ASSET_CLASS.cash]: 0,
+    });
 
     const bonds = await createAccountThroughApi(request, token, {
       name: BONDS_ACCOUNT,
@@ -533,9 +504,8 @@ test('transfer plan: preview, minimum, skip, accept, check off, undo, top-up and
       quantity: 60000,
       date: warsawDate(),
     });
-    await expectAccountProjected(request, token, bonds.id, { valuePln: 60000, cashPln: 60000 });
+    await expectClassesProjected(request, token, { [ASSET_CLASS.bond]: 60000 });
     await createBondThroughApi(request, token, bonds.id);
-    await expectAccountProjected(request, token, bonds.id, { valuePln: 60000, cashPln: 0 });
 
     await createGoldBarThroughApi(request, token);
     await syncPrices(page);
