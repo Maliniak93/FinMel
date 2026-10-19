@@ -6,5 +6,5 @@ internal sealed class StubCurrentUser(Guid userId) : ICurrentUser
 {
     public bool IsAuthenticated => true;
 
-    public Guid UserId => userId;
+    public Guid UserId { get; set; } = userId;
 }

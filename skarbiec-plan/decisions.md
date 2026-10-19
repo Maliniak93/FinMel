@@ -126,7 +126,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-021 ✅ Event-carried state transfer for positions; REST narrowed to validation + batch
 
-**Amended by ADR-026, ADR-027, ADR-032.**
+**Amended by ADR-026, ADR-027, ADR-032, ADR-039.**
 
 **Shipped:** 2026-09-22 (spec-02 publishes the events, spec-03 consumes them and deletes the REST query).
 
@@ -262,3 +262,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** the transfer plan needs the to-invest amounts per bucket, account and account type (Portfolio, computed live and changing backwards) and the target groups and per-class values (Reporting); `/internal` may not serve user data (ADR-027).
 **Decision:** the plan lives in Portfolio; Reporting publishes `TargetAllocationSaved` and `LatestValuationChanged` with full state through its outbox, and Portfolio replicates them with idempotent consumers, ignoring older messages (`SavedAtUtc`; `Date` then `OccurredAtUtc`). The loser — the plan in Reporting fed by a Portfolio event — needed a publish on every planning write plus a month-rollover job.
 **Consequences:** Reporting becomes a publisher and Portfolio a consumer; events flow both ways but no consumer calls a publisher back; the replica lags by one delivery. Amends ADR-020, ADR-021.
+
+## ADR-039 🕐 An account's cash publishes the class it counts under, with its timeline
+
+**Context:** free cash on an investing account counts toward its holdings' class, not Cash. Transactions live in Portfolio, and Reporting values from events (ADR-021).
+**Decision:** `AssetPositionChanged` gains `required ClassHistory` (`ClassPoint { Date, AssetClass }`, ascending, empty = `AssetClass` holds on every date). Portfolio derives it for a Brokerage account's cash: on date `d` the class of the latest Buy by `(Date, EntryOrder)` on or before `d` whose asset has end-of-day quantity above 0, else Cash; `AssetClass` is the class today. A Bonds account's cash publishes Bond. `Transaction.EntryOrder` is a database sequence value set at insert and never changed by an edit, so two buys on one date order deterministically. The stored `Asset.AssetClass` of the cash stays Cash. Amends ADR-021.
+**Consequences:** a buy, sell, edit, delete or class change in a Brokerage account republishes its cash with the whole timeline recomputed; consumers ignore `ClassHistory` until they adopt it.

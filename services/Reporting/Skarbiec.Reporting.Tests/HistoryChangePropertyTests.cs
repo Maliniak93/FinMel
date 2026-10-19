@@ -190,6 +190,7 @@ public sealed class HistoryChangePropertyTests
             Quantity = history.Count > 0 ? history[^1].Quantity : 0m,
             QuoteUnitsPerQuantity = 1m,
             QuantityHistory = [.. history.Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
+            ClassHistory = [],
             IsArchived = isArchived,
             Version = 1,
             OccurredAtUtc = occurredAt ?? DateTimeOffset.UtcNow,

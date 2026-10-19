@@ -43,6 +43,31 @@ public sealed class AssetPositionChangedContractTests
     }
 
     [Fact]
+    public void Deserialize_WithClassHistory_KeepsEveryClassPoint()
+    {
+        var json = File.ReadAllText(Path.Combine("Fixtures", "asset-position-changed-with-extra-fields.json"));
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var evt = JsonSerializer.Deserialize<AssetPositionChanged>(json, options);
+
+        Assert.NotNull(evt);
+        Assert.Equal(
+            new (DateOnly Date, AssetClass AssetClass)[] { (new DateOnly(2024, 3, 4), AssetClass.Cash), (new DateOnly(2025, 1, 10), AssetClass.Stock) },
+            evt.ClassHistory.Select(point => (point.Date, point.AssetClass)));
+    }
+
+    [Fact]
+    public void Deserialize_WithoutClassHistory_IsRejectedAsRequired()
+    {
+        var json = File.ReadAllText(Path.Combine("Fixtures", "asset-position-changed-with-extra-fields.json"))
+            .Replace("\"classHistory\"", "\"unrelatedHistory\"", StringComparison.Ordinal);
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<AssetPositionChanged>(json, options));
+    }
+
+    [Fact]
     public void Deserialize_WithoutAccountId_LeavesItNull()
     {
         var json = File.ReadAllText(Path.Combine("Fixtures", "asset-position-changed-with-extra-fields.json"))

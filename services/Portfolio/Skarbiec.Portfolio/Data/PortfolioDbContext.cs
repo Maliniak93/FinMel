@@ -1,5 +1,6 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Tenancy;
 
@@ -45,6 +46,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.HasSequence<long>("transaction_entry_order");
 
         modelBuilder.Entity<Account>(account =>
         {
@@ -106,6 +109,10 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
 
             // A transfer's legs are found by their shared TransferId.
             transaction.HasIndex(t => t.TransferId);
+
+            transaction.Property(t => t.EntryOrder)
+                .HasDefaultValueSql("nextval('transaction_entry_order')")
+                .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
 
             // Same xmin concurrency token as Asset, guarding concurrent edits of one transaction.
             transaction.Property<uint>("Xmin")

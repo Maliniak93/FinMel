@@ -115,11 +115,19 @@ public sealed class UpdateAssetHandler(
             asset.ValuationMode = AssetValuationMode.CurrencyValued;
         }
 
+        var classChanged = asset.AssetClass != request.AssetClass;
         asset.AssetClass = request.AssetClass;
         asset.Name = request.Name;
         asset.Currency = request.Currency;
 
         await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
+
+        // The account's cash counts under its holdings' class, so a class change moves it too.
+        if (classChanged && asset.AccountId is { } accountId)
+        {
+            var cash = await dbContext.LoadAccountCashAsync(accountId, cancellationToken);
+            await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

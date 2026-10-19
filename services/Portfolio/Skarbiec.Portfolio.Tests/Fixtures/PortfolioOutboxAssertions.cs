@@ -2,6 +2,7 @@ using System.Text.Json;
 using MassTransit.EntityFrameworkCoreIntegration;
 using MassTransit.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
@@ -29,4 +30,11 @@ internal static class PortfolioOutboxAssertions
 
     public static IReadOnlyList<(DateOnly Date, decimal Quantity)> Points(this AssetPositionChanged evt) =>
         [.. evt.QuantityHistory.Select(point => (point.Date, point.Quantity))];
+
+    public static IReadOnlyList<(DateOnly Date, AssetClass AssetClass)> ClassPoints(this AssetPositionChanged evt) =>
+        [.. evt.ClassHistory.Select(point => (point.Date, point.AssetClass))];
+
+    public static async Task<AssetPositionChanged> LastPublishedAsync(
+        this PortfolioDbContext dbContext, Guid assetId, CancellationToken cancellationToken) =>
+        (await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken)).Last(e => e.AssetId == assetId);
 }
