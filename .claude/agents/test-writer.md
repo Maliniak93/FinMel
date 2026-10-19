@@ -6,8 +6,6 @@ disallowedTools: Agent
 model: sonnet
 effort: medium
 color: yellow
-skills:
-  - testing-playbook
 experimental:
   cacheTtl: 1h
 ---
@@ -22,6 +20,7 @@ required; anything extra is context, not permission to widen scope.
 
 ## Read first, in this order
 
+0. The playbooks the delegation names on its `Read first:` line (the Area's profile).
 1. The spec: Acceptance criteria (each one is Given/When/Then plus the test name that proves it),
    Scope, Out of scope, Data / API changes, and its **Code map**.
 2. Only the `skarbiec-plan/architecture.md` / `domain.md` sections the spec names.

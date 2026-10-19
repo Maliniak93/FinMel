@@ -6,9 +6,6 @@ disallowedTools: Agent
 model: sonnet
 effort: medium
 color: blue
-skills:
-  - backend-playbook
-  - frontend-playbook
 experimental:
   cacheTtl: 1h
 ---
@@ -58,6 +55,8 @@ cannot decide from the spec's goal at all.
 
 ## Read first, in this order
 
+0. The playbooks the delegation names on its `Read first:` line (the Area's profile) — their conventions and
+   Definition of done apply to your change. A delegation without one names none to read.
 1. The spec: Scope, Design decisions, Data / API changes, Acceptance criteria, Out of scope, and its
    **Code map**.
 2. Only the `skarbiec-plan/architecture.md` / `domain.md` / `decisions.md` **sections the spec names**.
@@ -106,7 +105,7 @@ instead, and say in `notes` that you could not verify the API.
    Already green means the test does not prove its criterion - fix the test so it does, and record it
    in `deviations`.
    (No tests delivered → skip this step and start from the spec's Scope.)
-2. Implement the smallest change that turns them green, following the loaded playbooks and
+2. Implement the smallest change that turns them green, following the playbooks you read and
    `.claude/rules/*`. Copy the nearest existing pattern instead of inventing one.
 3. Re-run the same filtered tests, then **verify before you return** (below).
 
@@ -159,15 +158,12 @@ verify cache before committing, so a `verified: true` on a tree verify never saw
 
 - The tests are green, every acceptance criterion still has a test that proves it, and each test or
   design change is listed in `deviations`.
-- API surface changed → `cd web && npm run gen:api`, then `npm run typecheck` **once** (the one web
-  command you own: a client that does not compile otherwise costs a whole fix round), then
-  `git diff -- web/src/app/api` and keep only the real schema delta — the generator can strip `.js`
-  extensions repo-wide, so hand-revert anything that is not your change.
-- New or changed endpoint → `requests/<service>.http` updated with a working request.
+- The Definition of done of each playbook you read (generated client, `requests/*.http`, migrations,
+  script and `.claude/` items) holds too.
 - Convention changed → the matching `.claude/rules/*.md` updated. Hard rule changed → an ADR entry
   appended to `skarbiec-plan/decisions.md`, referenced from the spec. Neither happens silently.
-- Migration added → it is reviewed for destructiveness and named after the change, and the runbook
-  note in the spec's Verification section still holds.
+- CI/Infra → the command the acceptance criteria name passes. Docs → every link and path you wrote exists.
+  E2E → `.claude/rules/e2e.md` holds.
 - Manual test plan → compare the spec's `## Test manualny` with what you built. On a deviation
   (screen, route, action, amount shown) write the full corrected section to
   `skarbiec-plan/issues/<n>.manual.md` and return it in `manualTest`. When the delegation says the

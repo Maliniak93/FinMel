@@ -3,10 +3,10 @@ export const meta = {
   description: 'Spec to a verified, reviewed change and the exact ship command: failing tests, implementation, verification, adversarial review',
   whenToUse: 'Invoked by /build and /fix after `gh-project.mjs prepare` cut the issue branch (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
-    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; haiku/high on tier 1, sonnet/medium on tier 2 (skippable)' },
-    { title: 'Implement', detail: 'implementer does the work and runs scripts/verify.mjs itself (scoped by the changed files, `--all` on the last non-e2e part of an epic) with up to 3 fixes; sonnet/medium on tier 1, haiku/high on a tier-1 skip-tests cleanup, sonnet/high on tier 2; a red result escalates once to opus (medium on tier 1, high on tier 2), a second red blocks the run' },
+    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; haiku/high on tier 1, sonnet/medium on tier 2 (skippable; skipped for an Area whose profile has no test-writer: Scripts, Claude, Docs, CI/Infra, E2E - the implementer then writes the missing tests itself)' },
+    { title: 'Implement', detail: 'implementer reads the playbooks of the Area profile first, does the work and runs scripts/verify.mjs itself (scoped by the changed files, `--all` on the last non-e2e part of an epic) with up to 3 fixes; sonnet/medium on tier 1, haiku/high on a tier-1 skip-tests cleanup, sonnet/high on tier 2; a red result escalates once to opus (medium on tier 1, high on tier 2), a second red blocks the run' },
     { title: 'E2E', detail: 'only for an epic\'s e2e part (args.e2e): replaces Tests and Implement. The e2e agent automates the epic\'s manual test plan as Playwright tests, runs verify --projects e2e and the whole e2e suite; sonnet (medium on tier 1, high on tier 2), one escalation to opus; a stable app failure or an environment problem blocks the run' },
-    { title: 'Review', detail: 'reviewer reads scripts/review-diff.mjs against the spec; opus/medium on tier 1, opus/high on tier 2 (skippable)', model: 'claude-opus-5-5' },
+    { title: 'Review', detail: 'reviewer reads scripts/review-diff.mjs against the spec and applies the review-checklist sections of the Area profile; opus/medium on tier 1, opus/high on tier 2 (skippable)', model: 'claude-opus-5-5' },
   ],
 }
 
@@ -142,7 +142,7 @@ const REVIEW = {
 
 // ---------------------------------------------------------------- setup
 
-const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false, verifyAll = false, area = null } = args || {}
+const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false, verifyAll = false, area = null, profile = null } = args || {}
 
 if (!(spec && issue && branch && title)) {
   return {
@@ -154,6 +154,19 @@ if (!(spec && issue && branch && title)) {
 
 const skipped = new Set((Array.isArray(skip) ? skip : [skip]).map((s) => String(s).trim().toLowerCase()))
 const noTests = skipped.has('tests')
+// Without a profile (no Area, older prepare) the full path runs: both implementer playbooks, the testing playbook, every checklist section.
+const FULL_PATH = {
+  tests: true,
+  implementerPlaybooks: ['.claude/skills/backend-playbook/SKILL.md', '.claude/skills/frontend-playbook/SKILL.md'],
+  testWriterPlaybooks: ['.claude/skills/testing-playbook/SKILL.md'],
+  checklist: ['Common', 'Backend', 'Frontend', 'Scripts', 'Claude', 'CI/Infra', 'Docs', 'E2E'],
+}
+const plan = profile || FULL_PATH
+const profileLabel = profile && profile.label ? profile.label : null
+// The Area has no test-writer and `skip-tests` is not set: the implementer proves the acceptance criteria with tests it writes itself.
+const writesOwnTests = !e2e && !noTests && plan.tests === false
+const runsTestWriter = !e2e && !noTests && plan.tests !== false
+const readFirst = (paths) => (paths && paths.length ? `Read first: ${paths.join(', ')}` : null)
 
 const OPUS = 'claude-opus-5-5'
 const startLevel =
@@ -257,7 +270,7 @@ async function implement(label, lines) {
   const result = await step(
     'implementer',
     label,
-    [`Work on the spec at \`${spec}\`. You are already on its branch \`${branch}\`.`].concat(lines, [OWN, MANUAL_LINE, VERIFY_LINE]),
+    [readFirst(plan.implementerPlaybooks), `Work on the spec at \`${spec}\`. You are already on its branch \`${branch}\`.`].concat(lines, [OWN, MANUAL_LINE, VERIFY_LINE]),
     IMPL,
     level,
   )
@@ -345,7 +358,7 @@ async function attempt(label, lines, runner = implement, isFailed = failed) {
 log(
   e2e
     ? `Spec ${spec} on ${branch} - e2e part, tier ${tier}, e2e agent ${e2eStartLevel.model}/${e2eStartLevel.effort} escalating once to ${escalatedLevel.model}/${escalatedLevel.effort}, no test-writer and no implementer, reviewer opus/${reviewEffort} then opus/medium re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`
-    : `Spec ${spec} on ${branch} - tier ${tier}, test-writer ${testWriter.model}/${testWriter.effort}, implementer ${startLevel.model}/${startLevel.effort} escalating once to ${escalatedLevel.model}/${escalatedLevel.effort}, reviewer opus/${reviewEffort} then opus/medium re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`,
+    : `Spec ${spec} on ${branch} - tier ${tier}${profileLabel ? `, profile ${profileLabel}` : ', no profile (full path)'}, ${runsTestWriter ? `test-writer ${testWriter.model}/${testWriter.effort}` : 'no test-writer'}, implementer ${startLevel.model}/${startLevel.effort} escalating once to ${escalatedLevel.model}/${escalatedLevel.effort}, reviewer opus/${reviewEffort} then opus/medium re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`,
 )
 
 // ---------------------------------------------------------------- tests
@@ -356,6 +369,8 @@ if (e2e) {
   log('Tests skipped - an e2e part writes its tests through the e2e agent')
 } else if (noTests) {
   log('Tests skipped - this spec proves its acceptance criteria with commands, not new tests')
+} else if (writesOwnTests) {
+  log(`Tests skipped - the ${profileLabel || 'profile'} has no test-writer: the implementer writes the tests the acceptance criteria need`)
 } else {
   if (broke()) return stop('tests', { reason: 'budget' })
 
@@ -363,6 +378,7 @@ if (e2e) {
     'test-writer',
     'failing tests from acceptance criteria',
     [
+      readFirst(plan.testWriterPlaybooks),
       `Write the failing tests for the spec at \`${spec}\`. You are on its branch \`${branch}\`.`,
       'Read that spec first and start from its Code map section, then only the skarbiec-plan sections it names, then the target test project Fixtures/ helpers the Code map names.',
       'One or more tests per acceptance criterion, named as the spec names them. Include tenancy isolation for any new user-owned resource and outbox/idempotency tests for any new or changed event.',
@@ -395,11 +411,17 @@ const implementLines = tests.tests.length
       `Make these failing tests pass: ${JSON.stringify(tests)}`,
       "Start from the spec's Code map and the tests' contextFiles - read those instead of rediscovering the code. Then only the skarbiec-plan sections the spec names. Smallest correct change; do not widen scope beyond the spec.",
     ]
-  : [
-      'This spec has no new tests - it adds no behaviour. Implement its Scope exactly and leave every existing suite green.',
-      "Start from the spec's Code map, then only the skarbiec-plan sections it names. Smallest correct change; do not widen scope beyond the spec.",
-      'Run the command each acceptance criterion names as its proof, and report those commands in `commandsRun`.',
-    ]
+  : writesOwnTests
+    ? [
+        'No test-writer runs for this Area. Implement the spec\'s Scope exactly and leave every existing suite green.',
+        "Start from the spec's Code map, then only the skarbiec-plan sections it names. Smallest correct change; do not widen scope beyond the spec.",
+        'Prove every acceptance criterion by the test or command it names, writing the missing tests yourself, and report the commands you ran in `commandsRun`.',
+      ]
+    : [
+        'This spec has no new tests - it adds no behaviour. Implement its Scope exactly and leave every existing suite green.',
+        "Start from the spec's Code map, then only the skarbiec-plan sections it names. Smallest correct change; do not widen scope beyond the spec.",
+        'Run the command each acceptance criterion names as its proof, and report those commands in `commandsRun`.',
+      ]
 
 const initial = e2e
   ? await attempt('e2e: automate the epic plan and run the suite', [], e2eRun, e2eFailed)
@@ -444,7 +466,9 @@ if (skipped.has('review')) {
             e2e ? 'This is an epic\'s e2e part (the `e2e` label): there is no test-writer and no implementer. Apply the "An e2e part" rules of your agent prompt; the epic body and the sibling parts are in `skarbiec-plan/issues/`, and `.git/e2e-result.json` holds the run.' : null,
             e2e ? DIAGNOSIS_REVIEW_LINE : null,
             deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
-            e2e || tests.tests.length ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
+            e2e || tests.tests.length || writesOwnTests ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
+            writesOwnTests ? 'No test-writer ran for this Area: the implementer wrote any tests the acceptance criteria need. Judge each acceptance criterion by the test or command it names.' : null,
+            `Apply the review-checklist sections: ${plan.checklist.join(', ')}${!e2e && plan.tests === false ? ' and Areas without a test-writer' : ''}.`,
             area ? `The ticket's Area is ${area}. \`node scripts/areas.mjs outside ${area}\` lists the changed files outside it: each listed file is a \`minor\` finding, \`blocking\` only when that change is unrelated to the spec.` : null,
             'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',
           ],
@@ -504,6 +528,7 @@ return {
     report: {
       status: 'shipped',
       branch,
+      profile: profileLabel,
       tests: tests.tests.map((t) => t.name),
       e2e: e2e ? true : undefined,
       rounds,
