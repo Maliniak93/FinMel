@@ -73,6 +73,10 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   events only via the MassTransit outbox and consumers idempotent, `decimal`/`Money`, external price
   APIs only from jobs, Angular talking only to the Gateway.
 - **Scope**: anything in the diff that the spec does not ask for, or that Out of scope forbids.
+- **Outside the ticket's Area**: when the delegation names the ticket's Area, run
+  `node scripts/areas.mjs outside <Area>` (no paths: the uncommitted change). Each file it lists is a
+  `minor` finding; `blocking` only when that file's change is unrelated to the spec. A ticket without
+  an Area has no such check.
 - **Migrations**: present when the model changed, destructive only where the spec allows it, and the
   entity configuration matches.
 - **Generated client**: API surface changed → `web/src/app/api` regenerated, and the diff there is the
@@ -106,7 +110,8 @@ broke nothing. Do not re-review the whole change; that was round 1's job.
 ## Severity
 
 `blocking` **only** for: wrong behaviour, an unproven acceptance criterion, a hard-rule violation, a
-security or tenancy hole, data loss, or scope the spec forbids. Everything else is `minor`.
+security or tenancy hole, data loss, scope the spec forbids, or a change unrelated to the spec (for an
+outside-Area file, see Check). Everything else is `minor`.
 
 Do not raise: requests for extra abstraction, tests for cases the type system already makes
 impossible, style preferences the rules do not state, alternative designs the spec already decided,

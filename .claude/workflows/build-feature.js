@@ -4,7 +4,7 @@ export const meta = {
   whenToUse: 'Invoked by /build and /fix after `gh-project.mjs prepare` cut the issue branch (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
     { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; haiku/high on tier 1, sonnet/medium on tier 2 (skippable)' },
-    { title: 'Implement', detail: 'implementer does the work and runs the full scripts/verify.mjs itself with up to 3 fixes; sonnet/medium on tier 1, haiku/high on a tier-1 skip-tests cleanup, sonnet/high on tier 2; a red result escalates once to opus (medium on tier 1, high on tier 2), a second red blocks the run' },
+    { title: 'Implement', detail: 'implementer does the work and runs scripts/verify.mjs itself (scoped by the changed files, `--all` on the last non-e2e part of an epic) with up to 3 fixes; sonnet/medium on tier 1, haiku/high on a tier-1 skip-tests cleanup, sonnet/high on tier 2; a red result escalates once to opus (medium on tier 1, high on tier 2), a second red blocks the run' },
     { title: 'E2E', detail: 'only for an epic\'s e2e part (args.e2e): replaces Tests and Implement. The e2e agent automates the epic\'s manual test plan as Playwright tests, runs verify --projects e2e and the whole e2e suite; sonnet (medium on tier 1, high on tier 2), one escalation to opus; a stable app failure or an environment problem blocks the run' },
     { title: 'Review', detail: 'reviewer reads scripts/review-diff.mjs against the spec; opus/medium on tier 1, opus/high on tier 2 (skippable)', model: 'claude-opus-5-5' },
   ],
@@ -142,7 +142,7 @@ const REVIEW = {
 
 // ---------------------------------------------------------------- setup
 
-const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false } = args || {}
+const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false, verifyAll = false, area = null } = args || {}
 
 if (!(spec && issue && branch && title)) {
   return {
@@ -250,8 +250,9 @@ const MANUAL_LINE = epicLast
   : "Compare the spec's `## Test manualny` with what you built. On a deviation (screen, route, action, amount shown) write the full corrected section to `skarbiec-plan/issues/" +
     issue +
     '.manual.md` and return `manualTest: [{ issue, file }]`; otherwise return no `manualTest`.'
-const VERIFY_LINE =
-  'Before you return, run the full verification (`scripts/verify.mjs --all`) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it.'
+const VERIFY_LINE = verifyAll
+  ? 'Before you return, run the full verification (`scripts/verify.mjs --all --fix --cache`: this is the last non-e2e part of its epic) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it.'
+  : 'Before you return, run the scoped verification (`scripts/verify.mjs --fix --cache`, scoped by the changed files) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it.'
 async function implement(label, lines) {
   const result = await step(
     'implementer',
@@ -444,6 +445,7 @@ if (skipped.has('review')) {
             e2e ? DIAGNOSIS_REVIEW_LINE : null,
             deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
             e2e || tests.tests.length ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
+            area ? `The ticket's Area is ${area}. \`node scripts/areas.mjs outside ${area}\` lists the changed files outside it: each listed file is a \`minor\` finding, \`blocking\` only when that change is unrelated to the spec.` : null,
             'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',
           ],
       REVIEW,

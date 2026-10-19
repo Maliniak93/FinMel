@@ -117,7 +117,7 @@ Every Bash call running `dotnet test` (filtered too) sets Bash `timeout: 600000`
 
 **Never run**: a solution-wide `dotnet format` as a habit · `dotnet build` on the solution · an
 unfiltered `dotnet test` · `npm run typecheck` / `lint` / `format:check` / `build` · `npm test`.
-`scripts/verify.mjs` is the one full check you run, and only as described below.
+`scripts/verify.mjs` is the one verification you run, and only as described below.
 
 **Do run**: `dotnet test <project> --filter "FullyQualifiedName~<Name>"` for the tests you are
 driving green, `dotnet ef migrations add` when the model changed, and `dotnet format` **once** right
@@ -129,14 +129,17 @@ checks only verify that its output is already in the tree.
 
 ## Verify before you return
 
-Once your filtered tests are green, run the full verification — every test project, `web/` and the
-API client, not just what you touched:
+Once your filtered tests are green, run the verification your delegation names. By default it is
+scoped by the changed files (`verify.mjs` picks the projects, web and client the change touches);
+the delegation says `verifyAll` when this is the epic's last non-e2e part, and then the run is `--all`
+(every test project, `web/` and the API client). A green result is green for its scope.
 
 1. Start it as an ordinary foreground Bash command, never `run_in_background`:
-   `node scripts/verify.mjs --all --fix --cache --out .git/verify-result.json --detach`. It returns at
-   once with `VERIFY_STARTED`; the run goes on as its own process, independent of the Bash call, so
-   nothing cuts it off. `--fix` reformats the changed files first; `--cache` answers instantly for a
-   tree already proven green; starting it kills any earlier run.
+   `node scripts/verify.mjs --fix --cache --out .git/verify-result.json --detach` (`--all --fix --cache`
+   when `verifyAll`). It returns at once with `VERIFY_STARTED`; the run goes on as its own process,
+   independent of the Bash call, so nothing cuts it off. `--fix` reformats the changed files first;
+   `--cache` answers instantly for a tree already proven green (a green wider run counts); starting it
+   kills any earlier run.
 2. Wait (Bash `timeout: 3600000`): `node scripts/verify.mjs --await .git/verify-result.json`. It waits
    up to 55 min, so one call normally covers a full run (10–20 min). `VERIFY_PENDING: …` (exit 3)
    means still running — call `--await` again. `VERIFY_RESULT: {"ok":…,"failures":[{step,summary,file?}]}`

@@ -9,9 +9,10 @@ allowed-tools: Bash, Read
 
 Run `node scripts/verify.mjs $ARGUMENTS` from the repository root and report what it said.
 
-With no arguments the script auto-detects the changed areas from git. `--quick` is format + build only;
-`--all` is everything; `--projects a,b` limits it to the named projects. Use a generous timeout - test
-runs start Docker containers.
+With no arguments the script derives the scope from the files changed against master, so `/check` is the
+scoped run. `--all` is the full run (every test project, web, the API client, e2e typecheck) and is asked for
+by hand only. `--quick` is format + build only; `--projects a,b` limits it to the named projects. Use a
+generous timeout - test runs start Docker containers.
 
 ## Report (at most 5 lines)
 
