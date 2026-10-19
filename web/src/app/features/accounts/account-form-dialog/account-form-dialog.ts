@@ -23,6 +23,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
+import { GroupSelect } from '../../../shared/group-select/group-select';
 import {
   ACCOUNT_TYPE,
   BANK_ACCOUNT_TYPES,
@@ -48,6 +49,7 @@ export interface AccountFormDialogData {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    GroupSelect,
     TranslocoPipe,
   ],
   templateUrl: './account-form-dialog.html',
@@ -71,6 +73,7 @@ export class AccountFormDialog {
 
   protected readonly form = this.formBuilder.nonNullable.group({
     name: [this.data.account?.name ?? '', [Validators.required, Validators.maxLength(200)]],
+    groupId: [this.data.account?.groupId ?? (null as string | null)],
     type: [this.data.account?.type ?? this.data.type ?? (ACCOUNT_TYPE.Brokerage as AccountType)],
     wrapper: [this.data.account?.wrapper ?? (TAX_WRAPPER.Regular as TaxWrapper)],
     currency: [this.data.account?.currency ?? DEFAULT_CURRENCY],
@@ -116,10 +119,13 @@ export class AccountFormDialog {
       bankName: values.bankName.trim() || null,
       annualInterestRatePercent: Number(values.annualInterestRatePercent),
     };
+    const groupId = values.groupId;
     const result = this.data.account
       ? await putApiPortfolioAccountsById({
           path: { id: this.data.account.id },
-          body: bank ? { name: values.name, ...bankTerms } : { name: values.name },
+          body: bank
+            ? { name: values.name, ...bankTerms, groupId }
+            : { name: values.name, groupId },
         })
       : await postApiPortfolioAccounts({
           body: bank
@@ -129,8 +135,9 @@ export class AccountFormDialog {
                 wrapper: TAX_WRAPPER.Regular,
                 currency: values.currency,
                 ...bankTerms,
+                groupId,
               }
-            : { name: values.name, type: values.type, wrapper: values.wrapper },
+            : { name: values.name, type: values.type, wrapper: values.wrapper, groupId },
         });
 
     this.submitting.set(false);

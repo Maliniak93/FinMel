@@ -21,6 +21,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from '../../../shared/currencies';
+import { GroupSelect } from '../../../shared/group-select/group-select';
 
 export type CashPlaceFormDialogData =
   | { mode: 'create' }
@@ -38,6 +39,7 @@ export type CashPlaceFormDialogData =
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    GroupSelect,
     TranslocoPipe,
   ],
   templateUrl: './cash-place-form-dialog.html',
@@ -69,6 +71,7 @@ export class CashPlaceFormDialog {
       [Validators.required, Validators.maxLength(200)],
     ],
     currency: [this.missingCurrencies()[0]?.code ?? '', [Validators.required]],
+    groupId: [(this.data.mode === 'rename' ? this.data.place.groupId : null) ?? null],
   });
 
   protected readonly noCurrencySelected = computed(() => this.selectedCurrencies().length === 0);
@@ -109,12 +112,16 @@ export class CashPlaceFormDialog {
     const result =
       data.mode === 'create'
         ? await postApiPortfolioCashPlaces({
-            body: { name: values.name.trim(), currencies: [...this.selectedCurrencies()] },
+            body: {
+              name: values.name.trim(),
+              currencies: [...this.selectedCurrencies()],
+              groupId: values.groupId,
+            },
           })
         : data.mode === 'rename'
           ? await putApiPortfolioCashPlacesById({
               path: { id: data.place.id },
-              body: { name: values.name.trim() },
+              body: { name: values.name.trim(), groupId: values.groupId },
             })
           : await postApiPortfolioCashPlacesByIdCurrencies({
               path: { id: data.place.id },

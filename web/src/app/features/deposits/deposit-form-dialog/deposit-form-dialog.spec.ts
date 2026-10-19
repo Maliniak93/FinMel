@@ -12,6 +12,7 @@ import {
   renderedText,
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { assetGroups, blueGroupId, isGroupListRequest } from '../../groups/testing/group-fixtures';
 import {
   CAPITALIZATION,
   bankAccountsForDeposits,
@@ -19,6 +20,7 @@ import {
   mBankAccount,
   mBankUsdAccount,
   nestAccount,
+  pickSelectOption,
   rolledOverDeposit,
   selectOptionLabels,
   TERM_UNIT,
@@ -52,6 +54,9 @@ describe('DepositFormDialog', () => {
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (isGroupListRequest(input)) {
+        return jsonResponse(assetGroups);
+      }
       if (method(input) === 'GET' && requestUrl(input).includes('/api/portfolio/accounts')) {
         return jsonResponse(bankAccountsForDeposits);
       }
@@ -183,6 +188,7 @@ describe('DepositFormDialog', () => {
       sourceAccountId: mBankAccount.id,
       principal: 10000,
       startDate: '2026-01-15',
+      groupId: null,
       termLength: 3,
       termUnit: TERM_UNIT.Months,
       annualInterestRatePercent: 6,
@@ -193,6 +199,19 @@ describe('DepositFormDialog', () => {
       expect(body).not.toHaveProperty(gone);
     }
     expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  describe('group', () => {
+    it('sends groupId', async () => {
+      await setup({});
+      await fill({ ...validTerms, sourceAccountId: mBankAccount.id });
+      await pickSelectOption(fixture, 'groupId', 'Emerytura');
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect((await request.json()).groupId).toBe(blueGroupId);
+    });
   });
 
   it('edit pre-fills the terms and PUTs them without currency', async () => {

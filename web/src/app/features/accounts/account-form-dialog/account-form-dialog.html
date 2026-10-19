@@ -77,6 +77,11 @@
       </mat-form-field>
     }
 
+    <app-group-select
+      formControlName="groupId"
+      [labelKey]="isBank() ? 'groups.field.group' : 'groups.field.defaultGroup'"
+    />
+
     @if (isEdit) {
       <p class="account-form-dialog__hint">{{ 'accounts.form.fixedHint' | transloco }}</p>
     }

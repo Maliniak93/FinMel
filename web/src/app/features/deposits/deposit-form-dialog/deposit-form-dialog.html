@@ -16,6 +16,8 @@
       }
     </mat-form-field>
 
+    <app-group-select formControlName="groupId" />
+
     <mat-form-field appearance="outline" class="deposit-form-dialog__field">
       <mat-label>{{ 'deposits.bank' | transloco }}</mat-label>
       <input matInput type="text" formControlName="bankName" autocomplete="off" />

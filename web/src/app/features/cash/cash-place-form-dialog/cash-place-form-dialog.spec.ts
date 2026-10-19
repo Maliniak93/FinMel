@@ -5,6 +5,8 @@ import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { CashPlaceResponse } from '../../../api/portfolio';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { jsonResponse, renderedText } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { pickSelectOption } from '../../deposits/testing/deposit-fixtures';
+import { assetGroups, blueGroupId, isGroupListRequest } from '../../groups/testing/group-fixtures';
 import { CashPlaceFormDialog, type CashPlaceFormDialogData } from './cash-place-form-dialog';
 
 const place: CashPlaceResponse = {
@@ -36,7 +38,11 @@ describe('CashPlaceFormDialog', () => {
     writeResponse: () => Response = () => jsonResponse({ id: 'x' }, 201),
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => writeResponse());
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) =>
+        isGroupListRequest(input) ? jsonResponse(assetGroups) : writeResponse(),
+      );
 
     await TestBed.configureTestingModule({
       imports: [CashPlaceFormDialog],
@@ -55,7 +61,9 @@ describe('CashPlaceFormDialog', () => {
   }
 
   function writes(): Request[] {
-    return fetchSpy.mock.calls.map((call: unknown[]) => call[0] as Request);
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter((request: Request) => request.method !== 'GET');
   }
 
   async function settle(): Promise<void> {
@@ -73,8 +81,28 @@ describe('CashPlaceFormDialog', () => {
     const [request] = writes();
     expect(request.method).toBe('POST');
     expect(request.url).toContain('/api/portfolio/cash-places');
-    expect(await request.json()).toEqual({ name: 'Safe', currencies: ['PLN', 'USD'] });
+    expect(await request.json()).toEqual({
+      name: 'Safe',
+      currencies: ['PLN', 'USD'],
+      groupId: null,
+    });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('sends groupId', async () => {
+    await setup({ mode: 'create' });
+    component['form'].controls.name.setValue('Safe');
+    await pickSelectOption(fixture, 'groupId', 'Emerytura');
+
+    await component['onSubmit']();
+
+    const [request] = writes();
+    expect(request.method).toBe('POST');
+    expect(await request.json()).toEqual({
+      name: 'Safe',
+      currencies: ['PLN'],
+      groupId: blueGroupId,
+    });
   });
 
   it('defaults to PLN and refuses a place with no currency or no name', async () => {
@@ -120,7 +148,7 @@ describe('CashPlaceFormDialog', () => {
     const [request] = writes();
     expect(request.method).toBe('PUT');
     expect(request.url).toContain(`/api/portfolio/cash-places/${place.id}`);
-    expect(await request.json()).toEqual({ name: 'Vault' });
+    expect(await request.json()).toEqual({ name: 'Vault', groupId: null });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 

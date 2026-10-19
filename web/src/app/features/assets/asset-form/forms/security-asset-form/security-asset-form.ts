@@ -1,9 +1,10 @@
 import { Component, computed, forwardRef, inject, input, type OnInit } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder } from '@angular/forms';
+import { FormBuilder, FormControl, ReactiveFormsModule } from '@angular/forms';
 import { translate } from '@jsverse/transloco';
 
 import type { AssetClass, AssetResponse } from '../../../../../api/portfolio';
+import { GroupSelect } from '../../../../../shared/group-select/group-select';
 import { ASSET_FORM, assetFormBody, type AssetForm, type AssetFormBody } from '../../asset-form';
 import {
   AssetBasicsFields,
@@ -22,7 +23,13 @@ import {
 
 @Component({
   selector: 'app-security-asset-form',
-  imports: [AssetBasicsFields, FirstTransactionFields, InstrumentPicker],
+  imports: [
+    ReactiveFormsModule,
+    AssetBasicsFields,
+    FirstTransactionFields,
+    GroupSelect,
+    InstrumentPicker,
+  ],
   templateUrl: './security-asset-form.html',
   styleUrl: './security-asset-form.scss',
   providers: [{ provide: ASSET_FORM, useExisting: forwardRef(() => SecurityAssetForm) }],
@@ -40,6 +47,7 @@ export class SecurityAssetForm implements AssetForm, OnInit {
     basics: createAssetBasicsGroup(this.formBuilder),
     instrument: createInstrumentControl(),
     initialTransaction: createFirstTransactionGroup(this.formBuilder),
+    groupId: new FormControl<string | null>(null),
   });
 
   protected readonly currency = toSignal(this.form.controls.basics.controls.currency.valueChanges, {
@@ -64,6 +72,7 @@ export class SecurityAssetForm implements AssetForm, OnInit {
     const asset = this.asset();
     if (asset) {
       fillAssetBasics(this.form.controls.basics, asset);
+      this.form.controls.groupId.setValue(asset.groupId ?? null);
     }
   }
 
@@ -72,7 +81,7 @@ export class SecurityAssetForm implements AssetForm, OnInit {
   }
 
   toBody(): AssetFormBody {
-    return assetFormBody(
+    const body = assetFormBody(
       {
         assetClass: this.assetClass(),
         ...this.form.controls.basics.getRawValue(),
@@ -81,5 +90,6 @@ export class SecurityAssetForm implements AssetForm, OnInit {
       this.form.controls.initialTransaction,
       this.isEdit(),
     );
+    return this.isEdit() ? body : { ...body, groupId: this.form.controls.groupId.value };
   }
 }

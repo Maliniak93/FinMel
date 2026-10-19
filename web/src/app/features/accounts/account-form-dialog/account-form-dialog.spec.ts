@@ -3,9 +3,11 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { AccountResponse } from '../../../api/portfolio';
+import { pickSelectOption, selectTriggerState } from '../../deposits/testing/deposit-fixtures';
+import { assetGroups, blueGroupId, isGroupListRequest } from '../../groups/testing/group-fixtures';
 import { AccountFormDialog, type AccountFormDialogData } from './account-form-dialog';
 import { provideI18nTesting } from '../../../core/i18n/testing';
-import { restoreEnglish } from '../../../../testing/i18n';
+import { labelsOf, restoreEnglish } from '../../../../testing/i18n';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -42,7 +44,11 @@ describe('AccountFormDialog', () => {
 
   async function setup(data: AccountFormDialogData): Promise<void> {
     dialogRef = { close: vi.fn() };
-    fetchSpy = vi.spyOn(globalThis, 'fetch');
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) =>
+        isGroupListRequest(input) ? jsonResponse(assetGroups) : jsonResponse(existingAccount),
+      );
 
     await TestBed.configureTestingModule({
       imports: [AccountFormDialog],
@@ -58,6 +64,12 @@ describe('AccountFormDialog', () => {
     await fixture.whenStable();
   }
 
+  function writes(): Request[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter((request: Request) => request.method !== 'GET');
+  }
+
   it('creates with name, type and wrapper and closes with true', async () => {
     await setup({});
     fetchSpy.mockResolvedValue(
@@ -69,13 +81,14 @@ describe('AccountFormDialog', () => {
     component['form'].controls.wrapper.setValue(1);
     await component['onSubmit']();
 
-    const request = fetchSpy.mock.calls[0][0] as Request;
+    const request = writes()[0];
     expect(request.method).toBe('POST');
     expect(request.url).toContain('/api/portfolio/accounts');
     expect(JSON.parse(await request.text())).toEqual({
       name: 'Obligacje IKE',
       type: 1,
       wrapper: 1,
+      groupId: null,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
@@ -91,10 +104,10 @@ describe('AccountFormDialog', () => {
     component['form'].controls.name.setValue('XTB IKE 2');
     await component['onSubmit']();
 
-    const request = fetchSpy.mock.calls[0][0] as Request;
+    const request = writes()[0];
     expect(request.method).toBe('PUT');
     expect(request.url).toContain(existingAccount.id);
-    expect(JSON.parse(await request.text())).toEqual({ name: 'XTB IKE 2' });
+    expect(JSON.parse(await request.text())).toEqual({ name: 'XTB IKE 2', groupId: null });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
@@ -132,7 +145,7 @@ describe('AccountFormDialog', () => {
     component['form'].controls.name.setValue('');
     await component['onSubmit']();
 
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(writes()).toEqual([]);
     expect(dialogRef.close).not.toHaveBeenCalled();
   });
 
@@ -193,7 +206,7 @@ describe('AccountFormDialog', () => {
     component['form'].controls.annualInterestRatePercent.setValue(5);
     await component['onSubmit']();
 
-    const request = fetchSpy.mock.calls[0][0] as Request;
+    const request = writes()[0];
     expect(request.method).toBe('POST');
     expect(JSON.parse(await request.text())).toMatchObject({
       name: 'Nest Oszczędnościowe',
@@ -232,13 +245,68 @@ describe('AccountFormDialog', () => {
     component['form'].controls.annualInterestRatePercent.setValue(4);
     await component['onSubmit']();
 
-    const request = fetchSpy.mock.calls[0][0] as Request;
+    const request = writes()[0];
     expect(request.method).toBe('PUT');
     expect(JSON.parse(await request.text())).toEqual({
       name: 'mBank',
       variant: 0,
       bankName: 'mBank',
       annualInterestRatePercent: 4,
+      groupId: null,
+    });
+  });
+
+  describe('group', () => {
+    it('labels the group field by type', async () => {
+      await setup({});
+      const labelsFor = async (type: number): Promise<string[]> => {
+        component['form'].controls.type.setValue(type);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        return labelsOf(fixture.nativeElement as HTMLElement, 'mat-label');
+      };
+
+      expect(await labelsFor(0)).toContain('Default group');
+      expect(await labelsFor(1)).toContain('Default group');
+      const bankLabels = await labelsFor(2);
+      expect(bankLabels).toContain('Group');
+      expect(bankLabels).not.toContain('Default group');
+    });
+
+    it('sends groupId', async () => {
+      await setup({});
+      component['form'].controls.name.setValue('Obligacje IKE');
+      component['form'].controls.type.setValue(1);
+      component['form'].controls.wrapper.setValue(1);
+      await pickSelectOption(fixture, 'groupId', 'Emerytura');
+
+      await component['onSubmit']();
+
+      const request = writes()[0];
+      expect(request.method).toBe('POST');
+      expect(JSON.parse(await request.text())).toEqual({
+        name: 'Obligacje IKE',
+        type: 1,
+        wrapper: 1,
+        groupId: blueGroupId,
+      });
+    });
+
+    it('sends groupId on update', async () => {
+      await setup({ account: { ...existingAccount, groupId: blueGroupId } });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('Emerytura');
+
+      component['form'].controls.name.setValue('XTB IKE 2');
+      await component['onSubmit']();
+
+      const request = writes()[0];
+      expect(request.method).toBe('PUT');
+      expect(JSON.parse(await request.text())).toEqual({
+        name: 'XTB IKE 2',
+        groupId: blueGroupId,
+      });
     });
   });
 });

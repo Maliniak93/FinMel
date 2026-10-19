@@ -672,6 +672,11 @@
     "empty": "Nie masz jeszcze grup. Dodaj grupę, aby podzielić majątek na cele, np. emeryturę czy poduszkę finansową.",
     "limitHint": "Osiągnięto limit 12 grup. Usuń grupę, aby dodać nową.",
     "loadFailed": "Nie udało się wczytać grup.",
+    "field": {
+      "group": "Grupa",
+      "defaultGroup": "Domyślna grupa",
+      "none": "Bez grupy"
+    },
     "assetCount": "Aktywa: {{ count }}",
     "target": "Cel: {{ amount }}",
     "colors": {

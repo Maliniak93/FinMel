@@ -23,6 +23,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../shared/format';
+import { GroupList } from '../../shared/group-select/group-list';
 import { ASSET_CLASSES, assetClassLabel } from '../assets/asset-class';
 import { GroupFormDialog, type GroupFormDialogData } from './group-form-dialog/group-form-dialog';
 import { groupColor } from './group-color';
@@ -50,6 +51,7 @@ const MAX_GROUPS = 12;
 export class Groups {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly groupList = inject(GroupList);
 
   protected readonly selectedId = signal<string | null>(null);
   protected readonly textFilter = signal('');
@@ -212,7 +214,7 @@ export class Groups {
     if (this.selectedId() === group.id) {
       this.selectedId.set(null);
     }
-    this.groupsResource.reload();
+    this.reloadGroups();
   }
 
   protected async saveAssignment(): Promise<void> {
@@ -249,7 +251,12 @@ export class Groups {
     }
 
     this.assetsResource.reload();
+    this.reloadGroups();
+  }
+
+  private reloadGroups(): void {
     this.groupsResource.reload();
+    this.groupList.reload();
   }
 
   private openFormDialog(data: GroupFormDialogData): void {
@@ -258,7 +265,7 @@ export class Groups {
       .afterClosed()
       .subscribe((saved) => {
         if (saved) {
-          this.groupsResource.reload();
+          this.reloadGroups();
         }
       });
   }

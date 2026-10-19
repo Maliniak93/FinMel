@@ -27,6 +27,17 @@ describe('translation files', () => {
     }
   });
 
+  it('en and pl define every groups.field key', () => {
+    const keys = ['groups.field.group', 'groups.field.defaultGroup', 'groups.field.none'];
+
+    for (const lang of ['en', 'pl'] as const) {
+      expect(
+        keys.filter((key) => !(key in TRANSLATIONS[lang])),
+        `missing in ${lang}.json`,
+      ).toEqual([]);
+    }
+  });
+
   it('en and pl use the same interpolation parameters for every key', () => {
     const mismatched = Object.keys(TRANSLATIONS.en).filter((key) => {
       const en = TRANSLATIONS.en[key];
