@@ -110,6 +110,18 @@ test("summary shows area", () => {
   assert.match(lineOf(text, 2), /Area epic.*Backend → Frontend/);
 });
 
+test("summary shows priority", () => {
+  const plan = queueOf([{ number: 1, title: "Helper item", status: "Todo", area: "Scripts", priority: "P1 Wysoki", epic: false, parent: null, autobuild: false }]);
+  const ctx = { tty: true, plan, power: working, now };
+  const lineOf = (text, n) => text.split(/\r?\n/).find((l) => l.includes(`#${n} `));
+
+  const items = questions({}, ctx).find((q) => q.id === "items");
+  assert.match(lineOf(items.prompt, 1), /Helper item.*\[P1 · Scripts\]/);
+
+  const text = summary({ items: "all", "on-limit": "wait", "max-wait": "12", shutdown: true, start: "now" }, ctx);
+  assert.match(lineOf(text, 1), /Helper item.*\[P1 · Scripts\]/);
+});
+
 test("declined wizard starts nothing", async () => {
   const flags = { items: "all", "on-limit": "wait", "max-wait": "12", shutdown: true, start: "now" };
   const declined = scripted(["", "n"]);

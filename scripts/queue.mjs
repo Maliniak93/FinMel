@@ -1,6 +1,6 @@
 // Usage: imported by gh-project.mjs and plan-status.mjs - the build queue is the board order of the top-level, not-Done items
 
-import { PRIORITIES } from "./priority.mjs";
+import { PRIORITIES, shortOf } from "./priority.mjs";
 
 const itemIdOf =(card) => card.id ?? card.itemId ?? null;
 const partNumbers = (epic) => (epic.subIssues ?? []).map((s) => (typeof s === "object" ? s.number : s));
@@ -39,6 +39,10 @@ export function areaText(item) {
   return item.area ?? "—";
 }
 
+export const priorityText = (item) => (item.priority ? shortOf(item.priority) : `${shortOf(null)}*`);
+
+export const itemTag = (item) => `${priorityText(item)} · ${areaText(item)}`;
+
 export function positionTarget(queue, spec, board = queue) {
   const members = new Set(queue.map((q) => q.number));
   const ordered = board.filter((b) => members.has(b.number));
@@ -58,6 +62,6 @@ export function queueLines(queue) {
   return queue.map((q, i) => {
     const state = q.status === "In progress" ? ` (In progress${q.manual ? ", ręczny" : ""})` : "";
     const action = q.epic ? (q.next ? `next #${q.next}` : "no open part") : `/build #${q.number}`;
-    return `${i + 1}. #${q.number} ${q.title}${state} — ${action} [${areaText(q)}]`;
+    return `${i + 1}. #${q.number} ${q.title}${state} — ${action} [${itemTag(q)}]`;
   });
 }
