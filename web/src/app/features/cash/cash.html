@@ -176,7 +176,11 @@
                     <mat-icon>account_balance</mat-icon>
                     <span>{{ 'cash.bankDeposit' | transloco }}</span>
                   </button>
-                  <a mat-menu-item [routerLink]="transactionsLink(balance)">
+                  <a
+                    mat-menu-item
+                    [routerLink]="transactionsLink(balance)"
+                    [queryParams]="{ from: 'cash' }"
+                  >
                     <mat-icon>history</mat-icon>
                     <span>{{ 'cash.history' | transloco }}</span>
                   </a>

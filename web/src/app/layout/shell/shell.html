@@ -1,22 +1,45 @@
 <mat-sidenav-container class="shell">
   <mat-sidenav #drawer mode="side" opened class="shell__nav">
-    <mat-nav-list>
-      @for (link of navLinks; track link.path) {
-        <a mat-list-item [routerLink]="link.path" routerLinkActive="shell__nav-link--active">
-          <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
-          <span matListItemTitle>{{ link.label | transloco }}</span>
-          @if (link.path === 'planning' && planningState.todoCount() > 0) {
-            <span
-              matListItemMeta
-              class="shell__badge"
-              data-testid="todo-badge"
-              [attr.aria-label]="'planning.todo.badge' | transloco"
-              >{{ planningState.todoCount() }}</span
-            >
-          }
+    <div class="shell__nav-body">
+      <div class="shell__nav-list" data-testid="nav-list">
+        @for (section of navSections; track section.label) {
+          <div class="shell__nav-section" data-testid="nav-section">
+            {{ section.label | transloco }}
+          </div>
+          <mat-nav-list>
+            @for (link of section.links; track link.path) {
+              <a
+                mat-list-item
+                [routerLink]="link.path"
+                [class.shell__nav-link--active]="isActive(link.path)"
+              >
+                <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
+                <span matListItemTitle>{{ link.label | transloco }}</span>
+                @if (link.path === 'planning' && planningState.todoCount() > 0) {
+                  <span
+                    matListItemMeta
+                    class="shell__badge"
+                    data-testid="todo-badge"
+                    [attr.aria-label]="'planning.todo.badge' | transloco"
+                    >{{ planningState.todoCount() }}</span
+                  >
+                }
+              </a>
+            }
+          </mat-nav-list>
+        }
+      </div>
+      <mat-nav-list class="shell__nav-pinned" data-testid="nav-pinned">
+        <a
+          mat-list-item
+          [routerLink]="settingsLink.path"
+          [class.shell__nav-link--active]="isActive(settingsLink.path)"
+        >
+          <mat-icon matListItemIcon>{{ settingsLink.icon }}</mat-icon>
+          <span matListItemTitle>{{ settingsLink.label | transloco }}</span>
         </a>
-      }
-    </mat-nav-list>
+      </mat-nav-list>
+    </div>
   </mat-sidenav>
 
   <mat-sidenav-content class="shell__content-area">

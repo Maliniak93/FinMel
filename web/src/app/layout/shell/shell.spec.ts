@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import {
@@ -201,98 +201,6 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/cash');
   });
 
-  it('offers a "Cash" nav item right after Precious metals', async () => {
-    const links = () =>
-      Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-          'mat-nav-list a',
-        ),
-      );
-    const english = links().map((a) => a.getAttribute('href'));
-    expect(english.indexOf('/cash')).toBe(english.indexOf('/metals') + 1);
-
-    await TestBed.inject(LanguageService).setLanguage('pl');
-    await fixture.whenStable();
-
-    const polish = links();
-    const link = polish.find((a) => a.getAttribute('href') === '/cash');
-    expect(link?.textContent).toContain('Gotówka');
-    expect(polish[polish.indexOf(link!) - 1].textContent).toContain('Metale szlachetne');
-  });
-
-  it('offers a "Stocks & ETFs" nav item linking to /securities right after Deposits, "Akcje i ETF" in Polish', async () => {
-    const links = () =>
-      Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-          'mat-nav-list a',
-        ),
-      );
-    const english = links().map((a) => a.getAttribute('href'));
-    expect(english.indexOf('/securities')).toBe(english.indexOf('/deposits') + 1);
-    expect(links().find((a) => a.getAttribute('href') === '/securities')?.textContent).toContain(
-      'Stocks & ETFs',
-    );
-
-    await TestBed.inject(LanguageService).setLanguage('pl');
-    await fixture.whenStable();
-
-    expect(links().find((a) => a.getAttribute('href') === '/securities')?.textContent).toContain(
-      'Akcje i ETF',
-    );
-  });
-
-  it('offers a "Rachunki" nav item linking to /accounts in place of "Portfele"', async () => {
-    await TestBed.inject(LanguageService).setLanguage('pl');
-    await fixture.whenStable();
-
-    const links = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
-    );
-    const accounts = links.find((a) => (a.textContent ?? '').includes('Rachunki'));
-
-    expect(accounts).toBeDefined();
-    expect(accounts!.getAttribute('href')).toBe('/accounts');
-    expect(links.some((a) => (a.textContent ?? '').includes('Portfele'))).toBe(false);
-    expect(links.some((a) => a.getAttribute('href') === '/portfolios')).toBe(false);
-  });
-
-  it('offers a "Konta bankowe" nav item linking to /bank-accounts right after Rachunki', async () => {
-    const links = () =>
-      Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-          'mat-nav-list a',
-        ),
-      );
-    const english = links().map((a) => a.getAttribute('href'));
-    expect(english.indexOf('/bank-accounts')).toBe(english.indexOf('/accounts') + 1);
-
-    await TestBed.inject(LanguageService).setLanguage('pl');
-    await fixture.whenStable();
-
-    const link = links().find((a) => (a.textContent ?? '').includes('Konta bankowe'));
-    expect(link).toBeDefined();
-    expect(link!.getAttribute('href')).toBe('/bank-accounts');
-  });
-
-  it('offers a "Lokaty" nav item linking to /deposits right after Konta bankowe', async () => {
-    const links = () =>
-      Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-          'mat-nav-list a',
-        ),
-      );
-    const english = links().map((a) => a.getAttribute('href'));
-    expect(english.indexOf('/deposits')).toBe(english.indexOf('/bank-accounts') + 1);
-
-    await TestBed.inject(LanguageService).setLanguage('pl');
-    await fixture.whenStable();
-
-    const polish = links();
-    const link = polish.find((a) => a.getAttribute('href') === '/deposits');
-    expect(link?.querySelector('[matListItemTitle]')?.textContent?.trim()).toBe('Lokaty');
-    expect(polish[polish.indexOf(link!) - 1].textContent).toContain('Konta bankowe');
-  });
-
   it('offers an "Obligacje" nav item linking to /bonds', async () => {
     await TestBed.inject(LanguageService).setLanguage('pl');
     await fixture.whenStable();
@@ -305,60 +213,109 @@ describe('Shell', () => {
     expect(link!.getAttribute('href')).toBe('/bonds');
   });
 
-  it('offers a "Metale szlachetne" nav item linking to /metals right after Bonds', async () => {
-    const links = () =>
-      Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-          'mat-nav-list a',
-        ),
-      );
-    const english = links().map((a) => a.getAttribute('href'));
-    expect(english.indexOf('/metals')).toBe(english.indexOf('/bonds') + 1);
+  const sidebarSequence = () =>
+    Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '[data-testid="nav-section"], mat-sidenav a [matListItemTitle]',
+      ),
+      textOf,
+    );
+
+  it('groups the nav items under section headings in order', async () => {
+    expect(sidebarSequence()).toEqual([
+      'Overview',
+      'Dashboard',
+      'Allocation',
+      'Planning',
+      'Wealth',
+      'Accounts',
+      'Bank accounts',
+      'Cash',
+      'Deposits',
+      'Bonds',
+      'Stocks & ETFs',
+      'Precious metals',
+      'Settings',
+    ]);
 
     await TestBed.inject(LanguageService).setLanguage('pl');
     await fixture.whenStable();
 
-    const link = links().find((a) => (a.textContent ?? '').includes('Metale szlachetne'));
-    expect(link).toBeDefined();
-    expect(link!.getAttribute('href')).toBe('/metals');
-    expect(link!.querySelector('mat-icon')?.textContent?.trim()).toBe('diamond');
+    expect(sidebarSequence()).toEqual([
+      'Przegląd',
+      'Pulpit',
+      'Alokacja',
+      'Planowanie',
+      'Majątek',
+      'Rachunki',
+      'Konta bankowe',
+      'Gotówka',
+      'Lokaty',
+      'Obligacje',
+      'Akcje i ETF',
+      'Metale szlachetne',
+      'Ustawienia',
+    ]);
   });
 
-  it('offers an "Alokacja" nav item linking to /allocation right after the dashboard', async () => {
-    const links = () =>
+  it('pins settings below the nav list', () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const list = element.querySelector<HTMLElement>('[data-testid="nav-list"]')!;
+    const pinned = element.querySelector<HTMLElement>('[data-testid="nav-pinned"]')!;
+    const settings = Array.from(element.querySelectorAll<HTMLAnchorElement>('mat-sidenav a')).find(
+      (a) => a.getAttribute('href') === '/settings',
+    )!;
+
+    expect(list).not.toBeNull();
+    expect(pinned).not.toBeNull();
+    expect(pinned.contains(settings)).toBe(true);
+    expect(list.contains(settings)).toBe(false);
+    expect(list.contains(pinned)).toBe(false);
+    expect(list.compareDocumentPosition(pinned) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pinned.querySelectorAll('a')).toHaveLength(1);
+    expect(pinned.querySelector('[data-testid="nav-section"]')).toBeNull();
+  });
+
+  it('section headings are not focusable', async () => {
+    const headings = () =>
       Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-          'mat-nav-list a',
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          '[data-testid="nav-section"]',
         ),
       );
-    const english = links().map((a) => a.getAttribute('href'));
-    expect(english.indexOf('/allocation')).toBe(english.indexOf('/dashboard') + 1);
+
+    expect(headings()).toHaveLength(2);
+    for (const heading of headings()) {
+      expect(heading.closest('a, button')).toBeNull();
+      expect(heading.querySelector('a, button, [tabindex]')).toBeNull();
+      expect(heading.hasAttribute('tabindex')).toBe(false);
+      expect(heading.hasAttribute('href')).toBe(false);
+    }
+    expect(headings().map(textOf)).toEqual(['Overview', 'Wealth']);
 
     await TestBed.inject(LanguageService).setLanguage('pl');
     await fixture.whenStable();
 
-    const link = links().find((a) => (a.textContent ?? '').includes('Alokacja'));
-    expect(link).toBeDefined();
-    expect(link!.getAttribute('href')).toBe('/allocation');
+    expect(headings().map(textOf)).toEqual(['Przegląd', 'Majątek']);
   });
 
   it('switches the navigation to Polish without a reload', async () => {
     const element = fixture.nativeElement as HTMLElement;
     const navLabels = () =>
-      Array.from(element.querySelectorAll('mat-nav-list a [matListItemTitle]'), textOf);
+      Array.from(element.querySelectorAll('mat-sidenav a [matListItemTitle]'), textOf);
 
     const englishLabels = navLabels();
     expect(englishLabels).toEqual([
       'Dashboard',
       'Allocation',
+      'Planning',
       'Accounts',
       'Bank accounts',
-      'Deposits',
-      'Stocks & ETFs',
-      'Bonds',
-      'Precious metals',
       'Cash',
-      'Planning',
+      'Deposits',
+      'Bonds',
+      'Stocks & ETFs',
+      'Precious metals',
       'Settings',
     ]);
 
@@ -402,5 +359,54 @@ describe('Shell', () => {
       expect(label).not.toBe(english[index]);
       expect(looksLikeTranslationKey(label)).toBe(false);
     });
+  });
+});
+
+describe('Shell active item', () => {
+  let fixture: ComponentFixture<Shell>;
+  let router: Router;
+
+  beforeEach(async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ items: [] }));
+
+    await TestBed.configureTestingModule({
+      imports: [Shell],
+      providers: [provideRouter([{ path: '**', children: [] }]), provideI18nTesting()],
+    }).compileComponents();
+
+    router = TestBed.inject(Router);
+    fixture = TestBed.createComponent(Shell);
+    await fixture.whenStable();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function activeHrefs(url: string): Promise<(string | null)[]> {
+    await router.navigateByUrl(url);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+        'mat-sidenav a.shell__nav-link--active',
+      ),
+      (a) => a.getAttribute('href'),
+    );
+  }
+
+  it('highlights the origin item on the transactions route', async () => {
+    expect(await activeHrefs('/assets/a1/transactions?from=cash')).toEqual(['/cash']);
+    expect(await activeHrefs('/assets/a1/transactions?from=metals')).toEqual(['/metals']);
+    expect(await activeHrefs('/assets/a1/transactions?from=securities')).toEqual(['/securities']);
+    expect(await activeHrefs('/assets/a1/transactions?from=accounts')).toEqual(['/accounts']);
+    expect(await activeHrefs('/assets/a1/transactions')).toEqual([]);
+    expect(await activeHrefs('/assets/a1/transactions?from=nowhere')).toEqual([]);
+  });
+
+  it('keeps highlighting Rachunki on account detail', async () => {
+    expect(await activeHrefs('/accounts/acc-1')).toEqual(['/accounts']);
   });
 });

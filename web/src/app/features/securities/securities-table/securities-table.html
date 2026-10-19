@@ -167,7 +167,11 @@
             <mat-icon>paid</mat-icon>
             <span>{{ 'securities.dividend' | transloco }}</span>
           </button>
-          <a mat-menu-item [routerLink]="transactionsLink(holding)">
+          <a
+            mat-menu-item
+            [routerLink]="transactionsLink(holding)"
+            [queryParams]="{ from: 'securities' }"
+          >
             <mat-icon>receipt_long</mat-icon>
             <span>{{ 'securities.transactions' | transloco }}</span>
           </a>

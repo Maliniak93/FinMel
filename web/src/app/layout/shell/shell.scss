@@ -11,6 +11,31 @@
   width: 240px;
 }
 
+.shell__nav-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.shell__nav-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.shell__nav-section {
+  padding: 16px 16px 4px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell__nav-pinned {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
 .shell__nav-link--active {
   background: var(--mat-sys-secondary-container);
 }

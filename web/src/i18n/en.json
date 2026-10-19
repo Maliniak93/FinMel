@@ -44,6 +44,10 @@
       "accounts": "Accounts",
       "bankAccounts": "Bank accounts"
     },
+    "navSection": {
+      "overview": "Overview",
+      "wealth": "Wealth"
+    },
     "toggleNavigation": "Toggle navigation",
     "logOut": "Log out",
     "theme": {
