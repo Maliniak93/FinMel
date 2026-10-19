@@ -72,10 +72,10 @@ test("filter by area keeps matching epics", () => {
 const priorityState = () =>
   buildState({
     issues: [
-      { number: 1, status: "Todo", title: "Backend item", labels: ["spec"], area: "Backend", priority: "P1 Wysoki" },
+      { number: 1, status: "Todo", title: "Backend item", labels: ["spec"], area: "Backend", priority: "P1" },
       { number: 2, status: "Todo", title: "Scripts item", labels: ["spec"], area: "Scripts" },
-      { number: 3, status: "Todo", title: "Urgent epic", labels: ["epic"], priority: "P0 Pilne" },
-      { number: 4, status: "Todo", title: "Urgent part", labels: ["spec"], parent: 3, area: "Backend", priority: "P0 Pilne" },
+      { number: 3, status: "Todo", title: "Urgent epic", labels: ["epic"], priority: "P0" },
+      { number: 4, status: "Todo", title: "Urgent part", labels: ["spec"], parent: 3, area: "Backend", priority: "P0" },
     ],
   });
 
@@ -122,9 +122,9 @@ test("filter by priority", () => {
 test("band and dependency warnings", () => {
   const state = buildState({
     issues: [
-      { number: 450, status: "Todo", title: "Low one", labels: ["spec"], area: "Scripts", priority: "P3 Niski" },
-      { number: 440, status: "Todo", title: "Needs the base", labels: ["spec"], area: "Scripts", priority: "P1 Wysoki", body: "## Depends on\n\n- #432\n" },
-      { number: 432, status: "Todo", title: "The base", labels: ["spec"], area: "Scripts", priority: "P1 Wysoki" },
+      { number: 450, status: "Todo", title: "Low one", labels: ["spec"], area: "Scripts", priority: "P3" },
+      { number: 440, status: "Todo", title: "Needs the base", labels: ["spec"], area: "Scripts", priority: "P1", body: "## Depends on\n\n- #432\n" },
+      { number: 432, status: "Todo", title: "The base", labels: ["spec"], area: "Scripts", priority: "P1" },
     ],
   });
   const sandbox = createSandbox(state, { branch: "" });
@@ -147,4 +147,26 @@ test("board skill passes an area to --area", () => {
   assert.match(skill, /--area/);
   assert.match(skill, /--priority/);
   assert.match(readFileSync(path.join(root, "skarbiec-plan", "workflow.md"), "utf8"), /re-read before every part/);
+});
+
+test("missing or unknown priority warns", () => {
+  const state = buildState({
+    issues: [
+      { number: 1, status: "Todo", title: "No priority", labels: ["spec"], area: "Scripts" },
+      { number: 2, status: "Todo", title: "Odd priority", labels: ["spec"], area: "Scripts", priority: "Soon" },
+      { number: 3, status: "Todo", title: "Epic", labels: ["epic"], priority: "P2" },
+      { number: 4, status: "Todo", title: "Part", labels: ["spec"], parent: 3, area: "Scripts" },
+    ],
+  });
+  const sandbox = createSandbox(state, { branch: "" });
+  try {
+    const { code, out, stdout } = sandbox.run("plan-status.mjs", []);
+
+    assert.equal(code, 0, out);
+    assert.ok(stdout.includes("#1 bez priorytetu — liczony jako P2"), stdout);
+    assert.ok(stdout.includes('#2 ma nieznany priorytet "Soon" — liczony jako P2'), stdout);
+    assert.ok(!stdout.includes("#4 bez priorytetu"), stdout);
+  } finally {
+    sandbox.cleanup();
+  }
 });

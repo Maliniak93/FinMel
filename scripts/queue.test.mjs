@@ -51,9 +51,9 @@ test("queue orders In progress then Todo by position", () => {
 
 test("P0 lifts above In progress", () => {
   const queue = queueOf([
-    card(10, "In progress", { priority: "P2 Normalny", autobuild: true }),
-    card(11, "Todo", { priority: "P1 Wysoki" }),
-    card(12, "Todo", { priority: "P0 Pilne" }),
+    card(10, "In progress", { priority: "P2", autobuild: true }),
+    card(11, "Todo", { priority: "P1" }),
+    card(12, "Todo", { priority: "P0" }),
   ]);
 
   assert.deepEqual(numbers(queue), [12, 10, 11]);
@@ -157,4 +157,10 @@ test("queue lines show area", () => {
   assert.match(standalone, /^1\. #1 Issue 1 — \/build #1 \[P2\* · Backend\]$/);
   assert.match(unlabelled, /^2\. #2 Issue 2 — \/build #2 \[P2\* · —\]$/);
   assert.match(epicLine, /^3\. #3 Issue 3 — next #4 \[P2\* · Backend → Frontend → E2E\]$/);
+});
+
+test("a Todo P0 comes before a Todo P3", () => {
+  const queue = queueOf([card(1, "Todo", { priority: "P3" }), card(2, "Todo", { priority: "P0" })]);
+
+  assert.deepEqual(numbers(queue), [2, 1]);
 });

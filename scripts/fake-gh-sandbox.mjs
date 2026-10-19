@@ -36,7 +36,7 @@ const optionsOf = (name, names) => ({
 
 export const AREA_OPTIONS = ["Backend", "Frontend", "E2E", "Claude", "Scripts", "CI/Infra", "Docs", "Fullstack"];
 
-export const PRIORITY_OPTIONS = ["P0 Pilne", "P1 Wysoki", "P2 Normalny", "P3 Niski"];
+export const PRIORITY_OPTIONS = ["P0", "P1", "P2", "P3"];
 
 export function buildState({ issues, order, nextNumber = 100, withArea = true, withPriority = true, prs = [] }) {
   const map = {};

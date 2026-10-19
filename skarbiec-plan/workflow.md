@@ -10,7 +10,7 @@ How features get designed and built (ADR-024). A spec is a GitHub issue on the *
 | Tier | 1, 2 | `/design` / `/fix`; `/build --tier` overrides for one run |
 | Kind | New, Change, Cleanup, Fix | `/design` / `/fix` |
 | Area | Backend, Frontend, E2E, Claude, Scripts, CI/Infra, Docs, Fullstack (none on an epic; see "Area") | `create --area` (an e2e part defaults to E2E), `edit <n> --area`, `set <n> Area <v>`; `area-backfill.mjs` for existing tickets |
-| Priority | P0 Pilne, P1 Wysoki, P2 Normalny, P3 Niski (none on a part; see "Priority") | `create --priority` (default P2), `priority <n> <P>`; `priority --backfill --apply` for existing items |
+| Priority | P0–P3 (none on a part; see "Priority") | `create --priority` (default P2), `priority <n> <P>`; `priority --backfill --apply` for existing items |
 | Branch | `feat/<slug>`, `fix/<slug>` (none on an epic) | `/design` / `/fix` |
 | labels | `spec` (buildable), `epic` (umbrella of a split — its sub-issues are built, never the epic), `skip-tests`, `e2e` (an epic's last part, or an own-plan e2e part of a coverage epic, see "The e2e part"), `autobuild` (built unattended by `autobuild.mjs`; an In progress item without it is a manual build, `ręczny`) | `/design` / `/fix` |
 
@@ -112,7 +112,7 @@ The single-select project field Area says which part of the repo a ticket change
 
 ## Priority
 
-The single-select project field Priority says how urgent a top-level item is: P0 Pilne, P1 Wysoki, P2 Normalny, P3 Niski. An item without a value counts as P2; a part has none and follows its epic. `scripts/priority.mjs` is the single source of the levels and of the placement rule.
+The single-select project field Priority says how urgent a top-level item is: P0 (Pilne), P1 (Wysoki), P2 (Normalny), P3 (Niski). An item without a value counts as P2; a part has none and follows its epic. `scripts/priority.mjs` is the single source of the levels and of the placement rule.
 
 - **Bands.** The queue is P0 first (an In progress P0 ahead of a Todo P0, so a P0 is lifted above running work), then the other In progress items, then Todo P1, P2, P3 in board order.
 - **Placement rule.** A Todo item with priority P goes directly after the last Todo item (not itself) whose priority is P or more urgent; with none it goes to the top. Only Todo cards are anchors, so where an In progress card sits on the board changes nothing.
