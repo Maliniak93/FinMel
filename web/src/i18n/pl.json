@@ -44,6 +44,10 @@
       "accounts": "Rachunki",
       "bankAccounts": "Konta bankowe"
     },
+    "navSection": {
+      "overview": "Przegląd",
+      "wealth": "Majątek"
+    },
     "toggleNavigation": "Pokaż lub ukryj nawigację",
     "logOut": "Wyloguj",
     "theme": {

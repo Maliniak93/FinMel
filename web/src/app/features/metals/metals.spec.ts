@@ -123,6 +123,17 @@ describe('Metals', () => {
     expect(silver).not.toContain('PLN');
   });
 
+  it('links each holding to its transactions with the metals origin', async () => {
+    await setup();
+
+    const link = rowFor(goldKrugerrand.name).querySelector<HTMLAnchorElement>(
+      'a[href*="/transactions"]',
+    );
+    expect(link?.getAttribute('href')).toBe(
+      `/assets/${goldKrugerrand.assetId}/transactions?from=metals`,
+    );
+  });
+
   it('shows a zero value today, not a dash, for a priced holding with no pieces', async () => {
     await setup([metalResponse({ pieces: 0, totalFineGrams: 0 })]);
 

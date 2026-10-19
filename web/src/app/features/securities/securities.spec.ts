@@ -367,7 +367,7 @@ describe('Securities page', () => {
     const items = await rowMenuItems(fixture, rowFor('Vanguard FTSE All-World'));
     const link = items.find((item) => /transakcje/i.test(textOf(item)));
 
-    expect(link?.getAttribute('href')).toBe(`/assets/${vwce.assetId}/transactions`);
+    expect(link?.getAttribute('href')).toBe(`/assets/${vwce.assetId}/transactions?from=securities`);
   });
 
   it('shows a Rachunek column with the account name of each holding', async () => {

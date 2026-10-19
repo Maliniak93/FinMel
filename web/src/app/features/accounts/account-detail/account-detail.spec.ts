@@ -262,7 +262,7 @@ describe('AccountDetail', () => {
     await setup();
 
     const link = root().querySelector<HTMLAnchorElement>(
-      `a[href="/assets/${etfAssetId}/transactions"]`,
+      `a[href="/assets/${etfAssetId}/transactions?from=accounts"]`,
     );
     expect(link?.textContent).toContain('World ETF');
   });

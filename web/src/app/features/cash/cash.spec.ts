@@ -332,7 +332,7 @@ describe('Cash', () => {
     const items = await rowMenuItems(fixture, balanceRow('Safe', 'USD'));
 
     const link = items.find((item) => /^history$/i.test(menuItemLabel(item)));
-    expect(link?.getAttribute('href')).toBe(`/assets/${usdBalanceId}/transactions`);
+    expect(link?.getAttribute('href')).toBe(`/assets/${usdBalanceId}/transactions?from=cash`);
   });
 
   it('archives a place after confirming and reloads', async () => {
