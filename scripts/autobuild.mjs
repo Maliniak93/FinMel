@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
+import { postRunVerify } from "./autobuild-verify.mjs";
 import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
 import { areaWarning, mayStart, planFrom, planLines, runQueue, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { UsageError, WizardCancelled, parseFlags, runWizard } from "./autobuild-wizard.mjs";
@@ -574,6 +575,7 @@ async function mergeAndSync(pr, branch, number) {
     },
   });
   say(`merged PR #${pr.number}`);
+  ctx.merged++;
   for (const argv of [["switch", "master"], ["pull", "--ff-only", "origin", "master"]]) {
     const step = git(argv);
     if (!step.ok) throw new Stop("sync-failed", `git ${argv.join(" ")}: ${step.firstErr}`);
@@ -811,11 +813,12 @@ function dryRunTable(issue) {
   }
 }
 
-function summary(reason, detail, parts, resume, costLine) {
+function summary(reason, detail, parts, resume, costLine, verifyLine) {
   const lines = [`## Autobuild run: ${reason}`, ""];
   lines.push(parts.length ? "Parts handled in this run:" : "No part was merged in this run.");
   for (const p of parts) lines.push(`- #${p.number} ${p.title} - ${p.prUrl ?? "no PR"} (${p.shipOnly ? "ship retried" : `build ${p.buildMin ?? "-"} min`}, CI ${p.ciMin ?? "-"} min)`);
   if (detail) lines.push("", "Detail:", "", "```", detail, "```");
+  if (verifyLine) lines.push("", verifyLine);
   if (costLine) lines.push("", costLine);
   lines.push("", `Resume with \`${resume}\`.`);
   return lines.join("\n");
@@ -872,10 +875,18 @@ async function finishRun(reason, detail, ctx) {
   if (ctx.parts.length) say(`done in this run: ${ctx.parts.map(partLine).join("; ")}`);
   const resume = resumeCommand(ctx);
   if (!ok && reason !== "usage") say(`resume: ${resume}`);
+  const verifyLine = await postRunVerify({
+    merged: ctx.merged,
+    dryRun: ctx.dryRun,
+    run,
+    branch: ctx.merged > 0 && !ctx.dryRun ? currentBranch() : "master",
+    dirty: ctx.merged > 0 && !ctx.dryRun ? dirtyFiles().length : 0,
+    log: say,
+  });
   if (!ctx.dryRun && ctx.started) {
     for (const number of ctx.touched) {
       const parts = ctx.parts.filter((p) => p.item === number);
-      const failure = await postSummary(number, summary(reason, detail, parts, resume, ok ? costLine(parts) : null));
+      const failure = await postSummary(number, summary(reason, detail, parts, resume, ok ? costLine(parts) : null, verifyLine));
       if (failure) say(`could not post the comment on #${number}: ${failure}`);
     }
     if (IS_WIN) await finishShutdown({ confirm: confirmPower, run, noShutdown: ctx.flags["no-shutdown"], dryRun: ctx.dryRun, log: say });
@@ -975,7 +986,7 @@ async function startWizard(flags) {
   }
 }
 
-const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null };
+const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], merged: 0, builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null };
 
 async function powerTest(mode, minutesAhead) {
   const planned = new Date(Date.now() + minutesAhead * 60e3);
