@@ -48,5 +48,16 @@ instead of constructor injection, native control flow (`@if`/`@for` with `track`
 
 > **Who runs them.** `scripts/verify.mjs` runs the web checks (typecheck, lint, build, test, format) in the implementer's verify run before it returns, when the changed files are in `web/`. While implementing, run only the spec you are driving green (`npm test -- --watch=false -t "<name>"`), plus the single `npm run typecheck` that follows a `gen:api` regeneration. Running the suites yourself only repeats that verify a few minutes early.
 
-## Testing
-Vitest specs live next to the component they test (`thing.spec.ts` beside `thing.ts`). Node must be ≥ 22.22.3, ≥ 24.15.0, or ≥ 26 — Angular CLI 22 refuses older runtimes outright.
+## Tests (Vitest)
+- A spec sits beside the component or service it tests (`thing.spec.ts` beside `thing.ts`) and names the behaviour its acceptance criterion states.
+- `cd web && npm test` runs them all (Vitest); while iterating, `npm test -- --watch=false -t "<name>"` runs one.
+- Render through the same providers the app uses: `provideI18nTesting()` for translated text, `provideNativeDateAdapter()` for datepickers (see Forms and Languages above).
+- A spec of a `resource()`-backed template covers loading, error and empty, as the template does.
+- Node must be ≥ 22.22.3, ≥ 24.15.0, or ≥ 26 — Angular CLI 22 refuses older runtimes outright.
+
+## Definition of done
+- Only the generated client calls the backend (`web/src/app/api/<service>/`); no `HttpClient`, no URL, no call that bypasses the Gateway (ADR-013).
+- API changed → `npm run gen:api`, one `npm run typecheck`, then `git diff -- web/src/app/api` keeps only the real schema delta.
+- Vitest: a spec beside each changed component or service proves its acceptance criteria; `npm test` is green.
+- Both UI languages: every new user-facing string is a key in both `src/i18n/en.json` and `src/i18n/pl.json`, and a spec rendering it uses `provideI18nTesting()`.
+- Zero warnings, lint and format clean (`scripts/verify.mjs` runs `typecheck`, `lint`, `build`, `test` and `format:check`).
