@@ -38,7 +38,45 @@ const PATH_MAP = [
   { area: "Docs", paths: ["skarbiec-plan/", "README.md", "*.md"] },
 ];
 
-const COMPANIONS = [/^web\/src\/app\/api\//, /^requests\//, /^Skarbiec\.AppHost\//];
+const playbook = (name) => `.claude/skills/${name}/SKILL.md`;
+const CHECKLIST_SECTIONS = ["Common", "Backend", "Frontend", "Scripts", "Claude", "CI/Infra", "Docs", "E2E"];
+const PROFILES = {
+  Backend: { tests: true, implementer: ["backend-playbook"], testWriter: ["testing-playbook"], checklist: ["Backend"] },
+  Frontend: { tests: true, implementer: ["frontend-playbook"], testWriter: ["frontend-playbook"], checklist: ["Frontend"] },
+  Fullstack: {
+    tests: true,
+    implementer: ["backend-playbook", "frontend-playbook"],
+    testWriter: ["testing-playbook", "frontend-playbook"],
+    checklist: ["Backend", "Frontend"],
+  },
+  Scripts: { tests: false, implementer: ["scripts-playbook"], testWriter: [], checklist: ["Scripts"] },
+  Claude: { tests: false, implementer: ["claude-playbook"], testWriter: [], checklist: ["Claude"] },
+  "CI/Infra": { tests: false, implementer: [], testWriter: [], checklist: ["CI/Infra"] },
+  Docs: { tests: false, implementer: [], testWriter: [], checklist: ["Docs"] },
+  E2E: { tests: false, implementer: [], testWriter: [], checklist: ["E2E"] },
+};
+const NO_AREA_LABEL = "Brak obszaru — pełna ścieżka";
+
+export function profileOf(area, { skip = [], e2e = false } = {}) {
+  const known = Object.hasOwn(PROFILES, area ?? "");
+  const entry = known ? PROFILES[area] : { tests: true, implementer: ["backend-playbook", "frontend-playbook"], testWriter: ["testing-playbook"], checklist: CHECKLIST_SECTIONS.slice(1) };
+  const tests = entry.tests && !e2e && !skip.includes("tests");
+  const review = !skip.includes("review");
+  const phases = [...(e2e ? ["e2e"] : tests ? ["test-writer", "implementer"] : ["implementer"]), ...(review ? ["reviewer"] : [])];
+  return {
+    area: known ? area : null,
+    known,
+    tests,
+    e2e,
+    review,
+    testWriterPlaybooks: tests ? entry.testWriter.map(playbook) : [],
+    implementerPlaybooks: e2e ? [] : entry.implementer.map(playbook),
+    checklist: ["Common", ...(e2e ? ["E2E"] : entry.checklist)],
+    label: known ? `${area} (${phases.join(" → ")})` : NO_AREA_LABEL,
+  };
+}
+
+const COMPANIONS =[/^web\/src\/app\/api\//, /^requests\//, /^Skarbiec\.AppHost\//];
 const PRIMARY = new Set(["Backend", "Frontend", "E2E", "Scripts", "CI/Infra"]);
 const SECONDARY = new Set(["Claude", "Docs"]);
 

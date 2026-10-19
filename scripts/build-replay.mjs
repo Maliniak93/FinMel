@@ -142,6 +142,7 @@ function replayOf({ c, record, runArgs, args, previous, issue }) {
     if (Number(args.tier) !== Number(runArgs.tier ?? 1)) return { ok: false, reason: `tier changed (${runArgs.tier ?? 1} -> ${args.tier})` };
     if (normSkip(args.skip) !== normSkip(runArgs.skip)) return { ok: false, reason: `skip changed (${normSkip(runArgs.skip) || "none"} -> ${normSkip(args.skip) || "none"})` };
     if (Boolean(args.e2e) !== Boolean(runArgs.e2e)) return { ok: false, reason: "e2e flag changed" };
+    if (args.profile && args.profile.label !== runArgs.profile?.label) return { ok: false, reason: "profile changed" };
   }
   const entries = readJournal(c.journal);
   if (!entries) return { ok: false, reason: "journal has an unreadable line" };

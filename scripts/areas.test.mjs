@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import * as areasModule from "./areas.mjs";
 import { AREAS, areaOfFiles, areaOfPath, parseArea } from "./areas.mjs";
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), "areas.mjs");
@@ -64,6 +65,80 @@ test("outside", () => {
   assert.deepEqual(outside(["Fullstack", "services/Portfolio/X.cs", "web/src/app/a.ts", "skarbiec-plan/workflow.md"]), ["skarbiec-plan/workflow.md"]);
   assert.deepEqual(outside(["Backend", "web/src/app/api/client.ts", "requests/x.http", "Skarbiec.AppHost/Program.cs"]), []);
   assert.deepEqual(outside(["Frontend", "requests/x.http", "Skarbiec.AppHost/Program.cs", "web/src/app/api/client.ts"]), []);
+});
+
+const playbook = (name) => `.claude/skills/${name}/SKILL.md`;
+const sorted = (list) => [...list].sort();
+
+test("profileOf table", () => {
+  const { profileOf } = areasModule;
+  const table = {
+    Backend: { tests: true, implementer: ["backend-playbook"], testWriter: ["testing-playbook"], checklist: ["Common", "Backend"], phases: "test-writer → implementer → reviewer" },
+    Frontend: { tests: true, implementer: ["frontend-playbook"], testWriter: ["frontend-playbook"], checklist: ["Common", "Frontend"], phases: "test-writer → implementer → reviewer" },
+    Fullstack: {
+      tests: true,
+      implementer: ["backend-playbook", "frontend-playbook"],
+      testWriter: ["testing-playbook", "frontend-playbook"],
+      checklist: ["Common", "Backend", "Frontend"],
+      phases: "test-writer → implementer → reviewer",
+    },
+    Scripts: { tests: false, implementer: ["scripts-playbook"], testWriter: [], checklist: ["Common", "Scripts"], phases: "implementer → reviewer" },
+    Claude: { tests: false, implementer: ["claude-playbook"], testWriter: [], checklist: ["Common", "Claude"], phases: "implementer → reviewer" },
+    "CI/Infra": { tests: false, implementer: [], testWriter: [], checklist: ["Common", "CI/Infra"], phases: "implementer → reviewer" },
+    Docs: { tests: false, implementer: [], testWriter: [], checklist: ["Common", "Docs"], phases: "implementer → reviewer" },
+    E2E: { tests: false, implementer: [], testWriter: [], checklist: ["Common", "E2E"], phases: "implementer → reviewer" },
+  };
+  for (const [area, want] of Object.entries(table)) {
+    const profile = profileOf(area);
+    assert.equal(profile.area, area, area);
+    assert.equal(profile.known, true, area);
+    assert.equal(profile.tests, want.tests, area);
+    assert.equal(profile.e2e, false, area);
+    assert.equal(profile.review, true, area);
+    assert.deepEqual(sorted(profile.implementerPlaybooks), sorted(want.implementer.map(playbook)), area);
+    assert.deepEqual(sorted(profile.testWriterPlaybooks), sorted(want.testWriter.map(playbook)), area);
+    assert.deepEqual(sorted(profile.checklist), sorted(want.checklist), area);
+    assert.ok(profile.label.startsWith(area), profile.label);
+    assert.ok(profile.label.includes(want.phases), profile.label);
+  }
+  assert.equal(profileOf("Scripts").label, "Scripts (implementer → reviewer)");
+});
+
+test("profileOf without area", () => {
+  const { profileOf } = areasModule;
+  for (const area of [null, undefined, "", "epic", "Nope"]) {
+    const profile = profileOf(area);
+    assert.equal(profile.known, false, String(area));
+    assert.equal(profile.tests, true, String(area));
+    assert.equal(profile.review, true, String(area));
+    assert.equal(profile.e2e, false, String(area));
+    assert.deepEqual(sorted(profile.implementerPlaybooks), sorted([playbook("backend-playbook"), playbook("frontend-playbook")]), String(area));
+    assert.deepEqual(profile.testWriterPlaybooks, [playbook("testing-playbook")], String(area));
+    assert.deepEqual(sorted(profile.checklist), sorted(["Common", "Backend", "Frontend", "Scripts", "Claude", "CI/Infra", "Docs", "E2E"]), String(area));
+    assert.equal(profile.label, "Brak obszaru — pełna ścieżka", String(area));
+  }
+});
+
+test("profileOf overrides", () => {
+  const { profileOf } = areasModule;
+  for (const area of ["Backend", "Scripts"]) {
+    const noTests = profileOf(area, { skip: ["tests"] });
+    assert.equal(noTests.tests, false, area);
+    assert.equal(noTests.review, true, area);
+    assert.equal(noTests.e2e, false, area);
+    assert.ok(!noTests.label.includes("test-writer"), noTests.label);
+
+    const noReview = profileOf(area, { skip: ["review"] });
+    assert.equal(noReview.review, false, area);
+    assert.equal(noReview.e2e, false, area);
+    assert.ok(!noReview.label.includes("reviewer"), noReview.label);
+
+    const e2e = profileOf(area, { e2e: true });
+    assert.equal(e2e.e2e, true, area);
+    assert.equal(e2e.tests, false, area);
+    assert.deepEqual(sorted(e2e.checklist), sorted(["Common", "E2E"]), area);
+    assert.ok(e2e.label.includes("e2e → reviewer"), e2e.label);
+  }
 });
 
 test("cli prints the area", () => {
