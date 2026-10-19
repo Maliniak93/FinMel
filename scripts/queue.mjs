@@ -1,15 +1,17 @@
 // Usage: imported by gh-project.mjs and plan-status.mjs - the build queue is the board order of the top-level, not-Done items
 
-const itemIdOf = (card) => card.id ?? card.itemId ?? null;
+import { PRIORITIES } from "./priority.mjs";
+
+const itemIdOf =(card) => card.id ?? card.itemId ?? null;
 const partNumbers = (epic) => (epic.subIssues ?? []).map((s) => (typeof s === "object" ? s.number : s));
 
 export function queueOf(cards) {
   const byNumber = new Map(cards.map((c) => [c.number, c]));
   const parts = new Set(cards.flatMap((c) => (c.epic ? partNumbers(c) : [])));
   const topLevel = cards.filter((c) => c.parent == null && !parts.has(c.number));
-  const inRank = (status) => topLevel.filter((c) => c.status === status);
+  const inRank = (status, urgent) => topLevel.filter((c) => c.status === status && (c.priority === PRIORITIES[0]) === urgent);
 
-  return [...inRank("In progress"), ...inRank("Todo")].map((c) => {
+  return [...inRank("In progress", true), ...inRank("Todo", true), ...inRank("In progress", false), ...inRank("Todo", false)].map((c) => {
     if (!c.epic) return { ...c, manual: c.status === "In progress" && !c.autobuild };
 
     const children = partNumbers(c)

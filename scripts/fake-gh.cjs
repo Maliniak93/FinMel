@@ -32,6 +32,7 @@ function fieldNodes(i) {
     tier: i.tier ? { name: i.tier } : null,
     kind: i.kind ? { name: i.kind } : null,
     area: i.area ? { name: i.area } : null,
+    priority: i.priority ? { name: i.priority } : null,
     branch: i.branch ? { text: i.branch } : null,
   };
 }
@@ -79,6 +80,7 @@ function applyField(n, fieldName, value) {
   if (fieldName === "Tier") issues[n].tier = value;
   if (fieldName === "Kind") issues[n].kind = value;
   if (fieldName === "Area") issues[n].area = value;
+  if (fieldName === "Priority") issues[n].priority = value;
   if (fieldName === "Branch") issues[n].branch = value;
 }
 
@@ -204,6 +206,7 @@ if (args[0] === "issue" && args[1] === "create") {
     status: null,
     tier: null,
     kind: null,
+    priority: null,
     branch: null,
     inProject: false,
   };
