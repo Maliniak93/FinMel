@@ -42,7 +42,8 @@
       "metals": "Metale szlachetne",
       "settings": "Ustawienia",
       "accounts": "Rachunki inwestycyjne",
-      "bankAccounts": "Konta bankowe"
+      "bankAccounts": "Konta bankowe",
+      "groups": "Grupy"
     },
     "navSection": {
       "overview": "Przegląd",
@@ -663,6 +664,65 @@
       "archived": "Miejsce jest zarchiwizowane — najpierw je przywróć.",
       "duplicateName": "Miejsce o tej nazwie już istnieje.",
       "duplicateCurrency": "Miejsce ma już tę walutę."
+    }
+  },
+  "groups": {
+    "title": "Grupy",
+    "add": "Dodaj grupę",
+    "empty": "Nie masz jeszcze grup. Dodaj grupę, aby podzielić majątek na cele, np. emeryturę czy poduszkę finansową.",
+    "limitHint": "Osiągnięto limit 12 grup. Usuń grupę, aby dodać nową.",
+    "loadFailed": "Nie udało się wczytać grup.",
+    "assetCount": "Aktywa: {{ count }}",
+    "target": "Cel: {{ amount }}",
+    "colors": {
+      "blue": "Niebieski",
+      "green": "Zielony",
+      "orange": "Pomarańczowy",
+      "purple": "Fioletowy",
+      "red": "Czerwony",
+      "teal": "Morski",
+      "pink": "Różowy",
+      "amber": "Bursztynowy",
+      "indigo": "Indygo",
+      "lime": "Limonkowy",
+      "cyan": "Turkusowy",
+      "brown": "Brązowy"
+    },
+    "form": {
+      "createTitle": "Dodaj grupę",
+      "editTitle": "Edytuj grupę",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameTooLong": "Nazwa może mieć najwyżej 50 znaków.",
+      "color": "Kolor",
+      "colorRequired": "Wybierz kolor.",
+      "target": "Cel (PLN)",
+      "targetHint": "Opcjonalny",
+      "targetInvalid": "Cel musi być większy od zera."
+    },
+    "errors": {
+      "duplicateName": "Grupa o tej nazwie już istnieje.",
+      "colorTaken": "Ten kolor jest już używany przez inną grupę.",
+      "invalidTarget": "Cel musi być większy od zera, mieć najwyżej 2 miejsca po przecinku i nie przekraczać dopuszczalnej wartości.",
+      "limitReached": "Osiągnięto limit 12 grup."
+    },
+    "delete": {
+      "title": "Usunąć grupę?",
+      "message": "Grupa \"{{ name }}\" ma aktywa: {{ count }}. Jej historia trafi do „Bez grupy”, a aktywa oraz domyślne grupy rachunków i miejsc wrócą do „Bez grupy”.",
+      "failed": "Nie udało się usunąć grupy."
+    },
+    "assets": {
+      "manage": "Aktywa",
+      "title": "Aktywa w grupie „{{ name }}”",
+      "loadFailed": "Nie udało się wczytać aktywów.",
+      "saveFailed": "Nie udało się zapisać przypisania.",
+      "empty": "Nie masz jeszcze aktywów do przypisania.",
+      "filter": "Szukaj",
+      "classFilter": "Klasa",
+      "allClasses": "Wszystkie klasy",
+      "selectAllShown": "Zaznacz wszystkie widoczne",
+      "class": "Klasa",
+      "location": "Rachunek lub miejsce",
+      "group": "Grupa"
     }
   },
   "planning": {

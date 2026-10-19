@@ -235,6 +235,7 @@ describe('Shell', () => {
       'Bonds',
       'Stocks & ETFs',
       'Precious metals',
+      'Groups',
       'Settings',
     ]);
 
@@ -254,8 +255,25 @@ describe('Shell', () => {
       'Obligacje',
       'Akcje i ETF',
       'Metale szlachetne',
+      'Grupy',
       'Ustawienia',
     ]);
+  });
+
+  it('offers a "Groups" nav item linking to /groups in both languages', async () => {
+    const groupsLink = () =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+          'mat-nav-list a',
+        ),
+      ).find((a) => a.getAttribute('href') === '/groups');
+
+    expect(groupsLink()?.textContent).toContain('Groups');
+
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await fixture.whenStable();
+
+    expect(groupsLink()?.textContent).toContain('Grupy');
   });
 
   it('pins settings below the nav list', () => {
@@ -316,6 +334,7 @@ describe('Shell', () => {
       'Bonds',
       'Stocks & ETFs',
       'Precious metals',
+      'Groups',
       'Settings',
     ]);
 

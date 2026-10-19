@@ -1,0 +1,169 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+
+import { client as portfolioClient } from '../../../api/portfolio/client.gen';
+import { provideI18nTesting } from '../../../core/i18n/testing';
+import { jsonResponse } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { blueGroup, greenGroup } from '../testing/group-fixtures';
+import { GroupFormDialog, type GroupFormDialogData } from './group-form-dialog';
+
+describe('GroupFormDialog', () => {
+  let fixture: ComponentFixture<GroupFormDialog>;
+  let component: GroupFormDialog;
+  let dialogRef: { close: ReturnType<typeof vi.fn> };
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeAll(() => {
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  async function setup(
+    data: GroupFormDialogData,
+    writeResponse: () => Response = () => jsonResponse(greenGroup, 201),
+  ): Promise<void> {
+    dialogRef = { close: vi.fn() };
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => writeResponse());
+
+    await TestBed.configureTestingModule({
+      imports: [GroupFormDialog],
+      providers: [
+        provideI18nTesting(),
+        { provide: MAT_DIALOG_DATA, useValue: data },
+        { provide: MatDialogRef, useValue: dialogRef },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(GroupFormDialog);
+    component = fixture.componentInstance;
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  function writes(): Request[] {
+    return fetchSpy.mock.calls.map((call: unknown[]) => call[0] as Request);
+  }
+
+  async function settle(): Promise<void> {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  function swatch(color: string): HTMLElement {
+    const found = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      `[role=radiogroup] [role=radio][data-color="${color}"]`,
+    );
+    if (!found) {
+      throw new Error(`No swatch '${color}'.`);
+    }
+    return found;
+  }
+
+  function isDisabled(element: HTMLElement): boolean {
+    return element.hasAttribute('disabled') || element.getAttribute('aria-disabled') === 'true';
+  }
+
+  function errorText(id: string): string {
+    return (
+      (fixture.nativeElement as HTMLElement)
+        .querySelector(`[data-testid="${id}"]`)
+        ?.textContent?.trim() ?? ''
+    );
+  }
+
+  it('creates a group', async () => {
+    await setup({ mode: 'create', groups: [blueGroup] });
+    component['form'].controls.name.setValue('  Poduszka ');
+    component['form'].controls.color.setValue('orange');
+    component['form'].controls.targetPln.setValue(30000);
+
+    await component['onSubmit']();
+
+    const [request] = writes();
+    expect(request.method).toBe('POST');
+    expect(request.url).toContain('/api/portfolio/asset-groups');
+    expect(await request.json()).toEqual({ name: 'Poduszka', color: 'orange', targetPln: 30000 });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('refuses a blank name without calling the API', async () => {
+    await setup({ mode: 'create', groups: [] });
+    component['form'].controls.color.setValue('blue');
+
+    await component['onSubmit']();
+
+    expect(writes()).toEqual([]);
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('updates through PUT on edit', async () => {
+    await setup({ mode: 'edit', group: greenGroup, groups: [blueGroup, greenGroup] }, () =>
+      jsonResponse(greenGroup),
+    );
+    expect(component['form'].controls.name.value).toBe('Poduszka');
+    expect(component['form'].controls.color.value).toBe('green');
+    component['form'].controls.name.setValue('Poduszka finansowa');
+    component['form'].controls.color.setValue('purple');
+
+    await component['onSubmit']();
+
+    const [request] = writes();
+    expect(request.method).toBe('PUT');
+    expect(request.url).toContain(`/api/portfolio/asset-groups/${greenGroup.id}`);
+    expect(await request.json()).toEqual({
+      name: 'Poduszka finansowa',
+      color: 'purple',
+      targetPln: 30000,
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('disables used colours', async () => {
+    await setup({ mode: 'create', groups: [blueGroup, greenGroup] });
+
+    expect(isDisabled(swatch('blue'))).toBe(true);
+    expect(isDisabled(swatch('green'))).toBe(true);
+    expect(isDisabled(swatch('orange'))).toBe(false);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('[role=radiogroup] [role=radio]'),
+    ).toHaveLength(12);
+  });
+
+  it('keeps the own colour selectable on edit', async () => {
+    await setup({ mode: 'edit', group: greenGroup, groups: [blueGroup, greenGroup] });
+
+    expect(isDisabled(swatch('green'))).toBe(false);
+    expect(isDisabled(swatch('blue'))).toBe(true);
+  });
+
+  it.each([
+    ['Conflict.DuplicateName', 'name-error'],
+    ['Conflict.GroupColorTaken', 'color-error'],
+    ['Validation.InvalidTarget', 'target-error'],
+  ])('maps server errors: %s', async (errorCode, testId) => {
+    await setup({ mode: 'create', groups: [] }, () =>
+      jsonResponse({ title: 'Conflict', status: 409, detail: 'Rejected.', errorCode }, 409),
+    );
+    component['form'].controls.name.setValue('Poduszka');
+    component['form'].controls.color.setValue('orange');
+
+    await component['onSubmit']();
+    await settle();
+
+    expect(errorText(testId)).not.toBe('');
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('closes with false on cancel', async () => {
+    await setup({ mode: 'create', groups: [] });
+
+    component['cancel']();
+
+    expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+});
