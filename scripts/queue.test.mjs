@@ -136,8 +136,8 @@ test("queue renders numbered with manual", () => {
     assert.equal(code, 0, out);
     assert.match(out, /Queue/);
     assert.doesNotMatch(out, /Next up/);
-    assert.match(out, /^1\. #391 Month dashboard \(In progress, ręczny\) — next #394 \[—\]\s*$/m);
-    assert.match(out, /^2\. #400 Second thing — \/build #400 \[—\]\s*$/m);
+    assert.match(out, /^1\. #391 Month dashboard \(In progress, ręczny\) — next #394 \[P2\* · —\]\s*$/m);
+    assert.match(out, /^2\. #400 Second thing — \/build #400 \[P2\* · —\]\s*$/m);
   } finally {
     sandbox.cleanup();
   }
@@ -154,7 +154,7 @@ test("queue lines show area", () => {
   ]);
   const [standalone, unlabelled, epicLine] = queueLines(queue);
 
-  assert.match(standalone, /^1\. #1 Issue 1 — \/build #1 \[Backend\]$/);
-  assert.match(unlabelled, /^2\. #2 Issue 2 — \/build #2 \[—\]$/);
-  assert.match(epicLine, /^3\. #3 Issue 3 — next #4 \[Backend → Frontend → E2E\]$/);
+  assert.match(standalone, /^1\. #1 Issue 1 — \/build #1 \[P2\* · Backend\]$/);
+  assert.match(unlabelled, /^2\. #2 Issue 2 — \/build #2 \[P2\* · —\]$/);
+  assert.match(epicLine, /^3\. #3 Issue 3 — next #4 \[P2\* · Backend → Frontend → E2E\]$/);
 });

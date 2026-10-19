@@ -1,7 +1,7 @@
 // Usage: imported by autobuild.mjs - the flag parser and the interactive start wizard (questions, summary, equivalent command); runs nothing on import
 import { createInterface } from "node:readline/promises";
 import { planFrom, startAt, windowEnd } from "./autobuild-queue.mjs";
-import { areaText } from "./queue.mjs";
+import { itemTag } from "./queue.mjs";
 
 const BOOLEAN_FLAGS = new Set(["dry-run", "shutdown", "no-shutdown", "include-manual", "skip-manual", "stop"]);
 const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "items", "start", "until", "on-limit", "max-wait", "sleep-test", "hibernate-test"]);
@@ -43,7 +43,7 @@ function yesNo(text) {
   return null;
 }
 
-const planLine = (item, i) => `${i + 1}. #${item.number} ${item.title} (${item.status}${item.manual ? ", ręczny" : ""}) [${areaText(item)}]`;
+const planLine = (item, i) => `${i + 1}. #${item.number} ${item.title} (${item.status}${item.manual ? ", ręczny" : ""}) [${itemTag(item)}]`;
 
 function confirmQuestion(id, prompt, whenYes, whenNo) {
   return {

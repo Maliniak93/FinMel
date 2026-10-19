@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { areaWarning, mayStart, nextWork, planFrom, planLines, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { areaWarning, mayStart, nextWork, pickNext, planFrom, planLines, runQueue, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { queueOf } from "./queue.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -99,6 +99,87 @@ test("missing area warns and continues", () => {
   assert.equal(areaWarning(areaCards[1], areaCards), "⚠ #11 bez obszaru (Area)");
   assert.equal(areaWarning(areaCards[2], areaCards), "⚠ #14 bez obszaru (Area)");
   assert.equal(areaWarning(areaCards[0], areaCards), null);
+});
+
+const flowCards = () => [
+  { number: 434, title: "Running epic", status: "In progress", epic: true, parent: null, autobuild: true, subIssues: [435, 436, 437], priority: "P2 Normalny", area: null },
+  { number: 435, title: "Part one", status: "Done", parent: 434, area: "Backend" },
+  { number: 436, title: "Part two", status: "Todo", parent: 434, area: "Backend" },
+  { number: 437, title: "Part three", status: "Todo", parent: 434, area: "Backend" },
+  { number: 440, title: "Other", status: "Todo", epic: false, parent: null, priority: "P2 Normalny", area: "Scripts" },
+];
+const urgent = { number: 450, title: "Fire", status: "Todo", epic: false, parent: null, priority: "P0 Pilne", area: "Scripts" };
+const setStatus = (cards, number, status) => cards.map((c) => (c.number === number ? { ...c, status } : c));
+
+test("pickNext takes a new P0 between parts", () => {
+  const started = new Set([434]);
+  let cards = [...flowCards(), urgent];
+  assert.equal(pickNext(queueOf(cards), { started, items: Infinity })?.number, 450);
+
+  cards = setStatus(cards, 450, "Done");
+  assert.equal(pickNext(queueOf(cards), { started, items: Infinity })?.number, 434);
+});
+
+test("pickNext respects items and manual", () => {
+  const cards = [...flowCards(), urgent];
+  assert.equal(pickNext(queueOf(cards), { started: new Set([434]), items: 1 })?.number, 434);
+  assert.equal(pickNext(queueOf(cards), { started: new Set([434, 450]), items: 1 })?.number, 450);
+
+  const manual = [{ number: 2, title: "manual", status: "In progress", epic: false, parent: null, autobuild: false }, ...flowCards().slice(3)];
+  assert.equal(pickNext(queueOf(manual), { started: new Set(), items: Infinity })?.number, 440);
+  assert.equal(pickNext(queueOf(manual), { started: new Set(), items: Infinity, includeManual: true })?.number, 2);
+});
+
+test("queue re-read before each part", async () => {
+  let cards = flowCards();
+  let reads = 0;
+  const built = [];
+  const logs = [];
+  await runQueue({
+    items: Infinity,
+    includeManual: false,
+    readCards: async () => {
+      reads++;
+      return cards;
+    },
+    buildPart: async (item, part) => {
+      built.push(part);
+      cards = setStatus(cards, part, "Done");
+      if (part === 437) cards = setStatus(cards, 434, "Done");
+      if (built.length === 1) cards = [...cards, urgent];
+    },
+    log: (line) => logs.push(line),
+  });
+
+  assert.deepEqual(built, [436, 450, 437, 440]);
+  assert.ok(reads >= built.length, "the queue is read before every part");
+  assert.ok(logs.some((l) => l.includes("kolejka zmieniona: #450 (P0) przed #434")), logs.join("\n"));
+});
+
+test("a merged part is not built again while its card lags behind the closed issue", async () => {
+  const cards = flowCards();
+  const closed = new Set();
+  const built = [];
+  const finishedEpics = [];
+  await runQueue({
+    readCards: async () => cards,
+    buildPart: async (item, part) => {
+      built.push(part);
+      closed.add(part);
+    },
+    isClosed: async (number) => closed.has(number),
+    finishEpic: async (item) => {
+      finishedEpics.push(item.number);
+    },
+  });
+
+  assert.deepEqual(built, [436, 437, 440]);
+  assert.deepEqual(finishedEpics, [434]);
+});
+
+test("plan lines show priority", () => {
+  const cards = [{ number: 1, title: "Helper item", status: "Todo", area: "Scripts", priority: "P1 Wysoki", epic: false, parent: null, autobuild: false }];
+  assert.match(planLines(queueOf(cards), cards)[0], /Helper item.*\[P1 · Scripts\]/);
 });
 
 test("delay is an unknown flag", () => {

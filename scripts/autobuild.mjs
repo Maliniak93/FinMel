@@ -30,10 +30,10 @@ import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
 import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
-import { areaWarning, mayStart, planFrom, planLines, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { areaWarning, mayStart, planFrom, planLines, runQueue, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { UsageError, WizardCancelled, parseFlags, runWizard } from "./autobuild-wizard.mjs";
 import { confirmPower, suspendUntil, wakeTimers } from "./power.mjs";
-import { areaText, queueOf } from "./queue.mjs";
+import { itemTag, queueOf } from "./queue.mjs";
 import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -711,7 +711,7 @@ async function handlePart(sub, ctx) {
   await mergeAndSync(pr, part.branch, part.number);
 }
 
-// returns after a repair so runEpic picks the next open part: a fix part placed ahead of the e2e part, or the e2e part again
+// returns after a repair so runQueue picks the next open part: a fix part placed ahead of the e2e part, or the e2e part again
 async function repairE2e(part, block, ctx) {
   const giveUp = (why) => new Stop(block.reason, `#${part.number}: ${block.reason} failure, ${block.where} - ${why}, then resume with ${resumeCommand(ctx)}`);
   if (block.cls === "environment") {
@@ -883,53 +883,51 @@ async function finishRun(reason, detail, ctx) {
   process.exit(ok ? 0 : 2);
 }
 
-async function runEpic(number) {
-  while (true) {
-    const issue = getIssue(number);
-    if (issue.state === "CLOSED") return;
-    if (!issue.subIssues.length) throw new Stop("no-parts", `#${number} has no sub-issues`);
-    const next = issue.subIssues.find((s) => s.state !== "CLOSED");
-    if (!next) break;
-    sayUsage(`#${next.number} start`);
-    try {
-      await handlePart(next, ctx);
-    } finally {
-      sayUsage(`#${next.number} end`);
-    }
-  }
-  await closeIssue(number);
-  const moved = retryTransient(`set ${number} Done`, () => project(["set", String(number), "Status", "Done"]));
-  if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
-}
-
-async function runItem(item, cards) {
+async function finishEpic(item) {
   const number = item.number;
-  const issue = getIssue(number);
-  if (issue.state === "CLOSED") {
-    say(`#${number} ${issue.title} is closed - skipped`);
-    return;
-  }
-  ctx.item = number;
   ctx.touched.add(number);
-  say(`── item #${number} ${issue.title} [${areaText(item)}]`);
-  const warning = areaWarning(item, cards);
-  if (warning) say(warning);
-  if (issue.epic) await runEpic(number);
-  else {
-    sayUsage(`#${number} start`);
-    try {
-      await handlePart({ number }, ctx);
-    } finally {
-      sayUsage(`#${number} end`);
-    }
+  const issue = getIssue(number);
+  if (issue.state !== "CLOSED") {
+    if (!issue.subIssues.length) throw new Stop("no-parts", `#${number} has no sub-issues`);
+    await closeIssue(number);
+    const moved = retryTransient(`set ${number} Done`, () => project(["set", String(number), "Status", "Done"]));
+    if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
   }
   ctx.itemsDone.push(number);
 }
 
-function readPlan(flags) {
+async function buildPart(item, part, cards) {
+  const number = item.number;
+  if (ctx.item !== number) {
+    const issue = getIssue(number);
+    if (issue.state === "CLOSED") {
+      say(`#${number} ${issue.title} is closed - skipped`);
+      return false;
+    }
+    ctx.item = number;
+    ctx.touched.add(number);
+    say(`── item #${number} ${issue.title} [${itemTag(item)}]`);
+    const warning = areaWarning(item, cards);
+    if (warning) say(warning);
+  }
+  sayUsage(`#${part} start`);
+  try {
+    await handlePart({ number: part }, ctx);
+  } finally {
+    sayUsage(`#${part} end`);
+  }
+  if (!item.epic) ctx.itemsDone.push(number);
+  return true;
+}
+
+function readCards() {
   const res = retryTransient("project list", () => project(["list"]));
   if (!res.ok) throw new Stop("github", `gh-project.mjs list: ${res.firstErr}`);
-  const cards = JSON.parse(res.out);
+  return JSON.parse(res.out);
+}
+
+function readPlan(flags) {
+  const cards = readCards();
   const items = flags.items === undefined || flags.items === "all" ? Infinity : Number(flags.items);
   try {
     return { cards, plan: planFrom(queueOf(cards), { only: flags.only, includeManual: Boolean(flags["include-manual"]), items }, cards) };
@@ -939,6 +937,7 @@ function readPlan(flags) {
 }
 
 function sayPlan(plan, cards) {
+  say("plan (podgląd - kolejka jest czytana ponownie przed każdą częścią):");
   for (const line of planLines(plan, cards)) say(line);
 }
 
@@ -1060,14 +1059,23 @@ try {
     say(`window end: ${times.until ? `${clock(times.until)} (${times.until.toLocaleDateString("en-CA")})` : "none"}`);
     sayPlan(plan, cards);
     for (const item of plan) {
-      say(`── item #${item.number} ${item.title}`);
+      say(`── item #${item.number} ${item.title} [${itemTag(item)}]`);
       dryRunTable(getIssue(item.number));
     }
     await finishRun("dry-run", null, ctx);
   }
 
   ctx.started = true;
-  for (const item of plan) await runItem(item, cards);
+  await runQueue({
+    items: flags.items === undefined || flags.items === "all" ? Infinity : Number(flags.items),
+    includeManual: Boolean(flags["include-manual"]),
+    only: flags.only ?? null,
+    readCards,
+    buildPart,
+    isClosed: async (number) => getIssue(number).state === "CLOSED",
+    finishEpic,
+    log: say,
+  });
   await finishRun("done", null, ctx);
 } catch (err) {
   const stop = err instanceof Stop ? err : new Stop("error", err.stack ?? err.message);

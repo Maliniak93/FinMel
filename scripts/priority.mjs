@@ -148,6 +148,21 @@ export function blockingDependent(queue, deps, number) {
   return queue.find((q, i) => i < at && q.status === "Todo" && dependenciesOf(owner, deps, q.number).includes(number)) ?? null;
 }
 
+export function orderWarnings(queue, deps) {
+  const owner = ownersOf(queue);
+  const indexOf = new Map(queue.map((q, i) => [q.number, i]));
+  const warnings = [];
+  queue.forEach((item, i) => {
+    if (item.status !== "Todo") return;
+    const lower = queue.slice(i + 1).find((q) => q.status === "Todo" && rankOf(q) < rankOf(item));
+    if (lower) warnings.push({ number: item.number, text: `#${item.number} ${shortOf(item.priority)} stoi nad #${lower.number} ${shortOf(lower.priority)} — /prio albo przesuń` });
+    for (const dep of dependenciesOf(owner, deps, item.number)) {
+      if (indexOf.get(dep) > i) warnings.push({ number: item.number, text: `#${item.number} stoi nad swoją zależnością #${dep} — /prio albo przesuń` });
+    }
+  });
+  return warnings;
+}
+
 export function describeSpot(queue, number) {
   const at = queue.findIndex((q) => q.number === number);
   if (at <= 0) return "1. w kolejce (góra Todo)";

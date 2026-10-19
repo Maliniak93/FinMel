@@ -1482,6 +1482,7 @@ async function listCards() {
       ),
     };
     bodies.set(entry.number, item.content.body ?? "");
+    entry.dependsOn = dependsOn(item.content.body ?? "");
     if (entry.epic)
       entry.subIssues = subIssues(entry.number).map((s) => s.number);
     return entry;
