@@ -77,7 +77,7 @@ Changing a convention or a hard rule in the same change that motivated it: updat
 
 > **Who runs what.** While implementing, run only `dotnet test <project> --filter "FullyQualifiedName~<Name>"`
 > for the tests you are driving green. `dotnet format`, a solution build, the full suites and
-> `scripts/verify.mjs` belong to the implementer's full verify run before it returns — repeating them
+> `scripts/verify.mjs` belong to the implementer's verify run before it returns, scoped by the changed files — repeating them
 > earlier buys nothing and costs minutes. The exception is `dotnet format` immediately after
 > `dotnet ef migrations add`, because generated migrations are not formatted.
 - Handler registered in `Program.cs`; endpoint mapped; migration present if the model changed.
