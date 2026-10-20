@@ -121,6 +121,12 @@ function graphql() {
         fs.writeSync(2, `injected failure writing ${fieldName}`);
         process.exit(1);
       }
+      if ((state.failFieldsOnce ?? []).includes(fieldName)) {
+        state.failFieldsOnce = state.failFieldsOnce.filter((f) => f !== fieldName);
+        fs.writeFileSync(statePath, JSON.stringify(state));
+        fs.writeSync(2, `injected one-time failure writing ${fieldName}`);
+        process.exit(1);
+      }
       const option = (field[1].options ?? []).find((o) => o.id === variables.value.singleSelectOptionId);
       const value = option ? option.name : variables.value.text;
       const n = numberOfItem(variables.item);
@@ -220,6 +226,11 @@ if (args[0] === "issue" && args[1] === "create") {
 if (args[0] === "issue" && args[1] === "view") {
   const i = issues[Number(args[2])];
   out(JSON.stringify(i ? { number: i.number, title: i.title, state: i.state, labels: i.labels.map((name) => ({ name })), comments: [] } : {}));
+}
+if (args[0] === "issue" && args[1] === "develop" && args.includes("--list")) {
+  const n = Number(args[args.indexOf("--list") + 1]);
+  log({ kind: "developList", number: n });
+  out(((state.linkedBranches ?? {})[n] ?? []).map((b) => `${b}\thttps://github.com/Maliniak93/FinMel/tree/${b}`).join("\n"));
 }
 if (args[0] === "issue" && args[1] === "comment") {
   log({ kind: "comment", number: Number(args[2]), body: readInput() });

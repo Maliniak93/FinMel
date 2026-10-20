@@ -63,6 +63,15 @@ test("create places the card", () => {
     assert.equal(sent[0].afterId, "ITEM_3");
     assert.equal(sent[1].itemId, `ITEM_${secondNumber}`);
     assert.equal(sent[1].afterId, "ITEM_8");
+
+    const fix = sandbox.run("gh-project.mjs", [...args("Third", "third").map((a) => (a === "change" ? "fix" : a)), "--priority", "P2"]);
+    assert.equal(fix.code, 0, fix.out);
+    const fixNumber = JSON.parse(fix.stdout.trim().split(/\r?\n/).pop()).number;
+
+    const { issues } = sandbox.state();
+    assert.equal(issues[firstNumber].branch, "feat/first");
+    assert.equal(issues[secondNumber].branch, "feat/second");
+    assert.equal(issues[fixNumber].branch, "fix/third");
   } finally {
     sandbox.cleanup();
   }
@@ -929,16 +938,183 @@ test("create checks options before creating", () => {
   }
 });
 
-test("create names unwritten fields", () => {
+test("create retries a missing field", () => {
   const state = priorityState();
-  state.failFields = ["Area"];
+  state.failFieldsOnce = ["Branch"];
+  const sandbox = createSandbox(state);
+  try {
+    const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "retried", ["--area", "Backend"]));
+
+    assert.equal(run.code, 0, run.out);
+    const number = lastJson(run.stdout).number;
+    assert.equal(sandbox.state().issues[number].branch, "feat/retried");
+    const branchWrites = setFields(sandbox).filter((e) => e.field === "Branch");
+    assert.equal(branchWrites.length, 1);
+    assert.deepEqual(sandbox.state().failFieldsOnce, []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("create reports fields still missing", () => {
+  const state = priorityState();
+  state.failFields = ["Tier", "Branch", "Area"];
   const sandbox = createSandbox(state);
   try {
     const run = sandbox.run("gh-project.mjs", createArgs(sandbox, "half", ["--area", "Backend"]));
+
     assert.notEqual(run.code, 0, run.out);
     const number = sandbox.log().find((e) => e.kind === "issueCreate").number;
     assert.match(run.out, new RegExp(`issue #${number} already created: https://github.com/[^ ]+/issues/${number}`));
-    assert.match(run.out, /fields not written: Area, Priority, Branch/);
+    assert.match(run.stderr, new RegExp(`node scripts/gh-project\\.mjs set ${number} Tier 1\\b`));
+    assert.match(run.stderr, new RegExp(`node scripts/gh-project\\.mjs set ${number} Branch feat/half\\b`));
+    assert.match(run.stderr, new RegExp(`warning: Area is still missing on #${number}: node scripts/gh-project\\.mjs set ${number} Area Backend`));
+  } finally {
+    sandbox.cleanup();
+  }
+
+  const recommended = priorityState();
+  recommended.failFields = ["Area", "Priority"];
+  const lenient = createSandbox(recommended);
+  try {
+    const run = lenient.run("gh-project.mjs", createArgs(lenient, "lenient", ["--area", "Backend"]));
+
+    assert.equal(run.code, 0, run.out);
+    assert.match(run.stderr, /warning: Area is still missing/);
+    assert.match(run.stderr, /warning: Priority is still missing/);
+    assert.doesNotMatch(run.stderr, /Branch|Tier/);
+    assert.equal(lastJson(run.stdout).branch, "feat/lenient");
+  } finally {
+    lenient.cleanup();
+  }
+});
+
+const healTitle = "Pasek boczny z grupami";
+const healBranchOf = (sandbox, n) => sandbox.state().issues[n].branch;
+const branchWrites = (sandbox) => setFields(sandbox).filter((e) => e.field === "Branch");
+
+function healState(card = {}, extra = {}) {
+  const state = buildState({
+    issues: [
+      { number: 20, status: "Todo", labels: ["spec"], title: healTitle, kind: "Change", ...card },
+      { number: 21, status: "Todo", labels: ["epic"], title: "An epic", kind: null, tier: null },
+    ],
+  });
+  return Object.assign(state, extra);
+}
+
+test("heal derives the name", () => {
+  const sandbox = createSandbox(healState());
+  try {
+    const run = sandbox.run("gh-project.mjs", ["heal", "20"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.deepEqual(lastJson(run.stdout), { branch: "feat/pasek-boczny-z-grupami", healed: true, source: "derived" });
+    assert.match(run.stderr, /^#20: brak Branch, ustawiono feat\/pasek-boczny-z-grupami$/m);
+    assert.equal(healBranchOf(sandbox, 20), "feat/pasek-boczny-z-grupami");
+  } finally {
+    sandbox.cleanup();
+  }
+
+  const fix = createSandbox(healState({ kind: "Fix" }));
+  try {
+    const run = fix.run("gh-project.mjs", ["heal", "20"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.equal(lastJson(run.stdout).branch, "fix/pasek-boczny-z-grupami");
+  } finally {
+    fix.cleanup();
+  }
+
+  const set = createSandbox(healState({ branch: "feat/already" }));
+  try {
+    const run = set.run("gh-project.mjs", ["heal", "20"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.deepEqual(lastJson(run.stdout), { branch: "feat/already", healed: false, source: "card" });
+    assert.deepEqual(branchWrites(set), []);
+    assert.doesNotMatch(run.stderr, /brak Branch/);
+  } finally {
+    set.cleanup();
+  }
+});
+
+test("heal uses the linked branch", () => {
+  const sandbox = createSandbox(healState({}, { linkedBranches: { 20: ["feat/linked-name"] } }));
+  try {
+    const run = sandbox.run("gh-project.mjs", ["heal", "20"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.deepEqual(lastJson(run.stdout), { branch: "feat/linked-name", healed: true, source: "linked" });
+    assert.equal(healBranchOf(sandbox, 20), "feat/linked-name");
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("heal suffixes a collision", () => {
+  const sandbox = createSandbox(healState(), { branch: "feat/pasek-boczny-z-grupami" });
+  try {
+    const run = sandbox.run("gh-project.mjs", ["heal", "20"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.deepEqual(lastJson(run.stdout), { branch: "feat/pasek-boczny-z-grupami-20", healed: true, source: "derived" });
+    assert.equal(healBranchOf(sandbox, 20), "feat/pasek-boczny-z-grupami-20");
+  } finally {
+    sandbox.cleanup();
+  }
+
+  const linked = createSandbox(healState({}, { linkedBranches: { 20: ["feat/pasek-boczny-z-grupami"] } }), { branch: "feat/pasek-boczny-z-grupami" });
+  try {
+    const run = linked.run("gh-project.mjs", ["heal", "20"]);
+
+    assert.equal(lastJson(run.stdout).branch, "feat/pasek-boczny-z-grupami");
+  } finally {
+    linked.cleanup();
+  }
+});
+
+test("heal warns on a failed write", () => {
+  const sandbox = createSandbox(healState({}, { failFields: ["Branch"] }));
+  try {
+    const run = sandbox.run("gh-project.mjs", ["heal", "20"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.match(run.stderr, /warning: could not write Branch on #20/);
+    assert.equal(lastJson(run.stdout).branch, "feat/pasek-boczny-z-grupami");
+    assert.equal(healBranchOf(sandbox, 20), null);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("heal leaves an epic alone", () => {
+  const sandbox = createSandbox(healState());
+  try {
+    const run = sandbox.run("gh-project.mjs", ["heal", "21"]);
+
+    assert.equal(run.code, 0, run.out);
+    assert.deepEqual(lastJson(run.stdout), { branch: null, healed: false, source: "epic" });
+    assert.deepEqual(branchWrites(sandbox), []);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("prepare heals a missing Branch", () => {
+  const state = prepareState("Todo");
+  state.issues[5].branch = null;
+  state.issues[5].title = "Part one";
+  const sandbox = createSandbox(state, { branch: "" });
+  try {
+    const run = sandbox.run("gh-project.mjs", ["prepare", "5"]);
+
+    assert.equal(run.code, 0, run.out);
+    const out = lastJson(run.stdout);
+    assert.equal(out.ok, true, run.out);
+    assert.deepEqual(out.branch, { name: "feat/part-one", action: "created" });
+    assert.equal(healBranchOf(sandbox, 5), "feat/part-one");
+    assert.match(run.stderr, /^#5: brak Branch, ustawiono feat\/part-one$/m);
   } finally {
     sandbox.cleanup();
   }

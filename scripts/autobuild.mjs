@@ -17,6 +17,7 @@
 //   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
+//   a part without Branch is healed first (gh-project.mjs heal); a card with a missing or invalid Tier is skipped with the later open parts of its epic and the cards whose Depends on names it (a log line and one comment each, Status unchanged) and the run ends `done` listing them as `pominięte: …`
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
 //   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
@@ -31,7 +32,7 @@ import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-rep
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
 import { postRunVerify } from "./autobuild-verify.mjs";
 import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
-import { areaWarning, mayStart, planFrom, planLines, runQueue, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { areaWarning, ensureBranch, mayStart, planFrom, planLines, postSkipOnce, runQueue, skipMarker, skippedLine, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { UsageError, WizardCancelled, parseFlags, runWizard } from "./autobuild-wizard.mjs";
 import { confirmPower, suspendUntil, wakeTimers } from "./power.mjs";
 import { itemTag, queueOf } from "./queue.mjs";
@@ -672,9 +673,15 @@ function buildThroughLimit(part) {
   });
 }
 
+function healBranch(number) {
+  const res = retryTransient(`project heal ${number}`, () => project(["heal", String(number)]));
+  if (!res.ok) throw new Stop("github", `gh-project.mjs heal ${number}: ${res.firstErr}`);
+  say(res.err.split(/\r?\n/).find((l) => l.startsWith(`#${number}:`)) ?? `#${number}: Branch healed`);
+  return JSON.parse(res.out);
+}
+
 async function handlePart(sub, ctx) {
-  const part = getIssue(sub.number);
-  if (!part.branch) throw new Stop("no-branch", `#${part.number} has no Branch field`);
+  const part = ensureBranch(getIssue(sub.number), healBranch);
   const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null };
   let pr = openPr(part.branch);
 
@@ -802,7 +809,7 @@ function dryRunTable(issue) {
         const pr = branch ? openPr(branch) : null;
         const dirtyCount = dirtyFiles().length;
         const plan = branch && !pr ? partPlan({ number: sub.number, branch }, dirtyCount) : "build";
-        if (!branch) action = "stop: no Branch field";
+        if (!branch) action = "heal Branch from the title, then build";
         else if (pr) action = `CI → merge PR ${pr.url}`;
         else if (plan === "ship") action = "retry ship (previous ship step failed)";
         else if (plan === "resume") action = `resume build (${dirtyCount} uncommitted file(s) on ${branch})`;
@@ -873,6 +880,8 @@ async function finishRun(reason, detail, ctx) {
   say(`run: ${reason}${detail ? ` — ${detail}` : ""}`);
   if (ctx.itemsDone.length) say(`items done in this run: ${ctx.itemsDone.map((n) => `#${n}`).join(", ")}`);
   if (ctx.parts.length) say(`done in this run: ${ctx.parts.map(partLine).join("; ")}`);
+  const skippedText = skippedLine(ctx.skipped);
+  if (skippedText) say(skippedText);
   const resume = resumeCommand(ctx);
   if (!ok && reason !== "usage") say(`resume: ${resume}`);
   const verifyLine = await postRunVerify({
@@ -905,6 +914,27 @@ async function finishEpic(item) {
     if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
   }
   ctx.itemsDone.push(number);
+}
+
+// A skipped card never stops the run: a failed comment is only reported
+async function noteSkip({ number, reason }) {
+  ctx.skipped.push({ number, reason });
+  const file = path.join(os.tmpdir(), `skarbiec-autobuild-${number}-skip.md`);
+  try {
+    await postSkipOnce({
+      number,
+      reason,
+      comments: () => epicComments(number),
+      post: (text) => {
+        writeFileSync(file, text, "utf8");
+        const res = retryTransient(`comment ${number}`, () => project(["comment", String(number), "--body-file", file]), { alreadyDone: () => hasRunMarker(epicComments(number), skipMarker(number)) });
+        rmSync(file, { force: true });
+        if (!res.ok) say(`could not post the skip comment on #${number}: ${res.firstErr}`);
+      },
+    });
+  } catch (err) {
+    say(`could not post the skip comment on #${number}: ${String(err.message).split(/\r?\n/)[0]}`);
+  }
 }
 
 async function buildPart(item, part, cards) {
@@ -986,7 +1016,7 @@ async function startWizard(flags) {
   }
 }
 
-const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], merged: 0, builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null };
+const ctx = { item: null, touched: new Set(), itemsDone: [], skipped: [], parts: [], merged: 0, builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null };
 
 async function powerTest(mode, minutesAhead) {
   const planned = new Date(Date.now() + minutesAhead * 60e3);
@@ -1085,6 +1115,7 @@ try {
     buildPart,
     isClosed: async (number) => getIssue(number).state === "CLOSED",
     finishEpic,
+    onSkip: noteSkip,
     log: say,
   });
   await finishRun("done", null, ctx);

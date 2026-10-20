@@ -6,6 +6,7 @@
 //   edit <n> [--body-file <p>] [--tier 1|2] [--area <area>] [--parent <n>] replace the body, set Tier or Area, or attach the issue to an epic
 //   section <n> --heading <h> --file <f> [--dry-run]       replace one `## <h>` section of the body (inserted before ## Verification when absent)
 //   set <n> <field> <value>                                set one project field
+//   heal <n>                                               give a card without Branch the branch linked to the issue, else one derived from its title and Kind (also run by prepare); prints {branch, healed, source}
 //   get <n> [--out <path> [--raw]]                         print the issue as JSON (parent, lastPart), optionally write a local copy
 //   prepare <n> [--tier 1|2] [--skip tests,review] [--fresh] [--dry-run]   /build's pre-workflow step: validates, cuts or switches to the branch (an e2e part's idle branch is recut from origin/master), moves the card; a last epic part also gets the epic and sibling bodies; on a resumed dirty branch it replays the interrupted run's finished steps (--fresh starts over)
 //   report <n> [--json '<run report>']                     post a run report (JSON on stdin otherwise); a shipped one also replaces ## Test manualny per manualTest
@@ -50,6 +51,7 @@ import {
   spawnGh,
 } from "./gh.mjs";
 import { AREAS, parseArea, profileOf } from "./areas.mjs";
+import { branchFor, slugify } from "./branch-name.mjs";
 import {
   DEFAULT_PRIORITY,
   PRIORITIES,
@@ -676,9 +678,7 @@ async function create(flags) {
     throw new Error(
       "the project has no Priority field — run node scripts/gh-project.mjs init",
     );
-  const branch = flags.epic
-    ? null
-    : `${flags.kind === "fix" ? "fix" : "feat"}/${flags.slug}`;
+  const branch = flags.epic ? null : branchFor(flags.kind, flags.slug);
   const writes = [
     ["Status", "Todo"],
     ["Tier", flags.tier],
@@ -723,12 +723,10 @@ async function create(flags) {
   const issueNumber = Number(url.split("/").pop());
 
   const written = new Set();
+  let stillMissing = [];
   try {
     addToProject(issueNumber);
-    for (const [field, value] of writes) {
-      setField(issueNumber, field, value);
-      written.add(field);
-    }
+    writeFields(issueNumber, writes, written);
     if (flags.before)
       placeBefore(flags.parent, issueNumber, Number(flags.before));
     if (flags.parent) {
@@ -738,6 +736,7 @@ async function create(flags) {
     } else setPosition(issueNumber, afterId);
     const { board } = await projectQueue();
     applyRaises(raiseChanges(board, issueNumber).changes);
+    stillMissing = verifyFields(issueNumber, writes);
   } catch (err) {
     const missing = writes.map(([f]) => f).filter((f) => !written.has(f));
     const note = `\nissue #${issueNumber} already created: ${url}${missing.length ? `\nfields not written: ${missing.join(", ")}` : ""}`;
@@ -747,9 +746,53 @@ async function create(flags) {
     }
     throw new Error(`${err.message}${note}`);
   }
+  const setCommand = ([field, value]) =>
+    `node scripts/gh-project.mjs set ${issueNumber} ${field} ${value}`;
+  for (const pair of stillMissing.filter(([f]) => !REQUIRED_FIELDS.has(f)))
+    process.stderr.write(
+      `warning: ${pair[0]} is still missing on #${issueNumber}: ${setCommand(pair)}\n`,
+    );
+  const required = stillMissing.filter(([f]) => REQUIRED_FIELDS.has(f));
+  if (required.length)
+    throw new Error(
+      `issue #${issueNumber} already created: ${url}\nrequired field(s) still missing after a retry:\n${required.map((pair) => `  ${setCommand(pair)}`).join("\n")}`,
+    );
   console.log(
     JSON.stringify({ number: issueNumber, url, branch }),
   );
+}
+
+const REQUIRED_FIELDS = new Set(["Branch", "Tier"]);
+const CARD_KEY = {
+  Status: "status",
+  Tier: "tier",
+  Kind: "kind",
+  Area: "area",
+  Priority: "priority",
+  Branch: "branch",
+};
+
+function writeFields(number, writes, written) {
+  for (const [field, value] of writes) {
+    try {
+      setField(number, field, value);
+      written.add(field);
+    } catch (err) {
+      if (err instanceof GhLimitError) throw err;
+    }
+  }
+}
+
+// One read-back, one rewrite of what is missing, one more read: the fields still wrong afterwards
+function verifyFields(number, writes) {
+  const missingIn = () => {
+    const { result } = fetchIssue(number);
+    return writes.filter(([field, value]) => result[CARD_KEY[field]] !== value);
+  };
+  const first = missingIn();
+  if (!first.length) return [];
+  writeFields(number, first, new Set());
+  return missingIn();
 }
 
 function placeBefore(parent, number, before) {
@@ -873,6 +916,66 @@ function set([number, field, value]) {
   console.log(`#${number} ${field} = ${value}`);
 }
 
+function linkedBranch(number) {
+  try {
+    const listed = gh(["issue", "develop", "--list", String(number), "--repo", REPO]);
+    return (
+      listed
+        .split(/\r?\n/)
+        .map((line) => line.split("\t")[0].trim())
+        .find(Boolean) ?? null
+    );
+  } catch (err) {
+    if (err instanceof GhLimitError) throw err;
+    return null;
+  }
+}
+
+function refExists(name) {
+  if (
+    git(["rev-parse", "--verify", "--quiet", `refs/heads/${name}`]).ok ||
+    git(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${name}`]).ok
+  )
+    return true;
+  const remote = git(["ls-remote", "--heads", "origin", name]);
+  return remote.ok && remote.out !== "";
+}
+
+// A card without Branch gets the branch linked to the issue, else the name derived from its title and Kind
+function healBranch(issue, { write = true } = {}) {
+  if (issue.branch)
+    return { branch: issue.branch, healed: false, source: "card" };
+  if (issue.epic) return { branch: null, healed: false, source: "epic" };
+  const n = issue.number;
+  let branch = linkedBranch(n);
+  let source = "linked";
+  if (!branch) {
+    source = "derived";
+    const derived = branchFor(issue.kind, slugify(issue.title, n));
+    branch = refExists(derived) ? `${derived}-${n}` : derived;
+  }
+  if (write) {
+    try {
+      setField(n, "Branch", branch);
+    } catch (err) {
+      if (err instanceof GhLimitError) throw err;
+      process.stderr.write(
+        `warning: could not write Branch on #${n}: ${String(err.message).split(/\r?\n/)[0]}\n`,
+      );
+    }
+  }
+  process.stderr.write(`#${n}: brak Branch, ustawiono ${branch}\n`);
+  return { branch, healed: true, source };
+}
+
+function heal([number]) {
+  const n = String(number ?? "").replace(/^#/, "");
+  if (!/^\d+$/.test(n)) throw new Error("usage: heal <issue number>");
+  const { result: issue } = fetchIssue(n);
+  if (!issue.inProject) throw new Error(`#${n} is not a card on project ${PROJECT}`);
+  console.log(JSON.stringify(healBranch(issue)));
+}
+
 function get([number, ...rest]) {
   if (!number)
     throw new Error("usage: get <issue number> [--out <path> [--raw]]");
@@ -955,6 +1058,8 @@ function prepare([number, ...rest]) {
       `/build #${prerequisites[0].number}`,
     );
   }
+  if (!issue.branch && issue.inProject && issue.labels.includes("spec"))
+    issue.branch = healBranch(issue, { write: !flags["dry-run"] }).branch;
   const missing = [
     !issue.labels.includes("spec") && "the `spec` label",
     !issue.inProject && "a card on the project",
@@ -1784,6 +1889,7 @@ const VERBS = {
   edit,
   section: sectionVerb,
   set,
+  heal,
   get,
   prepare,
   report,
