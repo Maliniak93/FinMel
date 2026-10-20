@@ -4,7 +4,11 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
-import type { AccountResponse, CashPlacesResponse } from '../../../api/portfolio';
+import type {
+  AccountResponse,
+  AssetGroupResponse,
+  CashPlacesResponse,
+} from '../../../api/portfolio';
 import { client as reportingClient } from '../../../api/reporting/client.gen';
 import type { DashboardResponse, TargetAllocationResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -31,6 +35,27 @@ export const dashboard: DashboardResponse = {
   ],
   byGroup: [{ groupId: null, valuePln: 15000, percentage: 100 }],
 };
+
+export const RETIREMENT_GROUP_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+export const INVESTMENTS_GROUP_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+export const CUSHION_GROUP_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+export const groups: AssetGroupResponse[] = [
+  { id: RETIREMENT_GROUP_ID, name: 'Emerytura', color: 'blue', targetPln: null, assetCount: 2 },
+  { id: INVESTMENTS_GROUP_ID, name: 'Inwestycje', color: 'green', targetPln: null, assetCount: 1 },
+  { id: CUSHION_GROUP_ID, name: 'Poduszka', color: 'orange', targetPln: 30000, assetCount: 1 },
+];
+
+export function dashboardWithGroups(
+  byGroup: DashboardResponse['byGroup'] = [
+    { groupId: RETIREMENT_GROUP_ID, valuePln: 75000, percentage: 46.88 },
+    { groupId: INVESTMENTS_GROUP_ID, valuePln: 55000, percentage: 34.38 },
+    { groupId: CUSHION_GROUP_ID, valuePln: 28000, percentage: 17.5 },
+    { groupId: null, valuePln: 2000, percentage: 1.25 },
+  ],
+): DashboardResponse {
+  return { ...dashboard, netWorthPln: 160000, byGroup };
+}
 
 export const dashboardWithClasses: DashboardResponse = {
   ...dashboard,
@@ -83,6 +108,7 @@ export const API_PATHS = {
   dashboard: '/api/reporting/dashboard',
   history: '/net-worth-history',
   accounts: '/api/portfolio/accounts',
+  groups: '/api/portfolio/asset-groups',
   cash: '/api/portfolio/cash-places',
   deposits: '/api/portfolio/deposits',
   bonds: '/api/portfolio/bonds',
@@ -130,6 +156,7 @@ const EMPTY_ROUTES: Record<ApiRoute, Responder> = {
   dashboard: jsonResponse(dashboard),
   history: jsonResponse({ range: '1Y', points: [] }),
   accounts: jsonResponse([]),
+  groups: jsonResponse([]),
   cash: jsonResponse(cashPlacesResponse([])),
   deposits: jsonResponse([]),
   bonds: jsonResponse([]),

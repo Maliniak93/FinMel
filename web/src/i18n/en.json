@@ -434,6 +434,15 @@
     "netWorth": "Net worth",
     "change": "Change",
     "allocation": "Allocation",
+    "groups": {
+      "title": "By group",
+      "ungrouped": "No group",
+      "hint": "Split your wealth into groups such as retirement or an emergency cushion to see how it divides.",
+      "link": "Manage groups",
+      "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
+      "filter": "Group",
+      "loadFailed": "Failed to load groups."
+    },
     "empty": "You haven't entered any wealth yet.",
     "stale": "Stale",
     "staleTooltip": "At least one holding's valuation hasn't refreshed in a while — this total may be out of date.",

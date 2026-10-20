@@ -434,6 +434,15 @@
     "netWorth": "Wartość majątku",
     "change": "Zmiana",
     "allocation": "Struktura majątku",
+    "groups": {
+      "title": "Wg grup",
+      "ungrouped": "Bez grupy",
+      "hint": "Podziel majątek na grupy, np. emeryturę albo poduszkę finansową, aby zobaczyć jego strukturę.",
+      "link": "Przejdź do grup",
+      "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
+      "filter": "Grupa",
+      "loadFailed": "Nie udało się wczytać grup."
+    },
     "empty": "Nie wprowadzono jeszcze żadnego majątku.",
     "stale": "Nieaktualne",
     "staleTooltip": "Wycena co najmniej jednej pozycji od dawna się nie odświeżyła — ta suma może być nieaktualna.",

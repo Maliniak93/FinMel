@@ -13,6 +13,7 @@
 
     @if (classes().length > 0) {
       <mat-chip-listbox
+        #classBox
         class="net-worth-chart__classes"
         hideSingleSelectionIndicator
         [value]="assetClass() ?? allClasses"
@@ -26,6 +27,24 @@
           <mat-chip-option [value]="option">{{
             assetClassLabel(option) | transloco
           }}</mat-chip-option>
+        }
+      </mat-chip-listbox>
+    }
+
+    @if (groups().length > 0) {
+      <mat-chip-listbox
+        #groupBox
+        class="net-worth-chart__groups"
+        hideSingleSelectionIndicator
+        [value]="group() ?? allClasses"
+        (change)="onGroupChange($event.value)"
+        [attr.aria-label]="'dashboard.groups.filter' | transloco"
+      >
+        <mat-chip-option [value]="allClasses">{{
+          'netWorthChart.allClasses' | transloco
+        }}</mat-chip-option>
+        @for (option of groups(); track option.key) {
+          <mat-chip-option [value]="option.key">{{ option.label }}</mat-chip-option>
         }
       </mat-chip-listbox>
     }
@@ -44,10 +63,16 @@
     </div>
   } @else if (chart(); as view) {
     @let selectedClass = assetClass();
-    @if (selectedClass !== null) {
+    @let selectedGroup = groupLabel();
+    @if (selectedClass !== null || selectedGroup !== null) {
       <p class="net-worth-chart__caption">
-        <span class="net-worth-chart__swatch" [style.background]="seriesColor()"></span>
-        {{ assetClassLabel(selectedClass) | transloco }}
+        @if (selectedClass !== null) {
+          <span class="net-worth-chart__swatch" [style.background]="seriesColor()"></span>
+          {{ assetClassLabel(selectedClass) | transloco }}
+        }
+        @if (selectedGroup !== null) {
+          <span>{{ selectedGroup }}</span>
+        }
       </p>
     }
     <div class="net-worth-chart__canvas">
